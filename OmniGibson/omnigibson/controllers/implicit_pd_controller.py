@@ -41,18 +41,18 @@ m.DEFAULT_DAMPING = 80.0
 class ImplicitPDController(LocomotionController, ManipulationController, GripperController):
     """
     Controller class that implements PD position control matching Isaac Lab's actuator models.
-    
+
     This controller supports two modes:
-    
+
     **Implicit Mode** (use_explicit_pd=False, default):
         Matches Isaac Lab's ImplicitActuatorCfg. The stiffness and damping are set as
         isaac_kp and isaac_kd, and the physics engine handles PD control internally.
         The controller just passes position targets.
-    
+
     **Explicit Mode** (use_explicit_pd=True):
         Matches Isaac Lab's IdealPDActuator. The controller computes efforts using:
             effort = stiffness * (pos_target - pos) + damping * (vel_target - vel) + feedforward_effort
-        
+
         This matches Isaac Lab's formula exactly and supports:
         - Position targets
         - Velocity targets (optional, defaults to 0)
@@ -107,7 +107,7 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
         self._effort_limit = effort_limit
         self._velocity_limit = velocity_limit
         self._use_explicit_pd = use_explicit_pd
-        
+
         # Create control filter if specified
         command_dim = len(dof_idx)
         self.control_filter = (
@@ -115,7 +115,7 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
             if smoothing_filter_size in {None, 0}
             else MovingAverageFilter(obs_dim=command_dim, filter_width=smoothing_filter_size)
         )
-        
+
         # When in delta mode, don't use default output limits
         assert not (
             self._use_delta_commands and type(command_output_limits) is str and command_output_limits == "default"
@@ -141,19 +141,19 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
             isaac_kp=isaac_kp,
             isaac_kd=isaac_kd,
         )
-        
+
         # Convert gains to tensors after dof_idx is set (for explicit mode)
         n_dofs = len(self._dof_idx)
         if isinstance(self._stiffness_value, (int, float)):
             self._stiffness = cb.array([self._stiffness_value] * n_dofs)
         else:
             self._stiffness = cb.array(self._stiffness_value)
-            
+
         if isinstance(self._damping_value, (int, float)):
             self._damping = cb.array([self._damping_value] * n_dofs)
         else:
             self._damping = cb.array(self._damping_value)
-            
+
         # Convert effort limit to tensor if needed
         if self._effort_limit is not None:
             if isinstance(self._effort_limit, (int, float)):
@@ -190,11 +190,14 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
     def serialize(self, state):
         """Serialize controller state to tensor."""
         state_flat = super().serialize(state=state)
-        return th.cat([
-            state_flat,
-            th.tensor([]) if self.control_filter is None 
-            else self.control_filter.serialize(state=state["control_filter"]),
-        ])
+        return th.cat(
+            [
+                state_flat,
+                th.tensor([])
+                if self.control_filter is None
+                else self.control_filter.serialize(state=state["control_filter"]),
+            ]
+        )
 
     def deserialize(self, state):
         """Deserialize controller state from tensor."""
@@ -214,11 +217,11 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
     def _update_goal(self, command, control_dict):
         """
         Update the goal based on the input command.
-        
+
         Args:
             command: Scaled command (joint positions)
             control_dict: Dictionary containing current joint states
-            
+
         Returns:
             dict: Goal dictionary with target position
         """
@@ -229,54 +232,54 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
         else:
             # Absolute mode: command is the target directly
             target = command
-            
+
         # Clip target to position limits
         target = target.clip(
             self._control_limits[ControlType.POSITION][0][self.dof_idx],
             self._control_limits[ControlType.POSITION][1][self.dof_idx],
         )
-        
+
         return dict(target=target)
 
     def compute_control(self, goal_dict, control_dict):
         """
         Compute the control output.
-        
+
         In implicit mode: returns position targets (physics does PD)
         In explicit mode: computes effort = stiffness * pos_error + damping * vel_error
-        
+
         This matches Isaac Lab's IdealPDActuator formula:
             effort = stiffness * (pos_target - pos) + damping * (vel_target - vel) + feedforward
-        
+
         Args:
             goal_dict: Dictionary containing 'target' position
             control_dict: Dictionary containing current joint states
-            
+
         Returns:
             Array[float]: Position targets (implicit) or effort commands (explicit)
         """
         target = goal_dict["target"]
-        
+
         # Apply smoothing filter if configured
         if self.control_filter is not None:
             target = self.control_filter.estimate(target)
-        
+
         if self._use_explicit_pd:
             # Explicit mode: compute efforts like Isaac Lab's IdealPDActuator
             # effort = stiffness * (pos_target - pos) + damping * (vel_target - vel) + feedforward
             current_pos = control_dict["joint_position"][self.dof_idx]
             current_vel = control_dict["joint_velocity"][self.dof_idx]
-            
+
             # Position error
             pos_error = target - current_pos
-            
+
             # Velocity error (target velocity is 0 by default, like Isaac Lab when not specified)
             vel_target = cb.zeros(len(self._dof_idx))
             vel_error = vel_target - current_vel
-            
+
             # Compute effort (no feedforward by default)
             effort = self._stiffness * pos_error + self._damping * vel_error
-            
+
             # Clip effort
             if self._effort_limit_tensor is not None:
                 effort = effort.clip(-self._effort_limit_tensor, self._effort_limit_tensor)
@@ -285,7 +288,7 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
                     self._control_limits[ControlType.EFFORT][0][self.dof_idx],
                     self._control_limits[ControlType.EFFORT][1][self.dof_idx],
                 )
-            
+
             return effort
         else:
             # Implicit mode: just return position targets, physics does PD
@@ -341,7 +344,7 @@ class ImplicitPDController(LocomotionController, ManipulationController, Gripper
     def damping(self):
         """The damping (Kd) gains."""
         return self._damping
-    
+
     @property
     def use_explicit_pd(self):
         """Whether the controller computes efforts explicitly."""

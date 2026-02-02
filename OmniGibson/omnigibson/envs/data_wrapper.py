@@ -1300,11 +1300,14 @@ class DataPlaybackWrapper(DataWrapper):
             record_data (bool): Whether to record data during playback or not
         """
         if n_episodes is None:
-            episode_ids = range(self.input_hdf5["data"].attrs["n_episodes"])    
+            episode_ids = range(self.input_hdf5["data"].attrs["n_episodes"])
         else:
             if random_sample:
                 import numpy as np
-                episode_ids = np.random.choice(self.input_hdf5["data"].attrs["n_episodes"], size=n_episodes, replace=False)
+
+                episode_ids = np.random.choice(
+                    self.input_hdf5["data"].attrs["n_episodes"], size=n_episodes, replace=False
+                )
             else:
                 episode_ids = range(n_episodes)
 

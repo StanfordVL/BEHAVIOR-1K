@@ -1331,8 +1331,8 @@ class ManipulationRobot(BaseRobot):
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": None,
-                "stiffness": 400.0,       # Default matching Isaac Lab
-                "damping": 80.0,          # Default matching Isaac Lab
+                "stiffness": 400.0,  # Default matching Isaac Lab
+                "damping": 80.0,  # Default matching Isaac Lab
                 "use_delta_commands": False,
             }
         return dic
@@ -1672,7 +1672,6 @@ class ManipulationRobot(BaseRobot):
                         )
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
-
                 if self._ag_release_counter[arm] is not None:
                     self._handle_release_window(arm=arm)
                 else:

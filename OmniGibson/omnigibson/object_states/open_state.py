@@ -17,7 +17,7 @@ m = create_module_macros(module_path=__file__)
 # Should be a number in the range [0, 1] which will be transformed
 # to a position in the joint's min-max range.
 m.JOINT_THRESHOLD_BY_TYPE = {
-    JointType.JOINT_REVOLUTE: 0.10, # TODO: revert back to 0.05
+    JointType.JOINT_REVOLUTE: 0.10,  # TODO: revert back to 0.05
     JointType.JOINT_PRISMATIC: 0.10,
 }
 m.OPEN_SAMPLING_ATTEMPTS = 5
@@ -115,7 +115,7 @@ def _get_relevant_joints(obj):
             # Legacy format: value is just the joint name string
             joint_names.append(value)
             joint_directions.append(1)
-    
+
     relevant_joints = []
     for joint_name in joint_names:
         assert joint_name in obj.joints, f"Unexpected joint name from Open metadata for object {obj.name}: {joint_name}"
