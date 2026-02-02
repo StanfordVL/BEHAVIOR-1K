@@ -1,5 +1,6 @@
 import argparse
 import av
+
 # Suppress verbose FFmpeg/libx264 encoder output at module load time
 av.logging.set_level(av.logging.PANIC)
 
@@ -235,10 +236,9 @@ def encode_video_frames(
         video_options["preset"] = str(preset) if preset is not None else "12"
 
     # Set logging level for both Python and native FFmpeg
-    if log_level is not None:        
+    if log_level is not None:
         av.logging.set_level(av.logging.PANIC)
         logging.getLogger("libav").setLevel(log_level)
-
 
     # Create and open output file (overwrite by default)
     with av.open(str(video_path), "w") as output:

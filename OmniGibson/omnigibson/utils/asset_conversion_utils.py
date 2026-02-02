@@ -794,8 +794,7 @@ def import_obj_metadata(
         # Convert list format [[idx, name], [idx, name, direction]] to dict format
         # output format: {joint_id: [joint_name]} or {joint_id: [joint_name, direction]}
         data["metadata"]["openable_joint_ids"] = {
-            str(open_metadata[0]): list(open_metadata[1:]) 
-            for open_metadata in data["metadata"]["openable_joint_ids"]
+            str(open_metadata[0]): list(open_metadata[1:]) for open_metadata in data["metadata"]["openable_joint_ids"]
         }
 
     # Grab light info if any
