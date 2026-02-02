@@ -17,8 +17,23 @@ class RobotStateMixin:
 
 class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
     def _get_value(self, obj):
-        # TODO: Make this work with non-assisted grasping
-        return any(self.robot._ag_obj_in_hand[arm] == obj for arm in self.robot.arm_names)
+        """
+        Check if the robot is grasping the given object.
+        Works with both assisted grasping and physical grasping.
+        
+        Uses the robot's built-in is_grasping() method which handles:
+        - Assisted grasping: checks _ag_obj_in_hand
+        - Physical grasping: checks gripper controller state AND finger contact with object
+        """
+        from omnigibson.controllers import IsGraspingState
+        
+
+        for arm in self.robot.arm_names:
+            grasp_state = self.robot.is_grasping(arm=arm, candidate_obj=obj)
+            if grasp_state == IsGraspingState.TRUE:
+                return True
+        
+        return False
 
 
 # class InReachOfRobot(AbsoluteObjectState, BooleanStateMixin):

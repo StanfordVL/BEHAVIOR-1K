@@ -17,8 +17,8 @@ m = create_module_macros(module_path=__file__)
 # Should be a number in the range [0, 1] which will be transformed
 # to a position in the joint's min-max range.
 m.JOINT_THRESHOLD_BY_TYPE = {
-    JointType.JOINT_REVOLUTE: 0.05,
-    JointType.JOINT_PRISMATIC: 0.05,
+    JointType.JOINT_REVOLUTE: 0.10, # TODO: revert back to 0.05
+    JointType.JOINT_PRISMATIC: 0.10,
 }
 m.OPEN_SAMPLING_ATTEMPTS = 5
 
@@ -98,17 +98,27 @@ def _get_relevant_joints(obj):
         return default_both_sides, default_relevant_joints, default_joint_directions
 
     both_sides = obj.metadata[m.BOTH_SIDES_METADATA_FIELD] if m.BOTH_SIDES_METADATA_FIELD in obj.metadata else False
-    joint_metadata = obj.metadata[m.METADATA_FIELD].items()
+    joint_metadata = obj.metadata[m.METADATA_FIELD]
 
-    # The joint metadata is in the format of [(joint_id, joint_name), ...] for legacy annotations and
-    # [(joint_id, joint_name, joint_direction), ...] for direction-annotated objects.
-    joint_names = [m[1] for m in joint_metadata]
-    joint_directions = [m[2] if len(m) > 2 else 1 for m in joint_metadata]
-
+    # The joint metadata is in the format of {joint_id: [joint_name]} for legacy annotations and
+    # {joint_id: [joint_name, joint_direction]} for direction-annotated objects.
+    # Handle both list format and legacy string format for backwards compatibility
+    joint_names = []
+    joint_directions = []
+    for joint_id in joint_metadata:
+        value = joint_metadata[joint_id]
+        if isinstance(value, list):
+            joint_names.append(value[0])
+            joint_directions.append(value[1] if len(value) > 1 else 1)
+        else:
+            # Legacy format: value is just the joint name string
+            joint_names.append(value)
+            joint_directions.append(1)
+    
     relevant_joints = []
-    for key in joint_names:
-        assert key in obj.joints, f"Unexpected joint name from Open metadata for object {obj.name}: {key}"
-        relevant_joints.append(obj.joints[key])
+    for joint_name in joint_names:
+        assert joint_name in obj.joints, f"Unexpected joint name from Open metadata for object {obj.name}: {joint_name}"
+        relevant_joints.append(obj.joints[joint_name])
 
     assert all(joint.joint_type in m.JOINT_THRESHOLD_BY_TYPE.keys() for joint in relevant_joints)
 
