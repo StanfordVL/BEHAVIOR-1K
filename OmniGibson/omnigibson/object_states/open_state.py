@@ -113,11 +113,11 @@ def _get_relevant_joints(obj):
             joint_names.append(value)
             joint_directions.append(1)
         else:
-            #value is a list or Vt.StringArray
+            # value is a list or Vt.StringArray
             joint_names.append(value[0])
             direction = int(value[1]) if len(value) > 1 else 1
             joint_directions.append(direction)
-            
+
     relevant_joints = []
     for joint_name in joint_names:
         assert joint_name in obj.joints, f"Unexpected joint name from Open metadata for object {obj.name}: {joint_name}"
