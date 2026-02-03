@@ -1302,6 +1302,7 @@ class DataPlaybackWrapper(DataWrapper):
         if n_episodes is None:
             episode_ids = range(self.input_hdf5["data"].attrs["n_episodes"])
         else:
+            n_episodes = min(n_episodes, self.input_hdf5["data"].attrs["n_episodes"])
             if random_sample:
                 import numpy as np
 
