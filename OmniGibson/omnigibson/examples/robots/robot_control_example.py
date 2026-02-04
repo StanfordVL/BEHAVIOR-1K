@@ -69,7 +69,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose scene to load
-    scene_model = "Rs_int"
+    scene_model = "empty"
     if not quickstart:
         scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
 

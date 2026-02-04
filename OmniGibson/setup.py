@@ -24,7 +24,7 @@ setup(
         "huggingface-hub[cli]>=0.34.4",
         "gymnasium>=0.28.1",
         "numpy<2.0.0,>=1.23.5",
-        "scipy>=1.10.1",
+        "scipy>=1.10.1,<1.11",  # scipy 1.11+ can pull numpy 2.x on some platforms
         "GitPython>=3.1.40",
         "transforms3d>=0.4.1",
         "networkx>=3.2.1",
