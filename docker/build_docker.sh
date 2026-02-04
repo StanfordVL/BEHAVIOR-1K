@@ -14,8 +14,3 @@ docker build \
     -f docker/Dockerfile \
     --build-arg DEV_MODE=1 \
     .
-
-docker build \
-    -t stanfordvl/behavior-vscode:latest \
-    -f docker/vscode.Dockerfile \
-    .
