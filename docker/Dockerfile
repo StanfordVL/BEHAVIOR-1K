@@ -95,14 +95,10 @@ RUN sed -i 's/conda activate/conda activate behavior/' /root/.bashrc
 # Optionally remove the BEHAVIOR source code if we are in dev mode and change the workdir
 ARG DEV_MODE
 ENV DEV_MODE=${DEV_MODE}
-ARG WORKDIR_PATH=/behavior-src
+WORKDIR /behavior-src
 RUN if [ "$DEV_MODE" == "1" ]; then \
-      WORKDIR_PATH=/; \
       cd / && rm -rf /behavior-src; \
     fi
-
-# Reset the WORKDIR based on whether or not we are in dev mode
-WORKDIR ${WORKDIR_PATH}
 
 # Add before ENTRYPOINT
 RUN echo '#!/bin/bash\n\
