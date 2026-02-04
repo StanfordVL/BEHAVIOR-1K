@@ -1,0 +1,43 @@
+# A1 arm with multiple end effector options
+raw_controller_order: ["arm_0", "gripper_0"]
+default_controllers:
+  arm_0: InverseKinematicsController
+  gripper_0: MultiFingerGripperController
+
+manipulation:
+  arm_link_names:
+    "0": ["arm_seg1", "arm_seg2", "arm_seg3", "arm_seg4", "arm_seg5"]
+  arm_joint_names:
+    "0": ["arm_joint1", "arm_joint2", "arm_joint3", "arm_joint4", "arm_joint5", "arm_joint6"]
+  supported_end_effector: ["gripper", "inspire"]
+  end_effectors:
+    gripper:
+      eef_link_names:
+        "0": "eef_link"
+      finger_link_names:
+        "0": ["gripper1", "gripper2"]
+      finger_joint_names:
+        "0": ["gripper_joint1", "gripper_joint2"]
+      default_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, 0.0, 0.0, 0.0]
+      teleop_rotation_offset:
+        "0": [0, 0, 0.707, 0.707]
+      disabled_collision_pairs: [["gripper1", "gripper2"]]
+      ag_start_points: [["gripper1", [0.065, -0.014, 0.0115]], ["gripper1", [0.015, -0.014, 0.0115]]]
+      ag_end_points: [["gripper2", [0.065, -0.014, 0.0115]], ["gripper2", [0.015, -0.014, 0.0115]]]
+    inspire:
+      eef_link_names:
+        "0": "palm_lower"
+      # thumb.proximal, ..., thumb.tip, ..., ring.tip
+      finger_link_names:
+        "0": ["link11", "link12", "link13", "link14", "link21", "link22", "link31", "link32", "link41", "link42", "link51", "link52"]
+      finger_joint_names:
+        "0": ["joint11", "joint12", "joint13", "joint14", "joint21", "joint22", "joint31", "joint32", "joint41", "joint42", "joint51", "joint52"]
+      # the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
+      default_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, -1.571, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      teleop_rotation_offset:
+        "0": [0, 0, 0.707, 0.707]
+      usd_path: "models/a1/usd/a1_inspire.usda"
+      disabled_collision_pairs: [["base_link", "connector"], ["base_link", "link12"]]
+      ag_start_points: [["base_link", [-0.025, -0.07, 0.012]], ["base_link", [-0.015, -0.11, 0.012]], ["link14", [-0.01, 0.015, 0.004]]]
+      ag_end_points: [["link22", [0.006, 0.04, 0.003]], ["link32", [0.006, 0.045, 0.003]], ["link42", [0.006, 0.04, 0.003]], ["link52", [0.006, 0.04, 0.003]]]
+      not_support_urdf: true

@@ -1,21 +1,27 @@
-capabilities: 
-  - is_two_wheel
-  - is_articulated_trunk
-  - is_untucked_arm_pose
-  - is_active_camera
-property:
-  raw_controller_order: ["base", "trunk", "camera", "arm_0", "gripper_0"]
-  default_controllers:
-    "base": "DifferentialDriveController"
-    "trunk": "JointController"
-    "camera": "JointController"
-    "arm_0": "InverseKinematicsController"
-    "gripper_0": "MultiFingerGripperController"
+# Fetch Robot - mobile manipulation with two-wheel base
+raw_controller_order: ["base", "trunk", "camera", "arm_0", "gripper_0"]
+default_controllers:
+  base: DifferentialDriveController
+  trunk: JointController
+  camera: JointController
+  arm_0: InverseKinematicsController
+  gripper_0: MultiFingerGripperController
+tucked_default_joint_pos: [0.0, 0.0, 0.02, 0.0, 1.1707963267948966, 0.0, 1.4707963267948965, -0.4, 1.6707963267948966, 0.0, 1.5707963267948966, 0.0, 0.05, 0.05]
+
+locomotion:
+  base_joint_names: ["l_wheel_joint", "r_wheel_joint"]
+
+two_wheel:
   wheel_radius: 0.0613
   wheel_axle_length: 0.372
-  base_joint_names: ["l_wheel_joint", "r_wheel_joint"]
-  camera_joint_names: ["head_pan_joint", "head_tilt_joint"]
+
+articulated_trunk:
   trunk_joint_names: ["torso_lift_joint"]
+
+active_camera:
+  camera_joint_names: ["head_pan_joint", "head_tilt_joint"]
+
+manipulation:
   arm_link_names:
     "0": ["shoulder_pan_link", "shoulder_lift_link", "upperarm_roll_link", "elbow_flex_link", "forearm_roll_link", "wrist_flex_link", "wrist_roll_link"]
   arm_joint_names:
@@ -30,7 +36,8 @@ property:
     "0": [-45, 45]
   teleop_rotation_offset:
     "0": [0, "pi/2", "pi"]
-  tucked_default_joint_pos: [0.0, 0.0, 0.02, 0.0, 1.1707963267948966, 0.0, 1.4707963267948965, -0.4, 1.6707963267948966, 0.0, 1.5707963267948966, 0.0, 0.05, 0.05]
+
+untucked_arm_pose:
   default_arm_poses:
     vertical: [-0.94121, -0.64134, 1.55186, 1.65672, -0.93218, 1.53416, 2.14474]
     diagonal15: [-0.95587, -0.34778, 1.46388, 1.47821, -0.93813, 1.4587, 1.9939]

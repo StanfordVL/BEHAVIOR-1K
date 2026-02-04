@@ -1,8 +1,0 @@
-capabilities: 
- - is_locomotion
-property:
-  wheel_radius: 0.165
-  wheel_axle_length: 0.670
-  base_joint_names: ["front_left_wheel", "front_right_wheel", "rear_left_wheel", "rear_right_wheel"]
-  default_joint_pos: [0,0,0,0]
-

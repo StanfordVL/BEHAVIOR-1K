@@ -1,0 +1,178 @@
+# Tiago Robot - holonomic base mobile manipulation
+# Reference: https://pal-robotics.com/robots/tiago/
+support_variant: true
+raw_controller_order: ["base", "trunk", "camera", "arm_left", "gripper_left", "arm_right", "gripper_right"]
+default_controllers:
+  arm_left: InverseKinematicsController
+  arm_right: InverseKinematicsController
+  gripper_left: MultiFingerGripperController
+  gripper_right: MultiFingerGripperController
+disabled_collision_link_names:
+  - "arm_left_tool_link"
+  - "wrist_left_ft_link"
+  - "wrist_left_ft_tool_link"
+  - "arm_right_tool_link"
+  - "wrist_right_ft_link"
+  - "wrist_right_ft_tool_link"
+disabled_collision_pairs:
+  - ["arm_left_1_link", "arm_left_2_link"]
+  - ["arm_left_2_link", "arm_left_3_link"]
+  - ["arm_left_3_link", "arm_left_4_link"]
+  - ["arm_left_4_link", "arm_left_5_link"]
+  - ["arm_left_5_link", "arm_left_6_link"]
+  - ["arm_left_6_link", "arm_left_7_link"]
+  - ["arm_right_1_link", "arm_right_2_link"]
+  - ["arm_right_2_link", "arm_right_3_link"]
+  - ["arm_right_3_link", "arm_right_4_link"]
+  - ["arm_right_4_link", "arm_right_5_link"]
+  - ["arm_right_5_link", "arm_right_6_link"]
+  - ["arm_right_6_link", "arm_right_7_link"]
+  - ["gripper_right_right_finger_link", "gripper_right_left_finger_link"]
+  - ["gripper_right_link", "wrist_right_ft_link"]
+  - ["arm_right_6_link", "gripper_right_link"]
+  - ["arm_right_6_link", "wrist_right_ft_tool_link"]
+  - ["arm_right_6_link", "wrist_right_ft_link"]
+  - ["arm_right_6_link", "arm_right_tool_link"]
+  - ["arm_right_5_link", "wrist_right_ft_link"]
+  - ["arm_right_5_link", "arm_right_tool_link"]
+  - ["gripper_left_right_finger_link", "gripper_left_left_finger_link"]
+  - ["gripper_left_link", "wrist_left_ft_link"]
+  - ["arm_left_6_link", "gripper_left_link"]
+  - ["arm_left_6_link", "wrist_left_ft_tool_link"]
+  - ["arm_left_6_link", "wrist_left_ft_link"]
+  - ["arm_left_6_link", "arm_left_tool_link"]
+  - ["arm_left_5_link", "wrist_left_ft_link"]
+  - ["arm_left_5_link", "arm_left_tool_link"]
+  - ["torso_lift_link", "torso_fixed_column_link"]
+  - ["torso_fixed_link", "torso_fixed_column_link"]
+  - ["base_antenna_left_link", "torso_fixed_link"]
+  - ["base_antenna_right_link", "torso_fixed_link"]
+  - ["base_link", "wheel_rear_left_link"]
+  - ["base_link", "wheel_rear_right_link"]
+  - ["base_link", "wheel_front_left_link"]
+  - ["base_link", "wheel_front_right_link"]
+  - ["base_link", "base_dock_link"]
+  - ["base_link", "base_antenna_right_link"]
+  - ["base_link", "base_antenna_left_link"]
+  - ["base_link", "torso_fixed_column_link"]
+  - ["base_link", "suspension_front_left_link"]
+  - ["base_link", "suspension_front_right_link"]
+  - ["base_link", "torso_fixed_link"]
+  - ["suspension_front_left_link", "wheel_front_left_link"]
+  - ["torso_lift_link", "arm_right_1_link"]
+  - ["torso_lift_link", "arm_right_2_link"]
+  - ["torso_lift_link", "arm_left_1_link"]
+  - ["torso_lift_link", "arm_left_2_link"]
+  - ["arm_left_tool_link", "wrist_left_ft_link"]
+  - ["wrist_left_ft_link", "wrist_left_ft_tool_link"]
+  - ["wrist_left_ft_tool_link", "gripper_left_link"]
+  - ["gripper_left_grasping_frame", "gripper_left_left_finger_link"]
+  - ["gripper_left_grasping_frame", "gripper_left_right_finger_link"]
+  - ["wrist_right_ft_link", "arm_right_tool_link"]
+  - ["wrist_right_ft_tool_link", "wrist_right_ft_link"]
+  - ["gripper_right_link", "wrist_right_ft_tool_link"]
+  - ["head_1_link", "head_2_link"]
+  - ["torso_fixed_column_link", "arm_right_1_link"]
+  - ["torso_fixed_column_link", "arm_left_1_link"]
+  - ["arm_left_1_link", "arm_left_3_link"]
+  - ["arm_right_1_link", "arm_right_3_link"]
+  - ["base_link", "arm_right_4_link"]
+  - ["base_link", "arm_right_5_link"]
+  - ["base_link", "arm_left_4_link"]
+  - ["base_link", "arm_left_5_link"]
+  - ["wrist_left_ft_tool_link", "arm_left_5_link"]
+  - ["wrist_right_ft_tool_link", "arm_right_5_link"]
+  - ["arm_left_tool_link", "wrist_left_ft_tool_link"]
+  - ["arm_right_tool_link", "wrist_right_ft_tool_link"]
+visual_only_eef_links: true
+manipulation_link_names:
+  - "torso_fixed_link"
+  - "torso_lift_link"
+  - "arm_left_1_link"
+  - "arm_left_2_link"
+  - "arm_left_3_link"
+  - "arm_left_4_link"
+  - "arm_left_5_link"
+  - "arm_left_6_link"
+  - "arm_left_7_link"
+  - "arm_left_tool_link"
+  - "wrist_left_ft_link"
+  - "wrist_left_ft_tool_link"
+  - "gripper_left_link"
+  - "gripper_left_left_finger_link"
+  - "gripper_left_right_finger_link"
+  - "gripper_left_tool_link"
+  - "arm_right_1_link"
+  - "arm_right_2_link"
+  - "arm_right_3_link"
+  - "arm_right_4_link"
+  - "arm_right_5_link"
+  - "arm_right_6_link"
+  - "arm_right_7_link"
+  - "arm_right_tool_link"
+  - "wrist_right_ft_link"
+  - "wrist_right_ft_tool_link"
+  - "gripper_right_link"
+  - "gripper_right_left_finger_link"
+  - "gripper_right_right_finger_link"
+  - "gripper_right_tool_link"
+  - "head_1_link"
+  - "head_2_link"
+  - "xtion_link"
+
+holonomic_base:
+  base_footprint_link_name: "base_footprint"
+  floor_touching_base_link_names:
+    - "wheel_front_left_link"
+    - "wheel_front_right_link"
+    - "wheel_rear_left_link"
+    - "wheel_rear_right_link"
+
+articulated_trunk:
+  trunk_joint_names: ["torso_lift_joint"]
+
+active_camera:
+  camera_joint_names: ["head_1_joint", "head_2_joint"]
+
+mobile_manipulation:
+  tucked_default_joint_pos:
+    base_idx: current
+    trunk_control_idx: 0
+    camera_control_idx: [0.0, 0.0]
+    gripper_control_idx:
+      left: [0.045, 0.045]
+      right: [0.045, 0.045]
+    arm_control_idx:
+      left: [-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0]
+      right: [-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0]
+
+untucked_arm_pose:
+  default_arm_poses:
+    vertical: [0.85846, -0.14852, 1.81008, 1.63368, 0.13764, -1.32488, -0.68415]
+    diagonal15: [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, -1.08908]
+    diagonal30: [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, -1.11046]
+    diagonal45: [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, -1.32857]
+    horizontal: [0.61511, 0.49229, 1.46306, 1.24919, 1.08282, -1.28865, 1.50910]
+
+manipulation:
+  n_arms: 2
+  arm_names: ["left", "right"]
+  arm_link_names:
+    left: ["arm_left_1_link", "arm_left_2_link", "arm_left_3_link", "arm_left_4_link", "arm_left_5_link", "arm_left_6_link", "arm_left_7_link"]
+    right: ["arm_right_1_link", "arm_right_2_link", "arm_right_3_link", "arm_right_4_link", "arm_right_5_link", "arm_right_6_link", "arm_right_7_link"]
+  arm_joint_names:
+    left: ["arm_left_1_joint", "arm_left_2_joint", "arm_left_3_joint", "arm_left_4_joint", "arm_left_5_joint", "arm_left_6_joint", "arm_left_7_joint"]
+    right: ["arm_right_1_joint", "arm_right_2_joint", "arm_right_3_joint", "arm_right_4_joint", "arm_right_5_joint", "arm_right_6_joint", "arm_right_7_joint"]
+  eef_link_names:
+    left: "left_eef_link"
+    right: "right_eef_link"
+  finger_link_names:
+    left: ["gripper_left_right_finger_link", "gripper_left_left_finger_link"]
+    right: ["gripper_right_right_finger_link", "gripper_right_left_finger_link"]
+  finger_joint_names:
+    left: ["gripper_left_right_finger_joint", "gripper_left_left_finger_joint"]
+    right: ["gripper_right_right_finger_joint", "gripper_right_left_finger_joint"]
+  arm_workspace_range:
+    left: [15, 75]
+    right: [-75, -15]
+  add_combined_arm_control_idx: true

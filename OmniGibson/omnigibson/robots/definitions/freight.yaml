@@ -1,0 +1,9 @@
+# Freight - two-wheel differential drive robot (Fetch base)
+default_joint_pos: [0, 0]
+
+locomotion:
+  base_joint_names: ["l_wheel_joint", "r_wheel_joint"]
+
+two_wheel:
+  wheel_radius: 0.0613
+  wheel_axle_length: 0.372

@@ -1,0 +1,9 @@
+# Locobot - simple two-wheel differential drive robot
+default_joint_pos: [0, 0]
+
+locomotion:
+  base_joint_names: ["wheel_left_joint", "wheel_right_joint"]
+
+two_wheel:
+  wheel_radius: 0.038
+  wheel_axle_length: 0.230

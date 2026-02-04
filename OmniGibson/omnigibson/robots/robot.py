@@ -2,8 +2,21 @@ import os
 from copy import deepcopy
 import math
 import torch as th
-import yaml
 from functools import cached_property
+from omegaconf import OmegaConf
+
+from omnigibson.robots.definition_schema import (
+    RobotDefinition,
+    ManipulationDefinition,
+    TwoWheelDefinition,
+    HolonomicBaseDefinition,
+    LocomotionDefinition,
+    ArticulatedTrunkDefinition,
+    ActiveCameraDefinition,
+    MobileManipulationDefinition,
+    UntuckedArmPoseDefinition,
+    EndEffectorDefinition,
+)
 from typing import Literal
 from collections import namedtuple
 import networkx as nx
@@ -215,22 +228,22 @@ class Robot(USDObject, GymObservable):
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         self.robot_type_name = robot_type_name.lower()
-        # Read robot config YAML file
-        robot_config_dir = os.path.dirname(__file__)
-        robot_cfg_path = os.path.join(robot_config_dir, "robot_configs", self.robot_type_name + ".yaml")
-        with open(robot_cfg_path, "r") as f:
-            cfg = yaml.safe_load(f) or {}
-            self._robot_cfg = cfg["property"]
-            self._init_capabilities(cfg["capabilities"])
+        # Read and validate robot definition YAML file using OmegaConf
+        definition_dir = os.path.dirname(__file__)
+        definition_path = os.path.join(definition_dir, "definitions", self.robot_type_name + ".yaml")
+        yaml_definition = OmegaConf.load(definition_path)
+        schema = OmegaConf.structured(RobotDefinition)
+        merged_definition = OmegaConf.merge(schema, yaml_definition)
+        self._definition: RobotDefinition = OmegaConf.to_object(merged_definition)
 
         # Unique to Tiago
-        if "support_variant" in self._robot_cfg.keys():
+        if self._definition.support_variant:
             if default_arm_pose is None:
                 default_arm_pose = "diagonal15"
             assert variant in ("default", "wrist_cam"), f"Invalid Tiago variant specified {variant}!"
             self._variant = variant
 
-        if "supported_end_effector" in self._robot_cfg.keys():
+        if self.has_end_effector_variants:
             self.end_effector = end_effector
             grasping_direction = "lower" if end_effector == "gripper" else "upper"
             self._init_ag_points()
@@ -374,30 +387,63 @@ class Robot(USDObject, GymObservable):
                         if finger_dynamic_friction is not None:
                             self._link_physics_materials[finger_link_name]["dynamic_friction"] = finger_dynamic_friction
 
-    def _init_capabilities(self, capabilities):
-        # init
-        self.is_manipulation = False
-        self.is_holonomic_base = False
-        self.is_articulated_trunk = False
-        self.is_active_camera = False
-        self.is_mobile_manipulation = False
-        self.is_untucked_arm_pose = False
-        self.is_locomotion = False
-        self.is_two_wheel = False
+    # ===== Capability Properties (derived from presence of sub-configs) =====
 
-        for capability in capabilities:
-            assert hasattr(self, capability)
-            setattr(self, capability, True)
+    @property
+    def is_two_wheel(self) -> bool:
+        """Returns True if this robot has a two-wheel differential drive base."""
+        return self._definition.two_wheel is not None
 
-        # Set derived capabilities
-        if self.is_untucked_arm_pose:
-            self.is_mobile_manipulation = True
-        if self.is_mobile_manipulation or self.is_articulated_trunk:
-            self.is_manipulation = True
-        if self.is_holonomic_base:
-            self.is_locomotion = True
-        if self.is_two_wheel:
-            self.is_locomotion = True
+    @property
+    def is_holonomic_base(self) -> bool:
+        """Returns True if this robot has a holonomic base."""
+        return self._definition.holonomic_base is not None
+
+    @property
+    def is_articulated_trunk(self) -> bool:
+        """Returns True if this robot has an articulated trunk."""
+        return self._definition.articulated_trunk is not None
+
+    @property
+    def is_active_camera(self) -> bool:
+        """Returns True if this robot has an active (controllable) camera."""
+        return self._definition.active_camera is not None
+
+    @property
+    def is_untucked_arm_pose(self) -> bool:
+        """Returns True if this robot has untucked arm pose configurations."""
+        return self._definition.untucked_arm_pose is not None
+
+    @property
+    def is_mobile_manipulation(self) -> bool:
+        """Returns True if this robot is a mobile manipulation robot."""
+        return self._definition.mobile_manipulation is not None or self.is_untucked_arm_pose
+
+    @property
+    def is_manipulation(self) -> bool:
+        """Returns True if this robot has manipulation capabilities."""
+        return (
+            self._definition.manipulation is not None
+            or self.is_mobile_manipulation
+            or self.is_articulated_trunk
+        )
+
+    @property
+    def is_locomotion(self) -> bool:
+        """Returns True if this robot has locomotion capabilities."""
+        return (
+            self.is_holonomic_base
+            or self.is_two_wheel
+            or self._definition.locomotion is not None
+        )
+
+    @property
+    def has_end_effector_variants(self) -> bool:
+        """Returns True if this robot supports multiple end effector types."""
+        return (
+            self._definition.manipulation is not None
+            and self._definition.manipulation.supported_end_effector is not None
+        )
 
     def _convert_to_grasping_points(self, li):
         result = []
@@ -407,12 +453,19 @@ class Robot(USDObject, GymObservable):
         return result
 
     def _init_ag_points(self):
-        prop = self._robot_cfg[self.end_effector]
-        if "ag_start_points" not in prop.keys():
+        """Initialize assisted grasp points from end effector definition."""
+        eef_def = self._get_end_effector_definition()
+        if eef_def is None or eef_def.ag_start_points is None:
             return
 
-        self._ag_start_points = self._convert_to_grasping_points(prop["ag_start_points"])
-        self._ag_end_points = self._convert_to_grasping_points(prop["ag_end_points"])
+        self._ag_start_points = self._convert_to_grasping_points(eef_def.ag_start_points)
+        self._ag_end_points = self._convert_to_grasping_points(eef_def.ag_end_points)
+
+    def _get_end_effector_definition(self) -> "EndEffectorDefinition | None":
+        """Get the current end effector configuration if this robot has end effector variants."""
+        if not self.has_end_effector_variants:
+            return None
+        return self._definition.manipulation.end_effectors.get(self.end_effector)
 
     def load(self, scene):
         # Run super first
@@ -467,14 +520,19 @@ class Robot(USDObject, GymObservable):
                 lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
             )
 
-        if self._robot_cfg.get("force_sphere_wheel_approximation", False):
+        force_sphere = (
+            self.is_holonomic_base
+            and self._definition.holonomic_base
+            and self._definition.holonomic_base.force_sphere_wheel_approximation
+        )
+        if force_sphere:
             # R1 and R1Pro's URDFs still use the mesh type for the collision meshes of the wheels
             # We need to manually set it back to sphere approximation
             for wheel_name in self.floor_touching_base_link_names:
                 wheel_link = self.links[wheel_name]
                 assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
                 wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
-        if self._robot_cfg.get("visual_only_eef_links", False):
+        if self._definition.visual_only_eef_links:
             # The eef gripper links should be visual-only. They only contain a "ghost" box volume
             # for detecting objects inside the gripper, in order to activate attachments (AG for Cloths).
             for arm in self.arm_names:
@@ -1025,7 +1083,7 @@ class Robot(USDObject, GymObservable):
             for arm in self.arm_names:
                 eef_link_name = self.eef_link_names[arm] if self.eef_link_names else None
                 if eef_link_name is None:
-                    raise ValueError(f"eef_link_names is None for arm {arm}. Check robot config YAML.")
+                    raise ValueError(f"eef_link_names is None for arm {arm}. Check robot definition YAML.")
                 # Verify the link actually exists
                 if eef_link_name not in self._links:
                     raise ValueError(
@@ -2282,19 +2340,22 @@ class Robot(USDObject, GymObservable):
         Returns:
             str: name of this robot model. usually corresponds to the class name of a given robot model
         """
-        if "supported_end_effector" in self._robot_cfg.keys():
-            return self._robot_cfg[self.end_effector].get("model_name", self.robot_type_name)
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.model_name:
+                return eef_def.model_name
         return self.robot_type_name
 
     @property
     def usd_path(self):
-        if "usd_path" in self._robot_cfg.keys():
-            return os.path.join(get_dataset_path("omnigibson-robot-assets"), self._robot_cfg["usd_path"])
-        if "supported_end_effector" in self._robot_cfg.keys():
-            if "usd_path" in self._robot_cfg[self.end_effector].keys():
-                return os.path.join(
-                    get_dataset_path("omnigibson-robot-assets"), self._robot_cfg[self.end_effector]["usd_path"]
-                )
+        # Check top-level usd_path
+        if self._definition.usd_path:
+            return os.path.join(get_dataset_path("omnigibson-robot-assets"), self._definition.usd_path)
+        # Check end-effector specific usd_path
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.usd_path:
+                return os.path.join(get_dataset_path("omnigibson-robot-assets"), eef_def.usd_path)
 
         # By default, sets the standardized path
         model = self.model_name.lower()
@@ -2306,14 +2367,16 @@ class Robot(USDObject, GymObservable):
         Returns:
             str: file path to the robot urdf file.
         """
-        if "urdf_path" in self._robot_cfg.keys():
-            return os.path.join(get_dataset_path("omnigibson-robot-assets"), self._robot_cfg["urdf_path"])
-        if "supported_end_effector" in self._robot_cfg.keys():
-            assert not self._robot_cfg[self.end_effector].get("not_support_urdf", False), "Robot doesn't support URDF."
-            if "urdf_path" in self._robot_cfg[self.end_effector].keys():
-                return os.path.join(
-                    get_dataset_path("omnigibson-robot-assets"), self._robot_cfg[self.end_effector]["urdf_path"]
-                )
+        # Check top-level urdf_path
+        if self._definition.urdf_path:
+            return os.path.join(get_dataset_path("omnigibson-robot-assets"), self._definition.urdf_path)
+        # Check end-effector specific urdf_path
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def:
+                assert not eef_def.not_support_urdf, "Robot doesn't support URDF."
+                if eef_def.urdf_path:
+                    return os.path.join(get_dataset_path("omnigibson-robot-assets"), eef_def.urdf_path)
 
         # By default, sets the standardized path
         model = self.model_name.lower()
@@ -2332,8 +2395,8 @@ class Robot(USDObject, GymObservable):
         Returns:
             str: Name of the base footprint link for this object
         """
-        if "base_footprint_link_name" in self._robot_cfg.keys():
-            return self._robot_cfg["base_footprint_link_name"]
+        if self.is_holonomic_base and self._definition.holonomic_base.base_footprint_link_name:
+            return self._definition.holonomic_base.base_footprint_link_name
         if self.is_holonomic_base:
             raise NotImplementedError("base_footprint_link_name is not implemented for HolonomicBaseRobot")
         return self.root_link_name
@@ -2414,14 +2477,11 @@ class Robot(USDObject, GymObservable):
                 ordering of actions, which may be a subset of the controllers due to some controllers subsuming others
                 (e.g.: arm controller subsuming the trunk controller if using IK)
         """
+        # Check top-level raw_controller_order
+        if self._definition.raw_controller_order:
+            return self._definition.raw_controller_order
 
-        if "raw_controller_order" in self._robot_cfg.keys():
-            return self._robot_cfg["raw_controller_order"]
-
-        if "supported_end_effector" in self._robot_cfg.keys():
-            if "raw_controller_order" in self._robot_cfg[self.end_effector]:
-                return self._robot_cfg[self.end_effector]["raw_controller_order"]
-
+        # Fall back to defaults based on capabilities
         controllers = []
         if self.is_manipulation:
             for arm in self.arm_names:
@@ -2502,11 +2562,14 @@ class Robot(USDObject, GymObservable):
         Returns:
             n-array: Default joint positions for this robot
         """
-        if "default_joint_pos" in self._robot_cfg.keys():
-            return self._convert_yaml_list_to_tensor(self._robot_cfg["default_joint_pos"])
-        elif "supported_end_effector" in self._robot_cfg.keys():
-            if "default_joint_pos" in self._robot_cfg[self.end_effector]:
-                return self._convert_yaml_list_to_tensor(self._robot_cfg[self.end_effector]["default_joint_pos"])
+        # Check top-level default_joint_pos
+        if self._definition.default_joint_pos:
+            return self._convert_yaml_list_to_tensor(self._definition.default_joint_pos)
+        # Check end-effector specific default_joint_pos
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.default_joint_pos:
+                return self._convert_yaml_list_to_tensor(eef_def.default_joint_pos)
 
         if self.is_mobile_manipulation:
             return (
@@ -2739,13 +2802,10 @@ class Robot(USDObject, GymObservable):
         if self.is_active_camera:
             controllers["camera"] = "JointController"
 
-        if "default_controllers" in self._robot_cfg.keys():
-            for key, value in self._robot_cfg["default_controllers"].items():
+        # Override with config-specified defaults
+        if self._definition.default_controllers:
+            for key, value in self._definition.default_controllers.items():
                 controllers[key] = value
-        elif "supported_end_effector" in self._robot_cfg.keys():
-            if "default_controllers" in self._robot_cfg[self.end_effector]:
-                for key, value in self._robot_cfg[self.end_effector]["default_controllers"].items():
-                    controllers[key] = value
 
         return controllers
 
@@ -2767,7 +2827,9 @@ class Robot(USDObject, GymObservable):
         Returns:
             int: Number of arms this robot has. Returns 1 by default
         """
-        return self._robot_cfg.get("n_arms", 1)
+        if self._definition.manipulation:
+            return self._definition.manipulation.n_arms
+        return 1
 
     @property
     def arm_names(self):
@@ -2778,7 +2840,9 @@ class Robot(USDObject, GymObservable):
                 arm- and gripper-related dictionaries, e.g.: eef_link_names, finger_link_names, etc.
                 Default is string enumeration based on @self.n_arms.
         """
-        return self._robot_cfg.get("arm_names", [str(i) for i in range(self.n_arms)])
+        if self._definition.manipulation and self._definition.manipulation.arm_names:
+            return self._definition.manipulation.arm_names
+        return [str(i) for i in range(self.n_arms)]
 
     @property
     def default_arm(self):
@@ -2828,10 +2892,9 @@ class Robot(USDObject, GymObservable):
                 directly used to define the set of corresponding idxs.
         """
         assert self.is_manipulation
-        if "arm_link_names" in self._robot_cfg.keys():
-            return self._robot_cfg["arm_link_names"]
-        elif self.end_effector in self._robot_cfg.keys():
-            return self._robot_cfg[self.end_effector]["arm_link_names"]
+        if self._definition.manipulation and self._definition.manipulation.arm_link_names:
+            return self._definition.manipulation.arm_link_names
+        return {}
 
     @cached_property
     def arm_joint_names(self):
@@ -2844,10 +2907,9 @@ class Robot(USDObject, GymObservable):
                 directly used to define the set of corresponding control idxs.
         """
         assert self.is_manipulation
-        if "arm_joint_names" in self._robot_cfg.keys():
-            return self._robot_cfg["arm_joint_names"]
-        elif self.end_effector in self._robot_cfg.keys():
-            return self._robot_cfg[self.end_effector]["arm_joint_names"]
+        if self._definition.manipulation and self._definition.manipulation.arm_joint_names:
+            return self._definition.manipulation.arm_joint_names
+        return {}
 
     @cached_property
     def eef_link_names(self):
@@ -2857,14 +2919,17 @@ class Robot(USDObject, GymObservable):
                 should correspond to specific link name in this robot's underlying model file
         """
         assert self.is_manipulation
-        if "eef_link_names" in self._robot_cfg.keys():
-            return self._robot_cfg["eef_link_names"]
-        elif self.end_effector in self._robot_cfg.keys():
-            return self._robot_cfg[self.end_effector]["eef_link_names"]
-        else:
-            raise ValueError(
-                f"eef_link_names not found in robot config for robot_type_name={self.robot_type_name}, end_effector={self.end_effector}"
-            )
+        # Check manipulation definition
+        if self._definition.manipulation and self._definition.manipulation.eef_link_names:
+            return self._definition.manipulation.eef_link_names
+        # Check end-effector specific
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.eef_link_names:
+                return eef_def.eef_link_names
+        raise ValueError(
+            f"eef_link_names not found in robot config for robot_type_name={self.robot_type_name}"
+        )
 
     @cached_property
     def gripper_link_names(self):
@@ -2877,6 +2942,8 @@ class Robot(USDObject, GymObservable):
                 directly used to define the set of corresponding idxs.
         """
         assert self.is_manipulation
+        if self._definition.manipulation and self._definition.manipulation.gripper_link_names:
+            return self._definition.manipulation.gripper_link_names
         raise NotImplementedError
 
     @cached_property
@@ -2890,10 +2957,15 @@ class Robot(USDObject, GymObservable):
                 directly used to define the set of corresponding idxs.
         """
         assert self.is_manipulation
-        if "finger_link_names" in self._robot_cfg.keys():
-            return self._robot_cfg["finger_link_names"]
-        elif self.end_effector in self._robot_cfg.keys():
-            return self._robot_cfg[self.end_effector]["finger_link_names"]
+        # Check manipulation definition
+        if self._definition.manipulation and self._definition.manipulation.finger_link_names:
+            return self._definition.manipulation.finger_link_names
+        # Check end-effector specific
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.finger_link_names:
+                return eef_def.finger_link_names
+        return {}
 
     @cached_property
     def finger_joint_names(self):
@@ -2906,10 +2978,15 @@ class Robot(USDObject, GymObservable):
                 directly used to define the set of corresponding control idxs.
         """
         assert self.is_manipulation
-        if "finger_joint_names" in self._robot_cfg.keys():
-            return self._robot_cfg["finger_joint_names"]
-        elif self.end_effector in self._robot_cfg.keys():
-            return self._robot_cfg[self.end_effector]["finger_joint_names"]
+        # Check manipulation definition
+        if self._definition.manipulation and self._definition.manipulation.finger_joint_names:
+            return self._definition.manipulation.finger_joint_names
+        # Check end-effector specific
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.finger_joint_names:
+                return eef_def.finger_joint_names
+        return {}
 
     @cached_property
     def arm_control_idx(self):
@@ -2923,7 +3000,7 @@ class Robot(USDObject, GymObservable):
             arm: th.tensor([list(self.joints.keys()).index(name) for name in self.arm_joint_names[arm]])
             for arm in self.arm_names
         }
-        if self._robot_cfg.get("add_combined_arm_control_idx", False):
+        if self._definition.manipulation and self._definition.manipulation.add_combined_arm_control_idx:
             idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))[0]
         return idxs
 
@@ -3006,8 +3083,8 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        if "assisted_grasp_start_points" in self._robot_cfg.keys():
-            return self._convert_to_grasping_points(self._robot_cfg["assisted_grasp_start_points"])
+        if self._definition.manipulation and self._definition.manipulation.assisted_grasp_start_points:
+            return self._convert_to_grasping_points(self._definition.manipulation.assisted_grasp_start_points)
         if self.is_manipulation and hasattr(self, "_ag_start_points"):
             return {self.default_arm: self._ag_start_points}
         return None
@@ -3047,8 +3124,8 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        if "assisted_grasp_end_points" in self._robot_cfg.keys():
-            return self._convert_to_grasping_points(self._robot_cfg["assisted_grasp_end_points"])
+        if self._definition.manipulation and self._definition.manipulation.assisted_grasp_end_points:
+            return self._convert_to_grasping_points(self._definition.manipulation.assisted_grasp_end_points)
         if self.is_manipulation and hasattr(self, "_ag_end_points"):
             return {self.default_arm: self._ag_end_points}
         return None
@@ -3094,7 +3171,10 @@ class Robot(USDObject, GymObservable):
         """
         assert self.is_manipulation
         dic = dict()
-        for k, v in self._robot_cfg.get("arm_workspace_range", dict()):
+        workspace_range = {}
+        if self._definition.manipulation and self._definition.manipulation.arm_workspace_range:
+            workspace_range = self._definition.manipulation.arm_workspace_range
+        for k, v in workspace_range.items():
             dic[k] = th.deg2rad(th.tensor(v, dtype=th.float32))
         return dic
 
@@ -3376,13 +3456,14 @@ class Robot(USDObject, GymObservable):
             str or Dict[CuRoboEmbodimentSelection, str]: file path to the robot curobo file or a mapping from
                 CuRoboEmbodimentSelection to the file path
         """
-        if "curobo_path" in self._robot_cfg.keys():
-            return os.path.join(get_dataset_path("omnigibson-robot-assets"), self._robot_cfg["curobo_path"])
-        if "supported_end_effector" in self._robot_cfg.keys():
-            if "curobo_path" in self._robot_cfg[self.end_effector].keys():
-                return os.path.join(
-                    get_dataset_path("omnigibson-robot-assets"), self._robot_cfg[self.end_effector]["curobo_path"]
-                )
+        # Check top-level curobo_path
+        if self._definition.curobo_path:
+            return os.path.join(get_dataset_path("omnigibson-robot-assets"), self._definition.curobo_path)
+        # Check end-effector specific curobo_path
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.curobo_path:
+                return os.path.join(get_dataset_path("omnigibson-robot-assets"), eef_def.curobo_path)
             else:
                 assert False, f"Robot not supported for curobo."
 
@@ -3405,9 +3486,12 @@ class Robot(USDObject, GymObservable):
         Returns:
             Dict[str, str]: mapping from robot eef link names to the link names of the attached objects
         """
-        if "eef_support_curobo_attached_object_link_names" in self._robot_cfg.keys():
+        if (
+            self._definition.manipulation
+            and self._definition.manipulation.eef_support_curobo_attached_object_link_names
+        ):
             assert (
-                self.end_effector in self._robot_cfg["eef_support_curobo_attached_object_link_names"]
+                self.end_effector in self._definition.manipulation.eef_support_curobo_attached_object_link_names
             ), f"Robot not supported for curobo."
 
         assert self.is_manipulation
@@ -3753,11 +3837,14 @@ class Robot(USDObject, GymObservable):
         such that [0, 0, 0, 1] as action will keep the robot eef pointing at +x axis
         """
         assert self.is_manipulation
-        if "supported_end_effector" in self._robot_cfg.keys():
-            if "teleop_rotation_offset" in self._robot_cfg[self.end_effector].keys():
-                return self._get_teleop_rotation_offset(self._robot_cfg[self.end_effector]["teleop_rotation_offset"])
-        if "teleop_rotation_offset" in self._robot_cfg.keys():
-            return self._get_teleop_rotation_offset(self._robot_cfg["teleop_rotation_offset"])
+        # Check end-effector specific
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.teleop_rotation_offset:
+                return self._get_teleop_rotation_offset(eef_def.teleop_rotation_offset)
+        # Check manipulation definition
+        if self._definition.manipulation and self._definition.manipulation.teleop_rotation_offset:
+            return self._get_teleop_rotation_offset(self._definition.manipulation.teleop_rotation_offset)
         return {arm: th.tensor([0, 0, 0, 1]) for arm in self.arm_names}
 
     @property
@@ -3888,7 +3975,9 @@ class Robot(USDObject, GymObservable):
     @cached_property
     def floor_touching_base_link_names(self):
         assert self.is_locomotion
-        return self._robot_cfg.get("floor_touching_base_link_names", [])
+        if self.is_holonomic_base and self._definition.holonomic_base:
+            return self._definition.holonomic_base.floor_touching_base_link_names or []
+        return []
 
     @property
     def base_action_idx(self):
@@ -3907,9 +3996,9 @@ class Robot(USDObject, GymObservable):
                 directly used to define the set of corresponding control idxs.
         """
         assert self.is_locomotion
-        return self._robot_cfg.get(
-            "base_joint_names", [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
-        )
+        if self._definition.locomotion and self._definition.locomotion.base_joint_names:
+            return self._definition.locomotion.base_joint_names
+        return [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
 
     @cached_property
     def base_control_idx(self):
@@ -4075,7 +4164,12 @@ class Robot(USDObject, GymObservable):
     @property
     def tucked_default_joint_pos(self):
         assert self.is_mobile_manipulation
-        return self._get_tucked_default_joint_pos(self._robot_cfg["tucked_default_joint_pos"])
+        if self._definition.mobile_manipulation and self._definition.mobile_manipulation.tucked_default_joint_pos:
+            return self._get_tucked_default_joint_pos(self._definition.mobile_manipulation.tucked_default_joint_pos)
+        # Fallback for fetch which stores it at top level
+        if hasattr(self._definition, 'tucked_default_joint_pos') and self._definition.tucked_default_joint_pos:
+            return self._get_tucked_default_joint_pos(self._definition.tucked_default_joint_pos)
+        raise ValueError("tucked_default_joint_pos not found in robot definition")
 
     @property
     def untucked_default_joint_pos(self):
@@ -4138,12 +4232,16 @@ class Robot(USDObject, GymObservable):
     @cached_property
     def trunk_link_names(self):
         assert self.is_articulated_trunk
-        raise NotImplementedError
+        if self._definition.articulated_trunk:
+            return self._definition.articulated_trunk.trunk_link_names
+        return []
 
     @cached_property
     def trunk_joint_names(self):
         assert self.is_articulated_trunk
-        return self._robot_cfg.get("trunk_joint_names", [])
+        if self._definition.articulated_trunk:
+            return self._definition.articulated_trunk.trunk_joint_names
+        return []
 
     @cached_property
     def trunk_control_idx(self):
@@ -4245,8 +4343,9 @@ class Robot(USDObject, GymObservable):
     def default_arm_poses(self):
         assert self.is_untucked_arm_pose
         dic = dict()
-        for key, value in self._robot_cfg.get("default_arm_poses", {}).items():
-            dic[key] = self._convert_yaml_list_to_tensor(value)
+        if self._definition.untucked_arm_pose and self._definition.untucked_arm_pose.default_arm_poses:
+            for key, value in self._definition.untucked_arm_pose.default_arm_poses.items():
+                dic[key] = self._convert_yaml_list_to_tensor(value)
         return dic
 
     def _create_discrete_action_space(self):
@@ -4310,7 +4409,7 @@ class Robot(USDObject, GymObservable):
             float: radius of each wheel at the base, in metric units
         """
         assert self.is_two_wheel
-        return self._robot_cfg.get("wheel_radius", None)
+        return self._definition.two_wheel.wheel_radius
 
     @property
     def wheel_axle_length(self):
@@ -4319,7 +4418,7 @@ class Robot(USDObject, GymObservable):
             float: perpendicular distance between the robot's two wheels, in metric units
         """
         assert self.is_two_wheel
-        return self._robot_cfg.get("wheel_axle_length", None)
+        return self._definition.two_wheel.wheel_axle_length
 
     @property
     def _default_camera_joint_controller_config(self):
@@ -4366,7 +4465,9 @@ class Robot(USDObject, GymObservable):
                 directly used to define the set of corresponding control idxs.
         """
         assert self.is_active_camera
-        return self._robot_cfg.get("camera_joint_names", [])
+        if self._definition.active_camera:
+            return self._definition.active_camera.camera_joint_names
+        return []
 
     @cached_property
     def camera_control_idx(self):
@@ -4379,14 +4480,18 @@ class Robot(USDObject, GymObservable):
 
     @property
     def disabled_collision_link_names(self):
-        return self._robot_cfg.get("disabled_collision_link_names", [])
+        return self._definition.disabled_collision_link_names or []
 
     @property
     def disabled_collision_pairs(self):
-        if "supported_end_effector" in self._robot_cfg.keys():
-            return self._robot_cfg[self.end_effector].get("disabled_collision_pairs", [])
-        return self._robot_cfg.get("disabled_collision_pairs", [])
+        # Check end-effector specific first
+        if self.has_end_effector_variants:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.disabled_collision_pairs:
+                return eef_def.disabled_collision_pairs
+        # Fall back to top-level
+        return self._definition.disabled_collision_pairs or []
 
     @cached_property
     def manipulation_link_names(self):
-        return self._robot_cfg.get("manipulation_link_names", [])
+        return self._definition.manipulation_link_names or []
