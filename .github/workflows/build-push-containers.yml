@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - 'main'
-      - 'update-docker'  # Used for updating the docker image configuration.
 
 jobs:
   docker:

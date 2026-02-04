@@ -14,3 +14,8 @@ docker build \
     -f docker/Dockerfile \
     --build-arg DEV_MODE=1 \
     .
+
+docker build \
+    -t stanfordvl/behavior-gha:latest \
+    -f docker/gh-actions/Dockerfile \
+    .
