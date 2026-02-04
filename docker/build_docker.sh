@@ -19,8 +19,3 @@ docker build \
     -t stanfordvl/behavior-vscode:latest \
     -f docker/vscode.Dockerfile \
     .
-
-docker build \
-    -t stanfordvl/behavior-colab:latest \
-    -f docker/colab.Dockerfile \
-    .
