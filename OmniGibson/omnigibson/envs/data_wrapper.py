@@ -7,6 +7,7 @@ import logging
 
 import h5py
 import torch as th
+from tqdm import tqdm
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -1291,14 +1292,31 @@ class DataPlaybackWrapper(DataWrapper):
         """
         raise NotImplementedError
 
-    def playback_dataset(self, record_data=False):
+    def playback_dataset(self, record_data=False, n_episodes=None, random_sample=False):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
 
         Args:
             record_data (bool): Whether to record data during playback or not
         """
-        for episode_id in range(self.input_hdf5["data"].attrs["n_episodes"]):
+        if n_episodes is None:
+            episode_ids = range(self.input_hdf5["data"].attrs["n_episodes"])
+        else:
+            if n_episodes > self.input_hdf5["data"].attrs["n_episodes"]:
+                log.warning(
+                    f"n_episodes is greater than the number of episodes in the dataset. Setting n_episodes to {self.input_hdf5['data'].attrs['n_episodes']}"
+                )
+                n_episodes = self.input_hdf5["data"].attrs["n_episodes"]
+            if random_sample:
+                import numpy as np
+
+                episode_ids = np.random.choice(
+                    self.input_hdf5["data"].attrs["n_episodes"], size=n_episodes, replace=False
+                )
+            else:
+                episode_ids = range(n_episodes)
+
+        for episode_id in tqdm(episode_ids, desc="Playing back episodes:"):
             self.playback_episode(
                 episode_id=episode_id,
                 record_data=record_data,

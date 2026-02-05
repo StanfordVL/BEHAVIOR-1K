@@ -54,6 +54,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         vel_kp=None,
         smoothing_filter_size=None,
         use_impedances=False,
+        use_inertia_compensation=True,
         use_gravity_compensation=False,
         use_cc_compensation=True,
         use_delta_commands=False,
@@ -138,6 +139,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self.pos_kd = None if pos_kp is None or pos_damping_ratio is None else 2 * math.sqrt(pos_kp) * pos_damping_ratio
         self.vel_kp = vel_kp
         self._use_impedances = use_impedances
+        self._use_inertia_compensation = use_inertia_compensation
         self._use_gravity_compensation = use_gravity_compensation
         self._use_cc_compensation = use_cc_compensation
 
@@ -307,7 +309,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            u = cb.get_custom_method("compute_joint_torques")(u, control_dict["mass_matrix"], self.dof_idx)
+            if self._use_inertia_compensation:
+                u = cb.get_custom_method("compute_joint_torques")(u, control_dict["mass_matrix"], self.dof_idx)
 
             # Add gravity compensation
             if self._use_gravity_compensation:

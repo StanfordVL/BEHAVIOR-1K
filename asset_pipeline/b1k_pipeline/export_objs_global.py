@@ -817,8 +817,12 @@ def process_object(root_node, target, relevant_nodes, requried_meta_types, outpu
                 "orientation": [0.0, 0.0, 0.0, 1.0],
             }
 
+        # Build openable_joint_ids with direction info
+        # Format: [[index, joint_name, direction], ...] 
+        # where direction is 1 (positive opening, lower position is closed)
+
         openable_joint_ids = [
-            (i, joint.attrib["name"])
+            (i, joint.attrib["name"], 1)
             for i, joint in enumerate(tree.findall("joint"))
             if "openable"
             in out_metadata["link_tags"].get(joint.find("child").attrib["link"], [])

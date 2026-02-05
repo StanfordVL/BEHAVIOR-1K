@@ -791,9 +791,14 @@ def import_obj_metadata(
 
     # Manually modify metadata
     if "openable_joint_ids" in data["metadata"]:
-        data["metadata"]["openable_joint_ids"] = {
-            str(pair[0]): pair[1] for pair in data["metadata"]["openable_joint_ids"]
-        }
+        # Convert list format [[idx, name], [idx, name, direction]] to dict format
+        # Format: {joint_id: [joint_name]} or {joint_id: [joint_name, direction_str]}
+        converted = {}
+        for open_metadata in data["metadata"]["openable_joint_ids"]:
+            key = str(open_metadata[0])
+            value = [str(x) for x in open_metadata[1:]]
+            converted[key] = value
+        data["metadata"]["openable_joint_ids"] = converted
 
     # Grab light info if any
     meta_links = data["metadata"].get("meta_links", dict())
@@ -2478,14 +2483,24 @@ def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", over
     # BBox size is simply the extent of the overall AABB
     bbox_size = scene.bounding_box.extents
 
+    # Get the urdf metadata (if any)
+    urdf_dir = pathlib.Path(urdf_path).parent
+    metadata_path = urdf_dir.parent / "misc" / "metadata.json"
+    if metadata_path.exists():
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+    else:
+        metadata = {}
+
     # Save metadata json
     out_metadata = {
-        "meta_links": {},
-        "link_tags": {},
-        "object_parts": [],
+        "meta_links": metadata.get("meta_links", {}),
+        "link_tags": metadata.get("link_tags", {}),
+        "object_parts": metadata.get("object_parts", []),
         "base_link_offset": base_link_offset.tolist(),
         "bbox_size": bbox_size.tolist(),
-        "orientations": [],
+        "orientations": metadata.get("orientations", []),
+        "openable_joint_ids": metadata.get("openable_joint_ids", {}),
     }
     misc_dir = pathlib.Path(obj_dir) / "misc"
     misc_dir.mkdir(exist_ok=overwrite)
