@@ -40,7 +40,7 @@ jobs:
 
     defaults:
       run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+        shell: conda run -n omnigibson /bin/bash -leo pipefail {0}
         working-directory: ${{ github.workspace }}/OmniGibson
 
     steps:
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+        shell: conda run -n omnigibson /bin/bash -leo pipefail {0}
     needs: [run_test]
     if: always()
     steps:
