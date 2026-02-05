@@ -7,6 +7,7 @@ from omnigibson.object_states import ObjectsInFOVOfRobot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.constants import semantic_class_name_to_id
 
+
 def test_camera_pose_flatcache_off():
     camera_pose_test(False)
 
@@ -80,7 +81,7 @@ def test_holonomic_robot_tuck_untuck_base_joint_invariance():
     robot = env.robots[0]
     env.reset()
     og.sim.step()
-    
+
     assert robot.holonomic_base, "R1 should have holonomic base"
     assert robot.mobile_manipulation, "R1 should have mobile_manipulation capability"
 
@@ -90,16 +91,15 @@ def test_holonomic_robot_tuck_untuck_base_joint_invariance():
     # Test tuck() - should preserve base joint positions
     robot.tuck()
     base_joint_pos_after_tuck = robot.get_joint_positions()[robot.base_idx]
-    assert th.allclose(initial_base_joint_pos, base_joint_pos_after_tuck, atol=1e-6), (
-        f"tuck() changed base joint positions! Initial: {initial_base_joint_pos}, After tuck: {base_joint_pos_after_tuck}"
-    )
+    assert th.allclose(
+        initial_base_joint_pos, base_joint_pos_after_tuck, atol=1e-6
+    ), f"tuck() changed base joint positions! Initial: {initial_base_joint_pos}, After tuck: {base_joint_pos_after_tuck}"
 
     # Test untuck() - should preserve base joint positions
     robot.untuck()
     base_joint_pos_after_untuck = robot.get_joint_positions()[robot.base_idx]
-    assert th.allclose(initial_base_joint_pos, base_joint_pos_after_untuck, atol=1e-6), (
-        f"untuck() changed base joint positions! Initial: {initial_base_joint_pos}, After untuck: {base_joint_pos_after_untuck}"
-    )
+    assert th.allclose(
+        initial_base_joint_pos, base_joint_pos_after_untuck, atol=1e-6
+    ), f"untuck() changed base joint positions! Initial: {initial_base_joint_pos}, After untuck: {base_joint_pos_after_untuck}"
 
     og.clear()
-

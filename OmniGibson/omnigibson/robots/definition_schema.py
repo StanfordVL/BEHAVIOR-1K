@@ -59,7 +59,7 @@ class TwoWheelDefinition:
 @dataclass
 class HolonomicBaseDefinition:
     """Fields for holonomic base robots (e.g., R1, Tiago)"""
-    
+
     force_sphere_wheel_approximation: bool = False
 
 
