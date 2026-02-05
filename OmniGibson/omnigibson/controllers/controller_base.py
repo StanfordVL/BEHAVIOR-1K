@@ -304,7 +304,6 @@ class BaseController(Serializable, Registerable, Recreatable):
         ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
 
         # Preprocess and run internal command
-
         self._goal = self._update_goal(command=self._preprocess_command(command), control_dict=control_dict)
 
     def _update_goal(self, command, control_dict):

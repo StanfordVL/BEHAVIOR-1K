@@ -37,7 +37,7 @@ def setup_environment(flatcache):
         "robots": [
             {
                 "type": "Fetch",
-                "robot_type_name": "Fetch",
+                "model": "Fetch",
                 "obs_modalities": ["rgb", "seg_semantic", "seg_instance"],
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
@@ -162,7 +162,7 @@ def test_robot_load_drive():
 
         robot = Robot(
             name=robot_name,
-            robot_type_name=robot_name,
+            model=robot_name,
             obs_modalities=[],
         )
         env.scene.add_object(robot)
@@ -183,7 +183,7 @@ def test_robot_load_drive():
         )
 
         # If this is a manipulation robot, we want to test moving the arm
-        if robot.is_manipulation:
+        if robot.manipulation:
             # load IK controller
             controller_config = {
                 f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
@@ -195,7 +195,7 @@ def test_robot_load_drive():
 
             eef_pos = env.robots[0].get_eef_position()
             eef_orn = env.robots[0].get_eef_orientation()
-            if robot.model_name == "stretch":  # Stretch arm faces the y-axis
+            if robot.model == "stretch":  # Stretch arm faces the y-axis
                 target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
             else:
                 target_eef_pos = th.tensor([eef_pos[0] + 0.1, eef_pos[1], eef_pos[2]], dtype=th.float32)
@@ -205,7 +205,7 @@ def test_robot_load_drive():
             assert th.norm(robot.get_eef_position() - target_eef_pos) < 0.05
 
         # If this is a locomotion robot, we want to test driving
-        if robot.is_locomotion:
+        if robot.locomotion:
             action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
             goal_location = th.tensor([0, 1, 0], dtype=th.float32)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
@@ -278,7 +278,7 @@ def test_grasping_mode():
     for grasping_mode in grasping_modes:
         robot = Robot(
             name="Fetch",
-            robot_type_name="Fetch",
+            model="Fetch",
             obs_modalities=[],
             controller_config={"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
             grasping_mode=grasping_mode,

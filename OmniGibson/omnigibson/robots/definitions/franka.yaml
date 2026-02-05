@@ -1,4 +1,3 @@
-# Franka Panda with multiple end effector options
 raw_controller_order: ["arm_0", "gripper_0"]
 default_controllers:
   arm_0: InverseKinematicsController
@@ -13,7 +12,7 @@ manipulation:
   eef_support_curobo_attached_object_link_names: ["gripper", "robotiq"]
   end_effectors:
     gripper:
-      model_name: "franka_panda"
+      model: "franka_panda"
       eef_link_names:
         "0": "eef_link"
       finger_link_names:
@@ -30,7 +29,7 @@ manipulation:
       ag_start_points: [["panda_rightfinger", [0.0, 0.001, 0.045]]]
       ag_end_points: [["panda_leftfinger", [0.0, 0.001, 0.045]]]
     robotiq:
-      model_name: "franka_robotiq"
+      model: "franka_robotiq"
       gripper_control_idx: [7, 8]
       eef_link_names:
         "0": "eef_link"
@@ -76,7 +75,7 @@ manipulation:
         - ["right_outer_finger", "right_inner_knuckle"]
         - ["right_inner_finger", "right_inner_knuckle"]
     allegro:
-      model_name: "franka_allegro"
+      model: "franka_allegro"
       eef_link_names:
         "0": "palm_center"
       # thumb.proximal, ..., thumb.tip, ..., ring.tip
@@ -94,7 +93,7 @@ manipulation:
       ag_end_points: [["link_3_0_tip", [0.012, 0, 0.007]], ["link_7_0_tip", [0.012, 0, 0.007]], ["link_11_0_tip", [0.012, 0, 0.007]]]
       not_support_urdf: true
     leap_right:
-      model_name: "franka_leap_right"
+      model: "franka_leap_right"
       eef_link_names:
         "0": "palm_center"
       finger_link_names:
@@ -111,7 +110,7 @@ manipulation:
       ag_end_points: [["fingertip_1", [-0.0115, -0.06, 0.015]], ["fingertip_2", [-0.0115, -0.06, 0.015]], ["fingertip_3", [-0.0115, -0.06, 0.015]]]
       not_support_urdf: true
     leap_left:
-      model_name: "franka_leap_left"
+      model: "franka_leap_left"
       eef_link_names:
         "0": "palm_center"
       finger_link_names:
@@ -127,7 +126,7 @@ manipulation:
       ag_end_points: [["fingertip_1", [-0.0115, -0.06, 0.015]], ["fingertip_2", [-0.0115, -0.06, 0.015]], ["fingertip_3", [-0.0115, -0.06, 0.015]]]
       not_support_urdf: true
     inspire:
-      model_name: "franka_inspire"
+      model: "franka_inspire"
       eef_link_names:
         "0": "palm_center"
       finger_link_names:

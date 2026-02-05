@@ -253,7 +253,7 @@ def test_curobo():
 
         floor_touching_base_link_prim_paths = (
             [os.path.join(robot.prim_path, link_name) for link_name in robot.floor_touching_base_link_names]
-            if robot.is_locomotion
+            if robot.locomotion
             else []
         )
 
@@ -291,7 +291,7 @@ def test_curobo():
         th.manual_seed(1)
         lo, hi = robot.joint_lower_limits.clone().view(1, -1), robot.joint_upper_limits.clone().view(1, -1)
 
-        if robot.is_holonomic_base:
+        if robot.holonomic_base:
             lo[0, :2] = -0.1
             lo[0, 2:5] = 0.0
             lo[0, 5] = -math.pi

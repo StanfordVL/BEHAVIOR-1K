@@ -1,6 +1,3 @@
-# Tiago Robot - holonomic base mobile manipulation
-# Reference: https://pal-robotics.com/robots/tiago/
-support_variant: true
 raw_controller_order: ["base", "trunk", "camera", "arm_left", "gripper_left", "arm_right", "gripper_right"]
 default_controllers:
   arm_left: InverseKinematicsController
@@ -85,48 +82,17 @@ disabled_collision_pairs:
   - ["arm_left_tool_link", "wrist_left_ft_tool_link"]
   - ["arm_right_tool_link", "wrist_right_ft_tool_link"]
 visual_only_eef_links: true
-manipulation_link_names:
-  - "torso_fixed_link"
-  - "torso_lift_link"
-  - "arm_left_1_link"
-  - "arm_left_2_link"
-  - "arm_left_3_link"
-  - "arm_left_4_link"
-  - "arm_left_5_link"
-  - "arm_left_6_link"
-  - "arm_left_7_link"
-  - "arm_left_tool_link"
-  - "wrist_left_ft_link"
-  - "wrist_left_ft_tool_link"
-  - "gripper_left_link"
-  - "gripper_left_left_finger_link"
-  - "gripper_left_right_finger_link"
-  - "gripper_left_tool_link"
-  - "arm_right_1_link"
-  - "arm_right_2_link"
-  - "arm_right_3_link"
-  - "arm_right_4_link"
-  - "arm_right_5_link"
-  - "arm_right_6_link"
-  - "arm_right_7_link"
-  - "arm_right_tool_link"
-  - "wrist_right_ft_link"
-  - "wrist_right_ft_tool_link"
-  - "gripper_right_link"
-  - "gripper_right_left_finger_link"
-  - "gripper_right_right_finger_link"
-  - "gripper_right_tool_link"
-  - "head_1_link"
-  - "head_2_link"
-  - "xtion_link"
 
-holonomic_base:
-  base_footprint_link_name: "base_footprint"
+base_footprint_link_name: "base_footprint"
+
+locomotion:
   floor_touching_base_link_names:
     - "wheel_front_left_link"
     - "wheel_front_right_link"
     - "wheel_rear_left_link"
     - "wheel_rear_right_link"
+
+holonomic_base: {} # need to add to show that Tiago is a holonomic base robot
 
 articulated_trunk:
   trunk_joint_names: ["torso_lift_joint"]
@@ -135,18 +101,11 @@ active_camera:
   camera_joint_names: ["head_1_joint", "head_2_joint"]
 
 mobile_manipulation:
-  tucked_default_joint_pos:
-    base_idx: current
-    trunk_control_idx: 0
-    camera_control_idx: [0.0, 0.0]
-    gripper_control_idx:
-      left: [0.045, 0.045]
-      right: [0.045, 0.045]
-    arm_control_idx:
-      left: [-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0]
-      right: [-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0]
+  tucked_default_joint_pos: [-5.6805e-08, 7.8630e-09, 0.00034702, 6.7167e-08, -3.4509e-07, -1.0606e-08, 0.0, -1.1, -1.1, 0.0, 1.47, 1.47, 0.0, 2.71, 2.71, 1.71, 1.71, -1.57, -1.57, 1.39, 1.39, 0.0, 0.0, 0.045, 0.045, 0.045, 0.045]
+  untucked_default_joint_pos: [-5.6805e-08, 7.8630e-09, 0.00034702, 6.7167e-08, -3.4509e-07, -1.0606e-08, 0.17, 0.90522, 0.90522, 0.0, -0.42811, -0.42811, -0.45, 2.235, 2.235, 1.6463, 1.6463, 0.76867, 0.76867, -0.79464, -0.79464, -1.0891, -1.0891, 0.045, 0.045, 0.045, 0.045]
 
 untucked_arm_pose:
+  default_arm_pose_key: "diagonal15"
   default_arm_poses:
     vertical: [0.85846, -0.14852, 1.81008, 1.63368, 0.13764, -1.32488, -0.68415]
     diagonal15: [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, -1.08908]
@@ -176,3 +135,37 @@ manipulation:
     left: [15, 75]
     right: [-75, -15]
   add_combined_arm_control_idx: true
+  manipulation_link_names:
+    - "torso_fixed_link"
+    - "torso_lift_link"
+    - "arm_left_1_link"
+    - "arm_left_2_link"
+    - "arm_left_3_link"
+    - "arm_left_4_link"
+    - "arm_left_5_link"
+    - "arm_left_6_link"
+    - "arm_left_7_link"
+    - "arm_left_tool_link"
+    - "wrist_left_ft_link"
+    - "wrist_left_ft_tool_link"
+    - "gripper_left_link"
+    - "gripper_left_left_finger_link"
+    - "gripper_left_right_finger_link"
+    - "gripper_left_tool_link"
+    - "arm_right_1_link"
+    - "arm_right_2_link"
+    - "arm_right_3_link"
+    - "arm_right_4_link"
+    - "arm_right_5_link"
+    - "arm_right_6_link"
+    - "arm_right_7_link"
+    - "arm_right_tool_link"
+    - "wrist_right_ft_link"
+    - "wrist_right_ft_tool_link"
+    - "gripper_right_link"
+    - "gripper_right_left_finger_link"
+    - "gripper_right_right_finger_link"
+    - "gripper_right_tool_link"
+    - "head_1_link"
+    - "head_2_link"
+    - "xtion_link"

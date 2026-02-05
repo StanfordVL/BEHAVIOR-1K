@@ -69,18 +69,6 @@ class OGRobotServer:
         for rule in DISABLED_TRANSITION_RULES:
             rule.ENABLED = False
 
-        # Check if robot is valid and supports manipulation by reading from YAML config
-        robot_config_dir = os.path.dirname(inspect.getfile(Robot))
-        robot_cfg_path = os.path.join(robot_config_dir, "robot_configs", robot.lower() + ".yaml")
-        assert os.path.exists(robot_cfg_path), f"Robot config file not found: {robot_cfg_path}"
-        
-        with open(robot_cfg_path, "r") as f:
-            robot_cfg = yaml.safe_load(f) or {}
-        
-        capabilities = robot_cfg.get("capabilities", [])
-        is_manipulation = "is_manipulation" in capabilities
-        assert is_manipulation, f"Robot {robot} does not support manipulation (is_manipulation not in capabilities)! Cannot use GELLO"
-        
         assert robot in SUPPORTED_ROBOTS, f"Robot {robot} is not supported by GELLO! Supported robots: {SUPPORTED_ROBOTS}"
 
         if config is None:
@@ -100,6 +88,8 @@ class OGRobotServer:
 
         self.env = og.Environment(configs=cfg)
         self.robot = self.env.robots[0]
+
+        assert self.robot.manipulation, f"Robot {robot} is not a manipulation robot! Cannot use GELLO"
         
         self.ghosting = ghosting
         if self.ghosting:
@@ -205,7 +195,7 @@ class OGRobotServer:
                     if obj.category in VISUAL_ONLY_CATEGORIES:
                         obj.visual_only = True
                 else:
-                    if isinstance(obj, Robot) and obj.model_name.startswith("r1"):
+                    if isinstance(obj, Robot) and obj.model in ("r1", "r1pro"):
                         obj.base_footprint_link.mass = 250.0
 
             # Update ghost robot's masses to be uniform to avoid orthonormal errors
@@ -392,7 +382,7 @@ class OGRobotServer:
         """
         # If R1, process manually
         state = joint_state.clone()
-        if self.robot.model_name=="r1" and self.robot.model_name!="r1pro":
+        if self.robot.model == "r1":
             # [ 6DOF left arm, 6DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
             start_idx = 0
             for component, dim in zip(
@@ -403,7 +393,7 @@ class OGRobotServer:
                     break
                 self._joint_cmd[component] = state[start_idx: start_idx + dim]
                 start_idx += dim
-        elif self.robot.model_name=="r1pro":
+        elif self.robot.model == "r1pro":
             # [ 7DOF left arm, 7DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
             start_idx = 0
             for component, dim in zip(
@@ -735,7 +725,7 @@ class OGRobotServer:
         action = th.zeros(self.robot.action_dim)
 
         # Apply arm action + extra dimension from base
-        if self.robot.model_name=="r1":
+        if self.robot.model == "r1":
             # Apply arm action
             left_act = self._joint_cmd["left_arm"].clone().clip(self._arm_joint_limits["left"]["lower"], self._arm_joint_limits["left"]["upper"])
             right_act = self._joint_cmd["right_arm"].clone().clip(self._arm_joint_limits["right"]["lower"], self._arm_joint_limits["right"]["upper"])
@@ -845,7 +835,7 @@ class OGRobotServer:
         self._grasp_action = {arm: 1 for arm in self.robot.arm_names}
         for detector in self._gripper_action_signal_detectors.values():
             detector.reset()
-        if self.robot.model_name.startswith("r1"):
+        if self.robot.model in ("r1", "r1pro"):
             for arm in self.robot.arm_names:
                 self._joint_cmd[f"{arm}_gripper"] = th.ones(len(self.robot.gripper_action_idx[arm]))
                 self._joint_cmd["base"] = self._joint_state[self.robot.base_control_idx]
@@ -886,8 +876,8 @@ class OGRobotServer:
                     presampled_robot_poses = tro_state
                     # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
                     # for orientation
-                    robot_pos = presampled_robot_poses[self.robot.model_name][0]["position"]
-                    robot_quat = presampled_robot_poses[self.robot.model_name][0]["orientation"]
+                    robot_pos = presampled_robot_poses[self.robot.model][0]["position"]
+                    robot_quat = presampled_robot_poses[self.robot.model][0]["orientation"]
                     self.robot.set_position_orientation(robot_pos, robot_quat)
                     # Write robot poses to scene metadata
                     self.env.scene.write_task_metadata(key=tro_key, data=tro_state)

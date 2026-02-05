@@ -89,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Add the robot we want to load
     robot0_cfg = dict()
-    robot0_cfg["robot_type_name"] = robot_name
+    robot0_cfg["model"] = robot_name
     robot0_cfg["obs_modalities"] = ["rgb"]
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True

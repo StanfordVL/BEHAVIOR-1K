@@ -1,4 +1,3 @@
-# Stretch Robot - mobile manipulation with two-wheel base
 raw_controller_order: ["base", "camera", "arm_0", "gripper_0"]
 default_controllers:
   base: DifferentialDriveController

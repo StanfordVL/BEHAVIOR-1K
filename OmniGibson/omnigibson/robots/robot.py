@@ -7,14 +7,6 @@ from omegaconf import OmegaConf
 
 from omnigibson.robots.definition_schema import (
     RobotDefinition,
-    ManipulationDefinition,
-    TwoWheelDefinition,
-    HolonomicBaseDefinition,
-    LocomotionDefinition,
-    ArticulatedTrunkDefinition,
-    ActiveCameraDefinition,
-    MobileManipulationDefinition,
-    UntuckedArmPoseDefinition,
     EndEffectorDefinition,
 )
 from typing import Literal
@@ -121,7 +113,7 @@ class Robot(USDObject, GymObservable):
         self,
         # Shared kwargs in hierarchy
         name,
-        robot_type_name,
+        model,
         relative_prim_path=None,
         scale=None,
         visible=True,
@@ -162,7 +154,7 @@ class Robot(USDObject, GymObservable):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            robot_type_name (str): Type of Robot.
+            model (str): Model of Robot.
             relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
@@ -225,30 +217,23 @@ class Robot(USDObject, GymObservable):
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             end_effector (str): The end effector type to use.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
-        self.robot_type_name = robot_type_name.lower()
+        self.model = model.lower()
         # Read and validate robot definition YAML file using OmegaConf
         definition_dir = os.path.dirname(__file__)
-        definition_path = os.path.join(definition_dir, "definitions", self.robot_type_name + ".yaml")
+        definition_path = os.path.join(definition_dir, "definitions", self.model + ".yaml")
         yaml_definition = OmegaConf.load(definition_path)
         schema = OmegaConf.structured(RobotDefinition)
         merged_definition = OmegaConf.merge(schema, yaml_definition)
         self._definition: RobotDefinition = OmegaConf.to_object(merged_definition)
-
-        # Unique to Tiago
-        if self._definition.support_variant:
-            if default_arm_pose is None:
-                default_arm_pose = "diagonal15"
-            assert variant in ("default", "wrist_cam"), f"Invalid Tiago variant specified {variant}!"
-            self._variant = variant
 
         if self.has_end_effector_variants:
             self.end_effector = end_effector
             grasping_direction = "lower" if end_effector == "gripper" else "upper"
             self._init_ag_points()
 
-        if self.is_manipulation:
+        if self.manipulation:
             # Store relevant internal vars
             assert_valid_key(key=grasping_mode, valid_keys=AG_MODES, name="grasping_mode")
             assert_valid_key(key=grasping_direction, valid_keys=["lower", "upper"], name="grasping direction")
@@ -267,7 +252,7 @@ class Robot(USDObject, GymObservable):
             self._ag_release_counter = {arm: None for arm in self.arm_names}
             self._ag_grasp_counter = {arm: None for arm in self.arm_names}
 
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             fixed_base = True
             self._world_base_fixed_joint_prim = None
 
@@ -277,15 +262,15 @@ class Robot(USDObject, GymObservable):
                     controller_config["base"]["name"] == "HolonomicBaseJointController"
                 ), "Base controller must be a HolonomicBaseJointController!"
 
-        if self.is_mobile_manipulation:
+        if self.mobile_manipulation:
             assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
             self.default_reset_mode = default_reset_mode
 
-        if self.is_untucked_arm_pose:
+        if self.untucked_arm_pose:
             if default_arm_pose is not None:
                 assert_valid_key(key=default_arm_pose, valid_keys=self.default_arm_poses, name="default_arm_pose")
             else:
-                default_arm_pose = "vertical"
+                default_arm_pose = self._definition.untucked_arm_pose.default_arm_pose_key
             self.default_arm_pose = default_arm_pose
 
         # Store robot-specific inputs
@@ -327,14 +312,14 @@ class Robot(USDObject, GymObservable):
         self._action_type = action_type
         self._action_normalize = action_normalize
 
-        # Store internal placeholders that will be filled in later (from ControllableObject)
+        # Store internal placeholders that will be filled in later
         self._dof_to_joints = None  # dict that will map DOF indices to JointPrims
         self._last_action = None
         self._controllers = None
         self.dof_names_ordered = None
         self._control_enabled = True
 
-        class_name = self.robot_type_name.lower()
+        class_name = self.kinematic_tree_identifier.lower()
         if relative_prim_path:
             # If prim path is specified, assert that the last element starts with the right prefix to ensure that
             # the object will be included in the ControllableObjectViewAPI.
@@ -375,7 +360,7 @@ class Robot(USDObject, GymObservable):
             self._load_config["scale"] == self._load_config["scale"][0]
         ), f"Robot scale must be uniform! Got: {self._load_config['scale']}"
 
-        if self.is_manipulation:
+        if self.manipulation:
             # Update finger link material dictionary based on desired values
             if finger_static_friction is not None or finger_dynamic_friction is not None:
                 for arm, finger_link_names in self.finger_link_names.items():
@@ -387,53 +372,51 @@ class Robot(USDObject, GymObservable):
                         if finger_dynamic_friction is not None:
                             self._link_physics_materials[finger_link_name]["dynamic_friction"] = finger_dynamic_friction
 
-    # ===== Capability Properties (derived from presence of sub-configs) =====
-
     @property
-    def is_two_wheel(self) -> bool:
+    def two_wheel(self) -> bool:
         """Returns True if this robot has a two-wheel differential drive base."""
         return self._definition.two_wheel is not None
 
     @property
-    def is_holonomic_base(self) -> bool:
+    def holonomic_base(self) -> bool:
         """Returns True if this robot has a holonomic base."""
         return self._definition.holonomic_base is not None
 
     @property
-    def is_articulated_trunk(self) -> bool:
+    def articulated_trunk(self) -> bool:
         """Returns True if this robot has an articulated trunk."""
         return self._definition.articulated_trunk is not None
 
     @property
-    def is_active_camera(self) -> bool:
+    def active_camera(self) -> bool:
         """Returns True if this robot has an active (controllable) camera."""
         return self._definition.active_camera is not None
 
     @property
-    def is_untucked_arm_pose(self) -> bool:
+    def untucked_arm_pose(self) -> bool:
         """Returns True if this robot has untucked arm pose configurations."""
         return self._definition.untucked_arm_pose is not None
 
     @property
-    def is_mobile_manipulation(self) -> bool:
+    def mobile_manipulation(self) -> bool:
         """Returns True if this robot is a mobile manipulation robot."""
-        return self._definition.mobile_manipulation is not None or self.is_untucked_arm_pose
+        return self._definition.mobile_manipulation is not None or self.untucked_arm_pose
 
     @property
-    def is_manipulation(self) -> bool:
+    def manipulation(self) -> bool:
         """Returns True if this robot has manipulation capabilities."""
         return (
             self._definition.manipulation is not None
-            or self.is_mobile_manipulation
-            or self.is_articulated_trunk
+            or self.mobile_manipulation
+            or self.articulated_trunk
         )
 
     @property
-    def is_locomotion(self) -> bool:
+    def locomotion(self) -> bool:
         """Returns True if this robot has locomotion capabilities."""
         return (
-            self.is_holonomic_base
-            or self.is_two_wheel
+            self.holonomic_base
+            or self.two_wheel
             or self._definition.locomotion is not None
         )
 
@@ -466,6 +449,14 @@ class Robot(USDObject, GymObservable):
         if not self.has_end_effector_variants:
             return None
         return self._definition.manipulation.end_effectors.get(self.end_effector)
+    
+    @property
+    def kinematic_tree_identifier(self):
+        if self._definition.manipulation and self._definition.manipulation.supported_end_effector:
+            eef_def = self._get_end_effector_definition()
+            if eef_def and eef_def.model:
+                return eef_def.model
+        return self.model
 
     def load(self, scene):
         # Run super first
@@ -509,7 +500,7 @@ class Robot(USDObject, GymObservable):
         # Load the sensors
         self._load_sensors()
 
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             self._world_base_fixed_joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
                 f"{self.prim_path}/rootJoint"
             )
@@ -521,7 +512,7 @@ class Robot(USDObject, GymObservable):
             )
 
         force_sphere = (
-            self.is_holonomic_base
+            self.holonomic_base
             and self._definition.holonomic_base
             and self._definition.holonomic_base.force_sphere_wheel_approximation
         )
@@ -691,7 +682,7 @@ class Robot(USDObject, GymObservable):
         )
 
     def reset(self):
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             base_joint_positions = self.get_joint_positions()[self.base_idx]
         # Call super first
         super().reset()
@@ -699,7 +690,7 @@ class Robot(USDObject, GymObservable):
         # Override the reset joint state based on reset values
         self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
 
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             self.set_joint_positions(base_joint_positions, indices=self.base_idx)
 
     def _create_continuous_action_space(self):
@@ -735,7 +726,7 @@ class Robot(USDObject, GymObservable):
         Args:
             action (n-array): n-DOF length array of actions to apply to this object's internal controllers
         """
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             rz_joint_dof_indices = self.joints["base_footprint_rz_joint"].dof_indices
             j_pos = self.get_joint_positions()[rz_joint_dof_indices]
             # In preparation for the base controller's @update_goal, we need to wrap the current joint pos
@@ -872,7 +863,7 @@ class Robot(USDObject, GymObservable):
             control_type (n-array): control types for each DOF. Each entry should be one of ControlType.
                  This should be n-DOF length for all joints being set.
         """
-        if self.is_manipulation:
+        if self.manipulation:
             # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
             for arm in self.arm_names:
                 if self._ag_freeze_gripper[arm]:
@@ -916,7 +907,7 @@ class Robot(USDObject, GymObservable):
                 indices=eff_idxs,
             )
 
-        if self.is_manipulation:
+        if self.manipulation:
             # Then run assisted grasping
             if self.grasping_mode != "physical" and not self._disable_grasp_handling:
                 self._handle_assisted_grasping()
@@ -932,7 +923,7 @@ class Robot(USDObject, GymObservable):
             arm (str): specific arm to establish grasp.
                 Default is "default" which corresponds to the first entry in self.arm_names
         """
-        assert self.is_manipulation
+        assert self.manipulation
         attachment_point_pos_local = self._ag_obj_constraint_params[arm]["attachment_point_pos_local"]
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         attachment_point_pos, _ = T.pose_transform(
@@ -945,7 +936,7 @@ class Robot(USDObject, GymObservable):
         """
         Handles assisted grasping by creating or removing constraints.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # Loop over all arms
         for arm in self.arm_names:
             # We apply a threshold based on the control rather than the command here so that the behavior
@@ -1066,7 +1057,7 @@ class Robot(USDObject, GymObservable):
             self.articulation_root_path
         )
 
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             # Add canonical position and orientation
             fcns["_canonical_pos_quat"] = lambda: ControllableObjectViewAPI.get_root_position_orientation(
                 self.articulation_root_path
@@ -1074,12 +1065,12 @@ class Robot(USDObject, GymObservable):
             fcns["canonical_pos"] = lambda: fcns["_canonical_pos_quat"][0]
             fcns["canonical_quat"] = lambda: fcns["_canonical_pos_quat"][1]
 
-        if self.is_articulated_trunk:
+        if self.articulated_trunk:
             self._add_task_frame_control_dict(
                 fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
             )
 
-        if self.is_manipulation:
+        if self.manipulation:
             for arm in self.arm_names:
                 eef_link_name = self.eef_link_names[arm] if self.eef_link_names else None
                 if eef_link_name is None:
@@ -1160,7 +1151,7 @@ class Robot(USDObject, GymObservable):
         Sets robot's pose with respect to the specified frame
         ...
         """
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
             # If no position or no orientation are given, get the current position and orientation of the object
@@ -1201,7 +1192,8 @@ class Robot(USDObject, GymObservable):
                         lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                     )
             return
-        if self.is_manipulation:
+        
+        if self.manipulation:
             # Store the original EEF poses.
             original_poses = {}
             for arm in self.arm_names:
@@ -1246,7 +1238,7 @@ class Robot(USDObject, GymObservable):
         state["controllers"] = controller_states
 
         # If we're using actual physical grasping, no extra state needed to save
-        if self.is_manipulation and self.grasping_mode != "physical":
+        if self.manipulation and self.grasping_mode != "physical":
             # Include AG_state
             ag_params = self._ag_obj_constraint_params.copy()
             for arm in ag_params.keys():
@@ -1271,7 +1263,7 @@ class Robot(USDObject, GymObservable):
         for controller_name, controller in self._controllers.items():
             controller.load_state(state=controller_states[controller_name])
 
-        if self.is_manipulation:
+        if self.manipulation:
             # No additional loading needed if we're using physical grasping
             if self.grasping_mode == "physical":
                 return
@@ -1330,12 +1322,10 @@ class Robot(USDObject, GymObservable):
 
         # Concatenate and return
         state_flat = th.cat([state_flat, controller_states_flat])
-        if self.is_manipulation:
+        if self.manipulation:
             # No additional serialization needed if we're using physical grasping
             if self.grasping_mode == "physical":
                 return state_flat
-
-            # TODO AG
         return state_flat
 
     def deserialize(self, state):
@@ -1349,13 +1339,10 @@ class Robot(USDObject, GymObservable):
             idx += deserialized_items
         state_dict["controllers"] = controller_states
 
-        if self.is_manipulation:
+        if self.manipulation:
             # No additional deserialization needed if we're using physical grasping
             if self.grasping_mode == "physical":
                 return state_dict, idx
-
-            # TODO AG
-
         return state_dict, idx
 
     def _initialize(self):
@@ -1372,7 +1359,7 @@ class Robot(USDObject, GymObservable):
             robot_name_components[0] == "controllable"
         ), "Third component of articulation root path (robot name) must start with 'controllable'"
         assert (
-            robot_name_components[1] == self.robot_type_name.lower()
+            robot_name_components[1] == self.kinematic_tree_identifier.lower()
         ), "Third component of articulation root path (robot name) must contain the class name as the second part"
         # Run super
         super()._initialize()
@@ -1414,7 +1401,7 @@ class Robot(USDObject, GymObservable):
 
         self._reset_joint_pos_aabb_extent = self.aabb_extent
 
-        if self.is_manipulation:
+        if self.manipulation:
             # make eef link not visible
             for arm in self.arm_names:
                 self._links[self.eef_link_names[arm]].visible = False
@@ -1427,7 +1414,7 @@ class Robot(USDObject, GymObservable):
             except AssertionError as e:
                 log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
 
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             for i, component in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
                 joint_name = f"base_footprint_{component}_joint"
                 assert joint_name in self.joints, f"Missing base joint: {joint_name}"
@@ -1547,7 +1534,7 @@ class Robot(USDObject, GymObservable):
         """
         Run any needed sanity checks to make sure this robot was created correctly.
         """
-        if self.is_manipulation:
+        if self.manipulation:
             # Iterate over all arms
             for arm in self.arm_names:
                 # If we have an arm controller, make sure it is a manipulation controller
@@ -1562,13 +1549,13 @@ class Robot(USDObject, GymObservable):
                         self._controllers["gripper_{}".format(arm)], GripperController
                     ), "Gripper {} controller must be a GripperController!".format(arm)
 
-        if self.is_locomotion:
+        if self.locomotion:
             # If we have a base controller, make sure it is a locomotion controller
             if "base" in self._controllers:
                 assert isinstance(
                     self._controllers["base"], LocomotionController
                 ), "Base controller must be a LocomotionController!"
-        if self.is_two_wheel:
+        if self.two_wheel:
             assert (
                 len(self.base_control_idx) == 2
             ), "Differential drive can only be used with robot with two base joints!"
@@ -1656,7 +1643,7 @@ class Robot(USDObject, GymObservable):
             ),
         )
 
-        if self.is_manipulation:
+        if self.manipulation:
             # Loop over all arms to grab proprio info
             joint_positions = dic["joint_qpos"]
             joint_velocities = dic["joint_qvel"]
@@ -1678,12 +1665,12 @@ class Robot(USDObject, GymObservable):
                 dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)])
                 dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
                 dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
-        if self.is_articulated_trunk:
+        if self.articulated_trunk:
             joint_positions = dic["joint_qpos"]
             joint_velocities = dic["joint_qvel"]
             dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
             dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
-        if self.is_locomotion:
+        if self.locomotion:
             joint_positions = dic["joint_qpos"]
             joint_velocities = dic["joint_qvel"]
 
@@ -1692,7 +1679,7 @@ class Robot(USDObject, GymObservable):
             dic["base_qpos_sin"] = th.sin(joint_positions[self.base_control_idx])
             dic["base_qpos_cos"] = th.cos(joint_positions[self.base_control_idx])
             dic["base_qvel"] = joint_velocities[self.base_control_idx]
-        if self.is_two_wheel:
+        if self.two_wheel:
             # Grab wheel joint velocity info
             l_vel, r_vel = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)[
                 self.base_control_idx
@@ -1705,7 +1692,7 @@ class Robot(USDObject, GymObservable):
             # Add info
             dic["dd_base_lin_vel"] = th.tensor([lin_vel])
             dic["dd_base_ang_vel"] = th.tensor([ang_vel])
-        if self.is_active_camera:
+        if self.active_camera:
             joint_positions = dic["joint_qpos"]
             joint_velocities = dic["joint_qvel"]
             dic["camera_qpos"] = joint_positions[self.camera_control_idx]
@@ -1844,7 +1831,7 @@ class Robot(USDObject, GymObservable):
         z points in the direction of the fingers, y points in the direction of grasp articulation, and x
         is then inferred automatically
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # Calculate and cache fingertip to eef frame offsets, as well as AG grasping points
         self._eef_to_fingertip_lengths = dict()
         self._default_ag_start_points = dict()
@@ -2041,7 +2028,7 @@ class Robot(USDObject, GymObservable):
                 (potentially @candidate_obj if specified), IsGraspingState.FALSE if it is not grasping,
                 and IsGraspingState.UNKNOWN if unknown.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         if self.grasping_mode != "physical":
             is_grasping_obj = (
@@ -2082,7 +2069,7 @@ class Robot(USDObject, GymObservable):
                 - dict: dictionary mapping unique contact objects defined by the contact prim_path to
                     set of unique robot link prim_paths that it is in contact with
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
 
         # Get robot finger links
@@ -2130,7 +2117,7 @@ class Robot(USDObject, GymObservable):
             arm (str): specific arm whose grasp will be released.
                 Default is "default" which corresponds to the first entry in self.arm_names
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
@@ -2145,7 +2132,7 @@ class Robot(USDObject, GymObservable):
         Magic action to release this robot's grasp for one arm.
         As opposed to @_release_grasp, this method would bypass the release window mechanism and immediately release.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         if self._ag_obj_constraints[arm] is not None:
             self._release_grasp(arm=arm)
             self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
@@ -2172,7 +2159,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             th.tensor: array of action data filled with update value
         """
-        if self.is_two_wheel:
+        if self.two_wheel:
             action = th.zeros(self.action_dim)
             assert isinstance(
                 self._controllers["base"], DifferentialDriveController
@@ -2180,7 +2167,7 @@ class Robot(USDObject, GymObservable):
             action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
             return action
 
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             action = th.zeros(self.action_dim)
             hands = ["left", "right"] if self.n_arms == 2 else ["right"]
             for i, hand in enumerate(hands):
@@ -2200,7 +2187,7 @@ class Robot(USDObject, GymObservable):
             action[self.base_action_idx] = th.tensor(teleop_action.base).float()
             return action
 
-        if self.is_manipulation:
+        if self.manipulation:
             action = th.zeros(self.action_dim)
             hands = ["left", "right"] if self.n_arms == 2 else ["right"]
             for i, hand in enumerate(hands):
@@ -2313,7 +2300,7 @@ class Robot(USDObject, GymObservable):
             list of str: Default proprioception observations to use
         """
         obs_keys = []
-        if self.is_manipulation:
+        if self.manipulation:
             for arm in self.arm_names:
                 obs_keys += [
                     "arm_{}_qpos_sin".format(arm),
@@ -2324,27 +2311,15 @@ class Robot(USDObject, GymObservable):
                     "grasp_{}".format(arm),
                 ]
             return obs_keys
-        if self.is_locomotion:
+        if self.locomotion:
             obs_keys += ["base_qpos_sin", "base_qpos_cos", "robot_lin_vel", "robot_ang_vel"]
-        if self.is_articulated_trunk:
+        if self.articulated_trunk:
             obs_keys += ["trunk_qpos", "trunk_qvel"]
-        if self.is_two_wheel:
+        if self.two_wheel:
             obs_keys += ["dd_base_lin_vel", "dd_base_ang_vel"]
-        if self.is_active_camera:
+        if self.active_camera:
             obs_keys += ["camera_qpos_sin", "camera_qpos_cos"]
         return obs_keys
-
-    @property
-    def model_name(self):
-        """
-        Returns:
-            str: name of this robot model. usually corresponds to the class name of a given robot model
-        """
-        if self.has_end_effector_variants:
-            eef_def = self._get_end_effector_definition()
-            if eef_def and eef_def.model_name:
-                return eef_def.model_name
-        return self.robot_type_name
 
     @property
     def usd_path(self):
@@ -2358,7 +2333,7 @@ class Robot(USDObject, GymObservable):
                 return os.path.join(get_dataset_path("omnigibson-robot-assets"), eef_def.usd_path)
 
         # By default, sets the standardized path
-        model = self.model_name.lower()
+        model = self.model.lower()
         return os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{model}/usd/{model}.usda")
 
     @property
@@ -2379,7 +2354,7 @@ class Robot(USDObject, GymObservable):
                     return os.path.join(get_dataset_path("omnigibson-robot-assets"), eef_def.urdf_path)
 
         # By default, sets the standardized path
-        model = self.model_name.lower()
+        model = self.model.lower()
         return os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{model}/urdf/{model}.urdf")
 
     @property
@@ -2395,9 +2370,9 @@ class Robot(USDObject, GymObservable):
         Returns:
             str: Name of the base footprint link for this object
         """
-        if self.is_holonomic_base and self._definition.holonomic_base.base_footprint_link_name:
-            return self._definition.holonomic_base.base_footprint_link_name
-        if self.is_holonomic_base:
+        if self._definition.base_footprint_link_name:
+            return self._definition.base_footprint_link_name
+        if self.holonomic_base:
             raise NotImplementedError("base_footprint_link_name is not implemented for HolonomicBaseRobot")
         return self.root_link_name
 
@@ -2483,13 +2458,13 @@ class Robot(USDObject, GymObservable):
 
         # Fall back to defaults based on capabilities
         controllers = []
-        if self.is_manipulation:
+        if self.manipulation:
             for arm in self.arm_names:
                 controllers += ["arm_{}".format(arm), "gripper_{}".format(arm)]
             return controllers
-        if self.is_active_camera:
+        if self.active_camera:
             return ["camera"]
-        if self.is_locomotion:
+        if self.locomotion:
             return ["base"]
 
     @property
@@ -2571,7 +2546,7 @@ class Robot(USDObject, GymObservable):
             if eef_def and eef_def.default_joint_pos:
                 return self._convert_yaml_list_to_tensor(eef_def.default_joint_pos)
 
-        if self.is_mobile_manipulation:
+        if self.mobile_manipulation:
             return (
                 self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
             )
@@ -2600,7 +2575,7 @@ class Robot(USDObject, GymObservable):
                 e.g.: IKController, DifferentialDriveController, JointController, etc.
         """
         cfg = {}
-        if self.is_manipulation:
+        if self.manipulation:
             arm_ik_configs = self._default_arm_ik_controller_configs
             arm_osc_configs = self._default_arm_osc_controller_configs
             arm_joint_configs = self._default_arm_joint_controller_configs
@@ -2622,7 +2597,7 @@ class Robot(USDObject, GymObservable):
                     gripper_joint_configs[arm]["name"]: gripper_joint_configs[arm],
                     gripper_null_configs[arm]["name"]: gripper_null_configs[arm],
                 }
-        if self.is_locomotion:
+        if self.locomotion:
             # Add supported base controllers
             cfg["base"] = {
                 self._default_base_joint_controller_config["name"]: self._default_base_joint_controller_config,
@@ -2630,7 +2605,7 @@ class Robot(USDObject, GymObservable):
                     "name"
                 ]: self._default_base_null_joint_controller_config,
             }
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             # Add supported base controllers
             cfg["base"] = {
                 self._default_holonomic_base_joint_controller_config[
@@ -2640,7 +2615,7 @@ class Robot(USDObject, GymObservable):
                     "name"
                 ]: self._default_base_null_joint_controller_config,
             }
-        if self.is_articulated_trunk:
+        if self.articulated_trunk:
             cfg["trunk"] = {
                 self._default_trunk_joint_controller_config["name"]: self._default_trunk_joint_controller_config,
                 self._default_trunk_null_joint_controller_config[
@@ -2649,11 +2624,11 @@ class Robot(USDObject, GymObservable):
                 self._default_trunk_ik_controller_config["name"]: self._default_trunk_ik_controller_config,
                 self._default_trunk_osc_controller_config["name"]: self._default_trunk_osc_controller_config,
             }
-        if self.is_two_wheel:
+        if self.two_wheel:
             cfg["base"][self._default_base_differential_drive_controller_config["name"]] = (
                 self._default_base_differential_drive_controller_config
             )
-        if self.is_active_camera:
+        if self.active_camera:
             cfg["camera"] = {
                 self._default_camera_joint_controller_config["name"]: self._default_camera_joint_controller_config,
                 self._default_camera_null_joint_controller_config[
@@ -2675,7 +2650,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             (None or str): If obj can be grasped, returns the joint type to use for assisted grasping.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # Deny objects that are too heavy and are not a non-base link of a fixed-base object)
         mass = ag_link.mass
         if mass > m.ASSIST_GRASP_MASS_THRESHOLD and not (ag_obj.fixed_base and ag_link != ag_obj.root_link):
@@ -2703,7 +2678,7 @@ class Robot(USDObject, GymObservable):
                 Otherwise, does a no-op
             contact_pos (None or th.tensor): if specified, contact position to use for grasp.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
 
         # Return immediately if ag_data is None
@@ -2787,19 +2762,19 @@ class Robot(USDObject, GymObservable):
         """
         controllers = {}
 
-        if self.is_manipulation:
+        if self.manipulation:
             for arm in self.arm_names:
                 controllers["arm_{}".format(arm)] = "JointController"
                 controllers["gripper_{}".format(arm)] = "JointController"
-        if self.is_locomotion:
+        if self.locomotion:
             controllers["base"] = "JointController"
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             controllers["base"] = "HolonomicBaseJointController"
-        if self.is_articulated_trunk:
+        if self.articulated_trunk:
             controllers["trunk"] = "JointController"
-        if self.is_two_wheel:
+        if self.two_wheel:
             controllers["base"] = "DifferentialDriveController"
-        if self.is_active_camera:
+        if self.active_camera:
             controllers["camera"] = "JointController"
 
         # Override with config-specified defaults
@@ -2817,7 +2792,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             str: Grasping mode for this robot
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return self._grasping_mode
 
     @property
@@ -2850,12 +2825,12 @@ class Robot(USDObject, GymObservable):
         Returns:
             str: Default arm name for this robot, corresponds to the first entry in @arm_names by default
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return self.arm_names[0]
 
     @property
     def arm_action_idx(self):
-        assert self.is_manipulation
+        assert self.manipulation
         arm_action_idx = {}
         for arm_name in self.arm_names:
             controller_idx = self.controller_order.index(f"arm_{arm_name}")
@@ -2869,7 +2844,7 @@ class Robot(USDObject, GymObservable):
 
     @property
     def gripper_action_idx(self):
-        assert self.is_manipulation
+        assert self.manipulation
         gripper_action_idx = {}
         for arm_name in self.arm_names:
             controller_idx = self.controller_order.index(f"gripper_{arm_name}")
@@ -2891,7 +2866,7 @@ class Robot(USDObject, GymObservable):
                 Note: the ordering within the dictionary is assumed to be intentional, and is
                 directly used to define the set of corresponding idxs.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         if self._definition.manipulation and self._definition.manipulation.arm_link_names:
             return self._definition.manipulation.arm_link_names
         return {}
@@ -2906,7 +2881,7 @@ class Robot(USDObject, GymObservable):
                 Note: the ordering within the dictionary is assumed to be intentional, and is
                 directly used to define the set of corresponding control idxs.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         if self._definition.manipulation and self._definition.manipulation.arm_joint_names:
             return self._definition.manipulation.arm_joint_names
         return {}
@@ -2918,7 +2893,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to corresponding name of the EEF link,
                 should correspond to specific link name in this robot's underlying model file
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # Check manipulation definition
         if self._definition.manipulation and self._definition.manipulation.eef_link_names:
             return self._definition.manipulation.eef_link_names
@@ -2928,7 +2903,7 @@ class Robot(USDObject, GymObservable):
             if eef_def and eef_def.eef_link_names:
                 return eef_def.eef_link_names
         raise ValueError(
-            f"eef_link_names not found in robot config for robot_type_name={self.robot_type_name}"
+            f"eef_link_names not found in model definition for model={self.model}"
         )
 
     @cached_property
@@ -2941,7 +2916,7 @@ class Robot(USDObject, GymObservable):
                 Note: the ordering within the dictionary is assumed to be intentional, and is
                 directly used to define the set of corresponding idxs.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         if self._definition.manipulation and self._definition.manipulation.gripper_link_names:
             return self._definition.manipulation.gripper_link_names
         raise NotImplementedError
@@ -2956,7 +2931,7 @@ class Robot(USDObject, GymObservable):
                 Note: the ordering within the dictionary is assumed to be intentional, and is
                 directly used to define the set of corresponding idxs.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # Check manipulation definition
         if self._definition.manipulation and self._definition.manipulation.finger_link_names:
             return self._definition.manipulation.finger_link_names
@@ -2977,7 +2952,7 @@ class Robot(USDObject, GymObservable):
                 Note: the ordering within the dictionary is assumed to be intentional, and is
                 directly used to define the set of corresponding control idxs.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # Check manipulation definition
         if self._definition.manipulation and self._definition.manipulation.finger_joint_names:
             return self._definition.manipulation.finger_joint_names
@@ -2995,7 +2970,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to indices in low-level control
                 vector corresponding to arm joints.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         idxs = {
             arm: th.tensor([list(self.joints.keys()).index(name) for name in self.arm_joint_names[arm]])
             for arm in self.arm_names
@@ -3011,7 +2986,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to indices in low-level control
                 vector corresponding to gripper joints.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return {
             arm: th.tensor([list(self.joints.keys()).index(name) for name in self.finger_joint_names[arm]])
             for arm in self.arm_names
@@ -3024,7 +2999,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to robot links corresponding to
                 that arm's links
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return {arm: [self._links[link] for link in self.arm_link_names[arm]] for arm in self.arm_names}
 
     @cached_property
@@ -3036,7 +3011,7 @@ class Robot(USDObject, GymObservable):
                 eef morphology, it is assumed that the eef z-axis points out from the tips of the fingers, the y-axis
                 points from the left finger to the right finger, and the x-axis inferred programmatically
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return {arm: self._links[self.eef_link_names[arm]] for arm in self.arm_names}
 
     @cached_property
@@ -3046,7 +3021,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to robot links corresponding to
                 that arm's gripper links
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return {arm: [self._links[link] for link in self.gripper_link_names[arm]] for arm in self.arm_names}
 
     @cached_property
@@ -3056,7 +3031,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to robot links corresponding to
                 that arm's finger links
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return {arm: [self._links[link] for link in self.finger_link_names[arm]] for arm in self.arm_names}
 
     @cached_property
@@ -3066,7 +3041,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to robot joints corresponding to
                 that arm's finger joints
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return {arm: [self._joints[joint] for joint in self.finger_joint_names[arm]] for arm in self.arm_names}
 
     @property
@@ -3085,7 +3060,7 @@ class Robot(USDObject, GymObservable):
         """
         if self._definition.manipulation and self._definition.manipulation.assisted_grasp_start_points:
             return self._convert_to_grasping_points(self._definition.manipulation.assisted_grasp_start_points)
-        if self.is_manipulation and hasattr(self, "_ag_start_points"):
+        if self.manipulation and hasattr(self, "_ag_start_points"):
             return {self.default_arm: self._ag_start_points}
         return None
 
@@ -3103,7 +3078,7 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return (
             self._assisted_grasp_start_points
             if self._assisted_grasp_start_points is not None
@@ -3126,7 +3101,7 @@ class Robot(USDObject, GymObservable):
         """
         if self._definition.manipulation and self._definition.manipulation.assisted_grasp_end_points:
             return self._convert_to_grasping_points(self._definition.manipulation.assisted_grasp_end_points)
-        if self.is_manipulation and hasattr(self, "_ag_end_points"):
+        if self.manipulation and hasattr(self, "_ag_end_points"):
             return {self.default_arm: self._ag_end_points}
         return None
 
@@ -3144,7 +3119,7 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return (
             self._assisted_grasp_end_points
             if self._assisted_grasp_end_points is not None
@@ -3158,7 +3133,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to per-finger corresponding z-distance between EEF and each
                 respective fingertip
         """
-        assert self.is_manipulation
+        assert self.manipulation
         return self._eef_to_fingertip_lengths
 
     @property
@@ -3169,7 +3144,7 @@ class Robot(USDObject, GymObservable):
                 angular range of the arm workspace around the Z axis of the robot, where 0 is facing
                 forward.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = dict()
         workspace_range = {}
         if self._definition.manipulation and self._definition.manipulation.arm_workspace_range:
@@ -3187,7 +3162,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             2-tuple: End-effector pose, in (pos, quat) format, corresponding to arm @arm
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         return self._links[self.eef_link_names[arm]].get_position_orientation()
 
@@ -3201,7 +3176,7 @@ class Robot(USDObject, GymObservable):
             3-array: (x,y,z) global end-effector Cartesian position for this robot's end-effector corresponding
                 to arm @arm
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         return self.get_eef_pose(arm=arm)[0]
 
@@ -3215,7 +3190,7 @@ class Robot(USDObject, GymObservable):
             3-array: (x,y,z,w) global quaternion orientation for this robot's end-effector corresponding
                 to arm @arm
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         return self.get_eef_pose(arm=arm)[1]
 
@@ -3230,7 +3205,7 @@ class Robot(USDObject, GymObservable):
             2-tuple or (4, 4)-array: End-effector pose, either in 4x4 homogeneous
                 matrix form (if @mat=True) or (pos, quat) tuple (if @mat=False), corresponding to arm @arm
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         eef_link_pose = self.eef_links[arm].get_position_orientation()
         base_link_pose = self.get_position_orientation()
@@ -3247,7 +3222,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             3-array: (x,y,z) Cartesian position of end-effector relative to robot base frame
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         return self.get_relative_eef_pose(arm=arm)[0]
 
@@ -3260,7 +3235,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             4-array: (x,y,z,w) quaternion orientation of end-effector relative to robot base frame
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         return self.get_relative_eef_pose(arm=arm)[1]
 
@@ -3274,7 +3249,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             3-array: (x,y,z) Linear velocity of end-effector relative to robot base frame
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         base_link_quat = self.get_position_orientation()[1]
         return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_linear_velocity()
@@ -3288,7 +3263,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             3-array: (ax,ay,az) angular velocity of end-effector relative to robot base frame
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         base_link_quat = self.get_position_orientation()[1]
         return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_angular_velocity()
@@ -3307,7 +3282,7 @@ class Robot(USDObject, GymObservable):
                 (object, object_link) (i.e.: (BaseObject, RigidDynamicPrim)) pair to the contacted in-hand object.
                 Otherwise, returns None
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
 
         # If we're not using physical grasping, we check for gripper contact
@@ -3381,7 +3356,7 @@ class Robot(USDObject, GymObservable):
             are not the robot itself. Note: if no objects that are not the robot itself are intersecting,
             the set will be empty.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         # First, make sure start and end grasp points exist (i.e.: aren't None)
         assert (
@@ -3441,7 +3416,7 @@ class Robot(USDObject, GymObservable):
             arm (str): specific arm to handle release window.
                 Default is "default" which corresponds to the first entry in self.arm_names
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
         self._ag_release_counter[arm] += 1
         time_since_release = self._ag_release_counter[arm] * og.sim.get_sim_step_dt()
@@ -3471,7 +3446,7 @@ class Robot(USDObject, GymObservable):
         from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
 
         # By default, sets the standardized path
-        model = self.model_name.lower()
+        model = self.model.lower()
         return {
             emb_sel: os.path.join(
                 get_dataset_path("omnigibson-robot-assets"),
@@ -3494,7 +3469,7 @@ class Robot(USDObject, GymObservable):
                 self.end_effector in self._definition.manipulation.eef_support_curobo_attached_object_link_names
             ), f"Robot not supported for curobo."
 
-        assert self.is_manipulation
+        assert self.manipulation
         # By default, sets the standardized path
         return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
 
@@ -3505,7 +3480,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to default controller config to control that
                 robot's arm. Uses velocity control by default.
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
@@ -3527,7 +3502,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to default controller config for an
                 Inverse kinematics controller to control this robot's arm
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
@@ -3554,7 +3529,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to default controller config for an
                 operational space controller to control this robot's arm
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
@@ -3580,7 +3555,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to default arm null controller config
                 to control this robot's arm i.e. dummy controller
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
@@ -3601,7 +3576,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to default controller config to control
                 this robot's multi finger gripper. Assumes robot gripper idx has exactly two elements
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
@@ -3624,7 +3599,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to default gripper joint controller config
                 to control this robot's gripper
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
@@ -3646,7 +3621,7 @@ class Robot(USDObject, GymObservable):
             dict: Dictionary mapping arm appendage name to default gripper null controller config
                 to control this robot's (non-prehensile) gripper i.e. dummy controller
         """
-        assert self.is_manipulation
+        assert self.manipulation
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
@@ -3661,14 +3636,14 @@ class Robot(USDObject, GymObservable):
         return dic
 
     def _calculate_in_hand_object(self, arm="default"):
-        assert self.is_manipulation
+        assert self.manipulation
         if gm.AG_CLOTH:
             return self._calculate_in_hand_object_cloth(arm)
         else:
             return self._calculate_in_hand_object_rigid(arm)
 
     def _establish_grasp(self, arm="default", ag_data=None, contact_pos=None):
-        assert self.is_manipulation
+        assert self.manipulation
         if gm.AG_CLOTH:
             return self._establish_grasp_cloth(arm, ag_data)
         else:
@@ -3696,7 +3671,7 @@ class Robot(USDObject, GymObservable):
                 returns the corresponding (object, object_link, attachment_point_position), i.e.
                 ((BaseObject, RigidDynamicPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # TODO (eric): Assume joint_pos = 0 means fully closed
         GRIPPER_FINGER_CLOSE_THRESHOLD = 0.03
         gripper_finger_pos = self.get_joint_positions()[self.gripper_control_idx[arm]]
@@ -3739,7 +3714,7 @@ class Robot(USDObject, GymObservable):
                 (object, object_link, attachment_point_position), i.e. ((BaseObject, RigidPrim, th.Tensor)) to the]
                 contacted in-hand object
         """
-        assert self.is_manipulation
+        assert self.manipulation
         arm = self.default_arm if arm == "default" else arm
 
         # Return immediately if ag_data is None
@@ -3836,7 +3811,7 @@ class Robot(USDObject, GymObservable):
         Rotational offset that will be applied for teleoperation
         such that [0, 0, 0, 1] as action will keep the robot eef pointing at +x axis
         """
-        assert self.is_manipulation
+        assert self.manipulation
         # Check end-effector specific
         if self.has_end_effector_variants:
             eef_def = self._get_end_effector_definition()
@@ -3854,7 +3829,7 @@ class Robot(USDObject, GymObservable):
             dict: Default base joint controller config to control this robot's base. Uses velocity
                 control by default.
         """
-        assert self.is_locomotion
+        assert self.locomotion
         return {
             "name": "JointController",
             "control_freq": self._control_freq,
@@ -3871,7 +3846,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             dict: Default null joint controller config to control this robot's base i.e. dummy controller
         """
-        assert self.is_locomotion
+        assert self.locomotion
         return {
             "name": "NullJointController",
             "control_freq": self._control_freq,
@@ -3889,7 +3864,7 @@ class Robot(USDObject, GymObservable):
         Args:
             delta (float):float], (x,y,z) cartesian delta base position
         """
-        assert self.is_locomotion
+        assert self.locomotion
         new_pos = th.tensor(delta) + self.get_position_orientation()[0]
         self.set_position_orientation(position=new_pos)
 
@@ -3900,7 +3875,7 @@ class Robot(USDObject, GymObservable):
         Args:
             delta (float): delta base position forward
         """
-        assert self.is_locomotion
+        assert self.locomotion
         self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([delta, 0, 0])))
 
     def move_backward(self, delta=0.05):
@@ -3910,7 +3885,7 @@ class Robot(USDObject, GymObservable):
         Args:
             delta (float): delta base position backward
         """
-        assert self.is_locomotion
+        assert self.locomotion
         self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([-delta, 0, 0])))
 
     def move_left(self, delta=0.05):
@@ -3920,7 +3895,7 @@ class Robot(USDObject, GymObservable):
         Args:
             delta (float): delta base position left
         """
-        assert self.is_locomotion
+        assert self.locomotion
         self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([0, -delta, 0])))
 
     def move_right(self, delta=0.05):
@@ -3930,7 +3905,7 @@ class Robot(USDObject, GymObservable):
         Args:
             delta (float): delta base position right
         """
-        assert self.is_locomotion
+        assert self.locomotion
         self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([0, delta, 0])))
 
     def turn_left(self, delta=0.03):
@@ -3940,7 +3915,7 @@ class Robot(USDObject, GymObservable):
         Args:
             delta (float): delta angle to rotate the base left
         """
-        assert self.is_locomotion
+        assert self.locomotion
         quat = self.get_position_orientation()[1]
         quat = T.quat_multiply((T.euler2quat(-delta, 0, 0)), quat)
         self.set_position_orientation(orientation=quat)
@@ -3952,36 +3927,34 @@ class Robot(USDObject, GymObservable):
         Args:
             delta (float): angle to rotate the base right
         """
-        assert self.is_locomotion
+        assert self.locomotion
         quat = self.get_position_orientation()[1]
         quat = T.quat_multiply((T.euler2quat(delta, 0, 0)), quat)
         self.set_position_orientation(orientation=quat)
 
     @cached_property
     def non_floor_touching_base_links(self):
-        assert self.is_locomotion
+        assert self.locomotion
         return [self.links[name] for name in self.non_floor_touching_base_link_names]
 
     @cached_property
     def non_floor_touching_base_link_names(self):
-        assert self.is_locomotion
+        assert self.locomotion
         return [self.base_footprint_link_name]
 
     @cached_property
     def floor_touching_base_links(self):
-        assert self.is_locomotion
+        assert self.locomotion
         return [self.links[name] for name in self.floor_touching_base_link_names]
 
     @cached_property
     def floor_touching_base_link_names(self):
-        assert self.is_locomotion
-        if self.is_holonomic_base and self._definition.holonomic_base:
-            return self._definition.holonomic_base.floor_touching_base_link_names or []
-        return []
-
+        assert self.locomotion
+        return self._definition.locomotion.floor_touching_base_link_names or []
+    
     @property
     def base_action_idx(self):
-        assert self.is_locomotion
+        assert self.locomotion
         controller_idx = self.controller_order.index("base")
         action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
         return th.arange(action_start_idx, action_start_idx + self.controllers["base"].command_dim)
@@ -3995,7 +3968,7 @@ class Robot(USDObject, GymObservable):
                 Note: the ordering within the list is assumed to be intentional, and is
                 directly used to define the set of corresponding control idxs.
         """
-        assert self.is_locomotion
+        assert self.locomotion
         if self._definition.locomotion and self._definition.locomotion.base_joint_names:
             return self._definition.locomotion.base_joint_names
         return [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
@@ -4006,7 +3979,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             n-array: Indices in low-level control vector corresponding to base joints.
         """
-        assert self.is_locomotion
+        assert self.locomotion
         return th.tensor([list(self.joints.keys()).index(name) for name in self.base_joint_names])
 
     @property
@@ -4016,7 +3989,7 @@ class Robot(USDObject, GymObservable):
             dict: Default base joint controller config to control this robot's base. Uses velocity
                 control by default.
         """
-        assert self.is_holonomic_base
+        assert self.holonomic_base
         return {
             "name": "HolonomicBaseJointController",
             "control_freq": self._control_freq,
@@ -4032,7 +4005,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             n-array: Indices in low-level control vector corresponding to the six 1DoF base joints
         """
-        assert self.is_holonomic_base
+        assert self.holonomic_base
         joints = list(self.joints.keys())
         return th.tensor(
             [joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "z", "rx", "ry", "rz"]]
@@ -4052,12 +4025,12 @@ class Robot(USDObject, GymObservable):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
         return super().get_position_orientation()
 
     def set_linear_velocity(self, velocity: th.Tensor):
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
             # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
             # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
@@ -4068,14 +4041,14 @@ class Robot(USDObject, GymObservable):
             super().set_linear_velocity(velocity)
 
     def get_linear_velocity(self) -> th.Tensor:
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             # Note that the link we are interested in is self.base_footprint_link, not self.root_link
             return self.base_footprint_link.get_linear_velocity()
         else:
             super().get_linear_velocity()
 
     def set_angular_velocity(self, velocity: th.Tensor) -> None:
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             # 1e-3 is emperically tuned to be a good value for the time step
             delta_t = 1e-3 / (velocity.norm() + 1e-6)
             delta_mat = T.delta_rotation_matrix(velocity, delta_t)
@@ -4095,7 +4068,7 @@ class Robot(USDObject, GymObservable):
             super().set_angular_velocity(velocity)
 
     def get_angular_velocity(self) -> th.Tensor:
-        if self.is_holonomic_base:
+        if self.holonomic_base:
             # Note that the link we are interested in is self.base_footprint_link, not self.root_link
             return self.base_footprint_link.get_angular_velocity()
         else:
@@ -4106,7 +4079,7 @@ class Robot(USDObject, GymObservable):
         Converts a target joint configuration to an action that can be applied to this object.
         All controllers should be JointController with use_delta_commands=False
         """
-        if not self.is_holonomic_base:
+        if not self.holonomic_base:
             action = []
             for name, controller in self.controllers.items():
                 assert (
@@ -4144,101 +4117,51 @@ class Robot(USDObject, GymObservable):
         ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
         return action
 
-    def _get_tucked_default_joint_pos(self, prop):
-        if isinstance(prop, list):
-            return self._convert_yaml_list_to_tensor(prop)
-        pos = th.zeros(self.n_dof)
-        for key, value in prop.items():
-            attr = key if isinstance(key, int) else getattr(self, key)
-            if isinstance(value, dict):
-                for arm in prop[key].keys():
-                    pos[attr[arm]] = self._convert_yaml_list_to_tensor(prop[key][arm])
-            elif isinstance(value, list):
-                pos[attr] = self._convert_yaml_list_to_tensor(value)
-            elif value == "current":
-                pos[attr] = self.get_joint_positions()[attr]
-            else:
-                pos[attr] = value
-        return pos
-
     @property
     def tucked_default_joint_pos(self):
-        assert self.is_mobile_manipulation
-        if self._definition.mobile_manipulation and self._definition.mobile_manipulation.tucked_default_joint_pos:
-            return self._get_tucked_default_joint_pos(self._definition.mobile_manipulation.tucked_default_joint_pos)
-        # Fallback for fetch which stores it at top level
-        if hasattr(self._definition, 'tucked_default_joint_pos') and self._definition.tucked_default_joint_pos:
-            return self._get_tucked_default_joint_pos(self._definition.tucked_default_joint_pos)
-        raise ValueError("tucked_default_joint_pos not found in robot definition")
+        assert self.mobile_manipulation
+        return self._convert_yaml_list_to_tensor(self._definition.mobile_manipulation.tucked_default_joint_pos)
 
     @property
     def untucked_default_joint_pos(self):
-        if self.model_name == "r1":
-            pos = th.zeros(self.n_dof)
-            # Keep the current joint positions for the base joints
-            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
-            for arm in self.arm_names:
-                pos[self.gripper_control_idx[arm]] = th.tensor([0.05, 0.05])  # open gripper
-                pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
-            return pos
-        if self.model_name == "r1pro":
-            pos = th.zeros(self.n_dof)
-            # Keep the current joint positions for the base joints
-            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
-            for arm in self.arm_names:
-                pos[self.gripper_control_idx[arm]] = th.tensor([0.05, 0.05])  # open gripper
-            pos[self.arm_control_idx["left"]] = th.tensor([0.0, 1.57, 0.0, -1.57, 1.57, 0.0, 0.0])
-            pos[self.arm_control_idx["right"]] = th.tensor([0.0, -1.57, 0.0, -1.57, -1.57, 0.0, 0.0])
-            return pos
-
-        pos = th.zeros(self.n_joints)
-        for arm in self.arm_names:
-            pos[self.arm_control_idx[arm]] = self.default_arm_poses[self.default_arm_pose]
-        if self.model_name == "fetch":
-            pos[self.base_control_idx] = 0.0
-            pos[self.trunk_control_idx] = 0.385
-            pos[self.camera_control_idx] = th.tensor([0.0, 0.45])
-            pos[self.gripper_control_idx[self.default_arm]] = th.tensor([0.05, 0.05])  # open gripper
-            return pos
-        if self.model_name == "tiago":
-            # Keep the current joint positions for the base joints
-            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
-            pos[self.trunk_control_idx] = 0.17
-            pos[self.camera_control_idx] = th.tensor([0.0, -0.45])
-            for arm in self.arm_names:
-                pos[self.gripper_control_idx[arm]] = th.tensor([0.045, 0.045])  # open gripper
-            return pos
-        return pos
+        assert self.mobile_manipulation
+        return self._convert_yaml_list_to_tensor(self._definition.mobile_manipulation.untucked_default_joint_pos)
 
     def tuck(self):
         """
         Immediately set this robot's configuration to be in tucked mode
         """
-        assert self.is_mobile_manipulation
-        self.set_joint_positions(self.tucked_default_joint_pos)
+        assert self.mobile_manipulation
+        pos = self.tucked_default_joint_pos
+        if self.holonomic_base:
+            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+        self.set_joint_positions(pos)
 
     def untuck(self):
         """
         Immediately set this robot's configuration to be in untucked mode
         """
-        assert self.is_mobile_manipulation
-        self.set_joint_positions(self.untucked_default_joint_pos)
+        assert self.mobile_manipulation
+        pos = self.untucked_default_joint_pos
+        if self.holonomic_base:
+            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+        self.set_joint_positions(pos)
 
     @cached_property
     def trunk_links(self):
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         return [self.links[name] for name in self.trunk_link_names]
 
     @cached_property
     def trunk_link_names(self):
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         if self._definition.articulated_trunk:
             return self._definition.articulated_trunk.trunk_link_names
         return []
 
     @cached_property
     def trunk_joint_names(self):
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         if self._definition.articulated_trunk:
             return self._definition.articulated_trunk.trunk_joint_names
         return []
@@ -4249,12 +4172,12 @@ class Robot(USDObject, GymObservable):
         Returns:
             n-array: Indices in low-level control vector corresponding to trunk joints.
         """
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def trunk_action_idx(self):
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         controller_idx = self.controller_order.index("trunk")
         action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
         return th.arange(action_start_idx, action_start_idx + self.controllers["trunk"].command_dim)
@@ -4265,7 +4188,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             dict: Default controller config for an Inverse kinematics controller to control this robot's trunk
         """
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         return {
             "name": "InverseKinematicsController",
             "task_name": "trunk",
@@ -4288,7 +4211,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             dict: Default controller config for an Operational Space controller to control this robot's trunk
         """
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         return {
             "name": "OperationalSpaceController",
             "task_name": "trunk",
@@ -4311,7 +4234,7 @@ class Robot(USDObject, GymObservable):
             dict: Default base joint controller config to control this robot's base. Uses position
                 control by default.
         """
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         return {
             "name": "JointController",
             "control_freq": self._control_freq,
@@ -4328,7 +4251,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             dict: Default null joint controller config to control this robot's base i.e. dummy controller
         """
-        assert self.is_articulated_trunk
+        assert self.articulated_trunk
         return {
             "name": "NullJointController",
             "control_freq": self._control_freq,
@@ -4341,7 +4264,7 @@ class Robot(USDObject, GymObservable):
 
     @property
     def default_arm_poses(self):
-        assert self.is_untucked_arm_pose
+        assert self.untucked_arm_pose
         dic = dict()
         if self._definition.untucked_arm_pose and self._definition.untucked_arm_pose.default_arm_poses:
             for key, value in self._definition.untucked_arm_pose.default_arm_poses.items():
@@ -4349,8 +4272,8 @@ class Robot(USDObject, GymObservable):
         return dic
 
     def _create_discrete_action_space(self):
-        if not self.is_two_wheel:
-            raise ValueError(f"{self.robot_type_name} does not support discrete actions!")
+        if not self.two_wheel:
+            raise ValueError(f"{self.model} does not support discrete actions!")
 
         # Set action list based on controller (joint or DD) used
 
@@ -4392,7 +4315,7 @@ class Robot(USDObject, GymObservable):
             dict: Default differential drive controller config to
                 control this robot's base.
         """
-        assert self.is_two_wheel
+        assert self.two_wheel
         return {
             "name": "DifferentialDriveController",
             "control_freq": self._control_freq,
@@ -4408,7 +4331,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             float: radius of each wheel at the base, in metric units
         """
-        assert self.is_two_wheel
+        assert self.two_wheel
         return self._definition.two_wheel.wheel_radius
 
     @property
@@ -4417,7 +4340,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             float: perpendicular distance between the robot's two wheels, in metric units
         """
-        assert self.is_two_wheel
+        assert self.two_wheel
         return self._definition.two_wheel.wheel_axle_length
 
     @property
@@ -4426,7 +4349,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             dict: Default camera joint controller config to control this robot's camera
         """
-        assert self.is_active_camera
+        assert self.active_camera
         return {
             "name": "JointController",
             "control_freq": self._control_freq,
@@ -4444,7 +4367,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             dict: Default null joint controller config to control this robot's camera i.e. dummy controller
         """
-        assert self.is_active_camera
+        assert self.active_camera
         return {
             "name": "NullJointController",
             "control_freq": self._control_freq,
@@ -4464,7 +4387,7 @@ class Robot(USDObject, GymObservable):
                 Note: the ordering within the list is assumed to be intentional, and is
                 directly used to define the set of corresponding control idxs.
         """
-        assert self.is_active_camera
+        assert self.active_camera
         if self._definition.active_camera:
             return self._definition.active_camera.camera_joint_names
         return []
@@ -4475,7 +4398,7 @@ class Robot(USDObject, GymObservable):
         Returns:
             n-array: Indices in low-level control vector corresponding to camera joints.
         """
-        assert self.is_active_camera
+        assert self.active_camera
         return th.tensor([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
 
     @property
@@ -4484,14 +4407,12 @@ class Robot(USDObject, GymObservable):
 
     @property
     def disabled_collision_pairs(self):
-        # Check end-effector specific first
         if self.has_end_effector_variants:
             eef_def = self._get_end_effector_definition()
             if eef_def and eef_def.disabled_collision_pairs:
                 return eef_def.disabled_collision_pairs
-        # Fall back to top-level
         return self._definition.disabled_collision_pairs or []
 
     @cached_property
     def manipulation_link_names(self):
-        return self._definition.manipulation_link_names or []
+        return self._definition.manipulation.manipulation_link_names or []

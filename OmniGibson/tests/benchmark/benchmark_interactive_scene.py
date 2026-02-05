@@ -47,7 +47,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
 
     if import_robot:
         turtlebot = Robot(
-            robot_type_name="turtlebot", relative_prim_path="/robot", name="agent", obs_modalities=["rgb"]
+            model="turtlebot", relative_prim_path="/robot", name="agent", obs_modalities=["rgb"]
         )
         scene.add_object(turtlebot)
         og.sim.step()

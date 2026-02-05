@@ -1,4 +1,3 @@
-# Kinova Gen3 arm
 raw_controller_order: ["arm_0", "gripper_0"]
 default_controllers:
   arm_0: InverseKinematicsController

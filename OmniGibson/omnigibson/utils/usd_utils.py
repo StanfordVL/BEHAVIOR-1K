@@ -507,13 +507,11 @@ RigidContactAPI = RigidContactAPIImpl()
 class GripperRigidContactAPIImpl(RigidContactAPIImpl):
     @classmethod
     def get_column_filters(cls):
-        from omnigibson.robots.robot import Robot
-
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
             for robot in scene.robots:
-                if isinstance(robot, Robot) and robot.is_manipulation:
+                if robot.manipulation:
                     filters[scene_idx].extend(link.prim_path for links in robot.finger_links.values() for link in links)
 
         return filters

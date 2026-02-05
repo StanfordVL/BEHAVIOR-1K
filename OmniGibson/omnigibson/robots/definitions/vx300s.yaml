@@ -1,5 +1,3 @@
-# The VX300-6DOF arm from Trossen Robotics
-# https://www.trossenrobotics.com/docs/interbotix_xsarms/specifications/vx300s.html
 raw_controller_order: ["arm_0", "gripper_0"]
 default_controllers:
   arm_0: InverseKinematicsController

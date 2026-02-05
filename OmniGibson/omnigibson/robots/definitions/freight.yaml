@@ -1,4 +1,3 @@
-# Freight - two-wheel differential drive robot (Fetch base)
 default_joint_pos: [0, 0]
 
 locomotion:

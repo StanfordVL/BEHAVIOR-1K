@@ -22,7 +22,6 @@ from gello.robots.sim_robot.og_teleop_cfg import *
 
 from bddl.activity import Conditions
 from bddl.object_taxonomy import ObjectTaxonomy
-import json
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -274,7 +273,7 @@ def setup_cameras(robot, external_sensors, resolution):
     og.sim.viewer_camera.image_width = resolution[1]
 
     # Adjust wrist cameras for R1
-    if robot.model_name.startswith("r1"):
+    if robot.model in ("r1", "r1pro"):
         left_wrist_camera_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
             prim_path=f"{robot.links[WRIST_CAMERA_LINK_NAME[robot.__class__.__name__]['left']].prim_path}/Camera"
         )
@@ -297,7 +296,7 @@ def setup_cameras(robot, external_sensors, resolution):
         ) # expects (w, x, y, z)
     
     # Adjust head camera for R1Pro (TODO: fix this in assets)
-    if robot.model_name=="r1pro":
+    if robot.model == "r1pro":
         head_camera_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=f"{robot.links[HEAD_CAMERA_LINK_NAME[robot.__class__.__name__]].prim_path}/Camera")
         head_camera_prim.GetAttribute("xformOp:translate").Set(
             lazy.pxr.Gf.Vec3d(*R1PRO_HEAD_CAMERA_LOCAL_POS.tolist())
@@ -1021,9 +1020,9 @@ def optimize_sim_settings(vr_mode=False):
     settings.set("/app/vsync", True)
 
 def setup_ghost_robot_info(ghost, robot):
-    if robot.robot_type_name=="r1pro":
+    if robot.model == "r1pro":
         robot_arm_dof = 7
-    elif robot.robot_type_name=="r1":
+    elif robot.model == "r1":
         robot_arm_dof = 6
     else:
         raise ValueError(f"Unknown robot type: {type(robot)}")

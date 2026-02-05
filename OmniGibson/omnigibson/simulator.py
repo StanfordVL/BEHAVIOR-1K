@@ -1142,7 +1142,7 @@ def _launch_simulator(*args, **kwargs):
 
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
-                    # sim was stopped. We need to reset them to default_kp and default_kd defined in ControllableObject.
+                    # sim was stopped. We need to reset them to default_kp and default_kd defined defined in Robot.
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
                     # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
@@ -1242,9 +1242,8 @@ def _launch_simulator(*args, **kwargs):
             if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                 # Run the controller step on every controllable object
                 for scene in self.scenes:
-                    for obj in scene.objects:
-                        if isinstance(obj, Robot):
-                            obj.step()
+                    for robot in scene.robots:
+                        robot.step()
 
                 # Flush the controls from the ControllableObjectViewAPI
                 ControllableObjectViewAPI.flush_control()
