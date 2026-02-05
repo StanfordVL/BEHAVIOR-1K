@@ -1317,27 +1317,6 @@ class ManipulationRobot(BaseRobot):
         return dic
 
     @property
-    def _default_arm_implicit_pd_controller_configs(self):
-        """
-        Returns:
-            dict: Dictionary mapping arm appendage name to default controller config for an
-                ImplicitPDController.  Matches Isaac Lab's ImplicitActuatorCfg.
-        """
-        dic = {}
-        for arm in self.arm_names:
-            dic[arm] = {
-                "name": "ImplicitPDController",
-                "control_freq": self._control_freq,
-                "control_limits": self.control_limits,
-                "dof_idx": self.arm_control_idx[arm],
-                "command_output_limits": None,
-                "stiffness": 400.0,  # Default matching Isaac Lab
-                "damping": 80.0,  # Default matching Isaac Lab
-                "use_delta_commands": False,
-            }
-        return dic
-
-    @property
     def _default_arm_ik_controller_configs(self):
         """
         Returns:
@@ -1480,7 +1459,6 @@ class ManipulationRobot(BaseRobot):
         arm_osc_configs = self._default_arm_osc_controller_configs
         arm_joint_configs = self._default_arm_joint_controller_configs
         arm_null_joint_configs = self._default_arm_null_joint_controller_configs
-        arm_implicit_pd_configs = self._default_arm_implicit_pd_controller_configs
         gripper_pj_configs = self._default_gripper_multi_finger_controller_configs
         gripper_joint_configs = self._default_gripper_joint_controller_configs
         gripper_null_configs = self._default_gripper_null_controller_configs
@@ -1492,7 +1470,6 @@ class ManipulationRobot(BaseRobot):
                 arm_osc_configs[arm]["name"]: arm_osc_configs[arm],
                 arm_joint_configs[arm]["name"]: arm_joint_configs[arm],
                 arm_null_joint_configs[arm]["name"]: arm_null_joint_configs[arm],
-                arm_implicit_pd_configs[arm]["name"]: arm_implicit_pd_configs[arm],
             }
             cfg["gripper_{}".format(arm)] = {
                 gripper_pj_configs[arm]["name"]: gripper_pj_configs[arm],
