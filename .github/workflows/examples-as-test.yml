@@ -18,7 +18,7 @@ jobs:
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
     defaults:
       run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+        shell: conda run -n behavior /bin/bash -leo pipefail {0}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
 
     defaults:
       run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+        shell: conda run -n behavior /bin/bash -leo pipefail {0}
 
     steps:
       - name: Check for generated tests
@@ -89,7 +89,7 @@ jobs:
     runs-on: [self-hosted, linux]
     defaults:
       run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+        shell: conda run -n behavior /bin/bash -leo pipefail {0}
     needs: [run_test]
     steps:
       - name: Pull reports
