@@ -121,6 +121,8 @@ class RobotDefinition:
     disabled_collision_link_names: List[str] = field(default_factory=list)
     base_footprint_link_name: Optional[str] = None
     visual_only_eef_links: bool = False
+    kp_lin_vel: Optional[float] = None
+    kp_ang_vel: Optional[float] = None
 
     manipulation: Optional[ManipulationDefinition] = None
     two_wheel: Optional[TwoWheelDefinition] = None

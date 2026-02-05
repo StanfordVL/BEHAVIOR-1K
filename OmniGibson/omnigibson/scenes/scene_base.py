@@ -15,8 +15,8 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots.robot import m as robot_macros
 from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.utils.constants import ROBOT_CATEGORY
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -197,7 +197,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             list of BaseRobot: Robot(s) that are currently in this scene
         """
-        return list(sorted(self.object_registry("category", robot_macros.ROBOT_CATEGORY, []), key=lambda x: x.name))
+        return list(sorted(self.object_registry("category", ROBOT_CATEGORY, []), key=lambda x: x.name))
 
     @property
     def systems(self):
@@ -667,7 +667,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
                 # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
                 # We do this by adding the object to our tracked collision groups
-                if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
+                if obj.fixed_base and obj.category != ROBOT_CATEGORY and not obj.visual_only:
                     obj_fixed_links = obj.get_fixed_link_names_in_subtree()
                     for link_name, link in obj.links.items():
                         if link_name in obj_fixed_links:
@@ -936,7 +936,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return {
             obj.name: obj
             for obj in self.object_registry("fixed_base", True, default_val=[])
-            if obj.category != robot_macros.ROBOT_CATEGORY
+            if obj.category != ROBOT_CATEGORY
         }
 
     @property

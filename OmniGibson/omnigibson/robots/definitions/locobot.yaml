@@ -1,4 +1,6 @@
 default_joint_pos: [0, 0]
+kp_lin_vel: 1.5
+kp_ang_vel: 1.0
 
 locomotion:
   base_joint_names: ["wheel_left_joint", "wheel_right_joint"]

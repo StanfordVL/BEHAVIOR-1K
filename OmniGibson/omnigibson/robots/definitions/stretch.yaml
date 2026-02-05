@@ -1,4 +1,6 @@
 raw_controller_order: ["base", "camera", "arm_0", "gripper_0"]
+kp_lin_vel: 0.5
+kp_ang_vel: 0.7
 default_controllers:
   base: DifferentialDriveController
   camera: JointController

@@ -46,29 +46,6 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 m = create_module_macros(module_path=__file__)
 
-m.KP_LIN_VEL = {
-    "tiago": 0.3,
-    "fetch": 0.2,
-    "stretch": 0.5,
-    "turtlebot": 0.3,
-    "husky": 0.05,
-    "freight": 0.2,
-    "locobot": 1.5,
-    "r1": 0.3,
-    "r1pro": 0.3,
-}
-m.KP_ANGLE_VEL = {
-    "tiago": 0.2,
-    "fetch": 0.1,
-    "stretch": 0.7,
-    "turtlebot": 0.2,
-    "husky": 0.05,
-    "freight": 0.1,
-    "locobot": 1.0,
-    "r1": 0.2,
-    "r1pro": 0.2,
-}
-
 m.DEFAULT_COLLISION_ACTIVATION_DISTANCE = 0.02
 m.MAX_PLANNING_ATTEMPTS = 100
 m.MAX_IK_FAILURES_BEFORE_RETURN = 50
@@ -1673,12 +1650,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         self.robot.controllers["base"].motor_type == "velocity"
                     ), "Holonomic base controller must be in velocity mode"
                     direction_vec = (
-                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[self.robot.model]
+                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * self.robot.kp_lin_vel
                     )
                     base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 elif isinstance(self.robot.controllers["base"], DifferentialDriveController):
-                    base_action = th.tensor([m.KP_LIN_VEL[self.robot.model], 0.0], dtype=th.float32)
+                    base_action = th.tensor([self.robot.kp_lin_vel, 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     raise ValueError(f"Unsupported base controller: {type(self.robot.controllers['base'])}")
@@ -1714,7 +1691,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action()
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
-            ang_vel = m.KP_ANGLE_VEL[self.robot.model] * direction
+            ang_vel = self.robot.kp_ang_vel * direction
 
             base_action = action[self.robot.controller_action_idx["base"]]
 

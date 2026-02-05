@@ -50,7 +50,7 @@ from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.object_states import ContactBodies
 from omnigibson.prims.geom_prim import VisualGeomPrim
-from omnigibson.utils.constants import JointType, PrimType
+from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
@@ -74,9 +74,6 @@ RESET_JOINT_OPTIONS = {
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
-
-# Name of the category to assign to all robots
-m.ROBOT_CATEGORY = "agent"
 
 # ---Manipulation---
 # Assisted grasping parameters
@@ -342,7 +339,7 @@ class Robot(USDObject, GymObservable):
             relative_prim_path=relative_prim_path,
             usd_path=self.usd_path,
             name=name,
-            category=m.ROBOT_CATEGORY,
+            category=ROBOT_CATEGORY,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -419,6 +416,18 @@ class Robot(USDObject, GymObservable):
             or self.two_wheel
             or self._definition.locomotion is not None
         )
+
+    @property
+    def kp_lin_vel(self) -> float:
+        """Returns the linear velocity proportional gain for action primitives."""
+        assert self._definition.kp_lin_vel is not None, f"kp_lin_vel not defined for robot {self.model}"
+        return self._definition.kp_lin_vel
+
+    @property
+    def kp_ang_vel(self) -> float:
+        """Returns the angular velocity proportional gain for action primitives."""
+        assert self._definition.kp_ang_vel is not None, f"kp_ang_vel not defined for robot {self.model}"
+        return self._definition.kp_ang_vel
 
     @property
     def has_end_effector_variants(self) -> bool:

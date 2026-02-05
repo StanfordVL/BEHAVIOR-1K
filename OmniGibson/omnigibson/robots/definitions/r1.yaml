@@ -1,4 +1,6 @@
 raw_controller_order: ["base", "trunk", "arm_left", "gripper_left", "arm_right", "gripper_right"]
+kp_lin_vel: 0.3
+kp_ang_vel: 0.2
 default_controllers:
   base: HolonomicBaseJointController
   trunk: JointController
