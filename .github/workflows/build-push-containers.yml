@@ -9,7 +9,7 @@ on:
 
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: docker-builder  # This is a larger runner with more disk space.
     steps:
       - 
         name: Check disk space
@@ -23,6 +23,7 @@ jobs:
             /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \
             /usr/lib/jvm /opt/hostedtoolcache/CodeQL || true
           echo "some directories deleted"
+          sudo apt-get update >/dev/null 2>&1
           sudo apt install aptitude -y >/dev/null 2>&1
           sudo aptitude purge aria2 ansible azure-cli shellcheck rpm xorriso zsync \
             esl-erlang firefox gfortran-8 gfortran-9 google-chrome-stable \
@@ -33,13 +34,13 @@ jobs:
             libfreetype6 libfreetype6-dev libfontconfig1 libfontconfig1-dev \
             snmp pollinate libpq-dev postgresql-client powershell ruby-full \
             sphinxsearch subversion mongodb-org azure-cli microsoft-edge-stable \
-            -y -f >/dev/null 2>&1
-          sudo aptitude purge google-cloud-sdk -f -y >/dev/null 2>&1
+            -y -f >/dev/null 2>&1 || true
+          sudo aptitude purge google-cloud-sdk -f -y >/dev/null 2>&1 || true
           sudo aptitude purge microsoft-edge-stable -f -y >/dev/null 2>&1 || true
           sudo apt purge microsoft-edge-stable -f -y >/dev/null 2>&1 || true
-          sudo aptitude purge '~n ^mysql' -f -y >/dev/null 2>&1
-          sudo aptitude purge '~n ^php' -f -y >/dev/null 2>&1
-          sudo aptitude purge '~n ^dotnet' -f -y >/dev/null 2>&1
+          sudo aptitude purge '~n ^mysql' -f -y >/dev/null 2>&1 || true
+          sudo aptitude purge '~n ^php' -f -y >/dev/null 2>&1 || true
+          sudo aptitude purge '~n ^dotnet' -f -y >/dev/null 2>&1 || true
           sudo apt-get autoremove -y >/dev/null 2>&1
           sudo apt-get autoclean -y >/dev/null 2>&1
           echo "some packages purged"
@@ -72,7 +73,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            stanfordvl/omnigibson
+            stanfordvl/behavior
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -82,17 +83,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            stanfordvl/omnigibson-dev
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-      -
-        name: Metadata for vscode Image
-        id: meta-vscode
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            stanfordvl/omnigibson-vscode
+            stanfordvl/behavior-dev
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -102,7 +93,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            stanfordvl/omnigibson-gha
+            stanfordvl/behavior-gha
           tags: |
             # We only push to the latest tag for the actions image
             type=raw,value=latest
@@ -111,56 +102,42 @@ jobs:
         id: build-prod
         uses: docker/build-push-action@v5
         with:
-          context: OmniGibson/
+          context: .
           push: true
+          provenance: false
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
-          file: OmniGibson/docker/prod.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache
-          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
+          file: docker/Dockerfile
+          cache-from: type=registry,ref=stanfordvl/behavior:build-cache
+          cache-to: type=registry,ref=stanfordvl/behavior:build-cache,mode=max
 
       -
         name: Build and push dev image
         id: build-dev
         uses: docker/build-push-action@v5
         with:
-          context: OmniGibson/
+          context: .
           build-args: "DEV_MODE=1"
           push: true
+          provenance: false
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
-          file: OmniGibson/docker/prod.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
-          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
-
-      - name: Update vscode image Dockerfile with prod image tag
-        run: |
-          sed -i "s/omnigibson:latest/omnigibson@${{ steps.build-prod.outputs.digest }}/g" OmniGibson/docker/vscode.Dockerfile && cat OmniGibson/docker/vscode.Dockerfile
-      -
-        name: Build and push vscode image
-        id: build-vscode
-        uses: docker/build-push-action@v5
-        with:
-          context: OmniGibson/
-          push: true
-          tags: ${{ steps.meta-vscode.outputs.tags }}
-          labels: ${{ steps.meta-vscode.outputs.labels }}
-          file: OmniGibson/docker/vscode.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
-          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
+          file: docker/Dockerfile
+          cache-from: type=registry,ref=stanfordvl/behavior:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/behavior:build-cache,mode=max
 
       - name: Update actions image Dockerfile with dev image tag
         run: |
-          sed -i "s/omnigibson-dev:latest/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" OmniGibson/docker/gh-actions/Dockerfile && cat OmniGibson/docker/gh-actions/Dockerfile
+          sed -i "s/behavior-dev:latest/behavior-dev@${{ steps.build-dev.outputs.digest }}/g" docker/gh-actions/Dockerfile && cat docker/gh-actions/Dockerfile
       -
         name: Build and push actions image
         id: build-actions
         uses: docker/build-push-action@v5
         with:
-          context: OmniGibson/docker/gh-actions
+          context: docker/gh-actions
           push: true
           tags: ${{ steps.meta-actions.outputs.tags }}
           labels: ${{ steps.meta-actions.outputs.labels }}
-          file: OmniGibson/docker/gh-actions/Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
-          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
+          file: docker/gh-actions/Dockerfile
+          cache-from: type=registry,ref=stanfordvl/behavior:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/behavior:build-cache,mode=max
