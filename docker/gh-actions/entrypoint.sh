@@ -180,6 +180,10 @@ if [[ ${_START_DOCKER_SERVICE} == "true" ]]; then
   ${_PREFIX} service docker start
 fi
 
+# Activate the conda environment
+source /opt/conda/etc/profile.d/conda.sh
+conda activate behavior
+
 # Container's command (CMD) execution as runner user
 
 
