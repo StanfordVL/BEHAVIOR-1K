@@ -67,7 +67,7 @@ ENROOT_MOUNT_HOME=no enroot start \
     ${ENV_KWARGS} \
     ${MOUNT_KWARGS} \
     ${CONTAINER_NAME} \
-    micromamba run -n behavior /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pytest tests/test_object_states.py"
+    pytest tests/test_object_states.py
 
 # Clean up the image if possible.
 enroot remove -f ${CONTAINER_NAME}

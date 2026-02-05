@@ -40,7 +40,6 @@ jobs:
 
     defaults:
       run:
-        shell: conda run -n behavior /bin/bash -leo pipefail {0}
         working-directory: ${{ github.workspace }}/OmniGibson
 
     steps:
@@ -85,9 +84,6 @@ jobs:
   upload_report:
     name: Compile Report
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: conda run -n behavior /bin/bash -leo pipefail {0}
     needs: [run_test]
     if: always()
     steps:
