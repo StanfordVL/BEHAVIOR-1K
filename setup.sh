@@ -371,7 +371,10 @@ fi
 if [ "$JOYLO" = true ]; then
     echo "Installing JoyLo..."
     [ ! -d "joylo" ] && { echo "ERROR: joylo directory not found"; exit 1; }
-    pip install -e "$WORKDIR/joylo"
+    CONSTRAINTS="$(mktemp)"
+    printf "numpy<2\n" > "$CONSTRAINTS"
+    pip install -c "$CONSTRAINTS" -e "$WORKDIR/joylo"
+    rm -f "$CONSTRAINTS"
 fi
 
 # Install Eval
