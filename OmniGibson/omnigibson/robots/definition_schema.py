@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 
 # === Capability-specific definitions ===
@@ -88,18 +88,13 @@ class LocomotionDefinition:
 
 @dataclass
 class MobileManipulationDefinition:
-    """Fields for mobile manipulation robots"""
+    """Fields for mobile manipulation robots (tuck/untuck and multiple arm poses)"""
 
     untucked_default_joint_pos: Optional[List[Any]] = None
     tucked_default_joint_pos: Optional[List[Any]] = None
-
-
-@dataclass
-class UntuckedArmPoseDefinition:
-    """Fields for robots with multiple arm poses"""
-
-    default_arm_pose_key: str = "vertical"
-    default_arm_poses: Dict[str, List[Any]] = field(default_factory=dict)
+    # Multiple arm pose support (optional)
+    default_arm_pose_key: Optional[str] = None
+    default_arm_poses: Optional[Dict[str, List[Any]]] = None
 
 
 # === Main Robot Definition ===
@@ -131,4 +126,3 @@ class RobotDefinition:
     articulated_trunk: Optional[ArticulatedTrunkDefinition] = None
     active_camera: Optional[ActiveCameraDefinition] = None
     mobile_manipulation: Optional[MobileManipulationDefinition] = None
-    untucked_arm_pose: Optional[UntuckedArmPoseDefinition] = None

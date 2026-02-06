@@ -9,7 +9,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.robots.robot import Robot
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import multi_dim_linspace
 
@@ -886,7 +885,7 @@ class CuRoboMotionGenerator:
             orientation = poses.quaternion[:, [1, 2, 3, 0]]
 
             # If the robot is holonomic, we need to transform the poses to the base link frame
-            if isinstance(self.robot, HolonomicBaseRobot):
+            if self.robot.holonomic_base:
                 base_link_position = th.zeros_like(position)
                 base_link_position[:, 0] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_x_joint")]
                 base_link_position[:, 1] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_y_joint")]

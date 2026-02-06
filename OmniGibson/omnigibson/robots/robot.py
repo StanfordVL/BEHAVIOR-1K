@@ -46,7 +46,6 @@ from omnigibson.controllers import (
     HolonomicBaseJointController,
     DifferentialDriveController,
 )
-from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.object_states import ContactBodies
 from omnigibson.prims.geom_prim import VisualGeomPrim
@@ -140,7 +139,7 @@ class Robot(USDObject, GymObservable):
         finger_dynamic_friction=None,
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
-        # Unique to UntuckedArmPoseRobot
+        # Unique to robots with multiple arm poses
         default_arm_pose=None,
         # Unique to Tiago
         variant="default",
@@ -263,11 +262,11 @@ class Robot(USDObject, GymObservable):
             assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
             self.default_reset_mode = default_reset_mode
 
-        if self.untucked_arm_pose:
+        if self.has_multiple_arm_poses:
             if default_arm_pose is not None:
                 assert_valid_key(key=default_arm_pose, valid_keys=self.default_arm_poses, name="default_arm_pose")
             else:
-                default_arm_pose = self._definition.untucked_arm_pose.default_arm_pose_key
+                default_arm_pose = self._definition.mobile_manipulation.default_arm_pose_key
             self.default_arm_pose = default_arm_pose
 
         # Store robot-specific inputs
@@ -390,14 +389,17 @@ class Robot(USDObject, GymObservable):
         return self._definition.active_camera is not None
 
     @property
-    def untucked_arm_pose(self) -> bool:
-        """Returns True if this robot has untucked arm pose configurations."""
-        return self._definition.untucked_arm_pose is not None
+    def has_multiple_arm_poses(self) -> bool:
+        """Returns True if this robot has multiple arm pose configurations."""
+        return (
+            self._definition.mobile_manipulation is not None
+            and self._definition.mobile_manipulation.default_arm_poses is not None
+        )
 
     @property
     def mobile_manipulation(self) -> bool:
         """Returns True if this robot is a mobile manipulation robot."""
-        return self._definition.mobile_manipulation is not None or self.untucked_arm_pose
+        return self._definition.mobile_manipulation is not None
 
     @property
     def manipulation(self) -> bool:
@@ -4273,10 +4275,10 @@ class Robot(USDObject, GymObservable):
 
     @property
     def default_arm_poses(self):
-        assert self.untucked_arm_pose
+        assert self.has_multiple_arm_poses
         dic = dict()
-        if self._definition.untucked_arm_pose and self._definition.untucked_arm_pose.default_arm_poses:
-            for key, value in self._definition.untucked_arm_pose.default_arm_poses.items():
+        if self._definition.mobile_manipulation and self._definition.mobile_manipulation.default_arm_poses:
+            for key, value in self._definition.mobile_manipulation.default_arm_poses.items():
                 dic[key] = self._convert_yaml_list_to_tensor(value)
         return dic
 

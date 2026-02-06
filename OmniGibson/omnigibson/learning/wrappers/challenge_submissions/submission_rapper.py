@@ -511,7 +511,7 @@ class RAPPERWrapper(EnvironmentWrapper):
 
             # ========== Dynamic Map 생성 + A* path plan ==========
             if self._final_target_pos_3d is not None and self._planned_path is None:
-                print(f"[MyWrapper] Planning A* path with dynamic map...")
+                print("[MyWrapper] Planning A* path with dynamic map...")
                 print(f"            Start: {robot_pos[:2].tolist()}")
                 print(f"            Goal:  {self._final_target_pos_3d[:2].tolist()}")
 
@@ -520,7 +520,7 @@ class RAPPERWrapper(EnvironmentWrapper):
 
                 # 2. Dynamic map 생성 (movable objects 반영)
                 dynamic_map = self._update_dynamic_map(static_map, robot)
-                print(f"[MyWrapper] Dynamic map updated with movable objects")
+                print("[MyWrapper] Dynamic map updated with movable objects")
 
                 # Save dynamic map visualization immediately after creation
                 try:
@@ -552,7 +552,7 @@ class RAPPERWrapper(EnvironmentWrapper):
                 path_map = astar(eroded_map, source_map, target_map)
 
                 if path_map is None or len(path_map) == 0:
-                    print(f"[MyWrapper] A* failed! Trying to switch to next CSV aligned with current progress...")
+                    print("[MyWrapper] A* failed! Trying to switch to next CSV aligned with current progress...")
 
                     # --- replace_range 조회: (task_idx, skill, target) -> replace_length ---
                     try:
@@ -577,7 +577,7 @@ class RAPPERWrapper(EnvironmentWrapper):
                             only_replace_this=False, replace_length=repl_len
                         )
                     if possible:
-                        print(f"[MyWrapper] Switched to next CSV. Will re-inject on next step.")
+                        print("[MyWrapper] Switched to next CSV. Will re-inject on next step.")
                         new_step = self._target_sequence[self._cur_target_idx % len(self._target_sequence)]
                         new_skill = str(new_step.get("skill", "")).strip().lower()
                         new_info = {k: v for k, v in new_step.items() if k != "skill"}
@@ -593,7 +593,7 @@ class RAPPERWrapper(EnvironmentWrapper):
                             self._do_action(new_info)
                         return  # 같은 틱 내 재주입 완료
 
-                    print(f"[MyWrapper] A* failed! Using straight line fallback")
+                    print("[MyWrapper] A* failed! Using straight line fallback")
                     distance = th.norm(self._final_target_pos_3d[:2] - robot_pos[:2])
                     num_waypoints = max(30, int(distance / 0.05))  # 5cm 간격
                     current_z = robot_pos[2]
@@ -643,7 +643,7 @@ class RAPPERWrapper(EnvironmentWrapper):
         # target arrive
         if self._final_target_pos_3d is None:
             if self._action_step_count >= 100:
-                print(f"[MyWrapper] Moveto failed (no target)")
+                print("[MyWrapper] Moveto failed (no target)")
                 self._advance_step()
             return
 
