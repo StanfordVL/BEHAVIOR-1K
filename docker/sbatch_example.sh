@@ -8,7 +8,7 @@
 
 set -e -o pipefail
 
-IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
+IMAGE_PATH="/cvgl2/u/cgokmen/behavior.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
 
@@ -37,7 +37,7 @@ declare -A MOUNTS=(
     [${ISAAC_CACHE_PATH}/isaac-sim/data]=/root/.local/share/ov/data
     [${ISAAC_CACHE_PATH}/isaac-sim/documents]=/root/Documents
     # Feel free to include lines like the below to mount a workspace or a custom OG version
-    # [/cvgl2/u/cgokmen/OmniGibson]=/omnigibson-src
+    # [/cvgl2/u/cgokmen/behavior-1k]=/behavior-src
     # [/cvgl2/u/cgokmen/my-project]=/my-project
 )
 
@@ -52,7 +52,7 @@ for mount in "${!MOUNTS[@]}"; do
 done
 
 # Create the image if it doesn't already exist
-CONTAINER_NAME=omnigibson_${GPU_ID}
+CONTAINER_NAME=behavior_${GPU_ID}
 enroot create --force --name ${CONTAINER_NAME} ${IMAGE_PATH}
 
 # Remove leading space in string
@@ -67,7 +67,7 @@ ENROOT_MOUNT_HOME=no enroot start \
     ${ENV_KWARGS} \
     ${MOUNT_KWARGS} \
     ${CONTAINER_NAME} \
-    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pytest tests/test_object_states.py"
+    pytest tests/test_object_states.py
 
 # Clean up the image if possible.
 enroot remove -f ${CONTAINER_NAME}

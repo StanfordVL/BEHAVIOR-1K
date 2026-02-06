@@ -16,9 +16,6 @@ jobs:
   generate_example_tests:
     name: Generate Example Tests
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
-    defaults:
-      run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -49,10 +46,6 @@ jobs:
         test_file:
           - ${{ needs.generate_example_tests.outputs.example_tests != '' && fromJson(needs.generate_example_tests.outputs.example_tests) }}
       fail-fast: true
-
-    defaults:
-      run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
 
     steps:
       - name: Check for generated tests
@@ -87,9 +80,6 @@ jobs:
   upload_report:
     name: Compile Example Test Report
     runs-on: [self-hosted, linux]
-    defaults:
-      run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
     needs: [run_test]
     steps:
       - name: Pull reports

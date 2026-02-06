@@ -6,7 +6,7 @@ Color_Off='\033[0m'
 
 # Parse the command line arguments.
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-DEFAULT_DATA_DIR="$SCRIPT_DIR/omnigibson_data"
+DEFAULT_DATA_DIR="$SCRIPT_DIR/behavior_docker_data"
 DATA_PATH=$DEFAULT_DATA_DIR
 GUI=true
 
@@ -27,7 +27,7 @@ do
     esac
 done
 
-echo -e "${BYellow}IMPORTANT: Saving OmniGibson assets at ${DATA_PATH}."
+echo -e "${BYellow}IMPORTANT: Saving BEHAVIOR assets at ${DATA_PATH}."
 echo -e "You can change this path by providing your desired path as an argument"
 echo -e "to the run_docker script you are using. Also note that Docker containers"
 echo -e "are incompatible with AFS/NFS drives, so please make sure that this path"
@@ -47,7 +47,7 @@ while true; do
     esac
 done
 
-docker pull stanfordvl/omnigibson:latest
+docker pull stanfordvl/behavior:latest
 DOCKER_DISPLAY=""
 OMNIGIBSON_HEADLESS=1
 if [ "$GUI" = true ] ; then
@@ -70,7 +70,7 @@ docker run \
     -v $DATA_PATH/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
     -v $DATA_PATH/isaac-sim/data:/root/.local/share/ov/data:rw \
     -v $DATA_PATH/isaac-sim/documents:/root/Documents:rw \
-    --network=host --rm -it stanfordvl/omnigibson:latest
+    --network=host --rm -it stanfordvl/behavior:latest
 if [ "$GUI" = true ] ; then
     xhost -local:root
 fi
