@@ -404,20 +404,12 @@ class Robot(USDObject, GymObservable):
     @property
     def manipulation(self) -> bool:
         """Returns True if this robot has manipulation capabilities."""
-        return (
-            self._definition.manipulation is not None
-            or self.mobile_manipulation
-            or self.articulated_trunk
-        )
+        return self._definition.manipulation is not None or self.mobile_manipulation or self.articulated_trunk
 
     @property
     def locomotion(self) -> bool:
         """Returns True if this robot has locomotion capabilities."""
-        return (
-            self.holonomic_base
-            or self.two_wheel
-            or self._definition.locomotion is not None
-        )
+        return self.holonomic_base or self.two_wheel or self._definition.locomotion is not None
 
     @property
     def kp_lin_vel(self) -> float:
@@ -460,7 +452,7 @@ class Robot(USDObject, GymObservable):
         if not self.has_end_effector_variants:
             return None
         return self._definition.manipulation.end_effectors.get(self.end_effector)
-    
+
     @property
     def kinematic_tree_identifier(self):
         if self._definition.manipulation and self._definition.manipulation.supported_end_effector:
@@ -1203,7 +1195,7 @@ class Robot(USDObject, GymObservable):
                         lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                     )
             return
-        
+
         if self.manipulation:
             # Store the original EEF poses.
             original_poses = {}
@@ -2913,9 +2905,7 @@ class Robot(USDObject, GymObservable):
             eef_def = self._get_end_effector_definition()
             if eef_def and eef_def.eef_link_names:
                 return eef_def.eef_link_names
-        raise ValueError(
-            f"eef_link_names not found in model definition for model={self.model}"
-        )
+        raise ValueError(f"eef_link_names not found in model definition for model={self.model}")
 
     @cached_property
     def gripper_link_names(self):
@@ -3962,7 +3952,7 @@ class Robot(USDObject, GymObservable):
     def floor_touching_base_link_names(self):
         assert self.locomotion
         return self._definition.locomotion.floor_touching_base_link_names or []
-    
+
     @property
     def base_action_idx(self):
         assert self.locomotion

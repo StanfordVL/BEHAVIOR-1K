@@ -1649,9 +1649,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     assert (
                         self.robot.controllers["base"].motor_type == "velocity"
                     ), "Holonomic base controller must be in velocity mode"
-                    direction_vec = (
-                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * self.robot.kp_lin_vel
-                    )
+                    direction_vec = body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * self.robot.kp_lin_vel
                     base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 elif isinstance(self.robot.controllers["base"], DifferentialDriveController):
