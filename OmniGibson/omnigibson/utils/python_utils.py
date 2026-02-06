@@ -723,11 +723,11 @@ def torch_compile(func):
         function: Compiled function
     """
     # If we're on Windows, return a jitscript option
-    if sys.platform == "win32":
-        return th.jit.script(func)
+    return th.jit.script(func)
+
     # Otherwise, return a torch.compile option
-    else:
-        return th.compile(func)
+    # else:
+    #     return th.compile(func)
 
 
 def nums2array(nums, dim, dtype=th.float32):

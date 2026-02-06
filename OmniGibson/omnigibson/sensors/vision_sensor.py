@@ -307,7 +307,17 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
-            raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+            for _ in range(5):
+                raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+                check_obs = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+                if check_obs is not None and (
+                    (isinstance(check_obs, np.ndarray) and check_obs.size > 0)
+                    or (th.is_tensor(check_obs) and check_obs.numel() > 0)
+                ):
+                    break
+                og.sim.render()
+            else:
+                raise ValueError("Could not get nonempty observation. What's going on?")
 
             if modality == "pointcloud":
                 # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values

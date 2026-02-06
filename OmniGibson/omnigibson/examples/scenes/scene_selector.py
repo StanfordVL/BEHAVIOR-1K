@@ -6,7 +6,7 @@ from omnigibson.utils.ui_utils import choose_from_options, KeyboardEventHandler
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 
 # Configure macros for maximum performance
-gm.USE_GPU_DYNAMICS = True
+gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
@@ -18,6 +18,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
+    # Choose the scene type to load
+    scene_options = {
+        "InteractiveTraversableScene": "Procedurally generated scene with fully interactive objects",
+        # "StaticTraversableScene": "Monolithic scene mesh with no interactive objects",
+    }
+    scene_type = "InteractiveTraversableScene"  # choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
+
     # Choose the scene model to load
     scenes = get_available_behavior_1k_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
@@ -25,7 +32,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = {
         "scene": {
             "type": "InteractiveTraversableScene",
-            "scene_model": scene_model,
+            "scene_model": "Rs_int",
         },
     }
 
@@ -55,10 +62,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Loop indefinitely
     steps = 0
-    max_steps = -1 if not short_exec else 100
-    while steps != max_steps:
-        env.step([])
-        steps += 1
+    while not short_exec or steps < 1000:
+        og.sim.render()
 
     og.shutdown()
 

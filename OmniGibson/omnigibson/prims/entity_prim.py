@@ -1455,9 +1455,25 @@ class EntityPrim(XFormPrim):
             return th.cat([p for p in points_world if p is not None], dim=0)
 
     @property
+    def visual_points_world(self):
+        """Get all collision points in world coordinates.
+
+        For cloth objects, returns particle positions.
+        For rigid objects, returns collision boundary points from all links.
+        """
+        if self._prim_type == PrimType.CLOTH:
+            return self.root_link.compute_particle_positions()
+        else:
+            points_world = [link.visual_boundary_points_world for link in self._links.values()]
+            points_world = [p for p in points_world if p is not None and len(p) != 0]
+            if not points_world:
+                raise ValueError(f"{self.prim_path} has no visual mesh to compute visual points from!")
+            return th.cat(points_world, dim=0)
+
+    @property
     def aabb(self):
         """Compute axis-aligned bounding box from collision mesh points."""
-        points = self.collision_points_world
+        points = self.visual_points_world
         if self._prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             aabb_lo = th.min(points, dim=0).values - particle_contact_offset

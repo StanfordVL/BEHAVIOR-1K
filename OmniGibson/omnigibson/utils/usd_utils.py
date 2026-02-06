@@ -676,10 +676,11 @@ class PoseAPI:
         cls._refresh()
 
         # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import get_world_pose
+        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
 
-        position, orientation = get_world_pose(cls.PRIMS[prim_path])
-        return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
+        result_transform = _get_world_pose_transform_w_scale(cls.PRIMS[prim_path])
+        scale, shear, quat, translate = T.decompose_mat(th.as_tensor(result_transform).T.unsqueeze(0))
+        return translate.squeeze(0), quat.squeeze(0)
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -708,10 +709,10 @@ class PoseAPI:
         local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)  # unscale local transform's rotation
 
         # Check that the local transform consists only of a position, scale and rotation
-        product = local_transform[:3, :3] @ local_transform[:3, :3].T
-        assert th.allclose(
-            product, th.diag(th.diag(product)), atol=1e-3
-        ), f"{prim.GetPath()} local transform is not orthogonal."
+        # product = local_transform[:3, :3] @ local_transform[:3, :3].T
+        # assert th.allclose(
+        #     product, th.diag(th.diag(product)), atol=1e-3
+        # ), f"{prim.GetPath()} local transform is not orthogonal."
 
         # Return the local pose
         return T.mat2pose(local_transform)

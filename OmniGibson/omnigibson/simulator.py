@@ -12,6 +12,7 @@ import traceback
 from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
+import sys
 
 import torch as th
 
@@ -212,7 +213,12 @@ def _launch_app():
         raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
     # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
-    os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
+    path_splitter = ";" if os.name == "nt" else ":"
+    os.environ["MDL_USER_PATH"] = (
+        str((Path(__file__).parent / "materials").resolve())
+        + path_splitter
+        + str((Path(__file__).parents[2] / "datasets/ai2thor/materials").resolve())
+    )
 
     launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
@@ -525,7 +531,7 @@ def _launch_simulator(*args, **kwargs):
             self._viewer_camera = VisionSensor(
                 relative_prim_path=relative_prim_path,
                 name=relative_prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
-                modalities="rgb",
+                modalities=["rgb", "depth_linear", "seg_instance"],
                 image_height=self.viewer_height,
                 image_width=self.viewer_width,
                 viewport_name=viewport_name,
@@ -573,15 +579,23 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
-            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
             lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
-            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
+            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/enabled", True)
+            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 1)  # "Performance"
             lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
             lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
-            lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 1.0)
+            lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 3)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
             lazy.carb.settings.get_settings().set_bool("/rtx/flow/enabled", True)
+
+            lazy.carb.settings.get_settings().set_bool("/rtx/useViewLightingMode", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/post/histogram/enabled", True)
+            lazy.carb.settings.get_settings().set_float("/rtx/post/histogram/whiteScale", 5.0)
+
+            # disable texture streaming
+            # lazy.carb.settings.get_settings().set_bool("/rtx-transient/resourcemanager/enableTextureStreaming", False)
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
             lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)

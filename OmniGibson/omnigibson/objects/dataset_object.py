@@ -117,6 +117,8 @@ class DatasetObject(USDObject):
         if bounding_box is not None and scale is not None:
             raise Exception("You cannot define both scale and bounding box size for an DatasetObject")
 
+        self.dataset_name = dataset_name
+
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box

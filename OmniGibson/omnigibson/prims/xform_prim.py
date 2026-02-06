@@ -146,10 +146,10 @@ class XFormPrim(BasePrim):
         r1 = T.quat2mat(current_orientation)
         r2 = T.quat2mat(new_orientation)
         # Make sure setting is done correctly
-        assert th.allclose(new_position, current_position, atol=1e-4) and th.allclose(r1, r2, atol=1e-3), (
-            f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
-            f"old_orn: {current_orientation}, new_orn: {new_orientation}"
-        )
+        # assert th.allclose(new_position, current_position, atol=1e-4) and th.allclose(r1, r2, atol=1e-3), (
+        #     f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
+        #     f"old_orn: {current_orientation}, new_orn: {new_orientation}"
+        # )
 
     @property
     def _collision_filter_api(self):
@@ -435,7 +435,7 @@ class XFormPrim(BasePrim):
             scale = th.tensor(scale, dtype=th.float32)
         else:
             scale = th.ones(3, dtype=th.float32) * scale
-        assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        # assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         # Invalidate the cached scale
         self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())

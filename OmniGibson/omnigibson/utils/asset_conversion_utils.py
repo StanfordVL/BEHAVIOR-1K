@@ -2384,10 +2384,79 @@ def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", over
         json.dump(out_metadata, f)
 
 
+def bind_custom_mdl_material(prim, mdl_path, mdl_material_name):
+    """
+    Binds a custom MDL material to all visual mesh prims in an object.
+
+    This function finds all visual mesh prims under the given object prim and binds
+    the specified MDL material to them.
+
+    Args:
+        prim (Usd.Prim): The root prim of the object
+        mdl_path (str): Full path to the MDL file
+        mdl_material_name (str): Name of the material within the MDL file
+
+    Returns:
+        bool: True if material was successfully bound, False otherwise
+    """
+    if not mdl_path or not os.path.exists(mdl_path):
+        log.warning(f"MDL path does not exist: {mdl_path}")
+        return False
+
+    stage = prim.GetStage()
+    root_prim_path = prim.GetPrimPath().pathString
+
+    # Create the MDL material
+    mtl_created_list = []
+    lazy.omni.kit.commands.execute(
+        "CreateAndBindMdlMaterialFromLibrary",
+        mdl_name=mdl_path,
+        mtl_name=mdl_material_name,
+        mtl_created_list=mtl_created_list,
+    )
+
+    assert mtl_created_list, f"Failed to create MDL material: {mdl_material_name}"
+
+    mat_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
+    shader = lazy.pxr.UsdShade.Material(mat_prim)
+
+    # Find all visual mesh prims and bind the material
+    bound_count = 0
+    for child in prim.GetChildren():
+        # Look for link prims (they contain visuals)
+        visuals_prim_path = f"{child.GetPrimPath().pathString}/visuals"
+        visuals_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(visuals_prim_path)
+
+        if not visuals_prim or not visuals_prim.IsValid():
+            continue
+
+        # Bind to the visuals prim itself if it's a mesh
+        if visuals_prim.GetTypeName() == "Mesh":
+            lazy.pxr.UsdShade.MaterialBindingAPI(visuals_prim).Bind(
+                shader, lazy.pxr.UsdShade.Tokens.strongerThanDescendants
+            )
+            bound_count += 1
+        else:
+            # Otherwise bind to all mesh children
+            for mesh_child in visuals_prim.GetChildren():
+                if mesh_child.GetTypeName() == "Mesh":
+                    lazy.pxr.UsdShade.MaterialBindingAPI(mesh_child).Bind(
+                        shader, lazy.pxr.UsdShade.Tokens.strongerThanDescendants
+                    )
+                    bound_count += 1
+
+    if bound_count > 0:
+        log.debug(f"Bound material {mdl_material_name} to {bound_count} mesh prims")
+        stage.Save()
+        return True
+
+    return False
+
+
 def import_og_asset_from_urdf(
     category,
     model,
-    dataset_root,
+    dataset_name="custom_dataset",
     urdf_path=None,
     collision_method="coacd",
     coacd_links=None,
@@ -2398,16 +2467,20 @@ def import_og_asset_from_urdf(
     hull_count=32,
     overwrite=False,
     use_usda=False,
+    mdl_material_path=None,
+    mdl_material_name=None,
 ):
     """
     Imports an asset from URDF format into OmniGibson-compatible USD format. This will write the new USD
-    (and copy the URDF if it does not already exist within @dataset_root) to @dataset_root
+    to the dataset directory specified by @dataset_name.
 
     Args:
         category (str): Category to assign to imported asset
         model (str): Model name to assign to imported asset
+        dataset_name (str): Name of the dataset (e.g., "spoc", "custom_dataset"). The dataset root
+            will be computed as gm.DATA_PATH/dataset_name
         urdf_path (None or str): If specified, external URDF that should be copied into the dataset first before
-            converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_root dir
+            converting into USD format. Otherwise, assumes that the urdf file already exists within the dataset dir
         collision_method (None or str): If specified, collision decomposition method to use to generate
             OmniGibson-compatible collision meshes. Valid options are {"coacd", "convex"}
         coacd_links (None or list of str): If specified, links that should use CoACD to decompose collision meshes
@@ -2416,13 +2489,14 @@ def import_og_asset_from_urdf(
             decomposition applied. This will only use the convex hull
         visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
         merge_fixed_joints (bool): Whether to merge fixed joints or not
-        dataset_root (str): Dataset root directory to use for writing imported USD file. Default is custom dataset
-            path set from the global macros
         hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
             Only relevant if @collision_method is "coacd"
         overwrite (bool): If set, will overwrite any pre-existing files
         use_usda (bool): If set, will write files to .usda files instead of .usd
             (bigger memory footprint, but human-readable)
+        mdl_material_path (None or str): If specified, full path to an MDL material file to bind to all visual meshes
+        mdl_material_name (None or str): If specified (along with mdl_material_path), the name of the material
+            within the MDL file to use
 
     Returns:
         3-tuple:
@@ -2430,6 +2504,9 @@ def import_og_asset_from_urdf(
             - str: Absolute path to generated USD file
             - Usd.Prim: Generated root USD prim (currently on active stage)
     """
+    # Compute dataset root from dataset name
+    dataset_root = get_dataset_path(dataset_name)
+
     # Make sure all scaling is positive
     model_dir = os.path.join(dataset_root, "objects", category, model)
     os.makedirs(model_dir, exist_ok=overwrite)
@@ -2465,13 +2542,19 @@ def import_og_asset_from_urdf(
         urdf_path=urdf_path,
         obj_category=category,
         obj_model=model,
-        dataset_root=dataset_root,
+        dataset_name=dataset_name,
         use_omni_convex_decomp=False,  # We already pre-decomposed the values, so don' use omni convex decomp
         use_usda=use_usda,
         merge_fixed_joints=merge_fixed_joints,
     )
 
     prim = import_obj_metadata(usd_path=usd_path, obj_category=category, obj_model=model, dataset_root=dataset_root)
+
+    # Bind custom MDL material if specified
+    if mdl_material_path and mdl_material_name:
+        print(f"Binding custom MDL material: {mdl_material_name}")
+        bind_custom_mdl_material(prim, mdl_material_path, mdl_material_name)
+
     print(
         f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
     )
