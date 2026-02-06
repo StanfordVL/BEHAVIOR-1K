@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -e -x
 
 # Parse arguments
 HELP=false
@@ -277,7 +277,7 @@ if [ "$OMNIGIBSON" = true ]; then
         echo "Setting up pre-commit..."
         conda install -c conda-forge pre-commit -y
         cd "$WORKDIR/OmniGibson"
-        pre-commit install
+        pre-commit install || true  # Ignore errors here in case the directory is not a git repo
         cd "$WORKDIR"
     fi
     
@@ -371,16 +371,7 @@ fi
 if [ "$JOYLO" = true ]; then
     echo "Installing JoyLo..."
     [ ! -d "joylo" ] && { echo "ERROR: joylo directory not found"; exit 1; }
-    # Constrain deps to keep OmniGibson / Isaac Sim compatible
-    JOYLO_CONSTRAINTS_FILE=$(mktemp)
-    trap 'rm -f "$JOYLO_CONSTRAINTS_FILE"' EXIT
-    cat > "$JOYLO_CONSTRAINTS_FILE" << 'EOF'
-opencv-contrib-python<=4.11.0.86
-numpy<2
-EOF
-    pip install -e "$WORKDIR/joylo" -c "$JOYLO_CONSTRAINTS_FILE"
-    rm -f "$JOYLO_CONSTRAINTS_FILE"
-    trap - EXIT
+    pip install -e "$WORKDIR/joylo"
 fi
 
 # Install Eval
