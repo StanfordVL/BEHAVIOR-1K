@@ -75,6 +75,7 @@ class GraspTask(BaseTask):
         return rewards
 
     def _reset_agent(self, env):
+        # breakpoint()
         robot = env.robots[0]
         for arm in robot.arm_names:
             robot.release_grasp_immediately(arm=arm)
@@ -84,7 +85,8 @@ class GraspTask(BaseTask):
         if self._reset_poses is not None:
             joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             robot_pose = random.choice(self._reset_poses)
-            robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+            robot.set_joint_positions(th.tensor(robot_pose["joint_pos"]), joint_control_idx)
+            # breakpoint()
             robot_pos = th.tensor(robot_pose["base_pos"])
             robot_orn = th.tensor(robot_pose["base_ori"])
             robot.set_position_orientation(position=robot_pos, orientation=robot_orn, frame="scene")
@@ -176,6 +178,7 @@ class GraspTask(BaseTask):
         # Try up to 20 times.
         for _ in range(20):
             try:
+                # breakpoint()
                 self._reset_scene(env)
                 self._reset_agent(env)
                 break
@@ -205,8 +208,10 @@ class GraspTask(BaseTask):
         obj = env.scene.object_registry("name", self.obj_name)
         robot = env.robots[0]
         relative_pos, _ = T.relative_pose_transform(*obj.get_position_orientation(), *robot.get_position_orientation())
-
-        return {"obj_pos": relative_pos}, dict()
+        relative_pos_eef, _ = T.relative_pose_transform(
+            *obj.get_position_orientation(), robot.get_eef_position(), robot.get_orientation()
+        )
+        return {"obj_pos": relative_pos, "relative_pos_eef": relative_pos_eef}, dict()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -225,9 +230,10 @@ class GraspTask(BaseTask):
     def default_reward_config(cls):
         return {
             "dist_coeff": 0.1,
+            "dist_slope_coeff": 10.0,
             "grasp_reward": 1.0,
             "collision_penalty": 1.0,
             "eef_position_penalty_coef": 0.01,
             "eef_orientation_penalty_coef": 0.001,
-            "regularization_coef": 0.01,
+            "regularization_coef": 0.001,
         }

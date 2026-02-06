@@ -33,6 +33,7 @@ class GraspReward(BaseRewardFunction):
         self,
         obj_name,
         dist_coeff,
+        dist_slope_coeff,
         grasp_reward,
         collision_penalty,
         eef_position_penalty_coef,
@@ -46,6 +47,7 @@ class GraspReward(BaseRewardFunction):
         self.obj_name = obj_name
         self.obj = None
         self.dist_coeff = dist_coeff
+        self.dist_slope_coeff = dist_slope_coeff
         self.grasp_reward = grasp_reward
         self.collision_penalty = collision_penalty
         self.eef_position_penalty_coef = eef_position_penalty_coef
@@ -69,6 +71,7 @@ class GraspReward(BaseRewardFunction):
         reward = 0.0
 
         # Penalize large actions
+        action = th.tensor(action)
         action_mag = th.sum(th.abs(action))
         regularization_penalty = -(action_mag * self.regularization_coef)
         reward += regularization_penalty
@@ -87,16 +90,16 @@ class GraspReward(BaseRewardFunction):
             info["position_penalty"] = position_penalty
         self.prev_eef_pos = eef_pos
 
-        eef_quat = robot.get_eef_orientation(robot.default_arm)
+        eef_rot = robot.get_eef_orientation(robot.default_arm)
         info["rotation_penalty_factor"] = 0.0
         info["rotation_penalty"] = 0.0
-        if self.prev_eef_quat is not None:
-            delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_quat, eef_quat)
+        if self.prev_eef_rot is not None:
+            delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_rot, eef_rot)
             rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
             reward += rotation_penalty
             info["rotation_penalty_factor"] = delta_rot.item()
             info["rotation_penalty"] = rotation_penalty.item()
-        self.prev_eef_quat = eef_quat
+        self.prev_eef_rot = eef_rot
 
         # Penalize robot for colliding with an object
         info["collision_penalty_factor"] = 0.0
@@ -119,7 +122,7 @@ class GraspReward(BaseRewardFunction):
             # TODO: If we dropped the object recently, penalize for that
             obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(eef_pos, obj_center)
-            dist_reward = math.exp(-dist) * self.dist_coeff
+            dist_reward = math.exp(-self.dist_slope_coeff * dist) * self.dist_coeff
             reward += dist_reward
             info["pregrasp_dist"] = dist
             info["pregrasp_dist_reward_factor"] = math.exp(-dist)
@@ -134,7 +137,7 @@ class GraspReward(BaseRewardFunction):
             robot_center = robot.links["torso_lift_link"].get_position_orientation()[0]
             obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(robot_center, obj_center)
-            dist_reward = math.exp(-dist) * self.dist_coeff
+            dist_reward = math.exp(-self.dist_slope_coeff * dist) * self.dist_coeff
             reward += dist_reward
             info["postgrasp_dist"] = dist
             info["postgrasp_dist_reward_factor"] = math.exp(-dist)

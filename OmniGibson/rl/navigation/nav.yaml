@@ -1,0 +1,82 @@
+env:
+  action_frequency: 10
+  physics_frequency: 60
+  flatten_obs_space: true
+  flatten_action_space: true
+  external_sensors:
+    - sensor_type: VisionSensor
+      modalities: [rgb]
+      include_in_obs: False
+      sensor_kwargs:
+        image_height: 224
+        image_width: 224
+      local_position: [-0.5, -1.0, 5.0]
+      local_orientation: [0, 0, 0, 1]              # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
+
+render:
+  viewer_width: 1280
+  viewer_height: 720
+
+scene:
+  type: InteractiveTraversableScene
+  scene_model: Rs_int
+  load_object_categories:
+    - floors
+    - walls
+
+robots:
+  - type: Turtlebot
+    obs_modalities: []
+    # proprio_obs:
+    #   - robot_lin_vel
+    #   - robot_ang_vel
+    #   - robot_pos
+    #   - robot_2d_ori
+    scale: 1.0
+    self_collision: false
+    action_normalize: true
+    action_type: continuous
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 128
+          image_width: 128
+      ScanSensor:
+          sensor_kwargs:
+            min_range: 0.05
+            max_range: 10.0
+    controller_config:
+      base:
+        name: DifferentialDriveController
+
+objects: []
+
+task:
+  type: PointNavigationTask
+  obj_name: cologne
+  robot_idn: 0
+  floor: 0
+  initial_pos: [0.0, 0.0, 0.0]
+  initial_quat: [0.0, 0.0, 0.0, 1.0]
+  goal_pos: [-1.0, 0.5, 0.0]
+  goal_tolerance: 0.36    # turtlebot bodywidth
+  goal_in_polar: false
+  path_range: [1.0, 10.0]
+  visualize_goal: false
+  visualize_path: false
+  n_vis_waypoints: 25
+  reward_type: l2
+  termination_config:
+    max_collisions: 500
+    max_steps: 500
+    fall_height: 0.03
+  reward_config:
+    r_potential: 1.0
+    r_collision: 0.1
+    r_pointgoal: 10.0
+  objects_config:
+    - type: DatasetObject
+      name: cologne
+      category: bottle_of_cologne
+      model: lyipur
+      position: [-0.3, -0.8, 0.5]

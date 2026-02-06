@@ -3,6 +3,7 @@ from omnigibson.sensors.scan_sensor import ScanSensor
 from omnigibson.sensors.sensor_base import ALL_SENSOR_MODALITIES, REGISTERED_SENSORS, BaseSensor
 from omnigibson.sensors.sensor_noise_base import REGISTERED_SENSOR_NOISES, BaseSensorNoise
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.sensors.voxel_sensor import VoxelSensor
 from omnigibson.utils.python_utils import assert_valid_key
 
 # Map sensor prim names to corresponding sensor classes

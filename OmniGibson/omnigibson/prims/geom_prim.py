@@ -571,3 +571,59 @@ class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):
         # The purpose should be default, not guide as set by CollisionGeomPrim
         # this is to make sure the geom is visualized, even though it's also collidable
         self.purpose = "default"
+
+
+class TriggerGeomPrim(CollisionGeomPrim):
+    def __init__(
+        self,
+        relative_prim_path,
+        name,
+        load_config=None,
+    ):
+        # Store values created at runtime
+        self._trigger_api = None
+        self._trigger_state_api = None
+
+        # TODO: Load/save this & also figure out when to clear.
+        self._currently_inside = set()
+
+        # Run super method
+        super().__init__(
+            relative_prim_path=relative_prim_path,
+            name=name,
+            load_config=load_config,
+        )
+
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # Create API references
+        self._trigger_api = (
+            lazy.pxr.PhysxSchema.PhysxTriggerAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriggerAPI)
+            else lazy.pxr.PhysxSchema.PhysxTriggerAPI.Apply(self._prim)
+        )
+        self._trigger_state_api = (
+            lazy.pxr.PhysxSchema.PhysxTriggerStateAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriggerStateAPI)
+            else lazy.pxr.PhysxSchema.PhysxTriggerStateAPI.Apply(self._prim)
+        )
+
+    def update_state(self, trigger_event_data):
+        other_object = og.sim._link_id_to_objects.get(trigger_event_data.other_body_prim_id, None)
+        if trigger_event_data.event_type == "trigger_enter":  # TODO: Get the right value
+            self._currently_inside.add(other_object)
+        else:
+            self._currently_inside.remove(other_object)
+
+    def objects_inside(self):
+        return set(self._currently_inside)
+
+    def get_colliding_prim_paths(self):
+        return [str(x) for x in self._trigger_state_api.GetTriggeredCollisionsRel().GetTargets()]
+
+    def update_handles(self):
+        # TODO: Make this get called
+        prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+        og.sim.psi.subscribe_physics_trigger_report_events(self.register_entry, og.sim.stage_id, prim_id)

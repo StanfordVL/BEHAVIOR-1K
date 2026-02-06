@@ -183,6 +183,16 @@ def _launch_app():
         import isaacsim  # noqa: F401
     except ImportError:
         pass
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    # kit_file = Path(__file__).parent / "omnigibson.kit"
+    # kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
+    # try:
+    #     shutil.copy(kit_file, kit_file_target)
+    # except Exception as e:
+    #     raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
 
     # First obtain the Isaac Sim version
     isaac_path = os.environ["ISAAC_PATH"]

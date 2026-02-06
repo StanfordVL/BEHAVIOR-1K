@@ -116,6 +116,11 @@ class MultiFingerGripperController(GripperController):
         # If we're using binary signal, these values will be overridden manually, so set to default for now
         if mode == "binary":
             command_output_limits = "default"
+        # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
+        # absolute range and our values are relative). So reject the default mode option in that case.
+        assert not (
+            mode == "smooth_delta" and command_output_limits == "default"
+        ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
         super().__init__(

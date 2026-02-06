@@ -49,15 +49,18 @@ robots:
       arm_0:
         name: JointController
         motor_type: position
-        command_input_limits: default
-        command_output_limits: default
-        use_delta_commands: false
-        use_impedances: False
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: true
+        use_impedances: false
       gripper_0:
         name: MultiFingerGripperController
         mode: smooth
         command_input_limits: default
         command_output_limits: default
+      camera:
+        name: JointController
+        use_delta_commands: False
 objects: []
 
 task:
