@@ -10,7 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.robots.robot import Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.ui_utils import KeyboardEventHandler, create_module_logger
 from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
@@ -57,12 +57,12 @@ class TeleopSystem(TeleopPolicy):
     Base class for teleop policy
     """
 
-    def __init__(self, config: AttrDict, robot: Optional[BaseRobot] = None, show_control_marker: bool = False) -> None:
+    def __init__(self, config: AttrDict, robot: Optional[Robot] = None, show_control_marker: bool = False) -> None:
         """
         Initializes the Teleoperation System
         Args:
             config (AttrDict): configuration dictionary
-            robot (Optional[BaseRobot]): the robot that will be controlled. Can be None.
+            robot (Optional[Robot]): the robot that will be controlled. Can be None.
             show_control_marker (bool): whether to show a visual marker that indicates the target pose of the control.
         """
         super().__init__(config)
@@ -139,7 +139,7 @@ class OVXRSystem(TeleopSystem):
 
     def __init__(
         self,
-        robot: BaseRobot,
+        robot: Robot,
         show_control_marker: bool = True,
         system: str = "SteamVR",
         disable_display_output: bool = False,
@@ -151,7 +151,7 @@ class OVXRSystem(TeleopSystem):
         """
         Initializes the VR system
         Args:
-            robot (BaseRobot): the robot that VR will control.
+            robot (Robot): the robot that VR will control.
             show_control_marker (bool): whether to show a control marker
             system (str): the VR system to use, one of ["OpenXR", "SteamVR"], default is "SteamVR".
             disable_display_output (bool): whether we will not display output to the VR headset (only use controller tracking), default is False.

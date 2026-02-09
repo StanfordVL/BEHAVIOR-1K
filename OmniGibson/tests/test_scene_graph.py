@@ -21,7 +21,7 @@ def test_scene_graph():
     def create_robot_config(name, position):
         return {
             "name": name,
-            "type": "Fetch",
+            "model": "fetch",
             "obs_modalities": ["rgb", "seg_instance"],
             "position": position,
             "orientation": T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32)),

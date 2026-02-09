@@ -1,0 +1,10 @@
+default_joint_pos: [0, 0]
+linear_velocity_gain_for_primitives: 0.3
+angular_velocity_gain_for_primitives: 0.2
+
+locomotion:
+  base_joint_names: ["wheel_left_joint", "wheel_right_joint"]
+
+two_wheel:
+  wheel_radius: 0.038
+  wheel_axle_length: 0.23

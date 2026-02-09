@@ -198,6 +198,7 @@ def get_class_init_kwargs(cls):
     Returns:
         list: All keyword arguments (excluding "self") specified by @cls __init__ constructor method
     """
+    # Fall back to signature inspection for regular classes
     return list(inspect.signature(cls.__init__).parameters.keys())[1:]
 
 
