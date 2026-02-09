@@ -458,7 +458,7 @@ class Robot(USDObject, GymObservable):
         A string that uniquely identifies the kinematic tree of this particular robot+endeffector combination.
         This is used to generate the prim path of the robot, which is then used for glob matching by the batched
         controller APIs. This allows robots to be grouped into views based on their number, and type, of joints.
-        
+
         If the robot has a manipulation config with a supported end effector that defines
         a model, that end-effector model is returned; otherwise the robot's base model.
         """
