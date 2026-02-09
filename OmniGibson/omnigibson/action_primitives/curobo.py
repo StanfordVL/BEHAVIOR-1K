@@ -159,7 +159,7 @@ class CuRoboMotionGenerator:
 
             robot_cfg_obj = lazy.curobo.types.robot.RobotConfig.from_dict(robot_cfg_dict, self._tensor_args)
 
-            if robot.holonomic_base:
+            if robot.is_holonomic_base:
                 self.update_joint_limits(robot_cfg_obj, emb_sel)
 
             motion_kwargs = dict(

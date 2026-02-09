@@ -161,7 +161,7 @@ def test_robot_load_drive():
 
         robot = Robot(
             name=robot_name,
-            model=robot_name,
+            model=robot_name.lower(),
             obs_modalities=[],
         )
         env.scene.add_object(robot)
