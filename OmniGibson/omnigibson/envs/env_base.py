@@ -272,7 +272,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if "name" not in robot_config:
                     robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
                 if "model" in robot_config:
-                    assert "type" not in robot_config, "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
+                    assert (
+                        "type" not in robot_config
+                    ), "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
                 elif "type" in robot_config:
                     log.warning(
                         "Robot config key 'type' is deprecated; use 'model' instead. "
@@ -280,7 +282,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     )
                     robot_config["model"] = robot_config["type"].lower()
                     del robot_config["type"]
-                assert (robot_config["model"] in REGISTERED_ROBOTS), f"{robot_config['model']} is not a registered robot."
+                assert robot_config["model"] in REGISTERED_ROBOTS, f"{robot_config['model']} is not a registered robot."
                 robot_config = deepcopy(robot_config)
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 pose_frame = robot_config.pop("pose_frame", "scene")

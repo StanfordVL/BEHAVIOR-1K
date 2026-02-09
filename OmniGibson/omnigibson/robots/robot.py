@@ -409,13 +409,17 @@ class Robot(USDObject, GymObservable):
     @property
     def linear_velocity_gain_for_primitives(self) -> float:
         """Returns the linear velocity proportional gain for action primitives."""
-        assert self._definition.linear_velocity_gain_for_primitives is not None, f"linear_velocity_gain_for_primitives not defined for robot {self.model}"
+        assert (
+            self._definition.linear_velocity_gain_for_primitives is not None
+        ), f"linear_velocity_gain_for_primitives not defined for robot {self.model}"
         return self._definition.linear_velocity_gain_for_primitives
 
     @property
     def angular_velocity_gain_for_primitives(self) -> float:
         """Returns the angular velocity proportional gain for action primitives."""
-        assert self._definition.angular_velocity_gain_for_primitives is not None, f"angular_velocity_gain_for_primitives not defined for robot {self.model}"
+        assert (
+            self._definition.angular_velocity_gain_for_primitives is not None
+        ), f"angular_velocity_gain_for_primitives not defined for robot {self.model}"
         return self._definition.angular_velocity_gain_for_primitives
 
     @property
