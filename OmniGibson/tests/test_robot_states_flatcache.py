@@ -36,8 +36,7 @@ def setup_environment(flatcache):
         },
         "robots": [
             {
-                "type": "Fetch",
-                "model": "Fetch",
+                "model": "fetch",
                 "obs_modalities": ["rgb", "seg_semantic", "seg_instance"],
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
@@ -183,7 +182,7 @@ def test_robot_load_drive():
         )
 
         # If this is a manipulation robot, we want to test moving the arm
-        if robot.manipulation:
+        if robot.is_manipulation:
             # load IK controller
             controller_config = {
                 f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
@@ -205,7 +204,7 @@ def test_robot_load_drive():
             assert th.norm(robot.get_eef_position() - target_eef_pos) < 0.05
 
         # If this is a locomotion robot, we want to test driving
-        if robot.locomotion:
+        if robot.is_locomotion:
             action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
             goal_location = th.tensor([0, 1, 0], dtype=th.float32)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
@@ -278,7 +277,7 @@ def test_grasping_mode():
     for grasping_mode in grasping_modes:
         robot = Robot(
             name="Fetch",
-            model="Fetch",
+            model="fetch",
             obs_modalities=[],
             controller_config={"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
             grasping_mode=grasping_mode,

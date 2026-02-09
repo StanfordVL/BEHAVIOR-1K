@@ -15,7 +15,7 @@ def test_arm_control():
         "objects": [],
         "robots": [
             {
-                "model": "Franka",
+                "model": "franka",
                 "name": "robot0",
                 "obs_modalities": [],
                 "position": [150, 150, 100],
@@ -24,7 +24,7 @@ def test_arm_control():
                 "fixed_base": True,
             },
             {
-                "model": "Fetch",
+                "model": "fetch",
                 "name": "robot1",
                 "obs_modalities": [],
                 "position": [150, 150, 105],
@@ -33,7 +33,7 @@ def test_arm_control():
                 "fixed_base": False,
             },
             {
-                "model": "Tiago",
+                "model": "tiago",
                 "name": "robot2",
                 "obs_modalities": [],
                 "position": [150, 150, 110],
@@ -41,7 +41,7 @@ def test_arm_control():
                 "action_normalize": False,
             },
             {
-                "model": "A1",
+                "model": "a1",
                 "name": "robot3",
                 "obs_modalities": [],
                 "position": [150, 150, 115],
@@ -50,7 +50,7 @@ def test_arm_control():
                 "fixed_base": True,
             },
             {
-                "model": "R1",
+                "model": "r1",
                 "name": "robot4",
                 "obs_modalities": [],
                 "position": [150, 150, 120],
@@ -265,7 +265,7 @@ def test_arm_control():
 
                 # Add base movement action if locomotion robot
                 base_move_action = zero_action.clone()
-                if robot.locomotion:
+                if robot.is_locomotion:
                     c_name = "base"
                     start_idx = 0
                     for c in robot.controller_order:

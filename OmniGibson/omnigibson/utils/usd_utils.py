@@ -511,7 +511,7 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
             for robot in scene.robots:
-                if robot.manipulation:
+                if robot.is_manipulation:
                     filters[scene_idx].extend(link.prim_path for links in robot.finger_links.values() for link in links)
 
         return filters

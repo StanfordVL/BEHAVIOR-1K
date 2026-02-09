@@ -4,9 +4,7 @@ import torch as th
 import numpy as np
 from typing import Dict, Optional
 import json
-import inspect
 import omnigibson as og
-from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.envs import DataCollectionWrapper
 from omnigibson.robots import Robot
@@ -26,10 +24,6 @@ from gello.robots.sim_robot.zmq_server import ZMQRobotServer, ZMQServerThread
 
 from gello.robots.sim_robot.og_teleop_cfg import *
 import gello.robots.sim_robot.og_teleop_utils as utils
-
-from bddl.activity import Conditions
-import yaml
-
 
 class OGRobotServer:
     def __init__(
@@ -89,7 +83,7 @@ class OGRobotServer:
         self.env = og.Environment(configs=cfg)
         self.robot = self.env.robots[0]
 
-        assert self.robot.manipulation, f"Robot {robot} is not a manipulation robot! Cannot use GELLO"
+        assert self.robot.is_manipulation, f"Robot {robot} is not a manipulation robot! Cannot use GELLO"
         
         self.ghosting = ghosting
         if self.ghosting:

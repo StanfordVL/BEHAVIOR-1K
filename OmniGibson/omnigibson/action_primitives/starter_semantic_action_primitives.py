@@ -175,7 +175,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         control_dict = self.robot.get_control_dict()
         self._arm_targets = {}
         self._reset_eef_pose = {}
-        if self.robot.manipulation:
+        if self.robot.is_manipulation:
             for arm_name in self.robot.arm_names:
                 eef = f"eef_{arm_name}"
                 arm = f"arm_{arm_name}"
@@ -200,7 +200,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     @property
     def arm(self):
-        assert self.robot.manipulation, "Cannot use arm for non-manipulation robot"
+        assert self.robot.is_manipulation, "Cannot use arm for non-manipulation robot"
         return self.robot.default_arm
 
     def _postprocess_action(self, action):
@@ -1649,11 +1649,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     assert (
                         self.robot.controllers["base"].motor_type == "velocity"
                     ), "Holonomic base controller must be in velocity mode"
-                    direction_vec = body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * self.robot.kp_lin_vel
+                    direction_vec = body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * self.robot.linear_velocity_gain_for_primitives
                     base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 elif isinstance(self.robot.controllers["base"], DifferentialDriveController):
-                    base_action = th.tensor([self.robot.kp_lin_vel, 0.0], dtype=th.float32)
+                    base_action = th.tensor([self.robot.linear_velocity_gain_for_primitives, 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     raise ValueError(f"Unsupported base controller: {type(self.robot.controllers['base'])}")
@@ -1689,7 +1689,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action()
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
-            ang_vel = self.robot.kp_ang_vel * direction
+            ang_vel = self.robot.angular_velocity_gain_for_primitives * direction
 
             base_action = action[self.robot.controller_action_idx["base"]]
 
@@ -1978,7 +1978,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor: (x,y,z) Position in the world frame
             th.tensor: (x,y,z,w) Quaternion orientation in the world frame
         """
-        if self.robot.holonomic_base:
+        if self.robot.is_holonomic_base:
             base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
             pos = th.tensor([pose_2d[0], pose_2d[1], base_joints[2]], dtype=th.float32)
             euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)

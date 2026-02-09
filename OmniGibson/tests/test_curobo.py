@@ -59,7 +59,7 @@ def test_curobo():
 
     robot_cfgs = [
         {
-            "type": "FrankaPanda",
+            "model": "franka",
             "obs_modalities": "rgb",
             "position": [0.7, -0.55, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
@@ -83,7 +83,7 @@ def test_curobo():
             },
         },
         {
-            "type": "R1",
+            "model": "r1",
             "obs_modalities": "rgb",
             "position": [0.7, -0.7, 0.056],
             "orientation": [0, 0, 0.707, 0.707],
@@ -134,7 +134,7 @@ def test_curobo():
             },
         },
         {
-            "type": "Tiago",
+            "model": "tiago",
             "obs_modalities": "rgb",
             "position": [0.7, -0.85, 0],
             "orientation": [0, 0, 0.707, 0.707],
@@ -192,7 +192,7 @@ def test_curobo():
             },
         },
         {
-            "type": "R1Pro",
+            "model": "r1pro",
             "obs_modalities": "rgb",
             "position": [0.7, -0.75, 0.056],
             "orientation": [0, 0, 0.707, 0.707],
@@ -253,7 +253,7 @@ def test_curobo():
 
         floor_touching_base_link_prim_paths = (
             [os.path.join(robot.prim_path, link_name) for link_name in robot.floor_touching_base_link_names]
-            if robot.locomotion
+            if robot.is_locomotion
             else []
         )
 
@@ -291,7 +291,7 @@ def test_curobo():
         th.manual_seed(1)
         lo, hi = robot.joint_lower_limits.clone().view(1, -1), robot.joint_upper_limits.clone().view(1, -1)
 
-        if robot.holonomic_base:
+        if robot.is_holonomic_base:
             lo[0, :2] = -0.1
             lo[0, 2:5] = 0.0
             lo[0, 5] = -math.pi

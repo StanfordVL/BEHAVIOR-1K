@@ -885,7 +885,7 @@ class CuRoboMotionGenerator:
             orientation = poses.quaternion[:, [1, 2, 3, 0]]
 
             # If the robot is holonomic, we need to transform the poses to the base link frame
-            if self.robot.holonomic_base:
+            if self.robot.is_holonomic_base:
                 base_link_position = th.zeros_like(position)
                 base_link_position[:, 0] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_x_joint")]
                 base_link_position[:, 1] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_y_joint")]

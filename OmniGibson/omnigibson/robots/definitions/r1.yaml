@@ -1,6 +1,6 @@
 raw_controller_order: ["base", "trunk", "arm_left", "gripper_left", "arm_right", "gripper_right"]
-kp_lin_vel: 0.3
-kp_ang_vel: 0.2
+linear_velocity_gain_for_primitives: 0.3
+angular_velocity_gain_for_primitives: 0.2
 default_controllers:
   base: HolonomicBaseJointController
   trunk: JointController
@@ -21,6 +21,7 @@ holonomic_base:
   force_sphere_wheel_approximation: true
 
 locomotion:
+  base_joint_names: ["base_footprint_x_joint", "base_footprint_y_joint", "base_footprint_rz_joint"]
   floor_touching_base_link_names: ["wheel_link1", "wheel_link2", "wheel_link3"]
 
 articulated_trunk:

@@ -1,6 +1,6 @@
 raw_controller_order: ["base", "trunk", "camera", "arm_left", "gripper_left", "arm_right", "gripper_right"]
-kp_lin_vel: 0.3
-kp_ang_vel: 0.2
+linear_velocity_gain_for_primitives: 0.3
+angular_velocity_gain_for_primitives: 0.2
 default_controllers:
   arm_left: InverseKinematicsController
   arm_right: InverseKinematicsController
@@ -93,9 +93,11 @@ locomotion:
     - "wheel_front_right_link"
     - "wheel_rear_left_link"
     - "wheel_rear_right_link"
+  base_joint_names: ["base_footprint_x_joint", "base_footprint_y_joint", "base_footprint_rz_joint"]
 
-holonomic_base: {} # need to add to show that Tiago is a holonomic base robot
-
+holonomic_base: 
+  force_sphere_wheel_approximation: False
+  
 articulated_trunk:
   trunk_joint_names: ["torso_lift_joint"]
 

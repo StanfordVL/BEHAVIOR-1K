@@ -1,6 +1,6 @@
 raw_controller_order: ["base", "trunk", "camera", "arm_0", "gripper_0"]
-kp_lin_vel: 0.2
-kp_ang_vel: 0.1
+linear_velocity_gain_for_primitives: 0.2
+angular_velocity_gain_for_primitives: 0.1
 default_controllers:
   base: DifferentialDriveController
   trunk: JointController

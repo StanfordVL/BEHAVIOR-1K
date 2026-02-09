@@ -88,7 +88,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             {
                 link.prim_path
                 for robot in scene.robots
-                if isinstance(robot, Robot) and robot.manipulation
+                if robot.is_manipulation
                 for finger_links in robot.finger_links.values()
                 for link in finger_links
             }

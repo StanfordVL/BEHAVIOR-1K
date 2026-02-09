@@ -11,7 +11,7 @@ def task_tester(task_type):
         },
         "robots": [
             {
-                "type": "Fetch",
+                "model": "fetch",
                 "obs_modalities": [],
             }
         ],

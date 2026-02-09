@@ -20,7 +20,7 @@ def test_data_collect_and_playback():
         },
         "robots": [
             {
-                "type": "Fetch",
+                "model": "fetch",
                 "obs_modalities": [],
             }
         ],

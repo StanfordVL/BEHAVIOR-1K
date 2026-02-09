@@ -14,8 +14,7 @@ def test_teleop():
         "scene": {"type": "Scene"},
         "robots": [
             {
-                "type": "Fetch",
-                "model": "Fetch",
+                "model": "fetch",
                 "action_normalize": False,
                 "controller_config": {
                     "arm_0": {

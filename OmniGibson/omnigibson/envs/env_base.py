@@ -271,11 +271,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
                     robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
-                if "model" not in robot_config:
-                    assert (
-                        robot_config["type"] in REGISTERED_ROBOTS
-                    ), f"{robot_config['type']} is not a registered robot."
-                    robot_config["model"] = robot_config["type"]
+                if "model" in robot_config:
+                    assert "type" not in robot_config, "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
+                elif "type" in robot_config:
+                    log.warning(
+                        "Robot config key 'type' is deprecated; use 'model' instead. "
+                        "Model IDs are lowercase (e.g. 'model': 'fetch'). "
+                    )
+                    robot_config["model"] = robot_config["type"].lower()
+                    del robot_config["type"]
+                assert (robot_config["model"] in REGISTERED_ROBOTS), f"{robot_config['model']} is not a registered robot."
                 robot_config = deepcopy(robot_config)
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 pose_frame = robot_config.pop("pose_frame", "scene")
@@ -286,9 +291,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
                     )
 
-                cls_kwargs = extract_class_init_kwargs_from_dict(cls=Robot, dic=robot_config, copy=False)
-
-                robot = Robot(**cls_kwargs)
+                robot = Robot(**robot_config)
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
                 robot.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)

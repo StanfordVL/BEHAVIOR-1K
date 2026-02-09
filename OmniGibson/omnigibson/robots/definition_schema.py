@@ -1,19 +1,17 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 
 # === Capability-specific definitions ===
-
-
 @dataclass
 class EndEffectorDefinition:
     """Definition for a specific end effector (gripper, robotiq, allegro, etc.)"""
 
-    model: Optional[str] = None
-    eef_link_names: Optional[Dict[str, str]] = None
-    finger_link_names: Optional[Dict[str, List[str]]] = None
-    finger_joint_names: Optional[Dict[str, List[str]]] = None
-    default_joint_pos: Optional[List[Any]] = None
+    model: str
+    eef_link_names: Dict[str, str]
+    finger_link_names: Dict[str, List[str]]
+    finger_joint_names: Dict[str, List[str]]
+    default_joint_pos: List[Any]
     teleop_rotation_offset: Optional[Dict[str, List[Any]]] = None
     usd_path: Optional[str] = None
     urdf_path: Optional[str] = None
@@ -31,8 +29,8 @@ class ManipulationDefinition:
 
     n_arms: int = 1
     arm_names: Optional[List[str]] = None
-    arm_link_names: Dict[str, List[str]] = field(default_factory=dict)
-    arm_joint_names: Dict[str, List[str]] = field(default_factory=dict)
+    arm_link_names: Optional[Dict[str, List[str]]] = None
+    arm_joint_names: Optional[Dict[str, List[str]]] = None
     eef_link_names: Optional[Dict[str, str]] = None
     finger_link_names: Optional[Dict[str, List[str]]] = None
     finger_joint_names: Optional[Dict[str, List[str]]] = None
@@ -58,7 +56,7 @@ class TwoWheelDefinition:
 
 @dataclass
 class HolonomicBaseDefinition:
-    """Fields for holonomic base robots (e.g., R1, Tiago)"""
+    """Fields for holonomic base robots"""
 
     force_sphere_wheel_approximation: bool = False
 
@@ -67,57 +65,55 @@ class HolonomicBaseDefinition:
 class ArticulatedTrunkDefinition:
     """Fields for robots with articulated trunk"""
 
-    trunk_link_names: List[str] = field(default_factory=list)
-    trunk_joint_names: List[str] = field(default_factory=list)
+    trunk_joint_names: List[str]
+    trunk_link_names: Optional[List[str]] = None
 
 
 @dataclass
 class ActiveCameraDefinition:
     """Fields for robots with controllable camera"""
 
-    camera_joint_names: List[str] = field(default_factory=list)
+    camera_joint_names: List[str]
 
 
 @dataclass
 class LocomotionDefinition:
-    """Fields for generic locomotion robots (not two_wheel or holonomic)"""
+    """Fields for locomotion robots"""
 
-    base_joint_names: List[str] = field(default_factory=list)
-    floor_touching_base_link_names: List[str] = field(default_factory=list)
+    base_joint_names: Optional[List[str]] = None
+    floor_touching_base_link_names: Optional[List[str]] = None
 
 
 @dataclass
 class MobileManipulationDefinition:
     """Fields for mobile manipulation robots (tuck/untuck and multiple arm poses)"""
 
-    untucked_default_joint_pos: Optional[List[Any]] = None
-    tucked_default_joint_pos: Optional[List[Any]] = None
+    untucked_default_joint_pos: List[Any]
+    tucked_default_joint_pos: List[Any]
     # Multiple arm pose support (optional)
     default_arm_pose_key: Optional[str] = None
     default_arm_poses: Optional[Dict[str, List[Any]]] = None
 
 
 # === Main Robot Definition ===
-
-
 @dataclass
 class RobotDefinition:
     """
     Root configuration for a robot, with optional capability sub-configs.
     """
 
-    raw_controller_order: List[str] = field(default_factory=list)
-    default_controllers: Dict[str, str] = field(default_factory=dict)
+    raw_controller_order: List[str]
+    default_controllers: Dict[str, str]
     default_joint_pos: Optional[List[Any]] = None
+    disabled_collision_pairs: Optional[List[List[str]]] = None
+    disabled_collision_link_names: Optional[List[Any]] = None
     usd_path: Optional[str] = None
     urdf_path: Optional[str] = None
     curobo_path: Optional[str] = None
-    disabled_collision_pairs: List[List[str]] = field(default_factory=list)
-    disabled_collision_link_names: List[str] = field(default_factory=list)
     base_footprint_link_name: Optional[str] = None
     visual_only_eef_links: bool = False
-    kp_lin_vel: Optional[float] = None
-    kp_ang_vel: Optional[float] = None
+    linear_velocity_gain_for_primitives: Optional[float] = None
+    angular_velocity_gain_for_primitives: Optional[float] = None
 
     manipulation: Optional[ManipulationDefinition] = None
     two_wheel: Optional[TwoWheelDefinition] = None
