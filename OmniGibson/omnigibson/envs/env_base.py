@@ -27,7 +27,7 @@ from omnigibson.utils.python_utils import (
     Recreatable,
     assert_valid_key,
     create_class_from_registry_and_config,
-    merge_nested_dicts
+    merge_nested_dicts,
 )
 from omnigibson.utils.ui_utils import create_module_logger
 
