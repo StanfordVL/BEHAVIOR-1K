@@ -210,7 +210,7 @@ class Robot(USDObject, GymObservable):
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
-        self.model = model.lower()
+        self.model = model
         # Read and validate robot definition YAML file using OmegaConf
         definition_dir = os.path.dirname(__file__)
         definition_path = os.path.join(definition_dir, "definitions", self.model + ".yaml")

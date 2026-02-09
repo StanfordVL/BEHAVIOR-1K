@@ -26,7 +26,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Create and import robot
         robot = Robot(
             name=robot_name,
-            model=robot_name.lower(),
+            model=robot_name,
             obs_modalities=[],  # We're just moving robots around so don't load any observation modalities
         )
         env.scene.add_object(robot)

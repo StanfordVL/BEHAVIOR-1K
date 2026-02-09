@@ -77,9 +77,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
     @classmethod
     def global_update(cls):
-        # Avoid circular imports
-        from omnigibson.robots.robot import Robot
-
         # Clear finger contact objects since it will be refreshed now
         cls._finger_contact_objs = set()
 
