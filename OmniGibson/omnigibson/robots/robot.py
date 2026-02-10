@@ -243,7 +243,7 @@ class Robot(USDObject, GymObservable):
             self._ag_release_counter = {arm: None for arm in self.arm_names}
             self._ag_grasp_counter = {arm: None for arm in self.arm_names}
 
-        can_be_floating = (self.is_locomotion and not self.is_holonomic_base)
+        can_be_floating = self.is_locomotion and not self.is_holonomic_base
         if not fixed_base and not can_be_floating:
             log.warning(f"{self.model} is set to floating base but is not a non-holonomic locomotion robot")
         fixed_base = fixed_base or not can_be_floating
