@@ -15,23 +15,12 @@ from omnigibson.macros import gm, macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
-from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
+from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.controllers.controller_base import ControlType
-from omnigibson.utils.backend_utils import _compute_backend as cb
-
-from lerobot.datasets.lerobot_dataset import (
-    HF_LEROBOT_HOME,
-    LeRobotDataset,
-    CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION,
-)
-from omnigibson.learning.utils.lerobot_utils import OmniGibsonLeRobotV2Dataset, OmniGibsonLeRobotV3Dataset
-
-import shutil
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -52,17 +41,14 @@ class DataWrapper(EnvironmentWrapper):
     """
 
     def __init__(
-        self,
-        env,
-        output_path,
-        overwrite=True,
-        only_successes=True,
-        flush_every_n_traj=10,
+        self, env, output_path, compression=dict(), overwrite=True, only_successes=True, flush_every_n_traj=10
     ):
         """
         Args:
             env (Environment): The environment to wrap
-            output_path (str): path to store data file
+            output_path (str): path to store hdf5 data file
+            compression (dict): If specified, the compression arguments to use for the hdf5 file.
+                For more information, check out https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
@@ -81,25 +67,27 @@ class DataWrapper(EnvironmentWrapper):
         self.only_successes = only_successes
         self.flush_every_n_traj = flush_every_n_traj
         self.current_obs = None
+        self.compression = compression
+
         self.current_traj_history = []
 
-        # Create dataset
-        self.create_dataset(output_path, env, overwrite=overwrite)
+        Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
+        log.info(f"\nWriting dataset hdf5 to: {output_path}\n")
+        self.hdf5_file = h5py.File(output_path, "w" if overwrite else "a")
+        if "data" not in set(self.hdf5_file.keys()):
+            data_grp = self.hdf5_file.create_group("data")
+        else:
+            data_grp = self.hdf5_file["data"]
+        if overwrite or "config" not in set(data_grp.attrs.keys()):
+            if isinstance(env.task, BehaviorTask):
+                env.task.update_bddl_scope_metadata(env)
+            scene_file = env.scene.save()
+            config = deepcopy(env.config)
+            self.add_metadata(group=data_grp, name="config", data=config)
+            self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
 
         # Run super
         super().__init__(env=env)
-
-    def create_dataset(self, output_path, env, overwrite=True):
-        """
-        Creates a dataset at @output_path, possibly overwriting it if @overwrite is set
-
-        Args:
-            output_path (str): path to store data. May be either directory or filepath depending on the
-                dataset type
-            env (Environment): The wrapped environment
-            overwrite (bool): Whether to overwrite any pre-existing data or not
-        """
-        raise NotImplementedError
 
     def step(self, action, n_render_iterations=1):
         """
@@ -189,139 +177,7 @@ class DataWrapper(EnvironmentWrapper):
         """
         return self.env.observation_spec()
 
-    def process_traj_to_dataset(self, traj_data, nested_keys=("obs",)):
-        """
-        Processes trajectory data @traj_data and stores them as a new group under @traj_grp_name.
-
-        Args:
-            traj_data (list of dict): Trajectory data, where each entry is a keyword-mapped set of data for a single
-                sim step
-            nested_keys (list of str): Name of key(s) corresponding to nested data in @traj_data. This specific data
-                is assumed to be its own keyword-mapped dictionary of numpy array values, and will be parsed
-                differently from the rest of the data
-
-        Returns:
-            hdf5.Group: Generated hdf5 group storing the recorded trajectory data
-        """
-        raise NotImplementedError
-
-    @property
-    def should_save_current_episode(self):
-        """
-        Returns:
-            bool: Whether the current episode should be saved or discarded
-        """
-        # Only save successful demos and if actually recording
-        return self.env.task.success or not self.only_successes
-
-    def flush_current_traj(self):
-        """
-        Flush current trajectory data
-        """
-        # Only save successful demos and if actually recording
-        if self.should_save_current_episode:
-            self.process_traj_to_dataset(self.current_traj_history, nested_keys=["obs"])
-            self.traj_count += 1
-
-            # Potentially write to disk
-            if self.traj_count % self.flush_every_n_traj == 0:
-                self.flush_current_file()
-        else:
-            # Remove this demo
-            self.step_count -= len(self.current_traj_history)
-
-        # Clear trajectory and transition buffers
-        self.current_traj_history = []
-
-    def flush_current_file(self):
-        raise NotImplementedError
-
-    def save_data(self):
-        """
-        Save collected trajectories as a hdf5 file in the robomimic format
-        """
-        if len(self.current_traj_history) > 0:
-            self.flush_current_traj()
-
-        self.close_dataset()
-
-    def close_dataset(self):
-        """
-        Closes the active dataset, if open
-        """
-        raise NotImplementedError
-
-
-class HDF5DataWrapper(DataWrapper):
-    """
-    Specific data wrapper for writing data to HDF5 format
-    """
-
-    def __init__(
-        self,
-        env,
-        output_path,
-        overwrite=True,
-        only_successes=True,
-        flush_every_n_traj=10,
-        compression=None,
-    ):
-        """
-        Args:
-            env (Environment): The environment to wrap
-            output_path (str): path to store hdf5 data file. Should end in .hdf5
-            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
-                Otherwise, will load the data and append to it
-            only_successes (bool): Whether to only save successful episodes
-            flush_every_n_traj (int): How often to flush (write) current data to file
-            compression (None or dict): If specified, the compression arguments to use for the hdf5 file.
-                For more information, check out https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline
-        """
-        self.compression = dict() if compression is None else compression
-        self.hdf5_file = None
-
-        # Run super
-        super().__init__(
-            env=env,
-            output_path=output_path,
-            overwrite=overwrite,
-            only_successes=only_successes,
-            flush_every_n_traj=flush_every_n_traj,
-        )
-
-    def create_dataset(self, output_path, env, overwrite=True):
-        Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
-        log.info(f"\nWriting dataset hdf5 to: {output_path}\n")
-        self.hdf5_file = h5py.File(output_path, "w" if overwrite else "a")
-        if "data" not in set(self.hdf5_file.keys()):
-            data_grp = self.hdf5_file.create_group("data")
-        else:
-            data_grp = self.hdf5_file["data"]
-
-        if overwrite or "config" not in set(data_grp.attrs.keys()):
-            if isinstance(env.task, BehaviorTask):
-                env.task.update_bddl_scope_metadata(env)
-            scene_file = env.scene.save()
-            config = deepcopy(env.config)
-            self.add_metadata(group=data_grp, name="config", data=config)
-            self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
-
-    @property
-    def should_save_current_episode(self):
-        """
-        Returns:
-            bool: Whether the current episode should be saved or discarded
-        """
-        # Only save successful demos and if actually recording
-        success = super().should_save_current_episode
-        return success and self.hdf5_file is not None
-
-    def process_traj_to_dataset(self, traj_data, nested_keys=("obs",)):
-        traj_grp_name = f"demo_{self.traj_count}"
-        traj_grp = self._process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
-        self._postprocess_traj_group(traj_grp)
-
-    def _process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",), data_grp=None):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",), data_grp=None):
         """
         Processes trajectory data @traj_data and stores them as a new group under @traj_grp_name.
 
@@ -374,7 +230,17 @@ class HDF5DataWrapper(DataWrapper):
 
         return traj_grp
 
-    def _postprocess_traj_group(self, traj_grp):
+    @property
+    def should_save_current_episode(self):
+        """
+        Returns:
+            bool: Whether the current episode should be saved or discarded
+        """
+        # Only save successful demos and if actually recording
+        success = self.env.task.success or not self.only_successes
+        return success and self.hdf5_file is not None
+
+    def postprocess_traj_group(self, traj_grp):
         """
         Runs any necessary postprocessing on the given trajectory group @traj_grp. This should be an
         in-place operation!
@@ -384,6 +250,27 @@ class HDF5DataWrapper(DataWrapper):
         """
         # Default is no-op
         pass
+
+    def flush_current_traj(self):
+        """
+        Flush current trajectory data
+        """
+        # Only save successful demos and if actually recording
+        if self.should_save_current_episode:
+            traj_grp_name = f"demo_{self.traj_count}"
+            traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
+            self.traj_count += 1
+            self.postprocess_traj_group(traj_grp)
+
+            # Potentially write to disk
+            if self.traj_count % self.flush_every_n_traj == 0:
+                self.flush_current_file()
+        else:
+            # Remove this demo
+            self.step_count -= len(self.current_traj_history)
+
+        # Clear trajectory and transition buffers
+        self.current_traj_history = []
 
     def flush_current_file(self):
         self.hdf5_file.flush()  # Flush data to disk to avoid large memory footprint
@@ -404,22 +291,26 @@ class HDF5DataWrapper(DataWrapper):
         """
         group.attrs[name] = json.dumps(data, cls=TorchEncoder) if isinstance(data, dict) else data
 
-    def close_dataset(self):
+    def save_data(self):
         """
-        Closes the active dataset, if open
+        Save collected trajectories as a hdf5 file in the robomimic format
         """
+        if len(self.current_traj_history) > 0:
+            self.flush_current_traj()
+
         if self.hdf5_file is not None:
             log.info(
                 f"\nSaved:\n"
                 f"{self.traj_count} trajectories / {self.step_count} total steps\n"
                 f"to hdf5: {self.hdf5_file.filename}\n"
             )
+
             self.hdf5_file["data"].attrs["n_episodes"] = self.traj_count
             self.hdf5_file["data"].attrs["n_steps"] = self.step_count
             self.hdf5_file.close()
 
 
-class HDF5CollectionWrapper(HDF5DataWrapper):
+class DataCollectionWrapper(DataWrapper):
     """
     An OmniGibson environment wrapper for collecting data in an optimized way.
 
@@ -508,8 +399,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
 
         # Configure the simulator to optimize for data collection
         self._enable_dump_filters = enable_dump_filters
-        if viewport_camera_path:
-            self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
+        self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
 
     def update_checkpoint(self):
         """
@@ -575,21 +465,8 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
                 self.checkpoint_states = self.checkpoint_states[: index + 1]
                 self.checkpoint_step_idxs = self.checkpoint_step_idxs[: index + 1]
 
-    def _process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",), data_grp=None):
-        # First pad all state values to be the same max (uniform) size
-        for step_data in traj_data:
-            state = step_data["state"]
-            padded_state = th.zeros(self.max_state_size, dtype=th.float32)
-            padded_state[: len(state)] = state
-            step_data["state"] = padded_state
-
-        # Call super
-        traj_grp = super()._process_traj_to_hdf5(traj_data, traj_grp_name, nested_keys, data_grp)
-
-        return traj_grp
-
-    def _postprocess_traj_group(self, traj_grp):
-        super()._postprocess_traj_group(traj_grp=traj_grp)
+    def postprocess_traj_group(self, traj_grp):
+        super().postprocess_traj_group(traj_grp=traj_grp)
 
         # Add in transition info
         self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
@@ -799,6 +676,7 @@ class DataPlaybackWrapper(DataWrapper):
         cls,
         input_path,
         output_path,
+        compression=dict(),
         robot_obs_modalities=tuple(),
         robot_proprio_keys=None,
         robot_sensor_config=None,
@@ -818,7 +696,6 @@ class DataPlaybackWrapper(DataWrapper):
         include_robot_control=True,
         include_contacts=True,
         load_room_instances=None,
-        **kwargs,
     ):
         """
         Create a DataPlaybackWrapper environment instance form the recorded demonstration info
@@ -828,6 +705,7 @@ class DataPlaybackWrapper(DataWrapper):
             input_path (str): Absolute path to the input hdf5 file containing the relevant collected data to playback
             output_path (str): Absolute path to the output hdf5 file that will contain the recorded observations from
                 the replayed data
+            compression (dict): If specified, the compression arguments to use for the hdf5 file.
             robot_obs_modalities (list): Robot observation modalities to use. This list is directly passed into
                 the robot_cfg (`obs_modalities` kwarg) when spawning the robot
             robot_proprio_keys (None or list of str): If specified, a list of proprioception keys to use for the robot.
@@ -869,7 +747,6 @@ class DataPlaybackWrapper(DataWrapper):
                 objects to be visual_only
             load_room_instances (None or list of str): If specified, list of room instance names to load during
                 playback
-            kwargs (dict): Any remaining keyword arguments to pass into class constructor
 
         Returns:
             DataPlaybackWrapper: Generated playback environment
@@ -939,29 +816,11 @@ class DataPlaybackWrapper(DataWrapper):
                 robot_cfg["proprio_obs"] = robot_proprio_keys
             if robot_sensor_config is not None:
                 robot_cfg["sensor_config"] = robot_sensor_config
-            # For robot obs, make sure sensor modalities key is removed so that the modalities are
-            # auto-inferred from the set of robot obs modalities requested
-            for sensor_cfg in robot_cfg["sensor_config"].values():
-                if "modalities" in sensor_cfg:
-                    sensor_cfg.pop("modalities")
         if external_sensors_config is not None:
             config["env"]["external_sensors"] = external_sensors_config
 
         # Load env
         env = og.Environment(configs=config)
-
-        # Update robot sensor / proprio configuration
-        if robot_proprio_keys is not None:
-            for robot in env.robots:
-                robot._proprio_obs = list(robot_proprio_keys)
-        if robot_sensor_config is not None:
-            for robot in env.robots:
-                for sensor in robot.sensors.values():
-                    sensor_cls_name = sensor.__class__.__name__
-                    sensor_kwargs = robot_sensor_config.get(sensor_cls_name, dict()).get("sensor_kwargs", dict())
-                    for kwarg, value in sensor_kwargs.items():
-                        setattr(sensor, kwarg, value)
-            env.load_observation_space()
 
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
@@ -976,6 +835,7 @@ class DataPlaybackWrapper(DataWrapper):
             env=env,
             input_path=input_path,
             output_path=output_path,
+            compression=compression,
             n_render_iterations=n_render_iterations,
             overwrite=overwrite,
             only_successes=only_successes,
@@ -985,7 +845,6 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
-            **kwargs,
         )
 
     def __init__(
@@ -993,6 +852,7 @@ class DataPlaybackWrapper(DataWrapper):
         env,
         input_path,
         output_path,
+        compression=dict(),
         n_render_iterations=5,
         overwrite=True,
         only_successes=False,
@@ -1002,13 +862,13 @@ class DataPlaybackWrapper(DataWrapper):
         load_room_instances=None,
         include_robot_control=True,
         include_contacts=True,
-        **kwargs,
     ):
         """
         Args:
             env (Environment): The environment to wrap
             input_path (str): path to input hdf5 collected data file
             output_path (str): path to store output hdf5 data file
+            compression (dict): If specified, the compression arguments to use for the hdf5 file.
             n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
                 recorded data
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
@@ -1023,7 +883,6 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances (None or str): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
-            kwargs (dict): Arguments to pass to super class
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
@@ -1050,12 +909,14 @@ class DataPlaybackWrapper(DataWrapper):
                 self.scene_file = env.scene.save(as_dict=True)
 
         # Store additional variables
-        self.current_traj_history = []
         self.n_render_iterations = n_render_iterations
         if flush_every_n_steps > 0:
             assert flush_every_n_traj == 1, "flush_every_n_traj must be 1 if flush_every_n_steps is greater than 0"
         self.flush_every_n_steps = flush_every_n_steps
+
+        self.current_traj_grp = None
         self.current_episode_step_count = 0
+        self.traj_dsets = dict()
         self.include_robot_control = include_robot_control
         self.include_contacts = include_contacts
 
@@ -1063,10 +924,10 @@ class DataPlaybackWrapper(DataWrapper):
         super().__init__(
             env=env,
             output_path=output_path,
+            compression=compression,
             overwrite=overwrite,
             only_successes=only_successes,
             flush_every_n_traj=flush_every_n_traj,
-            **kwargs,
         )
 
     def _process_obs(self, obs, info):
@@ -1209,7 +1070,9 @@ class DataPlaybackWrapper(DataWrapper):
                 )
                 if self.flush_every_n_steps > 0:
                     if i == 0:
-                        self.allocate_traj(step_data, episode_id, num_samples=len(action), video_writers=video_writers)
+                        self.current_traj_grp, self.traj_dsets = self.allocate_traj_to_hdf5(
+                            step_data, f"demo_{episode_id}", num_samples=len(action), video_writers=video_writers
+                        )
                     if i % self.flush_every_n_steps == 0:
                         self.flush_partial_traj(num_samples=len(action), video_writers=video_writers)
                 # append to current trajectory history
@@ -1222,29 +1085,6 @@ class DataPlaybackWrapper(DataWrapper):
             if self.flush_every_n_steps > 0:
                 self.flush_partial_traj(num_samples=len(action), video_writers=video_writers)
             self.flush_current_traj()
-
-    def allocate_traj(
-        self,
-        step_data,
-        episode_id,
-        num_samples: int,
-        nested_keys=("obs",),
-        video_writers=None,
-    ):
-        """
-        Allocate trajectory data space from @step_data given the number of samples @num_samples.
-
-        Args:
-            step_data (dict): Keyword-mapped set of data for a single sim step
-            episode_id (int): Trajectory episode ID
-            num_samples (int): Number of samples in the trajectory
-            nested_keys (list of str): Name of key(s) corresponding to nested data in @step_data. This specific data
-                is assumed to be its own keyword-mapped dictionary of numpy array values, and will be parsed
-                differently from the rest of the data.
-            video_writers (None or dict): If specified, a dictionary mapping observation keys to video writers
-                for saving video frames during replay
-        """
-        raise NotImplementedError
 
     def playback_dataset(self, record_data=False):
         """
@@ -1259,197 +1099,7 @@ class DataPlaybackWrapper(DataWrapper):
                 record_data=record_data,
             )
 
-    def add_to_dataset(self, keys, idxs, data, idx_max=None):
-        """
-        Adds tensorized data @data to the active dataset with specified nested keys @keys, at indexes @idxs
-
-        Args:
-            keys (list of str): Key(s) to write data to. A list should be specified if using nested keys
-            idxs (int or list of int): Index(es) within batched tensor to write tensor data to
-        """
-        raise NotImplementedError
-
-    def flush_partial_traj(self, num_samples: int, video_writers=None):
-        """
-        Flush the current trajectory data to file.
-        If flush_every_n_steps is greater than 0, flush the current trajectory data to file every n steps.
-        Args:
-            num_samples: (int): The number of samples to flush.
-            video_writers: (None or dict): If specified, a dictionary mapping observation keys to video writers
-                for saving video frames during replay
-        """
-        log.info(f"Storing partial trajectory at step {self.current_episode_step_count}...")
-        assert self.flush_every_n_steps > 0, "flush_every_n_steps must be greater than 0 to flush partial trajectory"
-        data_length_to_flush = len(self.current_traj_history)
-        # At step 0, we only have observation data, so observation data will only have one more offset than others
-        if self.current_episode_step_count == 0:
-            assert data_length_to_flush == 1
-            for key, dat in self.current_traj_history[0].items():
-                for mod in dat.keys():
-                    if video_writers is not None and mod in video_writers.keys():
-                        assert (
-                            write_video is not None
-                        ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
-                        # write to video
-                        write_video(
-                            self.current_traj_history[0][key][mod].unsqueeze(0).numpy(),
-                            video_writer=video_writers[mod],
-                            batch_size=None,
-                            mode=mod.split("::")[-1],
-                        )
-                    else:
-                        self.add_to_dataset(keys=[key, mod], idxs=0, data=self.current_traj_history[0][key][mod])
-        else:
-            for key, dat in self.current_traj_history[0].items():
-                if isinstance(dat, dict):
-                    for mod in dat.keys():
-                        obs_data_length = (
-                            data_length_to_flush
-                            if self.current_episode_step_count < num_samples
-                            else data_length_to_flush - 1
-                        )
-                        if obs_data_length > 0:
-                            data_to_write = th.stack(
-                                [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
-                            )
-                            if video_writers is not None and mod in video_writers.keys():
-                                assert (
-                                    write_video is not None
-                                ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
-                                # write to video
-                                write_video(
-                                    data_to_write.numpy(),
-                                    video_writer=video_writers[mod],
-                                    batch_size=None,
-                                    mode=mod.split("::")[-1],
-                                )
-                            else:
-                                self.add_to_dataset(
-                                    keys=[key, mod],
-                                    idxs=list(
-                                        range(
-                                            self.current_episode_step_count - data_length_to_flush + 1,
-                                            self.current_episode_step_count + 1,
-                                        )
-                                    ),
-                                    data=data_to_write,
-                                )
-                else:
-                    self.add_to_dataset(
-                        keys=[key],
-                        idxs=list(
-                            range(
-                                self.current_episode_step_count - data_length_to_flush,
-                                self.current_episode_step_count,
-                            )
-                        ),
-                        data=th.stack([self.current_traj_history[i][key] for i in range(data_length_to_flush)], dim=0),
-                    )
-        # Reset the current trajectory history
-        self.current_traj_history = []
-
-    def flush_current_traj(self):
-        """
-        Flush current trajectory data
-        For playback, we assume that all data needs to be stored.
-        """
-        if self.flush_every_n_steps == 0:
-            super().flush_current_traj()
-        else:
-            self.postprocess_current_traj()
-            self.flush_current_file()
-            # Clear trajectory and transition buffers
-            self.traj_count += 1
-            self.current_episode_step_count = 0
-            self.current_traj_history = []
-
-    def postprocess_current_traj(self):
-        """
-        Postprocesses the current trajectory data
-        """
-        raise NotImplementedError
-
-
-class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
-    """
-    Playback wrapper for replaying data and writing to an HDF5 file
-    """
-
-    def __init__(
-        self,
-        env,
-        input_path,
-        output_path,
-        n_render_iterations=5,
-        overwrite=True,
-        only_successes=False,
-        flush_every_n_traj=10,
-        flush_every_n_steps=0,
-        full_scene_file=None,
-        load_room_instances=None,
-        include_robot_control=True,
-        include_contacts=True,
-        compression=None,
-    ):
-        """
-        Args:
-            env (Environment): The environment to wrap
-            input_path (str): path to input hdf5 collected data file
-            output_path (str): path to store output hdf5 data file
-            n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
-                recorded data
-            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
-                Otherwise, will load the data and append to it
-            only_successes (bool): Whether to only save successful episodes
-            flush_every_n_traj (int): How often to flush (write) current data to file across episodes
-            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
-                If this is greater than 0, flush_every_n_traj must be set to 1.
-            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
-                the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
-                full scene file.
-            load_room_instances (None or str): If specified, the room instances to load for playback.
-            include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
-            include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
-            compression (None or dict): If specified, the compression arguments to use for the hdf5 file.
-        """
-        self.current_traj_grp = None
-        self.traj_dsets = dict()
-
-        # Run super
-        super().__init__(
-            env=env,
-            input_path=input_path,
-            output_path=output_path,
-            n_render_iterations=n_render_iterations,
-            overwrite=overwrite,
-            only_successes=only_successes,
-            flush_every_n_traj=flush_every_n_traj,
-            flush_every_n_steps=flush_every_n_steps,
-            full_scene_file=full_scene_file,
-            load_room_instances=load_room_instances,
-            include_robot_control=include_robot_control,
-            include_contacts=include_contacts,
-            compression=compression,
-        )
-
-    def allocate_traj(
-        self,
-        step_data,
-        episode_id,
-        num_samples: int,
-        nested_keys=("obs",),
-        video_writers=None,
-    ):
-        # Allocate a new dataset group in HDF5
-        self.current_traj_grp, self.traj_dsets = self._allocate_traj_to_hdf5(
-            step_data,
-            f"demo_{episode_id}",
-            num_samples=num_samples,
-            nested_keys=nested_keys,
-            video_writers=video_writers,
-        )
-
-    def _allocate_traj_to_hdf5(
+    def allocate_traj_to_hdf5(
         self, step_data, traj_grp_name, num_samples: int, nested_keys=("obs",), data_grp=None, video_writers=None
     ):
         """
@@ -1501,594 +1151,84 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
 
         return traj_grp, traj_dsets
 
-    def add_to_dataset(self, keys, idxs, data, mod=None, idx_max=None):
-        dset = self.traj_dset
-        for key in keys:
-            dset = dset[key]
-        dset[idxs] = data
-
-    def postprocess_current_traj(self):
-        self._postprocess_traj_group(self.current_traj_grp)
-
-
-class LeRobotPlaybackWrapper(DataPlaybackWrapper):
-    """
-    An OmniGibson environment wrapper for playing back data and collecting observations to be stored in LeRobotV3 format
-
-    NOTE: This assumes a DataCollectionWrapper environment has been used to collect data!
-    """
-
-    def __init__(
-        self,
-        env,
-        input_path,
-        output_path,
-        n_render_iterations=5,
-        overwrite=True,
-        only_successes=False,
-        flush_every_n_traj=10,
-        flush_every_n_steps=0,
-        full_scene_file=None,
-        load_room_instances=None,
-        include_robot_control=True,
-        include_contacts=True,
-        root_dir=HF_LEROBOT_HOME,
-        robot_type=None,
-        image_writer_threads=10,
-        image_writer_processes=5,
-        task_name=None,
-        lerobot_version="v3.0",
-        use_videos=True,
-        include_multi_action_representation=False,
-    ):
+    def flush_partial_traj(self, num_samples: int, video_writers=None):
         """
+        Flush the current trajectory data to file.
+        If flush_every_n_steps is greater than 0, flush the current trajectory data to file every n steps.
         Args:
-            env (Environment): The environment to wrap
-            input_path (str): path to input hdf5 collected data file
-            output_path (str): path to the output lerobot dataset. This value is synonymous with lerobot's
-                @repo_id key, and should specify the name of the repo for saving the dataset, e.g. <username>/<dataset_name>
-            n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
-                recorded data
-            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
-                Otherwise, will load the data and append to it
-            only_successes (bool): Whether to only save successful episodes
-            flush_every_n_traj (int): How often to flush (write) current data to file across episodes
-            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
-                If this is greater than 0, flush_every_n_traj must be set to 1.
-            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
-                the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
-                full scene file.
-            load_room_instances (None or str): If specified, the room instances to load for playback.
-            include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
-            include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
-            root_dir (str): Root directory to store output dataset files
-            robot_type (None or str): Name of the robot within this dataset. If not specified, will be inferred
-                from environment
-            image_writer_threads (int): How many threads to use for writing images
-            image_writer_processes (int): How many processes to use for writing images
-            task_name (None or str): If specified, task that will be recorded in LeRobot dataset. If not specified,
-                will try to automatically infer if the wrapped environment is a BehaviorTask
-            lerobot_version (str): Version of LeRobot to use when saving dataset. This must be aligned with the
-                installed lerobot library version
-            use_videos (bool): Whether to save high dimensional image data as video or not
-            include_multi_action_representation (bool): Whether to include multi action representation in the dataset. This will make the action entry a concatenation of multiple action representations, with
-                corresponding annotations written to modalities.json in the meta folder
+            num_samples: (int): The number of samples to flush.
+            video_writers: (None or dict): If specified, a dictionary mapping observation keys to video writers
+                for saving video frames during replay
         """
-        # Store variables
-        self.lerobot_dataset_kwargs = {
-            "repo_id": output_path,
-            "root": f"{root_dir}/{output_path}",
-            "robot_type": env.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
-            "image_writer_threads": image_writer_threads,
-            "image_writer_processes": image_writer_processes,
-        }
-        self.dataset = None
-        self.obs_mapping = None  # Maps OG obs name -> lerobot obs name
-        assert_valid_key(lerobot_version, valid_keys={"v2.1", "v3.0"}, name="lerobot version")
-        assert lerobot_version == LEROBOT_CODEBASE_VERSION, (
-            f"Got mismatch between requested LeRobot version {lerobot_version} and actual version {LEROBOT_CODEBASE_VERSION}!\n\n"
-            + "Make sure LeRobot repo is cloned and sourced locally.\n\n"
-            + "For v2.1, run `git checkout v0.3.3`\n"
-            + "For v3.0, run `git checkout `v0.4.2`\n\n"
-        )
-        self.lerobot_version = lerobot_version
-        self.use_videos = use_videos
-        self.last_actions = None
-        self.controller_action_start_idxs = None
-        self.include_multi_action_representation = include_multi_action_representation
-        if self.include_multi_action_representation:
-            assert include_robot_control, "Multi action representation requires robot control!"
-
-        # Infer task name
-        if task_name is None:
-            if isinstance(env.task, BehaviorTask):
-                task_name = env.task.activity_name.replace("_", " ")
-            else:
-                task_name = "Do something"
-        self.task_name = task_name
-
-        # Run super
-        super().__init__(
-            env=env,
-            input_path=input_path,
-            output_path=output_path,
-            n_render_iterations=n_render_iterations,
-            overwrite=overwrite,
-            only_successes=only_successes,
-            flush_every_n_traj=flush_every_n_traj,
-            flush_every_n_steps=flush_every_n_steps,
-            full_scene_file=full_scene_file,
-            load_room_instances=load_room_instances,
-            include_robot_control=include_robot_control,
-            include_contacts=include_contacts,
-        )
-
-    @classmethod
-    def get_lerobot_obs_mapping(cls, env, use_videos=True):
-        obs_mapping, obs_features = dict(), dict()
-        for key, gym_shape in env.observation_space.items():
-            modality = key.split("::")[-1]
-            info = dict()
-            # Parse the relevant name to assign
-            obs_name_strs = key.split("::")[-2].split(":")
-            if "robot" in obs_name_strs[0]:
-                # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
-                obs_name_strs = obs_name_strs[1:]
-            # Join with "_" and make lowercase to make final name
-            obs_name = "_".join(obs_name_strs).lower()
-            if obs_name == "":
-                # e.g.: for proprio
-                obs_name = "robot"
-            if "rgb" in modality:
-                info["dtype"] = "video" if use_videos else "image"
-                info["shape"] = gym_shape.shape[:-1] + (3,)
-                info["names"] = ["height", "width", "channel"]
-            elif "depth" in modality:
-                info["dtype"] = "video" if use_videos else "image"
-                info["shape"] = gym_shape.shape + (1,)
-                info["names"] = ["height", "width"]
-
-                # We also add relative camera transforms (wrt robot egocentric frame) in case we
-                # want to convert depth to point clouds
-                # So we add an extra entry here
-                tf_name = f"observation.robot2cam_pose.{obs_name}"
-                if tf_name not in obs_features:
-                    obs_features[tf_name] = {
-                        "dtype": "float32",
-                        "shape": (7,),
-                        "names": None,
-                    }
-
-            elif "proprio" in modality or "low_dim" in modality:
-                info["dtype"] = "float32"
-                info["shape"] = gym_shape.shape
-                info["names"] = (None,)
-            else:
-                raise ValueError(f"Got LeRobot-incompatible observation modality: {modality}")
-
-            # Add this key to features, and store the obs name mapping
-            lerobot_obs_name = "observation.state" if "proprio" in modality else f"observation.{modality}.{obs_name}"
-            obs_features[lerobot_obs_name] = info
-            obs_mapping[key] = lerobot_obs_name
-
-        return obs_mapping, obs_features
-
-    @classmethod
-    def og_to_lerobot_obs(cls, env, obs_flat, obs_mapping):
-        # Add tfs to flattened obs
-        # TODO: Currently overfit to a single robot
-        robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))
-        for sensor_group in (env.external_sensors, env.robots[0].sensors):
-            if sensor_group is None:
-                continue
-            for name, sensor in sensor_group.items():
-                obs_flat[f"{name}::rel_pose"] = th.cat(
-                    T.mat2pose(robot_tf_inv @ T.pose2mat(sensor.get_position_orientation()))
-                )
-
-        # Compose lerobot format obs
-        frame = dict()
-        for name in env.observation_space.keys():
-            obs = obs_flat[name]
-            # Prune alpha channel if keeping RGB
-            if "rgb" in name:
-                obs = obs[..., :-1]
-            elif "depth" in name:
-                # Add channel dim at the end
-                obs = obs.unsqueeze(-1)
-                # If we haven't already added the sensor pose obs, do so now
-                obs_name_strs = name.split("::")[-2].split(":")
-                if "robot" in obs_name_strs[0]:
-                    # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
-                    obs_name_strs = obs_name_strs[1:]
-                # Join with "_" and make lowercase to make final name
-                obs_name = "_".join(obs_name_strs).lower()
-                tf_name = f"observation.robot2cam_pose.{obs_name}"
-                if tf_name not in frame:
-                    sensor_name = name.split("::")[-2]
-                    frame[tf_name] = obs_flat[f"{sensor_name}::rel_pose"]
-            elif "proprio" in name:
-                # Map float64 -> float32
-                obs = obs.float()
-            # Add the observation to the current frame
-            frame[obs_mapping[name]] = obs
-
-        return frame
-
-    def create_dataset(self, output_path, env, overwrite=True):
-        # Sanity checks
-        assert (
-            output_path == self.lerobot_dataset_kwargs["repo_id"]
-        ), f"Expected LeRobot repo_id path ({self.lerobot_dataset_kwargs['repo_id']}) to match output_path ({output_path})!"
-
-        abs_output_path = f"{self.lerobot_dataset_kwargs['root']}"
-
-        if os.path.exists(abs_output_path):
-            if overwrite:
-                # Remove any data from this path
-                shutil.rmtree(abs_output_path)
-            else:
-                raise ValueError(f"Found pre-existing LeRobot dataset at: {abs_output_path}")
-
-        # For now, we only support a single robot for the sake of deterministic mapping of
-        # robot obs
-        assert len(env.robots) == 1, "Only one robot supported for LeRobot dataset storage!"
-        robot = env.robots[0]
-
-        modality_info = {
-            "annotation": {
-                "language.language_instruction": {},
-                "language.language_instruction_2": {},
-                "language.language_instruction_3": {},
-            },
-        }
-
-        # Add video modality info
-        video_modality_info = dict()
-        for i, (sensor_name, sensor) in enumerate(env.external_sensors.items()):
-            if isinstance(sensor, VisionSensor):
-                for mod in ["rgb", "depth_linear"]:
-                    if mod in sensor.modalities:
-                        mod_name = f"observation.{mod}.{sensor_name}"
-                        key = f"exterior_image_{i}_{mod}"
-                        video_modality_info[key] = {
-                            "type": mod,
-                            "original_key": mod_name,
-                        }
-        for i, (sensor_name, sensor) in enumerate(robot.sensors.items()):
-            if isinstance(sensor, VisionSensor):
-                for mod in ["rgb", "depth_linear"]:
-                    if mod in sensor.modalities:
-                        remapped_sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
-                        mod_name = f"observation.{mod}.{remapped_sensor_name}"
-                        key = f"robot_image_{i}_{mod}"
-                        video_modality_info[key] = {
-                            "type": mod,
-                            "original_key": mod_name,
-                        }
-        modality_info["video" if self.use_videos else "image"] = video_modality_info
-
-        # If we are including multi action representation, run some additional sanity checks
-        if self.include_multi_action_representation:
-            # Get start index for each controller
-            self.controller_action_start_idxs = dict()
-            cmd_start_idx = 0
-            for name, controller in robot.controllers.items():
-                self.controller_action_start_idxs[name] = cmd_start_idx
-                cmd_start_idx += controller.command_dim
-            action_modality_info = dict()
-            idx = 0
-            from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController
-
-            for arm in robot.arm_names:
-                arm_name = f"arm_{arm}"
-                arm_controller = robot.controllers[arm_name]
-                assert isinstance(
-                    arm_controller, InverseKinematicsController
-                ), "Only IKController supported for multi action representation!"
-                # assert arm_controller.command_input_limits is None
-                # assert arm_controller.command_output_limits is None
-                gripper_name = f"gripper_{arm}"
-                gripper_controller = robot.controllers[gripper_name]
-                assert isinstance(
-                    gripper_controller, MultiFingerGripperController
-                ), "Only MultiFingerGripperController supported for multi action representation!"
-                assert (
-                    gripper_controller.command_dim == 1
-                ), "Only binary gripper commands supported for multi action representation!"
-                assert gripper_controller._mode in {
-                    "smooth",
-                    "binary",
-                }, "Only smooth or binary gripper commands supported for multi action representation!"
-                assert (
-                    gripper_controller._motor_type == "position"
-                ), "Only position motor type supported for multi action representation!"
-                action_modality_info[f"{arm_name}_eef_pos"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{arm_name}_eef_aa"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{arm_name}_delta_eef_pos"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{arm_name}_delta_eef_aa"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{gripper_name}_pos"] = {
-                    "start": idx,
-                    "end": idx + 1,
-                }
-                idx += 1
-                action_modality_info[f"{arm_name}_joint_pos"] = {
-                    "start": idx,
-                    "end": idx + arm_controller.control_dim,
-                }
-                idx += arm_controller.control_dim
-                action_modality_info[f"{arm_name}_delta_joint_pos"] = {
-                    "start": idx,
-                    "end": idx + arm_controller.control_dim,
-                }
-                idx += arm_controller.control_dim
-            modality_info["action"] = action_modality_info
-            action_shape = (idx,)
-        else:
-            action_shape = env.action_space[robot.name].shape
-
-        # Extract relevant info from original source env config
-        config = json.loads(self.input_hdf5["data"].attrs["config"])
-
-        # Create LeRobot dataset, define features to store
-        # Define standard features (RL-related entries, language instructions)
-        features = {
-            "action": {
-                "dtype": "float32",
-                "shape": action_shape,  # add all actions here
-                "names": ["action"],
-            },
-            # RL-specific fields
-            "next.reward": {
-                "dtype": "float32",
-                "shape": (1,),
-                "names": ["reward"],
-            },
-            "next.terminated": {
-                "dtype": "bool",
-                "shape": (1,),
-                "names": ["done"],
-            },
-            "next.truncated": {
-                "dtype": "bool",
-                "shape": (1,),
-                "names": ["done"],
-            },
-            # Language annotation fields store int64 task indices
-            # Mapping stored in meta/tasks.jsonl (managed by LeRobot)
-            "annotation.language.language_instruction": {
-                "dtype": "int64",
-                "shape": (1,),
-                "names": ["language_instruction"],
-            },
-            "annotation.language.language_instruction_2": {
-                "dtype": "int64",
-                "shape": (1,),
-                "names": ["language_instruction_2"],
-            },
-            "annotation.language.language_instruction_3": {
-                "dtype": "int64",
-                "shape": (1,),
-                "names": ["language_instruction_3"],
-            },
-        }
-
-        obs_mapping, obs_features = self.get_lerobot_obs_mapping(env=env, use_videos=self.use_videos)
-        features.update(obs_features)
-
-        if self.lerobot_version == "v2.1":
-            dataset_cls = OmniGibsonLeRobotV2Dataset
-        elif self.lerobot_version == "v3.0":
-            dataset_cls = OmniGibsonLeRobotV3Dataset
-        else:
-            raise ValueError(f"Got invalid lerobot version: {self.lerobot_version}")
-        self.dataset = dataset_cls.create(
-            fps=config["env"]["action_frequency"],
-            use_videos=self.use_videos,
-            features=features,
-            **self.lerobot_dataset_kwargs,
-        )
-        self.obs_mapping = obs_mapping
-
-        # Store proprio shape mapping
-        proprio_shape_mapping = dict()
-        proprio_dict = robot._get_proprioception_dict()
-        idx = 0
-        for obs in robot.proprio_obs:
-            obs_dim = len(proprio_dict[obs])
-            proprio_shape_mapping[obs] = {
-                "start": idx,
-                "end": idx + obs_dim,
-            }
-            idx += obs_dim
-        modality_info["state"] = proprio_shape_mapping
-        # self.dataset.set_omnigibson_metadata(key="proprio_shape_mapping", value=proprio_shape_mapping)
-
-        # Add in camera K matrices
-        cam_intrinsics = dict()
-
-        for sensor_name, sensor in env.external_sensors.items():
-            if isinstance(sensor, VisionSensor):
-                K = sensor.intrinsic_matrix.cpu()
-                cam_intrinsics[sensor_name] = K.numpy().tolist()
-        for sensor_name, sensor in env.robots[0].sensors.items():
-            if isinstance(sensor, VisionSensor):
-                # Remove robot naming prefix
-                sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
-                K = sensor.intrinsic_matrix.cpu()
-                cam_intrinsics[sensor_name] = K.numpy().tolist()
-        self.dataset.set_omnigibson_metadata(key="cam_intrinsics", value=cam_intrinsics)
-
-        # Write modality data
-        with open(os.path.join(abs_output_path, "meta", "modality.json"), "w+") as f:
-            json.dump(modality_info, f, indent=4)
-
-    def process_traj_to_dataset(self, traj_data, nested_keys=("obs",)):
-        # Write to LeRobot dataset
-        # The dataset length is (N_steps + 1), since the first entry only includes the env reset observations
-        # LeRobot expects (s,a) tuples to be paired with rewards from the next step, so we match the obs with
-        # all other entries from the proceeding (i.e.: t+1) step
-
-        for frame_idx, traj_step in enumerate(traj_data):
-            if frame_idx == 0:
-                assert (
-                    len(traj_step.keys()) == 1
-                ), f"Expected only one key in 0th traj step, but got: {traj_step.keys()}"
-                assert "obs" in traj_step, f"Expected 'obs' key in 0th traj step, but got: {traj_step.keys()}"
-                continue
-
-            # Compose frame to add to dataset
-            frame = {
-                "action": traj_step["action"],
-                "next.reward": th.tensor([traj_step["reward"]]),
-                "next.terminated": th.tensor([traj_step["terminated"]]),
-                "next.truncated": th.tensor([traj_step["truncated"]]),
-                # TODO: Make these not hardcoded by default
-                "annotation.language.language_instruction": th.zeros(1, dtype=th.int64),
-                "annotation.language.language_instruction_2": th.zeros(1, dtype=th.int64),
-                "annotation.language.language_instruction_3": th.zeros(1, dtype=th.int64),
-                **traj_step["obs"],
-            }
-
-            # Modify additional differing kwargs between V2 and V3 datasets
-            kwargs = {"frame": frame}
-            if isinstance(self.dataset, OmniGibsonLeRobotV2Dataset):
-                # Task should be separate
-                kwargs["task"] = self.task_name
-            else:
-                # V3, task should be part of dict
-                kwargs["frame"]["task"] = self.task_name
-
-            self.dataset.add_frame(**kwargs)
-
-        self.dataset.save_episode()
-
-    def reset(self):
-        # Call super first
-        out = super().reset()
-        self.last_actions = None
-        return out
-
-    def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
-        step_data = super()._parse_step_data(action, obs, reward, terminated, truncated, info)
-
-        # Handle multi action representation
-        if self.include_multi_action_representation:
-            # Our action representation is composed of [eef_pos, eef_aa, delta_eef_pos, delta_eef_aa, gripper_pos, joint_pos, delta_joint_pos] for each arm
-            robot = self.env.robots[0]
-            action = []
-            is_first_action = self.last_actions is None
-            if is_first_action:
-                self.last_actions = dict()
-            for arm in robot.arm_names:
-                arm_name = f"arm_{arm}"
-                arm_controller = robot.controllers[arm_name]
-
-                # Add eef action
-                action.append(cb.to_torch(arm_controller.goal["target_pos"]))
-                action.append(T.quat2axisangle(T.mat2quat(cb.to_torch(arm_controller.goal["target_ori_mat"]))))
-
-                # Add delta eef action
-                if is_first_action:
-                    action += [th.zeros(3), th.zeros(3)]  # zero delta commands
-                else:
-                    action.append(
-                        cb.to_torch(
-                            arm_controller.goal["target_pos"] - self.last_actions[arm_name]["goal"]["target_pos"]
+        log.info(f"Storing partial trajectory at step {self.current_episode_step_count}...")
+        assert self.flush_every_n_steps > 0, "flush_every_n_steps must be greater than 0 to flush partial trajectory"
+        data_length_to_flush = len(self.current_traj_history)
+        # At step 0, we only have observation data, so observation data will only have one more offset than others
+        if self.current_episode_step_count == 0:
+            assert data_length_to_flush == 1
+            for key, dat in self.current_traj_history[0].items():
+                for mod in dat.keys():
+                    if video_writers is not None and mod in video_writers.keys():
+                        assert (
+                            write_video is not None
+                        ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
+                        # write to video
+                        write_video(
+                            self.current_traj_history[0][key][mod].unsqueeze(0).numpy(),
+                            video_writer=video_writers[mod],
+                            batch_size=None,
+                            mode=mod.split("::")[-1],
                         )
-                    )
-                    action.append(
-                        T.quat2axisangle(
-                            T.mat2quat(
-                                cb.to_torch(
-                                    self.last_actions[arm_name]["goal"]["target_ori_mat"].T
-                                    @ arm_controller.goal["target_ori_mat"]
-                                )
+                    else:
+                        self.traj_dsets[key][mod][0] = self.current_traj_history[0][key][mod]
+        else:
+            for key, dat in self.current_traj_history[0].items():
+                if isinstance(dat, dict):
+                    for mod in dat.keys():
+                        obs_data_length = (
+                            data_length_to_flush
+                            if self.current_episode_step_count < num_samples
+                            else data_length_to_flush - 1
+                        )
+                        if obs_data_length > 0:
+                            data_to_write = th.stack(
+                                [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
                             )
-                        )
-                    )
-
-                # Add gripper action
-                gripper_name = f"gripper_{arm}"
-                gripper_controller = robot.controllers[gripper_name]
-                start_idx = self.controller_action_start_idxs[gripper_name]
-                end_idx = start_idx + gripper_controller.command_dim
-                action.append(step_data["action"][start_idx:end_idx])
-
-                # Add joint action
-                action.append(cb.to_torch(arm_controller.control))
-
-                # Add delta joint action
-                if is_first_action:
-                    action.append(th.zeros(arm_controller.control_dim))
+                            if video_writers is not None and mod in video_writers.keys():
+                                assert (
+                                    write_video is not None
+                                ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
+                                # write to video
+                                write_video(
+                                    data_to_write.numpy(),
+                                    video_writer=video_writers[mod],
+                                    batch_size=None,
+                                    mode=mod.split("::")[-1],
+                                )
+                            else:
+                                self.traj_dsets[key][mod][
+                                    self.current_episode_step_count
+                                    - data_length_to_flush
+                                    + 1 : self.current_episode_step_count + 1
+                                ] = data_to_write
                 else:
-                    action.append(cb.to_torch(arm_controller.control - self.last_actions[arm_name]["control"]))
+                    self.traj_dsets[key][
+                        self.current_episode_step_count - data_length_to_flush : self.current_episode_step_count
+                    ] = th.stack([self.current_traj_history[i][key] for i in range(data_length_to_flush)], dim=0)
+        # Reset the current trajectory history
+        self.current_traj_history = []
 
-                # Update last actions
-                self.last_actions[arm_name] = {
-                    "goal": arm_controller.goal,
-                    "control": arm_controller.control,
-                }
-
-            step_data["action"] = th.cat(action)
-
-        return step_data
-
-    def _process_obs(self, obs, info):
-        # Include camera poses wrt robot frame
-        obs = super()._process_obs(obs, info)
-
-        # Convert to lerobot format
-        obs = self.og_to_lerobot_obs(env=self.env, obs_flat=obs, obs_mapping=self.obs_mapping)
-        return obs
-
-    def postprocess_current_traj(self):
-        # Does nothing currently
-        pass
-
-    def flush_current_file(self):
-        # Does nothing currently
-        pass
-
-    def close_dataset(self):
-        if isinstance(self.dataset, OmniGibsonLeRobotV2Dataset):
-            self.dataset.stop_image_writer()
+    def flush_current_traj(self):
+        """
+        Flush current trajectory data
+        For playback, we assume that all data needs to be stored.
+        """
+        if self.flush_every_n_steps == 0:
+            super().flush_current_traj()
         else:
-            # V3, need to finalize to close all active writers
-            self.dataset.finalize()
-
-        # Remove the image directory
-        abs_output_path = f"{self.lerobot_dataset_kwargs['root']}"
-        images_dir = os.path.join(abs_output_path, "images")
-        shutil.rmtree(images_dir)
-
-    def allocate_traj(
-        self,
-        step_data,
-        episode_id,
-        num_samples: int,
-        nested_keys=("obs",),
-        video_writers=None,
-    ):
-        # Does nothing currently
-        pass
-
-    def add_to_dataset(self, keys, idxs, data, idx_max=None):
-        # This should hopefully never be called from LeRobot wrapper, so just raise Error if so
-        raise NotImplementedError("add_to_dataset not implemented for LeRobotPlaybackWrapper!")
+            self.postprocess_traj_group(self.current_traj_grp)
+            self.flush_current_file()
+            # Clear trajectory and transition buffers
+            self.traj_count += 1
+            self.current_episode_step_count = 0
+            self.current_traj_history = []
