@@ -110,7 +110,7 @@ class StatefulObject(BaseObject):
                 the object state instance constructor.
             include_default_states (bool): whether to include the default object states from @get_default_states
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
         # Values that will be filled later
         self._states = None

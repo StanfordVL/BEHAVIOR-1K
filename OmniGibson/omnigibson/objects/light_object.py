@@ -66,7 +66,7 @@ class LightObject(StatefulObject):
             radius (float): Radius for this light.
             intensity (float): Intensity for this light.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config

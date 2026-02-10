@@ -213,9 +213,9 @@ def sample_kinematics(
             rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
 
-            from omnigibson.robots.robot_base import BaseRobot
+            from omnigibson.robots.robot import Robot
 
-            if use_trav_map and not isinstance(objA, BaseRobot):
+            if use_trav_map and not isinstance(objA, Robot):
                 xy_map = trav_map.world_to_map(pos[:2])
                 if pos[2] > eef_z_max:
                     # We need to check if the sampled position is above the maximum z of the arm

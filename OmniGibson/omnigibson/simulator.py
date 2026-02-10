@@ -22,7 +22,7 @@ from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubsc
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
-from omnigibson.objects.controllable_object import ControllableObject
+from omnigibson.robots.robot import Robot
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -1142,7 +1142,7 @@ def _launch_simulator(*args, **kwargs):
 
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
-                    # sim was stopped. We need to reset them to default_kp and default_kd defined in ControllableObject.
+                    # sim was stopped. We need to reset them to default_kp and default_kd defined defined in Robot.
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
                     # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
@@ -1242,9 +1242,8 @@ def _launch_simulator(*args, **kwargs):
             if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                 # Run the controller step on every controllable object
                 for scene in self.scenes:
-                    for obj in scene.objects:
-                        if isinstance(obj, ControllableObject):
-                            obj.step()
+                    for robot in scene.robots:
+                        robot.step()
 
                 # Flush the controls from the ControllableObjectViewAPI
                 ControllableObjectViewAPI.flush_control()

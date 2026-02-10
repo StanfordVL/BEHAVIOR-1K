@@ -4,20 +4,14 @@ import torch as th
 import numpy as np
 from typing import Dict, Optional
 import json
-
 import omnigibson as og
-from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.envs import DataCollectionWrapper
-from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.robots.r1 import R1
-from omnigibson.robots.r1pro import R1Pro
-from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots import Robot
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
 from omnigibson.systems.macro_particle_system import MacroVisualParticleSystem
 from omnigibson.utils.teleop_utils import OVXRSystem
-from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states import Filled
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.usd_utils import GripperRigidContactAPI, ControllableObjectViewAPI
@@ -30,9 +24,6 @@ from gello.robots.sim_robot.zmq_server import ZMQRobotServer, ZMQServerThread
 
 from gello.robots.sim_robot.og_teleop_cfg import *
 import gello.robots.sim_robot.og_teleop_utils as utils
-
-from bddl.activity import Conditions
-
 
 class OGRobotServer:
     def __init__(
@@ -72,9 +63,6 @@ class OGRobotServer:
         for rule in DISABLED_TRANSITION_RULES:
             rule.ENABLED = False
 
-        robot_cls = REGISTERED_ROBOTS.get(robot, None)
-        assert robot_cls is not None, f"Got invalid OmniGibson robot class: {robot}"
-        assert issubclass(robot_cls, ManipulationRobot), f"Robot class {robot} is not a manipulation robot! Cannot use GELLO"
         assert robot in SUPPORTED_ROBOTS, f"Robot {robot} is not supported by GELLO! Supported robots: {SUPPORTED_ROBOTS}"
 
         if config is None:
@@ -94,6 +82,8 @@ class OGRobotServer:
 
         self.env = og.Environment(configs=cfg)
         self.robot = self.env.robots[0]
+
+        assert self.robot.is_manipulation, f"Robot {robot} is not a manipulation robot! Cannot use GELLO"
         
         self.ghosting = ghosting
         if self.ghosting:
@@ -199,7 +189,7 @@ class OGRobotServer:
                     if obj.category in VISUAL_ONLY_CATEGORIES:
                         obj.visual_only = True
                 else:
-                    if isinstance(obj, (R1, R1Pro)):
+                    if isinstance(obj, Robot) and obj.model in ("r1", "r1pro"):
                         obj.base_footprint_link.mass = 250.0
 
             # Update ghost robot's masses to be uniform to avoid orthonormal errors
@@ -386,7 +376,7 @@ class OGRobotServer:
         """
         # If R1, process manually
         state = joint_state.clone()
-        if isinstance(self.robot, R1) and not isinstance(self.robot, R1Pro):
+        if self.robot.model == "r1":
             # [ 6DOF left arm, 6DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
             start_idx = 0
             for component, dim in zip(
@@ -397,7 +387,7 @@ class OGRobotServer:
                     break
                 self._joint_cmd[component] = state[start_idx: start_idx + dim]
                 start_idx += dim
-        elif isinstance(self.robot, R1Pro):
+        elif self.robot.model == "r1pro":
             # [ 7DOF left arm, 7DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
             start_idx = 0
             for component, dim in zip(
@@ -729,7 +719,7 @@ class OGRobotServer:
         action = th.zeros(self.robot.action_dim)
 
         # Apply arm action + extra dimension from base
-        if isinstance(self.robot, R1):
+        if self.robot.model == "r1":
             # Apply arm action
             left_act = self._joint_cmd["left_arm"].clone().clip(self._arm_joint_limits["left"]["lower"], self._arm_joint_limits["left"]["upper"])
             right_act = self._joint_cmd["right_arm"].clone().clip(self._arm_joint_limits["right"]["lower"], self._arm_joint_limits["right"]["upper"])
@@ -839,7 +829,7 @@ class OGRobotServer:
         self._grasp_action = {arm: 1 for arm in self.robot.arm_names}
         for detector in self._gripper_action_signal_detectors.values():
             detector.reset()
-        if isinstance(self.robot, (R1, R1Pro)):
+        if self.robot.model in ("r1", "r1pro"):
             for arm in self.robot.arm_names:
                 self._joint_cmd[f"{arm}_gripper"] = th.ones(len(self.robot.gripper_action_idx[arm]))
                 self._joint_cmd["base"] = self._joint_state[self.robot.base_control_idx]
@@ -880,8 +870,8 @@ class OGRobotServer:
                     presampled_robot_poses = tro_state
                     # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
                     # for orientation
-                    robot_pos = presampled_robot_poses[self.robot.model_name][0]["position"]
-                    robot_quat = presampled_robot_poses[self.robot.model_name][0]["orientation"]
+                    robot_pos = presampled_robot_poses[self.robot.model][0]["position"]
+                    robot_quat = presampled_robot_poses[self.robot.model][0]["orientation"]
                     self.robot.set_position_orientation(robot_pos, robot_quat)
                     # Write robot poses to scene metadata
                     self.env.scene.write_task_metadata(key=tro_key, data=tro_state)

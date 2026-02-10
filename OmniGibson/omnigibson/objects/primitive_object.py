@@ -83,7 +83,7 @@ class PrimitiveObject(StatefulObject):
             size (None or float): If specified, sets the size for this object. This value is scaled by @scale
                 Note: Should only be specified if the @primitive_type is one of {"Cube", "Torus"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config

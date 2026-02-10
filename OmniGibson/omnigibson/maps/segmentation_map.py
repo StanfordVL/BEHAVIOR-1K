@@ -3,7 +3,6 @@ import os
 import cv2
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import torch_delete
