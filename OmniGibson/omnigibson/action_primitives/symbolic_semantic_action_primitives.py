@@ -12,7 +12,7 @@ from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.objects import DatasetObject
-from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.robots.robot import Robot
 from omnigibson.transition_rules import SlicingRule
 
 
@@ -78,7 +78,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         assert attempts > 0, "Must make at least one attempt"
         ctrl = self.controller_functions[primitive]
 
-        if any(isinstance(arg, BaseRobot) for arg in args):
+        if any(isinstance(arg, Robot) for arg in args):
             raise ActionPrimitiveErrorGroup(
                 [
                     ActionPrimitiveError(

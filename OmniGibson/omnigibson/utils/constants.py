@@ -14,6 +14,9 @@ MAX_INSTANCE_COUNT = th.iinfo(th.int32).max
 MAX_CLASS_COUNT = th.iinfo(th.int32).max
 MAX_VIEWER_SIZE = 2048
 
+# Category name assigned to all robots
+ROBOT_CATEGORY = "agent"
+
 
 class ViewerMode(IntEnum):
     NAVIGATION = 0

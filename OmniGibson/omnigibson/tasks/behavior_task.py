@@ -254,11 +254,11 @@ class BehaviorTask(BaseTask):
             robot = self.get_agent(env)
             presampled_poses = env.scene.get_task_metadata(key="robot_poses")
             assert (
-                robot.model_name in presampled_poses
-            ), f"{robot.model_name} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
+                robot.model in presampled_poses
+            ), f"{robot.model} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
 
             # Select pose based on randomize_presampled_pose flag
-            available_poses = presampled_poses[robot.model_name]
+            available_poses = presampled_poses[robot.model]
             if self.randomize_presampled_pose:
                 robot_pose = random.choice(available_poses)
             else:

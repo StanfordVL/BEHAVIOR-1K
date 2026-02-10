@@ -9,9 +9,9 @@ _IN_FOV_PIXEL_FRACTION_THRESHOLD = 0.05
 class RobotStateMixin:
     @property
     def robot(self):
-        from omnigibson.robots.robot_base import BaseRobot
+        from omnigibson.robots.robot import Robot
 
-        assert isinstance(self.obj, BaseRobot), "This state only works with robots."
+        assert isinstance(self.obj, Robot), "This state only works with robots."
         return self.obj
 
 

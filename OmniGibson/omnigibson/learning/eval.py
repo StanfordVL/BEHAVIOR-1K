@@ -270,8 +270,8 @@ class Evaluator:
         for tro_key, tro_state in tro_state.items():
             if tro_key == "robot_poses":
                 presampled_robot_poses = tro_state
-                robot_pos = presampled_robot_poses[self.robot.model_name][0]["position"]
-                robot_quat = presampled_robot_poses[self.robot.model_name][0]["orientation"]
+                robot_pos = presampled_robot_poses[self.robot.model][0]["position"]
+                robot_quat = presampled_robot_poses[self.robot.model][0]["orientation"]
                 self.robot.set_position_orientation(robot_pos, robot_quat)
                 # Write robot poses to scene metadata
                 self.env.scene.write_task_metadata(key=tro_key, data=tro_state)

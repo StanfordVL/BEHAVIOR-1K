@@ -26,8 +26,7 @@ def test_data_collect_and_playback():
         },
         "robots": [
             {
-                "type": "Fetch",
-                "name": "robot0",
+                "model": "fetch",
                 "obs_modalities": [],
                 "fixed_base": False,
             }

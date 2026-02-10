@@ -15,7 +15,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots.robot_base import REGISTERED_ROBOTS, BaseRobot, m as robot_macros
+from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
@@ -30,7 +30,7 @@ from omnigibson.systems.system_base import (
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
+from omnigibson.utils.constants import ROBOT_CATEGORY, STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -197,7 +197,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             list of BaseRobot: Robot(s) that are currently in this scene
         """
-        return list(sorted(self.object_registry("category", robot_macros.ROBOT_CATEGORY, []), key=lambda x: x.name))
+        return list(sorted(self.object_registry("category", ROBOT_CATEGORY, []), key=lambda x: x.name))
 
     @property
     def systems(self):
@@ -673,7 +673,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
                 # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
                 # We do this by adding the object to our tracked collision groups
-                if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
+                if obj.fixed_base and obj.category != ROBOT_CATEGORY and not obj.visual_only:
                     obj_fixed_links = obj.get_fixed_link_names_in_subtree()
                     for link_name, link in obj.links.items():
                         if link_name in obj_fixed_links:
@@ -712,7 +712,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Delete any (extra) vision sensors that were externally added to this object
             # This needs to happen BEFORE the object is removed or else the path to the sensor will become stale
             sensor_prim_paths = set(VisionSensor.SENSORS.keys())
-            if isinstance(obj, BaseRobot):
+            if isinstance(obj, Robot):
                 # However, for robots, we don't want to pre-emptively remove its own sensors since those are handled
                 # internally
                 sensor_prim_paths -= set([sensor.prim_path for sensor in obj.sensors.values()])
@@ -954,7 +954,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return {
             obj.name: obj
             for obj in self.object_registry("fixed_base", True, default_val=[])
-            if obj.category != robot_macros.ROBOT_CATEGORY
+            if obj.category != ROBOT_CATEGORY
         }
 
     @property

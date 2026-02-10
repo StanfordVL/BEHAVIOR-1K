@@ -1,0 +1,19 @@
+raw_controller_order: ["arm_0", "gripper_0"]
+default_controllers:
+  arm_0: InverseKinematicsController
+  gripper_0: MultiFingerGripperController
+default_joint_pos: [0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057]
+
+manipulation:
+  arm_link_names:
+    "0": ["base_link", "shoulder_link", "upper_arm_link", "upper_forearm_link", "lower_forearm_link", "wrist_link", "gripper_link"]
+  arm_joint_names:
+    "0": ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+  eef_link_names:
+    "0": "eef_link"
+  finger_link_names:
+    "0": ["left_finger_link", "right_finger_link"]
+  finger_joint_names:
+    "0": ["left_finger", "right_finger"]
+  teleop_rotation_offset:
+    "0": ["-pi", "0", "0"]

@@ -33,7 +33,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create environment configuration to use
     scene_cfg = dict(type="Scene")
     robot0_cfg = dict(
-        type="Fetch",
+        model="fetch",
         obs_modalities=["rgb"],  # we're just doing a grasping demo so we don't need all observation modalities
         action_type="continuous",
         action_normalize=True,
