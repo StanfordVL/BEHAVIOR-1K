@@ -521,8 +521,7 @@ def decompose_mat(hmat):
     P[:, :, 3] = torch.tensor([0.0, 0.0, 0.0, 1.0], device=hmat.device, dtype=hmat.dtype).expand(batch_size, 4)
 
     det_P = torch.linalg.det(P[:, :3, :3])  # (B,)
-    if torch.any(torch.abs(det_P) < 1e-6) is True:
-        raise ValueError("Some matrices are singular and cannot be decomposed")
+    torch._assert(torch.all(torch.abs(det_P) >= 1e-6), "Some matrices are singular and cannot be decomposed")
 
     if not torch.allclose(M[:, :3, 3], torch.tensor(0.0, device=hmat.device, dtype=hmat.dtype)):
         raise ValueError("Some matrices have perspective components")

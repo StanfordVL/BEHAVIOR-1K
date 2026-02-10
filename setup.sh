@@ -52,6 +52,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Validate CUDA_VERSION is a valid numeric version string
+if ! [[ "$CUDA_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    echo "ERROR: Invalid CUDA_VERSION '$CUDA_VERSION'. Must be in format X.Y (e.g., 12.8)"
+    exit 1
+fi
+
 if [ "$HELP" = true ]; then
     cat << EOF
 BEHAVIOR-1K Installation Script (Linux)
@@ -254,7 +260,7 @@ fi
 echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
 
 # Determine the CUDA version string for pip URL (e.g., cu128, cu126, etc.)
-CUDA_VER_SHORT=$(echo $CUDA_VERSION | sed 's/\.//g')  # e.g. convert 12.8 to 128
+CUDA_VER_SHORT=$(echo "$CUDA_VERSION" | sed 's/\.//g')  # e.g. convert 12.8 to 128
 
 pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
 
@@ -334,7 +340,7 @@ if [ "$OMNIGIBSON" = true ]; then
         else
             # Helper functions
             check_glibc_old() {
-                ldd --version 2>&1 | grep -qE "2\.(31|32|33)"
+                ldd --version 2>&1 | grep -qE "2\.(31|32|33|34)"
             }
 
             install_isaac_packages() {
@@ -384,7 +390,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
                     # Rename for older GLIBC
                     if check_glibc_old; then
-                        local new_filepath="${filepath/manylinux_2_34/manylinux_2_31}"
+                        local new_filepath="${filepath/manylinux_2_35/manylinux_2_31}"
                         mv "$filepath" "$new_filepath"
                         filepath="$new_filepath"
                     fi
