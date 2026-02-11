@@ -172,6 +172,7 @@ class RigidPrim(XFormPrim):
 
         # Find all geom prims and whether they are under a collision prim
         geom_prims = []
+
         def _find_geom_prims(prim, is_under_collision_prim=False):
             # Check if this prim is a collision prim
             is_collision_prim = is_under_collision_prim
@@ -185,6 +186,7 @@ class RigidPrim(XFormPrim):
             # Recursively find all geom prims under this prim
             for child in prim.GetChildren():
                 _find_geom_prims(child, is_collision_prim)
+
         _find_geom_prims(self._prim, False)
 
         coms, vols = [], []
