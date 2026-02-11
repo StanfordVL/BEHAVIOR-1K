@@ -230,8 +230,6 @@ def test_touching(env):
         bowl.states[Touching].set_value(breakfast_table, None)
 
 
-
-
 @og_test
 def test_next_to(env):
     bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
