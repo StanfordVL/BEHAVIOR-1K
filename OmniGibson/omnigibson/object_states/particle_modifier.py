@@ -9,7 +9,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -723,7 +722,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     @classmethod
     def get_optional_dependencies(cls):
         deps = super().get_optional_dependencies()
-        deps.update({Covered, ToggledOn, ContactBodies, ContactParticles})
+        deps.update({Covered, ToggledOn, ContactParticles})
         return deps
 
     @classproperty

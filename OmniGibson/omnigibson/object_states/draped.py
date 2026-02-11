@@ -2,18 +2,18 @@ import torch as th
 
 import omnigibson as og
 from omnigibson.object_states.cloth_mixin import ClothStateMixin
-from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.utils.sim_utils import get_rigid_contact_bodies
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
+from omnigibson.utils.usd_utils import PoseAPI
 
 
 class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.add(ContactBodies)
         return deps
 
     def _set_value(self, other, new_value):
@@ -41,16 +41,14 @@ class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothState
             raise ValueError("Draped state requires obj1 is cloth and obj2 is rigid.")
 
         # Find the links of @other that are in contact with @self.obj
-        contact_links = self.obj.states[ContactBodies].get_value() & set(other.links.values())
+        contact_links = get_rigid_contact_bodies(self.obj) & set(other.links.values())
         if len(contact_links) == 0:
             return False
         contact_link_prim_paths = {contact_link.prim_path for contact_link in contact_links}
 
-        # Filter the contact points to only include the ones that are on the contact links
-        contact_positions = []
-        for contact in self.obj.contact_list():
-            if len({contact.body0, contact.body1} & contact_link_prim_paths) > 0:
-                contact_positions.append(contact.position)
+        # Approximate contact points using the positions of the contacting rigid links.
+        # This keeps draping checks on the persistent RigidContactAPI pathway.
+        contact_positions = [PoseAPI.get_world_pose(prim_path)[0] for prim_path in contact_link_prim_paths]
 
         # The center of mass of the cloth needs to be below the average position of the contact points
         mean_contact_position = th.mean(th.stack(contact_positions), dim=0)
