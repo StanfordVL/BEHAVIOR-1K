@@ -31,7 +31,7 @@ class GeomPrim(XFormPrim):
 
     Geom prims are not inherently distinguished as collision or visual. Instead, at the link level,
     they are tracked separately based on whether they appear under a "collisions" scope prim.
-    Collision-related APIs can be set up on any geom prim by calling :meth:`setup_collision_apis`.
+    Collision-related APIs can be set up on any geom prim by calling :func:`omnigibson.utils.usd_utils.setup_collision_apis`.
 
     Args:
         relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.

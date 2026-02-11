@@ -165,9 +165,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         # Create the visual geom instance referencing the generated mesh prim
         relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)
-        self.visual_marker = GeomPrim(
-            relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker"
-        )
+        self.visual_marker = GeomPrim(relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker")
         self.visual_marker.load(self.obj.scene)
         self.visual_marker.scale = self.scale
         self.visual_marker.initialize()
