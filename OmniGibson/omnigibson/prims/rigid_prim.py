@@ -166,68 +166,77 @@ class RigidPrim(XFormPrim):
         additional bodies are added manually.
 
         Collision vs. visual meshes are distinguished at the link level based on whether the geom prim
-        appears under a "collisions" scope prim (i.e. its parent prim is named "collisions").
+        appears as or under a prim with a UsdPhysics.CollisionAPI or PhysxSchema.PhysxCollisionAPI attached to it.
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
-        prims_to_check = []
-        coms, vols = [], []
-        for prim in self._prim.GetChildren():
-            prims_to_check.append(prim)
-            for child in prim.GetChildren():
-                prims_to_check.append(child)
-        for prim in prims_to_check:
-            mesh_type = prim.GetPrimTypeInfo().GetTypeName()
-            if mesh_type in GEOM_TYPES:
-                mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                # Determine collision vs visual based on whether this geom is under a "collisions" scope
-                is_collision = prim.GetParent().GetName() == "collisions"
-                mesh_kwargs = {
-                    "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
-                    "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
-                    "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
-                }
-                mesh = GeomPrim(**mesh_kwargs)
-                mesh.load(self.scene)
-                if is_collision:
-                    setup_collision_apis(mesh)
-                    # Collision meshes should not show up in rendering by default
-                    mesh.purpose = "guide"
-                    # We also modify the collision mesh's contact and rest offsets, since omni's default values result
-                    # in lightweight objects sometimes not triggering contacts correctly
-                    mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
-                    mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
-                    self._collision_meshes[mesh_name] = mesh
 
-                    volume, com = get_mesh_volume_and_com(mesh.prim)
-                    # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
-                    local_pos, local_orn = mesh.get_position_orientation(frame="parent")
-                    vols.append(volume * th.prod(mesh.scale))
-                    coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
-                    # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
-                    # boundingCube approximation for the underlying collision approximation for GPU compatibility
-                    if not check_extent_radius_ratio(mesh, com):
-                        log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
-                        mesh.set_collision_approximation("boundingCube")
-                else:
-                    self._visual_meshes[mesh_name] = mesh
-                    # TODO: tmp fix for visible metalinks
-                    if "meta" in mesh.name:
-                        if "togglebutton" in mesh.name:
-                            # Make sure togglebutton mesh is visible
-                            mesh.purpose = "default"
-                        elif any(
-                            metalink in mesh.name
-                            for metalink in [
-                                "particlesource",
-                                "particlesink",
-                                "fillable",
-                                "particleremover",
-                                "particleapplier",
-                                "slicer",
-                            ]
-                        ):
-                            # Make sure particlesource, particlesink and fillable meshes are not visible
-                            mesh.purpose = "guide"
+        # Find all geom prims and whether they are under a collision prim
+        geom_prims = []
+        def _find_geom_prims(prim, is_under_collision_prim=False):
+            # Check if this prim is a collision prim
+            is_collision_prim = is_under_collision_prim
+            if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI) or prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI):
+                is_collision_prim = True
+
+            # Add this prim to the list if it is a geom prim
+            if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
+                geom_prims.append((prim, is_collision_prim))
+
+            # Recursively find all geom prims under this prim
+            for child in prim.GetChildren():
+                _find_geom_prims(child, is_collision_prim)
+        _find_geom_prims(self._prim, False)
+
+        coms, vols = [], []
+        for prim, is_collision in geom_prims:
+            mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
+            mesh_kwargs = {
+                "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
+                "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
+                "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
+            }
+            mesh = GeomPrim(**mesh_kwargs)
+            mesh.load(self.scene)
+            if is_collision:
+                setup_collision_apis(mesh)
+                # Collision meshes should not show up in rendering by default
+                mesh.purpose = "guide"
+                # We also modify the collision mesh's contact and rest offsets, since omni's default values result
+                # in lightweight objects sometimes not triggering contacts correctly
+                mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
+                mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
+                self._collision_meshes[mesh_name] = mesh
+
+                volume, com = get_mesh_volume_and_com(mesh.prim)
+                # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
+                local_pos, local_orn = mesh.get_position_orientation(frame="parent")
+                vols.append(volume * th.prod(mesh.scale))
+                coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
+                # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
+                # boundingCube approximation for the underlying collision approximation for GPU compatibility
+                if not check_extent_radius_ratio(mesh, com):
+                    log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
+                    mesh.set_collision_approximation("boundingCube")
+            else:
+                self._visual_meshes[mesh_name] = mesh
+                # TODO: tmp fix for visible metalinks
+                if "meta" in mesh.name:
+                    if "togglebutton" in mesh.name:
+                        # Make sure togglebutton mesh is visible
+                        mesh.purpose = "default"
+                    elif any(
+                        metalink in mesh.name
+                        for metalink in [
+                            "particlesource",
+                            "particlesink",
+                            "fillable",
+                            "particleremover",
+                            "particleapplier",
+                            "slicer",
+                        ]
+                    ):
+                        # Make sure particlesource, particlesink and fillable meshes are not visible
+                        mesh.purpose = "guide"
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
