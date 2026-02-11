@@ -10,7 +10,7 @@ from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
@@ -19,6 +19,7 @@ from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     check_extent_radius_ratio,
     get_mesh_volume_and_com,
+    setup_collision_apis,
 )
 
 # Create module logger
@@ -162,7 +163,10 @@ class RigidPrim(XFormPrim):
     def update_meshes(self):
         """
         Helper function to refresh owned visual and collision meshes. Useful for synchronizing internal data if
-        additional bodies are added manually
+        additional bodies are added manually.
+
+        Collision vs. visual meshes are distinguished at the link level based on whether the geom prim
+        appears under a "collisions" scope prim (i.e. its parent prim is named "collisions").
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
         prims_to_check = []
@@ -175,23 +179,26 @@ class RigidPrim(XFormPrim):
             mesh_type = prim.GetPrimTypeInfo().GetTypeName()
             if mesh_type in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
-                is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
+                # Determine collision vs visual based on whether this geom is under a "collisions" scope
+                is_collision = prim.GetParent().GetName() == "collisions"
                 mesh_kwargs = {
                     "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
                     "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
                     "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
                 }
+                mesh = GeomPrim(**mesh_kwargs)
+                mesh.load(self.scene)
                 if is_collision:
-                    mesh = CollisionGeomPrim(**mesh_kwargs)
-                    mesh.load(self.scene)
+                    setup_collision_apis(mesh)
+                    # Collision meshes should not show up in rendering by default
+                    mesh.purpose = "guide"
                     # We also modify the collision mesh's contact and rest offsets, since omni's default values result
                     # in lightweight objects sometimes not triggering contacts correctly
                     mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
                     mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
                     self._collision_meshes[mesh_name] = mesh
 
-                    volume, com = get_mesh_volume_and_com(mesh_prim)
+                    volume, com = get_mesh_volume_and_com(mesh.prim)
                     # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_position_orientation(frame="parent")
                     vols.append(volume * th.prod(mesh.scale))
@@ -202,8 +209,25 @@ class RigidPrim(XFormPrim):
                         log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
                         mesh.set_collision_approximation("boundingCube")
                 else:
-                    self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
-                    self._visual_meshes[mesh_name].load(self.scene)
+                    self._visual_meshes[mesh_name] = mesh
+                    # TODO: tmp fix for visible metalinks
+                    if "meta" in mesh.name:
+                        if "togglebutton" in mesh.name:
+                            # Make sure togglebutton mesh is visible
+                            mesh.purpose = "default"
+                        elif any(
+                            metalink in mesh.name
+                            for metalink in [
+                                "particlesource",
+                                "particlesink",
+                                "fillable",
+                                "particleremover",
+                                "particleapplier",
+                                "slicer",
+                            ]
+                        ):
+                            # Make sure particlesource, particlesink and fillable meshes are not visible
+                            mesh.purpose = "guide"
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link

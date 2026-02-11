@@ -17,6 +17,7 @@ import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
+from omnigibson.macros import gm
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key, torch_compile
@@ -608,6 +609,47 @@ class CollisionAPI:
 
         # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}
+
+
+def setup_collision_apis(geom_prim):
+    """
+    Set up collision-related physics APIs on a geom prim. This should be called for geom prims
+    that are identified as collision meshes (e.g. those appearing under a "collisions" scope prim).
+
+    This applies the CollisionAPI, PhysxCollisionAPI, and (for meshes) MeshCollisionAPI to the prim,
+    and sets a default convex hull collision approximation for mesh types.
+
+    Note: This does NOT set the prim's purpose. The caller should set purpose as appropriate
+    (e.g. "guide" for collision-only meshes, "default" for collision+visual meshes).
+
+    Args:
+        geom_prim (GeomPrim): The geom prim to set up collision APIs on.
+    """
+    prim = geom_prim.prim
+
+    # Create / get CollisionAPI reference
+    geom_prim._collision_api = (
+        lazy.pxr.UsdPhysics.CollisionAPI(prim)
+        if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
+        else lazy.pxr.UsdPhysics.CollisionAPI.Apply(prim)
+    )
+    geom_prim._physx_collision_api = (
+        lazy.pxr.PhysxSchema.PhysxCollisionAPI(prim)
+        if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI)
+        else lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(prim)
+    )
+
+    # Optionally add mesh collision API if this is a mesh
+    if prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
+        geom_prim._mesh_collision_api = (
+            lazy.pxr.UsdPhysics.MeshCollisionAPI(prim)
+            if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI)
+            else lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(prim)
+        )
+        # Set the approximation to be convex hull by default
+        geom_prim.set_collision_approximation(approximation_type="convexHull")
+
+    geom_prim.collision_enabled = not gm.VISUAL_ONLY
 
 
 class PoseAPI:

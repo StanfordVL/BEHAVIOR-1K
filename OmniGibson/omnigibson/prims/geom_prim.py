@@ -27,7 +27,11 @@ class GeomPrim(XFormPrim):
     """
     Provides high level functions to deal with a geom prim and its attributes / properties.
     If there is an geom prim present at the path, it will use it. By default, a geom prim cannot be directly
-    created from scratch.at
+    created from scratch.
+
+    Geom prims are not inherently distinguished as collision or visual. Instead, at the link level,
+    they are tracked separately based on whether they appear under a "collisions" scope prim.
+    Collision-related APIs can be set up on any geom prim by calling :meth:`setup_collision_apis`.
 
     Args:
         relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
@@ -43,6 +47,12 @@ class GeomPrim(XFormPrim):
         load_config=None,
     ):
         self._mesh_type = None
+
+        # Collision-related API references (initialized via setup_collision_apis())
+        self._collision_api = None
+        self._mesh_collision_api = None
+        self._physx_collision_api = None
+        self._applied_physics_material = None
 
         # Run super method
         super().__init__(
@@ -295,58 +305,6 @@ class GeomPrim(XFormPrim):
         points = self.points
         return th.max(points, dim=0).values - th.min(points, dim=0).values
 
-
-class CollisionGeomPrim(GeomPrim):
-    def __init__(
-        self,
-        relative_prim_path,
-        name,
-        load_config=None,
-    ):
-        # Store values created at runtime
-        self._collision_api = None
-        self._mesh_collision_api = None
-        self._physx_collision_api = None
-        self._applied_physics_material = None
-
-        # Run super method
-        super().__init__(
-            relative_prim_path=relative_prim_path,
-            name=name,
-            load_config=load_config,
-        )
-
-    def _post_load(self):
-        # run super first
-        super()._post_load()
-
-        # By default, CollisionGeomPrim does not show up in the rendering.
-        self.purpose = "guide"
-
-        # Create API references
-        self._collision_api = (
-            lazy.pxr.UsdPhysics.CollisionAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
-            else lazy.pxr.UsdPhysics.CollisionAPI.Apply(self._prim)
-        )
-        self._physx_collision_api = (
-            lazy.pxr.PhysxSchema.PhysxCollisionAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI)
-            else lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._prim)
-        )
-
-        # Optionally add mesh collision API if this is a mesh
-        if self._prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
-            self._mesh_collision_api = (
-                lazy.pxr.UsdPhysics.MeshCollisionAPI(self._prim)
-                if self._prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI)
-                else lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._prim)
-            )
-            # Set the approximation to be convex hull by default
-            self.set_collision_approximation(approximation_type="convexHull")
-
-        self.collision_enabled = not gm.VISUAL_ONLY
-
     @property
     def collision_enabled(self):
         """
@@ -369,7 +327,6 @@ class CollisionGeomPrim(GeomPrim):
             assert og.sim.is_stopped(), "Cannot toggle collisions while using GPU dynamics unless simulator is stopped!"
         self.set_attribute("physics:collisionEnabled", enabled)
 
-    # TODO: Maybe this should all be added to RigidPrim instead?
     def set_contact_offset(self, offset):
         """
         Args:
@@ -534,40 +491,3 @@ class CollisionGeomPrim(GeomPrim):
             else:
                 self._applied_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(prim_path=path)
                 return self._applied_physics_material
-
-
-class VisualGeomPrim(GeomPrim):
-    def _post_load(self):
-        # run super first
-        super()._post_load()
-
-        # TODO: tmp fix for visible metalinks
-        if "meta" in self.name:
-            if "togglebutton" in self.name:
-                # Make sure togglebutton mesh is visible
-                self.purpose = "default"
-            elif any(
-                [
-                    metalink in self.name
-                    for metalink in [
-                        "particlesource",
-                        "particlesink",
-                        "fillable",
-                        "particleremover",
-                        "particleapplier",
-                        "slicer",
-                    ]
-                ]
-            ):
-                # Make sure particlesource, particlesink and fillable meshes are not visible
-                self.purpose = "guide"
-
-
-class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):
-    def _post_load(self):
-        # run super first
-        super()._post_load()
-
-        # The purpose should be default, not guide as set by CollisionGeomPrim
-        # this is to make sure the geom is visualized, even though it's also collidable
-        self.purpose = "default"

@@ -48,7 +48,7 @@ from omnigibson.controllers import (
 )
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.object_states import ContactBodies
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
@@ -2013,7 +2013,7 @@ class Robot(USDObject, GymObservable):
                             extents=0.005,
                             primitive_type="Sphere",
                         )
-                        vis_geom = VisualGeomPrim(
+                        vis_geom = GeomPrim(
                             relative_prim_path=absolute_prim_path_to_scene_relative(
                                 scene=self.scene,
                                 absolute_prim_path=vis_mesh_prim_path,

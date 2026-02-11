@@ -4,11 +4,11 @@ import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import CollisionVisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_scene_path
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import add_asset_to_stage, scene_relative_prim_path_to_absolute
+from omnigibson.utils.usd_utils import add_asset_to_stage, scene_relative_prim_path_to_absolute, setup_collision_apis
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -83,11 +83,12 @@ class StaticTraversableScene(TraversableScene):
         )
 
         # Grab the actual mesh prim
-        self._scene_mesh = CollisionVisualGeomPrim(
+        self._scene_mesh = GeomPrim(
             relative_prim_path=f"/scene/mesh_z_up/{self.scene_model}_mesh_texture",
             name=f"{self.scene_model}_mesh",
         )
         self._scene_mesh.load(self)
+        setup_collision_apis(self._scene_mesh)
 
         # Load floor metadata
         floor_height_path = os.path.join(get_scene_path(self.scene_model), "floors.txt")
