@@ -9,7 +9,7 @@ from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
 
 
-def setup_multi_environment(num_of_envs, robot="Fetch", additional_objects_cfg=[]):
+def setup_multi_environment(num_of_envs, robot="fetch", additional_objects_cfg=[]):
     cfg = {
         "scene": {
             "type": "InteractiveTraversableScene",
@@ -18,7 +18,7 @@ def setup_multi_environment(num_of_envs, robot="Fetch", additional_objects_cfg=[
         },
         "robots": [
             {
-                "type": robot,
+                "model": robot,
                 "obs_modalities": [],
             }
         ],
@@ -264,7 +264,7 @@ def test_multi_scene_position_orientation_relative_to_scene():
 
 
 def test_tiago_getter():
-    vec_env = setup_multi_environment(2, robot="Tiago")
+    vec_env = setup_multi_environment(2, robot="tiago")
     robot1 = vec_env.envs[0].scene.robots[0]
 
     robot1_world_position, robot1_world_orientation = robot1.get_position_orientation()
@@ -293,7 +293,7 @@ def test_tiago_getter():
 
 
 def test_tiago_setter():
-    vec_env = setup_multi_environment(2, robot="Tiago")
+    vec_env = setup_multi_environment(2, robot="tiago")
 
     # use a robot with non-zero scene position
     robot = vec_env.envs[1].scene.robots[0]

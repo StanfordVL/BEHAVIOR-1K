@@ -1,4 +1,3 @@
-import numpy as np
 import omnigibson as og
 from omnigibson.metrics.metric_base import MetricBase
 from typing import Optional

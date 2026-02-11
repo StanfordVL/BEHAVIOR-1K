@@ -10,7 +10,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
-from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import VisionSensor, create_sensor
@@ -270,6 +270,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
                     robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
+                if "model" in robot_config:
+                    assert (
+                        "type" not in robot_config
+                    ), "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
+                elif "type" in robot_config:
+                    log.warning(
+                        "Robot config key 'type' is deprecated; use 'model' instead. "
+                        "Model IDs are lowercase (e.g. 'model': 'fetch'). "
+                    )
+                    robot_config["model"] = robot_config["type"].lower()
+                    del robot_config["type"]
+                assert robot_config["model"] in REGISTERED_ROBOTS, f"{robot_config['model']} is not a registered robot."
                 robot_config = deepcopy(robot_config)
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 pose_frame = robot_config.pop("pose_frame", "scene")
@@ -280,13 +292,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
                     )
 
-                # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
-                robot = create_class_from_registry_and_config(
-                    cls_name=robot_config["type"],
-                    cls_registry=REGISTERED_ROBOTS,
-                    cfg=robot_config,
-                    cls_type_descriptor="robot",
-                )
+                robot = Robot(**robot_config)
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
                 robot.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)

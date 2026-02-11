@@ -8,7 +8,6 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
-from omnigibson.robots.tiago import Tiago
 from omnigibson.utils.ui_utils import choose_from_options
 
 
@@ -71,7 +70,7 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=isinstance(robot, Tiago))
+    controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=robot.model == "tiago")
     coffee_table = scene.object_registry("name", "coffee_table_fqluyq_0")
     apple = scene.object_registry("name", "apple")
 

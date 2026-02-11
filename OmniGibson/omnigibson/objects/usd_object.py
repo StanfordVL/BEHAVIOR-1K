@@ -74,7 +74,7 @@ class USDObject(StatefulObject):
             include_default_states (bool): whether to include the default object states from @get_default_states
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
                 Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """

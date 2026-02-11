@@ -405,7 +405,7 @@ class CameraMover:
 
         # Make sure save path directory exists, and then save the image to that location
         Path(Path(fpath).parent).mkdir(parents=True, exist_ok=True)
-        Image.fromarray(self.get_image()).save(fpath)
+        Image.fromarray(self.get_image().cpu().numpy()).save(fpath)
         og.log.info(f"Saved current viewer camera image to {fpath}.")
 
     def record_trajectory(self, poses, fps, steps_per_frame=1, fpath=None):
@@ -438,7 +438,7 @@ class CameraMover:
             self.cam.set_position_orientation(position=pos, orientation=quat)
             og.sim.step()
             if i % steps_per_frame == 0:
-                video_writer.append_data(self.get_image())
+                video_writer.append_data(self.get_image().cpu().numpy())
 
         # Close writer
         video_writer.close()
@@ -470,7 +470,7 @@ class CameraMover:
 
         # Function help get arc derivative
         def arc_derivative(u):
-            return th.sqrt(th.sum([dspline(u) ** 2 for dspline in dsplines]))
+            return math.sqrt(sum(dspline(u) ** 2 for dspline in dsplines))
 
         # Function to help get interpolated positions
         def get_interpolated_positions(step):
@@ -480,7 +480,7 @@ class CameraMover:
             interpolated_points = th.zeros((path_length, 3))
             for i in range(path_length):
                 curr_step = step + (i / path_length)
-                interpolated_points[i, :] = th.tensor([spline(curr_step) for spline in splines])
+                interpolated_points[i, :] = th.tensor([float(spline(curr_step)) for spline in splines])
             return interpolated_points
 
         # Iterate over all waypoints and infer the resulting trajectory, recording the resulting poses
@@ -497,7 +497,7 @@ class CameraMover:
                 pan_angle = th.arctan2(-xy_direction[0], xy_direction[1])
                 tilt_angle = th.arcsin(z)
                 # Infer global quat orientation from these angles
-                quat = T.euler2quat([math.pi / 2 + tilt_angle, 0.0, pan_angle])
+                quat = T.euler2quat(th.tensor([math.pi / 2 + tilt_angle.item(), 0.0, pan_angle.item()]))
                 poses.append([positions[j], quat])
 
         # Record the generated trajectory
@@ -624,6 +624,7 @@ class KeyboardRobotController:
         self.keypress_mapping = None  # Maps omni keybindings to information for controlling various parts of the robot
         self.current_keypress = None  # Current key that is being pressed
         self.active_action = None  # Current action information based on the current keypress
+        self._pending_release_key = None  # Which key has a pending release (to handle batched events)
         self.toggling_gripper = False  # Whether we should toggle the gripper during the next action
         self.custom_keymapping = None  # Dictionary mapping custom keys to custom callback functions / info
 
@@ -640,7 +641,7 @@ class KeyboardRobotController:
         appwindow = lazy.omni.appwindow.get_default_app_window()
         input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
-        input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+        self._keyboard_sub = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
 
     def register_custom_keymapping(self, key, description, callback_fn):
         """
@@ -837,10 +838,9 @@ class KeyboardRobotController:
                 if event.input == lazy.carb.input.KeyboardInput.T:
                     self.toggling_gripper = True
 
-        # If we release a key, clear the active action and keypress
+        # If we release a key, mark release as pending (don't clear immediately to handle batched events)
         elif event.type == lazy.carb.input.KeyboardEventType.KEY_RELEASE:
-            self.active_action = None
-            self.current_keypress = None
+            self._pending_release_key = event.input
 
         # Callback always needs to return True
         return True
@@ -917,6 +917,12 @@ class KeyboardRobotController:
         # print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
         # sys.stdout.write("\033[F")
 
+        # Clear action after consuming if a key release was pending for the current key
+        if self._pending_release_key is not None and self._pending_release_key == self.current_keypress:
+            self.active_action = None
+            self.current_keypress = None
+        self._pending_release_key = None
+
         # Return action
         return action
 
@@ -939,8 +945,8 @@ class KeyboardRobotController:
         print_command("[, ]", "move the joint backwards, forwards, respectively")
         print()
         print("Differential Drive Control")
-        print_command("i, k", "turn left, right")
-        print_command("l, j", "move forward, backwards")
+        print_command("j, l", "turn left, right")
+        print_command("i, k", "move forward, backwards")
         print()
         print("Inverse Kinematics Control")
         print_command("3, 4", "toggle between the different arm(s) to control")
