@@ -9,7 +9,6 @@ import socket
 import sys
 import tempfile
 import traceback
-from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -18,11 +17,9 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
-from omnigibson.robots.robot import Robot
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -48,7 +45,6 @@ from omnigibson.utils.ui_utils import (
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
-    GripperRigidContactAPI,
     PoseAPI,
     RigidContactAPI,
 )
@@ -420,9 +416,6 @@ def _launch_simulator(*args, **kwargs):
             self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
             self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
             self._physx_fabric_interface = None
-            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
-                self._on_contact
-            )
             # The callback will be called right *before* the physics step
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
@@ -443,7 +436,6 @@ def _launch_simulator(*args, **kwargs):
 
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
-            self._objects_require_contact_callback = False
             self._objects_require_joint_break_callback = False
 
             # Maps callback name to callback
@@ -471,9 +463,6 @@ def _launch_simulator(*args, **kwargs):
                 for state in self.object_state_types
                 if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))
             ]
-            self.object_state_types_on_contact = {
-                state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)
-            }
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
@@ -1038,7 +1027,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
-            GripperRigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
@@ -1065,8 +1053,6 @@ def _launch_simulator(*args, **kwargs):
                         obj = self._objects_to_initialize[i]
                         obj.initialize()
                         scenes_modified.add(obj.scene)
-                        if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
-                            self._objects_require_contact_callback = True
                         if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
                             self._objects_require_joint_break_callback = True
                         obj.keep_still()
@@ -1235,8 +1221,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Invalidate various APIs so that any reads from them will be updated
             PoseAPI.invalidate()
-            RigidContactAPI.clear()
-            GripperRigidContactAPI.clear()
 
             # Only do this if we're not in the warmup phase
             if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
@@ -1254,44 +1238,11 @@ def _launch_simulator(*args, **kwargs):
                 # Run the post physics update for backend view
                 ControllableObjectViewAPI.post_physics_step()
 
+            # Update persistent rigid contact caches from the latest physics step
+            RigidContactAPI.update_contact_cache()
+
             # Record that we are done with the step context.
             self.currently_stepping = False
-
-        def _on_contact(self, contact_headers, contact_data):
-            """
-            This callback will be invoked after every PHYSICS step if there is any contact.
-            For each of the pair of objects in each contact, we invoke the on_contact function for each of its states
-            that subclass ContactSubscribedStateMixin. These states update based on contact events.
-            """
-            if gm.ENABLE_OBJECT_STATES and self._objects_require_contact_callback:
-                headers = defaultdict(list)
-                for contact_header in contact_headers:
-                    actor0_obj = self._link_id_to_objects.get(contact_header.actor0, None)
-                    actor1_obj = self._link_id_to_objects.get(contact_header.actor1, None)
-                    # If any of the objects cannot be found, skip
-                    if actor0_obj is None or actor1_obj is None:
-                        continue
-                    # If any of the objects is not initialized, skip
-                    if not actor0_obj.initialized or not actor1_obj.initialized:
-                        continue
-                    # If any of the objects is not stateful, skip
-                    if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
-                        continue
-                    # If any of the objects doesn't have states that require on_contact callbacks, skip
-                    if (
-                        len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0
-                        or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0
-                    ):
-                        continue
-                    headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x: x.uuid))].append(contact_header)
-
-                for actor0_obj, actor1_obj in headers:
-                    for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
-                        for state_type in self.object_state_types_on_contact:
-                            if state_type in obj0.states:
-                                obj0.states[state_type].on_contact(
-                                    obj1, headers[(actor0_obj, actor1_obj)], contact_data
-                                )
 
         def get_obj_at_prim_path(self, prim_path):
             for scene in self.scenes:

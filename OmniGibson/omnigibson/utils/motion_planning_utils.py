@@ -9,10 +9,9 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.geometry_utils import wrap_angle
-from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
+from omnigibson.utils.sim_utils import get_rigid_contact_bodies, prim_paths_to_rigid_prims
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.constants import GROUND_CATEGORIES
-from omnigibson.object_states import ContactBodies
 
 # Create module logger
 logger = create_module_logger(module_name=__name__)
@@ -519,7 +518,7 @@ def detect_robot_collision(context, verbose=False):
 
 def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=True):
     """
-    Detects robot collisions with the environment, but not with itself using the ContactBodies API
+    Detects robot collisions with the environment, but not with itself using the RigidContactAPI cache.
 
     Args:
         robot (BaseRobot): Robot object to detect collisions for
@@ -547,7 +546,7 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
     for category in GROUND_CATEGORIES:
         filter_objs.extend(robot.scene.object_registry("category", category, []))
 
-    return any(robot.states[ContactBodies].get_value(ignore_objs=tuple(filter_objs), non_zero_impulse=True))
+    return any(get_rigid_contact_bodies(robot, ignore_objs=tuple(filter_objs), non_zero_impulse=True))
 
 
 def astar(search_map, start, goal, eight_connected=True):

@@ -11,7 +11,6 @@ from omnigibson.object_states import (
     AABB,
     AttachedTo,
     Burnt,
-    ContactBodies,
     ContactParticles,
     Contains,
     Cooked,
@@ -229,33 +228,6 @@ def test_touching(env):
 
     with pytest.raises(NotImplementedError):
         bowl.states[Touching].set_value(breakfast_table, None)
-
-
-@og_test
-def test_contact_bodies(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
-    place_obj_on_floor_plane(breakfast_table)
-    for i, obj in enumerate((bowl, dishtowel)):
-        place_objA_on_objB_bbox(obj, breakfast_table)
-        for _ in range(5):
-            og.sim.step()
-
-        # TODO: rigid body's ContactBodies should include cloth
-        if obj.prim_type != PrimType.CLOTH:
-            assert obj.root_link in breakfast_table.states[ContactBodies].get_value()
-        assert breakfast_table.root_link in obj.states[ContactBodies].get_value()
-
-        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
-        og.sim.step()
-
-        assert obj.root_link not in breakfast_table.states[ContactBodies].get_value()
-        assert breakfast_table.root_link not in obj.states[ContactBodies].get_value()
-
-    with pytest.raises(NotImplementedError):
-        bowl.states[ContactBodies].set_value(None)
 
 
 @og_test
