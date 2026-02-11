@@ -4,7 +4,6 @@ import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty, torch_delete
@@ -31,7 +30,6 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.add(ContactBodies)
         return deps
 
     @classmethod

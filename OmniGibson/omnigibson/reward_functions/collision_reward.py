@@ -1,4 +1,4 @@
-from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.utils.sim_utils import get_rigid_contact_bodies
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
 
@@ -32,7 +32,7 @@ class CollisionReward(BaseRewardFunction):
         floors = list(env.scene.object_registry("category", "floors", []))
         ignore_objs = floors if self._ignore_self_collisions is None else floors + [robot]
         in_contact = (
-            len(env.robots[self._robot_idn].states[ContactBodies].get_value(ignore_objs=tuple(ignore_objs))) > 0
+            len(get_rigid_contact_bodies(env.robots[self._robot_idn], ignore_objs=tuple(ignore_objs))) > 0
         )
         reward = float(in_contact) * -self._r_collision
         return reward, {}
