@@ -167,21 +167,30 @@ class RigidPrim(XFormPrim):
         self._collision_meshes, self._visual_meshes = dict(), dict()
         prims_to_check = []
         coms, vols = [], []
-        for prim in self._prim.GetChildren():
-            prims_to_check.append(prim)
+
+        # Traverse the full subtree rooted at this rigid prim. Geoms are grouped at the link level
+        # based on whether they are descendants of a collision scope prim, rather than by whether the
+        # geom prim itself has collision APIs.
+        stack = [(prim, prim.GetName() == "collisions") for prim in self._prim.GetChildren()]
+        while stack:
+            prim, in_collision_scope = stack.pop()
+            prims_to_check.append((prim, in_collision_scope))
             for child in prim.GetChildren():
-                prims_to_check.append(child)
-        for prim in prims_to_check:
+                stack.append((child, in_collision_scope or child.GetName() == "collisions"))
+
+        for prim, is_collision in prims_to_check:
             mesh_type = prim.GetPrimTypeInfo().GetTypeName()
             if mesh_type in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
                 mesh_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
-                is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {
                     "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
                     "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
                     "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
                 }
+
+                mesh_dict = self._collision_meshes if is_collision else self._visual_meshes
+                mesh_dict_key = mesh_name if mesh_name not in mesh_dict else mesh_path
                 if is_collision:
                     mesh = CollisionGeomPrim(**mesh_kwargs)
                     mesh.load(self.scene)
@@ -189,7 +198,7 @@ class RigidPrim(XFormPrim):
                     # in lightweight objects sometimes not triggering contacts correctly
                     mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
                     mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
-                    self._collision_meshes[mesh_name] = mesh
+                    self._collision_meshes[mesh_dict_key] = mesh
 
                     volume, com = get_mesh_volume_and_com(mesh_prim)
                     # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
@@ -202,8 +211,8 @@ class RigidPrim(XFormPrim):
                         log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
                         mesh.set_collision_approximation("boundingCube")
                 else:
-                    self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
-                    self._visual_meshes[mesh_name].load(self.scene)
+                    self._visual_meshes[mesh_dict_key] = VisualGeomPrim(**mesh_kwargs)
+                    self._visual_meshes[mesh_dict_key].load(self.scene)
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
