@@ -415,7 +415,8 @@ class RigidContactAPIImpl:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
                     "This is expected if the physics sim view is not yet initialized, e.g. you are loading "
-                    "a scene for the first time.")
+                    "a scene for the first time."
+                )
                 self.clear()
                 return
 
