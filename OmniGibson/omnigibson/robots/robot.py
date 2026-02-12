@@ -535,8 +535,8 @@ class Robot(USDObject, GymObservable):
             # We need to manually set it back to sphere approximation
             for wheel_name in self.floor_touching_base_link_names:
                 wheel_link = self.links[wheel_name]
-                assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
-                wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+                assert len(wheel_link.collision_meshes) == 1, "Wheel link should only have 1 collision!"
+                wheel_link.set_collision_approximation("boundingSphere")
         if self._definition.visual_only_eef_links:
             # The eef gripper links should be visual-only. They only contain a "ghost" box volume
             # for detecting objects inside the gripper, in order to activate attachments (AG for Cloths).

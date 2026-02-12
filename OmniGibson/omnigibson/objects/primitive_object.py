@@ -171,7 +171,7 @@ class PrimitiveObject(StatefulObject):
                 col_approximation = "boundingCube"
             else:
                 col_approximation = "convexHull"
-            self.root_link.collision_meshes["collisions"].set_collision_approximation(col_approximation)
+            self.root_link.set_collision_approximation(col_approximation)
 
     def _initialize(self):
         # Run super first

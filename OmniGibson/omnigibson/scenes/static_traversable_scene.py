@@ -88,7 +88,7 @@ class StaticTraversableScene(TraversableScene):
             name=f"{self.scene_model}_mesh",
         )
         self._scene_mesh.load(self)
-        setup_collision_apis(self._scene_mesh)
+        setup_collision_apis(self._scene_mesh.prim)
 
         # Load floor metadata
         floor_height_path = os.path.join(get_scene_path(self.scene_model), "floors.txt")

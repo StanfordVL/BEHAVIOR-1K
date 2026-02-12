@@ -3,7 +3,6 @@ from functools import cached_property
 from scipy.spatial import Delaunay
 import torch as th
 
-import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.geometry_utils import (
     check_points_in_cone,
@@ -12,10 +11,8 @@ from omnigibson.utils.geometry_utils import (
     check_points_in_sphere,
 )
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh
 
@@ -29,9 +26,9 @@ class GeomPrim(XFormPrim):
     If there is an geom prim present at the path, it will use it. By default, a geom prim cannot be directly
     created from scratch.
 
-    Geom prims are not inherently distinguished as collision or visual. Instead, at the link level,
-    they are tracked separately based on whether they appear under a "collisions" scope prim.
-    Collision-related APIs can be set up on any geom prim by calling :func:`omnigibson.utils.usd_utils.setup_collision_apis`.
+    Geom prims are not inherently distinguished as collision or visual. Instead, at the link level
+    (RigidPrim), they are tracked separately based on whether they appear under a collision scope prim.
+    Collision-related APIs and methods live on RigidPrim and operate on all collision meshes of a link.
 
     Args:
         relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
@@ -47,11 +44,6 @@ class GeomPrim(XFormPrim):
         load_config=None,
     ):
         self._mesh_type = None
-
-        # Collision-related API references (initialized via setup_collision_apis())
-        self._collision_api = None
-        self._mesh_collision_api = None
-        self._physx_collision_api = None
         self._applied_physics_material = None
 
         # Run super method
@@ -304,149 +296,6 @@ class GeomPrim(XFormPrim):
         """
         points = self.points
         return th.max(points, dim=0).values - th.min(points, dim=0).values
-
-    @property
-    def collision_enabled(self):
-        """
-        Returns:
-            bool: Whether collisions are enabled for this collision mesh
-        """
-        return self.get_attribute("physics:collisionEnabled")
-
-    @collision_enabled.setter
-    def collision_enabled(self, enabled):
-        """
-        Sets whether collisions are enabled for this mesh
-
-        Args:
-            enabled (bool): Whether collisions should be enabled for this mesh
-        """
-        # Currently, trying to toggle while simulator is playing while using GPU dynamics results in a crash, so we
-        # assert that the sim is stopped here
-        if self._initialized and gm.USE_GPU_DYNAMICS:
-            assert og.sim.is_stopped(), "Cannot toggle collisions while using GPU dynamics unless simulator is stopped!"
-        self.set_attribute("physics:collisionEnabled", enabled)
-
-    def set_contact_offset(self, offset):
-        """
-        Args:
-            offset (float): Contact offset of a collision shape. Allowed range [maximum(0, rest_offset), 0].
-                            Default value is -inf, means default is picked by simulation based on the shape extent.
-        """
-        self._physx_collision_api.GetContactOffsetAttr().Set(offset)
-        return
-
-    def get_contact_offset(self):
-        """
-        Returns:
-            float: contact offset of the collision shape.
-        """
-        return self._physx_collision_api.GetContactOffsetAttr().Get()
-
-    def set_rest_offset(self, offset):
-        """
-        Args:
-            offset (float): Rest offset of a collision shape. Allowed range [-max_float, contact_offset.
-                            Default value is -inf, means default is picked by simulatiion. For rigid bodies its zero.
-        """
-        self._physx_collision_api.GetRestOffsetAttr().Set(offset)
-        return
-
-    def get_rest_offset(self):
-        """
-        Returns:
-            float: rest offset of the collision shape.
-        """
-        return self._physx_collision_api.GetRestOffsetAttr().Get()
-
-    def set_torsional_patch_radius(self, radius):
-        """
-        Args:
-            radius (float): radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
-        """
-        self._physx_collision_api.GetTorsionalPatchRadiusAttr().Set(radius)
-        return
-
-    def get_torsional_patch_radius(self):
-        """
-        Returns:
-            float: radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
-        """
-        return self._physx_collision_api.GetTorsionalPatchRadiusAttr().Get()
-
-    def set_min_torsional_patch_radius(self, radius):
-        """
-        Args:
-            radius (float): minimum radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
-        """
-        self._physx_collision_api.GetMinTorsionalPatchRadiusAttr().Set(radius)
-        return
-
-    def get_min_torsional_patch_radius(self):
-        """
-        Returns:
-            float: minimum radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
-        """
-        return self._physx_collision_api.GetMinTorsionalPatchRadiusAttr().Get()
-
-    def set_collision_approximation(self, approximation_type):
-        """
-        Args:
-            approximation_type (str): approximation used for collision.
-                Can be one of: {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf",
-                    "boundingSphere", "boundingCube"}
-                If None, the approximation will use the underlying triangle mesh.
-        """
-        assert self._mesh_collision_api is not None, "collision_approximation only applicable for meshes!"
-        assert_valid_key(
-            key=approximation_type,
-            valid_keys={
-                "none",
-                "convexHull",
-                "convexDecomposition",
-                "meshSimplification",
-                "sdf",
-                "boundingSphere",
-                "boundingCube",
-            },
-            name="collision approximation type",
-        )
-
-        # Make sure to add the appropriate API if we're setting certain values
-        if approximation_type == "convexHull" and not self._prim.HasAPI(
-            lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI
-        ):
-            lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
-        elif approximation_type == "convexDecomposition" and not self._prim.HasAPI(
-            lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI
-        ):
-            lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(self._prim)
-        elif approximation_type == "meshSimplification" and not self._prim.HasAPI(
-            lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI
-        ):
-            lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(self._prim)
-        elif approximation_type == "sdf" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
-            lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(self._prim)
-        elif approximation_type == "none" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI):
-            lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(self._prim)
-
-        if approximation_type == "convexHull":
-            pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(self._prim)
-            # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
-            # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
-            if pch_api.GetHullVertexLimitAttr().Get() is None:
-                pch_api.CreateHullVertexLimitAttr()
-            pch_api.GetHullVertexLimitAttr().Set(60)
-
-        self._mesh_collision_api.GetApproximationAttr().Set(approximation_type)
-
-    def get_collision_approximation(self):
-        """
-        Returns:
-            str: approximation used for collision, could be "none", "convexHull" or "convexDecomposition"
-        """
-        assert self._mesh_collision_api is not None, "collision_approximation only applicable for meshes!"
-        return self._mesh_collision_api.GetApproximationAttr().Get()
 
     def apply_physics_material(self, physics_material, weaker_than_descendants=False):
         """

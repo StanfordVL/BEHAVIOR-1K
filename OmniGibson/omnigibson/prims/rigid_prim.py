@@ -17,9 +17,9 @@ from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
+    apply_collision_approximation,
     check_extent_radius_ratio,
     get_mesh_volume_and_com,
-    setup_collision_apis,
 )
 
 # Create module logger
@@ -70,6 +70,12 @@ class RigidPrim(XFormPrim):
         self._collision_meshes = None
         self._visual_meshes = None
         self._belongs_to_articulation = None
+
+        # Collision API references collected from the prim hierarchy (not 1:1 with meshes).
+        # A single CollisionAPI on a scope prim may cover multiple geom prims.
+        self._collision_apis = None          # list of UsdPhysics.CollisionAPI
+        self._physx_collision_apis = None    # list of PhysxSchema.PhysxCollisionAPI
+        self._mesh_collision_apis = None     # list of (USD prim, UsdPhysics.MeshCollisionAPI)
 
         # Run super init
         super().__init__(
@@ -166,28 +172,43 @@ class RigidPrim(XFormPrim):
         additional bodies are added manually.
 
         Collision vs. visual meshes are distinguished at the link level based on whether the geom prim
-        appears as or under a prim with a UsdPhysics.CollisionAPI or PhysxSchema.PhysxCollisionAPI attached to it.
+        appears as or under a prim that already has a UsdPhysics.CollisionAPI or PhysxSchema.PhysxCollisionAPI.
+        The existing API references are collected into flat lists during traversal -- a single CollisionAPI
+        on a scope prim may cover multiple geom prims underneath it, so the API lists are not 1:1 with meshes.
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
+        self._collision_apis = []
+        self._physx_collision_apis = []
+        self._mesh_collision_apis = []
 
-        # Find all geom prims and whether they are under a collision prim
+        # Recursively find all geom prims, collecting collision API references into
+        # the link-level lists as they are encountered during descent.
         geom_prims = []
 
-        def _find_geom_prims(prim, is_under_collision_prim=False):
-            # Check if this prim is a collision prim
-            is_collision_prim = is_under_collision_prim
-            if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI) or prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI):
-                is_collision_prim = True
+        def _find_geom_prims(prim, is_collision=False):
+            # If this prim has collision APIs, add them to the link-level lists
+            if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
+                self._collision_apis.append(lazy.pxr.UsdPhysics.CollisionAPI(prim))
+                is_collision = True
+            if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI):
+                self._physx_collision_apis.append(lazy.pxr.PhysxSchema.PhysxCollisionAPI(prim))
+                is_collision = True
 
-            # Add this prim to the list if it is a geom prim
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
-                geom_prims.append((prim, is_collision_prim))
+                # MeshCollisionAPI is inherently per-geom-prim; store alongside prim reference
+                if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI):
+                    self._mesh_collision_apis.append((prim, lazy.pxr.UsdPhysics.MeshCollisionAPI(prim)))
+                geom_prims.append((prim, is_collision))
 
-            # Recursively find all geom prims under this prim
             for child in prim.GetChildren():
-                _find_geom_prims(child, is_collision_prim)
+                _find_geom_prims(child, is_collision)
 
-        _find_geom_prims(self._prim, False)
+        _find_geom_prims(self._prim)
+
+        # Set default contact/rest offsets on all PhysxCollisionAPIs
+        for api in self._physx_collision_apis:
+            api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
+            api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
 
         coms, vols = [], []
         for prim, is_collision in geom_prims:
@@ -200,13 +221,8 @@ class RigidPrim(XFormPrim):
             mesh = GeomPrim(**mesh_kwargs)
             mesh.load(self.scene)
             if is_collision:
-                setup_collision_apis(mesh)
                 # Collision meshes should not show up in rendering by default
                 mesh.purpose = "guide"
-                # We also modify the collision mesh's contact and rest offsets, since omni's default values result
-                # in lightweight objects sometimes not triggering contacts correctly
-                mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
-                mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
                 self._collision_meshes[mesh_name] = mesh
 
                 volume, com = get_mesh_volume_and_com(mesh.prim)
@@ -216,9 +232,9 @@ class RigidPrim(XFormPrim):
                 coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
                 # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
                 # boundingCube approximation for the underlying collision approximation for GPU compatibility
-                if not check_extent_radius_ratio(mesh, com):
+                if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) and not check_extent_radius_ratio(mesh, com):
                     log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
-                    mesh.set_collision_approximation("boundingCube")
+                    apply_collision_approximation(prim, lazy.pxr.UsdPhysics.MeshCollisionAPI(prim), "boundingCube")
             else:
                 self._visual_meshes[mesh_name] = mesh
                 # TODO: tmp fix for visible metalinks
@@ -250,19 +266,72 @@ class RigidPrim(XFormPrim):
 
     def enable_collisions(self):
         """
-        Enable collisions for this RigidPrim
+        Enable collisions for all collision meshes owned by this RigidPrim
         """
-        # Iterate through all owned collision meshes and toggle on their collisions
-        for col_mesh in self._collision_meshes.values():
-            col_mesh.collision_enabled = True
+        for collision_api in self._collision_apis:
+            collision_api.GetCollisionEnabledAttr().Set(True)
 
     def disable_collisions(self):
         """
-        Disable collisions for this RigidPrim
+        Disable collisions for all collision meshes owned by this RigidPrim
         """
-        # Iterate through all owned collision meshes and toggle off their collisions
-        for col_mesh in self._collision_meshes.values():
-            col_mesh.collision_enabled = False
+        for collision_api in self._collision_apis:
+            collision_api.GetCollisionEnabledAttr().Set(False)
+
+    def set_contact_offset(self, offset):
+        """
+        Set contact offset for all collision APIs in this link.
+
+        Args:
+            offset (float): Contact offset of a collision shape. Allowed range [maximum(0, rest_offset), 0].
+                            Default value is -inf, means default is picked by simulation based on the shape extent.
+        """
+        for api in self._physx_collision_apis:
+            api.GetContactOffsetAttr().Set(offset)
+
+    def set_rest_offset(self, offset):
+        """
+        Set rest offset for all collision APIs in this link.
+
+        Args:
+            offset (float): Rest offset of a collision shape. Allowed range [-max_float, contact_offset.
+                            Default value is -inf, means default is picked by simulation. For rigid bodies its zero.
+        """
+        for api in self._physx_collision_apis:
+            api.GetRestOffsetAttr().Set(offset)
+
+    def set_torsional_patch_radius(self, radius):
+        """
+        Set torsional patch radius for all collision APIs in this link.
+
+        Args:
+            radius (float): radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
+        """
+        for api in self._physx_collision_apis:
+            api.GetTorsionalPatchRadiusAttr().Set(radius)
+
+    def set_min_torsional_patch_radius(self, radius):
+        """
+        Set minimum torsional patch radius for all collision APIs in this link.
+
+        Args:
+            radius (float): minimum radius of the contact patch used to apply torsional friction.
+                            Allowed range [0, max_float].
+        """
+        for api in self._physx_collision_apis:
+            api.GetMinTorsionalPatchRadiusAttr().Set(radius)
+
+    def set_collision_approximation(self, approximation_type):
+        """
+        Set collision approximation for all mesh collision APIs in this link.
+
+        Args:
+            approximation_type (str): approximation used for collision.
+                Can be one of: {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf",
+                    "boundingSphere", "boundingCube"}
+        """
+        for prim, mesh_collision_api in self._mesh_collision_apis:
+            apply_collision_approximation(prim, mesh_collision_api, approximation_type)
 
     def update_handles(self):
         """
@@ -304,7 +373,7 @@ class RigidPrim(XFormPrim):
     def collision_meshes(self):
         """
         Returns:
-            dict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
+            dict: Dictionary mapping collision mesh names (str) to mesh prims (GeomPrim) owned by
                 this rigid body
         """
         return self._collision_meshes
@@ -313,7 +382,7 @@ class RigidPrim(XFormPrim):
     def visual_meshes(self):
         """
         Returns:
-            dict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
+            dict: Dictionary mapping visual mesh names (str) to mesh prims (GeomPrim) owned by
                 this rigid body
         """
         return self._visual_meshes

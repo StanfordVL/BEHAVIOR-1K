@@ -195,8 +195,7 @@ def assert_test_env():
         bounding_box_object_names = ["bagel_dough", "raw_egg"]
         for name in bounding_box_object_names:
             obj = env.scene.object_registry("name", name)
-            for collision_mesh in obj.root_link.collision_meshes.values():
-                collision_mesh.set_collision_approximation("boundingCube")
+            obj.root_link.set_collision_approximation("boundingCube")
         og.sim.play()
 
     assert env is not None, "Environment not created"

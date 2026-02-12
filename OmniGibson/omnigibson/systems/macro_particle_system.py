@@ -1227,7 +1227,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             )
         result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
-        setup_collision_apis(result)
+        setup_collision_apis(result.prim)
         result.apply_physics_material(self.particle_physics_material)
         return result
 

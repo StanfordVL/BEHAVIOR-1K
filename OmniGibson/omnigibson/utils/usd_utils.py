@@ -611,45 +611,107 @@ class CollisionAPI:
         cls.ACTIVE_COLLISION_GROUPS = {}
 
 
-def setup_collision_apis(geom_prim):
+def setup_collision_apis(prim):
     """
-    Set up collision-related physics APIs on a geom prim. This should be called for geom prims
+    Apply collision-related physics APIs to a USD prim. This should be called for prims
     that are identified as collision meshes (e.g. those appearing under a "collisions" scope prim).
 
     This applies the CollisionAPI, PhysxCollisionAPI, and (for meshes) MeshCollisionAPI to the prim,
-    and sets a default convex hull collision approximation for mesh types.
+    sets a default convex hull collision approximation for mesh types, and enables/disables collisions
+    based on the global VISUAL_ONLY setting.
 
     Note: This does NOT set the prim's purpose. The caller should set purpose as appropriate
     (e.g. "guide" for collision-only meshes, "default" for collision+visual meshes).
 
     Args:
-        geom_prim (GeomPrim): The geom prim to set up collision APIs on.
-    """
-    prim = geom_prim.prim
+        prim: The USD prim to set up collision APIs on.
 
+    Returns:
+        tuple: (collision_api, physx_collision_api, mesh_collision_api) where mesh_collision_api
+            may be None for non-mesh prims.
+    """
     # Create / get CollisionAPI reference
-    geom_prim._collision_api = (
+    collision_api = (
         lazy.pxr.UsdPhysics.CollisionAPI(prim)
         if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
         else lazy.pxr.UsdPhysics.CollisionAPI.Apply(prim)
     )
-    geom_prim._physx_collision_api = (
+    physx_collision_api = (
         lazy.pxr.PhysxSchema.PhysxCollisionAPI(prim)
         if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI)
         else lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(prim)
     )
 
     # Optionally add mesh collision API if this is a mesh
+    mesh_collision_api = None
     if prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
-        geom_prim._mesh_collision_api = (
+        mesh_collision_api = (
             lazy.pxr.UsdPhysics.MeshCollisionAPI(prim)
             if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI)
             else lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(prim)
         )
         # Set the approximation to be convex hull by default
-        geom_prim.set_collision_approximation(approximation_type="convexHull")
+        apply_collision_approximation(prim, mesh_collision_api, "convexHull")
 
-    geom_prim.collision_enabled = not gm.VISUAL_ONLY
+    # Set collision enabled based on global setting
+    collision_api.GetCollisionEnabledAttr().Set(not gm.VISUAL_ONLY)
+
+    return collision_api, physx_collision_api, mesh_collision_api
+
+
+def apply_collision_approximation(prim, mesh_collision_api, approximation_type):
+    """
+    Apply a collision approximation type to a single collision mesh prim.
+
+    Args:
+        prim: The USD prim to apply the collision approximation to.
+        mesh_collision_api: The UsdPhysics.MeshCollisionAPI for this prim.
+        approximation_type (str): Approximation type to use. One of:
+            {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf",
+             "boundingSphere", "boundingCube"}
+    """
+    assert mesh_collision_api is not None, "collision_approximation only applicable for meshes!"
+    assert_valid_key(
+        key=approximation_type,
+        valid_keys={
+            "none",
+            "convexHull",
+            "convexDecomposition",
+            "meshSimplification",
+            "sdf",
+            "boundingSphere",
+            "boundingCube",
+        },
+        name="collision approximation type",
+    )
+
+    # Make sure to add the appropriate API if we're setting certain values
+    if approximation_type == "convexHull" and not prim.HasAPI(
+        lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI
+    ):
+        lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(prim)
+    elif approximation_type == "convexDecomposition" and not prim.HasAPI(
+        lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI
+    ):
+        lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(prim)
+    elif approximation_type == "meshSimplification" and not prim.HasAPI(
+        lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI
+    ):
+        lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(prim)
+    elif approximation_type == "sdf" and not prim.HasAPI(lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
+        lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(prim)
+    elif approximation_type == "none" and not prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI):
+        lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(prim)
+
+    if approximation_type == "convexHull":
+        pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(prim)
+        # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
+        # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
+        if pch_api.GetHullVertexLimitAttr().Get() is None:
+            pch_api.CreateHullVertexLimitAttr()
+        pch_api.GetHullVertexLimitAttr().Set(60)
+
+    mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
 class PoseAPI:
