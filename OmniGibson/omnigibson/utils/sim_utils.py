@@ -10,6 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils import python_utils
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -99,6 +100,41 @@ def prim_paths_to_rigid_prims(prim_paths, scene):
     return rigid_prims
 
 
+def get_rigid_contact_bodies(obj, ignore_objs=None, non_zero_impulse=False):
+    """
+    Returns rigid prims currently (or persistently) in contact with @obj via RigidContactAPI.
+
+    Args:
+        obj (EntityPrim): Object whose rigid links should be checked.
+        ignore_objs (None or tuple): Optional objects to filter out from the returned contacts.
+        non_zero_impulse (bool): If True, only include contacts whose cached impulse norm is non-zero.
+
+    Returns:
+        set of RigidPrim: Contacting rigid prims not owned by @obj.
+    """
+    scene_idx = obj.scene.idx
+    if scene_idx not in RigidContactAPI._CONTACT_MATRIX:
+        return set()
+
+    my_link_paths = list(obj.link_prim_paths)
+    my_link_path_set = set(my_link_paths)
+    bodies = set()
+    for row_path, col_path in RigidContactAPI.get_contact_pairs(scene_idx=scene_idx, row_prim_paths=my_link_paths):
+        if row_path in my_link_path_set and col_path not in my_link_path_set:
+            if not non_zero_impulse:
+                bodies.add(col_path)
+            else:
+                impulse = RigidContactAPI.get_impulses([row_path], [col_path])[0, 0]
+                if th.norm(impulse) > 0:
+                    bodies.add(col_path)
+
+    rigid_prims = prim_paths_to_rigid_prims(bodies, obj.scene)
+    assert ignore_objs is None or isinstance(
+        ignore_objs, tuple
+    ), "ignore_objs must either be None or a tuple of objects to ignore!"
+    return {p for o, p in rigid_prims if ignore_objs is None or o not in ignore_objs}
+
+
 def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
     """
     Grab collisions that occurred during the most recent physics timestep associated with prims @prims
@@ -138,7 +174,15 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
         return {prim.prim_path for prim in inp_prims}
 
     def get_contacts(inp_prims):
-        return {(c.body0, c.body1) for prim in inp_prims for c in prim.contact_list()}
+        inp_paths = {prim.prim_path for prim in inp_prims}
+        collisions = set()
+        for scene in og.sim.scenes:
+            if scene is None:
+                continue
+            for row_path, col_path in RigidContactAPI.get_contact_pairs(scene_idx=scene.idx):
+                if row_path in inp_paths or col_path in inp_paths:
+                    collisions.add((row_path, col_path))
+        return collisions
 
     rprims = prims_to_rigid_prim_set(prims)
     rprims_check = prims_to_rigid_prim_set(prims_check)

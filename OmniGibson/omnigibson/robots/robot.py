@@ -47,13 +47,13 @@ from omnigibson.controllers import (
     DifferentialDriveController,
 )
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.object_states import ContactBodies
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
+from omnigibson.utils.sim_utils import get_rigid_contact_bodies
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
-    GripperRigidContactAPI,
+    RigidContactAPI,
     create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
@@ -2061,7 +2061,7 @@ class Robot(USDObject, GymObservable):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                if len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) == 0:
+                if len(get_rigid_contact_bodies(candidate_obj).intersection(finger_links)) == 0:
                     is_grasping = IsGraspingState.FALSE
         return is_grasping
 
@@ -2095,13 +2095,13 @@ class Robot(USDObject, GymObservable):
         if not return_contact_positions:
             raw_contact_data = {
                 (row, col)
-                for row, col in GripperRigidContactAPI.get_contact_pairs(self.scene.idx, column_prim_paths=finger_paths)
+                for row, col in RigidContactAPI.get_contact_pairs(self.scene.idx, column_prim_paths=finger_paths)
                 if row not in link_paths
             }
         else:
             raw_contact_data = {
                 (row, col, point)
-                for row, col, force, point, normal, sep in GripperRigidContactAPI.get_contact_data(
+                for row, col, force, point, normal, sep in RigidContactAPI.get_contact_data(
                     self.scene.idx, column_prim_paths=finger_paths
                 )
                 if row not in link_paths
@@ -2714,7 +2714,7 @@ class Robot(USDObject, GymObservable):
         assert contact_pos is not None, (
             "contact_pos in self._find_gripper_contacts(return_contact_positions=True) is not found in "
             "self._find_gripper_contacts(return_contact_positions=False). This is likely because "
-            "GripperRigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
+            "RigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
         )
 
         # Joint frame set at the contact point

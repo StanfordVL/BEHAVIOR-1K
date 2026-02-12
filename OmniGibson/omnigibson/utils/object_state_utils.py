@@ -7,8 +7,8 @@ import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import Dict, create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
+from omnigibson.utils.sim_utils import get_rigid_contact_bodies
 from omnigibson.utils.constants import GROUND_CATEGORIES, PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint, create_module_logger
 from omnigibson.utils.constants import JointType
@@ -245,7 +245,7 @@ def sample_kinematics(
 
             og.sim.step_physics()
             objA.keep_still()
-            success = len(objA.states[ContactBodies].get_value()) == 0
+            success = len(get_rigid_contact_bodies(objA)) == 0
 
         if macros.utils.sampling_utils.DEBUG_SAMPLING:
             debug_breakpoint(f"sample_kinematics: {success}")
@@ -281,7 +281,7 @@ def sample_kinematics(
         # step until (a) max steps is reached (restarted from 0) or (b) velocity is below some threshold
         n_steps_max = int(0.5 / og.sim.get_physics_dt())
         i = 0
-        while len(objA.states[ContactBodies].get_value()) == 0 and i < n_steps_max:
+        while len(get_rigid_contact_bodies(objA)) == 0 and i < n_steps_max:
             og.sim.step_physics()
             i += 1
         objA.keep_still()
@@ -361,7 +361,8 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
         obj.keep_still()
 
         og.sim.step_physics()
-        success = len(obj.states[ContactBodies].get_value()) == 0
+        # Cloth contacts are not represented in RigidContactAPI views.
+        success = len(obj.contact_list()) == 0
 
         if success:
             break
