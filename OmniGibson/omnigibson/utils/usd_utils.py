@@ -406,8 +406,16 @@ class RigidContactAPIImpl:
         Updates persistent contact caches from the latest physics step. Pairwise values are only refreshed for pairs
         whose relative positions changed; unchanged pairs preserve their cached contact state.
         """
-        for scene_idx in self._CONTACT_VIEW:
-            current_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
+        for scene_idx in list(self._CONTACT_VIEW.keys()):
+            try:
+                current_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
+            except Exception:
+                log.warning(
+                    "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
+                    "This is expected if the physics sim view is not yet initialized, e.g. you are loading "
+                    "a scene for the first time.")
+                self.clear()
+                return
 
             transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
             positions = transforms[:, :3]
@@ -1449,6 +1457,7 @@ def clear():
     """
     PoseAPI.invalidate()
     CollisionAPI.clear()
+    RigidContactAPI.clear()
     ControllableObjectViewAPI.clear()
 
 
