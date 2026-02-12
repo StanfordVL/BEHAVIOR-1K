@@ -367,7 +367,9 @@ class RigidContactAPIImpl:
         """
         Collects current-step contact data directly from PhysX and returns a dictionary keyed by (row_idx, col_idx).
         """
-        forces, points, normals, separations, contact_counts, start_indices = self._CONTACT_VIEW[scene_idx].get_contact_data(dt=1.0)
+        forces, points, normals, separations, contact_counts, start_indices = self._CONTACT_VIEW[
+            scene_idx
+        ].get_contact_data(dt=1.0)
         data_by_pair = dict()
         n_truncated_pairs = 0
         for row in range(contact_counts.shape[0]):
