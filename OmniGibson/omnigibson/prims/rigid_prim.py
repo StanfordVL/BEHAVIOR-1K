@@ -73,9 +73,9 @@ class RigidPrim(XFormPrim):
 
         # Collision API references collected from the prim hierarchy (not 1:1 with meshes).
         # A single CollisionAPI on a scope prim may cover multiple geom prims.
-        self._collision_apis = None          # list of UsdPhysics.CollisionAPI
-        self._physx_collision_apis = None    # list of PhysxSchema.PhysxCollisionAPI
-        self._mesh_collision_apis = None     # list of (USD prim, UsdPhysics.MeshCollisionAPI)
+        self._collision_apis = None  # list of UsdPhysics.CollisionAPI
+        self._physx_collision_apis = None  # list of PhysxSchema.PhysxCollisionAPI
+        self._mesh_collision_apis = None  # list of (USD prim, UsdPhysics.MeshCollisionAPI)
 
         # Run super init
         super().__init__(

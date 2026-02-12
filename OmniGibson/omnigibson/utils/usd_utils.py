@@ -686,9 +686,7 @@ def apply_collision_approximation(prim, mesh_collision_api, approximation_type):
     )
 
     # Make sure to add the appropriate API if we're setting certain values
-    if approximation_type == "convexHull" and not prim.HasAPI(
-        lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI
-    ):
+    if approximation_type == "convexHull" and not prim.HasAPI(lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI):
         lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(prim)
     elif approximation_type == "convexDecomposition" and not prim.HasAPI(
         lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI
