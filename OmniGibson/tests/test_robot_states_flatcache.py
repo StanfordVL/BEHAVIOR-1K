@@ -307,10 +307,14 @@ def test_grasping_mode():
         for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
             env.step(action)
 
-        gripper_controller = robot.controllers["gripper_0"]
+        gripper_controller = robot._get_controller_class("gripper_0")
 
         # Grasp the box
-        gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
+        gripper_controller.update_goal(
+            robot_id=robot._controller_id("gripper_0"),
+            command=cb.array([-1]),
+            control_dict=robot.get_control_dict(),
+        )
         for _ in range(10):
             og.sim.step()
 

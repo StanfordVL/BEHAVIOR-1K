@@ -6,7 +6,8 @@ import torch as th
 
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
+from omnigibson.utils.python_utils import Recreatable, Serializable, assert_valid_key
+from copy import deepcopy
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -14,27 +15,6 @@ m = create_module_macros(module_path=__file__)
 # Set default isaac kp / kd for controllers
 m.DEFAULT_ISAAC_KP = 1e7
 m.DEFAULT_ISAAC_KD = 1e5
-
-# Global dicts that will contain mappings
-REGISTERED_CONTROLLERS = dict()
-REGISTERED_LOCOMOTION_CONTROLLERS = dict()
-REGISTERED_MANIPULATION_CONTROLLERS = dict()
-REGISTERED_GRIPPER_CONTROLLERS = dict()
-
-
-def register_locomotion_controller(cls):
-    if cls.__name__ not in REGISTERED_LOCOMOTION_CONTROLLERS:
-        REGISTERED_LOCOMOTION_CONTROLLERS[cls.__name__] = cls
-
-
-def register_manipulation_controller(cls):
-    if cls.__name__ not in REGISTERED_MANIPULATION_CONTROLLERS:
-        REGISTERED_MANIPULATION_CONTROLLERS[cls.__name__] = cls
-
-
-def register_gripper_controller(cls):
-    if cls.__name__ not in REGISTERED_GRIPPER_CONTROLLERS:
-        REGISTERED_GRIPPER_CONTROLLERS[cls.__name__] = cls
 
 
 class IsGraspingState(IntEnum):
@@ -72,132 +52,160 @@ class ControlType:
         return cls._MAPPING[type_str.lower()]
 
 
-class BaseController(Serializable, Registerable, Recreatable):
+class BaseController(Serializable, Recreatable):
     """
-    An abstract class with interface for mapping specific types of commands to deployable control signals.
+    Singleton-style base class for controllers. All controller classes should inherit this and operate
+    on per-robot state stored in class-level dicts keyed by controller_id.
     """
 
-    def __init__(
-        self,
-        control_freq,
-        control_limits,
-        dof_idx,
-        command_input_limits="default",
-        command_output_limits="default",
-        isaac_kp=None,
-        isaac_kd=None,
-    ):
-        """
-        Args:
-            control_freq (int): controller loop frequency
-            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
-                control signal. Should specify per-dof type limits, i.e.:
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Per-subclass storage
+        # Dict keyed by controller_id (f"{robot.name}:{controller_name}")
+        cls._configs = {} # processed controller configs per robot/controller
+        cls._goals = {} # current goal
+        cls._controls = {} # last computed control signal, used by deploy_control
+        cls._state = {} # extra per-controller internal state that needs persistenc (filter buffers, integrator terms, smoothing history)
+        cls._robots = {} # actual robot instance, to query control_dict and other robot data
 
-                "position": [[min], [max]]
-                "velocity": [[min], [max]]
-                "effort": [[min], [max]]
-                "has_limit": [...bool...]
+    # Shared cache across all controller classes for a single simulation step
+    _ROBOT_CONTROL_STEP_CACHE = {}
 
-                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
-                controller-relevant values during control computations
-            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
-                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
-                If None, no clipping will be used. If "default", range will be set to (-1, 1)
-            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
-                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
-                then all inputted command values will be scaled from the input range to the output range.
-                If either is None, no scaling will be used. If "default", then this range will automatically be set
-                to the @control_limits entry corresponding to self.control_type
-            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
-                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
-                Should only be nonzero if self.control_type is position
-            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
-                isaac DOFs. Can either be a single number or a per-DOF set of numbers
-                Should only be nonzero if self.control_type is position or velocity
+    @classmethod
+    def register(cls, controller_id: str, config: dict, robot=None):
         """
-        # Store arguments
-        self._control_freq = control_freq
-        self._control_limits = {}
+        Register a robot with its config. Config should contain all values required by this controller.
+        """
+        cls._configs[controller_id] = cls._process_config(controller_id, config)
+        cls._goals.setdefault(controller_id, None)
+        cls._controls.setdefault(controller_id, None)
+        if controller_id not in cls._state:
+            cls._state[controller_id] = {}
+        if robot is not None:
+            cls._robots[controller_id] = robot
+        cls._init_state(controller_id=controller_id)
+
+    @classmethod
+    def unregister(cls, controller_id: str):
+        cls._configs.pop(controller_id, None)
+        cls._goals.pop(controller_id, None)
+        cls._controls.pop(controller_id, None)
+        cls._state.pop(controller_id, None)
+        cls._robots.pop(controller_id, None)
+
+    @classmethod
+    def _init_state(cls, controller_id: str):
+        # Subclasses may override
+        pass
+    
+    @classmethod
+    def set_goals(cls, controller_id: str, goals):
+        cls._goals[controller_id] = goals
+
+    @classmethod
+    def _process_config(cls, controller_id: str, input_config: dict):
+        """
+        Process and validate input controller config.
+        """
+        config = deepcopy(input_config)
+        config["dof_idx"] = cb.as_int(config["dof_idx"])
+        config["command_input_limits"] = config.get("command_input_limits", "default")
+        config["command_output_limits"] = config.get("command_output_limits", "default")
+
+        # Some classmethods (e.g., command_dim / control_type) read from cls._configs.
+        # Seed a temporary entry so these methods can run during config processing.
+        had_existing_config = controller_id in cls._configs
+        if not had_existing_config:
+            cls._configs[controller_id] = config
+
+        control_limits = {}
         for motor_type in {"position", "velocity", "effort"}:
-            if motor_type not in control_limits:
+            if motor_type not in config["control_limits"]:
                 continue
-
-            self._control_limits[ControlType.get_type(motor_type)] = [
-                control_limits[motor_type][0],
-                control_limits[motor_type][1],
+            control_limits[ControlType.get_type(motor_type)] = [
+                config["control_limits"][motor_type][0],
+                config["control_limits"][motor_type][1],
             ]
-        assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
-        self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = cb.as_int(dof_idx)
+        assert "has_limit" in config["control_limits"], "Expected has_limit specified in control_limits, but does not exist."
+        control_limits["has_limit"] = config["control_limits"]["has_limit"]
+        config["control_limits"] = control_limits
+        config["dof_has_limits"] = control_limits["has_limit"]
 
         # Generate goal information
-        self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(sum(cb.prod(cb.array(shape)) for shape in self._goal_shapes.values()))
+        config["goal_shapes"] = cls._get_goal_shapes(controller_id)
+        config["goal_dim"] = int(sum(cb.prod(cb.array(shape)) for shape in config["goal_shapes"].values()))
 
-        # Initialize some other variables that will be filled in during runtime
-        self._control = None
-        self._goal = None
-        self._command_scale_factor = None
-        self._command_output_transform = None
-        self._command_input_transform = None
+        cls._controls[controller_id] = None
+        cls._goals[controller_id] = None
+        config["command_scale_factor"] = None
+        config["command_output_transform"] = None
+        config["command_input_transform"] = None
 
-        # Standardize command input / output limits to be (min_array, max_array)
-        command_input_limits = (
-            self._generate_default_command_input_limits()
-            if type(command_input_limits) is str and command_input_limits == "default"
-            else command_input_limits
-        )
-        command_output_limits = (
-            self._generate_default_command_output_limits()
-            if type(command_output_limits) is str and command_output_limits == "default"
-            else command_output_limits
-        )
-        self._command_input_limits = (
+        command_input_limits = config["command_input_limits"]
+        command_output_limits = config["command_output_limits"]
+        if type(command_input_limits) is str and command_input_limits == "default":
+            command_input_limits = cls._generate_default_command_input_limits()
+        if type(command_output_limits) is str and command_output_limits == "default":
+            command_output_limits = cls._generate_default_command_output_limits(controller_id)
+
+        command_dim = cls.command_dim(controller_id)
+        config["command_input_limits"] = (
             None
             if command_input_limits is None
             else (
-                self.nums2array(command_input_limits[0], self.command_dim),
-                self.nums2array(command_input_limits[1], self.command_dim),
+                cls.nums2array(command_input_limits[0], command_dim),
+                cls.nums2array(command_input_limits[1], command_dim),
             )
         )
-        self._command_output_limits = (
+        config["command_output_limits"] = (
             None
             if command_output_limits is None
             else (
-                self.nums2array(command_output_limits[0], self.command_dim),
-                self.nums2array(command_output_limits[1], self.command_dim),
+                cls.nums2array(command_output_limits[0], command_dim),
+                cls.nums2array(command_output_limits[1], command_dim),
             )
         )
 
         # Set gains
-        if self.control_type == ControlType.POSITION:
+        isaac_kp = config.get("isaac_kp", None)
+        isaac_kd = config.get("isaac_kd", None)
+        control_type = cls.control_type(controller_id)
+        if control_type == ControlType.POSITION:
             # Set default kp / kd values if not specified
             isaac_kp = m.DEFAULT_ISAAC_KP if isaac_kp is None else isaac_kp
             isaac_kd = m.DEFAULT_ISAAC_KD if isaac_kd is None else isaac_kd
-        elif self.control_type == ControlType.VELOCITY:
+        elif control_type == ControlType.VELOCITY:
             # No kp should be specified, but kd should be
             assert (
                 isaac_kp is None
-            ), f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
+            ),f"Control type for controller {controller_id} is VELOCITY, so no isaac_kp should be set!"
+            
             isaac_kd = m.DEFAULT_ISAAC_KP if isaac_kd is None else isaac_kd
-        elif self.control_type == ControlType.EFFORT:
+        elif control_type == ControlType.EFFORT:
             # Neither kp nor kd should be specified
             assert (
                 isaac_kp is None
-            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
+            ), f"Control type for controller {controller_id} is EFFORT, so no isaac_kp should be set!"
+            
             assert (
                 isaac_kd is None
-            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
+            ), f"Control type for controller {controller_id} is EFFORT, so no isaac_kd should be set!"
         else:
             raise ValueError(
-                f"Expected control type to be one of: [POSITION, VELOCITY, EFFORT], but got: {self.control_type}"
+                f"Expected control type to be one of: [POSITION, VELOCITY, EFFORT], but got: {control_type}"
             )
 
-        self._isaac_kp = None if isaac_kp is None else self.nums2array(isaac_kp, self.control_dim)
-        self._isaac_kd = None if isaac_kd is None else self.nums2array(isaac_kd, self.control_dim)
+        control_dim = cls.control_dim(controller_id)
+        config["isaac_kp"] = None if isaac_kp is None else cls.nums2array(isaac_kp, control_dim)
+        config["isaac_kd"] = None if isaac_kd is None else cls.nums2array(isaac_kd, control_dim)
 
-    def _generate_default_command_input_limits(self):
+        if not had_existing_config:
+            cls._configs.pop(controller_id, None)
+        
+        return config
+
+    @classmethod
+    def _generate_default_command_input_limits(cls):
         """
         Generates default command input limits based on the control limits
 
@@ -208,7 +216,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         return (-1.0, 1.0)
 
-    def _generate_default_command_output_limits(self):
+    @classmethod
+    def _generate_default_command_output_limits(cls, controller_id: str):
         """
         Generates default command output limits based on the control limits
 
@@ -217,12 +226,14 @@ class BaseController(Serializable, Registerable, Recreatable):
                 - int or array: min command output limits
                 - int or array: max command output limits
         """
+        config = cls._configs[controller_id]
         return (
-            self._control_limits[self.control_type][0][self.dof_idx],
-            self._control_limits[self.control_type][1][self.dof_idx],
+            config["control_limits"][cls.control_type(controller_id)][0][config["dof_idx"]],
+            config["control_limits"][cls.control_type(controller_id)][1][config["dof_idx"]],
         )
 
-    def _preprocess_command(self, command):
+    @classmethod
+    def _preprocess_command(cls, controller_id, command):
         """
         Clips + scales inputted @command according to self.command_input_limits and self.command_output_limits.
         If self.command_input_limits is None, then no clipping will occur. If either self.command_input_limits
@@ -234,33 +245,35 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[float]: Processed command vector
         """
+        config = cls._configs[controller_id]
         # Make sure command is a th.tensor
         command = cb.array([command]) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
-        if self._command_input_limits is not None:
+        if config["command_input_limits"] is not None:
             # Clip
-            command = command.clip(*self._command_input_limits)
-            if self._command_output_limits is not None:
+            command = command.clip(*config["command_input_limits"])
+            if config["command_output_limits"] is not None:
                 # If we haven't calculated how to scale the command, do that now (once)
-                if self._command_scale_factor is None:
-                    self._command_scale_factor = abs(
-                        self._command_output_limits[1] - self._command_output_limits[0]
-                    ) / abs(self._command_input_limits[1] - self._command_input_limits[0])
-                    self._command_output_transform = (
-                        self._command_output_limits[1] + self._command_output_limits[0]
+                if config["command_scale_factor"] is None:
+                    config["command_scale_factor"] = abs(
+                        config["command_output_limits"][1] - config["command_output_limits"][0]
+                    ) / abs(config["command_input_limits"][1] - config["command_input_limits"][0])
+                    config["command_output_transform"] = (
+                        config["command_output_limits"][1] + config["command_output_limits"][0]
                     ) / 2.0
-                    self._command_input_transform = (
-                        self._command_input_limits[1] + self._command_input_limits[0]
+                    config["command_input_transform"] = (
+                        config["command_input_limits"][1] + config["command_input_limits"][0]
                     ) / 2.0
                 # Scale command
                 command = (
-                    command - self._command_input_transform
-                ) * self._command_scale_factor + self._command_output_transform
+                    command - config["command_input_transform"]
+                ) * config["command_scale_factor"] + config["command_output_transform"]
 
         # Return processed command
         return command
-
-    def _reverse_preprocess_command(self, processed_command):
+    
+    @classmethod
+    def _reverse_preprocess_command(cls, controller_id, processed_command):
         """
         Reverses the scaling operation performed by _preprocess_command.
         Note: This method does not reverse the clipping operation as it's not reversible.
@@ -271,25 +284,26 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             th.Tensor[float]: Original command vector (before scaling, clipping not reversed)
         """
+        config = cls._configs[controller_id]
         # We only reverse the scaling if both input and output limits exist
-        if self._command_input_limits is not None and self._command_output_limits is not None:
+        if config["command_input_limits"] is not None and config["command_output_limits"] is not None:
             # If we haven't calculated how to scale the command, do that now (once)
-            if self._command_scale_factor is None:
-                self._command_scale_factor = abs(self._command_output_limits[1] - self._command_output_limits[0]) / abs(
-                    self._command_input_limits[1] - self._command_input_limits[0]
+            if config["command_scale_factor"] is None:
+                config["command_scale_factor"] = abs(config["command_output_limits"][1] - config["command_output_limits"][0]) / abs(
+                    config["command_input_limits"][1] - config["command_input_limits"][0]
                 )
-                self._command_output_transform = (self._command_output_limits[1] + self._command_output_limits[0]) / 2.0
-                self._command_input_transform = (self._command_input_limits[1] + self._command_input_limits[0]) / 2.0
-
+                config["command_output_transform"] = (config["command_output_limits"][1] + config["command_output_limits"][0]) / 2.0
+                config["command_input_transform"] = (config["command_input_limits"][1] + config["command_input_limits"][0]) / 2.0
             original_command = (
-                processed_command - self._command_output_transform
-            ) / self._command_scale_factor + self._command_input_transform
+                processed_command - config["command_output_transform"]
+            ) / config["command_scale_factor"] + config["command_input_transform"]
         else:
             original_command = processed_command
 
         return original_command
-
-    def update_goal(self, command, control_dict):
+    
+    @classmethod
+    def update_goal(cls, controller_id: str, command, control_dict):
         """
         Updates inputted @command internally, writing any necessary internal variables as needed.
 
@@ -298,15 +312,16 @@ class BaseController(Serializable, Registerable, Recreatable):
                 internally in this controller
             control_dict (dict): Current state
         """
+        config = cls._configs[controller_id]
         # Sanity check the command
         assert (
-            len(command) == self.command_dim
-        ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
-
+            len(command) == cls.command_dim(controller_id)
+        ), f"Commands must be dimension {cls.command_dim(controller_id)}, got dim {len(command)} instead."
         # Preprocess and run internal command
-        self._goal = self._update_goal(command=self._preprocess_command(command), control_dict=control_dict)
+        cls._goals[controller_id] = cls._update_goal(controller_id, cls._preprocess_command(controller_id, command), control_dict)
 
-    def _update_goal(self, command, control_dict):
+    @classmethod
+    def _update_goal(cls, controller_id, command, control_dict):
         """
         Updates inputted @command internally, writing any necessary internal variables as needed.
 
@@ -320,13 +335,15 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         raise NotImplementedError
 
-    def compute_control(self, goal_dict, control_dict):
+
+    @classmethod
+    def compute_control(cls, controller_id, control_dict):
         """
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) control signal.
         Should be implemented by subclass.
 
         Args:
-            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+            controller_id: str, use to query cls._goals to get goal_dict (Dict[str, Any]), dictionary that should include any relevant keyword-mapped
                 goals necessary for controller computation
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation
@@ -336,7 +353,9 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         raise NotImplementedError
 
-    def clip_control(self, control):
+
+    @classmethod
+    def clip_control(cls, controller_id, control):
         """
         Clips the inputted @control signal based on @control_limits.
 
@@ -346,19 +365,21 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[float]: Clipped control signal
         """
+        config = cls._configs[controller_id]
         clipped_control = control.clip(
-            self._control_limits[self.control_type][0][self.dof_idx],
-            self._control_limits[self.control_type][1][self.dof_idx],
+            config["control_limits"][cls.control_type(controller_id)][0][config["dof_idx"]],
+            config["control_limits"][cls.control_type(controller_id)][1][config["dof_idx"]],
         )
         idx = (
-            self._dof_has_limits[self.dof_idx]
-            if self.control_type == ControlType.POSITION
-            else [True] * self.control_dim
+            config["dof_has_limits"][config["dof_idx"]]
+            if cls.control_type(controller_id) == ControlType.POSITION
+            else [True] * cls.control_dim(controller_id)
         )
         control[idx] = clipped_control[idx]
         return control
-
-    def step(self, control_dict):
+    
+    @classmethod
+    def step(cls, controller_id, control_dict):
         """
         Take a controller step.
 
@@ -369,25 +390,27 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[float]: numpy array of outputted control signals
         """
+        config = cls._configs[controller_id]
         # Generate no-op goal if not specified
-        if self._goal is None:
-            self._goal = self.compute_no_op_goal(control_dict=control_dict)
-
+        if cls._goals[controller_id] is None:
+            cls._goals[controller_id] = cls.compute_no_op_goal(controller_id=controller_id, control_dict=control_dict)
         # Compute control, then clip and return
-        control = self.compute_control(goal_dict=self._goal, control_dict=control_dict)
+        control = cls.compute_control(controller_id=controller_id, control_dict=control_dict)
         assert (
-            len(control) == self.control_dim
-        ), f"Control signal must be of length {self.control_dim}, got {len(control)} instead."
-        self._control = self.clip_control(control=control)
-        return self._control
+            len(control) == cls.control_dim(controller_id)
+        ), f"Control signal must be of length {cls.control_dim(controller_id)}, got {len(control)} instead."
+        cls._controls[controller_id] = cls.clip_control(controller_id, control)
+        return cls._controls[controller_id]
 
-    def reset(self):
+    @classmethod
+    def reset(cls, controller_id: str):
         """
         Resets this controller. Can be extended by subclass
         """
-        self._goal = None
+        cls._goals[controller_id] = None
 
-    def compute_no_op_goal(self, control_dict):
+    @classmethod
+    def compute_no_op_goal(cls, controller_id: str, control_dict):
         """
         Compute no-op goal given the current state @control_dict
 
@@ -399,72 +422,103 @@ class BaseController(Serializable, Registerable, Recreatable):
                 in controller computations
         """
         raise NotImplementedError
-
-    def compute_no_op_action(self, control_dict):
+    
+    @classmethod
+    def compute_no_op_action(cls, controller_id: str, control_dict):
         """
         Compute a no-op action that updates the goal to match the current position
         Disclaimer: this no-op might cause drift under external load (e.g. when the controller cannot reach the goal position)
         """
-        if self._goal is None:
-            self._goal = self.compute_no_op_goal(control_dict=control_dict)
-        command = self._compute_no_op_command(control_dict=control_dict)
-        return cb.to_torch(self._reverse_preprocess_command(command))
+        config = cls._configs[controller_id]
+        if cls._goals[controller_id] is None:
+            cls._goals[controller_id] = cls.compute_no_op_goal(controller_id=controller_id, control_dict=control_dict)
+        command = cls._compute_no_op_command(controller_id=controller_id, control_dict=control_dict)
+        return cb.to_torch(cls._reverse_preprocess_command(controller_id=controller_id, processed_command=command))
 
-    def _compute_no_op_command(self, control_dict):
+    @classmethod
+    def _compute_no_op_command(cls, controller_id: str, control_dict):
         """
         Compute no-op command given the goal
         """
         raise NotImplementedError
+    
 
-    def _dump_state(self):
+    @classmethod
+    def _dump_state(cls, controller_id: str):
         # Default is just the command
+        goal = cls._goals[controller_id]
         return dict(
-            goal_is_valid=self._goal is not None,
-            goal=None if self._goal is None else {k: cb.to_torch(v) for k, v in self._goal.items()},
+            goal_is_valid=goal is not None,
+            goal=None if goal is None else {k: cb.to_torch(v) for k, v in goal.items()},
         )
 
-    def _load_state(self, state):
+    @classmethod
+    def _load_state(cls, controller_id: str, state):
         # Make sure every entry in goal is a numpy array
         # Load goal
         if state["goal"] is None:
-            self._goal = None
+            cls._goals[controller_id] = None
         else:
-            self._goal = dict()
+            goal = dict()
             for name, goal_state in state["goal"].items():
                 if isinstance(goal_state, th.Tensor):
-                    self._goal[name] = cb.from_torch(goal_state)
+                    goal[name] = cb.from_torch(goal_state)
                 else:
-                    self._goal[name] = goal_state
+                    goal[name] = goal_state
+            cls._goals[controller_id] = goal
+    
+    @classmethod
+    def dump_state(cls, controller_id: str, serialized=False):
+        """
+        Dumps the state for a specific controller_id in either dict or serialized form.
+        """
+        state = cls._dump_state(controller_id=controller_id)
+        return cls.serialize(controller_id=controller_id, state=state) if serialized else state
 
-    def serialize(self, state):
+    @classmethod
+    def load_state(cls, controller_id: str, state, serialized=False):
+        """
+        Loads the state for a specific controller_id from dict or serialized form.
+        """
+        if serialized:
+            orig_state_len = len(state)
+            state, deserialized_items = cls.deserialize(controller_id=controller_id, state=state)
+            assert deserialized_items == orig_state_len, (
+                f"Invalid state deserialization occurred! Expected {orig_state_len} total "
+                f"values to be deserialized, only {deserialized_items} were."
+            )
+        cls._load_state(controller_id=controller_id, state=state)
+
+    @classmethod
+    def serialize(cls, controller_id: str, state):
         # Make sure size of the state is consistent, even if we have no goal
+        goal_is_valid = state["goal_is_valid"]
         goal_state_flattened = (
             th.cat([goal_state.flatten() for goal_state in state["goal"].values()])
-            if (state)["goal_is_valid"]
-            else th.zeros(self.goal_dim)
+            if goal_is_valid
+            else th.zeros(cls._configs[controller_id]["goal_dim"])
         )
+        return th.cat([th.tensor([goal_is_valid]), goal_state_flattened])
 
-        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
-
-    def deserialize(self, state):
+    @classmethod
+    def deserialize(cls, controller_id: str, state):
         goal_is_valid = bool(state[0])
         if goal_is_valid:
             # Un-flatten all the keys
             idx = 1
             goal = dict()
-            for key, shape in self._goal_shapes.items():
+            for key, shape in cls._configs[controller_id]["goal_shapes"].items():
                 length = math.prod(shape)
                 goal[key] = state[idx : idx + length].reshape(shape)
                 idx += length
         else:
             goal = None
-        state_dict = dict(
-            goal_is_valid=goal_is_valid,
-            goal=goal,
-        )
-        return state_dict, self.goal_dim + 1
+        state_dict = dict(goal_is_valid=goal_is_valid, goal=goal)
+        return state_dict, cls._configs[controller_id]["goal_dim"] + 1
 
-    def _get_goal_shapes(self):
+
+    @classmethod
+    def _get_goal_shapes(cls, controller_id: str):
         """
         Returns:
             dict: Maps keyword in @self.goal to its corresponding numerical shape. This should be static
@@ -498,189 +552,165 @@ class BaseController(Serializable, Registerable, Recreatable):
             if isinstance(nums, Iterable)
             else cb.ones(dim) * nums
         )
-
-    @property
-    def state_size(self):
+    
+    @classmethod
+    def state_size(cls, controller_id: str):
         # Default is goal dim + 1 (for whether the goal is valid or not)
-        return self.goal_dim + 1
-
-    @property
-    def goal(self):
+        return cls.goal_dim(controller_id) + 1
+    
+    @classmethod
+    def goal(cls, controller_id: str):
         """
         Returns:
             dict: Current goal for this controller. Maps relevant goal keys to goal values to be
                 used during controller step computations
         """
-        return self._goal
-
-    @property
-    def goal_dim(self):
-        """
-        Returns:
-            int: Expected size of flattened, internal goals
-        """
-        return self._goal_dim
-
-    @property
-    def control(self):
+        return cls._goals[controller_id]
+    
+    @classmethod
+    def goal_dim(cls, controller_id: str):
+        return cls._configs[controller_id]["goal_dim"]
+    
+    @classmethod
+    def control(cls, controller_id: str):
         """
         Returns:
             n-array: Array of most recent controls deployed by this controller
         """
-        return self._control
-
-    @property
-    def control_freq(self):
+        return cls._controls[controller_id]
+    
+    @classmethod
+    def control_freq(cls, controller_id: str):
         """
         Returns:
             float: Control frequency (Hz) of this controller
         """
-        return self._control_freq
-
-    @property
-    def control_dim(self):
+        return cls._configs[controller_id]["control_freq"]
+    
+    @classmethod
+    def control_dim(cls, controller_id: str):
         """
         Returns:
             int: Expected size of outputted controls
         """
-        return len(self.dof_idx)
-
-    @property
-    def control_type(self):
+        return len(cls._configs[controller_id]["dof_idx"])
+    @classmethod
+    def control_type(cls, controller_id: str):
         """
         Returns:
             ControlType: Type of control returned by this controller
         """
         raise NotImplementedError
-
-    @property
-    def isaac_kp(self):
+    
+    @classmethod
+    def isaac_kp(cls, controller_id: str):
         """
         Returns:
             None or Array[float]: Stiffness gains that should be applied to the underlying Isaac joint motors.
                 None if not specified.
         """
-        return self._isaac_kp
+        return cls._configs[controller_id]["isaac_kp"]
 
-    @property
-    def isaac_kd(self):
+    @classmethod
+    def isaac_kd(cls, controller_id: str):
         """
         Returns:
             None or Array[float]: Stiffness gains that should be applied to the underlying Isaac joint motors.
                 None if not specified.
         """
-        return self._isaac_kd
-
-    @property
-    def command_input_limits(self):
+        return cls._configs[controller_id]["isaac_kd"]
+    
+    @classmethod
+    def command_input_limits(cls, controller_id: str):
         """
         Returns:
             None or 2-tuple: If specified, returns (min, max) command input limits for this controller, where
                 @min and @max are numpy float arrays of length self.command_dim. Otherwise, returns None
         """
-        return self._command_input_limits
-
-    @property
-    def command_output_limits(self):
+        return cls._configs[controller_id]["command_input_limits"]
+    @classmethod
+    def command_output_limits(cls, controller_id: str):
         """
         Returns:
             None or 2-tuple: If specified, returns (min, max) command output limits for this controller, where
                 @min and @max are numpy float arrays of length self.command_dim. Otherwise, returns None
         """
-        return self._command_output_limits
+        return cls._configs[controller_id]["command_output_limits"]
 
-    @property
-    def command_dim(self):
-        """
-        Returns:
-            int: Expected size of inputted commands
-        """
+    
+
+    @classmethod
+    def command_dim(cls, controller_id: str):
         raise NotImplementedError
 
-    @property
-    def dof_idx(self):
+    @classmethod
+    def dof_idx(cls, controller_id: str):
         """
         Returns:
             Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
         """
-        return self._dof_idx
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("BaseController")
-        return classes
-
-    @classproperty
-    def _cls_registry(cls):
-        # Global registry
-        global REGISTERED_CONTROLLERS
-        return REGISTERED_CONTROLLERS
-
-
-class LocomotionController(BaseController):
-    """
-    Controller to control locomotion. All implemented controllers that encompass locomotion capabilities should extend
-    from this class.
-    """
-
-    def __init_subclass__(cls, **kwargs):
-        # Register as part of locomotion controllers
-        super().__init_subclass__(**kwargs)
-        register_locomotion_controller(cls)
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("LocomotionController")
-        return classes
-
-
-class ManipulationController(BaseController):
-    """
-    Controller to control manipulation. All implemented controllers that encompass manipulation capabilities
-    should extend from this class.
-    """
-
-    def __init_subclass__(cls, **kwargs):
-        # Register as part of manipulation controllers
-        super().__init_subclass__(**kwargs)
-        register_manipulation_controller(cls)
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("ManipulationController")
-        return classes
-
-
-class GripperController(BaseController):
-    """
-    Controller to control a gripper. All implemented controllers that encompass gripper capabilities
-    should extend from this class.
-    """
-
-    def __init_subclass__(cls, **kwargs):
-        # Register as part of gripper controllers
-        super().__init_subclass__(**kwargs)
-        register_gripper_controller(cls)
-
-    def is_grasping(self):
+        return cls._configs[controller_id]["dof_idx"]
+    
+    @classmethod
+    def apply_action(cls, controller_id: str, action):
         """
-        Checks whether the current state of this gripper being controlled is in a grasping state.
-        Should be implemented by subclass.
+        Converts inputted actions into low-level control signals
 
-        Returns:
-            IsGraspingState: Grasping state of gripper
+        NOTE: This does NOT deploy control on the object. Use step() instead.
+
+        Args:
+            action (n-array): n-DOF length array of actions to apply to this object's internal controllers
         """
-        raise NotImplementedError()
+        robot = cls._robots[controller_id]
+        cls.update_goal(
+            controller_id=controller_id,
+            command=action,
+            control_dict=robot.get_control_dict(),
+        )
+    
+    @classmethod
+    def begin_controller_step(cls):
+        BaseController._ROBOT_CONTROL_STEP_CACHE.clear()
 
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("GripperController")
-        return classes
+    @classmethod
+    def step_controller_class(cls):
+        for controller_id in list(cls._configs.keys()):
+            cls._goals.setdefault(controller_id, None)
+            cls._controls.setdefault(controller_id, None)
+            robot = cls._robots.get(controller_id, None)
+            if robot is None:
+                continue
+            if not robot.control_enabled:
+                continue
+            if robot._articulation_view_direct is None or not robot._articulation_view_direct.initialized:
+                continue
+
+            robot_name = robot.name
+            cache = BaseController._ROBOT_CONTROL_STEP_CACHE.get(robot_name, None)
+            if cache is None:
+                control_dict = robot.get_control_dict()
+                u_vec = cb.zeros(robot.n_dof)
+                u_type_vec = cb.array([ControlType.EFFORT] * robot.n_dof)
+                cache = {
+                    "robot": robot,
+                    "control_dict": control_dict,
+                    "u_vec": u_vec,
+                    "u_type_vec": u_type_vec,
+                }
+                BaseController._ROBOT_CONTROL_STEP_CACHE[robot_name] = cache
+
+            control = cls.step(controller_id=controller_id, control_dict=cache["control_dict"])
+            idx = cls.dof_idx(controller_id)
+            cache["u_vec"][idx] = control
+            cache["u_type_vec"][idx] = cls.control_type(controller_id)
+
+    @classmethod
+    def deploy_controller_step(cls):
+        for cache in BaseController._ROBOT_CONTROL_STEP_CACHE.values():
+            robot = cache["robot"]
+            control, control_type = robot._postprocess_control(
+                control=cache["u_vec"], control_type=cache["u_type_vec"]
+            )
+            robot.deploy_control(control=control, control_type=control_type)
+        BaseController._ROBOT_CONTROL_STEP_CACHE.clear()
+            

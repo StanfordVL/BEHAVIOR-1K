@@ -592,16 +592,18 @@ class KeyboardRobotController:
         self.controller_info = dict()
         self.joint_idx_to_controller = dict()
         idx = 0
-        for name, controller in robot._controllers.items():
+        for name in robot.controllers.keys():
+            controller = robot._get_controller_class(name)
+            cntroller_id = robot._controller_id(name)
             self.controller_info[name] = {
-                "name": type(controller).__name__,
+                "name": robot._controller_config[name]["name"],
                 "start_idx": idx,
-                "dofs": controller.dof_idx,
-                "command_dim": controller.command_dim,
+                "dofs": controller.dof_idx(cntroller_id),
+                "command_dim": controller.command_dim(cntroller_id),
             }
-            idx += controller.command_dim
-            for i in controller.dof_idx.tolist():
-                self.joint_idx_to_controller[i] = controller
+            idx += controller.command_dim(cntroller_id)
+            for i in controller.dof_idx(cntroller_id).tolist():
+                self.joint_idx_to_controller[i] = name
 
         # Other persistent variables we need to keep track of
         self.joint_names = [name for name in robot.joints.keys()]  # Ordered list of joint names belonging to the robot
@@ -877,11 +879,13 @@ class KeyboardRobotController:
                     # Import here to avoid circular imports
                     from omnigibson.utils.constants import JointType
 
-                    controller = self.joint_idx_to_controller[joint_idx]
+                    controller_name = self.joint_idx_to_controller[joint_idx]
+                    controller = self.robot._get_controller_class(controller_name)
+                    controller_cfg = controller._configs[self.robot._controller_id(controller_name)]
                     if (
                         self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC
-                        and controller.use_delta_commands
-                        and controller.motor_type == "position"
+                        and controller_cfg.get("use_delta_commands", False)
+                        and controller_cfg.get("motor_type", None) == "position"
                     ):
                         val *= 0.2
 

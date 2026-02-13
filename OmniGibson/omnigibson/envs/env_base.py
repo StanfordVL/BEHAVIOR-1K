@@ -590,9 +590,19 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Our inputted action is the action dictionary
             action_dict = action
 
-        # Iterate over all robots and apply actions
+        # Iterate over all robots and apply actions via controller singletons
         for robot in self.robots:
-            robot.apply_action(action_dict[robot.name])
+            robot_action = robot.prepare_action(action_dict[robot.name])
+            idx = 0
+            for controller_name in robot.controllers:
+                controller_cls = robot._get_controller_class(controller_name)
+                controller_id = robot._controller_id(controller_name)
+                cmd_dim = controller_cls.command_dim(controller_id)
+                controller_cls.apply_action(
+                    controller_id=controller_id,
+                    action=robot_action[idx : idx + cmd_dim],
+                )
+                idx += cmd_dim
 
     def _post_step(self, action):
         """Apply the post-sim-step part of an environment step, i.e. grab observations and return the step results."""

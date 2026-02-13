@@ -1,10 +1,11 @@
 import torch as th
 
-from omnigibson.controllers import ControlType, GripperController, IsGraspingState
+from omnigibson.controllers.controller_base import BaseController, ControlType, IsGraspingState
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
+from copy import deepcopy
 
 VALID_MODES = {
     "binary",
@@ -21,7 +22,7 @@ m.POS_TOLERANCE = 0.002  # arbitrary heuristic
 m.VEL_TOLERANCE = 0.02  # arbitrary heuristic
 
 
-class MultiFingerGripperController(GripperController):
+class MultiFingerGripperController(BaseController):
     """
     Controller class for multi finger gripper control. This either interprets an input as a binary
     command (open / close), continuous command (open / close with scaled velocities), or per-joint continuous command
@@ -31,215 +32,113 @@ class MultiFingerGripperController(GripperController):
         2a. Convert command into gripper joint control signals
         2b. Clips the resulting control by the motor limits
     """
-
-    def __init__(
-        self,
-        control_freq,
-        motor_type,
-        control_limits,
-        dof_idx,
-        command_input_limits="default",
-        command_output_limits="default",
-        isaac_kp=None,
-        isaac_kd=None,
-        inverted=False,
-        mode="binary",
-        open_qpos=None,
-        closed_qpos=None,
-        limit_tolerance=0.001,
-    ):
-        """
-        Args:
-            control_freq (int): controller loop frequency
-            motor_type (str): type of motor being controlled, one of {position, velocity, effort}
-            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
-                control signal. Should specify per-dof type limits, i.e.:
-
-                "position": [[min], [max]]
-                "velocity": [[min], [max]]
-                "effort": [[min], [max]]
-                "has_limit": [...bool...]
-
-                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
-                controller-relevant values during control computations
-            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
-                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
-                If None, no clipping will be used. If "default", range will be set to (-1, 1)
-            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
-                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
-                then all inputted command values will be scaled from the input range to the output range.
-                If either is None, no scaling will be used. If "default", then this range will automatically be set
-                to the @control_limits entry corresponding to self.control_type
-            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
-                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
-                Should only be nonzero if self.control_type is position
-            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
-                isaac DOFs. Can either be a single number or a per-DOF set of numbers
-                Should only be nonzero if self.control_type is position or velocity
-            inverted (bool): whether or not the command direction (grasp is negative) and the control direction are
-                inverted, e.g. to grasp you need to move the joint in the positive direction.
-            mode (str): mode for this controller. Valid options are:
-
-                "binary": 1D command, if preprocessed value > 0 is interpreted as an max open
-                    (send max pos / vel / tor signal), otherwise send max close control signals
-                "smooth": 1D command, sends symmetric signal to all finger joints equal to the preprocessed commands
-                "independent": n-dimensional command, sends independent signals to each finger joint equal to the preprocessed command
-
-            open_qpos (None or Array[float]): If specified, the joint positions representing a fully-opened gripper.
-                This is to allow representing the open state as a partially opened gripper, rather than the full
-                opened gripper. If None, will simply use the native joint limits of the gripper joints. Only relevant
-                if using @mode=binary and @motor_type=position
-            closed_qpos (None or Array[float]): If specified, the joint positions representing a fully-closed gripper.
-                This is to allow representing the closed state as a partially closed gripper, rather than the full
-                closed gripper. If None, will simply use the native joint limits of the gripper joints. Only relevant
-                if using @mode=binary and @motor_type=position
-            limit_tolerance (float): sets the tolerance from the joint limit ends, below which controls will be zeroed
-                out if the control is using velocity or torque control
-        """
-        # Store arguments
-        assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
-        self._motor_type = motor_type.lower()
-        assert_valid_key(key=mode, valid_keys=VALID_MODES, name="mode for multi finger gripper")
-        self._inverted = inverted
-        self._mode = mode
-        self._limit_tolerance = limit_tolerance
-        self._open_qpos = open_qpos if open_qpos is None else cb.array(open_qpos)
-        self._closed_qpos = closed_qpos if closed_qpos is None else cb.array(closed_qpos)
-
-        # Create other args to be filled in at runtime
-        self._is_grasping = IsGraspingState.FALSE
-
-        # Create ring buffer for velocity history to avoid high frequency nosie during grasp state inference
-        self._vel_filter = MovingAverageFilter(obs_dim=len(dof_idx), filter_width=5)
-
-        # If we're using binary signal, these values will be overridden manually, so set to default for now
-        if mode == "binary":
-            command_output_limits = "default"
-
-        # Run super init
-        super().__init__(
-            control_freq=control_freq,
-            control_limits=control_limits,
-            dof_idx=dof_idx,
-            command_input_limits=command_input_limits,
-            command_output_limits=command_output_limits,
-            isaac_kp=isaac_kp,
-            isaac_kd=isaac_kd,
+    @classmethod
+    def _process_config(cls, controller_id: str, input_config: dict):
+        config = deepcopy(input_config)
+        assert_valid_key(key=config["motor_type"].lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
+        config["motor_type"] = config["motor_type"].lower()
+        assert_valid_key(key=config.get("mode", "binary"), valid_keys=VALID_MODES, name="mode for multi finger gripper")
+        config["mode"] = config.get("mode", "binary")
+        config["inverted"] = config.get("inverted", False)
+        config["limit_tolerance"] = config.get("limit_tolerance", 0.001)
+        config["open_qpos"] = (
+            None if config.get("open_qpos", None) is None else cb.array(config.get("open_qpos"))
+        )
+        config["closed_qpos"] = (
+            None if config.get("closed_qpos", None) is None else cb.array(config.get("closed_qpos"))
         )
 
-    def _generate_default_command_output_limits(self):
-        # By default (independent mode), this is simply the super call
-        command_output_limits = super()._generate_default_command_output_limits()
+        if config["mode"] == "binary":
+            config["command_output_limits"] = "default"
 
-        # If we're in binary mode, output limits should just be (-1.0, 1.0)
-        if self._mode == "binary":
+        return super()._process_config(controller_id, config)
+
+    @classmethod
+    def _init_state(cls, controller_id: str):
+        config = cls._configs[controller_id]
+        cls._state[controller_id]["is_grasping"] = IsGraspingState.FALSE
+        cls._state[controller_id]["vel_filter"] = MovingAverageFilter(obs_dim=len(cls.dof_idx(controller_id)), filter_width=5)
+
+    @classmethod
+    def _generate_default_command_output_limits(cls, controller_id: str):
+        config = cls._configs[controller_id]
+        command_output_limits = super()._generate_default_command_output_limits(controller_id)
+        if config["mode"] == "binary":
             command_output_limits = (-1.0, 1.0)
-        # If we're in smoothing mode, output limits should be the average of the independent limits
-        elif self._mode == "smooth":
+        elif config["mode"] == "smooth":
             command_output_limits = (
                 cb.mean(command_output_limits[0]),
                 cb.mean(command_output_limits[1]),
             )
-        elif self._mode == "independent":
+        elif config["mode"] == "independent":
             pass
         else:
-            raise ValueError(f"Invalid mode {self._mode}")
-
+            raise ValueError(f"Invalid mode {config['mode']}")
         return command_output_limits
 
-    def reset(self):
-        # Call super first
-        super().reset()
+    @classmethod
+    def reset(cls, controller_id: str):
+        super().reset(controller_id=controller_id)
+        cls._state[controller_id]["vel_filter"].reset()
+        cls._state[controller_id]["is_grasping"] = IsGraspingState.FALSE
 
-        # Reset the filter
-        self._vel_filter.reset()
-
-        # reset grasping state
-        self._is_grasping = IsGraspingState.FALSE
-
-    @property
-    def state_size(self):
-        # Add state size from the control filter
-        return super().state_size + self._vel_filter.state_size
-
-    def _preprocess_command(self, command):
-        # We extend this method to make sure command is always n-dimensional
-        if self._mode != "independent":
+    @classmethod
+    def _preprocess_command(cls, controller_id: str, command):
+        config = cls._configs[controller_id]
+        if config["mode"] != "independent":
             command = (
-                cb.array([command] * self.command_dim)
+                cb.array([command] * cls.command_dim(controller_id=controller_id))
                 if type(command) in {int, float}
-                else cb.array([command[0]] * self.command_dim)
+                else cb.array([command[0]] * cls.command_dim(controller_id=controller_id))
             )
+        if config["inverted"]:
+            command = config["command_input_limits"][1] - (command - config["command_input_limits"][0])
+        return super()._preprocess_command(controller_id, command=command)
 
-        # Flip the command if the direction is inverted.
-        if self._inverted:
-            command = self._command_input_limits[1] - (command - self._command_input_limits[0])
-
-        # Return from super method
-        return super()._preprocess_command(command=command)
-
-    def _update_goal(self, command, control_dict):
-        # Directly store command as the goal
+    @classmethod
+    def _update_goal(cls, controller_id: str, command, control_dict):
         return dict(target=command)
 
-    def compute_control(self, goal_dict, control_dict):
-        """
-        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) gripper
-        joint control signal
-
-        Args:
-            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                goals necessary for controller computation. Must include the following keys:
-                    target: desired gripper target
-            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                states necessary for controller computation. Must include the following keys:
-                    joint_position: Array of current joint positions
-                    joint_velocity: Array of current joint velocities
-
-        Returns:
-            Array[float]: outputted (non-clipped!) control signal to deploy
-        """
-        target = goal_dict["target"]
-        joint_pos = control_dict["joint_position"][self.dof_idx]
-        # Choose what to do based on control mode
-        if self._mode == "binary":
-            # Use max control signal
-            should_open = target[0] >= 0.0 if not self._inverted else target[0] > 0.0
+    @classmethod
+    def compute_control(cls, controller_id: str, control_dict):
+        config = cls._configs[controller_id]
+        target = cls._goals[controller_id]["target"]
+        joint_pos = control_dict["joint_position"][cls.dof_idx(controller_id)]
+        if config["mode"] == "binary":
+            should_open = target[0] >= 0.0 if not config["inverted"] else target[0] > 0.0
             if should_open:
                 u = (
-                    self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-                    if self._open_qpos is None
-                    else self._open_qpos
+                    config["control_limits"][ControlType.get_type(config["motor_type"])][1][cls.dof_idx(controller_id)]
+                    if config["open_qpos"] is None
+                    else config["open_qpos"]
                 )
             else:
                 u = (
-                    self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
-                    if self._closed_qpos is None
-                    else self._closed_qpos
+                    config["control_limits"][ControlType.get_type(config["motor_type"])][0][cls.dof_idx(controller_id)]
+                    if config["closed_qpos"] is None
+                    else config["closed_qpos"]
                 )
         else:
             # Use continuous signal. Make sure to go from command to control dim.
-            u = cb.full((self.control_dim,), target[0]) if len(target) == 1 else target
+            u = cb.full((cls.control_dim(controller_id=controller_id),), target[0]) if len(target) == 1 else target
+
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
-        if self._motor_type in {"velocity", "torque"}:
+        if config["motor_type"] in {"velocity", "torque"}:
             violate_upper_limit = (
-                joint_pos > self._control_limits[ControlType.POSITION][1][self.dof_idx] - self._limit_tolerance
+                joint_pos > config["control_limits"][ControlType.POSITION][1][cls.dof_idx(controller_id)] - config["limit_tolerance"]
             )
             violate_lower_limit = (
-                joint_pos < self._control_limits[ControlType.POSITION][0][self.dof_idx] + self._limit_tolerance
+                joint_pos < config["control_limits"][ControlType.POSITION][0][cls.dof_idx(controller_id)] + config["limit_tolerance"]
             )
             violation = cb.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
             u *= ~violation
-
-        # Update whether we're grasping or not
-        self._update_grasping_state(control_dict=control_dict)
-
-        # Return control
+        cls._update_grasping_state(controller_id=controller_id, control_dict=control_dict)
         return u
 
-    def _update_grasping_state(self, control_dict):
+    @classmethod
+    def _update_grasping_state(cls, controller_id: str, control_dict):
+        config = cls._configs[controller_id]
         """
         Updates internal inferred grasping state of the gripper being controlled by this gripper controller
 
@@ -251,41 +150,41 @@ class MultiFingerGripperController(GripperController):
                     joint_velocity: Array of current joint velocities
         """
         # Update velocity history
-        finger_vel = self._vel_filter.estimate(control_dict["joint_velocity"][self.dof_idx])
+        finger_vel = cls._state[controller_id]["vel_filter"].estimate(control_dict["joint_velocity"][cls.dof_idx(controller_id)])
 
         # Calculate grasping state based on mode of this controller
         # Independent mode of MultiFingerGripperController does not have any good heuristics to determine is_grasping
-        if self._mode == "independent":
+        if config["mode"] == "independent":
             is_grasping = IsGraspingState.UNKNOWN
 
         # No control has been issued before -- we assume not grasping
-        elif self._control is None:
+        elif cls.control(controller_id) is None:
             is_grasping = IsGraspingState.FALSE
 
         #  Different values in the command for non-independent mode - cannot use heuristics
-        elif not cb.all(self._control == self._control[0]):
+        elif not cb.all(cls.control(controller_id) == cls.control(controller_id)[0]):
             is_grasping = IsGraspingState.UNKNOWN
 
         # Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the gripper
         # controller's tolerance of zero-ing out velocities, which makes the heuristics invalid.
-        elif not m.POS_TOLERANCE > self._limit_tolerance:
+        elif not m.POS_TOLERANCE > config["limit_tolerance"]:
             is_grasping = IsGraspingState.UNKNOWN
 
         else:
-            finger_pos = control_dict["joint_position"][self.dof_idx]
+            finger_pos = control_dict["joint_position"][cls.dof_idx(controller_id)]
 
             # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
-            if self._motor_type == "position" and cb.abs(finger_pos - self._control).mean() < m.POS_TOLERANCE:
+            if config["motor_type"] == "position" and cb.abs(finger_pos - cls.control(controller_id)).mean() < m.POS_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
-            elif self._motor_type in {"velocity", "torque"} and cb.abs(self._control).mean() < m.VEL_TOLERANCE:
+            elif config["motor_type"] in {"velocity", "torque"} and cb.abs(cls.control(controller_id)).mean() < m.VEL_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # Otherwise, the last control signal intends to "move" the gripper
             else:
-                min_pos = self._control_limits[ControlType.POSITION][0][self.dof_idx]
-                max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
+                min_pos = config["control_limits"][ControlType.POSITION][0][cls.dof_idx(controller_id)]
+                max_pos = config["control_limits"][ControlType.POSITION][1][cls.dof_idx(controller_id)]
 
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
                 finger_pos = finger_pos.clip(min_pos, max_pos)
@@ -306,96 +205,94 @@ class MultiFingerGripperController(GripperController):
                 is_grasping = IsGraspingState.TRUE if valid_grasp_pos and valid_grasp_vel else IsGraspingState.FALSE
 
         # Store calculated state
-        self._is_grasping = is_grasping
+        cls._state[controller_id]["is_grasping"] = is_grasping
 
-    def compute_no_op_goal(self, control_dict):
-        # Take care of the special case of binary control
-        if self._mode == "binary":
-            goal_sign = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
-            if self._inverted:
+    @classmethod
+    def compute_no_op_goal(cls, controller_id: str, control_dict):
+        config = cls._configs[controller_id]
+        if config["mode"] == "binary":
+            goal_sign = -1 if cls.is_grasping(controller_id) == IsGraspingState.TRUE else 1
+            if config["inverted"]:
                 goal_sign = -1 * goal_sign
             target = cb.array([goal_sign])
-
         else:
-            if self._motor_type == "position":
-                target = control_dict["joint_position"][self.dof_idx]
-            elif self._motor_type == "velocity":
-                target = cb.zeros(self.command_dim)
+            if config["motor_type"] == "position":
+                target = control_dict["joint_position"][cls.dof_idx(controller_id)]
+            elif config["motor_type"] == "velocity":
+                target = cb.zeros(cls.command_dim(controller_id))
             else:
                 raise ValueError("Cannot compute noop action for effort motor type.")
 
             # Convert to binary / smooth mode if necessary
-            if self._mode == "smooth":
+            if config["mode"] == "smooth":
                 target = cb.mean(target, dim=-1, keepdim=True)
 
         return dict(target=target)
 
-    def _compute_no_op_command(self, control_dict):
+    @classmethod
+    def _compute_no_op_command(cls, controller_id: str, control_dict):
+        config = cls._configs[controller_id]
         # Take care of the special case of binary control
-        if self._mode == "binary":
-            command_val = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
-            if self._inverted:
+        if config["mode"] == "binary":
+            command_val = -1 if cls.is_grasping(controller_id) == IsGraspingState.TRUE else 1
+            if config["inverted"]:
                 command_val = -1 * command_val
             return cb.array([command_val])
 
-        if self._motor_type == "position":
-            command = control_dict["joint_position"][self.dof_idx]
-        elif self._motor_type == "velocity":
-            command = cb.zeros(self.command_dim)
+        if config["motor_type"] == "position":
+            command = control_dict["joint_position"][cls.dof_idx(controller_id)]
+        elif config["motor_type"] == "velocity":
+            command = cb.zeros(cls.command_dim(controller_id))
         else:
             raise ValueError("Cannot compute noop action for effort motor type.")
 
         # Convert to binary / smooth mode if necessary
-        if self._mode == "smooth":
+        if config["mode"] == "smooth":
             command = cb.mean(command, dim=-1, keepdim=True)
-
         return command
 
-    def _get_goal_shapes(self):
-        return dict(target=(self.command_dim,))
+    @classmethod
+    def _get_goal_shapes(cls, controller_id: str):
+        return dict(target=(cls.command_dim(controller_id),))
 
-    def is_grasping(self):
-        # Return cached value
-        return self._is_grasping
+    @classmethod
+    def is_grasping(cls, controller_id: str):
+        return cls._state[controller_id]["is_grasping"]
 
-    def _dump_state(self):
-        # Run super first
-        state = super()._dump_state()
+    @classmethod
+    def control_type(cls, controller_id: str):
+        config = cls._configs[controller_id]
+        return ControlType.get_type(type_str=config["motor_type"])
 
-        # Add filter state
-        state["vel_filter"] = self._vel_filter.dump_state(serialized=False)
+    @classmethod
+    def command_dim(cls, controller_id: str):
+        config = cls._configs[controller_id]
+        if config["mode"] == "independent":
+            return len(cls.dof_idx(controller_id))
+        return 1
 
+    @classmethod
+    def _dump_state(cls, controller_id: str):
+        state = super()._dump_state(controller_id=controller_id)
+        state["vel_filter"] = cls._state[controller_id]["vel_filter"].dump_state(serialized=False)
         return state
 
-    def _load_state(self, state):
-        # Run super first
-        super()._load_state(state=state)
+    @classmethod
+    def _load_state(cls, controller_id: str, state):
+        super()._load_state(controller_id=controller_id, state=state)
+        if cls._goals[controller_id] is not None:
+            cls._state[controller_id]["vel_filter"].load_state(state["vel_filter"], serialized=False)
 
-        # Also load velocity filter state if we've set a goal
-        if self._goal is not None:
-            self._vel_filter.load_state(state["vel_filter"], serialized=False)
+    @classmethod
+    def serialize(cls, controller_id: str, state):
+        state_flat = super().serialize(controller_id=controller_id, state=state)
+        return th.cat([state_flat, cls._state[controller_id]["vel_filter"].serialize(state=state["vel_filter"])])
 
-    def serialize(self, state):
-        # Run super first
-        state_flat = super().serialize(state=state)
-
-        # Serialize state for this controller
-        return th.cat([state_flat, self._vel_filter.serialize(state=state["vel_filter"])])
-
-    def deserialize(self, state):
-        # Run super first
-        state_dict, idx = super().deserialize(state=state)
-
-        # Deserialize state for the velocity filter
-        state_dict["vel_filter"], deserialized_items = self._vel_filter.deserialize(state=state[idx:])
+    @classmethod
+    def deserialize(cls, controller_id: str, state):
+        state_dict, idx = super().deserialize(controller_id=controller_id, state=state)
+        state_dict["vel_filter"], deserialized_items = cls._state[controller_id]["vel_filter"].deserialize(
+            state=state[idx:]
+        )
         idx += deserialized_items
-
         return state_dict, idx
-
-    @property
-    def control_type(self):
-        return ControlType.get_type(type_str=self._motor_type)
-
-    @property
-    def command_dim(self):
-        return len(self.dof_idx) if self._mode == "independent" else 1

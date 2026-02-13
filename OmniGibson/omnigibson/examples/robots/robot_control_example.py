@@ -44,7 +44,7 @@ def choose_controllers(robot, random_selection=False):
     default_config = robot._default_controller_config
 
     # Iterate over all components in robot
-    controller_names = robot.controller_order
+    controller_names = list(robot._controllers.keys())
     for controller_name in controller_names:
         controller_options = default_config[controller_name]
         # Select controller

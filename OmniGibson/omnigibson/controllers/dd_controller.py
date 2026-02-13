@@ -1,8 +1,9 @@
-from omnigibson.controllers import ControlType, LocomotionController
+from copy import deepcopy
+from omnigibson.controllers.controller_base import BaseController, ControlType
 from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
-class DifferentialDriveController(LocomotionController):
+class DifferentialDriveController(BaseController):
     """
     Differential drive (DD) controller for controlling two independently controlled wheeled joints.
 
@@ -12,56 +13,16 @@ class DifferentialDriveController(LocomotionController):
         3. Clips the resulting command by the joint velocity limits
     """
 
-    def __init__(
-        self,
-        wheel_radius,
-        wheel_axle_length,
-        control_freq,
-        control_limits,
-        dof_idx,
-        command_input_limits="default",
-        command_output_limits="default",
-        isaac_kp=None,
-        isaac_kd=None,
-    ):
-        """
-        Args:
-            wheel_radius (float): radius of the wheels (both assumed to be same radius)
-            wheel_axle_length (float): perpendicular distance between the two wheels
-            control_freq (int): controller loop frequency
-            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
-                control signal. Should specify per-dof type limits, i.e.:
+    @classmethod
+    def _process_config(cls, controller_id: str, input_config: dict):
+        config = deepcopy(input_config)
+        config["wheel_radius"] = config["wheel_radius"]
+        config["wheel_axle_halflength"] = config["wheel_axle_length"] / 2.0
 
-                "position": [[min], [max]]
-                "velocity": [[min], [max]]
-                "effort": [[min], [max]]
-                "has_limit": [...bool...]
-
-                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
-                controller-relevant values during control computations
-            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
-                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
-                If None, no clipping will be used. If "default", range will be set to (-1, 1)
-            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
-                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
-                then all inputted command values will be scaled from the input range to the output range.
-                If either is None, no scaling will be used. If "default", then this range will automatically be set
-                to the maximum linear and angular velocities calculated from @wheel_radius, @wheel_axle_length, and
-                @control_limits velocity limits entry
-            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
-                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
-                Should only be nonzero if self.control_type is position
-            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
-                isaac DOFs. Can either be a single number or a per-DOF set of numbers
-                Should only be nonzero if self.control_type is position or velocity
-        """
-        # Store internal variables
-        self._wheel_radius = wheel_radius
-        self._wheel_axle_halflength = wheel_axle_length / 2.0
-
-        # If we're using default command output limits, map this to maximum linear / angular velocities
+        command_output_limits = config.get("command_output_limits", "default")
         if type(command_output_limits) is str and command_output_limits == "default":
+            control_limits = config["control_limits"]
+            dof_idx = config["dof_idx"]
             min_vels = control_limits["velocity"][0][dof_idx]
             assert (
                 min_vels[0] == min_vels[1]
@@ -73,26 +34,18 @@ class DifferentialDriveController(LocomotionController):
             assert abs(min_vels[0]) == abs(
                 max_vels[0]
             ), "Differential drive requires both wheel joints to have same min and max absolute velocities!"
-            max_lin_vel = max_vels[0] * wheel_radius
-            max_ang_vel = max_lin_vel * 2.0 / wheel_axle_length
-            command_output_limits = ((-max_lin_vel, -max_ang_vel), (max_lin_vel, max_ang_vel))
+            max_lin_vel = max_vels[0] * config["wheel_radius"]
+            max_ang_vel = max_lin_vel * 2.0 / config["wheel_axle_halflength"]
+            config["command_output_limits"] = ((-max_lin_vel, -max_ang_vel), (max_lin_vel, max_ang_vel))
 
-        # Run super init
-        super().__init__(
-            control_freq=control_freq,
-            control_limits=control_limits,
-            dof_idx=dof_idx,
-            command_input_limits=command_input_limits,
-            command_output_limits=command_output_limits,
-            isaac_kp=isaac_kp,
-            isaac_kd=isaac_kd,
-        )
+        return super()._process_config(controller_id, config)
 
-    def _update_goal(self, command, control_dict):
-        # Directly store command as the velocity goal
+    @classmethod
+    def _update_goal(cls, controller_id: str, command, control_dict):
         return dict(vel=command)
 
-    def compute_control(self, goal_dict, control_dict):
+    @classmethod
+    def compute_control(cls, controller_id: str, control_dict):
         """
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal.
         This processes converts the desired (lin_vel, ang_vel) command into (left, right) wheel joint velocity control
@@ -109,31 +62,34 @@ class DifferentialDriveController(LocomotionController):
             Array[float]: outputted (non-clipped!) velocity control signal to deploy
                 to the [left, right] wheel joints
         """
+        goal_dict = cls._goals[controller_id]
+        config = cls._configs[controller_id]
         lin_vel, ang_vel = goal_dict["vel"]
 
         # Convert to wheel velocities
-        left_wheel_joint_vel = (lin_vel - ang_vel * self._wheel_axle_halflength) / self._wheel_radius
-        right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
-
+        left_wheel_joint_vel = (lin_vel - ang_vel * config["wheel_axle_halflength"]) / config["wheel_radius"]
+        right_wheel_joint_vel = (lin_vel + ang_vel * config["wheel_axle_halflength"]) / config["wheel_radius"]
+        
         # Return desired velocities
         return cb.array([left_wheel_joint_vel, right_wheel_joint_vel])
 
-    def compute_no_op_goal(self, control_dict):
-        # This is zero-vector, since we want zero linear / angular velocity
+    @classmethod
+    def compute_no_op_goal(cls, controller_id: str, control_dict):
         return dict(vel=cb.zeros(2))
 
-    def _compute_no_op_command(self, control_dict):
+    @classmethod
+    def _compute_no_op_command(cls, controller_id: str, control_dict):
         return cb.zeros(2)
 
-    def _get_goal_shapes(self):
-        # Add (2, )-array representing linear, angular velocity
+    @classmethod
+    def _get_goal_shapes(cls, controller_id: str):
         return dict(vel=(2,))
 
-    @property
-    def control_type(self):
+    @classmethod
+    def control_type(cls, controller_id: str):
         return ControlType.VELOCITY
 
-    @property
-    def command_dim(self):
+    @classmethod
+    def command_dim(cls, controller_id: str):
         # [lin_vel, ang_vel]
         return 2

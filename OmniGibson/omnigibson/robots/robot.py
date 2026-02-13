@@ -33,18 +33,9 @@ from omnigibson.utils.python_utils import merge_nested_dicts, CachedFunctions, a
 from omnigibson.utils.vision_utils import segmentation_to_rgb, change_pcd_frame
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.controllers import (
-    create_controller,
     ControlType,
-    GripperController,
-    InverseKinematicsController,
     IsGraspingState,
-    ManipulationController,
-    MultiFingerGripperController,
-    OperationalSpaceController,
-    LocomotionController,
-    JointController,
-    HolonomicBaseJointController,
-    DifferentialDriveController,
+    REGISTERED_CONTROLLERS,
 )
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.object_states import ContactBodies
@@ -542,9 +533,7 @@ class Robot(USDObject, GymObservable):
 
     def _load_controllers(self):
         """
-        Loads controller(s) to map inputted actions into executable (pos, vel, and / or effort) signals on this object.
-        Stores created controllers as dictionary mapping controller names to specific controller
-        instances used by this object.
+        Registers controller config with controller singleton.
         """
         # Generate the controller config
         self._controller_config = self._generate_controller_config(custom_config=self._controller_config)
@@ -582,13 +571,14 @@ class Robot(USDObject, GymObservable):
                         subsume_name not in controller_subsumes
                     ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
                     subsume_names.add(subsume_name)
-
+        
         # Loop over all controllers, in the order corresponding to @action dim
         for name in self._raw_controller_order:
             # If this controller is subsumed by another controller, simply skip it
             if name in subsume_names:
                 continue
-            cfg = _controller_config[name]
+            cfg_raw = _controller_config[name]
+            cfg = deepcopy(cfg_raw)
             # If we subsume other controllers, prepend the subsumed' dof idxs to this controller's idxs
             if name in controller_subsumes:
                 for subsumed_name in controller_subsumes[name]:
@@ -598,15 +588,30 @@ class Robot(USDObject, GymObservable):
             if self._action_normalize:
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
 
-            # Create the controller
-            controller = create_controller(**cb.from_torch_recursive(cfg))
+            # Register controller singleton
+            controller_name = cfg["name"]
+            assert_valid_key(key=controller_name, valid_keys=REGISTERED_CONTROLLERS, name="controller")
+            controller_cls = REGISTERED_CONTROLLERS[controller_name]
+            controller_id = self._controller_id(name)
+            controller_cls.register(controller_id=controller_id, config=cb.from_torch_recursive(cfg), robot=self)
+            controller_cls.reset(controller_id=controller_id)
+            self._controllers[name] = deepcopy(cfg)
+            
             # Verify the controller's DOFs can all be driven
-            for idx in controller.dof_idx:
+            for idx in controller_cls.dof_idx(controller_id):
                 assert self._joints[
                     self.dof_names_ordered[idx]
                 ].driven, "Controllers should only control driveable joints!"
-            self._controllers[name] = controller
         self.update_controller_mode()
+
+    def _get_controller_class(self, controller_name):
+        controller_cfg = self._controllers[controller_name]
+        controller_type = controller_cfg["name"]
+        assert_valid_key(key=controller_type, valid_keys=REGISTERED_CONTROLLERS, name="controller")
+        return REGISTERED_CONTROLLERS[controller_type]
+
+    def _controller_id(self, controller_name):
+        return f"{self.name}:{controller_name}"
 
     def update_controller_mode(self):
         """
@@ -614,17 +619,24 @@ class Robot(USDObject, GymObservable):
         """
         # Update the control modes of each joint based on the outputted control from the controllers
         unused_dofs = {i for i in range(self.n_dof)}
-        for controller in self._controllers.values():
-            for i, dof in enumerate(controller.dof_idx):
+        for controller_name in self._controllers:
+            controller_cls = self._get_controller_class(controller_name)
+            controller_id = self._controller_id(controller_name)
+            dof_idx = controller_cls.dof_idx(controller_id)
+            for i, dof in enumerate(dof_idx):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof.item() in unused_dofs
                 unused_dofs.remove(dof.item())
-                control_type = controller.control_type
+                control_type = controller_cls.control_type(controller_id)
                 dof_joint = self._joints[self.dof_names_ordered[dof]]
                 dof_joint.set_control_type(
                     control_type=control_type,
-                    kp=None if controller.isaac_kp is None or dof_joint.is_mimic_joint else controller.isaac_kp[i],
-                    kd=None if controller.isaac_kd is None or dof_joint.is_mimic_joint else controller.isaac_kd[i],
+                    kp=None
+                    if controller_cls.isaac_kp(controller_id) is None or dof_joint.is_mimic_joint
+                    else controller_cls.isaac_kp(controller_id)[i],
+                    kd=None
+                    if controller_cls.isaac_kd(controller_id) is None or dof_joint.is_mimic_joint
+                    else controller_cls.isaac_kd(controller_id)[i],
                 )
 
         # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
@@ -715,10 +727,13 @@ class Robot(USDObject, GymObservable):
         """
         # Action space is ordered according to the order in _default_controller_config control
         low, high = [], []
-        for controller in self._controllers.values():
-            limits = controller.command_input_limits
-            low.append(th.tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
-            high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
+        for controller_name in self._controllers:
+            controller_cls = self._get_controller_class(controller_name)
+            controller_id = self._controller_id(controller_name)
+            limits = controller_cls.command_input_limits(controller_id)
+            cmd_dim = controller_cls.command_dim(controller_id)
+            low.append(th.tensor([-float("inf")] * cmd_dim) if limits is None else limits[0])
+            high.append(th.tensor([float("inf")] * cmd_dim) if limits is None else limits[1])
 
         return gym.spaces.Box(
             shape=(self.action_dim,),
@@ -727,7 +742,7 @@ class Robot(USDObject, GymObservable):
             dtype=NumpyTypes.FLOAT32,
         )
 
-    def apply_action(self, action):
+    def prepare_action(self, action):
         """
         Converts inputted actions into low-level control signals
 
@@ -767,15 +782,7 @@ class Robot(USDObject, GymObservable):
         # Convert action from torch if necessary
         action = cb.from_torch(action)
 
-        # First, loop over all controllers, and update the desired command
-        idx = 0
-        for name, controller in self._controllers.items():
-            # Set command, then take a controller step
-            controller.update_goal(
-                command=action[idx : idx + controller.command_dim], control_dict=self.get_control_dict()
-            )
-            # Update idx
-            idx += controller.command_dim
+        return action
 
     @property
     def is_driven(self) -> bool:
@@ -793,6 +800,7 @@ class Robot(USDObject, GymObservable):
     def control_enabled(self, value):
         self._control_enabled = value
 
+    # TODO deprecate
     def step(self):
         """
         Takes a controller step across all controllers and deploys the computed control signals onto the object.
@@ -812,20 +820,23 @@ class Robot(USDObject, GymObservable):
         # Compose control_dict
         control_dict = self.get_control_dict()
 
-        for name, controller in self._controllers.items():
+        for name in self._controllers:
+            controller_cls = self._get_controller_class(name)
+            controller_id = self._controller_id(name)
             control[name] = {
-                "value": controller.step(control_dict=control_dict),
-                "type": controller.control_type,
+                "value": controller_cls.step(controller_id=controller_id, control_dict=control_dict),
+                "type": controller_cls.control_type(controller_id),
             }
-            # Update idx
-            idx += controller.command_dim
+            idx += controller_cls.command_dim(controller_id)
 
         # Compose controls
         u_vec = cb.zeros(self.n_dof)
         # By default, the control type is Effort and the control value is 0 (th.zeros) - i.e. no control applied
         u_type_vec = cb.array([ControlType.EFFORT] * self.n_dof)
         for group, ctrl in control.items():
-            idx = self._controllers[group].dof_idx
+            controller_cls = self._get_controller_class(group)
+            controller_id = self._controller_id(group)
+            idx = controller_cls.dof_idx(controller_id)
             u_vec[idx] = ctrl["value"]
             u_type_vec[idx] = ctrl["type"]
 
@@ -877,9 +888,11 @@ class Robot(USDObject, GymObservable):
             # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
             for arm in self.arm_names:
                 if self._ag_freeze_gripper[arm]:
+                    controller_cls = self._get_controller_class(f"gripper_{arm}")
+                    controller_id = self._controller_id(f"gripper_{arm}")
                     control[self.gripper_control_idx[arm]] = (
                         self._ag_obj_constraint_params[arm]["gripper_pos"]
-                        if self.controllers[f"gripper_{arm}"].control_type == ControlType.POSITION
+                        if controller_cls.control_type(controller_id) == ControlType.POSITION
                         else 0.0
                     )
         # Run sanity check
@@ -952,21 +965,22 @@ class Robot(USDObject, GymObservable):
             # We apply a threshold based on the control rather than the command here so that the behavior
             # stays the same across different controllers and control modes (absolute / delta). This way,
             # a zero action will actually keep the AG setting where it already is.
-            controller = self._controllers[f"gripper_{arm}"]
-            controlled_joints = controller.dof_idx
-            control = cb.to_torch(controller.control)
+            controller_cls = self._get_controller_class(f"gripper_{arm}")
+            controller_id = self._controller_id(f"gripper_{arm}")
+            controlled_joints = controller_cls.dof_idx(controller_id)
+            control = cb.to_torch(controller_cls._controls[controller_id])
             if control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
                 applying_grasp = (
                     th.any(control < self.joint_upper_limits[controlled_joints])
-                    if controller.control_type == ControlType.POSITION
+                    if controller_cls.control_type(controller_id) == ControlType.POSITION
                     else th.any(control < 0)
                 )
             else:
                 applying_grasp = (
                     th.any(control > self.joint_lower_limits[controlled_joints])
-                    if controller.control_type == ControlType.POSITION
+                    if controller_cls.control_type(controller_id) == ControlType.POSITION
                     else th.any(control > 0)
                 )
             # Execute gradual release of object
@@ -1233,8 +1247,9 @@ class Robot(USDObject, GymObservable):
         # Also clear the controllable view's backend since state has changed
         if not drive:
             ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
-            for controller in self._controllers.values():
-                controller.reset()
+            for controller_name in self._controllers:
+                controller_cls = self._get_controller_class(controller_name)
+                controller_cls.reset(self._controller_id(controller_name))
 
     def _dump_state(self):
         # Grab super state
@@ -1242,8 +1257,9 @@ class Robot(USDObject, GymObservable):
 
         # Add in controller states
         controller_states = dict()
-        for controller_name, controller in self._controllers.items():
-            controller_states[controller_name] = controller.dump_state()
+        for controller_name in self._controllers:
+            controller_cls = self._get_controller_class(controller_name)
+            controller_states[controller_name] = controller_cls.dump_state(controller_id=self._controller_id(controller_name))
 
         state["controllers"] = controller_states
 
@@ -1270,8 +1286,9 @@ class Robot(USDObject, GymObservable):
 
         # Load controller states
         controller_states = state["controllers"]
-        for controller_name, controller in self._controllers.items():
-            controller.load_state(state=controller_states[controller_name])
+        for controller_name in self._controllers:
+            controller_cls = self._get_controller_class(controller_name)
+            controller_cls.load_state(controller_id=self._controller_id(controller_name), state=controller_states[controller_name])
 
         if self.is_manipulation:
             # No additional loading needed if we're using physical grasping
@@ -1327,7 +1344,10 @@ class Robot(USDObject, GymObservable):
 
         # Serialize the controller states sequentially
         controller_states_flat = th.cat(
-            [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
+            [
+                self._get_controller_class(c_name).serialize(controller_id=self._controller_id(c_name), state=state["controllers"][c_name])
+                for c_name in self._controllers
+            ]
         )
 
         # Concatenate and return
@@ -1344,8 +1364,11 @@ class Robot(USDObject, GymObservable):
 
         # Deserialize the controller states sequentially
         controller_states = dict()
-        for c_name, c in self._controllers.items():
-            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
+        for c_name in self._controllers:
+            controller_cls = self._get_controller_class(c_name)
+            controller_states[c_name], deserialized_items = controller_cls.deserialize(
+                controller_id=self._controller_id(c_name), state=state[idx:]
+            )
             idx += deserialized_items
         state_dict["controllers"] = controller_states
 
@@ -1548,23 +1571,34 @@ class Robot(USDObject, GymObservable):
             # Iterate over all arms
             for arm in self.arm_names:
                 # If we have an arm controller, make sure it is a manipulation controller
-                if f"arm_{arm}" in self._controllers:
-                    assert isinstance(
-                        self._controllers["arm_{}".format(arm)], ManipulationController
-                    ), "Arm {} controller must be a ManipulationController!".format(arm)
+                if f"arm_{arm}" in self._controller_config:
+                    arm_controller_name = self._controller_config[f"arm_{arm}"]["name"]
+                    assert arm_controller_name in {
+                        "JointController",
+                        "InverseKinematicsController",
+                        "OperationalSpaceController",
+                        "NullJointController",
+                    }, f"Arm {arm} controller must be a manipulation controller!"
 
                 # If we have a gripper controller, make sure it is a manipulation controller
-                if f"gripper_{arm}" in self._controllers:
-                    assert isinstance(
-                        self._controllers["gripper_{}".format(arm)], GripperController
-                    ), "Gripper {} controller must be a GripperController!".format(arm)
+                if f"gripper_{arm}" in self._controller_config:
+                    gripper_controller_name = self._controller_config[f"gripper_{arm}"]["name"]
+                    assert gripper_controller_name in {
+                        "MultiFingerGripperController",
+                        "JointController",
+                        "NullJointController",
+                    }, f"Gripper {arm} controller must be a gripper controller!"
 
         if self.is_locomotion:
             # If we have a base controller, make sure it is a locomotion controller
-            if "base" in self._controllers:
-                assert isinstance(
-                    self._controllers["base"], LocomotionController
-                ), "Base controller must be a LocomotionController!"
+            if "base" in self._controller_config:
+                base_controller_name = self._controller_config["base"]["name"]
+                assert base_controller_name in {
+                    "JointController",
+                    "HolonomicBaseJointController",
+                    "DifferentialDriveController",
+                    "NullJointController",
+                }, "Base controller must be a locomotion controller!"
         if self.is_two_wheel:
             assert (
                 len(self.base_control_idx) == 2
@@ -2053,7 +2087,8 @@ class Robot(USDObject, GymObservable):
             )
         else:
             # Infer from the gripper controller the state
-            is_grasping = self._controllers["gripper_{}".format(arm)].is_grasping()
+            controller_cls = self._get_controller_class(f"gripper_{arm}")
+            is_grasping = controller_cls.is_grasping(controller_id=self._controller_id(f"gripper_{arm}"))
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
@@ -2171,8 +2206,8 @@ class Robot(USDObject, GymObservable):
         """
         if self.is_two_wheel:
             action = th.zeros(self.action_dim)
-            assert isinstance(
-                self._controllers["base"], DifferentialDriveController
+            assert (
+                self._controller_config["base"]["name"] == "DifferentialDriveController"
             ), "Only DifferentialDriveController is supported!"
             action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
             return action
@@ -2184,14 +2219,17 @@ class Robot(USDObject, GymObservable):
                 arm_name = self.arm_names[i]
                 arm_action = th.tensor(teleop_action[hand]).float()
                 # arm action
-                assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(
-                    self._controllers[f"arm_{arm_name}"], OperationalSpaceController
-                ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
+                arm_controller_name = self._controller_config[f"arm_{arm_name}"]["name"]
+                assert arm_controller_name in {
+                    "InverseKinematicsController",
+                    "OperationalSpaceController",
+                }, f"Only IK and OSC controllers are supported for arm {arm_name}!"
                 target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
                 action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
                 # gripper action
-                assert isinstance(
-                    self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
+                gripper_controller_name = self._controller_config[f"gripper_{arm_name}"]["name"]
+                assert (
+                    gripper_controller_name == "MultiFingerGripperController"
                 ), f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
                 action[self.gripper_action_idx[arm_name]] = arm_action[6]
             action[self.base_action_idx] = th.tensor(teleop_action.base).float()
@@ -2204,14 +2242,17 @@ class Robot(USDObject, GymObservable):
                 arm_name = self.arm_names[i]
                 arm_action = th.tensor(teleop_action[hand]).float()
                 # arm action
-                assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(
-                    self._controllers[f"arm_{arm_name}"], OperationalSpaceController
-                ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
+                arm_controller_name = self._controller_config[f"arm_{arm_name}"]["name"]
+                assert arm_controller_name in {
+                    "InverseKinematicsController",
+                    "OperationalSpaceController",
+                }, f"Only IK and OSC controllers are supported for arm {arm_name}!"
                 target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
                 action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
                 # gripper action
-                assert isinstance(
-                    self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
+                gripper_controller_name = self._controller_config[f"gripper_{arm_name}"]["name"]
+                assert (
+                    gripper_controller_name == "MultiFingerGripperController"
                 ), f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
                 action[self.gripper_action_idx[arm_name]] = arm_action[6]
                 return action
@@ -2408,7 +2449,12 @@ class Robot(USDObject, GymObservable):
             int: Dimension of action space for this object. By default,
                 is the sum over all controller action dimensions
         """
-        return sum([controller.command_dim for controller in self._controllers.values()])
+        return sum(
+            [
+                self._get_controller_class(name).command_dim(self._controller_id(name))
+                for name in self._controllers
+            ]
+        )
 
     @property
     def action_space(self):
@@ -2436,7 +2482,7 @@ class Robot(USDObject, GymObservable):
     def controllers(self):
         """
         Returns:
-            dict: Controllers owned by this object, mapping controller name to controller object
+            dict: Controllers owned by this object, mapping controller name to controller configs
         """
         return self._controllers
 
@@ -2458,9 +2504,9 @@ class Robot(USDObject, GymObservable):
         Returns:
             list: Raw ordering of the actions, corresponding to the controllers. e.g., ["base", "arm", "gripper"],
                 to denote that the action vector should be interpreted as first the base action, then arm command, then
-                gripper command. Note that external users should query @controller_order, which is the post-processed
-                ordering of actions, which may be a subset of the controllers due to some controllers subsuming others
-                (e.g.: arm controller subsuming the trunk controller if using IK)
+                gripper command. External users should query the ordered keys of controller_config, which is the
+                post-processed ordering of actions, which may be a subset of the controllers due to some controllers
+                subsuming others (e.g.: arm controller subsuming the trunk controller if using IK)
         """
         # Check top-level raw_controller_order
         if self._definition.raw_controller_order:
@@ -2486,8 +2532,9 @@ class Robot(USDObject, GymObservable):
         """
         dic = {}
         idx = 0
-        for controller in self.controller_order:
-            cmd_dim = self._controllers[controller].command_dim
+        for controller in self._controllers:
+            controller_cls = self._get_controller_class(controller)
+            cmd_dim = controller_cls.command_dim(self._controller_id(controller))
             dic[controller] = th.arange(idx, idx + cmd_dim)
             idx += cmd_dim
 
@@ -2501,8 +2548,9 @@ class Robot(USDObject, GymObservable):
                 indices (list) of the joint state vector controlled by each controller
         """
         dic = {}
-        for controller in self.controller_order:
-            dic[controller] = self._controllers[controller].dof_idx
+        for controller in self._controllers:
+            controller_cls = self._get_controller_class(controller)
+            dic[controller] = controller_cls.dof_idx(self._controller_id(controller))
 
         return dic
 
@@ -2843,12 +2891,19 @@ class Robot(USDObject, GymObservable):
         assert self.is_manipulation
         arm_action_idx = {}
         for arm_name in self.arm_names:
-            controller_idx = self.controller_order.index(f"arm_{arm_name}")
+            controller_order = list(self._controllers.keys())
+            controller_idx = controller_order.index(f"arm_{arm_name}")
             action_start_idx = sum(
-                [self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)]
+                [
+                    self._get_controller_class(controller_order[i]).command_dim(self._controller_id(controller_order[i]))
+                    for i in range(controller_idx)
+                ]
+            )
+            arm_cmd_dim = self._get_controller_class(f"arm_{arm_name}").command_dim(
+                self._controller_id(f"arm_{arm_name}")
             )
             arm_action_idx[arm_name] = th.arange(
-                action_start_idx, action_start_idx + self.controllers[f"arm_{arm_name}"].command_dim
+                action_start_idx, action_start_idx + arm_cmd_dim
             )
         return arm_action_idx
 
@@ -2857,12 +2912,20 @@ class Robot(USDObject, GymObservable):
         assert self.is_manipulation
         gripper_action_idx = {}
         for arm_name in self.arm_names:
-            controller_idx = self.controller_order.index(f"gripper_{arm_name}")
+            controller_order = list(self._controllers.keys())
+            controller_idx = controller_order.index(f"gripper_{arm_name}")
             action_start_idx = sum(
-                [self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)]
+                [
+                    self._get_controller_class(controller_order[i]).command_dim(self._controller_id(controller_order[i]))
+                    
+                    for i in range(controller_idx)
+                ]
+            )
+            grip_cmd_dim = self._get_controller_class(f"gripper_{arm_name}").command_dim(
+                self._controller_id(f"gripper_{arm_name}")
             )
             gripper_action_idx[arm_name] = th.arange(
-                action_start_idx, action_start_idx + self.controllers[f"gripper_{arm_name}"].command_dim
+                action_start_idx, action_start_idx + grip_cmd_dim
             )
         return gripper_action_idx
 
@@ -3963,9 +4026,19 @@ class Robot(USDObject, GymObservable):
     @property
     def base_action_idx(self):
         assert self.is_locomotion
-        controller_idx = self.controller_order.index("base")
-        action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
-        return th.arange(action_start_idx, action_start_idx + self.controllers["base"].command_dim)
+        controller_order = list(self._controllers.keys())
+        controller_idx = controller_order.index("base")
+        action_start_idx = sum(
+            [
+                self._get_controller_class(controller_order[i]).command_dim(
+                    self._get_controller_class(controller_order[i])._configs[self._controller_id(controller_order[i])]
+                )
+                for i in range(controller_idx)
+            ]
+        )
+        base_cmd_dim = self._get_controller_class("base").command_dim(self._controller_id("base")
+        )
+        return th.arange(action_start_idx, action_start_idx + base_cmd_dim)
 
     @property
     def base_joint_names(self):
@@ -4087,12 +4160,15 @@ class Robot(USDObject, GymObservable):
         """
         if not self.is_holonomic_base:
             action = []
-            for name, controller in self.controllers.items():
+            for name in self._controllers:
+                controller_cls = self._get_controller_class(name)
+                controller_id = self._controller_id(name)
+                config = controller_cls._configs[controller_id]
                 assert (
-                    isinstance(controller, JointController) and not controller.use_delta_commands
+                    self._controller_config[name]["name"] == "JointController" and not config.get("use_delta_commands", False)
                 ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
-                command = q[controller.dof_idx]
-                action.append(controller._reverse_preprocess_command(command))
+                command = q[controller_cls.dof_idx(controller_id)]
+                action.append(controller_cls._reverse_preprocess_command(controller_id, command))
             action = th.cat(action, dim=0)
             assert (
                 action.shape[0] == self.action_dim
@@ -4100,12 +4176,15 @@ class Robot(USDObject, GymObservable):
             return action
 
         action = []
-        for name, controller in self.controllers.items():
+        for name in self._controllers:
+            controller_cls = self._get_controller_class(name)
+            config = controller_cls._configs[self._controller_id(name)]
             assert (
-                isinstance(controller, JointController) and not controller.use_delta_commands
+                self._controller_config[name]["name"] in {"JointController", "HolonomicBaseJointController"}
+                and not config.get("use_delta_commands", False)
             ), f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
-            command = q[controller.dof_idx]
-            if isinstance(controller, HolonomicBaseJointController):
+            command = q[controller_cls.dof_idx(self._controller_id(name))]
+            if self._controller_config[name]["name"] == "HolonomicBaseJointController":
                 # For a holonomic base joint controller, the command should be in the robot local frame
                 # For orientation, we need to convert the command to a delta angle
                 cur_rz_joint_pos = self.get_joint_positions()[self.base_idx][5]
@@ -4116,7 +4195,7 @@ class Robot(USDObject, GymObservable):
                 canonical_pos = th.tensor([command[0], command[1], body_pose[0][2]], dtype=th.float32)
                 local_pos = T.relative_pose_transform(canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), *body_pose)[0]
                 command = th.tensor([local_pos[0], local_pos[1], delta_q])
-            action.append(controller._reverse_preprocess_command(command))
+            action.append(controller_cls._reverse_preprocess_command(self._controller_id(name), command))
         action = th.cat(action, dim=0)
         assert (
             action.shape[0] == self.action_dim
@@ -4184,9 +4263,17 @@ class Robot(USDObject, GymObservable):
     @property
     def trunk_action_idx(self):
         assert self.is_articulated_trunk
-        controller_idx = self.controller_order.index("trunk")
-        action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
-        return th.arange(action_start_idx, action_start_idx + self.controllers["trunk"].command_dim)
+        controller_order = list(self._controllers.keys())
+        controller_idx = controller_order.index("trunk")
+        action_start_idx = sum(
+            [self._get_controller_class(controller_order[i]).command_dim(self._controller_id(controller_order[i]))
+                for i in range(controller_idx)
+            ]
+        )
+        trunk_cmd_dim = self._get_controller_class("trunk").command_dim(
+            self._controller_id("trunk")
+        )
+        return th.arange(action_start_idx, action_start_idx + trunk_cmd_dim)
 
     @property
     def _default_trunk_ik_controller_config(self):

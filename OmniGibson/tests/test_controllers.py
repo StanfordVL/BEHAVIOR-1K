@@ -186,8 +186,9 @@ def test_arm_control():
         # We need to explicitly reset the controllers to unify the initial state that will be seen
         # during downstream action executions -- i.e.: the state seen after robot.reload_controllers()
         # is called each time
-        for controller in robot.controllers.values():
-            controller.reset()
+        for controller_name in robot.controllers:
+            controller_cls = robot._get_controller_class(controller_name)
+            controller_cls.reset(robot._controller_id(controller_name))
 
     # Update initial state (robot should be stable and still)
     env.scene.update_initial_file()
@@ -235,10 +236,11 @@ def test_arm_control():
                     c_name = f"arm_{arm}"
                     start_idx = 0
                     init_eef_pos, init_eef_quat = initial_eef_pose[robot.name][arm]
-                    for c in robot.controller_order:
+                    for c in robot.controllers:
                         if c == c_name:
                             break
-                        start_idx += robot.controllers[c].command_dim
+                        controller_cls = robot._get_controller_class(c)
+                        start_idx += controller_cls.command_dim(robot._controller_id(c))
                     if controller_mode == "pose_delta_ori":
                         forward_action[start_idx] = 0.02
                         side_action[start_idx + 1] = 0.02
@@ -268,10 +270,11 @@ def test_arm_control():
                 if robot.is_locomotion:
                     c_name = "base"
                     start_idx = 0
-                    for c in robot.controller_order:
+                    for c in robot._controllers:
                         if c == c_name:
                             break
-                        start_idx += robot.controllers[c].command_dim
+                        controller_cls = robot._get_controller_class(c)
+                        start_idx += controller_cls.command_dim(robot._controller_id(c))
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
 
@@ -299,8 +302,8 @@ def test_arm_control():
 
                         init_pos, init_quat = initial_eef_pose[robot.name][arm]
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
-                        arm_controller = robot.controllers[f"arm_{arm}"]
-                        arm_goal = arm_controller.goal
+                        arm_controller = robot._get_controller_class(f"arm_{arm}")
+                        arm_goal = arm_controller._goals[robot._controller_id(f"arm_{arm}")]
                         target_pos = cb.to_torch(arm_goal["target_pos"])
                         target_quat = T.mat2quat(cb.to_torch(arm_goal["target_ori_mat"]))
                         pos_check = err_checks[controller_mode][action_name]["pos"]

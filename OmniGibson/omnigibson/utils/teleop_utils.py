@@ -101,7 +101,8 @@ class TeleopSystem(TeleopPolicy):
                     ]
                 ).unsqueeze(0)
                 # if we are grasping, we manually set the gripper position to be at most 0.5
-                if self.robot.controllers[f"gripper_{self.robot.arm_names[i]}"].is_grasping():
+                controller_cls = self.robot._get_controller_class(f"gripper_{self.robot.arm_names[i]}")
+                if controller_cls.is_grasping(self.robot._controller_id(f"gripper_{self.robot.arm_names[i]}")):
                     gripper_pos = th.min(gripper_pos, th.tensor([0.5]))
                 robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
 
