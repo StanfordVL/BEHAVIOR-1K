@@ -25,7 +25,10 @@ from omnigibson.action_primitives.action_primitive_set_base import (
     ActionPrimitiveErrorGroup,
     BaseActionPrimitiveSet,
 )
-from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
+from omnigibson.action_primitives.curobo import (
+    CuRoboEmbodimentSelection,
+    CuRoboMotionGenerator,
+)
 from omnigibson.controllers import (
     InverseKinematicsController,
     HolonomicBaseJointController,
@@ -941,8 +944,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Grab the first successful trajectory if found
         success_idx = th.where(successes)[0].cpu()
         if len(success_idx) == 0:
-            # print("motion planning fails")
-            # breakpoint()
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
                 "There is no accessible path from where you are to the desired pose. Try again",
@@ -967,8 +968,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         low_precision=False,
         ignore_physics=False,
     ):
-        for i, joint_pos in enumerate(q_traj):
-            # indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
+        for joint_pos in q_traj:
             if ignore_physics:
                 self.robot.set_joint_positions(joint_pos)
                 og.sim.step()
@@ -983,9 +983,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 for arm in self.robot.arm_names:
                     articulation_control_idx.append(self.robot.arm_control_idx[arm])
                 articulation_control_idx = th.cat(articulation_control_idx)
-                for j in range(m.MAX_STEPS_FOR_JOINT_MOTION):
-                    # indented_print(f"Step {j + 1}/{m.MAX_STEPS_FOR_JOINT_MOTION}")
-
+                for _ in range(m.MAX_STEPS_FOR_JOINT_MOTION):
                     # We need to call @q_to_action for every step because as the robot base moves, the same base joint_pos will be
                     # converted to different actions, since HolonomicBaseJointController accepts an action in the robot local frame.
                     action = self.robot.q_to_action(joint_pos)
@@ -1535,9 +1533,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.debug_visual_marker.set_position_orientation(*pose_3d)
         target_pos = {self.robot.base_footprint_link_name: pose_3d[0]}
         target_quat = {self.robot.base_footprint_link_name: pose_3d[1]}
-
-        # print("base motion planning")
-        # breakpoint()
         q_traj = self._plan_joint_motion(
             target_pos,
             target_quat,
