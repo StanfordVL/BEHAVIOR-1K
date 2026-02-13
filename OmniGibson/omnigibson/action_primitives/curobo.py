@@ -116,17 +116,22 @@ class CuRoboMotionGenerator:
                 CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
             }
         print("!" * 100)
+        # TODO [Wensi]: Check whether this is still true for future releases.
         print(
-            "NOTE: Currently for 50 series, only Default embodiment works for Tiago, and only non-DEFAULT embodiment works for R1Pro."
+            """
+            NOTE: Currently (v3.8.0), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
+                will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues. 
+                Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used. 
+            """
         )
         if th.cuda.get_device_capability(device) == (12, 0):
             if robot.model == "tiago":
-                print("Detected you are using Tiago with 50-series GPU: excluding non-DEFAULT embodiment.")
+                print("Detected you are using Tiago with cuda architecture 12.0 GPU: excluding non-DEFAULT embodiment.")
                 robot_cfg_path_dict = {
                     CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
                 }
             elif robot.model == "r1pro":
-                print("Detected you are using R1Pro with 50-series GPU: excluding DEFAULT embodiment.")
+                print("Detected you are using R1Pro with cuda architecture 12.0 GPU: excluding DEFAULT embodiment.")
                 robot_cfg_path_dict = {
                     k: v for k, v in robot_cfg_path_dict.items() if k != CuRoboEmbodimentSelection.DEFAULT
                 }

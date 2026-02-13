@@ -245,11 +245,13 @@ def test_curobo():
     ]
     for robot_cfg in robot_cfgs:
         if th.cuda.is_available() and th.cuda.get_device_capability(0) == (12, 0):
-            # TODO: Currently for 50 series, only Default embodiment works for Tiago, and for R1Pro, all embodiment except Default work.
-            # Here, we remove R1Pro for testing.
+            # TODO [Wensi]: Check whether this is still true for future releases.
+            # Currently (v3.8.0), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
+            #     will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues.
+            # Therefore, we remove R1Pro for testing if we detect such GPU is being used.
             if robot_cfg["model"] == "r1pro":
                 print(
-                    f"Skipping testing for {robot_cfg['model']} on 50 series GPU due to cuRobo embodiment compatibility issues."
+                    f"Skipping testing for {robot_cfg['model']} on cuda architecture 12.0 GPU due to cuRobo embodiment compatibility issues."
                 )
                 continue
         cfg["robots"] = [robot_cfg]
