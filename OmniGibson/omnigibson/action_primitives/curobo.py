@@ -61,21 +61,6 @@ def create_world_mesh_collision(tensor_args, obb_cache_size=10, mesh_cache_size=
     return lazy.curobo.geom.sdf.utils.create_collision_checker(world_cfg)
 
 
-def holonomic_base_pose_in_root_frame(robot):
-    """
-    Returns the current holonomic base pose expressed in the robot root frame (i.e., the 6DoF base joint).
-    """
-    if not robot.is_holonomic_base:
-        raise ValueError("holonomic_base_pose_in_root_frame only supports HolonomicBaseRobot instances.")
-
-    base_pos, base_quat = robot.links[robot.base_footprint_link_name].get_position_orientation()
-    root_pos, root_quat = robot.root_link.get_position_orientation()
-    relative_pos, relative_quat = T.relative_pose_transform(base_pos, base_quat, root_pos, root_quat)
-    base_euler = T.mat2euler_intrinsic(T.quat2mat(relative_quat))
-    base_pose = th.cat((relative_pos, base_euler))
-    return base_pose
-
-
 class CuRoboMotionGenerator:
     """
     Class for motion generator using CuRobo backend
