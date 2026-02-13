@@ -3452,7 +3452,7 @@ class Robot(USDObject, GymObservable):
             if eef_def and eef_def.curobo_path:
                 return os.path.join(get_dataset_path("omnigibson-robot-assets"), eef_def.curobo_path)
             else:
-                assert False, f"Robot not supported for curobo."
+                assert False, "Robot not supported for curobo."
 
         # Import here to avoid circular imports
         from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
@@ -3479,7 +3479,7 @@ class Robot(USDObject, GymObservable):
         ):
             assert (
                 self.end_effector in self._definition.manipulation.eef_support_curobo_attached_object_link_names
-            ), f"Robot not supported for curobo."
+            ), "Robot not supported for curobo."
 
         assert self.is_manipulation
         # By default, sets the standardized path
@@ -4110,15 +4110,19 @@ class Robot(USDObject, GymObservable):
             ), f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
             command = q[controller.dof_idx]
             if isinstance(controller, HolonomicBaseJointController):
-                # For a holonomic base joint controller, the command should be in the robot local frame
-                # For orientation, we need to convert the command to a delta angle
-                cur_rz_joint_pos = self.get_joint_positions()[self.base_idx][5]
+                # Holonomnic base controller expects delta (x, y, rz) in robot base footprint link frame
+                # However, q actions are in absolute (x, y, rz) in robot root frame, so we need to convert them before feeding to the controller
+                base_joint_pos = self.get_joint_positions()[self.base_idx]
+                cur_rz_joint_pos = base_joint_pos[5]
                 delta_q = wrap_angle(command[2] - cur_rz_joint_pos)
 
                 # For translation, we need to convert the command to the robot local frame
-                body_pose = self.get_position_orientation()
-                canonical_pos = th.tensor([command[0], command[1], body_pose[0][2]], dtype=th.float32)
-                local_pos = T.relative_pose_transform(canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), *body_pose)[0]
+                body_pos = base_joint_pos[:3]
+                body_quat = T.mat2quat(T.euler_intrinsic2mat(base_joint_pos[3:6]))
+                canonical_pos = th.tensor([command[0], command[1], body_pos[2]], dtype=th.float32)
+                local_pos = T.relative_pose_transform(
+                    canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), body_pos, body_quat
+                )[0]
                 command = th.tensor([local_pos[0], local_pos[1], delta_q])
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)

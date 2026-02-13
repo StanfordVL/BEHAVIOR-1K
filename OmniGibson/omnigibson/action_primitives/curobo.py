@@ -61,33 +61,11 @@ def create_world_mesh_collision(tensor_args, obb_cache_size=10, mesh_cache_size=
     return lazy.curobo.geom.sdf.utils.create_collision_checker(world_cfg)
 
 
-def holonomic_base_command_in_world_frame(robot, joint_pos):
-    """
-    Converts a CuRobo joint configuration whose holonomic base entries are expressed in the robot root frame
-    (i.e., base_footprint joints) into a world-frame configuration that HolonomicBaseJointController expects.
-    """
-    if not isinstance(robot, HolonomicBaseRobot):
-        raise ValueError("holonomic_base_command_in_world_frame only supports HolonomicBaseRobot instances.")
-
-    command_joint_pos = joint_pos.clone()
-    base_local = joint_pos[robot.base_idx]
-    local_pos = base_local[:3]
-    local_euler = base_local[3:]
-    local_quat = T.mat2quat(T.euler_intrinsic2mat(local_euler))
-
-    root_pos, root_quat = robot.root_link.get_position_orientation()
-    world_pos, world_quat = T.pose_transform(root_pos, root_quat, local_pos, local_quat)
-    world_euler = T.mat2euler_intrinsic(T.quat2mat(world_quat))
-    command_joint_pos[robot.base_idx[:3]] = world_pos
-    command_joint_pos[robot.base_idx[3:]] = world_euler
-    return command_joint_pos
-
-
 def holonomic_base_pose_in_root_frame(robot):
     """
     Returns the current holonomic base pose expressed in the robot root frame (i.e., the 6DoF base joint).
     """
-    if not isinstance(robot, HolonomicBaseRobot):
+    if not robot.is_holonomic_base:
         raise ValueError("holonomic_base_pose_in_root_frame only supports HolonomicBaseRobot instances.")
 
     base_pos, base_quat = robot.links[robot.base_footprint_link_name].get_position_orientation()
@@ -152,6 +130,22 @@ class CuRoboMotionGenerator:
             robot_cfg_path_dict = {
                 CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
             }
+        print("!" * 100)
+        print(
+            "NOTE: Currently for 50 series, only Default embodiment works for Tiago, and only non-DEFAULT embodiment works for R1Pro."
+        )
+        if th.cuda.get_device_capability(device) == (12, 0):
+            if robot.model == "tiago":
+                print("Detected you are using Tiago with 50-series GPU: excluding non-DEFAULT embodiment.")
+                robot_cfg_path_dict = {
+                    CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
+                }
+            elif robot.model == "r1pro":
+                print("Detected you are using R1Pro with 50-series GPU: excluding DEFAULT embodiment.")
+                robot_cfg_path_dict = {
+                    k: v for k, v in robot_cfg_path_dict.items() if k != CuRoboEmbodimentSelection.DEFAULT
+                }
+        print("!" * 100)
         robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
 
         # This will be shared across all MotionGen instances

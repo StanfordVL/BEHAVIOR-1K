@@ -244,6 +244,14 @@ def test_curobo():
         },
     ]
     for robot_cfg in robot_cfgs:
+        if th.cuda.is_available() and th.cuda.get_device_capability(0) == (12, 0):
+            # TODO: Currently for 50 series, only Default embodiment works for Tiago, and for R1Pro, all embodiment except Default work.
+            # Here, we remove R1Pro for testing.
+            if robot_cfg["model"] == "r1pro":
+                print(
+                    f"Skipping testing for {robot_cfg['model']} on 50 series GPU due to cuRobo embodiment compatibility issues."
+                )
+                continue
         cfg["robots"] = [robot_cfg]
 
         env = og.Environment(configs=cfg)
@@ -284,7 +292,7 @@ def test_curobo():
             debug=False,
             use_cuda_graph=True,
             collision_activation_distance=0.075,  # Use larger activation distance for better reproducibility
-            use_default_embodiment_only=True,
+            use_default_embodiment_only=False,
         )
 
         # Sample values for robot
