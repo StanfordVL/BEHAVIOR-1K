@@ -1493,6 +1493,7 @@ class ManipulationRobot(BaseRobot):
         """
 
         # Deny objects that are too heavy and are not a non-base link of a fixed-base object)
+        # TODO: maybe add a check for specfic objects
         mass = ag_link.mass
         if mass > m.ASSIST_GRASP_MASS_THRESHOLD and not (ag_obj.fixed_base and ag_link != ag_obj.root_link):
             return None

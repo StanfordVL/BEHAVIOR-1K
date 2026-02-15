@@ -1,5 +1,9 @@
 import argparse
 import av
+
+# Suppress verbose FFmpeg/libx264 encoder output at module load time
+av.logging.set_level(av.logging.PANIC)
+
 import json
 import logging
 import numpy as np
@@ -148,7 +152,7 @@ def encode_video_frames(
     vcodec: str = "libsvtav1",
     pix_fmt: str = "yuv420p",
     g: int | None = 2,
-    crf: int | None = 30,
+    crf: int | None = 24,
     fast_decode: int = 0,
     log_level: int | None = av.logging.ERROR,
     overwrite: bool = False,
@@ -231,9 +235,9 @@ def encode_video_frames(
     if vcodec == "libsvtav1":
         video_options["preset"] = str(preset) if preset is not None else "12"
 
-    # Set logging level
+    # Set logging level for both Python and native FFmpeg
     if log_level is not None:
-        # "While less efficient, it is generally preferable to modify logging with Python's logging"
+        av.logging.set_level(av.logging.PANIC)
         logging.getLogger("libav").setLevel(log_level)
 
     # Create and open output file (overwrite by default)
@@ -1229,6 +1233,7 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
         force_cache_sync: bool = False,
         download_videos: bool = True,
         video_backend: str | None = None,
+        # video_backend: str = "pyav",
         batch_encoding_size: int = 1,
         # chunk_streaming_using_keyframe: bool = True,
         # shuffle: bool = True,
