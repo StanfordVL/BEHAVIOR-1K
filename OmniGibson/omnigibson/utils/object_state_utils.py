@@ -298,6 +298,11 @@ def sample_kinematics(
         # Render at the end
         og.sim.render()
 
+    # We wake the object and take a final physics step because IsaacSim's latest regression causes sleeping objects to not trigger contact reporting
+    objA.wake()
+    objB.wake()
+    og.sim.step_physics()
+
     return success
 
 
