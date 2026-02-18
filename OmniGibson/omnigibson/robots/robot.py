@@ -572,6 +572,13 @@ class Robot(USDObject, GymObservable):
                     ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
                     subsume_names.add(subsume_name)
         
+        # Unregister old controller IDs from all controller classes so that stale
+        # entries don't linger when reloading and switching controller types (e.g. IK -> OSC).
+        for name in self._raw_controller_order:
+            cid = self._controller_id(name)
+            for cls in REGISTERED_CONTROLLERS.values():
+                cls.unregister(cid)
+
         # Loop over all controllers, in the order corresponding to @action dim
         for name in self._raw_controller_order:
             # If this controller is subsumed by another controller, simply skip it
