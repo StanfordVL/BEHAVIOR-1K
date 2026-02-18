@@ -74,6 +74,51 @@ class DifferentialDriveController(BaseController):
         return cb.array([left_wheel_joint_vel, right_wheel_joint_vel])
 
     @classmethod
+    def step_batch(cls, controller_ids):
+        """
+        Batched step for DifferentialDriveController instances.
+        All DD controllers have exactly 2 DOFs, so no padding needed.
+        """
+        N = len(controller_ids)
+
+        # Fill no-op goals
+        for cid in controller_ids:
+            if cls._goals[cid] is None:
+                cls._goals[cid] = cls.compute_no_op_goal(cid, cls._control_dicts[cid])
+
+        # Stack goals and config params into [N, 2] and [N] tensors
+        vels = cb.zeros((N, 2))
+        wheel_radius = cb.zeros(N)
+        half_axle = cb.zeros(N)
+        for i, cid in enumerate(controller_ids):
+            vels[i] = cls._goals[cid]["vel"]
+            config = cls._configs[cid]
+            wheel_radius[i] = config["wheel_radius"]
+            half_axle[i] = config["wheel_axle_halflength"]
+
+        lin_vel = vels[:, 0]
+        ang_vel = vels[:, 1]
+
+        # Vectorized wheel velocity computation
+        left = (lin_vel - ang_vel * half_axle) / wheel_radius
+        right = (lin_vel + ang_vel * half_axle) / wheel_radius
+
+        # Stack into [N, 2] result
+        u_batch = cb.zeros((N, 2))
+        u_batch[:, 0] = left
+        u_batch[:, 1] = right
+
+        # Clip and store
+        results = []
+        for i, cid in enumerate(controller_ids):
+            control = u_batch[i]
+            control = cls.clip_control(cid, control)
+            cls._controls[cid] = control
+            results.append(control)
+
+        return results
+
+    @classmethod
     def compute_no_op_goal(cls, controller_id: str, control_dict):
         return dict(vel=cb.zeros(2))
 

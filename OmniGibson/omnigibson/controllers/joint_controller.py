@@ -155,6 +155,104 @@ class JointController(BaseController):
         return u
 
     @classmethod
+    def step_batch(cls, controller_ids):
+        """
+        Batched step for JointController instances.
+        Non-impedance: u = target (trivial pass-through, processed sequentially).
+        Impedance: batched PD control + mass matrix multiply with zero-padded tensors.
+        """
+        # Fill no-op goals
+        for cid in controller_ids:
+            if cls._goals[cid] is None:
+                cls._goals[cid] = cls.compute_no_op_goal(cid, cls._control_dicts[cid])
+
+        # Split by impedance usage
+        impedance_indices = []
+        non_impedance_indices = []
+        for idx, cid in enumerate(controller_ids):
+            if cls._configs[cid]["use_impedances"]:
+                impedance_indices.append(idx)
+            else:
+                non_impedance_indices.append(idx)
+
+        results = [None] * len(controller_ids)
+
+        # Non-impedance: u = target, clip, done
+        for idx in non_impedance_indices:
+            cid = controller_ids[idx]
+            u = cb.copy(cls._goals[cid]["target"])
+            u = cls.clip_control(cid, u)
+            cls._controls[cid] = u
+            results[idx] = u
+
+        # Impedance: batched PD + mass matrix multiply
+        if impedance_indices:
+            imp_cids = [controller_ids[idx] for idx in impedance_indices]
+            N = len(imp_cids)
+            dims = [cls.control_dim(cid) for cid in imp_cids]
+            max_dim = max(dims)
+
+            # Build zero-padded [N, max_dim] tensors
+            targets = cb.zeros((N, max_dim))
+            base_values = cb.zeros((N, max_dim))
+            velocities = cb.zeros((N, max_dim))
+            gain = cb.zeros((N, max_dim))
+            damping = cb.zeros((N, max_dim))
+            gravity = cb.zeros((N, max_dim))
+            cc = cb.zeros((N, max_dim))
+            mass_matrices = cb.zeros((N, max_dim, max_dim))
+            is_effort = [False] * N
+
+            for i, cid in enumerate(imp_cids):
+                config = cls._configs[cid]
+                d = dims[i]
+                dof_idx = cls.dof_idx(cid)
+                cd = cls._control_dicts[cid]
+
+                targets[i, :d] = cls._goals[cid]["target"]
+                base_values[i, :d] = cd[f"joint_{config['motor_type']}"][dof_idx]
+                velocities[i, :d] = cd["joint_velocity"][dof_idx]
+
+                if config["motor_type"] == "position":
+                    gain[i, :d] = config["pos_kp"]
+                    damping[i, :d] = config["pos_kd"]
+                elif config["motor_type"] == "velocity":
+                    gain[i, :d] = config["vel_kp"]
+                else:
+                    is_effort[i] = True
+
+                # Extract sub mass matrix: full_mm[dof_idx][:, dof_idx] -> (d, d)
+                mass_matrices[i, :d, :d] = cd["mass_matrix"][dof_idx][:, dof_idx]
+
+                if config["use_gravity_compensation"]:
+                    gravity[i, :d] = cd["gravity_force"][dof_idx]
+                if config["use_cc_compensation"]:
+                    cc[i, :d] = cd["cc_force"][dof_idx]
+
+            # Vectorized PD: u = (target - base) * gain + (-vel) * damping
+            u = (targets - base_values) * gain + (-velocities) * damping
+            # For effort controllers, override with just target
+            for i in range(N):
+                if is_effort[i]:
+                    u[i] = targets[i]
+
+            # Batched mass matrix multiply: [N, D, D] @ [N, D, 1] -> [N, D]
+            u = (mass_matrices @ u[..., None])[..., 0]
+
+            # Add compensation forces (zeros for controllers that don't use them)
+            u = u + gravity + cc
+
+            # Unpad, clip, store
+            for i, (cid, idx) in enumerate(zip(imp_cids, impedance_indices)):
+                d = dims[i]
+                control = u[i, :d]
+                control = cls.clip_control(cid, control)
+                cls._controls[cid] = control
+                results[idx] = control
+
+        return results
+
+    @classmethod
     def compute_no_op_goal(cls, controller_id: str, control_dict):
         config = cls._configs[controller_id]
         if config["motor_type"] == "position":

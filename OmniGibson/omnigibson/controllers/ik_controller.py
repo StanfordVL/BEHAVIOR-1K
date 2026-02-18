@@ -291,6 +291,96 @@ class InverseKinematicsController(JointController):
         return dict(target_pos=(3,), target_ori_mat=(3, 3), target_quat=(4,))
 
     @classmethod
+    def step_batch(cls, controller_ids):
+        """
+        Batched step for InverseKinematicsController instances.
+        Batches the expensive IK solve (Jacobian pseudoinverse), then applies
+        per-instance smoothing filter and JointController tail sequentially.
+        """
+        # Fill no-op goals
+        for cid in controller_ids:
+            if cls._goals[cid] is None:
+                cls._goals[cid] = cls.compute_no_op_goal(cid, cls._control_dicts[cid])
+
+        N = len(controller_ids)
+        dims = [cls.control_dim(cid) for cid in controller_ids]
+        max_dim = max(dims)
+
+        # Gather and zero-pad IK data into batched tensors
+        q = cb.zeros((N, max_dim))
+        j_eef = cb.zeros((N, 6, max_dim))
+        ee_pos = cb.zeros((N, 3))
+        ee_mat = cb.zeros((N, 3, 3))
+        goal_pos = cb.zeros((N, 3))
+        goal_ori_mat = cb.zeros((N, 3, 3))
+        q_lower = cb.zeros((N, max_dim))
+        q_upper = cb.zeros((N, max_dim))
+
+        for i, cid in enumerate(controller_ids):
+            config = cls._configs[cid]
+            d = dims[i]
+            dof_idx = cls.dof_idx(cid)
+            cd = cls._control_dicts[cid]
+
+            q[i, :d] = cd["joint_position"][dof_idx]
+            j_eef[i, :, :d] = cd[f"{config['task_name']}_jacobian_relative"][:, dof_idx]
+            ee_pos[i] = cd[f"{config['task_name']}_pos_relative"]
+            ee_quat = cd[f"{config['task_name']}_quat_relative"]
+            ee_mat[i] = cb.as_float32(cb.T.quat2mat(ee_quat))
+            goal_pos[i] = cls._goals[cid]["target_pos"]
+            goal_ori_mat[i] = cls._goals[cid]["target_ori_mat"]
+            q_lower[i, :d] = config["control_limits"][ControlType.get_type("position")][0][dof_idx]
+            q_upper[i, :d] = config["control_limits"][ControlType.get_type("position")][1][dof_idx]
+
+        # Batched IK solve: [N, max_dim] joint position targets
+        target_batch = cb.get_custom_method("compute_ik_qpos_batch")(
+            q=q,
+            j_eef=j_eef,
+            ee_pos=cb.as_float32(ee_pos),
+            ee_mat=cb.as_float32(ee_mat),
+            goal_pos=cb.as_float32(goal_pos),
+            goal_ori_mat=cb.as_float32(goal_ori_mat),
+            q_lower_limit=q_lower,
+            q_upper_limit=q_upper,
+        )
+
+        # Per-instance post-processing: smoothing filter + JointController compute tail
+        results = []
+        for i, cid in enumerate(controller_ids):
+            d = dims[i]
+            target_joint_pos = target_batch[i, :d]
+
+            # Smoothing filter (per-instance, stateful)
+            if cls._state[cid]["control_filter"] is not None:
+                target_joint_pos = cls._state[cid]["control_filter"].estimate(target_joint_pos)
+
+            # JointController compute_control tail (inlined to avoid cross-class dict issues)
+            config = cls._configs[cid]
+            if config["use_impedances"]:
+                cd = cls._control_dicts[cid]
+                dof_idx = cls.dof_idx(cid)
+                base_value = cd[f"joint_{config['motor_type']}"][dof_idx]
+                if config["motor_type"] == "position":
+                    u = (target_joint_pos - base_value) * config["pos_kp"] + (-cd["joint_velocity"][dof_idx]) * config["pos_kd"]
+                elif config["motor_type"] == "velocity":
+                    u = (target_joint_pos - base_value) * config["vel_kp"]
+                else:
+                    u = target_joint_pos
+                u = cb.get_custom_method("compute_joint_torques")(u, cd["mass_matrix"], dof_idx)
+                if config["use_gravity_compensation"]:
+                    u += cd["gravity_force"][dof_idx]
+                if config["use_cc_compensation"]:
+                    u += cd["cc_force"][dof_idx]
+            else:
+                u = target_joint_pos
+
+            u = cls.clip_control(cid, u)
+            cls._controls[cid] = u
+            results.append(u)
+
+        return results
+
+    @classmethod
     def command_dim(cls, controller_id: str):
         return IK_MODE_COMMAND_DIMS[cls._configs[controller_id]["mode"]]
 
@@ -353,3 +443,52 @@ def _compute_ik_qpos_numpy(
 
 # Set these as part of the backend values
 add_compute_function(name="compute_ik_qpos", np_function=_compute_ik_qpos_numpy, th_function=_compute_ik_qpos_torch)
+
+
+def _compute_ik_qpos_batch_torch(
+    q: th.Tensor,
+    j_eef: th.Tensor,
+    ee_pos: th.Tensor,
+    ee_mat: th.Tensor,
+    goal_pos: th.Tensor,
+    goal_ori_mat: th.Tensor,
+    q_lower_limit: th.Tensor,
+    q_upper_limit: th.Tensor,
+):
+    """Batched IK solve for N controllers. All inputs have a leading batch dim N."""
+    pos_err = goal_pos - ee_pos  # [N, 3]
+    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)  # [N, 3]
+    err = th.cat([pos_err, ori_err], dim=-1)  # [N, 6]
+
+    j_eef_pinv = th.linalg.pinv(j_eef)  # [N, D, 6]
+    delta_j = (j_eef_pinv @ err.unsqueeze(-1)).squeeze(-1)  # [N, D]
+    target_joint_pos = q + delta_j
+
+    return target_joint_pos.clip(min=q_lower_limit, max=q_upper_limit)
+
+
+def _compute_ik_qpos_batch_numpy(
+    q,
+    j_eef,
+    ee_pos,
+    ee_mat,
+    goal_pos,
+    goal_ori_mat,
+    q_lower_limit,
+    q_upper_limit,
+):
+    """Batched IK solve for N controllers. All inputs have a leading batch dim N."""
+    pos_err = goal_pos - ee_pos  # [N, 3]
+    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)  # [N, 3]
+    err = np.concatenate([pos_err, ori_err], axis=-1)  # [N, 6]
+
+    j_eef_pinv = np.linalg.pinv(j_eef)  # [N, D, 6]
+    delta_j = (j_eef_pinv @ err[..., None])[..., 0]  # [N, D]
+    target_joint_pos = q + delta_j
+
+    return target_joint_pos.clip(q_lower_limit, q_upper_limit)
+
+
+add_compute_function(
+    name="compute_ik_qpos_batch", np_function=_compute_ik_qpos_batch_numpy, th_function=_compute_ik_qpos_batch_torch
+)

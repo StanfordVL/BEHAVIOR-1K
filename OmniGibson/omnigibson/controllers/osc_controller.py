@@ -300,6 +300,147 @@ class OperationalSpaceController(BaseController):
         return u
 
     @classmethod
+    def step_batch(cls, controller_ids):
+        """
+        Batched step for OperationalSpaceController instances.
+        Batches the expensive OSC torque computation (matrix inversions, multiplications).
+        Per-instance quaternion velocity error is computed in the gather loop.
+        """
+        # Fill no-op goals
+        for cid in controller_ids:
+            if cls._goals[cid] is None:
+                cls._goals[cid] = cls.compute_no_op_goal(cid, cls._control_dicts[cid])
+
+        N = len(controller_ids)
+        dims = [cls.control_dim(cid) for cid in controller_ids]
+        max_dim = max(dims)
+
+        # Build zero-padded batched tensors
+        # Mass matrix is initialized as identity (not zeros) so that the padded
+        # region remains invertible -- inv(mm) is used in the OSC computation and
+        # a zero-padded mm would be singular.
+        q = cb.zeros((N, max_dim))
+        qd = cb.zeros((N, max_dim))
+        mm = cb.zeros((N, max_dim, max_dim))
+        for i in range(N):
+            for j in range(max_dim):
+                mm[i, j, j] = 1.0
+        j_eef_batch = cb.zeros((N, 6, max_dim))
+        ee_pos_batch = cb.zeros((N, 3))
+        ee_mat_batch = cb.zeros((N, 3, 3))
+        ee_lin_vel_batch = cb.zeros((N, 3))
+        ee_ang_vel_err_batch = cb.zeros((N, 3))
+        goal_pos_batch = cb.zeros((N, 3))
+        goal_ori_mat_batch = cb.zeros((N, 3, 3))
+        kp_batch = cb.zeros((N, 6))
+        kd_batch = cb.zeros((N, 6))
+        kp_null_batch = cb.zeros((N, max_dim))
+        kd_null_batch = cb.zeros((N, max_dim))
+        rest_qpos_batch = cb.zeros((N, max_dim))
+        base_lin_vel_batch = cb.zeros((N, 3))
+        base_ang_vel_batch = cb.zeros((N, 3))
+        gravity = cb.zeros((N, max_dim))
+        cc_force = cb.zeros((N, max_dim))
+        decouple_flags = []
+
+        for i, cid in enumerate(controller_ids):
+            config = cls._configs[cid]
+            d = dims[i]
+            dof_idx = cls.dof_idx(cid)
+            cd = cls._control_dicts[cid]
+            goal_dict = cls._goals[cid]
+
+            q[i, :d] = cd["joint_position"][dof_idx]
+            qd[i, :d] = cd["joint_velocity"][dof_idx]
+            mm[i, :d, :d] = cd["mass_matrix"][dof_idx][:, dof_idx]
+            j_eef_batch[i, :, :d] = cd[f"{config['task_name']}_jacobian_relative"][:, dof_idx]
+            ee_pos_batch[i] = cd[f"{config['task_name']}_pos_relative"]
+            ee_quat = cd[f"{config['task_name']}_quat_relative"]
+            ee_mat_batch[i] = cb.as_float32(cb.T.quat2mat(ee_quat))
+
+            ee_lin_vel_batch[i] = cb.as_float32(cd[f"{config['task_name']}_lin_vel_relative"])
+            ee_ang_vel = cd[f"{config['task_name']}_ang_vel_relative"]
+            base_ang_vel = cd["root_rel_ang_vel"]
+            # Compute ee_ang_vel_err per-instance (quaternion ops not easily batchable)
+            ee_ang_vel_err_batch[i] = cb.as_float32(
+                cb.T.quat2axisangle(
+                    cb.T.quat_multiply(cb.T.axisangle2quat(-ee_ang_vel), cb.T.axisangle2quat(base_ang_vel))
+                )
+            )
+
+            goal_pos_batch[i] = goal_dict["target_pos"]
+            goal_ori_mat_batch[i] = goal_dict["target_ori_mat"]
+
+            kp = config["kp"]
+            kd_val = 2 * cb.sqrt(kp) * config["damping_ratio"]
+            kp_batch[i] = kp
+            kd_batch[i] = kd_val
+            kp_null_batch[i, :d] = config["kp_null"]
+            kd_null_batch[i, :d] = config["kd_null"]
+            rest_qpos_batch[i, :d] = config["reset_joint_pos"]
+
+            base_lin_vel_batch[i] = cb.as_float32(cd["root_rel_lin_vel"])
+            base_ang_vel_batch[i] = cb.as_float32(base_ang_vel)
+
+            decouple_flags.append(config["decouple_pos_ori"])
+
+            if config["use_gravity_compensation"]:
+                gravity[i, :d] = cd["gravity_force"][dof_idx]
+            if config["use_cc_compensation"]:
+                cc_force[i, :d] = cd["cc_force"][dof_idx]
+
+        # Batch compute, grouped by decouple_pos_ori flag
+        all_decouple = all(decouple_flags)
+        no_decouple = not any(decouple_flags)
+
+        if no_decouple or all_decouple:
+            u = cb.get_custom_method("compute_osc_torques_batch")(
+                q=q, qd=qd, mm=mm, j_eef=j_eef_batch,
+                ee_pos=ee_pos_batch, ee_mat=ee_mat_batch,
+                ee_lin_vel=ee_lin_vel_batch, ee_ang_vel_err=ee_ang_vel_err_batch,
+                goal_pos=goal_pos_batch, goal_ori_mat=goal_ori_mat_batch,
+                kp=kp_batch, kd=kd_batch,
+                kp_null=kp_null_batch, kd_null=kd_null_batch,
+                rest_qpos=rest_qpos_batch, max_dim=max_dim,
+                decouple_pos_ori=all_decouple,
+                base_lin_vel=base_lin_vel_batch, base_ang_vel=base_ang_vel_batch,
+            )
+        else:
+            # Mixed decouple flags: process in two groups
+            u = cb.zeros((N, max_dim))
+            for flag_val in [False, True]:
+                indices = [i for i in range(N) if decouple_flags[i] == flag_val]
+                if not indices:
+                    continue
+                idx_arr = cb.as_int(cb.array(indices))
+                u_group = cb.get_custom_method("compute_osc_torques_batch")(
+                    q=q[idx_arr], qd=qd[idx_arr], mm=mm[idx_arr], j_eef=j_eef_batch[idx_arr],
+                    ee_pos=ee_pos_batch[idx_arr], ee_mat=ee_mat_batch[idx_arr],
+                    ee_lin_vel=ee_lin_vel_batch[idx_arr], ee_ang_vel_err=ee_ang_vel_err_batch[idx_arr],
+                    goal_pos=goal_pos_batch[idx_arr], goal_ori_mat=goal_ori_mat_batch[idx_arr],
+                    kp=kp_batch[idx_arr], kd=kd_batch[idx_arr],
+                    kp_null=kp_null_batch[idx_arr], kd_null=kd_null_batch[idx_arr],
+                    rest_qpos=rest_qpos_batch[idx_arr], max_dim=max_dim,
+                    decouple_pos_ori=flag_val,
+                    base_lin_vel=base_lin_vel_batch[idx_arr], base_ang_vel=base_ang_vel_batch[idx_arr],
+                )
+                for j, idx in enumerate(indices):
+                    u[idx] = u_group[j]
+
+        # Add compensation forces and clip
+        u = u + gravity + cc_force
+
+        results = []
+        for i, cid in enumerate(controller_ids):
+            d = dims[i]
+            control = u[i, :d]
+            control = cls.clip_control(cid, control)
+            cls._controls[cid] = control
+            results.append(control)
+
+        return results
+
+    @classmethod
     def compute_no_op_goal(cls, controller_id: str, control_dict):
         config = cls._configs[controller_id]
         target_pos = cb.copy(control_dict[f"{config['task_name']}_pos_relative"])
@@ -495,4 +636,99 @@ def _compute_osc_torques_numpy(
 # Set these as part of the backend values
 add_compute_function(
     name="compute_osc_torques", np_function=_compute_osc_torques_numpy, th_function=_compute_osc_torques_torch
+)
+
+
+def _compute_osc_torques_batch_torch(
+    q, qd, mm, j_eef, ee_pos, ee_mat, ee_lin_vel, ee_ang_vel_err,
+    goal_pos, goal_ori_mat, kp, kd, kp_null, kd_null, rest_qpos,
+    max_dim, decouple_pos_ori, base_lin_vel, base_ang_vel,
+):
+    """Batched OSC torque computation. All tensor inputs have leading batch dim N."""
+    mm_inv = th.linalg.inv(mm)  # [N, D, D]
+
+    pos_err = goal_pos - ee_pos  # [N, 3]
+    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)  # [N, 3]
+
+    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos) - ee_lin_vel  # [N, 3]
+    vel_err = th.cat([lin_vel_err, ee_ang_vel_err], dim=-1)  # [N, 6]
+
+    task_err = th.cat([pos_err, ori_err], dim=-1)  # [N, 6]
+    err = (kp * task_err + kd * vel_err).unsqueeze(-1)  # [N, 6, 1]
+
+    j_eef_T = j_eef.transpose(-2, -1)  # [N, D, 6]
+
+    if decouple_pos_ori:
+        j_pos = j_eef[:, :3, :]
+        j_ori = j_eef[:, 3:, :]
+        m_eef_pos = th.linalg.inv(j_pos @ mm_inv @ j_pos.transpose(-2, -1))  # [N, 3, 3]
+        m_eef_ori = th.linalg.inv(j_ori @ mm_inv @ j_ori.transpose(-2, -1))  # [N, 3, 3]
+        wrench = th.cat([m_eef_pos @ err[:, :3, :], m_eef_ori @ err[:, 3:, :]], dim=1)  # [N, 6, 1]
+        m_eef = th.linalg.inv(j_eef @ mm_inv @ j_eef_T)  # needed for nullspace
+    else:
+        m_eef = th.linalg.inv(j_eef @ mm_inv @ j_eef_T)  # [N, 6, 6]
+        wrench = m_eef @ err  # [N, 6, 1]
+
+    u = j_eef_T @ wrench  # [N, D, 1]
+
+    # Nullspace projection
+    j_eef_inv = m_eef @ j_eef @ mm_inv  # [N, 6, D]
+    angle_diff = (rest_qpos - q + math.pi) % (2 * math.pi) - math.pi
+    u_null = (kd_null * (-qd) + kp_null * angle_diff).unsqueeze(-1)  # [N, D, 1]
+    u_null = mm @ u_null  # [N, D, 1]
+    eye = th.eye(max_dim, dtype=th.float32).unsqueeze(0)  # [1, D, D]
+    nullspace_proj = eye - j_eef_T @ j_eef_inv  # [N, D, D]
+    u = u + nullspace_proj @ u_null  # [N, D, 1]
+
+    return u.squeeze(-1)  # [N, D]
+
+
+def _compute_osc_torques_batch_numpy(
+    q, qd, mm, j_eef, ee_pos, ee_mat, ee_lin_vel, ee_ang_vel_err,
+    goal_pos, goal_ori_mat, kp, kd, kp_null, kd_null, rest_qpos,
+    max_dim, decouple_pos_ori, base_lin_vel, base_ang_vel,
+):
+    """Batched OSC torque computation. All array inputs have leading batch dim N."""
+    mm_inv = np.linalg.inv(mm)  # [N, D, D]
+
+    pos_err = goal_pos - ee_pos  # [N, 3]
+    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)  # [N, 3]
+
+    lin_vel_err = base_lin_vel + np.cross(base_ang_vel, ee_pos) - ee_lin_vel  # [N, 3]
+    vel_err = np.concatenate([lin_vel_err, ee_ang_vel_err], axis=-1)  # [N, 6]
+
+    task_err = np.concatenate([pos_err, ori_err], axis=-1)  # [N, 6]
+    err = np.expand_dims(kp * task_err + kd * vel_err, axis=-1)  # [N, 6, 1]
+
+    j_eef_T = np.swapaxes(j_eef, -2, -1)  # [N, D, 6]
+
+    if decouple_pos_ori:
+        j_pos = j_eef[:, :3, :]
+        j_ori = j_eef[:, 3:, :]
+        m_eef_pos = np.linalg.inv(j_pos @ mm_inv @ np.swapaxes(j_pos, -2, -1))
+        m_eef_ori = np.linalg.inv(j_ori @ mm_inv @ np.swapaxes(j_ori, -2, -1))
+        wrench = np.concatenate([m_eef_pos @ err[:, :3, :], m_eef_ori @ err[:, 3:, :]], axis=1)
+        m_eef = np.linalg.inv(j_eef @ mm_inv @ j_eef_T)
+    else:
+        m_eef = np.linalg.inv(j_eef @ mm_inv @ j_eef_T)  # [N, 6, 6]
+        wrench = m_eef @ err  # [N, 6, 1]
+
+    u = j_eef_T @ wrench  # [N, D, 1]
+
+    # Nullspace projection
+    j_eef_inv = m_eef @ j_eef @ mm_inv  # [N, 6, D]
+    angle_diff = (rest_qpos - q + np.pi) % (2 * np.pi) - np.pi
+    u_null = np.expand_dims(kd_null * (-qd) + kp_null * angle_diff, axis=-1).astype(np.float32)  # [N, D, 1]
+    u_null = mm @ u_null  # [N, D, 1]
+    eye = np.expand_dims(np.eye(max_dim, dtype=np.float32), axis=0)  # [1, D, D]
+    nullspace_proj = eye - j_eef_T @ j_eef_inv  # [N, D, D]
+    u = u + nullspace_proj @ u_null  # [N, D, 1]
+
+    return u.squeeze(-1) if u.ndim > 2 else u.reshape(u.shape[0], -1)  # [N, D]
+
+
+add_compute_function(
+    name="compute_osc_torques_batch",
+    np_function=_compute_osc_torques_batch_numpy,
+    th_function=_compute_osc_torques_batch_torch,
 )

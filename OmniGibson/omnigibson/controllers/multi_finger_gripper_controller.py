@@ -55,7 +55,6 @@ class MultiFingerGripperController(BaseController):
 
     @classmethod
     def _init_state(cls, controller_id: str):
-        config = cls._configs[controller_id]
         cls._state[controller_id]["is_grasping"] = IsGraspingState.FALSE
         cls._state[controller_id]["vel_filter"] = MovingAverageFilter(obs_dim=len(cls.dof_idx(controller_id)), filter_width=5)
 
@@ -98,6 +97,27 @@ class MultiFingerGripperController(BaseController):
     @classmethod
     def _update_goal(cls, controller_id: str, command, control_dict):
         return dict(target=command)
+
+    @classmethod
+    def step_batch(cls, controller_ids):
+        """
+        Batched step for MultiFingerGripperController instances.
+        Gripper computation is cheap (no matrix math), so the main value is
+        consistent infrastructure. Per-instance grasping state update (MovingAverageFilter)
+        must remain sequential.
+        """
+        # Fill no-op goals
+        for cid in controller_ids:
+            if cls._goals[cid] is None:
+                cls._goals[cid] = cls.compute_no_op_goal(cid, cls._control_dicts[cid])
+
+        results = []
+        for cid in controller_ids:
+            control = cls.compute_control(controller_id=cid, control_dict=cls._control_dicts[cid])
+            control = cls.clip_control(cid, control)
+            cls._controls[cid] = control
+            results.append(control)
+        return results
 
     @classmethod
     def compute_control(cls, controller_id: str, control_dict):

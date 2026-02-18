@@ -67,6 +67,7 @@ class BaseController(Serializable, Recreatable):
         cls._controls = {} # last computed control signal, used by deploy_control
         cls._state = {} # extra per-controller internal state that needs persistenc (filter buffers, integrator terms, smoothing history)
         cls._robots = {} # actual robot instance, to query control_dict and other robot data
+        cls._control_dicts = {} # control_dict per controller_id, populated each step for batch access
 
     # Shared cache across all controller classes for a single simulation step
     _ROBOT_CONTROL_STEP_CACHE = {}
@@ -92,6 +93,7 @@ class BaseController(Serializable, Recreatable):
         cls._controls.pop(controller_id, None)
         cls._state.pop(controller_id, None)
         cls._robots.pop(controller_id, None)
+        cls._control_dicts.pop(controller_id, None)
 
     @classmethod
     def _init_state(cls, controller_id: str):
@@ -403,6 +405,32 @@ class BaseController(Serializable, Recreatable):
         return cls._controls[controller_id]
 
     @classmethod
+    def step_batch(cls, controller_ids):
+        """
+        Batched version of step() for all active controller_ids.
+        Default implementation falls back to sequential per-id step calls.
+        Subclasses should override with vectorized implementations.
+
+        Args:
+            controller_ids (list[str]): List of active controller_ids to step.
+
+        Returns:
+            list[Array]: List of clipped control signals, one per controller_id.
+        """
+        # Fill no-op goals for any that are None
+        for cid in controller_ids:
+            if cls._goals[cid] is None:
+                cls._goals[cid] = cls.compute_no_op_goal(cid, cls._control_dicts[cid])
+        # Default: fall back to sequential (subclasses override with batched version)
+        results = []
+        for cid in controller_ids:
+            control = cls.compute_control(controller_id=cid, control_dict=cls._control_dicts[cid])
+            control = cls.clip_control(cid, control)
+            cls._controls[cid] = control
+            results.append(control)
+        return results
+
+    @classmethod
     def reset(cls, controller_id: str):
         """
         Resets this controller. Can be extended by subclass
@@ -674,6 +702,11 @@ class BaseController(Serializable, Recreatable):
 
     @classmethod
     def step_controller_class(cls):
+        # Clear per-step control_dict references from previous step
+        cls._control_dicts.clear()
+
+        # --- GATHER: collect active controller_ids and populate control_dicts ---
+        active_ids = []
         for controller_id in list(cls._configs.keys()):
             cls._goals.setdefault(controller_id, None)
             cls._controls.setdefault(controller_id, None)
@@ -699,7 +732,19 @@ class BaseController(Serializable, Recreatable):
                 }
                 BaseController._ROBOT_CONTROL_STEP_CACHE[robot_name] = cache
 
-            control = cls.step(controller_id=controller_id, control_dict=cache["control_dict"])
+            cls._control_dicts[controller_id] = cache["control_dict"]
+            active_ids.append(controller_id)
+
+        if not active_ids:
+            return
+
+        # --- BATCH COMPUTE ---
+        controls = cls.step_batch(active_ids)
+
+        # --- SCATTER: write results back into per-robot cache ---
+        for controller_id, control in zip(active_ids, controls):
+            robot_name = cls._robots[controller_id].name
+            cache = BaseController._ROBOT_CONTROL_STEP_CACHE[robot_name]
             idx = cls.dof_idx(controller_id)
             cache["u_vec"][idx] = control
             cache["u_type_vec"][idx] = cls.control_type(controller_id)
