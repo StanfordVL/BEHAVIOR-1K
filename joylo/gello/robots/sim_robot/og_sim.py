@@ -7,6 +7,7 @@ import json
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs import DataCollectionWrapper
+from omnigibson.controllers import Controller
 from omnigibson.robots import Robot
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
@@ -547,7 +548,8 @@ class OGRobotServer:
                         
                         # Handle gripper actions
                         for arm in self.robot.arm_names:
-                            gripper_goal = float(self.robot.controllers[f"gripper_{arm}"].goal["target"])
+                            cid = self.robot._controller_id(f"gripper_{arm}")
+                            gripper_goal = float(Controller._goals[cid]["target"])
                             checkpoint_gripper_action = 1 if gripper_goal > 0 else -1
                             self._grasp_action[arm] = checkpoint_gripper_action
 

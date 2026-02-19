@@ -587,22 +587,23 @@ class KeyboardRobotController:
             robot (BaseRobot): robot to control
         """
         # Store relevant info from robot
+        from omnigibson.controllers import Controller
+
         self.robot = robot
         self.action_dim = robot.action_dim
         self.controller_info = dict()
         self.joint_idx_to_controller = dict()
         idx = 0
-        for name in robot.controllers.keys():
-            controller = robot._get_controller_class(name)
-            cntroller_id = robot._controller_id(name)
+        for name in robot.controllers:
+            cid = robot._controller_id(name)
             self.controller_info[name] = {
-                "name": robot._controller_config[name]["name"],
+                "name": Controller._configs[cid]["name"],
                 "start_idx": idx,
-                "dofs": controller.dof_idx(cntroller_id),
-                "command_dim": controller.command_dim(cntroller_id),
+                "dofs": Controller.dof_idx(cid),
+                "command_dim": Controller.command_dim(cid),
             }
-            idx += controller.command_dim(cntroller_id)
-            for i in controller.dof_idx(cntroller_id).tolist():
+            idx += Controller.command_dim(cid)
+            for i in Controller.dof_idx(cid).tolist():
                 self.joint_idx_to_controller[i] = name
 
         # Other persistent variables we need to keep track of
@@ -877,11 +878,11 @@ class KeyboardRobotController:
                     joint_idx = self.joint_control_idx[self.active_joint_command_idx_idx]
 
                     # Import here to avoid circular imports
+                    from omnigibson.controllers import Controller
                     from omnigibson.utils.constants import JointType
 
                     controller_name = self.joint_idx_to_controller[joint_idx]
-                    controller = self.robot._get_controller_class(controller_name)
-                    controller_cfg = controller._configs[self.robot._controller_id(controller_name)]
+                    controller_cfg = Controller._configs[self.robot._controller_id(controller_name)]
                     if (
                         self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC
                         and controller_cfg.get("use_delta_commands", False)

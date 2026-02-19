@@ -5,7 +5,6 @@ import shutil
 import signal
 import tempfile
 
-from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.envs import Environment, VectorEnvironment
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
@@ -175,7 +174,6 @@ __all__ = [
     "gm",
     "launch",
     "log",
-    "REGISTERED_CONTROLLERS",
     "REGISTERED_OBJECTS",
     "REGISTERED_ROBOTS",
     "REGISTERED_SCENES",

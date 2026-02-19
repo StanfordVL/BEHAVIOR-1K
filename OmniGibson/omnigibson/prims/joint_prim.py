@@ -4,7 +4,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.controllers.controller_base import ControlType
+from omnigibson.controllers import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.constants import JointAxis, JointType

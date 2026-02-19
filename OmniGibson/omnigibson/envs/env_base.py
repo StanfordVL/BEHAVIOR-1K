@@ -10,6 +10,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
+from omnigibson.controllers import Controller
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.scenes import REGISTERED_SCENES
@@ -595,11 +596,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             robot_action = robot.prepare_action(action_dict[robot.name])
             idx = 0
             for controller_name in robot.controllers:
-                controller_cls = robot._get_controller_class(controller_name)
-                controller_id = robot._controller_id(controller_name)
-                cmd_dim = controller_cls.command_dim(controller_id)
-                controller_cls.apply_action(
-                    controller_id=controller_id,
+                cid = robot._controller_id(controller_name)
+                cmd_dim = Controller.command_dim(cid)
+                Controller.apply_action(
+                    controller_id=cid,
                     action=robot_action[idx : idx + cmd_dim],
                 )
                 idx += cmd_dim

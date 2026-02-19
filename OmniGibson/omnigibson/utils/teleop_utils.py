@@ -10,6 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.controllers import Controller
 from omnigibson.robots.robot import Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.ui_utils import KeyboardEventHandler, create_module_logger
@@ -101,8 +102,8 @@ class TeleopSystem(TeleopPolicy):
                     ]
                 ).unsqueeze(0)
                 # if we are grasping, we manually set the gripper position to be at most 0.5
-                controller_cls = self.robot._get_controller_class(f"gripper_{self.robot.arm_names[i]}")
-                if controller_cls.is_grasping(self.robot._controller_id(f"gripper_{self.robot.arm_names[i]}")):
+                cid = self.robot._controller_id(f"gripper_{self.robot.arm_names[i]}")
+                if Controller.is_grasping(cid):
                     gripper_pos = th.min(gripper_pos, th.tensor([0.5]))
                 robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
 

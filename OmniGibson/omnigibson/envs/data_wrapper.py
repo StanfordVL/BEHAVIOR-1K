@@ -20,7 +20,7 @@ from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.tasks.behavior_task import BehaviorTask
-from omnigibson.controllers.controller_base import ControlType
+from omnigibson.controllers import Controller, ControlType
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -1001,8 +1001,8 @@ class DataPlaybackWrapper(DataWrapper):
                 robot.control_enabled = False
                 # Set all controllers to effort mode with zero gain, this keeps the robot still
                 for controller_name in robot.controllers:
-                    controller_cls = robot._get_controller_class(controller_name)
-                    for i, dof in enumerate(controller_cls.dof_idx(robot._controller_id(controller_name))):
+                    cid = robot._controller_id(controller_name)
+                    for i, dof in enumerate(Controller.dof_idx(cid)):
                         dof_joint = robot.joints[robot.dof_names_ordered[dof]]
                         dof_joint.set_control_type(
                             control_type=ControlType.EFFORT,

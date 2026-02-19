@@ -26,8 +26,7 @@ from omnigibson.robots.robot import Robot
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
-from omnigibson.controllers import REGISTERED_CONTROLLERS
-from omnigibson.controllers.controller_base import BaseController
+from omnigibson.controllers import Controller
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
@@ -1243,10 +1242,9 @@ def _launch_simulator(*args, **kwargs):
             # Only do this if we're not in the warmup phase
             if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                 # Run the controller step on every controllable object
-                BaseController.begin_controller_step()
-                for controller_cls in REGISTERED_CONTROLLERS.values():
-                    controller_cls.step_controller_class()
-                BaseController.deploy_controller_step()
+                Controller.begin_controller_step()
+                Controller.step_controller_class()
+                Controller.deploy_controller_step()
 
                 # Flush the controls from the ControllableObjectViewAPI
                 ControllableObjectViewAPI.flush_control()

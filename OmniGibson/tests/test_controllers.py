@@ -3,6 +3,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
+from omnigibson.controllers import Controller
 from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
@@ -187,8 +188,7 @@ def test_arm_control():
         # during downstream action executions -- i.e.: the state seen after robot.reload_controllers()
         # is called each time
         for controller_name in robot.controllers:
-            controller_cls = robot._get_controller_class(controller_name)
-            controller_cls.reset(robot._controller_id(controller_name))
+            Controller.reset(robot._controller_id(controller_name))
 
     # Update initial state (robot should be stable and still)
     env.scene.update_initial_file()
@@ -239,8 +239,7 @@ def test_arm_control():
                     for c in robot.controllers:
                         if c == c_name:
                             break
-                        controller_cls = robot._get_controller_class(c)
-                        start_idx += controller_cls.command_dim(robot._controller_id(c))
+                        start_idx += Controller.command_dim(robot._controller_id(c))
                     if controller_mode == "pose_delta_ori":
                         forward_action[start_idx] = 0.02
                         side_action[start_idx + 1] = 0.02
@@ -273,8 +272,7 @@ def test_arm_control():
                     for c in robot._controllers:
                         if c == c_name:
                             break
-                        controller_cls = robot._get_controller_class(c)
-                        start_idx += controller_cls.command_dim(robot._controller_id(c))
+                        start_idx += Controller.command_dim(robot._controller_id(c))
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
 
@@ -302,8 +300,7 @@ def test_arm_control():
 
                         init_pos, init_quat = initial_eef_pose[robot.name][arm]
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
-                        arm_controller = robot._get_controller_class(f"arm_{arm}")
-                        arm_goal = arm_controller._goals[robot._controller_id(f"arm_{arm}")]
+                        arm_goal = Controller._goals[robot._controller_id(f"arm_{arm}")]
                         target_pos = cb.to_torch(arm_goal["target_pos"])
                         target_quat = T.mat2quat(cb.to_torch(arm_goal["target_ori_mat"]))
                         pos_check = err_checks[controller_mode][action_name]["pos"]

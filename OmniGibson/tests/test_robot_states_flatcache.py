@@ -7,6 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.macros import gm
 from omnigibson.macros import macros as m
+from omnigibson.controllers import Controller
 from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -307,11 +308,9 @@ def test_grasping_mode():
         for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
             env.step(action)
 
-        gripper_controller = robot._get_controller_class("gripper_0")
-
         # Grasp the box
-        gripper_controller.update_goal(
-            robot_id=robot._controller_id("gripper_0"),
+        Controller.update_goal(
+            controller_id=robot._controller_id("gripper_0"),
             command=cb.array([-1]),
             control_dict=robot.get_control_dict(),
         )

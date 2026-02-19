@@ -6,6 +6,7 @@ from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.backend_utils import _compute_backend as cb
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
+from omnigibson.controllers import Controller
 from omnigibson.robots import LocomotionRobot
 from gello.robots.sim_robot.og_teleop_utils import GHOST_APPEAR_THRESHOLD
 import torch as th
@@ -282,10 +283,11 @@ class GhostHandAppearanceMetric(EnvMetric):
             # infer un/grasping intent
             for robot in env.robots:
                 for arm in robot.arm_names:
-                    gripper_controller = robot.controllers[f"gripper_{arm}"]
-                    is_1d = gripper_controller.command_dim == 1
-                    is_normalized = (th.all(cb.to_torch(gripper_controller.command_input_limits[0]) == -1.0).item() and
-                                     th.all(cb.to_torch(gripper_controller.command_input_limits[1]) == 1.0).item())
+                    cid = robot._controller_id(f"gripper_{arm}")
+                    cfg = Controller._configs[cid]
+                    is_1d = Controller.command_dim(cid) == 1
+                    is_normalized = (th.all(cb.to_torch(cfg["command_input_limits"][0]) == -1.0).item() and
+                                     th.all(cb.to_torch(cfg["command_input_limits"][1]) == 1.0).item())
                     valid = is_1d and is_normalized
                     if not valid:
                         break
@@ -303,7 +305,7 @@ class GhostHandAppearanceMetric(EnvMetric):
                 active = th.max(th.abs(
                         robot_qpos[robot.arm_control_idx[arm]] - action[robot.arm_action_idx[arm]]
                 )).item() > GHOST_APPEAR_THRESHOLD
-                gripper_controller = robot.controllers[f"gripper_{arm}"]
+                cid = robot._controller_id(f"gripper_{arm}")
                 step_metrics[f"robot{i}::arm_{arm}::active"] = active
                 if self.color_arms:
                     if robot.name not in self.robot_arm_colors:
@@ -317,7 +319,7 @@ class GhostHandAppearanceMetric(EnvMetric):
                             for vm in link.visual_meshes.values():
                                 vm.material.diffuse_color_constant = color
                         self.robot_arm_colors[robot.name][arm] = active
-                op = operator.lt if gripper_controller._inverted else operator.ge
+                op = operator.lt if Controller._configs[cid]["inverted"] else operator.ge
                 step_metrics[f"robot{i}::arm_{arm}::open_cmd"] = th.all(op(action[gripper_action_idxs[arm]], 0.0)).item()
         return step_metrics
 
@@ -592,10 +594,11 @@ class FieldOfViewMetric(EnvMetric):
             # infer un/grasping intent
             for robot in env.robots:
                 for arm in robot.arm_names:
-                    gripper_controller = robot.controllers[f"gripper_{arm}"]
-                    is_1d = gripper_controller.command_dim == 1
-                    is_normalized = (th.all(cb.to_torch(gripper_controller.command_input_limits[0]) == -1.0).item() and
-                                     th.all(cb.to_torch(gripper_controller.command_input_limits[1]) == 1.0).item())
+                    cid = robot._controller_id(f"gripper_{arm}")
+                    cfg = Controller._configs[cid]
+                    is_1d = Controller.command_dim(cid) == 1
+                    is_normalized = (th.all(cb.to_torch(cfg["command_input_limits"][0]) == -1.0).item() and
+                                     th.all(cb.to_torch(cfg["command_input_limits"][1]) == 1.0).item())
                     valid = is_1d and is_normalized
                     if not valid:
                         break
@@ -623,8 +626,8 @@ class FieldOfViewMetric(EnvMetric):
             links_in_fov = set(info["seg_instance_id"].values())
             gripper_action_idxs = robot.gripper_action_idx
             for arm in robot.arm_names:
-                gripper_controller = robot.controllers[f"gripper_{arm}"]
-                op = operator.lt if gripper_controller._inverted else operator.ge
+                cid = robot._controller_id(f"gripper_{arm}")
+                op = operator.lt if Controller._configs[cid]["inverted"] else operator.ge
                 # check if any of the gripper link for this arm is in the field of view
                 gripper_in_fov = len(links_in_fov.intersection(self.gripper_link_paths[arm])) > 0
 
