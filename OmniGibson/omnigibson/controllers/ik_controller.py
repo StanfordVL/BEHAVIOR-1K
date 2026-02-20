@@ -12,6 +12,8 @@ from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.control_utils import jparse_compute
+
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -359,7 +361,6 @@ def _compute_ik_qpos_torch(
     )
 
 
-# Use numba since faster
 @jit(nopython=True)
 def _compute_ik_qpos_numpy(
     q,
@@ -371,18 +372,14 @@ def _compute_ik_qpos_numpy(
     q_lower_limit,
     q_upper_limit,
 ):
-    # Compute the pose error. Note that this is computed NOT in the EEF frame but still
-    # in the base frame.
     pos_err = goal_pos - ee_pos
     ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
     err = np.concatenate((pos_err, ori_err))
 
-    # Use the jacobian to compute a local approximation
-    j_eef_pinv = np.linalg.pinv(j_eef)
+    j_eef_pinv = jparse_compute(j_eef).astype(np.float32)
     delta_j = j_eef_pinv @ err
     target_joint_pos = q + delta_j
 
-    # Clip values to be within the joint limits
     return target_joint_pos.clip(q_lower_limit, q_upper_limit)
 
 

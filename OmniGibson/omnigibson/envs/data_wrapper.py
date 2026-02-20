@@ -2184,7 +2184,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 "annotation.language.language_instruction": th.zeros(1, dtype=th.int64),
                 "annotation.language.language_instruction_2": th.zeros(1, dtype=th.int64),
                 "annotation.language.language_instruction_3": th.zeros(1, dtype=th.int64),
-                **traj_step["obs"],
+                **traj_data[frame_idx - 1]["obs"],
             }
 
             # Modify additional differing kwargs between V2 and V3 datasets
