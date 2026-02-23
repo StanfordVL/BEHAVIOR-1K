@@ -312,7 +312,6 @@ def test_grasping_mode():
         Controller.update_goal(
             controller_id=robot._controller_id("gripper_0"),
             command=cb.array([-1]),
-            control_dict=robot.get_control_dict(),
         )
         for _ in range(10):
             og.sim.step()
@@ -336,7 +335,10 @@ def test_grasping_mode():
         ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
         # Release the box
-        gripper_controller.update_goal(cb.array([1]), robot.get_control_dict())
+        Controller.update_goal(
+            controller_id=robot._controller_id("gripper_0"),
+            command=cb.array([1]),
+        )
         for _ in range(20):
             og.sim.step()
 

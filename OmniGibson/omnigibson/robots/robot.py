@@ -29,7 +29,7 @@ from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
-from omnigibson.utils.python_utils import merge_nested_dicts, CachedFunctions, assert_valid_key
+from omnigibson.utils.python_utils import merge_nested_dicts, assert_valid_key
 from omnigibson.utils.vision_utils import segmentation_to_rgb, change_pcd_frame
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.controllers import (
@@ -231,7 +231,6 @@ class Robot(USDObject, GymObservable):
             self._ag_obj_in_hand = {arm: None for arm in self.arm_names}
             self._ag_obj_constraints = {arm: None for arm in self.arm_names}
             self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
-            self._ag_freeze_gripper = {arm: None for arm in self.arm_names}
             self._ag_release_counter = {arm: None for arm in self.arm_names}
             self._ag_grasp_counter = {arm: None for arm in self.arm_names}
 
@@ -547,6 +546,9 @@ class Robot(USDObject, GymObservable):
 
         # Initialize controllers to create
         self._controllers = []
+
+        if not self.control_enabled:
+            return
         # Keep track of any controllers that are subsumed by other controllers
         # We will not instantiate subsumed controllers
         controller_subsumes = dict()  # Maps independent controller name to list of subsumed controllers
@@ -578,6 +580,28 @@ class Robot(USDObject, GymObservable):
         for name in self._raw_controller_order:
             Controller.unregister(self._controller_id(name))
 
+        # Precompute jacobian info for task-frame controllers (IK/OSC)
+        task_frame_info = {}
+        if self.is_articulated_trunk:
+            lname = self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
+            lidx = self._articulation_view.get_body_index(lname)
+            task_frame_info["trunk"] = dict(
+                link_name=lname,
+                jac_link_row=-(self.n_links - lidx),
+                jac_col_start=0 if self.fixed_base else 6,
+                jac_n_cols=self.n_joints,
+            )
+        if self.is_manipulation:
+            for arm in self.arm_names:
+                lname = self.eef_link_names[arm]
+                lidx = self._articulation_view.get_body_index(lname)
+                task_frame_info[f"eef_{arm}"] = dict(
+                    link_name=lname,
+                    jac_link_row=-(self.n_links - lidx),
+                    jac_col_start=0 if self.fixed_base else 6,
+                    jac_n_cols=self.n_joints,
+                )
+
         # Loop over all controllers, in the order corresponding to @action dim
         for name in self._raw_controller_order:
             # If this controller is subsumed by another controller, simply skip it
@@ -598,7 +622,20 @@ class Robot(USDObject, GymObservable):
             controller_name = cfg["name"]
             controller_type = ControllerType[controller_name]
             controller_id = self._controller_id(name)
-            Controller.register(controller_id=controller_id, config=cb.from_torch_recursive(cfg), robot=self, controller_type=controller_type)
+            task_name = cfg_raw.get("task_name", None)
+            tinfo = task_frame_info.get(task_name, {})
+            Controller.register(
+                controller_id=controller_id,
+                config=cb.from_torch_recursive(cfg),
+                controller_type=controller_type,
+                articulation_root_path=self.articulation_root_path,
+                n_dof=self.n_dof,
+                mm_start_idx=0 if self.fixed_base else 6,
+                link_name=tinfo.get("link_name"),
+                jac_link_row=tinfo.get("jac_link_row"),
+                jac_col_start=tinfo.get("jac_col_start", 0),
+                jac_n_cols=tinfo.get("jac_n_cols"),
+            )
             Controller.reset(controller_id=controller_id)
             self._controllers.append(name)
 
@@ -741,9 +778,7 @@ class Robot(USDObject, GymObservable):
 
     def prepare_action(self, action):
         """
-        Converts inputted actions into low-level control signals
-
-        NOTE: This does NOT deploy control on the object. Use self.step() instead.
+        Converts inputted actions into low-level control signals.
 
         Args:
             action (n-array): n-DOF length array of actions to apply to this object's internal controllers
@@ -796,138 +831,11 @@ class Robot(USDObject, GymObservable):
     @control_enabled.setter
     def control_enabled(self, value):
         self._control_enabled = value
+        if value:
+            Controller._disabled_robots.discard(self.name)
+        else:
+            Controller._disabled_robots.add(self.name)
 
-    # TODO deprecate
-    def step(self):
-        """
-        Takes a controller step across all controllers and deploys the computed control signals onto the object.
-        """
-        # Skip if we don't have control enabled
-        if not self.control_enabled:
-            return
-
-        # Skip this step if our articulation view is not valid
-        if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
-            return
-
-        # First, loop over all controllers, and calculate the computed control
-        control = dict()
-        idx = 0
-
-        # Compose control_dict
-        control_dict = self.get_control_dict()
-
-        for name in self._controllers:
-            cid = self._controller_id(name)
-            control[name] = {
-                "value": Controller.step(controller_id=cid, control_dict=control_dict),
-                "type": Controller.control_type(cid),
-            }
-            idx += Controller.command_dim(cid)
-
-        # Compose controls
-        u_vec = cb.zeros(self.n_dof)
-        # By default, the control type is Effort and the control value is 0 (th.zeros) - i.e. no control applied
-        u_type_vec = cb.array([ControlType.EFFORT] * self.n_dof)
-        for group, ctrl in control.items():
-            cid = self._controller_id(group)
-            idx = Controller.dof_idx(cid)
-            u_vec[idx] = ctrl["value"]
-            u_type_vec[idx] = ctrl["type"]
-
-        u_vec, u_type_vec = self._postprocess_control(control=u_vec, control_type=u_type_vec)
-
-        # Deploy control signals
-        self.deploy_control(control=u_vec, control_type=u_type_vec)
-
-    def _postprocess_control(self, control, control_type):
-        """
-        Runs any postprocessing on @control with corresponding @control_type on this entity. Default is no-op.
-        Deploys control signals @control with corresponding @control_type on this entity.
-
-        Args:
-            control (k- or n-array): control signals to deploy. This should be n-DOF length if all joints are being set,
-                or k-length (k < n) if specific indices are being set. In this case, the length of @control must
-                be the same length as @indices!
-            control_type (k- or n-array): control types for each DOF. Each entry should be one of ControlType.
-                 This should be n-DOF length if all joints are being set, or k-length (k < n) if specific
-                 indices are being set. In this case, the length of @control must be the same length as @indices!
-
-        Returns:
-            2-tuple:
-                - n-array: raw control signals to send to the object's joints
-                - list: control types for each joint
-        """
-        return control, control_type
-
-    def deploy_control(self, control, control_type):
-        """
-        Deploys control signals @control with corresponding @control_type on this entity.
-
-        Note: This is DIFFERENT than self.set_joint_positions/velocities/efforts, because in this case we are only
-            setting target values (i.e.: we subject this entity to physical dynamics in order to reach the desired
-            @control setpoints), compared to set_joint_XXXX which manually sets the actual state of the joints.
-
-            This function is intended to be used with motorized entities, e.g.: robot agents or machines (e.g.: a
-            conveyor belt) to simulation physical control of these entities.
-
-            In contrast, use set_joint_XXXX for simulation-specific logic, such as simulator resetting or "magic"
-            action implementations.
-
-        Args:
-            control (n-array): control signals to deploy. This should be n-DOF length for all joints being set.
-            control_type (n-array): control types for each DOF. Each entry should be one of ControlType.
-                 This should be n-DOF length for all joints being set.
-        """
-        if self.is_manipulation:
-            # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
-            for arm in self.arm_names:
-                if self._ag_freeze_gripper[arm]:
-                    cid = self._controller_id(f"gripper_{arm}")
-                    control[self.gripper_control_idx[arm]] = (
-                        self._ag_obj_constraint_params[arm]["gripper_pos"]
-                        if Controller.control_type(cid) == ControlType.POSITION
-                        else 0.0
-                    )
-        # Run sanity check
-        assert len(control) == len(control_type) == self.n_dof, (
-            f"Control signals, control types, and number of DOF should all be the same!"
-            f"Got {len(control)}, {len(control_type)}, and {self.n_dof} respectively."
-        )
-
-        # set the targets for joints
-        pos_idxs = cb.where(control_type == ControlType.POSITION)[0]
-        if len(pos_idxs) > 0:
-            ControllableObjectViewAPI.set_joint_position_targets(
-                self.articulation_root_path,
-                positions=control[pos_idxs],
-                indices=pos_idxs,
-            )
-            # If we're setting joint position targets, we should also set velocity targets to 0
-            ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path,
-                velocities=cb.zeros(len(pos_idxs)),
-                indices=pos_idxs,
-            )
-        vel_idxs = cb.where(control_type == ControlType.VELOCITY)[0]
-        if len(vel_idxs) > 0:
-            ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path,
-                velocities=control[vel_idxs],
-                indices=vel_idxs,
-            )
-        eff_idxs = cb.where(control_type == ControlType.EFFORT)[0]
-        if len(eff_idxs) > 0:
-            ControllableObjectViewAPI.set_joint_efforts(
-                self.articulation_root_path,
-                efforts=control[eff_idxs],
-                indices=eff_idxs,
-            )
-
-        if self.is_manipulation:
-            # Then run assisted grasping
-            if self.grasping_mode != "physical" and not self._disable_grasp_handling:
-                self._handle_assisted_grasping()
 
     def _update_constraint_cloth(self, arm="default"):
         """
@@ -1009,142 +917,6 @@ class Robot(USDObject, GymObservable):
             else:
                 # Not trying to grasp, reset any pending grasp window
                 self._ag_grasp_counter[arm] = None
-
-    def get_control_dict(self):
-        """
-        Grabs all relevant information that should be passed to each controller during each controller step. This
-        automatically caches information
-
-        Returns:
-            CachedFunctions: Keyword-mapped control values for this object, mapping names to n-arrays.
-                By default, returns the following (can be queried via [] or get()):
-
-                - joint_position: (n_dof,) joint positions
-                - joint_velocity: (n_dof,) joint velocities
-                - joint_effort: (n_dof,) joint efforts
-                - root_pos: (3,) (x,y,z) global cartesian position of the object's root link
-                - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
-                - mass_matrix: (n_dof, n_dof) mass matrix
-                - gravity_force: (n_dof,) per-joint generalized gravity forces
-                - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
-        """
-        # Note that everything here uses the ControllableObjectViewAPI because these are faster implementations of
-        # the functions that this class also implements. The API centralizes access for all of the robots in the scene
-        # removing the need for multiple reads and writes.
-        # TODO(cgokmen): CachedFunctions can now be entirely removed since the ControllableObjectViewAPI already implements caching.
-        fcns = CachedFunctions()
-        fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
-        fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
-        fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-
-        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
-        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
-        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
-        # which is not used anywhere else in the codebase
-        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(
-            self.articulation_root_path, estimate=True
-        )
-        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(
-            self.articulation_root_path, estimate=True
-        )
-        fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
-            self.articulation_root_path,
-            estimate=True,
-        )
-        fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
-            self.articulation_root_path,
-            estimate=True,
-        )
-        fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(
-            self.articulation_root_path, estimate=True
-        )
-        fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
-        # Similar to the jacobians, there may be an additional 6 entries at the beginning of the mass matrix, if this robot does
-        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
-        fcns["mass_matrix"] = lambda: (
-            ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)
-            if self.fixed_base
-            else ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)[6:, 6:]
-        )
-        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_gravity_compensation_forces(
-            self.articulation_root_path
-        )
-        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_compensation_forces(
-            self.articulation_root_path
-        )
-
-        if self.is_holonomic_base:
-            # Add canonical position and orientation
-            fcns["_canonical_pos_quat"] = lambda: ControllableObjectViewAPI.get_root_position_orientation(
-                self.articulation_root_path
-            )
-            fcns["canonical_pos"] = lambda: fcns["_canonical_pos_quat"][0]
-            fcns["canonical_quat"] = lambda: fcns["_canonical_pos_quat"][1]
-
-        if self.is_articulated_trunk:
-            self._add_task_frame_control_dict(
-                fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
-            )
-
-        if self.is_manipulation:
-            for arm in self.arm_names:
-                eef_link_name = self.eef_link_names[arm] if self.eef_link_names else None
-                if eef_link_name is None:
-                    raise ValueError(f"eef_link_names is None for arm {arm}. Check robot definition YAML.")
-                # Verify the link actually exists
-                if eef_link_name not in self._links:
-                    raise ValueError(
-                        f"EEF link '{eef_link_name}' for arm '{arm}' not found in robot links. Available links: {list(self._links.keys())}"
-                    )
-
-                self._add_task_frame_control_dict(fcns=fcns, task_name=f"eef_{arm}", link_name=eef_link_name)
-
-        return fcns
-
-    def _add_task_frame_control_dict(self, fcns, task_name, link_name):
-        """
-        Internally helper function to generate per-link control dictionary entries. Useful for generating relevant
-        control values needed for IK / OSC for a given @task_name. Should be called within @get_control_dict()
-
-        Args:
-            fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
-            task_name (str): name to assign for this task_frame. It will be prepended to all fcns generated
-            link_name (str): the corresponding link name from this controllable object that @task_name is referencing
-        """
-        fcns[f"_{task_name}_pos_quat_relative"] = (
-            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
-                self.articulation_root_path, link_name
-            )
-        )
-        fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
-        fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
-
-        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
-        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
-        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
-        # which is not used anywhere else in the codebase
-        fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
-            self.articulation_root_path,
-            link_name,
-            estimate=True,
-        )
-        fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
-            self.articulation_root_path,
-            link_name,
-            estimate=True,
-        )
-        # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
-        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
-        # see self.get_relative_jacobian() for more info
-        # We also count backwards for the link frame because if the robot is fixed base, the jacobian returned has one
-        # less index than the number of links. This is presumably because the 1st link of a fixed base robot will
-        # always have a zero jacobian since it can't move. Counting backwards resolves this issue.
-        start_idx = 0 if self.fixed_base else 6
-        link_idx = self._articulation_view.get_body_index(link_name)
-        fcns[f"{task_name}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
-            self.articulation_root_path
-        )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
 
     def dump_action(self):
         """
@@ -2157,7 +1929,6 @@ class Robot(USDObject, GymObservable):
         delete_or_deactivate_prim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
-        self._ag_freeze_gripper[arm] = False
         self._ag_release_counter[arm] = 0
 
     def release_grasp_immediately(self, arm="default"):
@@ -2171,9 +1942,6 @@ class Robot(USDObject, GymObservable):
             self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
             self._handle_release_window(arm=arm)
             assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
-            # TODO: Verify not needed!
-            # for finger_link in self.finger_links[arm]:
-            #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
 
     @property
     def reset_joint_pos_aabb_extent(self):
@@ -2795,7 +2563,7 @@ class Robot(USDObject, GymObservable):
             "contact_pos": contact_pos,
         }
         self._ag_obj_in_hand[arm] = ag_obj
-        self._ag_freeze_gripper[arm] = True
+       
 
     @property
     def _default_controllers(self):
@@ -3807,7 +3575,6 @@ class Robot(USDObject, GymObservable):
             "contact_pos": attachment_point_pos,
         }
         self._ag_obj_in_hand[arm] = ag_obj
-        self._ag_freeze_gripper[arm] = True
 
     def _convert_to_math_pi(self, ele):
         """

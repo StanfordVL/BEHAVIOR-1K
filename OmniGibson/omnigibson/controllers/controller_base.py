@@ -1,3 +1,89 @@
+"""
+Controller singleton call-flow reference
+=========================================
+
+────────────────────────────────────────────────────────────────────────────────
+ FLOW 1 — update_goal  (called once per robot per env step, before physics step)
+────────────────────────────────────────────────────────────────────────────────
+
+ env._pre_step()
+ └─ Controller.apply_robot_action(robot_name, action)     # fans out flat action
+    └─ Controller.apply_action(controller_id, action)      # per-controller slice
+       └─ Controller.update_goal(controller_id, command)
+          ├─ Controller._preprocess_command(controller_id, command)
+          │   ├─ [NullJoint]  replace with default_goal
+          │   ├─ [Gripper]    broadcast scalar → command_dim; apply inversion
+          │   └─ Controller._preprocess_command_base()     # clip + affine scale
+          └─ Controller._update_goal(controller_id, preprocessed_command)
+             ├─ [JointController / NullJoint]
+             │    └─ _update_goal_joint()      # delta → abs; clip to joint limits
+             ├─ [HolonomicBaseJointController]
+             │    └─ _update_goal_holonomic()  # base→canonical frame; → _update_goal_joint
+             ├─ [InverseKinematicsController]
+             │    └─ _update_goal_ik()         # mode dispatch → {target_pos, target_ori_mat}
+             ├─ [OperationalSpaceController]
+             │    └─ _update_goal_osc()        # same modes as IK → {target_pos, target_ori_mat}
+             ├─ [DifferentialDriveController]  → {"vel": [lin, ang]}
+             └─ [MultiFingerGripperController] → {"target": command}
+
+ All _update_goal_* methods read current robot state inline via:
+   ControllableObjectViewAPI.get_joint_positions / get_link_relative_position_orientation
+
+
+────────────────────────────────────────────────────────────────────────────────
+ FLOW 2 — controller step  (called inside simulator._on_pre_physics_step)
+────────────────────────────────────────────────────────────────────────────────
+
+ simulator._on_pre_physics_step()
+ │
+ ├─1─ Controller.begin_controller_step()
+ │       └─ clear _ROBOT_CONTROL_STEP_CACHE
+ │
+ ├─2─ Controller.step_controller_class()
+ │    ├─ skip robots not in _articulation_root_paths (not yet initialised)
+ │    ├─ skip robots in _disabled_robots
+ │    ├─ lazily init per-robot {u_vec, u_type_vec} accumulator in cache
+ │    ├─ group active controller_ids by ControllerType
+ │    └─ for each type-group → Controller.step_batch(cids, ctype)
+ │         ├─ fill None goals via compute_no_op_goal()
+ │         ├─ [Joint / Null / Holonomic]
+ │         │    └─ _step_batch_joint()
+ │         │         ├─ non-impedance: return target directly (clip)
+ │         │         └─ impedance:     u = M(q)·(kp·Δq - kd·q̇) + gravity + cc
+ │         ├─ [InverseKinematicsController]
+ │         │    └─ _step_batch_ik()
+ │         │         ├─ gather q, J_eef, ee_pose, goal_pose (padded to max_dim)
+ │         │         ├─ compute_ik_qpos_batch()  → J_pinv · [pos_err; ori_err]
+ │         │         ├─ optional smoothing filter
+ │         │         └─ optional impedance torque conversion
+ │         ├─ [OperationalSpaceController]
+ │         │    └─ _step_batch_osc()
+ │         │         ├─ gather q, q̇, M, J_eef, ee_pose/vel, goal_pose, gains
+ │         │         ├─ compute_osc_torques_batch()
+ │         │         │    u = J^T · M_ee · (kp·err + kd·vel_err)
+ │         │         │      + (I - J^T·J_inv) · M · (kp_null·Δq_null - kd_null·q̇)
+ │         │         └─ optional gravity + Coriolis/centrifugal compensation
+ │         ├─ [DifferentialDriveController]
+ │         │    └─ _step_batch_dd()
+ │         │         left  = (lin_vel - ang_vel·half_axle) / wheel_radius
+ │         │         right = (lin_vel + ang_vel·half_axle) / wheel_radius
+ │         └─ [MultiFingerGripperController]
+ │              └─ _step_batch_gripper()
+ │                   ├─ binary/smooth/independent target resolution
+ │                   ├─ velocity limit zeroing at joint limits
+ │                   └─ _update_grasping_state()  (vel_filter → is_grasping)
+ │       scatter results → cache[robot_name]["u_vec"][dof_idx]
+ │
+ ├─3─ Controller.deploy_controller_step()
+ │    └─ for each robot in cache:
+ │         ├─ POSITION → set_joint_position_targets + zero velocity targets
+ │         ├─ VELOCITY → set_joint_velocity_targets
+ │         └─ EFFORT   → set_joint_efforts
+ │       clear _ROBOT_CONTROL_STEP_CACHE
+ │
+ └─4─ robot._handle_assisted_grasping()  (per robot, if grasping_mode != "physical")
+"""
+
 import math
 from collections.abc import Iterable
 from copy import deepcopy
@@ -16,6 +102,7 @@ from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import Recreatable, Serializable, assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 log = create_module_logger(module_name=__name__)
 
@@ -100,40 +187,109 @@ class Controller(Serializable, Recreatable):
     by ControllerType stored in _types[controller_id].
     """
 
-    _types = {}
-    _configs = {}
-    _goals = {}
-    _controls = {}
-    _state = {}
-    _robots = {}
-    _control_dicts = {}
-    _ROBOT_CONTROL_STEP_CACHE = {}
+    _types = {}                    # controller_id → ControllerType enum value
+    _configs = {}                  # controller_id → fully processed config dict (includes structural keys like _mm_start_idx, _link_name, etc.)
+    _goals = {}                    # controller_id → current internal goal dict (None until the first update_goal call)
+    _controls = {}                 # controller_id → last computed control array (None before the first step)
+    _state = {}                    # controller_id → mutable runtime state dict (filters, grasping state, fixed orientation target, etc.)
+    _disabled_robots = set()       # set of robot names whose control is disabled (synced with robot.control_enabled)
+    _articulation_root_paths = {}  # robot_name → articulation root prim path used as key for all ControllableObjectViewAPI calls
+    _robot_n_dofs = {}             # robot_name → total number of actuated DOFs (used to allocate u_vec / u_type_vec accumulators)
+    _robot_to_controllers = {}     # robot_name → ordered list of controller_ids (registration order = action vector slice order)
+    _ROBOT_CONTROL_STEP_CACHE = {} # robot_name → {"u_vec": ..., "u_type_vec": ...} accumulator buffers; allocated in step_controller_class, cleared after deploy
 
     # -------------------------------------------------------------------------
     # Registration
     # -------------------------------------------------------------------------
 
     @classmethod
-    def register(cls, controller_id: str, config: dict, robot=None, controller_type=None):
+    def register(cls, controller_id, config, controller_type=None,
+                 articulation_root_path=None, n_dof=None, mm_start_idx=0,
+                 link_name=None, jac_link_row=None, jac_col_start=0, jac_n_cols=None):
+        """Register a controller with the singleton and store all data needed for inline state access.
+
+        Processes the raw config dict, initialises per-controller state, and stores
+        robot-level metadata (articulation root path, DOF count, controller ordering)
+        so that the Controller can call ControllableObjectViewAPI directly without
+        holding a reference to the robot object.
+
+        Structural values that are expensive or impossible to recompute at each step
+        (Jacobian row index, column slicing bounds, mass-matrix start index) are
+        embedded directly into the processed config under private underscore keys.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            config (dict): Raw controller configuration dict (will be deep-copied and processed).
+            controller_type (ControllerType, optional): The controller type enum value.
+            articulation_root_path (str, optional): Articulation root prim path used as the
+                key for all ControllableObjectViewAPI calls for this robot.
+            n_dof (int, optional): Total number of actuated DOFs for the robot. Used to
+                pre-allocate the per-robot control accumulator vectors.
+            mm_start_idx (int): Row/column offset into the generalised mass matrix used to
+                skip the 6 virtual-base DOFs for floating-base robots (``0`` for fixed-base,
+                ``6`` for floating-base).
+            link_name (str, optional): Name of the task-space link (EEF or trunk tip) used
+                by IK and OSC controllers for pose and Jacobian queries. ``None`` for
+                joint-level controllers.
+            jac_link_row (int, optional): Negative index into the full Jacobian tensor for
+                the task link, computed as ``-(n_links - link_idx)``. Negative indexing is
+                stable across fixed-base and floating-base topologies.
+            jac_col_start (int): First column of the actuated-joint block in the full
+                Jacobian (``0`` for fixed-base, ``6`` for floating-base).
+            jac_n_cols (int, optional): Number of actuated-joint columns in the Jacobian
+                (equal to the robot's total joint count).
+        """
         cls._types[controller_id] = controller_type
         cls._configs[controller_id] = cls._process_config(controller_id, config)
         cls._goals.setdefault(controller_id, None)
         cls._controls.setdefault(controller_id, None)
         if controller_id not in cls._state:
             cls._state[controller_id] = {}
-        if robot is not None:
-            cls._robots[controller_id] = robot
         cls._init_state(controller_id=controller_id)
+
+        # Store robot-level info
+        if articulation_root_path is not None:
+            robot_name = controller_id.split(":", 1)[0]
+            cls._articulation_root_paths[robot_name] = articulation_root_path
+            cls._robot_n_dofs[robot_name] = n_dof
+            cls._robot_to_controllers.setdefault(robot_name, [])
+            if controller_id not in cls._robot_to_controllers[robot_name]:
+                cls._robot_to_controllers[robot_name].append(controller_id)
+
+        # Embed structural data into config for inline use in step/goal methods
+        cls._configs[controller_id]["_mm_start_idx"] = mm_start_idx
+        if link_name is not None:
+            cls._configs[controller_id]["_link_name"] = link_name
+            cls._configs[controller_id]["_jac_link_row"] = jac_link_row
+            cls._configs[controller_id]["_jac_col_start"] = jac_col_start
+            cls._configs[controller_id]["_jac_n_cols"] = jac_n_cols
 
     @classmethod
     def unregister(cls, controller_id: str):
+        """Remove a controller and clean up robot-level metadata when the last controller is removed.
+
+        All per-controller dicts (_types, _configs, _goals, _controls, _state) are purged.
+        If this was the last controller belonging to a robot, the robot-level entries
+        (_articulation_root_paths, _robot_n_dofs, _robot_to_controllers) are also removed.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+        """
         cls._types.pop(controller_id, None)
         cls._configs.pop(controller_id, None)
         cls._goals.pop(controller_id, None)
         cls._controls.pop(controller_id, None)
         cls._state.pop(controller_id, None)
-        cls._robots.pop(controller_id, None)
-        cls._control_dicts.pop(controller_id, None)
+
+        robot_name = controller_id.split(":", 1)[0]
+        if robot_name in cls._robot_to_controllers:
+            cls._robot_to_controllers[robot_name] = [
+                c for c in cls._robot_to_controllers[robot_name] if c != controller_id
+            ]
+            if not cls._robot_to_controllers[robot_name]:
+                cls._robot_to_controllers.pop(robot_name)
+                cls._articulation_root_paths.pop(robot_name, None)
+                cls._robot_n_dofs.pop(robot_name, None)
 
     # -------------------------------------------------------------------------
     # Config processing
@@ -141,6 +297,25 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _process_config(cls, controller_id: str, input_config: dict):
+        """Deep-copy and process a raw config dict through three ordered phases.
+
+        Phase 1: type-specific pre-processing (IK/OSC/DD/Holonomic/Gripper) that
+        sets defaults and validates mode-specific fields before joint processing runs.
+
+        Phase 2: joint-level processing (_process_config_joint) for any controller
+        that drives joints directly (JointController, NullJointController,
+        HolonomicBaseJointController, InverseKinematicsController).
+
+        Phase 3: common base processing (_process_config_base) that converts control
+        limits, computes command scaling, and validates Isaac Sim PD gains for all types.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            input_config (dict): Raw controller configuration dict.
+
+        Returns:
+            dict: Fully processed configuration dict ready for use in goal/step methods.
+        """
         config = deepcopy(input_config)
         ctype = cls._types[controller_id]
 
@@ -165,6 +340,17 @@ class Controller(Serializable, Recreatable):
     
     @classmethod
     def _process_config_joint(cls, config):
+        """Validate and normalise fields shared by all joint-based controllers.
+
+        Validates ``motor_type`` and sets gain defaults (``pos_kp``, ``pos_kd``,
+        ``vel_kp``) appropriate for the motor type. Also enforces that mutually
+        exclusive gain fields are not set together, and raises an error when
+        ``use_delta_commands`` is combined with the "default" output limits
+        (which would produce nonsensical scaling).
+
+        Args:
+            config (dict): Config dict mutated in place.
+        """
         motor_type = config["motor_type"].lower()
         assert_valid_key(key=motor_type, valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
         config["motor_type"] = motor_type
@@ -207,12 +393,35 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _process_config_holonomic(cls, config):
+        """Validate and initialise config for a holonomic base controller.
+
+        Asserts that exactly 3 DOFs are specified (x translation, y translation,
+        yaw rotation), then disables delta commands and clears the quaternion-space
+        delta flag because holonomic commands are always absolute velocity or
+        position targets expressed in the canonical frame.
+
+        Args:
+            config (dict): Config dict mutated in place.
+        """
         assert len(config["dof_idx"]) == 3, f"Expected 3 DOFs for holonomic base control, got {len(config['dof_idx'])}"
         config["use_delta_commands"] = False
         config["compute_delta_in_quat_space"] = None
 
     @classmethod
     def _process_config_ik(cls, config):
+        """Validate and initialise config for an Inverse Kinematics (IK) controller.
+
+        Sets ``motor_type`` to "position" (IK always outputs joint position targets),
+        disables delta-command mode, validates the IK mode string, and sets defaults
+        for smoothing filter size, workspace pose limiter, and conditioning on the
+        current joint position. Also slices ``reset_joint_pos`` down to the controller
+        DOFs and processes ``command_input_limits`` / ``command_output_limits`` with
+        special handling for ``absolute_pose`` and ``pose_absolute_ori`` modes
+        (which require full ±π orientation ranges).
+
+        Args:
+            config (dict): Config dict mutated in place.
+        """
         config["motor_type"] = "position"
         config["use_delta_commands"] = False
         config["mode"] = config.get("mode", "pose_delta_ori")
@@ -262,6 +471,21 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _process_config_osc(cls, config):
+        """Validate and initialise config for an Operational Space Controller (OSC).
+
+        Converts scalar gain values to arrays of the correct dimension, sets up
+        ``kd = 2 * sqrt(kp) * damping_ratio``, flags variable-gain dimensions,
+        validates the OSC mode, and computes the final ``command_dim`` (which grows
+        if any gains are variable and included in the command). Processes
+        ``command_input_limits`` / ``command_output_limits`` with the same
+        orientation-range special cases as the IK config. Slices ``reset_joint_pos``
+        to the controller DOFs.
+
+        Note: variable gains are not yet supported and will raise an AssertionError.
+
+        Args:
+            config (dict): Config dict mutated in place.
+        """
         control_dim = len(config["dof_idx"])
         config["use_gravity_compensation"] = config.get("use_gravity_compensation", False)
         config["use_cc_compensation"] = config.get("use_cc_compensation", True)
@@ -358,6 +582,16 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _process_config_dd(cls, config):
+        """Validate and initialise config for a Differential Drive controller.
+
+        Computes ``wheel_axle_halflength`` from ``wheel_axle_length`` and, when
+        ``command_output_limits`` is "default", derives the maximum linear and
+        angular velocity limits from the wheel joint velocity limits and robot
+        geometry. Asserts that both wheels have the same symmetric velocity range.
+
+        Args:
+            config (dict): Config dict mutated in place.
+        """
         config["wheel_radius"] = config["wheel_radius"]
         config["wheel_axle_halflength"] = config["wheel_axle_length"] / 2.0
 
@@ -376,6 +610,17 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _process_config_gripper(cls, config):
+        """Validate and initialise config for a MultiFingerGripper controller.
+
+        Validates ``motor_type`` and ``mode`` (binary / smooth / independent),
+        sets ``inverted``, ``limit_tolerance``, and converts ``open_qpos`` /
+        ``closed_qpos`` to backend arrays if provided. Forces
+        ``command_output_limits`` to "default" for binary mode (since binary
+        commands are always ±1).
+
+        Args:
+            config (dict): Config dict mutated in place.
+        """
         assert_valid_key(key=config["motor_type"].lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
         config["motor_type"] = config["motor_type"].lower()
         assert_valid_key(key=config.get("mode", "binary"), valid_keys=GRIPPER_MODES, name="mode for multi finger gripper")
@@ -390,6 +635,26 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _process_config_base(cls, controller_id: str, config):
+        """Apply common post-processing shared by all controller types.
+
+        Steps performed:
+        1. Convert ``dof_idx`` to integer indices.
+        2. Resolve "default" command input/output limits via the type-specific
+           helpers and broadcast scalar limits to full command-dimension arrays.
+        3. Validate and fill Isaac Sim PD gains (``isaac_kp`` / ``isaac_kd``)
+           according to the controller's output control type.
+        4. Set ``goal_shapes`` and ``goal_dim`` used for serialisation.
+
+        This method is called last in ``_process_config`` and must not be called
+        before all type-specific pre-processing is complete.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            config (dict): Partially processed config dict (mutated in place).
+
+        Returns:
+            dict: Fully processed config dict (same object as ``config``).
+        """
         config["dof_idx"] = cb.as_int(config["dof_idx"])
         config["command_input_limits"] = config.get("command_input_limits", "default")
         config["command_output_limits"] = config.get("command_output_limits", "default")
@@ -475,6 +740,19 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _init_state(cls, controller_id: str):
+        """Initialise the mutable runtime state dict for a controller.
+
+        State is type-dependent:
+        - IK: ``fixed_quat_target`` (None until the first position_fixed_ori command)
+          and an optional ``control_filter`` (MovingAverageFilter) for output smoothing.
+        - OSC: ``fixed_quat_target`` only.
+        - MultiFingerGripper: ``is_grasping`` (IsGraspingState enum) and a velocity
+          ``vel_filter`` (MovingAverageFilter with width=5) for grasping detection.
+        - NullJoint: ``default_goal`` array (zeros by default, configurable).
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+        """
         ctype = cls._types[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
             config = cls._configs[controller_id]
@@ -501,10 +779,29 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _generate_default_command_input_limits(cls):
+        """Return the default command input limits used for scaling commands to [-1, 1].
+
+        Returns:
+            tuple[float, float]: ``(-1.0, 1.0)``, the symmetric normalised input range.
+        """
         return (-1.0, 1.0)
 
     @classmethod
     def _generate_default_command_output_limits(cls, controller_id: str):
+        """Derive default command output limits from the robot's joint control limits.
+
+        For joint-based controllers the limits come from the appropriate motor-type
+        slice of ``control_limits``. For multi-finger grippers in binary mode the
+        limits are ±1; in smooth mode the scalar mean of the joint limits is used;
+        in independent mode the per-joint limits are returned directly.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            tuple: ``(lower_limits_array, upper_limits_array)`` with one entry per
+            controlled DOF, in the backend array type.
+        """
         config = cls._configs[controller_id]
         ctype = cls._types[controller_id]
 
@@ -539,26 +836,57 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def set_goals(cls, controller_id: str, goals):
+        """Directly overwrite the stored goal dict for a controller.
+
+        Bypasses command preprocessing and goal computation — intended for
+        state restoration (e.g. ``load_state``) where the goal is already in
+        the internal representation.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            goals: Goal dict as returned by one of the ``_update_goal_*`` methods, or None.
+        """
         cls._goals[controller_id] = goals
 
     @classmethod
-    def update_goal(cls, controller_id: str, command, control_dict):
+    def update_goal(cls, controller_id: str, command):
+        """Preprocess a raw command and compute/store the new internal goal.
+
+        Validates command dimensionality, passes the command through
+        ``_preprocess_command`` (clipping, inversion, scaling), and dispatches
+        to the type-specific ``_update_goal_*`` method which converts the
+        preprocessed command into the controller's internal goal representation
+        (e.g. a target joint position vector, a target EEF pose dict, etc.).
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Action array of length ``command_dim(controller_id)``.
+        """
         assert (
             len(command) == cls.command_dim(controller_id)
         ), f"Commands must be dimension {cls.command_dim(controller_id)}, got dim {len(command)} instead."
-        cls._goals[controller_id] = cls._update_goal(controller_id, cls._preprocess_command(controller_id, command), control_dict)
+        cls._goals[controller_id] = cls._update_goal(controller_id, cls._preprocess_command(controller_id, command))
 
     @classmethod
-    def _update_goal(cls, controller_id, command, control_dict):
+    def _update_goal(cls, controller_id, command):
+        """Dispatch a preprocessed command to the type-specific goal-update method.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Preprocessed and scaled command array.
+
+        Returns:
+            dict: Internal goal dict whose keys and shapes depend on controller type.
+        """
         ctype = cls._types[controller_id]
         if ctype in (ControllerType.JointController, ControllerType.NullJointController):
-            return cls._update_goal_joint(controller_id, command, control_dict)
+            return cls._update_goal_joint(controller_id, command)
         elif ctype == ControllerType.HolonomicBaseJointController:
-            return cls._update_goal_holonomic(controller_id, command, control_dict)
+            return cls._update_goal_holonomic(controller_id, command)
         elif ctype == ControllerType.InverseKinematicsController:
-            return cls._update_goal_ik(controller_id, command, control_dict)
+            return cls._update_goal_ik(controller_id, command)
         elif ctype == ControllerType.OperationalSpaceController:
-            return cls._update_goal_osc(controller_id, command, control_dict)
+            return cls._update_goal_osc(controller_id, command)
         elif ctype == ControllerType.DifferentialDriveController:
             return dict(vel=command)
         elif ctype == ControllerType.MultiFingerGripperController:
@@ -566,10 +894,32 @@ class Controller(Serializable, Recreatable):
         raise ValueError(f"Unknown controller type: {ctype}")
 
     @classmethod
-    def _update_goal_joint(cls, controller_id, command, control_dict):
+    def _update_goal_joint(cls, controller_id, command):
+        """Compute and return the target joint goal for a joint-level controller.
+
+        When ``use_delta_commands`` is True, reads the current joint state from
+        ControllableObjectViewAPI and adds the command as a delta, applying
+        quaternion-space composition for any rotational joints listed in
+        ``compute_delta_in_quat_space``. The resulting target is clipped to the
+        configured joint limits before being returned.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Preprocessed command array of length ``control_dim``.
+
+        Returns:
+            dict: ``{"target": target_array}`` where ``target_array`` is clipped to limits.
+        """
         config = cls._configs[controller_id]
         if config["use_delta_commands"]:
-            base_value = control_dict[f"joint_{config['motor_type']}"][cls.dof_idx(controller_id)]
+            arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+            motor_type = config["motor_type"]
+            if motor_type == "position":
+                base_value = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(controller_id)]
+            elif motor_type == "velocity":
+                base_value = ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[cls.dof_idx(controller_id)]
+            else:
+                base_value = ControllableObjectViewAPI.get_joint_efforts(arpath)[cls.dof_idx(controller_id)]
             target = base_value + command
             for rx_ind, ry_ind, rz_ind in config["compute_delta_in_quat_space"]:
                 start_rots = base_value[[rx_ind, ry_ind, rz_ind]]
@@ -589,9 +939,26 @@ class Controller(Serializable, Recreatable):
         return dict(target=target)
 
     @classmethod
-    def _update_goal_holonomic(cls, controller_id, command, control_dict):
-        base_pose = cb.T.pose2mat((control_dict["root_pos"], control_dict["root_quat"]))
-        canonical_pose = cb.T.pose2mat((control_dict["canonical_pos"], control_dict["canonical_quat"]))
+    def _update_goal_holonomic(cls, controller_id, command):
+        """Compute and return the target joint goal for a holonomic base controller.
+
+        Transforms the 3-DOF command (x, y, yaw) from the robot's base frame to the
+        canonical (world-aligned) frame. For position motor type, integrates the yaw
+        delta onto the current joint yaw reading. The transformed command is then
+        passed to ``_update_goal_joint`` for final clipping.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Preprocessed 3-DOF command array ``[x, y, yaw]`` in the base frame.
+
+        Returns:
+            dict: ``{"target": target_array}`` in the canonical frame.
+        """
+        arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+        root_pos, root_quat = ControllableObjectViewAPI.get_position_orientation(arpath)
+        canonical_pos, canonical_quat = ControllableObjectViewAPI.get_root_position_orientation(arpath)
+        base_pose = cb.T.pose2mat((root_pos, root_quat))
+        canonical_pose = cb.T.pose2mat((canonical_pos, canonical_quat))
         canonical_to_base_pose = cb.T.pose_inv(canonical_pose) @ base_pose
 
         if cls._configs[controller_id]["motor_type"] == "position":
@@ -599,7 +966,7 @@ class Controller(Serializable, Recreatable):
             command_in_base_frame[:2, 3] = command[:2]
             command_in_canonical_frame = canonical_to_base_pose @ command_in_base_frame
             position = command_in_canonical_frame[:2, 3]
-            rz_joint_pos = control_dict["joint_position"][cls.dof_idx(controller_id)][2:3]
+            rz_joint_pos = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(controller_id)][2:3]
             delta_joint_pos = wrap_angle(command[2])
             new_joint_pos = rz_joint_pos + delta_joint_pos
             command = cb.cat([position, new_joint_pos])
@@ -613,13 +980,40 @@ class Controller(Serializable, Recreatable):
             angular_velocity = command[2:3]
             command = cb.cat([linear_velocity, angular_velocity])
 
-        return cls._update_goal_joint(controller_id, command=command, control_dict=control_dict)
+        return cls._update_goal_joint(controller_id, command=command)
 
     @classmethod
-    def _update_goal_ik(cls, controller_id, command, control_dict):
+    def _update_goal_ik(cls, controller_id, command):
+        """Compute and return the target EEF pose goal for an IK controller.
+
+        Reads the current EEF position and orientation relative to the robot root
+        from ControllableObjectViewAPI. Interprets the 3-6 element command according
+        to the configured mode:
+
+        - ``absolute_pose``: command provides the absolute target position and an
+          axis-angle orientation in the canonical frame.
+        - ``pose_absolute_ori``: delta position + absolute axis-angle orientation.
+        - ``pose_delta_ori``: delta position + delta axis-angle orientation applied
+          as a left-multiply in SO(3) onto the current orientation.
+        - ``position_fixed_ori``: delta position only; orientation is frozen after
+          the first command and held thereafter.
+        - ``position_compliant_ori``: delta position only; orientation tracks the
+          current EEF orientation (no orientation correction).
+
+        Applies ``workspace_pose_limiter`` callback if configured.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Preprocessed command array (3 or 6 elements depending on mode).
+
+        Returns:
+            dict: ``{"target_pos": ..., "target_ori_mat": ...}`` with float32 arrays.
+        """
         config = cls._configs[controller_id]
-        pos_relative = control_dict[f"{config['task_name']}_pos_relative"]
-        quat_relative = control_dict[f"{config['task_name']}_quat_relative"]
+        arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+        pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
+            arpath, config["_link_name"]
+        )
 
         if config["mode"] == "absolute_pose":
             target_pos = command[:3]
@@ -642,7 +1036,7 @@ class Controller(Serializable, Recreatable):
             target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
 
         if config.get("workspace_pose_limiter", None) is not None:
-            target_pos, target_quat = config["workspace_pose_limiter"](target_pos, target_quat, control_dict)
+            target_pos, target_quat = config["workspace_pose_limiter"](target_pos, target_quat)
 
         return dict(
             target_pos=cb.as_float32(target_pos),
@@ -650,10 +1044,28 @@ class Controller(Serializable, Recreatable):
         )
 
     @classmethod
-    def _update_goal_osc(cls, controller_id, command, control_dict):
+    def _update_goal_osc(cls, controller_id, command):
+        """Compute and return the target EEF pose goal for an OSC controller.
+
+        Mirrors ``_update_goal_ik`` in mode semantics but operates on a copy of
+        the current EEF pose (to avoid aliasing issues with the ControllableObjectViewAPI
+        cache). Also updates variable OSC gains from an embedded gain command if the
+        controller is configured for variable gains (currently not supported).
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Preprocessed command array (3 or 6 elements depending on mode).
+
+        Returns:
+            dict: ``{"target_pos": ..., "target_ori_mat": ...}`` with float32 arrays.
+        """
         config = cls._configs[controller_id]
-        pos_relative = cb.copy(control_dict[f"{config['task_name']}_pos_relative"])
-        quat_relative = cb.copy(control_dict[f"{config['task_name']}_quat_relative"])
+        arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+        pos_relative_raw, quat_relative_raw = ControllableObjectViewAPI.get_link_relative_position_orientation(
+            arpath, config["_link_name"]
+        )
+        pos_relative = cb.copy(pos_relative_raw)
+        quat_relative = cb.copy(quat_relative_raw)
 
         if config["mode"] == "absolute_pose":
             target_pos = command[:3]
@@ -676,7 +1088,7 @@ class Controller(Serializable, Recreatable):
             target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
 
         if config["workspace_pose_limiter"] is not None:
-            target_pos, target_quat = config["workspace_pose_limiter"](target_pos, target_quat, control_dict)
+            target_pos, target_quat = config["workspace_pose_limiter"](target_pos, target_quat)
 
         gains = None
         if gains is not None:
@@ -693,6 +1105,23 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _preprocess_command(cls, controller_id, command):
+        """Apply type-specific preprocessing before base scaling is applied.
+
+        For NullJointController, the command is replaced entirely by the stored
+        default goal. For MultiFingerGripperController in non-independent modes,
+        the command is broadcast to ``command_dim`` elements; the inverted flag
+        reflects the command around the input limit midpoint.
+
+        After type-specific handling, delegates to ``_preprocess_command_base``
+        for clipping and input→output range mapping.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Raw command (scalar, list, or array) before any processing.
+
+        Returns:
+            Array: Processed command ready to be passed to ``_update_goal``.
+        """
         ctype = cls._types[controller_id]
 
         if ctype == ControllerType.NullJointController:
@@ -713,6 +1142,20 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _preprocess_command_base(cls, controller_id, command):
+        """Clip the command to input limits and linearly rescale it to output limits.
+
+        If ``command_input_limits`` is set, the command is clipped to that range.
+        If both input and output limits are set, a linear affine transform maps
+        the input range to the output range, with scaling and offset cached after
+        the first call for efficiency.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            command: Command value (scalar, list, or array).
+
+        Returns:
+            Array: Clipped and rescaled command.
+        """
         config = cls._configs[controller_id]
         command = cb.array([command]) if type(command) in {int, float} else command
         if config["command_input_limits"] is not None:
@@ -735,6 +1178,19 @@ class Controller(Serializable, Recreatable):
     
     @classmethod
     def _reverse_preprocess_command(cls, controller_id, processed_command):
+        """Invert the input→output linear scaling to recover the original input-space command.
+
+        Used by ``compute_no_op_action`` to express the current no-op goal as a
+        command in the normalised input range, so it can be directly re-issued
+        to ``update_goal`` without modification.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            processed_command: Command in output (joint / task) space.
+
+        Returns:
+            Array: Command in input (normalised) space.
+        """
         config = cls._configs[controller_id]
         if config["command_input_limits"] is not None and config["command_output_limits"] is not None:
             if config["command_scale_factor"] is None:
@@ -753,174 +1209,25 @@ class Controller(Serializable, Recreatable):
     # -------------------------------------------------------------------------
     # Control computation
     # -------------------------------------------------------------------------
-
-    @classmethod
-    def compute_control(cls, controller_id, control_dict, goal_dict=None):
-        ctype = cls._types[controller_id]
-        if ctype in _JOINT_TYPES:
-            if ctype == ControllerType.InverseKinematicsController:
-                return cls._compute_control_ik(controller_id, control_dict)
-            return cls._compute_control_joint(controller_id, control_dict, goal_dict=goal_dict)
-        elif ctype == ControllerType.OperationalSpaceController:
-            return cls._compute_control_osc(controller_id, control_dict)
-        elif ctype == ControllerType.DifferentialDriveController:
-            return cls._compute_control_dd(controller_id, control_dict)
-        elif ctype == ControllerType.MultiFingerGripperController:
-            return cls._compute_control_gripper(controller_id, control_dict)
-        raise ValueError(f"Unknown controller type: {ctype}")
-
-    @classmethod
-    def _compute_control_joint(cls, controller_id, control_dict, goal_dict=None):
-        config = cls._configs[controller_id]
-        base_value = control_dict[f"joint_{config['motor_type']}"][cls.dof_idx(controller_id)]
-        target = cls._goals[controller_id]["target"] if goal_dict is None else goal_dict["target"]
-
-        if config["use_impedances"]:
-            if config["motor_type"] == "position":
-                position_error = target - base_value
-                vel_pos_error = -control_dict["joint_velocity"][cls.dof_idx(controller_id)]
-                u = position_error * config["pos_kp"] + vel_pos_error * config["pos_kd"]
-            elif config["motor_type"] == "velocity":
-                velocity_error = target - base_value
-                u = velocity_error * config["vel_kp"]
-            else:
-                u = target
-
-            u = cb.get_custom_method("compute_joint_torques")(u, control_dict["mass_matrix"], cls.dof_idx(controller_id))
-
-            if config["use_gravity_compensation"]:
-                u += control_dict["gravity_force"][cls.dof_idx(controller_id)]
-            if config["use_cc_compensation"]:
-                u += control_dict["cc_force"][cls.dof_idx(controller_id)]
-        else:
-            u = target
-
-        return u
-
-    @classmethod
-    def _compute_control_ik(cls, controller_id, control_dict):
-        config = cls._configs[controller_id]
-        goal_dict = cls._goals[controller_id]
-        q = control_dict["joint_position"][cls.dof_idx(controller_id)]
-        j_eef = control_dict[f"{config['task_name']}_jacobian_relative"][:, cls.dof_idx(controller_id)]
-        ee_pos = control_dict[f"{config['task_name']}_pos_relative"]
-        ee_quat = control_dict[f"{config['task_name']}_quat_relative"]
-
-        target_joint_pos = cb.get_custom_method("compute_ik_qpos")(
-            q=q,
-            j_eef=j_eef,
-            ee_pos=cb.as_float32(ee_pos),
-            ee_mat=cb.as_float32(cb.T.quat2mat(ee_quat)),
-            goal_pos=goal_dict["target_pos"],
-            goal_ori_mat=goal_dict["target_ori_mat"],
-            q_lower_limit=config["control_limits"][ControlType.get_type("position")][0][cls.dof_idx(controller_id)],
-            q_upper_limit=config["control_limits"][ControlType.get_type("position")][1][cls.dof_idx(controller_id)],
-        )
-
-        if cls._state[controller_id]["control_filter"] is not None:
-            target_joint_pos = cls._state[controller_id]["control_filter"].estimate(target_joint_pos)
-
-        return cls._compute_control_joint(controller_id=controller_id, control_dict=control_dict, goal_dict=dict(target=target_joint_pos))
-
-    @classmethod
-    def _compute_control_osc(cls, controller_id, control_dict):
-        goal_dict = cls._goals[controller_id]
-        config = cls._configs[controller_id]
-        kp = config["kp"]
-        damping_ratio = config["damping_ratio"]
-        kd = 2 * cb.sqrt(kp) * damping_ratio
-
-        dof_idxs_mat = tuple(cb.meshgrid(cls.dof_idx(controller_id), cls.dof_idx(controller_id)))
-        q = control_dict["joint_position"][cls.dof_idx(controller_id)]
-        qd = control_dict["joint_velocity"][cls.dof_idx(controller_id)]
-        mm = control_dict["mass_matrix"][dof_idxs_mat]
-        j_eef = control_dict[f"{config['task_name']}_jacobian_relative"][:, cls.dof_idx(controller_id)]
-        ee_pos = control_dict[f"{config['task_name']}_pos_relative"]
-        ee_quat = control_dict[f"{config['task_name']}_quat_relative"]
-        ee_vel = cb.cat([
-            control_dict[f"{config['task_name']}_lin_vel_relative"],
-            control_dict[f"{config['task_name']}_ang_vel_relative"],
-        ])
-        base_lin_vel = control_dict["root_rel_lin_vel"]
-        base_ang_vel = control_dict["root_rel_ang_vel"]
-
-        u = cb.get_custom_method("compute_osc_torques")(
-            q=q, qd=qd, mm=mm, j_eef=j_eef,
-            ee_pos=cb.as_float32(ee_pos),
-            ee_mat=cb.as_float32(cb.T.quat2mat(ee_quat)),
-            ee_lin_vel=cb.as_float32(ee_vel[:3]),
-            ee_ang_vel_err=cb.as_float32(
-                cb.T.quat2axisangle(
-                    cb.T.quat_multiply(cb.T.axisangle2quat(-ee_vel[3:]), cb.T.axisangle2quat(base_ang_vel))
-                )
-            ),
-            goal_pos=goal_dict["target_pos"],
-            goal_ori_mat=goal_dict["target_ori_mat"],
-            kp=kp, kd=kd,
-            kp_null=config["kp_null"],
-            kd_null=config["kd_null"],
-            rest_qpos=config["reset_joint_pos"],
-            control_dim=cls.control_dim(controller_id),
-            decouple_pos_ori=config["decouple_pos_ori"],
-            base_lin_vel=cb.as_float32(base_lin_vel),
-            base_ang_vel=cb.as_float32(base_ang_vel),
-        ).flatten()
-
-        if config["use_gravity_compensation"]:
-            u += control_dict["gravity_force"][cls.dof_idx(controller_id)]
-        if config["use_cc_compensation"]:
-            u += control_dict["cc_force"][cls.dof_idx(controller_id)]
-        return u
-
-    @classmethod
-    def _compute_control_dd(cls, controller_id, control_dict):
-        goal_dict = cls._goals[controller_id]
-        config = cls._configs[controller_id]
-        lin_vel, ang_vel = goal_dict["vel"]
-        left_wheel_joint_vel = (lin_vel - ang_vel * config["wheel_axle_halflength"]) / config["wheel_radius"]
-        right_wheel_joint_vel = (lin_vel + ang_vel * config["wheel_axle_halflength"]) / config["wheel_radius"]
-        return cb.array([left_wheel_joint_vel, right_wheel_joint_vel])
-
-    @classmethod
-    def _compute_control_gripper(cls, controller_id, control_dict):
-        config = cls._configs[controller_id]
-        target = cls._goals[controller_id]["target"]
-        joint_pos = control_dict["joint_position"][cls.dof_idx(controller_id)]
-        if config["mode"] == "binary":
-            should_open = target[0] >= 0.0 if not config["inverted"] else target[0] > 0.0
-            if should_open:
-                u = (
-                    config["control_limits"][ControlType.get_type(config["motor_type"])][1][cls.dof_idx(controller_id)]
-                    if config["open_qpos"] is None
-                    else config["open_qpos"]
-                )
-            else:
-                u = (
-                    config["control_limits"][ControlType.get_type(config["motor_type"])][0][cls.dof_idx(controller_id)]
-                    if config["closed_qpos"] is None
-                    else config["closed_qpos"]
-                )
-        else:
-            u = cb.full((cls.control_dim(controller_id=controller_id),), target[0]) if len(target) == 1 else target
-
-        if config["motor_type"] in {"velocity", "torque"}:
-            violate_upper_limit = (
-                joint_pos > config["control_limits"][ControlType.POSITION][1][cls.dof_idx(controller_id)] - config["limit_tolerance"]
-            )
-            violate_lower_limit = (
-                joint_pos < config["control_limits"][ControlType.POSITION][0][cls.dof_idx(controller_id)] + config["limit_tolerance"]
-            )
-            violation = cb.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
-            u *= ~violation
-        cls._update_grasping_state(controller_id=controller_id, control_dict=control_dict)
-        return u
-
-    # -------------------------------------------------------------------------
-    # Clip, step, reset
+    # Clip, reset
     # -------------------------------------------------------------------------
 
     @classmethod
     def clip_control(cls, controller_id, control):
+        """Clip a computed control signal to the configured hardware joint limits.
+
+        For POSITION control type, clipping is only applied to DOFs that actually
+        have hardware limits (``dof_has_limits``). For other control types, all
+        DOFs are clipped unconditionally.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            control: Computed control array of length ``control_dim``.
+
+        Returns:
+            Array: Control array with out-of-range values clamped (mutates and returns
+            the input array).
+        """
         config = cls._configs[controller_id]
         clipped_control = control.clip(
             config["control_limits"][cls.control_type(controller_id)][0][config["dof_idx"]],
@@ -935,18 +1242,18 @@ class Controller(Serializable, Recreatable):
         return control
     
     @classmethod
-    def step(cls, controller_id, control_dict):
-        if cls._goals[controller_id] is None:
-            cls._goals[controller_id] = cls.compute_no_op_goal(controller_id=controller_id, control_dict=control_dict)
-        control = cls.compute_control(controller_id=controller_id, control_dict=control_dict)
-        assert (
-            len(control) == cls.control_dim(controller_id)
-        ), f"Control signal must be of length {cls.control_dim(controller_id)}, got {len(control)} instead."
-        cls._controls[controller_id] = cls.clip_control(controller_id, control)
-        return cls._controls[controller_id]
-
-    @classmethod
     def reset(cls, controller_id: str):
+        """Reset the goal and any persistent runtime state for a controller.
+
+        Clears the stored goal to None and resets type-specific state:
+        - IK: resets the smoothing filter and clears ``fixed_quat_target``.
+        - OSC: clears ``fixed_quat_target`` and variable gains.
+        - MultiFingerGripper: resets the velocity filter and sets
+          ``is_grasping`` to FALSE.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+        """
         cls._goals[controller_id] = None
         ctype = cls._types[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
@@ -966,9 +1273,22 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def step_batch(cls, controller_ids, controller_type):
+        """Compute control outputs for a homogeneous batch of controllers of the same type.
+
+        If any controller in the batch has no goal set, ``compute_no_op_goal`` is
+        called first to generate a hold-in-place goal. The batch is then dispatched
+        to the type-specific ``_step_batch_*`` method.
+
+        Args:
+            controller_ids (list[str]): Ordered list of controller IDs, all of the same type.
+            controller_type (ControllerType): The shared controller type for this batch.
+
+        Returns:
+            list: Ordered list of computed control arrays, one per controller ID.
+        """
         for cid in controller_ids:
             if cls._goals[cid] is None:
-                cls._goals[cid] = cls.compute_no_op_goal(cid, cls._control_dicts[cid])
+                cls._goals[cid] = cls.compute_no_op_goal(cid)
 
         if controller_type in (ControllerType.JointController, ControllerType.NullJointController, ControllerType.HolonomicBaseJointController):
             return cls._step_batch_joint(controller_ids)
@@ -981,17 +1301,29 @@ class Controller(Serializable, Recreatable):
         elif controller_type == ControllerType.MultiFingerGripperController:
             return cls._step_batch_gripper(controller_ids)
 
-        # Fallback: sequential
-        results = []
-        for cid in controller_ids:
-            control = cls.compute_control(controller_id=cid, control_dict=cls._control_dicts[cid])
-            control = cls.clip_control(cid, control)
-            cls._controls[cid] = control
-            results.append(control)
-        return results
+        raise ValueError(f"Unknown controller type: {controller_type}")
     
     @classmethod
     def _step_batch_joint(cls, controller_ids):
+        """Compute joint-level control outputs for a batch of joint controllers.
+
+        Controllers are split into impedance and non-impedance groups:
+
+        - Non-impedance: the stored target is returned directly after clipping.
+        - Impedance: batched matrix operations compute the full impedance torque:
+          ``u = M(q) * (kp * (q_target - q) - kd * q_dot) + gravity + cc``.
+          Gravity and Coriolis/centrifugal forces are added when the respective
+          compensation flags are set.
+
+        Both groups write their results to ``_controls[cid]``.
+
+        Args:
+            controller_ids (list[str]): IDs of JointController / NullJointController /
+                HolonomicBaseJointController instances to step.
+
+        Returns:
+            list: Ordered control arrays, one per controller ID.
+        """
         impedance_indices = []
         non_impedance_indices = []
         for idx, cid in enumerate(controller_ids):
@@ -1029,25 +1361,28 @@ class Controller(Serializable, Recreatable):
                 config = cls._configs[cid]
                 d = dims[i]
                 dof_idx = cls.dof_idx(cid)
-                cd = cls._control_dicts[cid]
+                arpath = cls._articulation_root_paths[cid.split(":", 1)[0]]
 
                 targets[i, :d] = cls._goals[cid]["target"]
-                base_values[i, :d] = cd[f"joint_{config['motor_type']}"][dof_idx]
-                velocities[i, :d] = cd["joint_velocity"][dof_idx]
-
-                if config["motor_type"] == "position":
+                motor_type = config["motor_type"]
+                if motor_type == "position":
+                    base_values[i, :d] = ControllableObjectViewAPI.get_joint_positions(arpath)[dof_idx]
                     gain[i, :d] = config["pos_kp"]
                     damping[i, :d] = config["pos_kd"]
-                elif config["motor_type"] == "velocity":
+                elif motor_type == "velocity":
+                    base_values[i, :d] = ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[dof_idx]
                     gain[i, :d] = config["vel_kp"]
                 else:
                     is_effort[i] = True
+                velocities[i, :d] = ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[dof_idx]
 
-                mass_matrices[i, :d, :d] = cd["mass_matrix"][dof_idx][:, dof_idx]
+                s = config["_mm_start_idx"]
+                mm_full = ControllableObjectViewAPI.get_generalized_mass_matrices(arpath)
+                mass_matrices[i, :d, :d] = mm_full[s:, s:][dof_idx][:, dof_idx]
                 if config["use_gravity_compensation"]:
-                    gravity[i, :d] = cd["gravity_force"][dof_idx]
+                    gravity[i, :d] = ControllableObjectViewAPI.get_gravity_compensation_forces(arpath)[dof_idx]
                 if config["use_cc_compensation"]:
-                    cc[i, :d] = cd["cc_force"][dof_idx]
+                    cc[i, :d] = ControllableObjectViewAPI.get_coriolis_and_centrifugal_compensation_forces(arpath)[dof_idx]
 
             u = (targets - base_values) * gain + (-velocities) * damping
             for i in range(N):
@@ -1068,6 +1403,28 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _step_batch_ik(cls, controller_ids):
+        """Compute joint position targets for a batch of IK controllers.
+
+        Gathers joint positions, Jacobians, EEF poses, and goal poses for all
+        controllers, pads them to the maximum DOF dimension, then calls the
+        registered ``compute_ik_qpos_batch`` JIT function (either PyTorch or NumPy)
+        to solve the batch of Jacobian pseudo-inverse IK problems in one kernel call.
+
+        After solving, each controller optionally applies a moving-average smoothing
+        filter (``control_filter``) and, if ``use_impedances`` is set, converts the
+        joint-position target to a torque via impedance control (same formula as
+        ``_step_batch_joint`` impedance path).
+
+        Reads state from ControllableObjectViewAPI using the precomputed Jacobian
+        slice indices (``_jac_link_row``, ``_jac_col_start``, ``_jac_n_cols``) and
+        mass-matrix start index (``_mm_start_idx``) stored in each controller's config.
+
+        Args:
+            controller_ids (list[str]): IDs of InverseKinematicsController instances to step.
+
+        Returns:
+            list: Ordered control arrays (joint positions or torques), one per controller ID.
+        """
         N = len(controller_ids)
         dims = [cls.control_dim(cid) for cid in controller_ids]
         max_dim = max(dims)
@@ -1085,12 +1442,18 @@ class Controller(Serializable, Recreatable):
             config = cls._configs[cid]
             d = dims[i]
             dof_idx = cls.dof_idx(cid)
-            cd = cls._control_dicts[cid]
+            arpath = cls._articulation_root_paths[cid.split(":", 1)[0]]
 
-            q[i, :d] = cd["joint_position"][dof_idx]
-            j_eef[i, :, :d] = cd[f"{config['task_name']}_jacobian_relative"][:, dof_idx]
-            ee_pos[i] = cd[f"{config['task_name']}_pos_relative"]
-            ee_quat = cd[f"{config['task_name']}_quat_relative"]
+            q[i, :d] = ControllableObjectViewAPI.get_joint_positions(arpath)[dof_idx]
+            jac_full = ControllableObjectViewAPI.get_relative_jacobian(arpath)
+            j_eef[i, :, :d] = jac_full[
+                config["_jac_link_row"], :,
+                config["_jac_col_start"]:config["_jac_col_start"] + config["_jac_n_cols"]
+            ][:, dof_idx]
+            ee_pos_i, ee_quat = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                arpath, config["_link_name"]
+            )
+            ee_pos[i] = ee_pos_i
             ee_mat[i] = cb.as_float32(cb.T.quat2mat(ee_quat))
             goal_pos[i] = cls._goals[cid]["target_pos"]
             goal_ori_mat[i] = cls._goals[cid]["target_ori_mat"]
@@ -1114,20 +1477,26 @@ class Controller(Serializable, Recreatable):
 
             config = cls._configs[cid]
             if config["use_impedances"]:
-                cd = cls._control_dicts[cid]
+                arpath = cls._articulation_root_paths[cid.split(":", 1)[0]]
                 dof_idx = cls.dof_idx(cid)
-                base_value = cd[f"joint_{config['motor_type']}"][dof_idx]
-                if config["motor_type"] == "position":
-                    u = (target_joint_pos - base_value) * config["pos_kp"] + (-cd["joint_velocity"][dof_idx]) * config["pos_kd"]
-                elif config["motor_type"] == "velocity":
+                motor_type = config["motor_type"]
+                if motor_type == "position":
+                    base_value = ControllableObjectViewAPI.get_joint_positions(arpath)[dof_idx]
+                    u = (target_joint_pos - base_value) * config["pos_kp"] + (
+                        -ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[dof_idx]
+                    ) * config["pos_kd"]
+                elif motor_type == "velocity":
+                    base_value = ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[dof_idx]
                     u = (target_joint_pos - base_value) * config["vel_kp"]
                 else:
                     u = target_joint_pos
-                u = cb.get_custom_method("compute_joint_torques")(u, cd["mass_matrix"], dof_idx)
+                s = config["_mm_start_idx"]
+                mm_full = ControllableObjectViewAPI.get_generalized_mass_matrices(arpath)
+                u = cb.get_custom_method("compute_joint_torques")(u, mm_full[s:, s:], dof_idx)
                 if config["use_gravity_compensation"]:
-                    u += cd["gravity_force"][dof_idx]
+                    u += ControllableObjectViewAPI.get_gravity_compensation_forces(arpath)[dof_idx]
                 if config["use_cc_compensation"]:
-                    u += cd["cc_force"][dof_idx]
+                    u += ControllableObjectViewAPI.get_coriolis_and_centrifugal_compensation_forces(arpath)[dof_idx]
             else:
                 u = target_joint_pos
 
@@ -1139,6 +1508,26 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _step_batch_osc(cls, controller_ids):
+        """Compute joint torques for a batch of Operational Space Controllers.
+
+        Gathers all tensors needed for the OSC batch kernel: joint positions and
+        velocities, mass matrices, Jacobians, EEF poses and velocities, goal poses,
+        PD gains, null-space gains and rest poses, and base linear/angular velocities.
+
+        If all controllers share the same ``decouple_pos_ori`` flag, a single
+        vectorised ``compute_osc_torques_batch`` call covers the whole batch.
+        If the batch is mixed, two sub-calls are made (one per flag value) and
+        results are scattered back into the output buffer.
+
+        Optional gravity and Coriolis/centrifugal compensation is added per-controller.
+        All results are clipped and stored in ``_controls[cid]``.
+
+        Args:
+            controller_ids (list[str]): IDs of OperationalSpaceController instances to step.
+
+        Returns:
+            list: Ordered torque control arrays, one per controller ID.
+        """
         N = len(controller_ids)
         dims = [cls.control_dim(cid) for cid in controller_ids]
         max_dim = max(dims)
@@ -1171,20 +1560,32 @@ class Controller(Serializable, Recreatable):
             config = cls._configs[cid]
             d = dims[i]
             dof_idx = cls.dof_idx(cid)
-            cd = cls._control_dicts[cid]
+            arpath = cls._articulation_root_paths[cid.split(":", 1)[0]]
             goal_dict = cls._goals[cid]
 
-            q[i, :d] = cd["joint_position"][dof_idx]
-            qd[i, :d] = cd["joint_velocity"][dof_idx]
-            mm[i, :d, :d] = cd["mass_matrix"][dof_idx][:, dof_idx]
-            j_eef_batch[i, :, :d] = cd[f"{config['task_name']}_jacobian_relative"][:, dof_idx]
-            ee_pos_batch[i] = cd[f"{config['task_name']}_pos_relative"]
-            ee_quat = cd[f"{config['task_name']}_quat_relative"]
+            q[i, :d] = ControllableObjectViewAPI.get_joint_positions(arpath)[dof_idx]
+            qd[i, :d] = ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[dof_idx]
+            s = config["_mm_start_idx"]
+            mm_full = ControllableObjectViewAPI.get_generalized_mass_matrices(arpath)
+            mm[i, :d, :d] = mm_full[s:, s:][dof_idx][:, dof_idx]
+            jac_full = ControllableObjectViewAPI.get_relative_jacobian(arpath)
+            j_eef_batch[i, :, :d] = jac_full[
+                config["_jac_link_row"], :,
+                config["_jac_col_start"]:config["_jac_col_start"] + config["_jac_n_cols"]
+            ][:, dof_idx]
+            ee_pos_i, ee_quat = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                arpath, config["_link_name"]
+            )
+            ee_pos_batch[i] = ee_pos_i
             ee_mat_batch[i] = cb.as_float32(cb.T.quat2mat(ee_quat))
 
-            ee_lin_vel_batch[i] = cb.as_float32(cd[f"{config['task_name']}_lin_vel_relative"])
-            ee_ang_vel = cd[f"{config['task_name']}_ang_vel_relative"]
-            base_ang_vel = cd["root_rel_ang_vel"]
+            ee_lin_vel_batch[i] = cb.as_float32(
+                ControllableObjectViewAPI.get_link_relative_linear_velocity(arpath, config["_link_name"], estimate=True)
+            )
+            ee_ang_vel = ControllableObjectViewAPI.get_link_relative_angular_velocity(
+                arpath, config["_link_name"], estimate=True
+            )
+            base_ang_vel = ControllableObjectViewAPI.get_relative_angular_velocity(arpath, estimate=True)
             ee_ang_vel_err_batch[i] = cb.as_float32(
                 cb.T.quat2axisangle(
                     cb.T.quat_multiply(cb.T.axisangle2quat(-ee_ang_vel), cb.T.axisangle2quat(base_ang_vel))
@@ -1202,15 +1603,17 @@ class Controller(Serializable, Recreatable):
             kd_null_batch[i, :d] = config["kd_null"]
             rest_qpos_batch[i, :d] = config["reset_joint_pos"]
 
-            base_lin_vel_batch[i] = cb.as_float32(cd["root_rel_lin_vel"])
+            base_lin_vel_batch[i] = cb.as_float32(
+                ControllableObjectViewAPI.get_relative_linear_velocity(arpath, estimate=True)
+            )
             base_ang_vel_batch[i] = cb.as_float32(base_ang_vel)
 
             decouple_flags.append(config["decouple_pos_ori"])
 
             if config["use_gravity_compensation"]:
-                gravity[i, :d] = cd["gravity_force"][dof_idx]
+                gravity[i, :d] = ControllableObjectViewAPI.get_gravity_compensation_forces(arpath)[dof_idx]
             if config["use_cc_compensation"]:
-                cc_force[i, :d] = cd["cc_force"][dof_idx]
+                cc_force[i, :d] = ControllableObjectViewAPI.get_coriolis_and_centrifugal_compensation_forces(arpath)[dof_idx]
 
         all_decouple = all(decouple_flags)
         no_decouple = not any(decouple_flags)
@@ -1262,6 +1665,21 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _step_batch_dd(cls, controller_ids):
+        """Compute wheel velocity targets for a batch of Differential Drive controllers.
+
+        Converts the ``[lin_vel, ang_vel]`` goal into per-wheel angular velocities
+        using the standard kinematic equations:
+        ``left = (lin_vel - ang_vel * half_axle) / wheel_radius``
+        ``right = (lin_vel + ang_vel * half_axle) / wheel_radius``
+
+        Results are clipped to hardware limits and stored in ``_controls[cid]``.
+
+        Args:
+            controller_ids (list[str]): IDs of DifferentialDriveController instances to step.
+
+        Returns:
+            list: Ordered ``[left_vel, right_vel]`` control arrays, one per controller ID.
+        """
         N = len(controller_ids)
 
         vels = cb.zeros((N, 2))
@@ -1294,10 +1712,61 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _step_batch_gripper(cls, controller_ids):
+        """Compute finger position / velocity targets for a batch of gripper controllers.
+
+        For each controller:
+        - binary mode: maps the sign of the target command to open/closed joint
+          limits (or custom ``open_qpos`` / ``closed_qpos`` if provided).
+        - smooth mode: broadcasts a scalar target to all fingers.
+        - independent mode: passes the target vector through unchanged.
+
+        For velocity and torque motor types, commands that would drive joints
+        beyond their soft limits are zeroed out to prevent windup.
+
+        Also calls ``_update_grasping_state`` to update the ``is_grasping``
+        classification based on current finger velocities and positions.
+
+        Args:
+            controller_ids (list[str]): IDs of MultiFingerGripperController instances to step.
+
+        Returns:
+            list: Ordered control arrays, one per controller ID.
+        """
         results = []
         for cid in controller_ids:
-            control = cls.compute_control(controller_id=cid, control_dict=cls._control_dicts[cid])
-            control = cls.clip_control(cid, control)
+            config = cls._configs[cid]
+            arpath = cls._articulation_root_paths[cid.split(":", 1)[0]]
+            target = cls._goals[cid]["target"]
+            joint_pos = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(cid)]
+            if config["mode"] == "binary":
+                should_open = target[0] >= 0.0 if not config["inverted"] else target[0] > 0.0
+                if should_open:
+                    u = (
+                        config["control_limits"][ControlType.get_type(config["motor_type"])][1][cls.dof_idx(cid)]
+                        if config["open_qpos"] is None
+                        else config["open_qpos"]
+                    )
+                else:
+                    u = (
+                        config["control_limits"][ControlType.get_type(config["motor_type"])][0][cls.dof_idx(cid)]
+                        if config["closed_qpos"] is None
+                        else config["closed_qpos"]
+                    )
+            else:
+                u = cb.full((cls.control_dim(controller_id=cid),), target[0]) if len(target) == 1 else target
+
+            if config["motor_type"] in {"velocity", "torque"}:
+                violate_upper_limit = (
+                    joint_pos > config["control_limits"][ControlType.POSITION][1][cls.dof_idx(cid)] - config["limit_tolerance"]
+                )
+                violate_lower_limit = (
+                    joint_pos < config["control_limits"][ControlType.POSITION][0][cls.dof_idx(cid)] + config["limit_tolerance"]
+                )
+                violation = cb.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
+                u *= ~violation
+            cls._update_grasping_state(controller_id=cid)
+
+            control = cls.clip_control(cid, u)
             cls._controls[cid] = control
             results.append(control)
         return results
@@ -1308,39 +1777,47 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def begin_controller_step(cls):
+        """Clear the per-robot control accumulator cache at the start of each physics step.
+
+        Must be called once before ``step_controller_class`` to reset the
+        ``u_vec`` / ``u_type_vec`` buffers that accumulate controller outputs
+        during the step.
+        """
         Controller._ROBOT_CONTROL_STEP_CACHE.clear()
 
     @classmethod
     def step_controller_class(cls):
-        cls._control_dicts.clear()
+        """Compute and accumulate control outputs for all active controllers in one pass.
 
+        Iterates over every registered controller, skipping those belonging to robots
+        with no articulation root path (not yet fully initialised) or robots in the
+        ``_disabled_robots`` set. Lazily initialises the per-robot
+        ``_ROBOT_CONTROL_STEP_CACHE`` accumulator buffers on first use.
+
+        Active controllers are grouped by ``ControllerType`` so each type's batch
+        method is called once with all controllers of that type (maximising GPU
+        parallelism). Results are scattered into the robot-level ``u_vec`` /
+        ``u_type_vec`` buffers indexed by each controller's DOF indices.
+
+        Call order: ``begin_controller_step`` → ``step_controller_class`` → ``deploy_controller_step``.
+        """
         active_ids = []
         for controller_id in list(cls._configs.keys()):
             cls._goals.setdefault(controller_id, None)
             cls._controls.setdefault(controller_id, None)
-            robot = cls._robots.get(controller_id, None)
-            if robot is None:
+            robot_name = controller_id.split(":", 1)[0]
+            if robot_name not in cls._articulation_root_paths:
                 continue
-            if not robot.control_enabled:
-                continue
-            if robot._articulation_view_direct is None or not robot._articulation_view_direct.initialized:
+            if robot_name in cls._disabled_robots:
                 continue
 
-            robot_name = robot.name
-            cache = Controller._ROBOT_CONTROL_STEP_CACHE.get(robot_name, None)
+            cache = cls._ROBOT_CONTROL_STEP_CACHE.get(robot_name, None)
             if cache is None:
-                control_dict = robot.get_control_dict()
-                u_vec = cb.zeros(robot.n_dof)
-                u_type_vec = cb.array([ControlType.EFFORT] * robot.n_dof)
-                cache = {
-                    "robot": robot,
-                    "control_dict": control_dict,
-                    "u_vec": u_vec,
-                    "u_type_vec": u_type_vec,
-                }
-                Controller._ROBOT_CONTROL_STEP_CACHE[robot_name] = cache
-
-            cls._control_dicts[controller_id] = cache["control_dict"]
+                n_dof = cls._robot_n_dofs[robot_name]
+                u_vec = cb.zeros(n_dof)
+                u_type_vec = cb.array([ControlType.EFFORT] * n_dof)
+                cache = {"u_vec": u_vec, "u_type_vec": u_type_vec}
+                cls._ROBOT_CONTROL_STEP_CACHE[robot_name] = cache
             active_ids.append(controller_id)
 
         if not active_ids:
@@ -1349,72 +1826,143 @@ class Controller(Serializable, Recreatable):
         # Group by controller type
         type_groups = {}
         for cid in active_ids:
-            ctype = cls._types[cid]
-            type_groups.setdefault(ctype, []).append(cid)
+            type_groups.setdefault(cls._types[cid], []).append(cid)
 
         # Batch compute per type
         all_results = {}
         for ctype, cids in type_groups.items():
-            controls = cls.step_batch(cids, ctype)
-            for cid, control in zip(cids, controls):
+            for cid, control in zip(cids, cls.step_batch(cids, ctype)):
                 all_results[cid] = control
 
         # Scatter
         for controller_id in active_ids:
             control = all_results[controller_id]
-            robot_name = cls._robots[controller_id].name
-            cache = Controller._ROBOT_CONTROL_STEP_CACHE[robot_name]
+            robot_name = controller_id.split(":", 1)[0]
+            cache = cls._ROBOT_CONTROL_STEP_CACHE[robot_name]
             idx = cls.dof_idx(controller_id)
             cache["u_vec"][idx] = control
             cache["u_type_vec"][idx] = cls.control_type(controller_id)
 
     @classmethod
     def deploy_controller_step(cls):
-        for cache in Controller._ROBOT_CONTROL_STEP_CACHE.values():
-            robot = cache["robot"]
-            control, control_type = robot._postprocess_control(
-                control=cache["u_vec"], control_type=cache["u_type_vec"]
-            )
-            robot.deploy_control(control=control, control_type=control_type)
-        Controller._ROBOT_CONTROL_STEP_CACHE.clear()
+        """Write accumulated control signals to the physics simulator for all active robots.
+
+        Iterates over every robot that has an entry in ``_ROBOT_CONTROL_STEP_CACHE``,
+        partitions its DOFs by control type (POSITION, VELOCITY, EFFORT), and issues
+        the corresponding ControllableObjectViewAPI setter calls:
+
+        - POSITION: ``set_joint_position_targets`` + zero-velocity target to
+          prevent velocity-mode windup.
+        - VELOCITY: ``set_joint_velocity_targets``.
+        - EFFORT: ``set_joint_efforts``.
+
+        Clears ``_ROBOT_CONTROL_STEP_CACHE`` after deployment so stale outputs
+        are not re-applied in subsequent steps.
+        """
+        for robot_name, cache in cls._ROBOT_CONTROL_STEP_CACHE.items():
+            arpath = cls._articulation_root_paths[robot_name]
+            control = cache["u_vec"]
+            control_type = cache["u_type_vec"]
+
+            pos_idxs = cb.where(control_type == ControlType.POSITION)[0]
+            if len(pos_idxs) > 0:
+                ControllableObjectViewAPI.set_joint_position_targets(arpath, positions=control[pos_idxs], indices=pos_idxs)
+                ControllableObjectViewAPI.set_joint_velocity_targets(arpath, velocities=cb.zeros(len(pos_idxs)), indices=pos_idxs)
+            vel_idxs = cb.where(control_type == ControlType.VELOCITY)[0]
+            if len(vel_idxs) > 0:
+                ControllableObjectViewAPI.set_joint_velocity_targets(arpath, velocities=control[vel_idxs], indices=vel_idxs)
+            eff_idxs = cb.where(control_type == ControlType.EFFORT)[0]
+            if len(eff_idxs) > 0:
+                ControllableObjectViewAPI.set_joint_efforts(arpath, efforts=control[eff_idxs], indices=eff_idxs)
+        cls._ROBOT_CONTROL_STEP_CACHE.clear()
 
     @classmethod
     def apply_action(cls, controller_id: str, action):
-        robot = cls._robots[controller_id]
-        cls.update_goal(
-            controller_id=controller_id,
-            command=action,
-            control_dict=robot.get_control_dict(),
-        )
+        """Validate and apply a single action to one controller.
+
+        Asserts that the action length matches ``command_dim`` then delegates to
+        ``update_goal`` for preprocessing and goal storage.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            action: Action array of length ``command_dim(controller_id)``.
+        """
+        assert len(action) == cls.command_dim(controller_id)
+        cls.update_goal(controller_id=controller_id, command=action)
+
+    @classmethod
+    def apply_robot_action(cls, robot_name: str, action):
+        """Apply a full robot action vector to all controllers of a robot in registration order.
+
+        Slices the flat ``action`` vector into per-controller chunks sized by each
+        controller's ``command_dim`` and calls ``apply_action`` for each one.
+        The action must have already been processed by ``robot.prepare_action``
+        (normalisation and clamping applied by the environment).
+
+        Args:
+            robot_name (str): Name of the robot as used in controller IDs.
+            action: Flat action array whose total length equals the sum of
+                ``command_dim`` for all controllers in ``_robot_to_controllers[robot_name]``.
+        """
+        idx = 0
+        for cid in cls._robot_to_controllers.get(robot_name, []):
+            cmd_dim = cls.command_dim(cid)
+            cls.apply_action(cid, action[idx : idx + cmd_dim])
+            idx += cmd_dim
 
     # -------------------------------------------------------------------------
     # No-op goals / commands
     # -------------------------------------------------------------------------
 
     @classmethod
-    def compute_no_op_goal(cls, controller_id: str, control_dict):
+    def compute_no_op_goal(cls, controller_id: str):
+        """Compute a goal that keeps the robot in its current state (no movement).
+
+        The semantics depend on controller type:
+        - JointController / Holonomic (position motor): hold current joint positions.
+        - JointController / Holonomic (velocity/effort motor): zero velocity/effort.
+        - NullJointController: use the stored ``default_goal``.
+        - IK / OSC: hold the current EEF pose (read from ControllableObjectViewAPI).
+        - DifferentialDrive: zero linear and angular velocity.
+        - MultiFingerGripper (binary): sign matches current grasping state to avoid
+          unintended open/close; (position) holds current finger positions; (velocity) zeros.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            dict: Internal goal dict in the same format as the corresponding
+            ``_update_goal_*`` method would return.
+        """
         ctype = cls._types[controller_id]
         config = cls._configs[controller_id]
 
         if ctype in (ControllerType.JointController, ControllerType.HolonomicBaseJointController):
             if config["motor_type"] == "position":
-                target = control_dict[f"joint_{config['motor_type']}"][cls.dof_idx(controller_id)]
+                arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+                target = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(controller_id)]
             else:
                 target = cb.zeros(cls.control_dim(controller_id))
             return dict(target=target)
         elif ctype == ControllerType.NullJointController:
             return dict(target=cls._state[controller_id]["default_goal"])
         elif ctype == ControllerType.InverseKinematicsController:
+            arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+            pos_rel, quat_rel = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                arpath, config["_link_name"]
+            )
             return dict(
-                target_pos=cb.as_float32(control_dict[f"{config['task_name']}_pos_relative"]),
-                target_ori_mat=cb.as_float32(cb.T.quat2mat(control_dict[f"{config['task_name']}_quat_relative"])),
+                target_pos=cb.as_float32(pos_rel),
+                target_ori_mat=cb.as_float32(cb.T.quat2mat(quat_rel)),
             )
         elif ctype == ControllerType.OperationalSpaceController:
-            target_pos = cb.copy(control_dict[f"{config['task_name']}_pos_relative"])
-            target_quat = cb.copy(control_dict[f"{config['task_name']}_quat_relative"])
+            arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+            pos_rel, quat_rel = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                arpath, config["_link_name"]
+            )
             return dict(
-                target_pos=cb.as_float32(target_pos),
-                target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
+                target_pos=cb.as_float32(cb.copy(pos_rel)),
+                target_ori_mat=cb.as_float32(cb.T.quat2mat(cb.copy(quat_rel))),
             )
         elif ctype == ControllerType.DifferentialDriveController:
             return dict(vel=cb.zeros(2))
@@ -1426,7 +1974,8 @@ class Controller(Serializable, Recreatable):
                 target = cb.array([goal_sign])
             else:
                 if config["motor_type"] == "position":
-                    target = control_dict["joint_position"][cls.dof_idx(controller_id)]
+                    arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+                    target = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(controller_id)]
                 elif config["motor_type"] == "velocity":
                     target = cb.zeros(cls.command_dim(controller_id))
                 else:
@@ -1437,34 +1986,65 @@ class Controller(Serializable, Recreatable):
         raise ValueError(f"Unknown controller type: {ctype}")
 
     @classmethod
-    def compute_no_op_action(cls, controller_id: str, control_dict):
+    def compute_no_op_action(cls, controller_id: str):
+        """Compute the action (in input-command space) required to maintain the current state.
+
+        Ensures a no-op goal is set if none exists, then computes the corresponding
+        command via ``_compute_no_op_command`` and maps it back to the normalised
+        input range via ``_reverse_preprocess_command``. The result is a PyTorch
+        tensor that can be re-issued unchanged to produce no motion.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            torch.Tensor: No-op action in input-command space.
+        """
         if cls._goals[controller_id] is None:
-            cls._goals[controller_id] = cls.compute_no_op_goal(controller_id=controller_id, control_dict=control_dict)
-        command = cls._compute_no_op_command(controller_id=controller_id, control_dict=control_dict)
+            cls._goals[controller_id] = cls.compute_no_op_goal(controller_id=controller_id)
+        command = cls._compute_no_op_command(controller_id=controller_id)
         return cb.to_torch(cls._reverse_preprocess_command(controller_id=controller_id, processed_command=command))
 
     @classmethod
-    def _compute_no_op_command(cls, controller_id: str, control_dict):
+    def _compute_no_op_command(cls, controller_id: str):
+        """Compute the raw output-space command that corresponds to no motion.
+
+        Called internally by ``compute_no_op_action``. Returns the command in the
+        output (joint / task) space before the reverse-scaling step that maps it
+        back to the input range.
+
+        The command is read from the current joint or EEF state as appropriate for
+        the controller type. For delta-command controllers, the no-op is zero delta.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            Array: No-op command in output space (same units as ``command_output_limits``).
+        """
         ctype = cls._types[controller_id]
         config = cls._configs[controller_id]
 
         if ctype == ControllerType.NullJointController:
             return cb.array([])
         elif ctype in (ControllerType.JointController,):
+            arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
             if config["motor_type"] == "position":
                 if config["use_delta_commands"]:
                     return cb.zeros(cls.command_dim(controller_id))
-                return control_dict["joint_position"][cls.dof_idx(controller_id)]
+                return ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(controller_id)]
             if config["motor_type"] == "velocity":
                 if config["use_delta_commands"]:
-                    return -control_dict["joint_velocity"][cls.dof_idx(controller_id)]
+                    return -ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[cls.dof_idx(controller_id)]
                 return cb.zeros(cls.command_dim(controller_id))
             raise ValueError("Cannot compute noop action for effort motor type.")
         elif ctype == ControllerType.HolonomicBaseJointController:
             return cb.zeros(cls.command_dim(controller_id))
         elif ctype == ControllerType.InverseKinematicsController:
-            pos_relative = control_dict[f"{config['task_name']}_pos_relative"]
-            quat_relative = control_dict[f"{config['task_name']}_quat_relative"]
+            arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+            pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                arpath, config["_link_name"]
+            )
             command = cb.zeros(6)
             mode = config["mode"]
             if mode == "absolute_pose":
@@ -1473,8 +2053,10 @@ class Controller(Serializable, Recreatable):
                 command[3:] = cb.T.quat2axisangle(quat_relative)
             return command
         elif ctype == ControllerType.OperationalSpaceController:
-            pos_relative = control_dict[f"{config['task_name']}_pos_relative"]
-            quat_relative = control_dict[f"{config['task_name']}_quat_relative"]
+            arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+            pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                arpath, config["_link_name"]
+            )
             command = cb.zeros(6)
             if config["mode"] == "absolute_pose":
                 command[:3] = pos_relative
@@ -1489,8 +2071,9 @@ class Controller(Serializable, Recreatable):
                 if config["inverted"]:
                     command_val = -1 * command_val
                 return cb.array([command_val])
+            arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
             if config["motor_type"] == "position":
-                command = control_dict["joint_position"][cls.dof_idx(controller_id)]
+                command = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(controller_id)]
             elif config["motor_type"] == "velocity":
                 command = cb.zeros(cls.command_dim(controller_id))
             else:
@@ -1506,6 +2089,19 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _dump_state(cls, controller_id: str):
+        """Capture the current mutable state of a controller as a plain dict.
+
+        The dict always contains ``goal_is_valid`` (bool) and ``goal`` (None or a
+        dict of torch tensors). Type-specific additions:
+        - IK: includes ``control_filter`` state if a smoothing filter is active.
+        - MultiFingerGripper: includes ``vel_filter`` state.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            dict: Serialisable state snapshot.
+        """
         goal = cls._goals[controller_id]
         state = dict(
             goal_is_valid=goal is not None,
@@ -1521,6 +2117,17 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _load_state(cls, controller_id: str, state):
+        """Restore the mutable state of a controller from a previously dumped dict.
+
+        Converts goal tensor values from torch to the current compute backend format.
+        For IK and OSC controllers, restores ``fixed_quat_target`` when the mode is
+        ``position_fixed_ori``. Also restores the smoothing filter (IK) and velocity
+        filter (gripper) if included in the state dict.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            state (dict): State dict as returned by ``_dump_state``.
+        """
         if state["goal"] is None:
             cls._goals[controller_id] = None
         else:
@@ -1548,11 +2155,32 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def dump_state(cls, controller_id: str, serialized=False):
+        """Public wrapper to capture controller state, optionally as a flat tensor.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            serialized (bool): If True, returns a flat 1-D torch tensor via ``serialize``;
+                if False, returns the raw state dict.
+
+        Returns:
+            dict or torch.Tensor: Controller state in the requested format.
+        """
         state = cls._dump_state(controller_id=controller_id)
         return cls.serialize(controller_id=controller_id, state=state) if serialized else state
 
     @classmethod
     def load_state(cls, controller_id: str, state, serialized=False):
+        """Public wrapper to restore controller state from a dict or flat tensor.
+
+        When ``serialized=True``, first calls ``deserialize`` to reconstruct the
+        state dict from a 1-D tensor, asserting that all values were consumed.
+        Then delegates to ``_load_state``.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            state (dict or torch.Tensor): State produced by a prior ``dump_state`` call.
+            serialized (bool): Whether ``state`` is a flat tensor (True) or a dict (False).
+        """
         if serialized:
             orig_state_len = len(state)
             state, deserialized_items = cls.deserialize(controller_id=controller_id, state=state)
@@ -1564,6 +2192,22 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def serialize(cls, controller_id: str, state):
+        """Flatten the state dict into a 1-D torch tensor for checkpoint storage.
+
+        The layout is:
+        ``[goal_is_valid (1)] + [goal_values (goal_dim)] + [filter_state (optional)]``
+
+        For IK controllers, the smoothing filter state is appended if a filter exists.
+        For gripper controllers, the velocity filter state is appended.
+        When the goal is invalid, a zero tensor of ``goal_dim`` is used as placeholder.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            state (dict): State dict as returned by ``_dump_state``.
+
+        Returns:
+            torch.Tensor: 1-D flat tensor suitable for concatenation with other state tensors.
+        """
         goal_is_valid = state["goal_is_valid"]
         goal_state_flattened = (
             th.cat([goal_state.flatten() for goal_state in state["goal"].values()])
@@ -1588,6 +2232,21 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def deserialize(cls, controller_id: str, state):
+        """Reconstruct the state dict from a flat 1-D tensor produced by ``serialize``.
+
+        Reads the goal validity flag, then slices out each goal field according to
+        the shapes in ``config["goal_shapes"]``. Appends optional filter state
+        for IK and gripper controllers. Returns both the reconstructed dict and the
+        total number of elements consumed from the input tensor.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            state (torch.Tensor): Flat state tensor from a prior ``serialize`` call.
+
+        Returns:
+            tuple[dict, int]: ``(state_dict, elements_consumed)`` where
+            ``elements_consumed`` equals ``state_size(controller_id)``.
+        """
         goal_is_valid = bool(state[0])
         if goal_is_valid:
             idx = 1
@@ -1621,6 +2280,18 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _get_goal_shapes(cls, controller_id: str):
+        """Return a dict mapping goal field names to their tensor shapes for serialisation.
+
+        Shapes are used by ``serialize`` / ``deserialize`` to correctly flatten and
+        slice the goal dict. The dict is also used to compute ``goal_dim`` stored in
+        the config.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            dict[str, tuple]: ``{field_name: shape_tuple}`` for each goal field.
+        """
         ctype = cls._types[controller_id]
         if ctype in (ControllerType.JointController, ControllerType.NullJointController, ControllerType.HolonomicBaseJointController):
             return dict(target=(cls.control_dim(controller_id),))
@@ -1636,6 +2307,23 @@ class Controller(Serializable, Recreatable):
 
     @staticmethod
     def nums2array(nums, dim):
+        """Convert a scalar, list, or array to a backend array of length ``dim``.
+
+        - If ``nums`` is already a backend array, it is returned unchanged.
+        - If ``nums`` is any other iterable, it is wrapped with ``cb.array``.
+        - If ``nums`` is a scalar, ``cb.ones(dim) * nums`` is returned.
+        - Strings are rejected (common misconfiguration).
+
+        Args:
+            nums: Input value — scalar, iterable, or backend array.
+            dim (int): Target length when broadcasting a scalar.
+
+        Returns:
+            Array: Backend array of length ``dim``.
+
+        Raises:
+            TypeError: If ``nums`` is a string.
+        """
         if isinstance(nums, str):
             raise TypeError("Error: Only numeric inputs are supported for this function, nums2array!")
         return (
@@ -1648,6 +2336,17 @@ class Controller(Serializable, Recreatable):
     
     @classmethod
     def state_size(cls, controller_id: str):
+        """Return the total number of floats in the serialised state tensor.
+
+        Equals ``goal_dim + 1`` (for the validity flag) plus optional filter sizes
+        for IK (smoothing filter) and gripper (velocity filter) controllers.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            int: Number of elements consumed by ``serialize`` / ``deserialize``.
+        """
         size = cls.goal_dim(controller_id) + 1
         ctype = cls._types[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
@@ -1657,26 +2356,80 @@ class Controller(Serializable, Recreatable):
     
     @classmethod
     def goal(cls, controller_id: str):
+        """Return the current internal goal dict, or None if no goal has been set.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            dict or None: Current goal in the format produced by the corresponding
+            ``_update_goal_*`` method.
+        """
         return cls._goals[controller_id]
     
     @classmethod
     def goal_dim(cls, controller_id: str):
+        """Return the total number of scalar values in the goal dict when serialised.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            int: Sum of all goal field sizes (product of each field's shape).
+        """
         return cls._configs[controller_id]["goal_dim"]
     
     @classmethod
     def control(cls, controller_id: str):
+        """Return the most recently computed control output array, or None before the first step.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            Array or None: Last computed control signal.
+        """
         return cls._controls[controller_id]
     
     @classmethod
     def control_freq(cls, controller_id: str):
+        """Return the control frequency (Hz) configured for this controller.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            float: Control frequency in Hz.
+        """
         return cls._configs[controller_id]["control_freq"]
     
     @classmethod
     def control_dim(cls, controller_id: str):
+        """Return the number of actuated DOFs this controller drives.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            int: Number of DOFs (length of ``dof_idx``).
+        """
         return len(cls._configs[controller_id]["dof_idx"])
 
     @classmethod
     def control_type(cls, controller_id: str):
+        """Return the ControlType (POSITION / VELOCITY / EFFORT) output by this controller.
+
+        Joint-based controllers with impedance mode output EFFORT regardless of
+        ``motor_type``. OSC always outputs EFFORT. DD always outputs VELOCITY.
+        Gripper uses ``motor_type``.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            int: One of ``ControlType.POSITION``, ``ControlType.VELOCITY``, or
+            ``ControlType.EFFORT``.
+        """
         ctype = cls._types[controller_id]
         config = cls._configs[controller_id]
         if ctype in _JOINT_TYPES:
@@ -1691,6 +2444,21 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def command_dim(cls, controller_id: str):
+        """Return the expected length of the action command vector for this controller.
+
+        - NullJointController: 0 (no command input accepted).
+        - JointController / Holonomic: number of controlled DOFs.
+        - IK: determined by mode (3 for position-only, 6 for pose modes).
+        - OSC: ``config["command_dim"]`` (accounts for optional gain dimensions).
+        - DifferentialDrive: 2 (linear velocity, angular velocity).
+        - MultiFingerGripper: 1 in binary/smooth mode, number of fingers in independent mode.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            int: Expected command vector length.
+        """
         ctype = cls._types[controller_id]
         config = cls._configs[controller_id]
         if ctype == ControllerType.NullJointController:
@@ -1711,22 +2479,65 @@ class Controller(Serializable, Recreatable):
     
     @classmethod
     def isaac_kp(cls, controller_id: str):
+        """Return the Isaac Sim position gain array used by the physics engine's PD controller.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            Array or None: Per-DOF ``kp`` values, or None for effort-mode controllers.
+        """
         return cls._configs[controller_id]["isaac_kp"]
 
     @classmethod
     def isaac_kd(cls, controller_id: str):
+        """Return the Isaac Sim derivative gain array used by the physics engine's PD controller.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            Array or None: Per-DOF ``kd`` values, or None for effort-mode controllers.
+        """
         return cls._configs[controller_id]["isaac_kd"]
     
     @classmethod
     def command_input_limits(cls, controller_id: str):
+        """Return the (lower, upper) command input limits used for normalised-command scaling.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            tuple[Array, Array] or None: Per-dimension input bounds, or None if no clipping.
+        """
         return cls._configs[controller_id]["command_input_limits"]
 
     @classmethod
     def command_output_limits(cls, controller_id: str):
+        """Return the (lower, upper) command output limits in physical units (joint/task space).
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            tuple[Array, Array] or None: Per-dimension output bounds, or None if no scaling.
+        """
         return cls._configs[controller_id]["command_output_limits"]
 
     @classmethod
     def dof_idx(cls, controller_id: str):
+        """Return the integer indices of the robot DOFs driven by this controller.
+
+        These indices index into the full robot joint state arrays returned by
+        ControllableObjectViewAPI (e.g. ``get_joint_positions``).
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            Array[int]: 1-D integer index array of length ``control_dim``.
+        """
         return cls._configs[controller_id]["dof_idx"]
     
     # -------------------------------------------------------------------------
@@ -1735,6 +2546,17 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def is_grasping(cls, controller_id: str):
+        """Return the current grasping state for gripper controllers.
+
+        For non-gripper controllers, returns ``IsGraspingState.UNKNOWN`` (0)
+        since grasping is not applicable.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            IsGraspingState: TRUE (1), UNKNOWN (0), or FALSE (-1).
+        """
         ctype = cls._types[controller_id]
         if ctype == ControllerType.MultiFingerGripperController:
             return cls._state[controller_id]["is_grasping"]
@@ -1742,14 +2564,39 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def use_delta_commands(cls, controller_id: str):
+        """Return whether this controller interprets commands as incremental deltas.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            bool: True if commands are relative to the current state; False if absolute.
+        """
         return cls._configs[controller_id].get("use_delta_commands", False)
     
     @classmethod
     def motor_type(cls, controller_id: str):
+        """Return the motor type string for joint-based controllers, or None for others.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+
+        Returns:
+            str or None: One of "position", "velocity", "effort", or None.
+        """
         return cls._configs[controller_id].get("motor_type", None)
 
     @classmethod
     def update_default_goal(cls, controller_id: str, target):
+        """Update the default hold-position goal for a NullJointController.
+
+        Raises an AssertionError for any other controller type since only
+        NullJointController uses a stored default goal.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            target: New default goal array of length ``control_dim``.
+        """
         assert cls._types[controller_id] == ControllerType.NullJointController
         assert (
             len(target) == cls.control_dim(controller_id)
@@ -1758,6 +2605,14 @@ class Controller(Serializable, Recreatable):
 
     @classmethod
     def _clear_variable_gains(cls, controller_id: str):
+        """Reset variable OSC gains to None, clearing any gains set by a previous command.
+
+        Called during ``reset`` for OSC controllers so that the next step will
+        re-read gains from the command stream rather than using stale values.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+        """
         config = cls._configs[controller_id]
         if config["variable_kp"]:
             config["kp"] = None
@@ -1769,6 +2624,17 @@ class Controller(Serializable, Recreatable):
     
     @classmethod
     def _update_variable_gains(cls, controller_id: str, gains):
+        """Apply variable gains embedded in an OSC command to the controller config.
+
+        Slices the ``gains`` array into ``kp`` (6 dims), ``damping_ratio`` (6 dims),
+        and ``kp_null`` (control_dim dims) segments according to which are flagged as
+        variable. Also recomputes ``kd_null = 2 * sqrt(kp_null)`` when ``kp_null``
+        is variable.
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+            gains: Gain array extracted from the trailing dimensions of the OSC command.
+        """
         config = cls._configs[controller_id]
         idx = 0
         if config["variable_kp"]:
@@ -1783,9 +2649,29 @@ class Controller(Serializable, Recreatable):
             idx += cls.control_dim(controller_id)
 
     @classmethod
-    def _update_grasping_state(cls, controller_id: str, control_dict):
+    def _update_grasping_state(cls, controller_id: str):
+        """Update the ``is_grasping`` classification for a MultiFingerGripper controller.
+
+        Uses a moving-average filter on finger joint velocities (``vel_filter``) to
+        smooth out noise. The classification logic:
+
+        - **UNKNOWN**: independent mode (per-finger control), or inconsistent finger
+          commands, or position tolerance exceeds the limit tolerance threshold.
+        - **UNKNOWN**: fingers are near their target (position motor: position error
+          below threshold; velocity/torque motor: velocity command below threshold) —
+          i.e. fingers are freely closing/opening without contact.
+        - **TRUE**: fingers are away from both joint limits and not moving
+          (velocity below VEL_TOLERANCE) — i.e. an object is blocking closure.
+        - **FALSE**: all other cases (fingers at limit or moving freely).
+
+        Args:
+            controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
+        """
         config = cls._configs[controller_id]
-        finger_vel = cls._state[controller_id]["vel_filter"].estimate(control_dict["joint_velocity"][cls.dof_idx(controller_id)])
+        arpath = cls._articulation_root_paths[controller_id.split(":", 1)[0]]
+        finger_vel = cls._state[controller_id]["vel_filter"].estimate(
+            ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[cls.dof_idx(controller_id)]
+        )
 
         if config["mode"] == "independent":
             is_grasping = IsGraspingState.UNKNOWN
@@ -1796,7 +2682,7 @@ class Controller(Serializable, Recreatable):
         elif not m.POS_TOLERANCE > config["limit_tolerance"]:
             is_grasping = IsGraspingState.UNKNOWN
         else:
-            finger_pos = control_dict["joint_position"][cls.dof_idx(controller_id)]
+            finger_pos = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx(controller_id)]
 
             if config["motor_type"] == "position" and cb.abs(finger_pos - cls.control(controller_id)).mean() < m.POS_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
@@ -1824,12 +2710,41 @@ class Controller(Serializable, Recreatable):
 
 @torch_compile
 def _compute_joint_torques_torch(u: th.Tensor, mm: th.Tensor, dof_idx: th.Tensor):
+    """Compute impedance joint torques via the mass matrix for PyTorch tensors.
+
+    Selects the ``dof_idx × dof_idx`` sub-block from the full mass matrix and
+    left-multiplies it by the PD error vector ``u`` to produce torque commands.
+
+    Args:
+        u (th.Tensor): PD error vector of shape ``(n_dof,)``.
+        mm (th.Tensor): Full generalised mass matrix of shape ``(n_joints, n_joints)``,
+            already sliced to exclude the virtual base DOFs.
+        dof_idx (th.Tensor): Integer index tensor of length ``n_dof`` selecting the
+            controlled joints from the full joint set.
+
+    Returns:
+        th.Tensor: Torque vector of shape ``(n_dof,)``.
+    """
     dof_idxs_mat = th.meshgrid(dof_idx, dof_idx, indexing="xy")
     return mm[dof_idxs_mat] @ u
 
 
 @jit(nopython=True)
 def numba_ix(arr, rows, cols):
+    """Numba-accelerated 2-D fancy indexing for NumPy arrays.
+
+    Computes ``arr[rows][:, cols]`` without creating intermediate copies by
+    building a flat 1-D index and using ``np.take`` — required because Numba's
+    nopython mode does not support advanced NumPy indexing with two index arrays.
+
+    Args:
+        arr (np.ndarray): 2-D source array of shape ``(M, N)``.
+        rows (np.ndarray): 1-D integer row indices.
+        cols (np.ndarray): 1-D integer column indices.
+
+    Returns:
+        np.ndarray: Sub-matrix of shape ``(len(rows), len(cols))``.
+    """
     one_d_index = np.zeros(len(rows) * len(cols), dtype=np.int32)
     for i, r in enumerate(rows):
         start = i * len(cols)
@@ -1841,6 +2756,20 @@ def numba_ix(arr, rows, cols):
 
 @jit(nopython=True)
 def _compute_joint_torques_numpy(u, mm, dof_idx):
+    """Compute impedance joint torques via the mass matrix for NumPy arrays (Numba JIT).
+
+    Equivalent to ``_compute_joint_torques_torch`` but operating on NumPy arrays
+    using ``numba_ix`` for DOF sub-matrix extraction.
+
+    Args:
+        u (np.ndarray): PD error vector of shape ``(n_dof,)``.
+        mm (np.ndarray): Generalised mass matrix of shape ``(n_joints, n_joints)``,
+            already sliced to exclude virtual base DOFs.
+        dof_idx (np.ndarray): Integer index array of length ``n_dof``.
+
+    Returns:
+        np.ndarray: Torque vector of shape ``(n_dof,)``.
+    """
     return numba_ix(mm, dof_idx, dof_idx) @ u
 
 
@@ -1850,43 +2779,31 @@ add_compute_function(
 
 
 # =============================================================================
-# JIT Functions: IK Controller
+# JIT Functions: IK Controller (batched)
 # =============================================================================
-
-@th.jit.script
-def _compute_ik_qpos_torch(
-    q: th.Tensor, j_eef: th.Tensor, ee_pos: th.Tensor, ee_mat: th.Tensor,
-    goal_pos: th.Tensor, goal_ori_mat: th.Tensor, q_lower_limit: th.Tensor, q_upper_limit: th.Tensor,
-):
-    pos_err = goal_pos - ee_pos
-    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
-    err = th.cat([pos_err, ori_err])
-    j_eef_pinv = th.linalg.pinv(j_eef)
-    delta_j = j_eef_pinv @ err
-    target_joint_pos = q + delta_j
-    return target_joint_pos.clip(min=q_lower_limit, max=q_upper_limit)
-
-
-@jit(nopython=True)
-def _compute_ik_qpos_numpy(
-    q, j_eef, ee_pos, ee_mat, goal_pos, goal_ori_mat, q_lower_limit, q_upper_limit,
-):
-    pos_err = goal_pos - ee_pos
-    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
-    err = np.concatenate((pos_err, ori_err))
-    j_eef_pinv = np.linalg.pinv(j_eef)
-    delta_j = j_eef_pinv @ err
-    target_joint_pos = q + delta_j
-    return target_joint_pos.clip(q_lower_limit, q_upper_limit)
-
-
-add_compute_function(name="compute_ik_qpos", np_function=_compute_ik_qpos_numpy, th_function=_compute_ik_qpos_torch)
-
 
 def _compute_ik_qpos_batch_torch(
     q: th.Tensor, j_eef: th.Tensor, ee_pos: th.Tensor, ee_mat: th.Tensor,
     goal_pos: th.Tensor, goal_ori_mat: th.Tensor, q_lower_limit: th.Tensor, q_upper_limit: th.Tensor,
 ):
+    """Solve a batch of IK problems via Jacobian pseudo-inverse (PyTorch).
+
+    Computes the Jacobian pseudo-inverse and applies one damped-least-squares step:
+    ``q_target = q + J_pinv @ [pos_err; ori_err]``, then clips to joint limits.
+
+    Args:
+        q (th.Tensor): Current joint positions, shape ``(N, max_dim)``.
+        j_eef (th.Tensor): EEF Jacobians, shape ``(N, 6, max_dim)``.
+        ee_pos (th.Tensor): Current EEF positions in robot-root frame, shape ``(N, 3)``.
+        ee_mat (th.Tensor): Current EEF rotation matrices, shape ``(N, 3, 3)``.
+        goal_pos (th.Tensor): Target EEF positions, shape ``(N, 3)``.
+        goal_ori_mat (th.Tensor): Target EEF rotation matrices, shape ``(N, 3, 3)``.
+        q_lower_limit (th.Tensor): Lower joint limits, shape ``(N, max_dim)``.
+        q_upper_limit (th.Tensor): Upper joint limits, shape ``(N, max_dim)``.
+
+    Returns:
+        th.Tensor: Target joint positions clipped to limits, shape ``(N, max_dim)``.
+    """
     pos_err = goal_pos - ee_pos
     ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
     err = th.cat([pos_err, ori_err], dim=-1)
@@ -1899,6 +2816,24 @@ def _compute_ik_qpos_batch_torch(
 def _compute_ik_qpos_batch_numpy(
     q, j_eef, ee_pos, ee_mat, goal_pos, goal_ori_mat, q_lower_limit, q_upper_limit,
 ):
+    """Solve a batch of IK problems via Jacobian pseudo-inverse (NumPy).
+
+    NumPy equivalent of ``_compute_ik_qpos_batch_torch``. Identical algorithm
+    using ``np.linalg.pinv`` and ``np.concatenate``.
+
+    Args:
+        q (np.ndarray): Current joint positions, shape ``(N, max_dim)``.
+        j_eef (np.ndarray): EEF Jacobians, shape ``(N, 6, max_dim)``.
+        ee_pos (np.ndarray): Current EEF positions, shape ``(N, 3)``.
+        ee_mat (np.ndarray): Current EEF rotation matrices, shape ``(N, 3, 3)``.
+        goal_pos (np.ndarray): Target EEF positions, shape ``(N, 3)``.
+        goal_ori_mat (np.ndarray): Target EEF rotation matrices, shape ``(N, 3, 3)``.
+        q_lower_limit (np.ndarray): Lower joint limits, shape ``(N, max_dim)``.
+        q_upper_limit (np.ndarray): Upper joint limits, shape ``(N, max_dim)``.
+
+    Returns:
+        np.ndarray: Target joint positions clipped to limits, shape ``(N, max_dim)``.
+    """
     pos_err = goal_pos - ee_pos
     ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
     err = np.concatenate([pos_err, ori_err], axis=-1)
@@ -1914,98 +2849,50 @@ add_compute_function(
 
 
 # =============================================================================
-# JIT Functions: OSC Controller
+# JIT Functions: OSC Controller (batched)
 # =============================================================================
-
-@th.jit.script
-def _compute_osc_torques_torch(
-    q: th.Tensor, qd: th.Tensor, mm: th.Tensor, j_eef: th.Tensor,
-    ee_pos: th.Tensor, ee_mat: th.Tensor, ee_lin_vel: th.Tensor, ee_ang_vel_err: th.Tensor,
-    goal_pos: th.Tensor, goal_ori_mat: th.Tensor,
-    kp: th.Tensor, kd: th.Tensor, kp_null: th.Tensor, kd_null: th.Tensor,
-    rest_qpos: th.Tensor, control_dim: int, decouple_pos_ori: bool,
-    base_lin_vel: th.Tensor, base_ang_vel: th.Tensor,
-):
-    mm_inv = th.linalg.inv(mm)
-    pos_err = goal_pos - ee_pos
-    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
-    err = th.cat((pos_err, ori_err))
-    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos) - ee_lin_vel
-    vel_err = th.cat((lin_vel_err, ee_ang_vel_err))
-    err = th.unsqueeze(kp * err + kd * vel_err, dim=-1)
-    m_eef_inv = j_eef @ mm_inv @ j_eef.T
-    m_eef = th.linalg.inv(m_eef_inv)
-
-    if decouple_pos_ori:
-        m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
-        m_eef_ori_inv = j_eef[3:, :] @ mm_inv @ j_eef[3:, :].T
-        m_eef_pos = th.linalg.inv(m_eef_pos_inv)
-        m_eef_ori = th.linalg.inv(m_eef_ori_inv)
-        wrench_pos = m_eef_pos @ err[:3, :]
-        wrench_ori = m_eef_ori @ err[3:, :]
-        wrench = th.cat((wrench_pos, wrench_ori))
-    else:
-        wrench = m_eef @ err
-
-    u = j_eef.T @ wrench
-
-    if rest_qpos is not None:
-        j_eef_inv = m_eef @ j_eef @ mm_inv
-        u_null = kd_null * -qd + kp_null * wrap_angle(rest_qpos - q)
-        u_null = mm @ th.unsqueeze(u_null, dim=-1)
-        u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
-
-    return u
-
-
-@jit(nopython=True)
-def _compute_osc_torques_numpy(
-    q, qd, mm, j_eef, ee_pos, ee_mat, ee_lin_vel, ee_ang_vel_err,
-    goal_pos, goal_ori_mat, kp, kd, kp_null, kd_null, rest_qpos,
-    control_dim, decouple_pos_ori, base_lin_vel, base_ang_vel,
-):
-    mm_inv = np.linalg.inv(mm)
-    pos_err = goal_pos - ee_pos
-    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
-    err = np.concatenate((pos_err, ori_err))
-    lin_vel_err = base_lin_vel + np.cross(base_ang_vel, ee_pos) - ee_lin_vel
-    vel_err = np.concatenate((lin_vel_err, ee_ang_vel_err))
-    err = np.expand_dims(kp * err + kd * vel_err, axis=-1)
-    m_eef_inv = j_eef @ mm_inv @ j_eef.T
-    m_eef = np.linalg.inv(m_eef_inv)
-
-    if decouple_pos_ori:
-        m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
-        m_eef_ori_inv = j_eef[3:, :] @ mm_inv @ j_eef[3:, :].T
-        m_eef_pos = np.linalg.inv(m_eef_pos_inv)
-        m_eef_ori = np.linalg.inv(m_eef_ori_inv)
-        wrench_pos = m_eef_pos @ err[:3, :]
-        wrench_ori = m_eef_ori @ err[3:, :]
-        wrench = np.concatenate((wrench_pos, wrench_ori))
-    else:
-        wrench = m_eef @ err
-
-    u = j_eef.T @ wrench
-
-    if rest_qpos is not None:
-        j_eef_inv = m_eef @ j_eef @ mm_inv
-        u_null = kd_null * -qd + kp_null * ((rest_qpos - q + np.pi) % (2 * np.pi) - np.pi)
-        u_null = mm @ np.expand_dims(u_null, axis=-1).astype(np.float32)
-        u += (np.eye(control_dim, dtype=np.float32) - j_eef.T @ j_eef_inv) @ u_null
-
-    return u
-
-
-add_compute_function(
-    name="compute_osc_torques", np_function=_compute_osc_torques_numpy, th_function=_compute_osc_torques_torch
-)
-
 
 def _compute_osc_torques_batch_torch(
     q, qd, mm, j_eef, ee_pos, ee_mat, ee_lin_vel, ee_ang_vel_err,
     goal_pos, goal_ori_mat, kp, kd, kp_null, kd_null, rest_qpos,
     max_dim, decouple_pos_ori, base_lin_vel, base_ang_vel,
 ):
+    """Compute OSC joint torques for a batch of controllers (PyTorch).
+
+    Implements the full Operational Space Control law with optional position/orientation
+    decoupling and null-space posture control:
+
+    1. Task-space PD error: ``task_err = kp * (goal - ee) + kd * vel_err``
+    2. Operational-space inertia: ``M_ee = (J M^{-1} J^T)^{-1}``
+    3. Task wrench: ``F = M_ee @ task_err`` (or decoupled pos/ori separately)
+    4. Joint torques: ``u = J^T @ F``
+    5. Null-space torques projected onto the null-space of J to pull joints toward
+       ``rest_qpos`` without disturbing the EEF pose.
+
+    Args:
+        q: Joint positions ``(N, max_dim)``.
+        qd: Joint velocities ``(N, max_dim)``.
+        mm: Mass matrices ``(N, max_dim, max_dim)``.
+        j_eef: EEF Jacobians ``(N, 6, max_dim)``.
+        ee_pos: EEF positions ``(N, 3)``.
+        ee_mat: EEF rotation matrices ``(N, 3, 3)``.
+        ee_lin_vel: EEF linear velocities in robot frame ``(N, 3)``.
+        ee_ang_vel_err: Angular velocity error (axis-angle) ``(N, 3)``.
+        goal_pos: Target EEF positions ``(N, 3)``.
+        goal_ori_mat: Target EEF rotation matrices ``(N, 3, 3)``.
+        kp: Proportional gains ``(N, 6)``.
+        kd: Derivative gains ``(N, 6)``.
+        kp_null: Null-space proportional gains ``(N, max_dim)``.
+        kd_null: Null-space derivative gains ``(N, max_dim)``.
+        rest_qpos: Rest joint positions for null-space control ``(N, max_dim)``.
+        max_dim (int): Padded joint dimension (for batching heterogeneous robots).
+        decouple_pos_ori (bool): If True, compute separate inertia for position and orientation.
+        base_lin_vel: Robot base linear velocity ``(N, 3)`` for velocity error computation.
+        base_ang_vel: Robot base angular velocity ``(N, 3)`` for velocity error computation.
+
+    Returns:
+        Tensor: Joint torques ``(N, max_dim)``.
+    """
     mm_inv = th.linalg.inv(mm)
     pos_err = goal_pos - ee_pos
     ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
@@ -2044,6 +2931,36 @@ def _compute_osc_torques_batch_numpy(
     goal_pos, goal_ori_mat, kp, kd, kp_null, kd_null, rest_qpos,
     max_dim, decouple_pos_ori, base_lin_vel, base_ang_vel,
 ):
+    """Compute OSC joint torques for a batch of controllers (NumPy).
+
+    NumPy equivalent of ``_compute_osc_torques_batch_torch``. Uses
+    ``np.linalg.inv``, ``np.concatenate``, and ``np.expand_dims`` in place
+    of their PyTorch counterparts. Identical OSC algorithm and argument layout.
+
+    Args:
+        q: Joint positions ``(N, max_dim)``.
+        qd: Joint velocities ``(N, max_dim)``.
+        mm: Mass matrices ``(N, max_dim, max_dim)``.
+        j_eef: EEF Jacobians ``(N, 6, max_dim)``.
+        ee_pos: EEF positions ``(N, 3)``.
+        ee_mat: EEF rotation matrices ``(N, 3, 3)``.
+        ee_lin_vel: EEF linear velocities in robot frame ``(N, 3)``.
+        ee_ang_vel_err: Angular velocity error (axis-angle) ``(N, 3)``.
+        goal_pos: Target EEF positions ``(N, 3)``.
+        goal_ori_mat: Target EEF rotation matrices ``(N, 3, 3)``.
+        kp: Proportional gains ``(N, 6)``.
+        kd: Derivative gains ``(N, 6)``.
+        kp_null: Null-space proportional gains ``(N, max_dim)``.
+        kd_null: Null-space derivative gains ``(N, max_dim)``.
+        rest_qpos: Rest joint positions ``(N, max_dim)``.
+        max_dim (int): Padded joint dimension.
+        decouple_pos_ori (bool): Separate position/orientation inertia if True.
+        base_lin_vel: Robot base linear velocity ``(N, 3)``.
+        base_ang_vel: Robot base angular velocity ``(N, 3)``.
+
+    Returns:
+        np.ndarray: Joint torques ``(N, max_dim)``.
+    """
     mm_inv = np.linalg.inv(mm)
     pos_err = goal_pos - ee_pos
     ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)

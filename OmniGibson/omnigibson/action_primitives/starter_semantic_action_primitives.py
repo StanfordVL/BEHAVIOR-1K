@@ -30,6 +30,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.macros import macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.controllers import Controller, ControllerType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 from omnigibson.robots import Robot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -168,21 +169,24 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._tracking_object = None
 
         # Store the current position of the arm as the arm target
-        control_dict = self.robot.get_control_dict()
         self._arm_targets = {}
         self._reset_eef_pose = {}
         if self.robot.is_manipulation:
             for arm_name in self.robot.arm_names:
-                eef = f"eef_{arm_name}"
                 arm = f"arm_{arm_name}"
                 cid = self.robot._controller_id(arm)
                 if Controller._types[cid] == ControllerType.InverseKinematicsController:
-                    pos_relative = cb.to_torch(control_dict[f"{eef}_pos_relative"])
-                    quat_relative = cb.to_torch(control_dict[f"{eef}_quat_relative"])
+                    eef_link_name = self.robot.eef_link_names[arm_name]
+                    pos_relative_raw, quat_relative_raw = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                        self.robot.articulation_root_path, eef_link_name
+                    )
+                    pos_relative = cb.to_torch(pos_relative_raw)
+                    quat_relative = cb.to_torch(quat_relative_raw)
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
-                    arm_target = cb.to_torch(control_dict["joint_position"])[Controller.dof_idx(cid)]
+                    joint_positions = ControllableObjectViewAPI.get_joint_positions(self.robot.articulation_root_path)
+                    arm_target = cb.to_torch(joint_positions)[Controller.dof_idx(cid)]
                     self._arm_targets[arm] = arm_target
 
                 self._reset_eef_pose[arm_name] = self.robot.get_relative_eef_pose(arm_name)
@@ -1460,9 +1464,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     else:
                         partial_action = target_joint_pos
             else:
-                partial_action = Controller.compute_no_op_action(
-                    cid, self.robot.get_control_dict()
-                )
+                partial_action = Controller.compute_no_op_action(cid)
             action_idx = self.robot.controller_action_idx[name]
             action[action_idx] = partial_action
         return action
