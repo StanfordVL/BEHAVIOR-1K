@@ -27,7 +27,7 @@ class GeomPrim(XFormPrim):
     created from scratch.
 
     Geom prims are not inherently distinguished as collision or visual. Instead, at the link level
-    (RigidPrim), they are tracked separately based on whether they appear under a collision scope prim.
+    (RigidPrim), they are tracked separately based on whether they appear with a CollisionAPI or as a child of one.
     Collision-related APIs and methods live on RigidPrim and operate on all collision meshes of a link.
 
     Args:
