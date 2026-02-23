@@ -13,14 +13,14 @@ log = create_module_logger(module_name=__name__)
 
 def make_glass(prim):
     """
-    Links the OmniGlass material with EntityPrim, RigidPrim, or VisualGeomPrim @obj, and procedurally generates
+    Links the OmniGlass material with EntityPrim, RigidPrim, or GeomPrim @obj, and procedurally generates
     the necessary OmniGlass material prim if necessary.
 
     Args:
-        prim (EntityPrim or RigidPrim or VisualGeomPrim): Desired prim to convert into glass
+        prim (EntityPrim or RigidPrim or GeomPrim): Desired prim to convert into glass
     """
     # Do this here to avoid circular imports
-    from omnigibson.prims import EntityPrim, RigidPrim, VisualGeomPrim
+    from omnigibson.prims import EntityPrim, RigidPrim, GeomPrim
 
     # Generate the set of visual meshes we'll convert into glass
     if isinstance(prim, EntityPrim):
@@ -29,12 +29,12 @@ def make_glass(prim):
     elif isinstance(prim, RigidPrim):
         # Grab all visual meshes from the link
         visual_meshes = [vm for vm in prim.visual_meshes.values()]
-    elif isinstance(prim, VisualGeomPrim):
+    elif isinstance(prim, GeomPrim):
         # Just use this visual mesh
         visual_meshes = [prim]
     else:
         raise ValueError(
-            "Inputted prim must an instance of EntityPrim, RigidPrim, or VisualGeomPrim "
+            "Inputted prim must an instance of EntityPrim, RigidPrim, or GeomPrim "
             "in order to be converted into glass!"
         )
 

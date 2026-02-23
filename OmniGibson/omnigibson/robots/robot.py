@@ -48,7 +48,7 @@ from omnigibson.controllers import (
 )
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.object_states import ContactBodies
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
@@ -535,8 +535,8 @@ class Robot(USDObject, GymObservable):
             # We need to manually set it back to sphere approximation
             for wheel_name in self.floor_touching_base_link_names:
                 wheel_link = self.links[wheel_name]
-                assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
-                wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+                assert len(wheel_link.collision_meshes) == 1, "Wheel link should only have 1 collision!"
+                wheel_link.set_collision_approximation("boundingSphere")
         if self._definition.visual_only_eef_links:
             # The eef gripper links should be visual-only. They only contain a "ghost" box volume
             # for detecting objects inside the gripper, in order to activate attachments (AG for Cloths).
@@ -2013,7 +2013,7 @@ class Robot(USDObject, GymObservable):
                             extents=0.005,
                             primitive_type="Sphere",
                         )
-                        vis_geom = VisualGeomPrim(
+                        vis_geom = GeomPrim(
                             relative_prim_path=absolute_prim_path_to_scene_relative(
                                 scene=self.scene,
                                 absolute_prim_path=vis_mesh_prim_path,
