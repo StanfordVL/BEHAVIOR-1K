@@ -92,6 +92,7 @@ jobs:
         with:
           name: profiling-${{ matrix.name }}
           path: OmniGibson/output.json
+          if-no-files-found: warn
 
   report:
     name: Compile Profiling Report
@@ -103,13 +104,14 @@ jobs:
     steps:
       - name: Download PR profiling results
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           path: pr-results
           pattern: profiling-*
 
       - name: Restore baseline from main
-        id: baseline-cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: baseline
           key: profiling-baseline-${{ github.event.pull_request.base.sha }}
@@ -241,11 +243,28 @@ jobs:
     needs: [profile]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Download profiling results
-        uses: actions/download-artifact@v4
+      - name: Restore previous baseline
+        uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: baseline
+          key: profiling-baseline-do-not-match
+          restore-keys: |
+            profiling-baseline-
+
+      - name: Download new profiling results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: new-results
           pattern: profiling-*
+
+      - name: Merge into baseline
+        run: |
+          mkdir -p baseline
+          if [ -d new-results ]; then
+            cp -r new-results/* baseline/
+          fi
 
       - name: Save baseline cache
         uses: actions/cache/save@v4
