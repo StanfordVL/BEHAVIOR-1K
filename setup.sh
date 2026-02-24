@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e -x
+set -e
 
 # Parse arguments
 HELP=false
@@ -231,6 +231,7 @@ if [ "$NEW_ENV" = true ]; then
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
     echo "✓ PyTorch installation completed"
 fi
+
 # Install BDDL
 if [ "$BDDL" = true ]; then
     echo "Installing BDDL..."
