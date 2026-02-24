@@ -100,20 +100,19 @@ def prim_paths_to_rigid_prims(prim_paths, scene):
     return rigid_prims
 
 
-def get_rigid_contact_bodies(obj, ignore_objs=None, non_zero_impulse=False):
+def get_rigid_contact_bodies(obj, ignore_objs=None):
     """
     Returns rigid prims currently (or persistently) in contact with @obj via RigidContactAPI.
 
     Args:
         obj (EntityPrim): Object whose rigid links should be checked.
         ignore_objs (None or tuple): Optional objects to filter out from the returned contacts.
-        non_zero_impulse (bool): If True, only include contacts whose cached impulse norm is non-zero.
 
     Returns:
         set of RigidPrim: Contacting rigid prims not owned by @obj.
     """
     scene_idx = obj.scene.idx
-    if scene_idx not in RigidContactAPI._CONTACT_MATRIX:
+    if not RigidContactAPI.has_scene(scene_idx):
         return set()
 
     my_link_paths = list(obj.link_prim_paths)
@@ -121,12 +120,7 @@ def get_rigid_contact_bodies(obj, ignore_objs=None, non_zero_impulse=False):
     bodies = set()
     for row_path, col_path in RigidContactAPI.get_contact_pairs(scene_idx=scene_idx, row_prim_paths=my_link_paths):
         if row_path in my_link_path_set and col_path not in my_link_path_set:
-            if not non_zero_impulse:
-                bodies.add(col_path)
-            else:
-                impulse = RigidContactAPI.get_impulses([row_path], [col_path])[0, 0]
-                if th.norm(impulse) > 0:
-                    bodies.add(col_path)
+            bodies.add(col_path)
 
     rigid_prims = prim_paths_to_rigid_prims(bodies, obj.scene)
     assert ignore_objs is None or isinstance(

@@ -212,9 +212,6 @@ class RigidContactAPIImpl:
         # Current cached contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
         self._CONTACT_MATRIX = dict()
 
-        # Cached relative positions for body pairs. Shape: (N, N, 3)
-        self._REL_POSITIONS = dict()
-
         # Cached contact data keyed by (row_idx, col_idx), where each value is a list of contact tuples
         self._PAIRWISE_CONTACT_DATA = dict()
 
@@ -274,7 +271,7 @@ class RigidContactAPIImpl:
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=f"/World/scene_{scene_idx}/*/*",
                     filter_patterns=scene_body_filters,
-                    max_contact_data_count=self.get_max_contact_data_count(),
+                    max_contact_data_count=self.get_max_contact_data_count(len(scene_body_filters)),
                 )
                 sensor_paths = list(self._CONTACT_VIEW[scene_idx].sensor_paths)
                 if set(sensor_paths) != set(scene_body_filters):
@@ -285,6 +282,13 @@ class RigidContactAPIImpl:
                         f"Expected {len(scene_body_filters)} bodies, got {len(sensor_paths)} sensors. "
                         f"Missing sensors ({len(missing_sensors)}): {missing_sensors}. "
                         f"Extra sensors ({len(extra_sensors)}): {extra_sensors}."
+                    )
+                if sensor_paths != list(scene_body_filters):
+                    raise AssertionError(
+                        "RigidContactAPI contact-view ordering mismatch. "
+                        "Contact view sensor_paths must match filter_patterns (scene_body_filters) order "
+                        "so that the shared row/column index mapping is correct. "
+                        f"Expected order: {list(scene_body_filters)}. Got: {sensor_paths}."
                     )
 
                 self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_body_view(
@@ -312,9 +316,15 @@ class RigidContactAPIImpl:
 
                 n_bodies = len(sensor_paths)
                 self._CONTACT_MATRIX[scene_idx] = th.zeros((n_bodies, n_bodies, 3), dtype=th.float32)
-                self._REL_POSITIONS[scene_idx] = None
                 self._PAIRWISE_CONTACT_DATA[scene_idx] = dict()
                 self._BODY_TRANSFORMS[scene_idx] = None
+
+    def has_scene(self, scene_idx):
+        """
+        Returns:
+            bool: Whether contact data is available for the given scene index.
+        """
+        return scene_idx in self._CONTACT_MATRIX
 
     def get_scene_idx(self, prim_path):
         """
@@ -422,11 +432,11 @@ class RigidContactAPIImpl:
 
             transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
             positions = transforms[:, :3]
-            rel_positions = positions[:, None, :] - positions[None, :, :]
+            n = positions.shape[0]
 
             prev_transforms = self._BODY_TRANSFORMS.get(scene_idx, None)
             if scene_idx not in self._CONTACT_MATRIX or prev_transforms is None:
-                changed_pairs = th.ones(rel_positions.shape[:2], dtype=th.bool)
+                changed_pairs = th.ones((n, n), dtype=th.bool)
             else:
                 prev_positions = prev_transforms[:, :3]
                 prev_orientations = prev_transforms[:, 3:7]
@@ -444,8 +454,10 @@ class RigidContactAPIImpl:
             )
             cached_impulses[changed_pairs] = current_impulses[changed_pairs]
             self._CONTACT_MATRIX[scene_idx] = cached_impulses
-            self._REL_POSITIONS[scene_idx] = rel_positions
             self._BODY_TRANSFORMS[scene_idx] = transforms.clone()
+
+            if not th.any(changed_pairs).item():
+                continue
 
             current_contact_data = self._collect_current_contact_data(scene_idx=scene_idx)
             pairwise_contact_data = self._PAIRWISE_CONTACT_DATA[scene_idx]
@@ -578,7 +590,6 @@ class RigidContactAPIImpl:
         self._CONTACT_VIEW = dict()
         self._RIGID_BODY_VIEW = dict()
         self._CONTACT_MATRIX = dict()
-        self._REL_POSITIONS = dict()
         self._PAIRWISE_CONTACT_DATA = dict()
         self._BODY_TRANSFORMS = dict()
 

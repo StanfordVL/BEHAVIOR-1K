@@ -546,7 +546,7 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
     for category in GROUND_CATEGORIES:
         filter_objs.extend(robot.scene.object_registry("category", category, []))
 
-    return any(get_rigid_contact_bodies(robot, ignore_objs=tuple(filter_objs), non_zero_impulse=True))
+    return any(get_rigid_contact_bodies(robot, ignore_objs=tuple(filter_objs)))
 
 
 def astar(search_map, start, goal, eight_connected=True):
