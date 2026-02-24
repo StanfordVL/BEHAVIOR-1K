@@ -24,45 +24,36 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Baselines (GPU dynamics on)
+          # Baselines (GPU dynamics, flatcache)
           - name: baseline-empty
-            args: "-g"
-            label: "Empty scene (GPU dyn.)"
+            args: "-g -f"
+            label: "Empty scene"
+          - name: baseline-empty-1robot
+            args: "-g -f -r 1"
+            label: "Empty scene + 1 Robot"
           - name: baseline-rs-int
-            args: "-g -s Rs_int"
-            label: "Rs_int (GPU dyn.)"
-          - name: baseline-rs-int-1fetch
-            args: "-g -s Rs_int -r 1"
-            label: "Rs_int + 1 Fetch (GPU dyn.)"
-          - name: baseline-rs-int-3fetch
-            args: "-g -s Rs_int -r 3"
-            label: "Rs_int + 3 Fetch (GPU dyn.)"
-          # Different scenes (GPU dynamics off)
-          - name: scene-ihlen
-            args: "-r 1 -s Ihlen_0_int"
-            label: "Ihlen_0_int + 1 Fetch"
-          - name: scene-pomaria
-            args: "-r 1 -s Pomaria_0_garden"
-            label: "Pomaria_0_garden + 1 Fetch"
+            args: "-g -f -s Rs_int"
+            label: "Rs_int"
+          - name: baseline-rs-int-1robot
+            args: "-g -f -s Rs_int -r 1"
+            label: "Rs_int + 1 Robot"
+          # Scenes (flatcache vs non-flatcache)
           - name: scene-house
+            args: "-f -r 1 -s house_single_floor"
+            label: "house_single_floor + 1 Robot"
+          - name: scene-house-no-flatcache
             args: "-r 1 -s house_single_floor"
-            label: "house_single_floor + 1 Fetch"
-          - name: scene-grocery
-            args: "-r 1 -s grocery_store_cafe"
-            label: "grocery_store_cafe + 1 Fetch"
-          # Non-physics features (GPU dynamics on)
+            label: "house_single_floor + 1 Robot (no flatcache)"
+          # Non-physics features (GPU dynamics, flatcache)
           - name: feature-fluids
-            args: "-g -r 1 -w"
-            label: "1 Fetch + fluids (GPU dyn.)"
+            args: "-g -f -r 1 -w"
+            label: "1 Robot + fluids"
           - name: feature-cloth
-            args: "-g -r 1 -c"
-            label: "1 Fetch + cloth (GPU dyn.)"
+            args: "-g -f -r 1 -c"
+            label: "1 Robot + cloth"
           - name: feature-particles
-            args: "-g -r 1 -p"
-            label: "1 Fetch + macro particles (GPU dyn.)"
-          - name: feature-all
-            args: "-g -r 1 -w -c -p"
-            label: "1 Fetch + all features (GPU dyn.)"
+            args: "-g -f -r 1 -p"
+            label: "1 Robot + macro particles"
 
     defaults:
       run:
@@ -124,26 +115,23 @@ jobs:
           import json, os
 
           SCENARIOS = [
-              ("profiling-baseline-empty",       "Empty scene",              "Baselines (GPU dynamics on)"),
-              ("profiling-baseline-rs-int",       "Rs_int",                  "Baselines (GPU dynamics on)"),
-              ("profiling-baseline-rs-int-1fetch","Rs_int + 1 Fetch",        "Baselines (GPU dynamics on)"),
-              ("profiling-baseline-rs-int-3fetch","Rs_int + 3 Fetch",        "Baselines (GPU dynamics on)"),
-              ("profiling-scene-ihlen",           "Ihlen_0_int + 1 Fetch",   "Scenes (GPU dynamics off)"),
-              ("profiling-scene-pomaria",         "Pomaria_0_garden + 1 Fetch","Scenes (GPU dynamics off)"),
-              ("profiling-scene-house",           "house_single_floor + 1 Fetch","Scenes (GPU dynamics off)"),
-              ("profiling-scene-grocery",         "grocery_store_cafe + 1 Fetch","Scenes (GPU dynamics off)"),
-              ("profiling-feature-fluids",        "1 Fetch + fluids",        "Non-physics features (GPU dynamics on)"),
-              ("profiling-feature-cloth",         "1 Fetch + cloth",         "Non-physics features (GPU dynamics on)"),
-              ("profiling-feature-particles",     "1 Fetch + macro particles","Non-physics features (GPU dynamics on)"),
-              ("profiling-feature-all",           "1 Fetch + all features",  "Non-physics features (GPU dynamics on)"),
+              ("profiling-baseline-empty",            "Empty scene",                          "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-baseline-empty-1robot",     "Empty scene + 1 Robot",                "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-baseline-rs-int",           "Rs_int",                               "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-baseline-rs-int-1robot",    "Rs_int + 1 Robot",                     "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-scene-house",               "house_single_floor + 1 Robot",         "Scenes"),
+              ("profiling-scene-house-no-flatcache",  "house_single_floor + 1 Robot (no FC)", "Scenes"),
+              ("profiling-feature-fluids",            "1 Robot + fluids",                     "Non-physics features (GPU dynamics, flatcache)"),
+              ("profiling-feature-cloth",             "1 Robot + cloth",                      "Non-physics features (GPU dynamics, flatcache)"),
+              ("profiling-feature-particles",         "1 Robot + macro particles",            "Non-physics features (GPU dynamics, flatcache)"),
           ]
 
-          METRICS = ["FPS", "Loading time", "Omni step time", "Non-omni step time", "Memory usage", "Vram usage"]
+          METRICS = ["FPS", "Loading time", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
           HEADERS = {
               "FPS": "FPS",
               "Loading time": "Load (s)",
-              "Omni step time": "Omni (ms)",
-              "Non-omni step time": "OG (ms)",
+              "Isaac step time": "Isaac (ms)",
+              "Non-Isaac step time": "Non-Isaac (ms)",
               "Memory usage": "Mem (GB)",
               "Vram usage": "VRAM (GB)",
           }
