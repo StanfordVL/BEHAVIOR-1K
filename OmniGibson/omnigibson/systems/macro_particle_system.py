@@ -5,7 +5,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import torch_delete
@@ -14,6 +14,7 @@ from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     scene_relative_prim_path_to_absolute,
+    setup_collision_apis,
 )
 from omnigibson.utils.vision_utils import add_semantic_label
 
@@ -461,7 +462,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             )
             prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             add_semantic_label(prim=prim, label=self.name)
-        result = VisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
+        result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
         return result
 
@@ -1217,8 +1218,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             mass_api = lazy.pxr.UsdPhysics.MassAPI.Apply(prim)
             mass_api.GetDensityAttr().Set(self.particle_density)
             add_semantic_label(prim=prim, label=self.name)
-        result = CollisionVisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
+        result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
+        setup_collision_apis(result.prim)
         result.apply_physics_material(self.particle_physics_material)
         return result
 

@@ -7,7 +7,7 @@ import time
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
-from omnigibson.prims import VisualGeomPrim
+from omnigibson.prims import GeomPrim
 from omnigibson.prims.material_prim import OmniPBRMaterialPrim
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.usd_utils import create_primitive_mesh, absolute_prim_path_to_scene_relative
@@ -360,7 +360,7 @@ def setup_camera_blinking_visualizers(camera_paths, scene):
                 "Cube",
                 extents=[2.0, 1.0, 0.01]
             )
-            vis_geom = VisualGeomPrim(
+            vis_geom = GeomPrim(
                 relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
                 name=f"{cam_path}:blink_vis_sphere"
             )
@@ -491,7 +491,7 @@ def setup_robot_visualizers(robot, scene):
                 "Cylinder",
                 extents=1.0
             )
-            vis_geom = VisualGeomPrim(
+            vis_geom = GeomPrim(
                 relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
                 name=f"{robot.name}:arm_{arm}:vis_cylinder_{axis}"
             )
@@ -516,7 +516,7 @@ def setup_robot_visualizers(robot, scene):
                 "Sphere",
                 extents=1.0
             )
-            vis_geom = VisualGeomPrim(
+            vis_geom = GeomPrim(
                 relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
                 name=f"{robot.name}:arm_{arm}:vis_sphere"
             )
@@ -540,7 +540,7 @@ def setup_robot_visualizers(robot, scene):
                 "Cylinder",
                 extents=1.0
             )
-            vis_geom = VisualGeomPrim(
+            vis_geom = GeomPrim(
                 relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
                 name=f"{robot.name}:arm_{arm}:vis_vertical"
             )
@@ -593,7 +593,7 @@ def setup_robot_visualizers(robot, scene):
                 "Cylinder",
                 extents=1.0
             )
-            edge_geom = VisualGeomPrim(
+            edge_geom = GeomPrim(
                 relative_prim_path=absolute_prim_path_to_scene_relative(scene, edge_prim_path),
                 name=f"{robot.name}:square_edge_{name}"
             )
@@ -847,7 +847,7 @@ def setup_object_beacons(task_relevant_objects, scene):
             "Cylinder",
             extents=1.0
         )
-        beacon = VisualGeomPrim(
+        beacon = GeomPrim(
             relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
             name=f"{obj.name}:beacon_cylinder"
         )
@@ -904,7 +904,7 @@ def setup_task_visualizers(task_relevant_objects, scene):
                         "Cylinder",
                         extents=1.0
                     )
-                    visualizer = VisualGeomPrim(
+                    visualizer = GeomPrim(
                         relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
                         name=f"{obj.name}:attachment_frame_{axis}"
                     )

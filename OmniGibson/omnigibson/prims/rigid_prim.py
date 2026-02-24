@@ -10,13 +10,14 @@ from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
+    apply_collision_approximation,
     check_extent_radius_ratio,
     get_mesh_volume_and_com,
 )
@@ -69,6 +70,12 @@ class RigidPrim(XFormPrim):
         self._collision_meshes = None
         self._visual_meshes = None
         self._belongs_to_articulation = None
+
+        # Collision API references collected from the prim hierarchy (not 1:1 with meshes).
+        # A single CollisionAPI on a scope prim may cover multiple geom prims.
+        self._collision_apis = None  # list of UsdPhysics.CollisionAPI
+        self._physx_collision_apis = None  # list of PhysxSchema.PhysxCollisionAPI
+        self._mesh_collision_apis = None  # list of (USD prim, UsdPhysics.MeshCollisionAPI)
 
         # Run super init
         super().__init__(
@@ -163,104 +170,94 @@ class RigidPrim(XFormPrim):
     def update_meshes(self):
         """
         Helper function to refresh owned visual and collision meshes. Useful for synchronizing internal data if
-        additional bodies are added manually
+        additional bodies are added manually.
+
+        Collision vs. visual meshes are distinguished at the link level based on whether the geom prim
+        appears as or under a prim that already has a UsdPhysics.CollisionAPI or PhysxSchema.PhysxCollisionAPI.
+        The existing API references are collected into flat lists during traversal -- a single CollisionAPI
+        on a scope prim may cover multiple geom prims underneath it, so the API lists are not 1:1 with meshes.
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
+        self._collision_apis = []
+        self._physx_collision_apis = []
+        self._mesh_collision_apis = []
 
-        # Need to explicitly check for instanced children here since they may include instanced meshes
-        def set_non_instanced(prim):
-            # Make sure all nested children are NOT instanceable, because it breaks backwards-compatibility
-            if prim.IsInstanceable():
-                prim.SetInstanceable(False)
-                # Explicitly load this prim so that its xform properties are generated automatically
-                xform = XFormPrim(
-                    relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
-                    name=f"{prim.GetName()}_non_instanced",
-                    load_config=None,
-                )
-                xform.load(self.scene)
-            return True
+        # Recursively find all geom prims, collecting collision API references into
+        # the link-level lists as they are encountered during descent.
+        geom_prims = []
 
-        # We don't do this recurisvely to save on compute, since we know the immediate children are instances if this
-        # does happen
-        # self.modify_children_prims(fcn=set_non_instanced, recursive=False, include_instances=True)
+        def _find_geom_prims(prim, is_collision=False):
+            # If this prim has collision APIs, add them to the link-level lists
+            if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
+                self._collision_apis.append(lazy.pxr.UsdPhysics.CollisionAPI(prim))
+                is_collision = True
+            if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI):
+                self._physx_collision_apis.append(lazy.pxr.PhysxSchema.PhysxCollisionAPI(prim))
+                is_collision = True
 
-        # Now iterate again and grab all the (potentially updated, newly non-instanced) meshes
-        prims_to_check = self.get_children_prims(recursive=True, include_instances=True, return_nested_dict=True)
+            if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
+                # MeshCollisionAPI is inherently per-geom-prim; store alongside prim reference
+                if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI):
+                    self._mesh_collision_apis.append((prim, lazy.pxr.UsdPhysics.MeshCollisionAPI(prim)))
+                geom_prims.append((prim, is_collision))
 
-        def _infer_meshes_recursively(prims_dict, current_local_tf, current_scale):
-            vols, coms = [], []
-            # Iterate through each prim, subsequent children in prims_dict
-            for prim, children_dict in prims_dict.items():
-                prim_type = prim.GetPrimTypeInfo().GetTypeName()
-                prim_path = prim.GetPrimPath().pathString
-                # Record this transform, if it has one
-                if prim.GetProperty("xformOp:translate").IsValid():
-                    prim_pos, prim_quat = lazy.isaacsim.core.utils.xforms.get_local_pose(prim_path)
-                    prim_pos = th.as_tensor(prim_pos, dtype=th.float32)
-                    prim_quat = th.as_tensor(prim_quat[[1, 2, 3, 0]], dtype=th.float32)
-                    prim_local_tf = T.pose2mat((prim_pos, prim_quat))
-                    prim_local_scale = th.tensor(prim.GetAttribute("xformOp:scale").Get())
-                    # Compute nested scale now because we're going to modify prim_local_tf in place
-                    nested_scale = current_scale * prim_local_tf[:3, :3] @ prim_local_scale
-                    prim_local_tf[:3, :3] *= prim_local_scale.unsqueeze(-1)
-                    nested_tf = current_local_tf @ prim_local_tf
-                else:
-                    nested_tf = current_local_tf
-                    nested_scale = current_scale
-                if prim_type in GEOM_TYPES:
-                    # Only GeomSubsets are allowed to be children (used for mapping to different materials)
-                    for child in children_dict.keys():
-                        assert (
-                            child.GetPrimTypeInfo().GetTypeName() == "GeomSubset"
-                        ), f"Only 'GeomSubset' prims should be owned by a Mesh prim, but found other prims at: {prim_path}"
-                    # Raw meshes themselves could be nested, and share the same name so we convert their (unique) prim path
-                    # into a string we'll use for their name
-                    mesh_name = prim_path.split(self.prim_path)[-1].strip("/").replace("/", "_")
-                    is_collision = prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
-                    mesh_kwargs = {
-                        "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, prim_path),
-                        "name": mesh_name,
-                        "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
-                        "link": self,
-                    }
-                    if is_collision:
-                        mesh = CollisionGeomPrim(**mesh_kwargs)
-                        mesh.load(self.scene)
-                        # We also modify the collision mesh's contact and rest offsets, since omni's default values result
-                        # in lightweight objects sometimes not triggering contacts correctly
-                        mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
-                        mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
-                        self._collision_meshes[mesh_name] = mesh
+            for child in prim.GetChildren():
+                _find_geom_prims(child, is_collision)
 
-                        volume, com = get_mesh_volume_and_com(prim)
-                        # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
-                        vols.append(volume * th.prod(nested_scale))
-                        com_link_frame = (nested_tf @ th.cat([com, th.tensor([1.0])]))[:3]
-                        coms.append(com_link_frame)
-                        # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
-                        # boundingCube approximation for the underlying collision approximation for GPU compatibility
-                        if not check_extent_radius_ratio(mesh, com):
-                            log.warning(
-                                f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation"
-                            )
-                            mesh.set_collision_approximation("boundingCube")
-                    else:
-                        self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
-                        self._visual_meshes[mesh_name].load(self.scene)
+        _find_geom_prims(self._prim)
 
-                # Iterate through all nested descendants
-                nested_vols, nested_cols = _infer_meshes_recursively(children_dict, nested_tf, nested_scale)
-                vols += nested_vols
-                coms += nested_cols
+        # Set default contact/rest offsets on all PhysxCollisionAPIs
+        for api in self._physx_collision_apis:
+            api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
+            api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
 
-            return vols, coms
+        coms, vols = [], []
+        for prim, is_collision in geom_prims:
+            mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
+            mesh_kwargs = {
+                "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
+                "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
+                "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
+            }
+            mesh = GeomPrim(**mesh_kwargs)
+            mesh.load(self.scene)
+            if is_collision:
+                # Collision meshes should not show up in rendering by default
+                mesh.purpose = "guide"
+                self._collision_meshes[mesh_name] = mesh
 
-        # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
-        # for this link
-        vols, coms = _infer_meshes_recursively(
-            prims_dict=prims_to_check, current_local_tf=th.eye(4), current_scale=th.ones(3)
-        )
+                volume, com = get_mesh_volume_and_com(mesh.prim)
+                # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
+                local_pos, local_orn = mesh.get_position_orientation(frame="parent")
+                vols.append(volume * th.prod(mesh.scale))
+                coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
+                # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
+                # boundingCube approximation for the underlying collision approximation for GPU compatibility
+                if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) and not check_extent_radius_ratio(mesh, com):
+                    log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
+                    apply_collision_approximation(prim, lazy.pxr.UsdPhysics.MeshCollisionAPI(prim), "boundingCube")
+            else:
+                self._visual_meshes[mesh_name] = mesh
+                # TODO: tmp fix for visible metalinks
+                if "meta" in mesh.name:
+                    if "togglebutton" in mesh.name:
+                        # Make sure togglebutton mesh is visible
+                        mesh.purpose = "default"
+                    elif any(
+                        metalink in mesh.name
+                        for metalink in [
+                            "particlesource",
+                            "particlesink",
+                            "fillable",
+                            "particleremover",
+                            "particleapplier",
+                            "slicer",
+                        ]
+                    ):
+                        # Make sure particlesource, particlesink and fillable meshes are not visible
+                        mesh.purpose = "guide"
+
+        # If we have any collision meshes, compute the center of mass from collision geometry
         if len(coms) > 0:
             coms_tensor = th.stack(coms)
             vols_tensor = th.tensor(vols).unsqueeze(1)
@@ -269,19 +266,72 @@ class RigidPrim(XFormPrim):
 
     def enable_collisions(self):
         """
-        Enable collisions for this RigidPrim
+        Enable collisions for all collision meshes owned by this RigidPrim
         """
-        # Iterate through all owned collision meshes and toggle on their collisions
-        for col_mesh in self._collision_meshes.values():
-            col_mesh.collision_enabled = True
+        for collision_api in self._collision_apis:
+            collision_api.GetCollisionEnabledAttr().Set(True)
 
     def disable_collisions(self):
         """
-        Disable collisions for this RigidPrim
+        Disable collisions for all collision meshes owned by this RigidPrim
         """
-        # Iterate through all owned collision meshes and toggle off their collisions
-        for col_mesh in self._collision_meshes.values():
-            col_mesh.collision_enabled = False
+        for collision_api in self._collision_apis:
+            collision_api.GetCollisionEnabledAttr().Set(False)
+
+    def set_contact_offset(self, offset):
+        """
+        Set contact offset for all collision APIs in this link.
+
+        Args:
+            offset (float): Contact offset of a collision shape. Allowed range [maximum(0, rest_offset), 0].
+                            Default value is -inf, means default is picked by simulation based on the shape extent.
+        """
+        for api in self._physx_collision_apis:
+            api.GetContactOffsetAttr().Set(offset)
+
+    def set_rest_offset(self, offset):
+        """
+        Set rest offset for all collision APIs in this link.
+
+        Args:
+            offset (float): Rest offset of a collision shape. Allowed range [-max_float, contact_offset.
+                            Default value is -inf, means default is picked by simulation. For rigid bodies its zero.
+        """
+        for api in self._physx_collision_apis:
+            api.GetRestOffsetAttr().Set(offset)
+
+    def set_torsional_patch_radius(self, radius):
+        """
+        Set torsional patch radius for all collision APIs in this link.
+
+        Args:
+            radius (float): radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
+        """
+        for api in self._physx_collision_apis:
+            api.GetTorsionalPatchRadiusAttr().Set(radius)
+
+    def set_min_torsional_patch_radius(self, radius):
+        """
+        Set minimum torsional patch radius for all collision APIs in this link.
+
+        Args:
+            radius (float): minimum radius of the contact patch used to apply torsional friction.
+                            Allowed range [0, max_float].
+        """
+        for api in self._physx_collision_apis:
+            api.GetMinTorsionalPatchRadiusAttr().Set(radius)
+
+    def set_collision_approximation(self, approximation_type):
+        """
+        Set collision approximation for all mesh collision APIs in this link.
+
+        Args:
+            approximation_type (str): approximation used for collision.
+                Can be one of: {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf",
+                    "boundingSphere", "boundingCube"}
+        """
+        for prim, mesh_collision_api in self._mesh_collision_apis:
+            apply_collision_approximation(prim, mesh_collision_api, approximation_type)
 
     def update_handles(self):
         """
@@ -323,7 +373,7 @@ class RigidPrim(XFormPrim):
     def collision_meshes(self):
         """
         Returns:
-            dict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
+            dict: Dictionary mapping collision mesh names (str) to mesh prims (GeomPrim) owned by
                 this rigid body
         """
         return self._collision_meshes
@@ -332,7 +382,7 @@ class RigidPrim(XFormPrim):
     def visual_meshes(self):
         """
         Returns:
-            dict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
+            dict: Dictionary mapping visual mesh names (str) to mesh prims (GeomPrim) owned by
                 this rigid body
         """
         return self._visual_meshes

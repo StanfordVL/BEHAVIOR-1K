@@ -17,7 +17,7 @@ from omnigibson.object_states.object_state_base import IntrinsicObjectState
 from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems import MicroParticleSystem
 from omnigibson.systems.system_base import PhysicalParticleSystem
@@ -158,7 +158,7 @@ def create_projection_visualization(
     prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
     create_primitive_mesh(prototype_path, primitive_type="Sphere")
     relative_prototype_path = absolute_prim_path_to_scene_relative(scene, prototype_path)
-    prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=f"{projection_name}_prototype")
+    prototype = GeomPrim(relative_prim_path=relative_prototype_path, name=f"{projection_name}_prototype")
     prototype.load(scene)
     prototype.initialize()
     # Set the scale (native scaling --> radius 0.5) and possibly update the material
@@ -403,7 +403,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     )
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
-            self.projection_mesh = VisualGeomPrim(
+            self.projection_mesh = GeomPrim(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path),
                 name=f"{name_prefix}_projection_mesh",
             )
@@ -475,7 +475,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 for shape_attr, default_val in shape_defaults.items():
                     if shape_attr in property_names:
                         indicator_mesh_prim.GetAttribute(shape_attr).Set(default_val)
-                indicator_mesh = VisualGeomPrim(
+                indicator_mesh = GeomPrim(
                     relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, indicator_mesh_path),
                     name=f"{name_prefix}_projection_mesh_direction_indicator",
                 )
@@ -1128,7 +1128,7 @@ class ParticleApplier(ParticleModifier):
             relative_projection_source_path = absolute_prim_path_to_scene_relative(
                 self.obj.scene, projection_visualization_path
             )
-            self.projection_source_sphere = VisualGeomPrim(
+            self.projection_source_sphere = GeomPrim(
                 relative_prim_path=relative_projection_source_path, name=f"{name_prefix}_projection_source_sphere"
             )
             self.projection_source_sphere.load(self.obj.scene)
