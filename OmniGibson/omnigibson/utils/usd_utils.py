@@ -1,5 +1,4 @@
 import collections
-import itertools
 import os
 import re
 from collections.abc import Iterable
@@ -198,23 +197,23 @@ class RigidContactAPIImpl:
     def __init__(self):
         self._PATH_TO_SCENE_IDX = dict()
 
-        # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
-        self._PATH_TO_IDX = dict()
+        # Dictionary mapping rigid body prim path to corresponding row / col index in the contact view matrix
+        self._PATH_TO_ROW_IDX = dict()
+        self._PATH_TO_COL_IDX = dict()
 
-        # Array of rigid body prim paths where each array index maps directly to the contact matrix index
-        self._IDX_TO_PATH = dict()
+        # Arrays of rigid body prim paths where each array index maps directly to the contact matrix row / col
+        self._ROW_IDX_TO_PATH = dict()
+        self._COL_IDX_TO_PATH = dict()
 
         # Contact view for generating contact matrices at each timestep
         self._CONTACT_VIEW = dict()
 
-        # Rigid body view for batched body transform reads
+        # Rigid body view for batched body transform reads used by persistence logic
         self._RIGID_BODY_VIEW = dict()
+        self._PATH_TO_RIGID_BODY_VIEW_IDX = dict()
 
-        # Current cached contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
+        # Current contacts over all tracked rigid bodies at the current timestep. Shape: (R, C, 3)
         self._CONTACT_MATRIX = dict()
-
-        # Cached contact data keyed by (row_idx, col_idx), where each value is a list of contact tuples
-        self._PAIRWISE_CONTACT_DATA = dict()
 
         # Cached body transforms used for change detection. Shape: (N, 7) [pos(3), quat(4)]
         self._BODY_TRANSFORMS = dict()
@@ -267,57 +266,58 @@ class RigidContactAPIImpl:
                 if len(scene_body_filters) == 0:
                     continue
 
-                # Contact view rows and columns should both correspond to rigid dynamic links.
-                # We assert this and then use one shared index mapping for row/column access.
+                # Rows correspond to dynamic rigid prims only, while columns correspond to all rigid prims.
+                scene_dynamic_body_filters = []
+                for obj in og.sim.scenes[scene_idx].objects:
+                    if obj.prim_type == PrimType.RIGID:
+                        for link in obj.links.values():
+                            from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+
+                            if isinstance(link, RigidDynamicPrim) and link.contact_reporting_enabled:
+                                scene_dynamic_body_filters.append(link.prim_path)
+
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=f"/World/scene_{scene_idx}/*/*",
                     filter_patterns=scene_body_filters,
                     max_contact_data_count=self.get_max_contact_data_count(len(scene_body_filters)),
                 )
-                sensor_paths = list(self._CONTACT_VIEW[scene_idx].sensor_paths)
-                if set(sensor_paths) != set(scene_body_filters):
-                    missing_sensors = sorted(set(scene_body_filters) - set(sensor_paths))
-                    extra_sensors = sorted(set(sensor_paths) - set(scene_body_filters))
+                row_paths = list(self._CONTACT_VIEW[scene_idx].sensor_paths)
+                col_paths = list(getattr(self._CONTACT_VIEW[scene_idx], "filter_patterns", scene_body_filters))
+
+                if set(row_paths) != set(scene_dynamic_body_filters):
+                    missing_rows = sorted(set(scene_dynamic_body_filters) - set(row_paths))
+                    extra_rows = sorted(set(row_paths) - set(scene_dynamic_body_filters))
                     raise AssertionError(
-                        "RigidContactAPI contact-view path mismatch. "
-                        f"Expected {len(scene_body_filters)} bodies, got {len(sensor_paths)} sensors. "
-                        f"Missing sensors ({len(missing_sensors)}): {missing_sensors}. "
-                        f"Extra sensors ({len(extra_sensors)}): {extra_sensors}."
+                        "RigidContactAPI contact-view row mismatch. "
+                        f"Expected {len(scene_dynamic_body_filters)} dynamic rows, got {len(row_paths)} rows. "
+                        f"Missing rows ({len(missing_rows)}): {missing_rows}. "
+                        f"Extra rows ({len(extra_rows)}): {extra_rows}."
                     )
-                if sensor_paths != list(scene_body_filters):
+
+                if set(col_paths) != set(scene_body_filters):
+                    missing_cols = sorted(set(scene_body_filters) - set(col_paths))
+                    extra_cols = sorted(set(col_paths) - set(scene_body_filters))
                     raise AssertionError(
-                        "RigidContactAPI contact-view ordering mismatch. "
-                        "Contact view sensor_paths must match filter_patterns (scene_body_filters) order "
-                        "so that the shared row/column index mapping is correct. "
-                        f"Expected order: {list(scene_body_filters)}. Got: {sensor_paths}."
+                        "RigidContactAPI contact-view column mismatch. "
+                        f"Expected {len(scene_body_filters)} rigid columns, got {len(col_paths)} columns. "
+                        f"Missing columns ({len(missing_cols)}): {missing_cols}. "
+                        f"Extra columns ({len(extra_cols)}): {extra_cols}."
                     )
+
+                self._ROW_IDX_TO_PATH[scene_idx] = row_paths
+                self._COL_IDX_TO_PATH[scene_idx] = col_paths
+                self._PATH_TO_ROW_IDX[scene_idx] = {path: i for i, path in enumerate(row_paths)}
+                self._PATH_TO_COL_IDX[scene_idx] = {path: i for i, path in enumerate(col_paths)}
+                for link_path in set(row_paths).union(col_paths):
+                    self._PATH_TO_SCENE_IDX[link_path] = scene_idx
 
                 self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_body_view(
                     pattern=f"/World/scene_{scene_idx}/*/*"
                 )
-                view_prim_paths = list(self._RIGID_BODY_VIEW[scene_idx].prim_paths)
-                if set(view_prim_paths) != set(scene_body_filters):
-                    missing_view_paths = sorted(set(scene_body_filters) - set(view_prim_paths))
-                    extra_view_paths = sorted(set(view_prim_paths) - set(scene_body_filters))
-                    raise AssertionError(
-                        "RigidContactAPI rigid-body-view path mismatch. "
-                        f"Expected {len(scene_body_filters)} bodies, got {len(view_prim_paths)} paths. "
-                        f"Missing view paths ({len(missing_view_paths)}): {missing_view_paths}. "
-                        f"Extra view paths ({len(extra_view_paths)}): {extra_view_paths}."
-                    )
-                assert view_prim_paths == sensor_paths, (
-                    "RigidContactAPI assumes rigid_body_view and rigid_contact_view use identical body ordering; "
-                    "got a mismatch. If this assumption no longer holds, restore explicit reordering."
-                )
-
-                self._IDX_TO_PATH[scene_idx] = sensor_paths
-                self._PATH_TO_IDX[scene_idx] = {path: i for i, path in enumerate(sensor_paths)}
-                for link_path in sensor_paths:
-                    self._PATH_TO_SCENE_IDX[link_path] = scene_idx
-
-                n_bodies = len(sensor_paths)
-                self._CONTACT_MATRIX[scene_idx] = th.zeros((n_bodies, n_bodies, 3), dtype=th.float32)
-                self._PAIRWISE_CONTACT_DATA[scene_idx] = dict()
+                self._PATH_TO_RIGID_BODY_VIEW_IDX[scene_idx] = {
+                    path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))
+                }
+                self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths), 3), dtype=th.float32)
                 self._BODY_TRANSFORMS[scene_idx] = None
 
     def has_scene(self, scene_idx):
@@ -340,84 +340,44 @@ class RigidContactAPIImpl:
             int: row idx assigned to the rigid body defined by @prim_path
         """
         scene_idx = self._PATH_TO_SCENE_IDX[prim_path]
-        return scene_idx, self._PATH_TO_IDX[scene_idx][prim_path]
+        return scene_idx, self._PATH_TO_ROW_IDX[scene_idx][prim_path]
 
     def get_body_col_idx(self, prim_path):
         """
         Returns:
             int: col idx assigned to the rigid body defined by @prim_path
         """
-        return self.get_body_row_idx(prim_path)
+        scene_idx = self._PATH_TO_SCENE_IDX[prim_path]
+        return scene_idx, self._PATH_TO_COL_IDX[scene_idx][prim_path]
 
     def get_row_idx_prim_path(self, scene_idx, idx):
         """
         Returns:
             str: @prim_path corresponding to the row idx @idx in the contact matrix
         """
-        return self._IDX_TO_PATH[scene_idx][idx]
+        return self._ROW_IDX_TO_PATH[scene_idx][idx]
 
     def get_col_idx_prim_path(self, scene_idx, idx):
         """
         Returns:
             str: @prim_path corresponding to the column idx @idx in the contact matrix
         """
-        return self.get_row_idx_prim_path(scene_idx, idx)
+        return self._COL_IDX_TO_PATH[scene_idx][idx]
 
     def get_all_impulses(self, scene_idx):
         """
         Grab all impulses at the current timestep
 
         Returns:
-            n-array: (N, N, 3) impulse array defining current impulses between all N tracked rigid bodies
+            n-array: (R, C, 3) impulse array defining current impulses between tracked row and column rigid bodies
         """
         if scene_idx not in self._CONTACT_MATRIX:
             return th.zeros((0, 0, 3), dtype=th.float32)
         return self._CONTACT_MATRIX[scene_idx]
 
-    def _collect_current_contact_data(self, scene_idx):
-        """
-        Collects current-step contact data directly from PhysX and returns a dictionary keyed by (row_idx, col_idx).
-        """
-        forces, points, normals, separations, contact_counts, start_indices = self._CONTACT_VIEW[
-            scene_idx
-        ].get_contact_data(dt=1.0)
-        data_by_pair = dict()
-        n_truncated_pairs = 0
-        for row in range(contact_counts.shape[0]):
-            for col in range(contact_counts.shape[1]):
-                n_contacts = int(contact_counts[row, col])
-                if n_contacts == 0:
-                    continue
-                start_idx = int(start_indices[row, col])
-                end_idx = start_idx + n_contacts
-                if start_idx >= len(forces) or end_idx > len(forces):
-                    n_truncated_pairs += 1
-                    continue
-                row_prim_path = self.get_row_idx_prim_path(scene_idx, row)
-                col_prim_path = self.get_col_idx_prim_path(scene_idx, col)
-                data_by_pair[(row, col)] = list(
-                    zip(
-                        itertools.repeat(row_prim_path),
-                        itertools.repeat(col_prim_path),
-                        forces[start_idx:end_idx],
-                        points[start_idx:end_idx],
-                        normals[start_idx:end_idx],
-                        separations[start_idx:end_idx],
-                    )
-                )
-
-        if n_truncated_pairs > 0:
-            log.warning(
-                f"RigidContactAPI contact data truncated for {n_truncated_pairs} body pairs in scene_{scene_idx}. "
-                "Consider increasing max_contact_data_count."
-            )
-
-        return data_by_pair
-
     def update_contact_cache(self):
         """
-        Updates persistent contact caches from the latest physics step. Pairwise values are only refreshed for pairs
-        whose relative positions changed; unchanged pairs preserve their cached contact state.
+        Updates contact caches from the latest physics step.
         """
         for scene_idx in list(self._CONTACT_VIEW.keys()):
             try:
@@ -428,170 +388,97 @@ class RigidContactAPIImpl:
                     "This is expected if the physics sim view is not yet initialized, e.g. you are loading "
                     "a scene for the first time."
                 )
-                self.clear()
-                return
+                # Keep previous cache if the view is transiently invalid.
+                continue
+
+            if scene_idx not in self._CONTACT_MATRIX:
+                self._CONTACT_MATRIX[scene_idx] = current_impulses
+                continue
+
+            prev_impulses = self._CONTACT_MATRIX[scene_idx]
+            if prev_impulses.shape != current_impulses.shape:
+                self._CONTACT_MATRIX[scene_idx] = current_impulses
+                continue
+
+            if scene_idx not in self._RIGID_BODY_VIEW or scene_idx not in self._PATH_TO_RIGID_BODY_VIEW_IDX:
+                self._CONTACT_MATRIX[scene_idx] = current_impulses
+                continue
 
             transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
-            positions = transforms[:, :3]
-            n = positions.shape[0]
-
             prev_transforms = self._BODY_TRANSFORMS.get(scene_idx, None)
-            if scene_idx not in self._CONTACT_MATRIX or prev_transforms is None:
-                changed_pairs = th.ones((n, n), dtype=th.bool)
-            else:
-                prev_positions = prev_transforms[:, :3]
-                prev_orientations = prev_transforms[:, 3:7]
-                curr_orientations = transforms[:, 3:7]
+            if prev_transforms is None or prev_transforms.shape != transforms.shape:
+                self._CONTACT_MATRIX[scene_idx] = current_impulses
+                self._BODY_TRANSFORMS[scene_idx] = transforms.clone()
+                continue
 
-                pos_changed = th.any(th.abs(positions - prev_positions) > self._POS_EPS, dim=-1)
-                # Quaternion sign ambiguity: compare |dot(q_prev, q_curr)|
-                ori_aligned = th.abs(th.sum(prev_orientations * curr_orientations, dim=-1))
+            path_to_view_idx = self._PATH_TO_RIGID_BODY_VIEW_IDX[scene_idx]
+            tracked_paths = set(self._ROW_IDX_TO_PATH[scene_idx]).union(self._COL_IDX_TO_PATH[scene_idx])
+            body_changed = dict()
+            for path in tracked_paths:
+                view_idx = path_to_view_idx.get(path, None)
+                if view_idx is None:
+                    body_changed[path] = True
+                    continue
+
+                curr = transforms[view_idx]
+                prev = prev_transforms[view_idx]
+                pos_changed = th.any(th.abs(curr[:3] - prev[:3]) > self._POS_EPS)
+                ori_aligned = th.abs(th.sum(curr[3:7] * prev[3:7]))
                 ori_changed = ori_aligned < (1.0 - self._ORI_EPS)
-                body_changed = pos_changed | ori_changed
-                changed_pairs = body_changed[:, None] | body_changed[None, :]
+                body_changed[path] = bool((pos_changed | ori_changed).item())
 
-            cached_impulses = self._CONTACT_MATRIX.get(
-                scene_idx, th.zeros_like(current_impulses, dtype=current_impulses.dtype)
+            changed_rows = th.tensor(
+                [body_changed[path] for path in self._ROW_IDX_TO_PATH[scene_idx]], dtype=th.bool
             )
+            changed_cols = th.tensor(
+                [body_changed[path] for path in self._COL_IDX_TO_PATH[scene_idx]], dtype=th.bool
+            )
+            changed_pairs = changed_rows[:, None] | changed_cols[None, :]
+
+            cached_impulses = prev_impulses.clone()
             cached_impulses[changed_pairs] = current_impulses[changed_pairs]
             self._CONTACT_MATRIX[scene_idx] = cached_impulses
             self._BODY_TRANSFORMS[scene_idx] = transforms.clone()
 
-            if not th.any(changed_pairs).item():
-                continue
-
-            current_contact_data = self._collect_current_contact_data(scene_idx=scene_idx)
-            pairwise_contact_data = self._PAIRWISE_CONTACT_DATA[scene_idx]
-            changed_rows, changed_cols = th.nonzero(changed_pairs, as_tuple=True)
-            for row, col in zip(changed_rows.tolist(), changed_cols.tolist()):
-                pairwise_contact_data[(row, col)] = current_contact_data.get((row, col), [])
-
-    def get_impulses(self, prim_paths_a, prim_paths_b):
-        """
-        Grabs the matrix representing all impulse forces between rigid prims from @prim_paths_a and
-        rigid prims from @prim_paths_b
-
-        Args:
-            prim_paths_a (list of str): Rigid body prim path(s) with which to grab contact impulses against
-                any of the rigid body prim path(s) defined by @prim_paths_b
-            prim_paths_b (list of str): Rigid body prim path(s) with which to grab contact impulses against
-                any of the rigid body prim path(s) defined by @prim_paths_a
-
-        Returns:
-            n-array: (N, M, 3) impulse array defining current impulses between N bodies from @prim_paths_a and M bodies
-                from @prim_paths_b
-        """
-        # Compute subset of matrix and return
-        if len(prim_paths_a) == 0 or len(prim_paths_b) == 0:
-            return th.zeros((len(prim_paths_a), len(prim_paths_b), 3), dtype=th.float32)
-        if prim_paths_a[0] not in self._PATH_TO_SCENE_IDX:
-            return th.zeros((len(prim_paths_a), len(prim_paths_b), 3), dtype=th.float32)
-        scene_idx = self._PATH_TO_SCENE_IDX[prim_paths_a[0]]
-        if scene_idx not in self._PATH_TO_IDX:
-            return th.zeros((len(prim_paths_a), len(prim_paths_b), 3), dtype=th.float32)
-        idxs_a = [self._PATH_TO_IDX[scene_idx][path] for path in prim_paths_a]
-        idxs_b = [self._PATH_TO_IDX[scene_idx][path] for path in prim_paths_b]
-        return self.get_all_impulses(scene_idx)[idxs_a][:, idxs_b]
-
-    def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
+    def get_contact_pairs(self, scene_idx, sensor_prim_paths=None):
         """Get pairs of prim paths that are in contact."""
-        if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_IDX:
+        if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return set()
         impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
-        interesting_col_paths = [
-            p for p in self._PATH_TO_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
-        ]
-        interesting_columns = [list(self.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
 
-        # Get the interesting-columns from the impulse matrix
-        interesting_impulse_columns = impulses[:, interesting_columns]
-        assert (
-            interesting_impulse_columns.ndim == 2
-        ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
-        interesting_row_idxes = th.nonzero(th.any(interesting_impulse_columns > 0, dim=1)).flatten()
-        interesting_row_paths = [self.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
+        # Get the row indices corresponding to the sensor prim paths
+        row_idxs = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in sensor_prim_paths]
 
-        # Filter out idxes by whether or not the row path is in the row prim paths list
-        if row_prim_paths is not None:
-            filtered = [(i, p) for i, p in zip(interesting_row_idxes, interesting_row_paths) if p in row_prim_paths]
-            if len(filtered) == 0:
-                return set()
-            interesting_row_idxes, interesting_row_paths = zip(*filtered)
-            interesting_row_idxes = th.tensor(list(interesting_row_idxes))
-
-        # Get the full interesting section of the impulse matrix
-        interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
-        assert interesting_impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
+        # Filter the impulses to only include the rows corresponding to the sensor prim paths
+        impulses = impulses[row_idxs, :]
 
         # Early return if not in contact.
-        if not th.any(interesting_impulses > 0):
+        if not th.any(impulses > 0):
             return set()
 
         # Get all of the (row, col) pairs where the impulse is greater than 0
+        all_idx_pairs = zip(*th.nonzero(impulses > 0, as_tuple=True))
+        
+        # Convert the index pairs in to (sensor_prim_path, other_contact) pairs
         return {
-            (interesting_row_paths[row], interesting_col_paths[col])
-            for row, col in zip(*th.nonzero(interesting_impulses > 0, as_tuple=True))
+            (sensor_prim_paths[row], self._COL_IDX_TO_PATH[scene_idx][col])
+            for row, col in all_idx_pairs
         }
-
-    def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
-        if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_IDX:
-            return []
-        # First check if the object has any contacts
-        impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
-        assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
-
-        row_idx = (
-            list(range(impulses.shape[0]))
-            if row_prim_paths is None
-            else [self.get_body_row_idx(path)[1] for path in row_prim_paths]
-        )
-        col_idx = (
-            list(range(impulses.shape[1]))
-            if column_prim_paths is None
-            else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
-        )
-        relevant_impulses = impulses[row_idx][:, col_idx]
-
-        # Early return if not in contact.
-        if not th.any(relevant_impulses > 0):
-            return []
-
-        # Fetch cached per-pair contact data
-        contacts = []
-        for row in row_idx:
-            for col in col_idx:
-                contacts.extend(self._PAIRWISE_CONTACT_DATA[scene_idx].get((row, col), []))
-
-        return contacts
-
-    def in_contact(self, prim_paths_a, prim_paths_b):
-        """
-        Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
-
-        Args:
-            prim_paths_a (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
-                body prim path(s) defined by @prim_paths_b
-            prim_paths_b (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
-                body prim path(s) defined by @prim_paths_a
-
-        Returns:
-            bool: Whether any body from @prim_paths_a is in contact with any body from @prim_paths_b
-        """
-        # In contact if any of the matrix values representing the interaction between the two groups is non-zero
-        return th.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b)).item()
 
     def clear(self):
         """
         Clears internal contact views, mappings, and caches.
         """
         self._PATH_TO_SCENE_IDX = dict()
-        self._PATH_TO_IDX = dict()
-        self._IDX_TO_PATH = dict()
+        self._PATH_TO_ROW_IDX = dict()
+        self._PATH_TO_COL_IDX = dict()
+        self._ROW_IDX_TO_PATH = dict()
+        self._COL_IDX_TO_PATH = dict()
         self._CONTACT_VIEW = dict()
         self._RIGID_BODY_VIEW = dict()
+        self._PATH_TO_RIGID_BODY_VIEW_IDX = dict()
         self._CONTACT_MATRIX = dict()
-        self._PAIRWISE_CONTACT_DATA = dict()
         self._BODY_TRANSFORMS = dict()
 
 

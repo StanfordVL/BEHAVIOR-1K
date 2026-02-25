@@ -123,9 +123,9 @@ class AttachedTo(
         scene_idx = self.obj.scene.idx
         my_link_paths = [link.prim_path for link in self.obj.links.values()]
         contacting_paths = {
-            col_path
-            for _, col_path in RigidContactAPI.get_contact_pairs(scene_idx=scene_idx, row_prim_paths=my_link_paths)
-            if col_path not in self.obj.link_prim_paths
+            other_contact
+            for this_contact, other_contact in RigidContactAPI.get_contact_pairs(scene_idx=scene_idx, sensor_prim_paths=my_link_paths)
+            if other_contact not in self.obj.link_prim_paths
         }
         for prim_path in sorted(contacting_paths):
             # Contact pairs return link prim paths; map to owning object prim path for lookup.
