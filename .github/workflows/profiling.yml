@@ -1,47 +1,261 @@
 name: Profiling
 
-on: 
-  workflow_dispatch:
+on:
+  pull_request:
   push:
     branches:
-      - og-develop
+      - main
+  workflow_dispatch:
 
 permissions:
-  # deployments permission to deploy GitHub pages website
-  deployments: write
-  # contents permission to update profiling contents in gh-pages branch
-  contents: write
+  pull-requests: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
-  profiling:
-    name: Speed Profiling
+  profile:
+    name: "Profile: ${{ matrix.label }}"
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
 
-    steps:
-      - name: Fix home
-        run: echo "HOME=/root" >> $GITHUB_ENV
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Baselines (GPU dynamics, flatcache)
+          - name: baseline-empty
+            args: "-g -f"
+            label: "Empty scene"
+          - name: baseline-empty-1robot
+            args: "-g -f -r 1"
+            label: "Empty scene + 1 Robot"
+          - name: baseline-rs-int
+            args: "-g -f -s Rs_int"
+            label: "Rs_int"
+          - name: baseline-rs-int-1robot
+            args: "-g -f -s Rs_int -r 1"
+            label: "Rs_int + 1 Robot"
+          # Scenes (flatcache vs non-flatcache)
+          - name: scene-house
+            args: "-f -r 1 -s house_single_floor"
+            label: "house_single_floor + 1 Robot"
+          - name: scene-house-no-flatcache
+            args: "-r 1 -s house_single_floor"
+            label: "house_single_floor + 1 Robot (no flatcache)"
+          # Non-physics features (GPU dynamics, flatcache)
+          - name: feature-fluids
+            args: "-g -f -r 1 -w"
+            label: "1 Robot + fluids"
+          - name: feature-cloth
+            args: "-g -r 1 -c"
+            label: "1 Robot + cloth"
+          - name: feature-particles
+            args: "-g -f -r 1 -p"
+            label: "1 Robot + macro particles"
 
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/OmniGibson
+
+    steps:
       - name: Checkout source
         uses: actions/checkout@v4
-
-      - name: Install
-        run: pip install -e .[dev,primitives]
-      
-      - name: Run performance benchmark
-        run: bash scripts/profiling.sh
-          
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
         with:
-          tool: 'customSmallerIsBetter'
-          output-file-path: output.json
-          benchmark-data-dir-path: profiling
-          fail-on-alert: false
-          alert-threshold: '200%'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: false
-          auto-push: true
+          submodules: true
+
+      - name: Install BDDL
+        run: pip install -e .
+        working-directory: ${{ github.workspace }}/bddl3
+
+      - name: Install OmniGibson
+        run: pip install -e .[dev,primitives,eval] --no-build-isolation
+
+      - name: Run profiling
+        run: |
+          rm -f output.json
+          python tests/benchmark/profiling.py ${{ matrix.args }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: profiling-${{ matrix.name }}
+          path: OmniGibson/output.json
+          if-no-files-found: warn
+
+  report:
+    name: Compile Profiling Report
+    runs-on: ubuntu-latest
+    needs: [profile]
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download PR profiling results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: pr-results
+          pattern: profiling-*
+
+      - name: Restore baseline from main
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: baseline
+          key: profiling-baseline-${{ github.event.pull_request.base.sha }}
+          restore-keys: |
+            profiling-baseline-
+
+      - name: Generate report
+        run: |
+          python3 << 'PYEOF'
+          import json, os
+
+          SCENARIOS = [
+              ("profiling-baseline-empty",            "Empty scene",                          "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-baseline-empty-1robot",     "Empty scene + 1 Robot",                "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-baseline-rs-int",           "Rs_int",                               "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-baseline-rs-int-1robot",    "Rs_int + 1 Robot",                     "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-scene-house",               "house_single_floor + 1 Robot",         "Scenes"),
+              ("profiling-scene-house-no-flatcache",  "house_single_floor + 1 Robot (no FC)", "Scenes"),
+              ("profiling-feature-fluids",            "1 Robot + fluids",                     "Non-physics features (GPU dynamics, flatcache)"),
+              ("profiling-feature-cloth",             "1 Robot + cloth",                      "Non-physics features (GPU dynamics, flatcache)"),
+              ("profiling-feature-particles",         "1 Robot + macro particles",            "Non-physics features (GPU dynamics, flatcache)"),
+          ]
+
+          METRICS = ["FPS", "Loading time", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
+          HEADERS = {
+              "FPS": "FPS",
+              "Loading time": "Load (s)",
+              "Isaac step time": "Isaac (ms)",
+              "Non-Isaac step time": "Non-Isaac (ms)",
+              "Memory usage": "Mem (GB)",
+              "Vram usage": "VRAM (GB)",
+          }
+          HIGHER_IS_BETTER = {"FPS"}
+
+          def load_results(base_path):
+              results = {}
+              if not os.path.isdir(base_path):
+                  return results
+              for dir_name, _, _ in SCENARIOS:
+                  json_path = os.path.join(base_path, dir_name, "output.json")
+                  if not os.path.exists(json_path):
+                      continue
+                  with open(json_path) as f:
+                      data = json.load(f)
+                  metrics = {}
+                  for entry in data:
+                      metrics[entry["extra"][0]] = entry["value"]
+                  results[dir_name] = metrics
+              return results
+
+          def fmt(metric, value):
+              if value is None:
+                  return "N/A"
+              return f"{value:.1f}" if metric in ("FPS", "Loading time") else f"{value:.2f}"
+
+          def delta(metric, pr_val, base_val):
+              if pr_val is None or base_val is None or base_val == 0:
+                  return ""
+              pct = ((pr_val - base_val) / abs(base_val)) * 100
+              is_better = (pct > 0) if metric in HIGHER_IS_BETTER else (pct < 0)
+              if abs(pct) < 5:
+                  emoji = "⚪"
+              elif is_better:
+                  emoji = "🟢"
+              else:
+                  emoji = "🔴"
+              sign = "+" if pct > 0 else ""
+              return f" ({sign}{pct:.1f}% {emoji})"
+
+          pr = load_results("pr-results")
+          base = load_results("baseline")
+          has_base = len(base) > 0
+
+          lines = ["## Profiling Report\n"]
+          if not has_base:
+              lines.append("> **Note:** No baseline found from `main`. Showing absolute values only.\n")
+
+          current_group = None
+          for dir_name, label, group in SCENARIOS:
+              if group != current_group:
+                  current_group = group
+                  lines.append(f"\n### {group}\n")
+                  hdr = "| Scenario |" + "".join(f" {HEADERS[m]} |" for m in METRICS)
+                  sep = "|---|" + "---|" * len(METRICS)
+                  lines.append(hdr)
+                  lines.append(sep)
+
+              pr_m = pr.get(dir_name, {})
+              if not pr_m:
+                  lines.append(f"| {label} |" + " N/A |" * len(METRICS))
+                  continue
+
+              base_m = base.get(dir_name, {})
+              row = f"| {label}"
+              for m in METRICS:
+                  pv, bv = pr_m.get(m), base_m.get(m)
+                  cell = fmt(m, pv)
+                  if has_base and pv is not None:
+                      cell += delta(m, pv, bv)
+                  row += f" | {cell}"
+              lines.append(row + " |")
+
+          lines.append("")
+          lines.append("<details><summary>Legend</summary>\n")
+          lines.append("- 🟢 Improvement >= 5%")
+          lines.append("- 🔴 Regression >= 5%")
+          lines.append("- ⚪ Change < 5%")
+          lines.append("- For **FPS**, higher is better. For all other metrics, lower is better.")
+          lines.append("\n</details>")
+
+          report = "\n".join(lines)
+          with open("profiling-report.md", "w") as f:
+              f.write(report)
+          print(report)
+          PYEOF
+
+      - name: Post PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: profiling-report
+          path: profiling-report.md
+
+  save_baseline:
+    name: Save Baseline
+    runs-on: ubuntu-latest
+    needs: [profile]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Restore previous baseline
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: baseline
+          key: profiling-baseline-do-not-match
+          restore-keys: |
+            profiling-baseline-
+
+      - name: Download new profiling results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: new-results
+          pattern: profiling-*
+
+      - name: Merge into baseline
+        run: |
+          mkdir -p baseline
+          if [ -d new-results ]; then
+            cp -r new-results/* baseline/
+          fi
+
+      - name: Save baseline cache
+        uses: actions/cache/save@v4
+        with:
+          path: baseline
+          key: profiling-baseline-${{ github.sha }}

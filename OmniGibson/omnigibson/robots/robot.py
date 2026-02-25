@@ -47,7 +47,7 @@ from omnigibson.controllers import (
     DifferentialDriveController,
 )
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.sim_utils import get_rigid_contact_bodies
@@ -535,8 +535,8 @@ class Robot(USDObject, GymObservable):
             # We need to manually set it back to sphere approximation
             for wheel_name in self.floor_touching_base_link_names:
                 wheel_link = self.links[wheel_name]
-                assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
-                wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+                assert len(wheel_link.collision_meshes) == 1, "Wheel link should only have 1 collision!"
+                wheel_link.set_collision_approximation("boundingSphere")
         if self._definition.visual_only_eef_links:
             # The eef gripper links should be visual-only. They only contain a "ghost" box volume
             # for detecting objects inside the gripper, in order to activate attachments (AG for Cloths).
@@ -2013,7 +2013,7 @@ class Robot(USDObject, GymObservable):
                             extents=0.005,
                             primitive_type="Sphere",
                         )
-                        vis_geom = VisualGeomPrim(
+                        vis_geom = GeomPrim(
                             relative_prim_path=absolute_prim_path_to_scene_relative(
                                 scene=self.scene,
                                 absolute_prim_path=vis_mesh_prim_path,
@@ -3452,7 +3452,7 @@ class Robot(USDObject, GymObservable):
             if eef_def and eef_def.curobo_path:
                 return os.path.join(get_dataset_path("omnigibson-robot-assets"), eef_def.curobo_path)
             else:
-                assert False, f"Robot not supported for curobo."
+                assert False, "Robot not supported for curobo."
 
         # Import here to avoid circular imports
         from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
@@ -3479,7 +3479,7 @@ class Robot(USDObject, GymObservable):
         ):
             assert (
                 self.end_effector in self._definition.manipulation.eef_support_curobo_attached_object_link_names
-            ), f"Robot not supported for curobo."
+            ), "Robot not supported for curobo."
 
         assert self.is_manipulation
         # By default, sets the standardized path
@@ -4110,15 +4110,19 @@ class Robot(USDObject, GymObservable):
             ), f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
             command = q[controller.dof_idx]
             if isinstance(controller, HolonomicBaseJointController):
-                # For a holonomic base joint controller, the command should be in the robot local frame
-                # For orientation, we need to convert the command to a delta angle
-                cur_rz_joint_pos = self.get_joint_positions()[self.base_idx][5]
+                # Holonomnic base controller expects delta (x, y, rz) in robot base footprint link frame
+                # However, q actions are in absolute (x, y, rz) in robot root frame, so we need to convert them before feeding to the controller
+                base_joint_pos = self.get_joint_positions()[self.base_idx]
+                cur_rz_joint_pos = base_joint_pos[5]
                 delta_q = wrap_angle(command[2] - cur_rz_joint_pos)
 
                 # For translation, we need to convert the command to the robot local frame
-                body_pose = self.get_position_orientation()
-                canonical_pos = th.tensor([command[0], command[1], body_pose[0][2]], dtype=th.float32)
-                local_pos = T.relative_pose_transform(canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), *body_pose)[0]
+                body_pos = base_joint_pos[:3]
+                body_quat = T.mat2quat(T.euler_intrinsic2mat(base_joint_pos[3:6]))
+                canonical_pos = th.tensor([command[0], command[1], body_pos[2]], dtype=th.float32)
+                local_pos = T.relative_pose_transform(
+                    canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), body_pos, body_quat
+                )[0]
                 command = th.tensor([local_pos[0], local_pos[1], delta_q])
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
