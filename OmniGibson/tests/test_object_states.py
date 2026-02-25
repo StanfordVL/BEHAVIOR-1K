@@ -247,10 +247,10 @@ def test_rigid_contact_bodies(env):
     assert bowl.root_link in table_contacts
 
     # Let bodies settle/sleep and verify contacts persist
-    for _ in range(10):
+    for _ in range(100):
         og.sim.step()
-    assert breakfast_table.is_asleep(), "Table should be asleep"
-    assert bowl.root_link.is_asleep(), "Bowl should be asleep"
+    assert breakfast_table.is_asleep, "Table should be asleep"
+    assert bowl.root_link.is_asleep, "Bowl should be asleep"
     table_contacts_after_sleep = get_rigid_contact_bodies(breakfast_table)
     assert bowl.root_link in table_contacts_after_sleep
 

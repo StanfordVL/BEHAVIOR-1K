@@ -239,7 +239,7 @@ class RigidContactAPIImpl:
         return filters
 
     @classmethod
-    def get_max_contact_data_count(cls):
+    def get_max_contact_data_count(cls, n_bodies):
         return 256
 
     def initialize_view(self):
