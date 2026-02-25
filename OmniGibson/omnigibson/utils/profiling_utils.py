@@ -107,7 +107,7 @@ class ProfilingEnv(og.Environment):
             ret = [total_frame_time, omni_time, og_time, memory_usage, vram_usage]
             if self._current_step % 100 == 0:
                 print(
-                    "total time: {:.3f} ms, Omni time: {:.3f} ms, OG time: {:.3f} ms, memory: {:.3f} GB, vram: {:.3f} GB.".format(
+                    "total time: {:.3f} ms, Isaac time: {:.3f} ms, Non-Isaac time: {:.3f} ms, memory: {:.3f} GB, vram: {:.3f} GB.".format(
                         *ret
                     )
                 )
