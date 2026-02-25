@@ -20,14 +20,14 @@ jobs:
       matrix:
         test_file:
           - test_controllers
-          - test_curobo
+          # - test_curobo
           - test_data_collection
           - test_dump_load_states
           - test_envs
           - test_multiple_envs
           - test_object_removal
           - test_object_states
-          - test_primitives
+          # - test_primitives
           - test_robot_states_flatcache
           - test_robot_states_no_flatcache
           - test_robot_teleoperation

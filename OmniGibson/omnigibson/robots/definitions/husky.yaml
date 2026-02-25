@@ -1,3 +1,6 @@
+raw_controller_order: ["base"]
+default_controllers:
+  base: JointController
 default_joint_pos: [0, 0, 0, 0]
 linear_velocity_gain_for_primitives: 0.05
 angular_velocity_gain_for_primitives: 0.05

@@ -1,3 +1,6 @@
+raw_controller_order: ["base"]
+default_controllers:
+  base: DifferentialDriveController
 default_joint_pos: [0, 0]
 linear_velocity_gain_for_primitives: 1.5
 angular_velocity_gain_for_primitives: 1.0
