@@ -149,7 +149,7 @@ def main():
         )
         knife.keep_still()
     if args.fluids:
-        table.states[Covered].set_value(env.scene.get_system("water"))
+        table.states[Covered].set_value(env.scene.get_system("water"), True)
 
     output, results = [], []
 

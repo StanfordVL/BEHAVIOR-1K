@@ -49,7 +49,7 @@ jobs:
             args: "-g -f -r 1 -w"
             label: "1 Robot + fluids"
           - name: feature-cloth
-            args: "-g -f -r 1 -c"
+            args: "-g -r 1 -c"
             label: "1 Robot + cloth"
           - name: feature-particles
             args: "-g -f -r 1 -p"
