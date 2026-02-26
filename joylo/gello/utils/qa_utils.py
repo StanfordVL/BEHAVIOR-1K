@@ -283,7 +283,7 @@ class GhostHandAppearanceMetric(EnvMetric):
             # infer un/grasping intent
             for robot in env.robots:
                 for arm in robot.arm_names:
-                    cid = robot._controller_id(f"gripper_{arm}")
+                    cid = robot.controller_ids[f"gripper_{arm}"]
                     cfg = Controller.configs[cid]
                     is_1d = Controller.command_dim(cid) == 1
                     is_normalized = (th.all(cb.to_torch(cfg["command_input_limits"][0]) == -1.0).item() and
@@ -305,7 +305,7 @@ class GhostHandAppearanceMetric(EnvMetric):
                 active = th.max(th.abs(
                         robot_qpos[robot.arm_control_idx[arm]] - action[robot.arm_action_idx[arm]]
                 )).item() > GHOST_APPEAR_THRESHOLD
-                cid = robot._controller_id(f"gripper_{arm}")
+                cid = robot.controller_ids[f"gripper_{arm}"]
                 step_metrics[f"robot{i}::arm_{arm}::active"] = active
                 if self.color_arms:
                     if robot.name not in self.robot_arm_colors:
@@ -594,7 +594,7 @@ class FieldOfViewMetric(EnvMetric):
             # infer un/grasping intent
             for robot in env.robots:
                 for arm in robot.arm_names:
-                    cid = robot._controller_id(f"gripper_{arm}")
+                    cid = robot.controller_ids[f"gripper_{arm}"]
                     cfg = Controller.configs[cid]
                     is_1d = Controller.command_dim(cid) == 1
                     is_normalized = (th.all(cb.to_torch(cfg["command_input_limits"][0]) == -1.0).item() and
@@ -626,7 +626,7 @@ class FieldOfViewMetric(EnvMetric):
             links_in_fov = set(info["seg_instance_id"].values())
             gripper_action_idxs = robot.gripper_action_idx
             for arm in robot.arm_names:
-                cid = robot._controller_id(f"gripper_{arm}")
+                cid = robot.controller_ids[f"gripper_{arm}"]
                 op = operator.lt if Controller.configs[cid]["inverted"] else operator.ge
                 # check if any of the gripper link for this arm is in the field of view
                 gripper_in_fov = len(links_in_fov.intersection(self.gripper_link_paths[arm])) > 0
