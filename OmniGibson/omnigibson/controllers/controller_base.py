@@ -160,9 +160,9 @@ class Controller(Serializable, Recreatable):
     configs = {}  # controller_id → fully processed config dict (includes structural keys like _mm_start_idx, _task_space_link_name, etc.)
     goals = {}  # controller_id → current internal goal dict (None until the first update_goal call)
     controls = {}  # controller_id → last computed control array (None before the first step)
-    _state = {}  # controller_id → mutable runtime state dict (filters, grasping state, fixed orientation target, etc.)
-    _disabled_controllers = set()  # set of controller_ids whose control is disabled (synced with robot.control_enabled)
-    _articulation_root_paths = {}  # controller_id → articulation root prim path used as key for all ControllableObjectViewAPI calls
+    state = {}  # controller_id → mutable runtime state dict (filters, grasping state, fixed orientation target, etc.)
+    disabled_controllers = set()  # set of controller_ids whose control is disabled (synced with robot.control_enabled)
+    articulation_root_paths = {}  # controller_id → articulation root prim path used as key for all ControllableObjectViewAPI calls
     ids_by_type = {}  # ControllerType → ordered list of controller_ids (precomputed at register time for O(1) step dispatch)
     motor_type = {}  # controller_id → motor type string ("position"/"velocity"/"effort"/None)
     use_delta_commands = {}  # controller_id → bool, whether commands are deltas (relative to current state)
@@ -244,12 +244,12 @@ class Controller(Serializable, Recreatable):
         cls.motor_type[controller_id] = cfg.get("motor_type", None)
         cls.command_dim[controller_id] = cls._command_dim_from_config(controller_id, cfg)
 
-        cls._state[controller_id] = {}
+        cls.state[controller_id] = {}
         cls._init_state(controller_id=controller_id)
 
         # Store robot-level info
         assert articulation_root_path is not None, "articulation_root_path of a robot can't be None."
-        cls._articulation_root_paths[controller_id] = articulation_root_path
+        cls.articulation_root_paths[controller_id] = articulation_root_path
         assert controller_id not in cls.ids_by_type.setdefault(controller_type, [])
         cls.ids_by_type[controller_type].append(controller_id)
 
@@ -268,7 +268,7 @@ class Controller(Serializable, Recreatable):
     def unregister(cls, controller_id: str):
         """Remove a controller and clean up robot-level metadata when the last controller is removed.
 
-        All per-controller dicts (types, configs, goals, controls, _state, _articulation_root_paths) are purged.
+        All per-controller dicts (types, configs, goals, controls, state, articulation_root_paths) are purged.
 
         Args:
             controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
@@ -283,7 +283,7 @@ class Controller(Serializable, Recreatable):
         cls.configs.pop(controller_id, None)
         cls.goals.pop(controller_id, None)
         cls.controls.pop(controller_id, None)
-        cls._state.pop(controller_id, None)
+        cls.state.pop(controller_id, None)
         cls.dof_idx.pop(controller_id, None)
         cls.control_dim.pop(controller_id, None)
         cls.goal_dim.pop(controller_id, None)
@@ -296,7 +296,7 @@ class Controller(Serializable, Recreatable):
         cls.motor_type.pop(controller_id, None)
         cls.command_dim.pop(controller_id, None)
 
-        cls._articulation_root_paths.pop(controller_id, None)
+        cls.articulation_root_paths.pop(controller_id, None)
 
     @classmethod
     def disable(cls, controller_id: str):
@@ -305,7 +305,7 @@ class Controller(Serializable, Recreatable):
         Args:
             controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
         """
-        cls._disabled_controllers.add(controller_id)
+        cls.disabled_controllers.add(controller_id)
 
     @classmethod
     def enable(cls, controller_id: str):
@@ -314,7 +314,7 @@ class Controller(Serializable, Recreatable):
         Args:
             controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
         """
-        cls._disabled_controllers.discard(controller_id)
+        cls.disabled_controllers.discard(controller_id)
 
     # -------------------------------------------------------------------------
     # Config processing
@@ -803,8 +803,8 @@ class Controller(Serializable, Recreatable):
         ctype = cls.type_by_id[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
             config = cls.configs[controller_id]
-            cls._state[controller_id]["fixed_quat_target"] = None
-            cls._state[controller_id]["control_filter"] = (
+            cls.state[controller_id]["fixed_quat_target"] = None
+            cls.state[controller_id]["control_filter"] = (
                 None
                 if config.get("smoothing_filter_size", None) in {None, 0}
                 else MovingAverageFilter(
@@ -812,10 +812,10 @@ class Controller(Serializable, Recreatable):
                 )
             )
         elif ctype == ControllerType.OperationalSpaceController:
-            cls._state[controller_id]["fixed_quat_target"] = None
+            cls.state[controller_id]["fixed_quat_target"] = None
         elif ctype == ControllerType.MultiFingerGripperController:
-            cls._state[controller_id]["is_grasping"] = IsGraspingState.FALSE
-            cls._state[controller_id]["vel_filter"] = MovingAverageFilter(
+            cls.state[controller_id]["is_grasping"] = IsGraspingState.FALSE
+            cls.state[controller_id]["vel_filter"] = MovingAverageFilter(
                 obs_dim=len(cls.dof_idx[controller_id]), filter_width=5
             )
         elif ctype == ControllerType.NullJointController:
@@ -823,7 +823,7 @@ class Controller(Serializable, Recreatable):
             default_goal = config.get("default_goal", None)
             if default_goal is None:
                 default_goal = cb.zeros(len(config["dof_idx"]))
-            cls._state[controller_id]["default_goal"] = cb.array(default_goal)
+            cls.state[controller_id]["default_goal"] = cb.array(default_goal)
 
     # -------------------------------------------------------------------------
     # Default limits
@@ -957,7 +957,7 @@ class Controller(Serializable, Recreatable):
         """
         config = cls.configs[controller_id]
         if config["use_delta_commands"]:
-            arpath = cls._articulation_root_paths[controller_id]
+            arpath = cls.articulation_root_paths[controller_id]
             motor_type = config["motor_type"]
             if motor_type == "position":
                 base_value = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx[controller_id]]
@@ -1001,7 +1001,7 @@ class Controller(Serializable, Recreatable):
         Returns:
             dict: ``{"target": target_array}`` in the canonical frame.
         """
-        arpath = cls._articulation_root_paths[controller_id]
+        arpath = cls.articulation_root_paths[controller_id]
         root_pos, root_quat = ControllableObjectViewAPI.get_position_orientation(arpath)
         canonical_pos, canonical_quat = ControllableObjectViewAPI.get_root_position_orientation(arpath)
         base_pose = cb.T.pose2mat((root_pos, root_quat))
@@ -1057,7 +1057,7 @@ class Controller(Serializable, Recreatable):
             dict: ``{"target_pos": ..., "target_ori_mat": ...}`` with float32 arrays.
         """
         config = cls.configs[controller_id]
-        arpath = cls._articulation_root_paths[controller_id]
+        arpath = cls.articulation_root_paths[controller_id]
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
             arpath, config["_task_space_link_name"]
         )
@@ -1069,11 +1069,11 @@ class Controller(Serializable, Recreatable):
             target_pos = pos_relative + dpos
 
         if config["mode"] == "position_fixed_ori":
-            if cls._state[controller_id]["fixed_quat_target"] is None:
-                cls._state[controller_id]["fixed_quat_target"] = (
+            if cls.state[controller_id]["fixed_quat_target"] is None:
+                cls.state[controller_id]["fixed_quat_target"] = (
                     quat_relative if (cls.goals[controller_id] is None) else cls.goals[controller_id]["target_quat"]
                 )
-            target_quat = cls._state[controller_id]["fixed_quat_target"]
+            target_quat = cls.state[controller_id]["fixed_quat_target"]
         elif config["mode"] == "position_compliant_ori":
             target_quat = quat_relative
         elif config["mode"] in ("pose_absolute_ori", "absolute_pose"):
@@ -1107,7 +1107,7 @@ class Controller(Serializable, Recreatable):
             dict: ``{"target_pos": ..., "target_ori_mat": ...}`` with float32 arrays.
         """
         config = cls.configs[controller_id]
-        arpath = cls._articulation_root_paths[controller_id]
+        arpath = cls.articulation_root_paths[controller_id]
         pos_relative_raw, quat_relative_raw = ControllableObjectViewAPI.get_link_relative_position_orientation(
             arpath, config["_task_space_link_name"]
         )
@@ -1121,11 +1121,11 @@ class Controller(Serializable, Recreatable):
             target_pos = pos_relative + dpos
 
         if config["mode"] == "position_fixed_ori":
-            if cls._state[controller_id]["fixed_quat_target"] is None:
-                cls._state[controller_id]["fixed_quat_target"] = (
+            if cls.state[controller_id]["fixed_quat_target"] is None:
+                cls.state[controller_id]["fixed_quat_target"] = (
                     quat_relative if (cls.goals[controller_id] is None) else cls.goals[controller_id]["target_quat"]
                 )
-            target_quat = cls._state[controller_id]["fixed_quat_target"]
+            target_quat = cls.state[controller_id]["fixed_quat_target"]
         elif config["mode"] == "position_compliant_ori":
             target_quat = quat_relative
         elif config["mode"] in ("pose_absolute_ori", "absolute_pose"):
@@ -1172,7 +1172,7 @@ class Controller(Serializable, Recreatable):
         ctype = cls.type_by_id[controller_id]
 
         if ctype == ControllerType.NullJointController:
-            return cb.array(cls._state[controller_id]["default_goal"])
+            return cb.array(cls.state[controller_id]["default_goal"])
 
         if ctype == ControllerType.MultiFingerGripperController:
             config = cls.configs[controller_id]
@@ -1224,7 +1224,7 @@ class Controller(Serializable, Recreatable):
         return command
 
     @classmethod
-    def _reverse_preprocess_command(cls, controller_id, processed_command):
+    def reverse_preprocess_command(cls, controller_id, processed_command):
         """Invert the input→output linear scaling to recover the original input-space command.
 
         Used by ``compute_no_op_action`` to express the current no-op goal as a
@@ -1308,15 +1308,15 @@ class Controller(Serializable, Recreatable):
         cls.goals[controller_id] = None
         ctype = cls.type_by_id[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
-            if cls._state[controller_id]["control_filter"] is not None:
-                cls._state[controller_id]["control_filter"].reset()
-            cls._state[controller_id]["fixed_quat_target"] = None
+            if cls.state[controller_id]["control_filter"] is not None:
+                cls.state[controller_id]["control_filter"].reset()
+            cls.state[controller_id]["fixed_quat_target"] = None
         elif ctype == ControllerType.OperationalSpaceController:
-            cls._state[controller_id]["fixed_quat_target"] = None
+            cls.state[controller_id]["fixed_quat_target"] = None
             cls._clear_variable_gains(controller_id=controller_id)
         elif ctype == ControllerType.MultiFingerGripperController:
-            cls._state[controller_id]["vel_filter"].reset()
-            cls._state[controller_id]["is_grasping"] = IsGraspingState.FALSE
+            cls.state[controller_id]["vel_filter"].reset()
+            cls.state[controller_id]["is_grasping"] = IsGraspingState.FALSE
 
     # -------------------------------------------------------------------------
     # Batching
@@ -1380,7 +1380,7 @@ class Controller(Serializable, Recreatable):
                 config = cls.configs[cid]
                 d = dims[i]
                 dof_idx = cls.dof_idx[cid]
-                arpath = cls._articulation_root_paths[cid]
+                arpath = cls.articulation_root_paths[cid]
 
                 targets[i, :d] = cls.goals[cid]["target"]
                 motor_type = config["motor_type"]
@@ -1463,7 +1463,7 @@ class Controller(Serializable, Recreatable):
             config = cls.configs[cid]
             d = dims[i]
             dof_idx = cls.dof_idx[cid]
-            arpath = cls._articulation_root_paths[cid]
+            arpath = cls.articulation_root_paths[cid]
 
             q[i, :d] = ControllableObjectViewAPI.get_joint_positions(arpath)[dof_idx]
             jac_full = ControllableObjectViewAPI.get_relative_jacobian(arpath)
@@ -1496,12 +1496,12 @@ class Controller(Serializable, Recreatable):
             d = dims[i]
             target_joint_pos = target_batch[i, :d]
 
-            if cls._state[cid]["control_filter"] is not None:
-                target_joint_pos = cls._state[cid]["control_filter"].estimate(target_joint_pos)
+            if cls.state[cid]["control_filter"] is not None:
+                target_joint_pos = cls.state[cid]["control_filter"].estimate(target_joint_pos)
 
             config = cls.configs[cid]
             if config["use_impedances"]:
-                arpath = cls._articulation_root_paths[cid]
+                arpath = cls.articulation_root_paths[cid]
                 dof_idx = cls.dof_idx[cid]
                 motor_type = config["motor_type"]
                 if motor_type == "position":
@@ -1584,7 +1584,7 @@ class Controller(Serializable, Recreatable):
             config = cls.configs[cid]
             d = dims[i]
             dof_idx = cls.dof_idx[cid]
-            arpath = cls._articulation_root_paths[cid]
+            arpath = cls.articulation_root_paths[cid]
             goal_dict = cls.goals[cid]
 
             q[i, :d] = ControllableObjectViewAPI.get_joint_positions(arpath)[dof_idx]
@@ -1782,7 +1782,7 @@ class Controller(Serializable, Recreatable):
         results = []
         for cid in controller_ids:
             config = cls.configs[cid]
-            arpath = cls._articulation_root_paths[cid]
+            arpath = cls.articulation_root_paths[cid]
             target = cls.goals[cid]["target"]
             joint_pos = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx[cid]]
             if config["mode"] == "binary":
@@ -1835,7 +1835,7 @@ class Controller(Serializable, Recreatable):
         intermediate accumulator buffer is needed.
         """
         for ctype, cids in cls.ids_by_type.items():
-            active_cids = [cid for cid in cids if cid not in cls._disabled_controllers]
+            active_cids = [cid for cid in cids if cid not in cls.disabled_controllers]
             if not active_cids:
                 continue
 
@@ -1861,7 +1861,7 @@ class Controller(Serializable, Recreatable):
                 raise ValueError(f"Unknown controller type: {ctype}")
 
             for cid, control in zip(active_cids, results):
-                arpath = cls._articulation_root_paths[cid]
+                arpath = cls.articulation_root_paths[cid]
                 dof_idx = cls.dof_idx[cid]
                 ct = cls.control_type[cid]
                 if ct == ControlType.POSITION:
@@ -1903,15 +1903,15 @@ class Controller(Serializable, Recreatable):
 
         if ctype in (ControllerType.JointController, ControllerType.HolonomicBaseJointController):
             if config["motor_type"] == "position":
-                arpath = cls._articulation_root_paths[controller_id]
+                arpath = cls.articulation_root_paths[controller_id]
                 target = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx[controller_id]]
             else:
                 target = cb.zeros(cls.control_dim[controller_id])
             return dict(target=target)
         elif ctype == ControllerType.NullJointController:
-            return dict(target=cls._state[controller_id]["default_goal"])
+            return dict(target=cls.state[controller_id]["default_goal"])
         elif ctype == ControllerType.InverseKinematicsController:
-            arpath = cls._articulation_root_paths[controller_id]
+            arpath = cls.articulation_root_paths[controller_id]
             pos_rel, quat_rel = ControllableObjectViewAPI.get_link_relative_position_orientation(
                 arpath, config["_task_space_link_name"]
             )
@@ -1920,7 +1920,7 @@ class Controller(Serializable, Recreatable):
                 target_ori_mat=cb.as_float32(cb.T.quat2mat(quat_rel)),
             )
         elif ctype == ControllerType.OperationalSpaceController:
-            arpath = cls._articulation_root_paths[controller_id]
+            arpath = cls.articulation_root_paths[controller_id]
             pos_rel, quat_rel = ControllableObjectViewAPI.get_link_relative_position_orientation(
                 arpath, config["_task_space_link_name"]
             )
@@ -1938,7 +1938,7 @@ class Controller(Serializable, Recreatable):
                 target = cb.array([goal_sign])
             else:
                 if config["motor_type"] == "position":
-                    arpath = cls._articulation_root_paths[controller_id]
+                    arpath = cls.articulation_root_paths[controller_id]
                     target = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx[controller_id]]
                 elif config["motor_type"] == "velocity":
                     target = cb.zeros(cls.command_dim[controller_id])
@@ -1955,7 +1955,7 @@ class Controller(Serializable, Recreatable):
 
         Ensures a no-op goal is set if none exists, then computes the corresponding
         command via ``_compute_no_op_command`` and maps it back to the normalised
-        input range via ``_reverse_preprocess_command``. The result is a PyTorch
+        input range via ``reverse_preprocess_command``. The result is a PyTorch
         tensor that can be re-issued unchanged to produce no motion.
 
         Args:
@@ -1967,7 +1967,7 @@ class Controller(Serializable, Recreatable):
         if cls.goals[controller_id] is None:
             cls.goals[controller_id] = cls.compute_no_op_goal(controller_id=controller_id)
         command = cls._compute_no_op_command(controller_id=controller_id)
-        return cb.to_torch(cls._reverse_preprocess_command(controller_id=controller_id, processed_command=command))
+        return cb.to_torch(cls.reverse_preprocess_command(controller_id=controller_id, processed_command=command))
 
     @classmethod
     def _compute_no_op_command(cls, controller_id: str):
@@ -1992,7 +1992,7 @@ class Controller(Serializable, Recreatable):
         if ctype == ControllerType.NullJointController:
             return cb.array([])
         elif ctype in (ControllerType.JointController,):
-            arpath = cls._articulation_root_paths[controller_id]
+            arpath = cls.articulation_root_paths[controller_id]
             if config["motor_type"] == "position":
                 if config["use_delta_commands"]:
                     return cb.zeros(cls.command_dim[controller_id])
@@ -2007,7 +2007,7 @@ class Controller(Serializable, Recreatable):
         elif ctype == ControllerType.HolonomicBaseJointController:
             return cb.zeros(cls.command_dim[controller_id])
         elif ctype == ControllerType.InverseKinematicsController:
-            arpath = cls._articulation_root_paths[controller_id]
+            arpath = cls.articulation_root_paths[controller_id]
             pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
                 arpath, config["_task_space_link_name"]
             )
@@ -2019,7 +2019,7 @@ class Controller(Serializable, Recreatable):
                 command[3:] = cb.T.quat2axisangle(quat_relative)
             return command
         elif ctype == ControllerType.OperationalSpaceController:
-            arpath = cls._articulation_root_paths[controller_id]
+            arpath = cls.articulation_root_paths[controller_id]
             pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
                 arpath, config["_task_space_link_name"]
             )
@@ -2037,7 +2037,7 @@ class Controller(Serializable, Recreatable):
                 if config["inverted"]:
                     command_val = -1 * command_val
                 return cb.array([command_val])
-            arpath = cls._articulation_root_paths[controller_id]
+            arpath = cls.articulation_root_paths[controller_id]
             if config["motor_type"] == "position":
                 command = ControllableObjectViewAPI.get_joint_positions(arpath)[cls.dof_idx[controller_id]]
             elif config["motor_type"] == "velocity":
@@ -2075,10 +2075,10 @@ class Controller(Serializable, Recreatable):
         )
         ctype = cls.type_by_id[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
-            if cls._state[controller_id]["control_filter"] is not None:
-                state["control_filter"] = cls._state[controller_id]["control_filter"].dump_state(serialized=False)
+            if cls.state[controller_id]["control_filter"] is not None:
+                state["control_filter"] = cls.state[controller_id]["control_filter"].dump_state(serialized=False)
         elif ctype == ControllerType.MultiFingerGripperController:
-            state["vel_filter"] = cls._state[controller_id]["vel_filter"].dump_state(serialized=False)
+            state["vel_filter"] = cls.state[controller_id]["vel_filter"].dump_state(serialized=False)
         return state
 
     @classmethod
@@ -2109,15 +2109,15 @@ class Controller(Serializable, Recreatable):
         if ctype == ControllerType.InverseKinematicsController:
             if cls.goals[controller_id] is not None:
                 if cls.configs[controller_id]["mode"] == "position_fixed_ori":
-                    cls._state[controller_id]["fixed_quat_target"] = cls.goals[controller_id]["target_quat"]
-                if cls._state[controller_id]["control_filter"] is not None:
-                    cls._state[controller_id]["control_filter"].load_state(state["control_filter"], serialized=False)
+                    cls.state[controller_id]["fixed_quat_target"] = cls.goals[controller_id]["target_quat"]
+                if cls.state[controller_id]["control_filter"] is not None:
+                    cls.state[controller_id]["control_filter"].load_state(state["control_filter"], serialized=False)
         elif ctype == ControllerType.OperationalSpaceController:
             if cls.goals[controller_id] is not None and cls.configs[controller_id]["mode"] == "position_fixed_ori":
-                cls._state[controller_id]["fixed_quat_target"] = cls.goals[controller_id]["target_quat"]
+                cls.state[controller_id]["fixed_quat_target"] = cls.goals[controller_id]["target_quat"]
         elif ctype == ControllerType.MultiFingerGripperController:
             if cls.goals[controller_id] is not None:
-                cls._state[controller_id]["vel_filter"].load_state(state["vel_filter"], serialized=False)
+                cls.state[controller_id]["vel_filter"].load_state(state["vel_filter"], serialized=False)
 
     @classmethod
     def load_state(cls, controller_id: str, state, serialized=False):
@@ -2174,14 +2174,14 @@ class Controller(Serializable, Recreatable):
                     state_flat,
                     (
                         th.tensor([])
-                        if cls._state[controller_id]["control_filter"] is None
-                        else cls._state[controller_id]["control_filter"].serialize(state=state["control_filter"])
+                        if cls.state[controller_id]["control_filter"] is None
+                        else cls.state[controller_id]["control_filter"].serialize(state=state["control_filter"])
                     ),
                 ]
             )
         elif ctype == ControllerType.MultiFingerGripperController:
             state_flat = th.cat(
-                [state_flat, cls._state[controller_id]["vel_filter"].serialize(state=state["vel_filter"])]
+                [state_flat, cls.state[controller_id]["vel_filter"].serialize(state=state["vel_filter"])]
             )
         return state_flat
 
@@ -2217,13 +2217,13 @@ class Controller(Serializable, Recreatable):
 
         ctype = cls.type_by_id[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
-            if cls._state[controller_id]["control_filter"] is not None:
-                state_dict["control_filter"], deserialized_items = cls._state[controller_id][
+            if cls.state[controller_id]["control_filter"] is not None:
+                state_dict["control_filter"], deserialized_items = cls.state[controller_id][
                     "control_filter"
                 ].deserialize(state=state[idx:])
                 idx += deserialized_items
         elif ctype == ControllerType.MultiFingerGripperController:
-            state_dict["vel_filter"], deserialized_items = cls._state[controller_id]["vel_filter"].deserialize(
+            state_dict["vel_filter"], deserialized_items = cls.state[controller_id]["vel_filter"].deserialize(
                 state=state[idx:]
             )
             idx += deserialized_items
@@ -2309,7 +2309,7 @@ class Controller(Serializable, Recreatable):
         size = cls.goal_dim[controller_id] + 1
         ctype = cls.type_by_id[controller_id]
         if ctype == ControllerType.InverseKinematicsController:
-            control_filter = cls._state[controller_id]["control_filter"]
+            control_filter = cls.state[controller_id]["control_filter"]
             size += 0 if control_filter is None else control_filter.state_size
         return size
 
@@ -2391,7 +2391,7 @@ class Controller(Serializable, Recreatable):
         """
         ctype = cls.type_by_id[controller_id]
         if ctype == ControllerType.MultiFingerGripperController:
-            return cls._state[controller_id]["is_grasping"]
+            return cls.state[controller_id]["is_grasping"]
         return IsGraspingState.UNKNOWN
 
     @classmethod
@@ -2409,7 +2409,7 @@ class Controller(Serializable, Recreatable):
         assert (
             len(target) == cls.control_dim[controller_id]
         ), f"Default goal must be length: {cls.control_dim[controller_id]}, got length: {len(target)}"
-        cls._state[controller_id]["default_goal"] = cb.array(target)
+        cls.state[controller_id]["default_goal"] = cb.array(target)
 
     @classmethod
     def _clear_variable_gains(cls, controller_id: str):
@@ -2476,8 +2476,8 @@ class Controller(Serializable, Recreatable):
             controller_id (str): Unique identifier formatted as ``"robot_name:controller_name"``.
         """
         config = cls.configs[controller_id]
-        arpath = cls._articulation_root_paths[controller_id]
-        finger_vel = cls._state[controller_id]["vel_filter"].estimate(
+        arpath = cls.articulation_root_paths[controller_id]
+        finger_vel = cls.state[controller_id]["vel_filter"].estimate(
             ControllableObjectViewAPI.get_joint_velocities(arpath, estimate=True)[cls.dof_idx[controller_id]]
         )
 
@@ -2514,7 +2514,7 @@ class Controller(Serializable, Recreatable):
                 valid_grasp_vel = cb.all(cb.abs(finger_vel) < m.VEL_TOLERANCE)
                 is_grasping = IsGraspingState.TRUE if valid_grasp_pos and valid_grasp_vel else IsGraspingState.FALSE
 
-        cls._state[controller_id]["is_grasping"] = is_grasping
+        cls.state[controller_id]["is_grasping"] = is_grasping
 
 
 # =============================================================================

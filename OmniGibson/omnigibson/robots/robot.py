@@ -3877,7 +3877,7 @@ class Robot(USDObject, GymObservable):
                     "use_delta_commands", False
                 ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
                 command = q[Controller.dof_idx[cid]]
-                action.append(Controller._reverse_preprocess_command(cid, command))
+                action.append(Controller.reverse_preprocess_command(cid, command))
             action = th.cat(action, dim=0)
             assert (
                 action.shape[0] == self.action_dim
@@ -3910,7 +3910,7 @@ class Robot(USDObject, GymObservable):
                     canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), body_pos, body_quat
                 )[0]
                 command = th.tensor([local_pos[0], local_pos[1], delta_q])
-            action.append(Controller._reverse_preprocess_command(cid, command))
+            action.append(Controller.reverse_preprocess_command(cid, command))
         action = th.cat(action, dim=0)
         assert (
             action.shape[0] == self.action_dim
