@@ -595,15 +595,15 @@ class KeyboardRobotController:
         self.joint_idx_to_controller = dict()
         idx = 0
         for name in robot.controllers:
-            cid = robot._controller_id(name)
+            cid = robot.controller_ids[name]
             self.controller_info[name] = {
-                "name": Controller._configs[cid]["name"],
+                "name": Controller.configs[cid]["name"],
                 "start_idx": idx,
-                "dofs": Controller.dof_idx(cid),
-                "command_dim": Controller.command_dim(cid),
+                "dofs": Controller.dof_idx[cid],
+                "command_dim": Controller.command_dim[cid],
             }
-            idx += Controller.command_dim(cid)
-            for i in Controller.dof_idx(cid).tolist():
+            idx += Controller.command_dim[cid]
+            for i in Controller.dof_idx[cid].tolist():
                 self.joint_idx_to_controller[i] = name
 
         # Other persistent variables we need to keep track of
@@ -882,7 +882,7 @@ class KeyboardRobotController:
                     from omnigibson.utils.constants import JointType
 
                     controller_name = self.joint_idx_to_controller[joint_idx]
-                    controller_cfg = Controller._configs[self.robot._controller_id(controller_name)]
+                    controller_cfg = Controller.configs[self.robot.controller_ids[controller_name]]
                     if (
                         self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC
                         and controller_cfg.get("use_delta_commands", False)

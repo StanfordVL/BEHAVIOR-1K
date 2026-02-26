@@ -174,8 +174,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if self.robot.is_manipulation:
             for arm_name in self.robot.arm_names:
                 arm = f"arm_{arm_name}"
-                cid = self.robot._controller_id(arm)
-                if Controller._types[cid] == ControllerType.InverseKinematicsController:
+                cid = self.robot.controller_ids[arm]
+                if Controller.type_by_id[cid] == ControllerType.InverseKinematicsController:
                     eef_link_name = self.robot.eef_link_names[arm_name]
                     pos_relative_raw, quat_relative_raw = ControllableObjectViewAPI.get_link_relative_position_orientation(
                         self.robot.articulation_root_path, eef_link_name
@@ -186,7 +186,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
                     joint_positions = ControllableObjectViewAPI.get_joint_positions(self.robot.articulation_root_path)
-                    arm_target = cb.to_torch(joint_positions)[Controller.dof_idx(cid)]
+                    arm_target = cb.to_torch(joint_positions)[Controller.dof_idx[cid]]
                     self._arm_targets[arm] = arm_target
 
                 self._reset_eef_pose[arm_name] = self.robot.get_relative_eef_pose(arm_name)
@@ -1111,10 +1111,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             ActionPrimitiveError: If the movement fails and ignore_failure is False.
         """
         # make sure controller is InverseKinematicsController and in expected mode
-        cid = self.robot._controller_id("arm_" + self.arm)
-        cfg = Controller._configs[cid]
+        cid = self.robot.controller_ids["arm_" + self.arm]
+        cfg = Controller.configs[cid]
         assert (
-            Controller._types[cid] == ControllerType.InverseKinematicsController
+            Controller.type_by_id[cid] == ControllerType.InverseKinematicsController
         ), "Controller must be InverseKinematicsController"
         assert cfg["mode"] == "pose_absolute_ori", "Controller must be in pose_absolute_ori mode"
         if in_world_frame:
@@ -1193,8 +1193,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         t_values = th.linspace(0, 1, num_poses)
         quat_waypoints = [T.quat_slerp(start_orn, target_pose[1], t) for t in t_values]
 
-        arm_cid = self.robot._controller_id("arm_" + self.arm)
-        if Controller._types[arm_cid] == ControllerType.InverseKinematicsController:
+        arm_cid = self.robot.controller_ids["arm_" + self.arm]
+        if Controller.type_by_id[arm_cid] == ControllerType.InverseKinematicsController:
             waypoints = list(zip(pos_waypoints, quat_waypoints))
 
             for i, waypoint in enumerate(waypoints):
@@ -1366,9 +1366,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         head_q = self._get_head_goal_q(target_obj_pose)
         head_idx = self.robot.controller_action_idx["camera"]
 
-        cam_cid = self.robot._controller_id("camera")
-        cam_cfg = Controller._configs[cam_cid]
-        assert Controller._types[cam_cid] == ControllerType.JointController, "Camera controller must be JointController"
+        cam_cid = self.robot.controller_ids["camera"]
+        cam_cfg = Controller.configs[cam_cid]
+        assert Controller.type_by_id[cam_cid] == ControllerType.JointController, "Camera controller must be JointController"
         assert cam_cfg["motor_type"] == "position", "Camera controller must be in position control mode"
         use_delta = cam_cfg["use_delta_commands"]
 
@@ -1434,9 +1434,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         action = th.zeros(self.robot.action_dim)
         for name in self.robot.controllers:
-            cid = self.robot._controller_id(name)
-            config = Controller._configs[cid]
-            ctype = Controller._types[cid]
+            cid = self.robot.controller_ids[name]
+            config = Controller.configs[cid]
+            ctype = Controller.type_by_id[cid]
             if follow_arm_targets and name in self._arm_targets:
                 if ctype == ControllerType.InverseKinematicsController:
                     arm = name.replace("arm_", "")
@@ -1649,10 +1649,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD)
             else:
                 action = self._empty_action()
-                base_cid = self.robot._controller_id("base")
-                base_ctype = Controller._types[base_cid]
+                base_cid = self.robot.controller_ids["base"]
+                base_ctype = Controller.type_by_id[base_cid]
                 if base_ctype == ControllerType.HolonomicBaseJointController:
-                    base_cfg = Controller._configs[base_cid]
+                    base_cfg = Controller.configs[base_cid]
                     assert (
                         base_cfg["motor_type"] == "velocity"
                     ), "Holonomic base controller must be in velocity mode"
@@ -1704,10 +1704,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             base_action = action[self.robot.controller_action_idx["base"]]
 
-            base_cid = self.robot._controller_id("base")
-            base_ctype = Controller._types[base_cid]
+            base_cid = self.robot.controller_ids["base"]
+            base_ctype = Controller.type_by_id[base_cid]
             if base_ctype == ControllerType.HolonomicBaseJointController:
-                base_cfg = Controller._configs[base_cid]
+                base_cfg = Controller.configs[base_cid]
                 assert (
                     base_cfg["motor_type"] == "velocity"
                 ), "Holonomic base controller must be in velocity mode"

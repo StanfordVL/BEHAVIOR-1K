@@ -1242,17 +1242,12 @@ def _launch_simulator(*args, **kwargs):
             # Only do this if we're not in the warmup phase
             if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                 # Run the controller step on every controllable object
-                Controller.begin_controller_step()
-                Controller.step_controller_class()
-                Controller.deploy_controller_step()
+                Controller.step()
 
                 # Assisted grasping (moved out of deploy_control)
                 for scene in self.scenes:
                     for robot in scene.robots:
-                        if (robot.is_manipulation
-                                and robot.grasping_mode != "physical"
-                                and not robot._disable_grasp_handling):
-                            robot._handle_assisted_grasping()
+                        robot._handle_assisted_grasping()
 
                 # Flush the controls from the ControllableObjectViewAPI
                 ControllableObjectViewAPI.flush_control()

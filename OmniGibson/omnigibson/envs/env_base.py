@@ -10,7 +10,6 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
-from omnigibson.controllers import Controller
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.scenes import REGISTERED_SCENES
@@ -593,8 +592,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Iterate over all robots and apply actions via controller singletons
         for robot in self.robots:
-            robot_action = robot.prepare_action(action_dict[robot.name])
-            Controller.apply_robot_action(robot.name, robot_action)
+            robot.apply_action(action_dict[robot.name])
 
     def _post_step(self, action):
         """Apply the post-sim-step part of an environment step, i.e. grab observations and return the step results."""

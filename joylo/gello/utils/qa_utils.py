@@ -284,7 +284,7 @@ class GhostHandAppearanceMetric(EnvMetric):
             for robot in env.robots:
                 for arm in robot.arm_names:
                     cid = robot._controller_id(f"gripper_{arm}")
-                    cfg = Controller._configs[cid]
+                    cfg = Controller.configs[cid]
                     is_1d = Controller.command_dim(cid) == 1
                     is_normalized = (th.all(cb.to_torch(cfg["command_input_limits"][0]) == -1.0).item() and
                                      th.all(cb.to_torch(cfg["command_input_limits"][1]) == 1.0).item())
@@ -319,7 +319,7 @@ class GhostHandAppearanceMetric(EnvMetric):
                             for vm in link.visual_meshes.values():
                                 vm.material.diffuse_color_constant = color
                         self.robot_arm_colors[robot.name][arm] = active
-                op = operator.lt if Controller._configs[cid]["inverted"] else operator.ge
+                op = operator.lt if Controller.configs[cid]["inverted"] else operator.ge
                 step_metrics[f"robot{i}::arm_{arm}::open_cmd"] = th.all(op(action[gripper_action_idxs[arm]], 0.0)).item()
         return step_metrics
 
@@ -595,7 +595,7 @@ class FieldOfViewMetric(EnvMetric):
             for robot in env.robots:
                 for arm in robot.arm_names:
                     cid = robot._controller_id(f"gripper_{arm}")
-                    cfg = Controller._configs[cid]
+                    cfg = Controller.configs[cid]
                     is_1d = Controller.command_dim(cid) == 1
                     is_normalized = (th.all(cb.to_torch(cfg["command_input_limits"][0]) == -1.0).item() and
                                      th.all(cb.to_torch(cfg["command_input_limits"][1]) == 1.0).item())
@@ -627,7 +627,7 @@ class FieldOfViewMetric(EnvMetric):
             gripper_action_idxs = robot.gripper_action_idx
             for arm in robot.arm_names:
                 cid = robot._controller_id(f"gripper_{arm}")
-                op = operator.lt if Controller._configs[cid]["inverted"] else operator.ge
+                op = operator.lt if Controller.configs[cid]["inverted"] else operator.ge
                 # check if any of the gripper link for this arm is in the field of view
                 gripper_in_fov = len(links_in_fov.intersection(self.gripper_link_paths[arm])) > 0
 

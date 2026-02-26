@@ -549,7 +549,7 @@ class OGRobotServer:
                         # Handle gripper actions
                         for arm in self.robot.arm_names:
                             cid = self.robot._controller_id(f"gripper_{arm}")
-                            gripper_goal = float(Controller._goals[cid]["target"])
+                            gripper_goal = float(Controller.goals[cid]["target"])
                             checkpoint_gripper_action = 1 if gripper_goal > 0 else -1
                             self._grasp_action[arm] = checkpoint_gripper_action
 

@@ -310,7 +310,7 @@ def test_grasping_mode():
 
         # Grasp the box
         Controller.update_goal(
-            controller_id=robot._controller_id("gripper_0"),
+            controller_id=robot.controller_ids["gripper_0"],
             command=cb.array([-1]),
         )
         for _ in range(10):
@@ -336,7 +336,7 @@ def test_grasping_mode():
 
         # Release the box
         Controller.update_goal(
-            controller_id=robot._controller_id("gripper_0"),
+            controller_id=robot.controller_ids["gripper_0"],
             command=cb.array([1]),
         )
         for _ in range(20):
