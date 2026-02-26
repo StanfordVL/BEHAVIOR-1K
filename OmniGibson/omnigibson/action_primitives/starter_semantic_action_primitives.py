@@ -180,8 +180,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 cid = self.robot.controller_ids[arm]
                 if Controller.type_by_id[cid] == ControllerType.InverseKinematicsController:
                     eef_link_name = self.robot.eef_link_names[arm_name]
-                    pos_relative_raw, quat_relative_raw = ControllableObjectViewAPI.get_link_relative_position_orientation(
-                        self.robot.articulation_root_path, eef_link_name
+                    pos_relative_raw, quat_relative_raw = (
+                        ControllableObjectViewAPI.get_link_relative_position_orientation(
+                            self.robot.articulation_root_path, eef_link_name
+                        )
                     )
                     pos_relative = cb.to_torch(pos_relative_raw)
                     quat_relative = cb.to_torch(quat_relative_raw)
@@ -1366,7 +1368,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         cam_cid = self.robot.controller_ids["camera"]
         cam_cfg = Controller.configs[cam_cid]
-        assert Controller.type_by_id[cam_cid] == ControllerType.JointController, "Camera controller must be JointController"
+        assert (
+            Controller.type_by_id[cam_cid] == ControllerType.JointController
+        ), "Camera controller must be JointController"
         assert cam_cfg["motor_type"] == "position", "Camera controller must be in position control mode"
         use_delta = cam_cfg["use_delta_commands"]
 
@@ -1648,9 +1652,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 base_ctype = Controller.type_by_id[base_cid]
                 if base_ctype == ControllerType.HolonomicBaseJointController:
                     base_cfg = Controller.configs[base_cid]
-                    assert (
-                        base_cfg["motor_type"] == "velocity"
-                    ), "Holonomic base controller must be in velocity mode"
+                    assert base_cfg["motor_type"] == "velocity", "Holonomic base controller must be in velocity mode"
                     direction_vec = (
                         body_target_pose[0][:2]
                         / th.norm(body_target_pose[0][:2])
@@ -1703,9 +1705,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_ctype = Controller.type_by_id[base_cid]
             if base_ctype == ControllerType.HolonomicBaseJointController:
                 base_cfg = Controller.configs[base_cid]
-                assert (
-                    base_cfg["motor_type"] == "velocity"
-                ), "Holonomic base controller must be in velocity mode"
+                assert base_cfg["motor_type"] == "velocity", "Holonomic base controller must be in velocity mode"
                 base_action[0] = 0.0
                 base_action[1] = 0.0
                 base_action[2] = ang_vel

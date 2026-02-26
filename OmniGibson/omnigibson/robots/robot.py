@@ -568,7 +568,7 @@ class Robot(USDObject, GymObservable):
                         subsume_name not in controller_subsumes
                     ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
                     subsume_names.add(subsume_name)
-        
+
         # Unregister old controller IDs so that stale entries don't linger
         # when reloading and switching controller types (e.g. IK -> OSC).
         for name in self._raw_controller_order:
@@ -638,7 +638,6 @@ class Robot(USDObject, GymObservable):
                     self.dof_names_ordered[idx]
                 ].driven, "Controllers should only control driveable joints!"
         self.update_controller_mode()
-
 
     @property
     def controller_ids(self):
@@ -846,7 +845,6 @@ class Robot(USDObject, GymObservable):
             else:
                 Controller.disable(cid)
 
-
     def _handle_assisted_grasping(self):
         """
         Handles assisted grasping by creating or removing constraints.
@@ -1015,7 +1013,9 @@ class Robot(USDObject, GymObservable):
         # Add in controller states
         controller_states = dict()
         for controller_name in self._controllers:
-            controller_states[controller_name] = Controller.dump_state(controller_id=self.controller_ids[controller_name])
+            controller_states[controller_name] = Controller.dump_state(
+                controller_id=self.controller_ids[controller_name]
+            )
 
         state["controllers"] = controller_states
 
@@ -1042,7 +1042,9 @@ class Robot(USDObject, GymObservable):
         # Load controller states
         controller_states = state["controllers"]
         for controller_name in self._controllers:
-            Controller.load_state(controller_id=self.controller_ids[controller_name], state=controller_states[controller_name])
+            Controller.load_state(
+                controller_id=self.controller_ids[controller_name], state=controller_states[controller_name]
+            )
 
         if self.is_manipulation:
             # No additional loading needed if we're using physical grasping
@@ -2244,12 +2246,7 @@ class Robot(USDObject, GymObservable):
             int: Dimension of action space for this object. By default,
                 is the sum over all controller action dimensions
         """
-        return sum(
-            [
-                Controller.command_dim[self.controller_ids[name]]
-                for name in self._controllers
-            ]
-        )
+        return sum([Controller.command_dim[self.controller_ids[name]] for name in self._controllers])
 
     @property
     def action_space(self):
@@ -2346,8 +2343,7 @@ class Robot(USDObject, GymObservable):
         """
         controller_idx = self._controllers.index(controller_name)
         action_start_idx = sum(
-            Controller.command_dim[self.controller_ids[self._controllers[i]]]
-            for i in range(controller_idx)
+            Controller.command_dim[self.controller_ids[self._controllers[i]]] for i in range(controller_idx)
         )
         cmd_dim = Controller.command_dim[self.controller_ids[controller_name]]
         return th.arange(action_start_idx, action_start_idx + cmd_dim)
@@ -3877,8 +3873,8 @@ class Robot(USDObject, GymObservable):
             for name in self._controllers:
                 cid = self.controller_ids[name]
                 config = Controller.configs[cid]
-                assert (
-                    Controller.type_by_id[cid] == ControllerType.JointController and not config.get("use_delta_commands", False)
+                assert Controller.type_by_id[cid] == ControllerType.JointController and not config.get(
+                    "use_delta_commands", False
                 ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
                 command = q[Controller.dof_idx[cid]]
                 action.append(Controller._reverse_preprocess_command(cid, command))
