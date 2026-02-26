@@ -141,8 +141,6 @@ class EntityPrim(XFormPrim):
         if self._prim_type == PrimType.CLOTH:
             assert not self._visual_only, "Cloth cannot be visual-only."
             assert len(self._links) == 1, f"Cloth entity prim can only have one link; got: {len(self._links)}"
-            if gm.AG_CLOTH:
-                self.create_attachment_point_link()
 
         # Globally disable any requested collision links
         for link_name in self.disabled_collision_link_names:
@@ -1590,65 +1588,6 @@ class EntityPrim(XFormPrim):
                 joint.keep_still()
         # Make sure object is awake
         self.wake()
-
-    def create_attachment_point_link(self):
-        """
-        Create a collision-free, invisible attachment point link for the cloth object, and create an attachment between
-        the ClothPrim and this attachment point link (RigidPrim).
-
-        One use case for this is that we can create a fixed joint between this link and the world to enable AG fo cloth.
-        During simulation, this joint will move and match the robot gripper frame, which will then drive the cloth.
-        """
-
-        assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
-        link_name = "attachment_point"
-        stage = lazy.isaacsim.core.utils.stage.get_current_stage()
-        link_prim = stage.DefinePrim(f"{self.prim_path}/{link_name}", "Xform")
-        vis_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/visuals").GetPrim()
-        col_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/collisions").GetPrim()
-
-        # Set the radius to be 0.03m. In theory, we want this radius to be as small as possible. Otherwise, the cloth
-        # dynamics will be unrealistic. However, in practice, if the radius is too small, the attachment becomes very
-        # unstable. Empirically 0.03m works reasonably well.
-        vis_prim.GetAttribute("radius").Set(0.03)
-        col_prim.GetAttribute("radius").Set(0.03)
-
-        # Need to sync the extents
-        extent = vis_prim.GetAttribute("extent").Get()
-        extent[0] = lazy.pxr.Gf.Vec3f(-0.03, -0.03, -0.03)
-        extent[1] = lazy.pxr.Gf.Vec3f(0.03, 0.03, 0.03)
-        vis_prim.GetAttribute("extent").Set(extent)
-        col_prim.GetAttribute("extent").Set(extent)
-
-        # Add collision API to collision geom
-        lazy.pxr.UsdPhysics.CollisionAPI.Apply(col_prim)
-        lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(col_prim)
-        lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
-
-        # Create a attachment point link
-        link = RigidDynamicPrim(
-            relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, link_prim.GetPrimPath().pathString),
-            name=f"{self._name}:{link_name}",
-        )
-        link.load(self.scene)
-        link.disable_collisions()
-        # TODO (eric): Should we disable gravity for this link?
-        # link.disable_gravity()
-        link.visible = False
-        # Set a very small mass
-        link.mass = 1e-6
-        link.density = 0.0
-
-        self._links[link_name] = link
-
-        # Create an attachment between the root link (ClothPrim) and the newly created attachment point link (RigidDynamicPrim)
-        attachment_path = self.root_link.prim.GetPath().AppendElementString("attachment")
-        lazy.omni.kit.commands.execute(
-            "CreatePhysicsAttachment",
-            target_attachment_path=attachment_path,
-            actor0_path=self.root_link.prim.GetPath(),
-            actor1_path=link.prim.GetPath(),
-        )
 
     def _dump_state(self):
         # We don't call super, instead, this state is simply the root link state and all joint states
