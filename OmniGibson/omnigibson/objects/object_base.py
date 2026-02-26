@@ -328,6 +328,25 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["scale"] = scale
 
     @property
+    def metadata(self):
+        """
+        Gets this object's metadata, if it exists
+
+        Returns:
+            None or dict: Nested dictionary of object's metadata if it exists, else None
+        """
+        return self.get_custom_data().get("metadata", None)
+
+    def get_custom_data(self):
+        """
+        Get custom data associated with this prim
+
+        Returns:
+            dict: Dictionary of any custom information
+        """
+        return self._prim.GetCustomData()
+
+    @property
     def highlighted(self):
         """
         Returns:

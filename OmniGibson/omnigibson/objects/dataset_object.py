@@ -400,16 +400,6 @@ class DatasetObject(USDObject):
         return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"))
 
     @property
-    def metadata(self):
-        """
-        Gets this object's metadata, if it exists
-
-        Returns:
-            None or dict: Nested dictionary of object's metadata if it exists, else None
-        """
-        return self.get_custom_data().get("metadata", None)
-
-    @property
     def orientations(self):
         """
         Returns:

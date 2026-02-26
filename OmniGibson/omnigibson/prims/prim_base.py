@@ -392,15 +392,6 @@ class BasePrim(Serializable, Recreatable, ABC):
         """
         self._prim.GetProperty(prop).Set(val)
 
-    def get_custom_data(self):
-        """
-        Get custom data associated with this prim
-
-        Returns:
-            dict: Dictionary of any custom information
-        """
-        return self._prim.GetCustomData()
-
     def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         """
         Generates a new instance of this prim's class with specified @relative_prim_path, @name, and @load_config, but otherwise
