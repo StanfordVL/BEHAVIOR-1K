@@ -8,7 +8,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot import Robot
 from omnigibson.sensors import VisionSensor
@@ -255,7 +255,7 @@ class OVXRSystem(TeleopSystem):
             blackout_sphere = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, blackout_prim_path)
             blackout_sphere.CreateRadiusAttr().Set(0.1)
             blackout_sphere.CreateDisplayColorAttr().Set(lazy.pxr.Vt.Vec3fArray([255, 255, 255]))
-            self._view_blackout_prim = VisualGeomPrim(
+            self._view_blackout_prim = GeomPrim(
                 relative_prim_path=blackout_relative_path,
                 name="view_blackout",
             )

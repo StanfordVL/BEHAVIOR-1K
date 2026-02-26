@@ -6,7 +6,7 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.material_prim import OmniPBRMaterialPrim, OmniSurfaceMaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
@@ -841,7 +841,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Creates any relevant particle prototypes to be used by this particle system.
 
         Returns:
-            list of VisualGeomPrim: Visual mesh prim(s) to use as this system's particle prototype(s)
+            list of GeomPrim: Visual mesh prim(s) to use as this system's particle prototype(s)
         """
         raise NotImplementedError()
 
@@ -1443,7 +1443,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(self.particle_radius)
         relative_prototype_prim_path = absolute_prim_path_to_scene_relative(self._scene, prototype_prim_path)
-        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
+        prototype = GeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
         prototype.visible = False
         lazy.isaacsim.core.utils.semantics.add_update_semantics(
@@ -1549,9 +1549,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
         prototype_path = f"{self.prim_path}/prototype0"
         lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
-        # Wrap it with VisualGeomPrim with the correct scale
+        # Wrap it with GeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
-        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
+        prototype = GeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
         prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False

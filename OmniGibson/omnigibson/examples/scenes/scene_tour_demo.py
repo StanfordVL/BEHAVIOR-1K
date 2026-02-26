@@ -63,6 +63,20 @@ def main(random_selection=False, headless=False, short_exec=False):
         print("Cleared all waypoints!")
         waypoints = []
 
+    def record_trajectory():
+        if len(waypoints) < 3:
+            print(
+                f"Need at least 3 waypoints to record a trajectory (currently have {len(waypoints)}). Press X to add waypoints."
+            )
+            return
+        cam_mover.record_trajectory_from_waypoints(
+            waypoints=th.stack(waypoints),
+            per_step_distance=0.02,
+            fps=30,
+            steps_per_frame=1,
+            fpath=None,  # This corresponds to the default path inferred from cam_mover.save_dir
+        )
+
     KeyboardEventHandler.initialize()
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.X,
@@ -74,13 +88,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.J,
-        callback_fn=lambda: cam_mover.record_trajectory_from_waypoints(
-            waypoints=th.tensor(waypoints),
-            per_step_distance=0.02,
-            fps=30,
-            steps_per_frame=1,
-            fpath=None,  # This corresponds to the default path inferred from cam_mover.save_dir
-        ),
+        callback_fn=record_trajectory,
     )
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.ESCAPE,
