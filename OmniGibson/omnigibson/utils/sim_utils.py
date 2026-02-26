@@ -118,7 +118,9 @@ def get_rigid_contact_bodies(obj, ignore_objs=None):
     my_link_paths = list(obj.link_prim_paths)
     my_link_path_set = set(my_link_paths)
     bodies = set()
-    for this_contact, other_contact in RigidContactAPI.get_contact_pairs(scene_idx=scene_idx, sensor_prim_paths=my_link_paths):
+    for this_contact, other_contact in RigidContactAPI.get_contact_pairs(
+        scene_idx=scene_idx, sensor_prim_paths=my_link_paths
+    ):
         if other_contact not in my_link_path_set:
             bodies.add(other_contact)
 

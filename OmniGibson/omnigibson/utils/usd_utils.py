@@ -427,12 +427,8 @@ class RigidContactAPIImpl:
                 ori_changed = ori_aligned < (1.0 - self._ORI_EPS)
                 body_changed[path] = bool((pos_changed | ori_changed).item())
 
-            changed_rows = th.tensor(
-                [body_changed[path] for path in self._ROW_IDX_TO_PATH[scene_idx]], dtype=th.bool
-            )
-            changed_cols = th.tensor(
-                [body_changed[path] for path in self._COL_IDX_TO_PATH[scene_idx]], dtype=th.bool
-            )
+            changed_rows = th.tensor([body_changed[path] for path in self._ROW_IDX_TO_PATH[scene_idx]], dtype=th.bool)
+            changed_cols = th.tensor([body_changed[path] for path in self._COL_IDX_TO_PATH[scene_idx]], dtype=th.bool)
             changed_pairs = changed_rows[:, None] | changed_cols[None, :]
 
             cached_impulses = prev_impulses.clone()
@@ -459,12 +455,9 @@ class RigidContactAPIImpl:
 
         # Get all of the (row, col) pairs where the impulse is greater than 0
         all_idx_pairs = zip(*th.nonzero(impulses > 0, as_tuple=True))
-        
+
         # Convert the index pairs in to (sensor_prim_path, other_contact) pairs
-        return {
-            (sensor_prim_paths[row], self._COL_IDX_TO_PATH[scene_idx][col])
-            for row, col in all_idx_pairs
-        }
+        return {(sensor_prim_paths[row], self._COL_IDX_TO_PATH[scene_idx][col]) for row, col in all_idx_pairs}
 
     def clear(self):
         """
