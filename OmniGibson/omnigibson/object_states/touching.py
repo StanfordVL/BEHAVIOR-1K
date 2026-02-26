@@ -12,7 +12,7 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
     @staticmethod
     def _check_cloth_contact(cloth_obj, other_obj):
         other_link_paths = set(other_obj.link_prim_paths)
-        return any(len({contact.body0, contact.body1} & other_link_paths) > 0 for contact in cloth_obj.contact_list())
+        return any(len({contact.body0, contact.body1} & other_link_paths) > 0 for contact in cloth_obj.root_link.contact_list())
 
     def _get_value(self, other):
         if self.obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.CLOTH:

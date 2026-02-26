@@ -362,7 +362,7 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
 
         og.sim.step_physics()
         # Cloth contacts are not represented in RigidContactAPI views.
-        success = len(obj.contact_list()) == 0
+        success = len(obj.root_link.contact_list()) == 0
 
         if success:
             break

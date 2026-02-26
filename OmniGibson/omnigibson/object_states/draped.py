@@ -41,7 +41,7 @@ class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothState
         # Cloth contact is only available through cloth contact_list.
         contact_link_prim_paths = set(other.link_prim_paths)
         contact_positions = []
-        for contact in self.obj.contact_list():
+        for contact in self.obj.root_link.contact_list():
             if len({contact.body0, contact.body1} & contact_link_prim_paths) > 0:
                 contact_positions.append(contact.position)
 

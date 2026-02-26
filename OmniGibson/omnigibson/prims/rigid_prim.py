@@ -340,27 +340,6 @@ class RigidPrim(XFormPrim):
         """
         pass
 
-    def contact_list(self):
-        """
-        Get list of all current contacts with this rigid body
-        NOTE: This method is slow and uncached, but it works even for sleeping objects.
-        For frequent contact checks, consider using RigidContactAPI for performance.
-
-        Returns:
-            list of CsRawData: raw contact info for this rigid body
-        """
-        # Make sure we have the ability to grab contacts for this object
-        contacts = []
-        if self.contact_reporting_enabled:
-            raw_data = og.sim.contact_sensor.get_rigid_body_raw_data(self.prim_path)
-            for c in raw_data:
-                # convert handles to prim paths for comparison
-                c = [*c]  # CsRawData enforces body0 and body1 types to be ints, but we want strings
-                c[2] = og.sim.contact_sensor.decode_body_name(c[2])
-                c[3] = og.sim.contact_sensor.decode_body_name(c[3])
-                contacts.append(CsRawData(*c))
-        return contacts
-
     @property
     def body_name(self):
         """
