@@ -2477,20 +2477,7 @@ class Robot(USDObject, GymObservable):
                 ordering of actions, which may be a subset of the controllers due to some controllers subsuming others
                 (e.g.: arm controller subsuming the trunk controller if using IK)
         """
-        # Check top-level raw_controller_order
-        if self._definition.raw_controller_order:
-            return self._definition.raw_controller_order
-
-        # Fall back to defaults based on capabilities
-        controllers = []
-        if self.is_manipulation:
-            for arm in self.arm_names:
-                controllers += ["arm_{}".format(arm), "gripper_{}".format(arm)]
-            return controllers
-        if self.is_active_camera:
-            return ["camera"]
-        if self.is_locomotion:
-            return ["base"]
+        return self._definition.raw_controller_order
 
     @property
     def controller_action_idx(self):
@@ -4002,7 +3989,7 @@ class Robot(USDObject, GymObservable):
             # Note that the link we are interested in is self.base_footprint_link, not self.root_link
             return self.base_footprint_link.get_linear_velocity()
         else:
-            super().get_linear_velocity()
+            return super().get_linear_velocity()
 
     def set_angular_velocity(self, velocity: th.Tensor) -> None:
         if self.is_holonomic_base:
@@ -4029,7 +4016,7 @@ class Robot(USDObject, GymObservable):
             # Note that the link we are interested in is self.base_footprint_link, not self.root_link
             return self.base_footprint_link.get_angular_velocity()
         else:
-            super().get_angular_velocity()
+            return super().get_angular_velocity()
 
     def q_to_action(self, q):
         """

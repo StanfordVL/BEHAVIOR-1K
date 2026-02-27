@@ -391,15 +391,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             left_edge_to_center = -aabb_min[0]
-            self._scene_prim.set_position_orientation(
-                position=[last_scene_edge + scene_margin + left_edge_to_center, 0, 0]
-            )
+            scene_position = th.tensor([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
+            identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+            self._scene_prim.set_position_orientation(position=scene_position, orientation=identity_quat)
             new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
+            scene_position = th.zeros(3)
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             new_scene_edge = aabb_max[0]
 
-        return new_scene_edge
+        return new_scene_edge, scene_position
 
     def _load_metadata_from_scene_file(self):
         """
@@ -467,16 +468,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
         # and metadata
-        new_scene_edge = self._load_scene_prim_with_objects(**kwargs)
+        new_scene_edge, scene_position = self._load_scene_prim_with_objects(**kwargs)
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
 
-        # Cache this scene's pose
-        pos_ori = self._scene_prim.get_position_orientation()
+        # Cache this scene's pose using the position we just set, rather than reading
+        # it back from the prim, since the physics engine may not have processed the
+        # update yet (sim is stopped during load).
+        identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+        pos_ori = (scene_position, identity_quat)
         pose = T.pose2mat(pos_ori)
         self._pose_info = {
             "pos_ori": pos_ori,
-            "pose": T.pose2mat(pos_ori),
+            "pose": pose,
             "pose_inv": th.linalg.inv_ex(pose).inverse,
         }
 
