@@ -213,9 +213,6 @@ gm.DEFAULT_SIM_STEP_FREQ = 30
 gm.DEFAULT_RENDERING_FREQ = 30
 gm.DEFAULT_PHYSICS_FREQ = 120
 
-# (Demo-purpose) Whether to activate Assistive Grasping mode for Cloth (it's handled differently from RigidBody)
-gm.AG_CLOTH = False
-
 # Forced light intensity for all DatasetObjects. None if the USD-provided intensities should be respected.
 gm.FORCE_LIGHT_INTENSITY = 10000
 

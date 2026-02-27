@@ -74,11 +74,7 @@ RESET_JOINT_OPTIONS = {
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.ASSIST_FRACTION = 1.0
 m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
-m.ARTICULATED_ASSIST_FRACTION = 0.7
-m.MIN_ASSIST_FORCE = 0
-m.MAX_ASSIST_FORCE = 100
 m.MIN_AG_DEFAULT_GRASP_POINT_PROP = 0.2
 m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.95
 m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
@@ -222,7 +218,6 @@ class Robot(USDObject, GymObservable):
         if self.has_end_effector_variants:
             self.end_effector = end_effector
             grasping_direction = "lower" if end_effector == "gripper" else "upper"
-            self._init_ag_points()
 
         if self.is_manipulation:
             # Store relevant internal vars
@@ -238,8 +233,9 @@ class Robot(USDObject, GymObservable):
             # Initialize other variables used for assistive grasping
             self._ag_obj_in_hand = {arm: None for arm in self.arm_names}
             self._ag_obj_constraints = {arm: None for arm in self.arm_names}
-            self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
-            self._ag_freeze_gripper = {arm: None for arm in self.arm_names}
+            self._ag_obj_constraint_params = {
+                arm: None for arm in self.arm_names
+            }  # Opaque args for create_joint. Don't inspect.
             self._ag_release_counter = {arm: None for arm in self.arm_names}
             self._ag_grasp_counter = {arm: None for arm in self.arm_names}
 
@@ -434,21 +430,21 @@ class Robot(USDObject, GymObservable):
             and self._definition.manipulation.supported_end_effector is not None
         )
 
-    def _convert_to_grasping_points(self, li):
-        result = []
-        for item in li:
-            link_name, position = item
-            result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
-        return result
+    def _convert_to_grasping_points(self, points):
+        """Converts raw assisted grasp point definitions into an arm-keyed dict of GraspingPoint entries."""
 
-    def _init_ag_points(self):
-        """Initialize assisted grasp points from end effector definition."""
-        eef_def = self._get_end_effector_definition()
-        if eef_def is None or eef_def.ag_start_points is None:
-            return
+        def _convert_point_list(point_list):
+            if point_list is None:
+                return None
+            result = []
+            for link_name, position in point_list:
+                result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
+            return result
 
-        self._ag_start_points = self._convert_to_grasping_points(eef_def.ag_start_points)
-        self._ag_end_points = self._convert_to_grasping_points(eef_def.ag_end_points)
+        if points is None:
+            return None
+
+        return {arm: _convert_point_list(points.get(arm)) for arm in self.arm_names}
 
     def _get_end_effector_definition(self) -> "EndEffectorDefinition | None":
         """Get the current end effector configuration if this robot has end effector variants."""
@@ -877,15 +873,6 @@ class Robot(USDObject, GymObservable):
             control_type (n-array): control types for each DOF. Each entry should be one of ControlType.
                  This should be n-DOF length for all joints being set.
         """
-        if self.is_manipulation:
-            # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
-            for arm in self.arm_names:
-                if self._ag_freeze_gripper[arm]:
-                    control[self.gripper_control_idx[arm]] = (
-                        self._ag_obj_constraint_params[arm]["gripper_pos"]
-                        if self.controllers[f"gripper_{arm}"].control_type == ControlType.POSITION
-                        else 0.0
-                    )
         # Run sanity check
         assert len(control) == len(control_type) == self.n_dof, (
             f"Control signals, control types, and number of DOF should all be the same!"
@@ -926,26 +913,6 @@ class Robot(USDObject, GymObservable):
             if self.grasping_mode != "physical" and not self._disable_grasp_handling:
                 self._handle_assisted_grasping()
 
-    def _update_constraint_cloth(self, arm="default"):
-        """
-        Update the AG constraint for cloth: for the fixed joint between the attachment point and the world, we set
-        the local pos to match the current eef link position plus the attachment_point_pos_local offset. As a result,
-        the joint will drive the attachment point to the updated position, which will then drive the cloth.
-        See _establish_grasp_cloth for more details.
-
-        Args:
-            arm (str): specific arm to establish grasp.
-                Default is "default" which corresponds to the first entry in self.arm_names
-        """
-        assert self.is_manipulation
-        attachment_point_pos_local = self._ag_obj_constraint_params[arm]["attachment_point_pos_local"]
-        eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
-        attachment_point_pos, _ = T.pose_transform(
-            eef_link_pos, eef_link_orn, attachment_point_pos_local, th.tensor([0, 0, 0, 1], dtype=th.float32)
-        )
-        joint_prim = self._ag_obj_constraints[arm]
-        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*attachment_point_pos))
-
     def _handle_assisted_grasping(self):
         """
         Handles assisted grasping by creating or removing constraints.
@@ -978,16 +945,13 @@ class Robot(USDObject, GymObservable):
                 if self._ag_release_counter[arm] is not None:
                     self._handle_release_window(arm=arm)
                 else:
-                    if gm.AG_CLOTH:
-                        self._update_constraint_cloth(arm=arm)
-
                     if not applying_grasp:
                         self._release_grasp(arm=arm)
             elif applying_grasp:
-                current_ag_data = self._calculate_in_hand_object(arm=arm)
+                ag_target_object_and_link_name = self._calculate_in_hand_object(arm=arm)
                 if self._ag_grasp_counter[arm] is not None:
                     # We're in a grasp window already
-                    if current_ag_data is None:
+                    if ag_target_object_and_link_name is None:
                         # Lost contact with object, reset window
                         self._ag_grasp_counter[arm] = None
                     else:
@@ -996,11 +960,16 @@ class Robot(USDObject, GymObservable):
                         # Check if window is complete
                         time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_sim_step_dt()
                         if time_in_grasp >= m.GRASP_WINDOW:
-                            # Establish grasp with the LATEST ag_data
-                            self._establish_grasp(arm=arm, ag_data=current_ag_data)
+                            # Consider establishing a grasp
+                            target_obj, target_link_name = ag_target_object_and_link_name
+                            self._maybe_establish_grasp(
+                                target_obj=target_obj, target_link_name=target_link_name, arm=arm
+                            )
+
                             # Reset the grasp window tracking
                             self._ag_grasp_counter[arm] = None
-                elif current_ag_data is not None:
+
+                elif ag_target_object_and_link_name is not None:
                     # Start tracking a new potential grasp
                     self._ag_grasp_counter[arm] = 0
             else:
@@ -1253,18 +1222,17 @@ class Robot(USDObject, GymObservable):
 
         # If we're using actual physical grasping, no extra state needed to save
         if self.is_manipulation and self.grasping_mode != "physical":
-            # Include AG_state
-            ag_params = self._ag_obj_constraint_params.copy()
-            for arm in ag_params.keys():
-                if len(ag_params[arm]) > 0:
-                    assert (
-                        self.scene is not None
-                    ), "Cannot get position and orientation relative to scene without a scene"
-                    ag_params[arm]["contact_pos"], _ = self.scene.convert_world_pose_to_scene_relative(
-                        ag_params[arm]["contact_pos"],
-                        th.tensor([0, 0, 0, 1], dtype=th.float32),
-                    )
-            state["ag_obj_constraint_params"] = ag_params
+            # Include AG state
+            state["ag_obj_constraint_params"] = {}
+            for arm, ag_params_for_arm in self._ag_obj_constraint_params.items():
+                if ag_params_for_arm is not None:
+                    # Make a copy so that the original is not mutated
+                    state["ag_obj_constraint_params"][arm] = ag_params_for_arm.copy()
+
+                    # Change the object reference to be the object name instead of the object itself
+                    state["ag_obj_constraint_params"][arm]["target_obj"] = state["ag_obj_constraint_params"][arm][
+                        "target_obj"
+                    ].name
 
         return state
 
@@ -1282,23 +1250,81 @@ class Robot(USDObject, GymObservable):
             if self.grasping_mode == "physical":
                 return
 
-            # Include AG_state
-            # TODO: currently does not take care of cloth objects
+            # Load AG state
             # TODO: add unit tests
             for arm in self.arm_names:
                 current_ag_constraint = self._ag_obj_constraint_params[arm]
-                has_current_constraint = len(current_ag_constraint) > 0
 
-                loaded_ag_constraint = {}
-                has_loaded_constraint = False
-                if "ag_obj_constraint_params" in state:
-                    loaded_ag_constraint = state["ag_obj_constraint_params"][arm]
-                    has_loaded_constraint = len(loaded_ag_constraint) > 0
+                loaded_ag_constraint = None
+                if (
+                    "ag_obj_constraint_params" in state
+                    and arm in state["ag_obj_constraint_params"]
+                    and state["ag_obj_constraint_params"][arm]
+                ):
+                    # Get this arm's constraint
+                    loaded_ag_constraint = state["ag_obj_constraint_params"][arm].copy()
+
+                    # If it's the legacy format, convert it to the new format
+                    if "contact_pos" in loaded_ag_constraint:
+                        # Find the object and the appropriate joint type
+                        target_obj = self.scene.object_registry("prim_path", loaded_ag_constraint["ag_obj_prim_path"])
+                        target_link_name = loaded_ag_constraint["ag_link_prim_path"].split("/")[-1]
+                        joint_type = self._get_assisted_grasp_joint_type(target_obj, target_link_name)
+                        assert joint_type in ["FixedJoint", "SphericalJoint"], "Failed to get assisted grasp joint type"
+
+                        # Here we address a major bug: the original "contact_pos" was the position of the contact point at the start
+                        # of the grasp, but it is possible that the objects have moved since then. We thus do not know where the joint
+                        # is supposed to go. We make a best-effort guess by taking the current position of the EEF.
+                        # For a FixedJoint, this is perfectly fine, since the joint position and orientation don't actually matter.
+                        # But for a SphericalJoint, it is quite problematic, because the relative rotation pivot of the two objects
+                        # will now have changed. So we need to warn the user.
+                        contact_pos_world = self.get_eef_position(arm)
+                        if joint_type == "SphericalJoint":
+                            log.warning(
+                                "You are restoring a robot state that was saved with a previous version of OmniGibson that had a bug "
+                                "in the assisted grasp functionality. The saved state contains an assisted grasp of a moving link, which "
+                                "uses a spherical joint. However, in that version of OmniGibson, the spherical joint position was not stored "
+                                "correctly in the saved state. As a result, we are making a best-effort guess for the relative pivot point "
+                                "of the two objects, which is guaranteed to be inaccurate and different from the original position. We recommend "
+                                "that you re-record the state with the current version of OmniGibson."
+                                f"The target object is {target_obj.name} and the link is {target_link_name}, being grasped by the {arm} arm of robot {self.name}."
+                            )
+
+                        # Need to find distance between robot and contact point in robot link's local frame and
+                        # ag link and contact point in ag link's local frame
+                        joint_frame_orn = th.tensor([0, 0, 0, 1.0])
+                        eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
+                        parent_frame_pos, parent_frame_orn = T.relative_pose_transform(
+                            contact_pos_world, joint_frame_orn, eef_link_pos, eef_link_orn
+                        )
+                        parent_frame_pos = parent_frame_pos / self.scale
+                        obj_link_pos, obj_link_orn = target_obj.links[target_link_name].get_position_orientation()
+                        child_frame_pos, child_frame_orn = T.relative_pose_transform(
+                            contact_pos_world, joint_frame_orn, obj_link_pos, obj_link_orn
+                        )
+                        child_frame_pos = child_frame_pos / target_obj.scale
+
+                        # Compile the constraint params dict
+                        loaded_ag_constraint = {
+                            "target_obj": target_obj.name,  # Here we use the name since this is what we saved in the state - it's converted to the object itself later
+                            "target_link_name": target_link_name,
+                            "parent_frame_pos": parent_frame_pos,
+                            "parent_frame_orn": parent_frame_orn,
+                            "child_frame_pos": child_frame_pos,
+                            "child_frame_orn": child_frame_orn,
+                            "joint_type": joint_type,
+                        }
+
+                    # Convert the target object name back to the object itself.
+                    loaded_ag_constraint["target_obj"] = self.scene.object_registry(
+                        "name", loaded_ag_constraint["target_obj"]
+                    )
+                    assert loaded_ag_constraint["target_obj"] is not None, "Target object not found in scene"
 
                 # Release existing grasp if needed
                 should_release = False
-                if has_current_constraint:
-                    if not has_loaded_constraint:
+                if current_ag_constraint:
+                    if loaded_ag_constraint is None:
                         should_release = True
                     else:
                         # Check if constraints are different
@@ -1311,19 +1337,9 @@ class Robot(USDObject, GymObservable):
                 if should_release:
                     self.release_grasp_immediately(arm=arm)
 
-                # Establish new grasp if needed
-                if has_loaded_constraint and (not has_current_constraint or should_release):
-                    obj = self.scene.object_registry("prim_path", loaded_ag_constraint["ag_obj_prim_path"])
-                    link = obj.links[loaded_ag_constraint["ag_link_prim_path"].split("/")[-1]]
-                    contact_pos_global = loaded_ag_constraint["contact_pos"]
-                    assert (
-                        self.scene is not None
-                    ), "Cannot set position and orientation relative to scene without a scene"
-                    contact_pos_global, _ = self.scene.convert_scene_relative_pose_to_world(
-                        contact_pos_global,
-                        th.tensor([0, 0, 0, 1], dtype=th.float32),
-                    )
-                    self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=contact_pos_global)
+                # Create new assisted grasp joint if needed
+                if loaded_ag_constraint is not None and (current_ag_constraint is None or should_release):
+                    self._create_assisted_grasp_joint(arm, loaded_ag_constraint)
 
     def serialize(self, state):
         # Run super first
@@ -2073,7 +2089,6 @@ class Robot(USDObject, GymObservable):
         Args:
             arm (str): specific arm whose gripper will be checked for contact. Default is "default" which
                 corresponds to the first entry in self.arm_names
-            return_contact_positions (bool): if True, will additionally return the contact (x,y,z) position
         Returns:
             2-tuple:
                 - set: set of unique contact prim_paths that are not the robot self-collisions.
@@ -2135,10 +2150,9 @@ class Robot(USDObject, GymObservable):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        delete_or_deactivate_prim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
+        delete_or_deactivate_prim(self._ag_obj_constraints[arm].GetPath().pathString)
         self._ag_obj_constraints[arm] = None
-        self._ag_obj_constraint_params[arm] = {}
-        self._ag_freeze_gripper[arm] = False
+        self._ag_obj_constraint_params[arm] = None
         self._ag_release_counter[arm] = 0
 
     def release_grasp_immediately(self, arm="default"):
@@ -2152,9 +2166,6 @@ class Robot(USDObject, GymObservable):
             self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
             self._handle_release_window(arm=arm)
             assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
-            # TODO: Verify not needed!
-            # for finger_link in self.finger_links[arm]:
-            #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
 
     @property
     def reset_joint_pos_aabb_extent(self):
@@ -2652,120 +2663,36 @@ class Robot(USDObject, GymObservable):
 
         return cfg
 
-    def _get_assisted_grasp_joint_type(self, ag_obj, ag_link):
+    def _get_assisted_grasp_joint_type(self, target_obj, target_link_name):
         """
         Check whether an object @obj can be grasped. If so, return the joint type to use for assisted grasping.
         Otherwise, return None.
 
         Args:
-            ag_obj (BaseObject): Object targeted for an assisted grasp
-            ag_link (RigidDynamicPrim): Link of the object to be grasped
+            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_link_name (str): Name of the link of the object to be grasped
 
         Returns:
             (None or str): If obj can be grasped, returns the joint type to use for assisted grasping.
         """
         assert self.is_manipulation
         # Deny objects that are too heavy and are not a non-base link of a fixed-base object)
-        mass = ag_link.mass
-        if mass > m.ASSIST_GRASP_MASS_THRESHOLD and not (ag_obj.fixed_base and ag_link != ag_obj.root_link):
+        mass = target_obj.links[target_link_name].mass
+        if mass > m.ASSIST_GRASP_MASS_THRESHOLD and not (
+            target_obj.fixed_base and target_link_name != target_obj.root_link_name
+        ):
             return None
 
         # Otherwise, compute the joint type. We use a fixed joint unless the link is a non-fixed link.
         # A link is non-fixed if it has any non-fixed parent joints.
         joint_type = "FixedJoint"
-        for edge in nx.edge_dfs(ag_obj.articulation_tree, ag_link.body_name, orientation="reverse"):
-            joint = ag_obj.articulation_tree.edges[edge[:2]]
+        for edge in nx.edge_dfs(target_obj.articulation_tree, target_link_name, orientation="reverse"):
+            joint = target_obj.articulation_tree.edges[edge[:2]]
             if joint["joint_type"] != JointType.JOINT_FIXED:
                 joint_type = "SphericalJoint"
                 break
 
         return joint_type
-
-    def _establish_grasp_rigid(self, arm="default", ag_data=None, contact_pos=None):
-        """
-        Establishes an ag-assisted grasp, if enabled.
-
-        Args:
-            arm (str): specific arm to establish grasp.
-                Default is "default" which corresponds to the first entry in self.arm_names
-            ag_data (None or 2-tuple): if specified, assisted-grasp object, link tuple (i.e. :(BaseObject, RigidDynamicPrim)).
-                Otherwise, does a no-op
-            contact_pos (None or th.tensor): if specified, contact position to use for grasp.
-        """
-        assert self.is_manipulation
-        arm = self.default_arm if arm == "default" else arm
-
-        # Return immediately if ag_data is None
-        if ag_data is None:
-            return
-        ag_obj, ag_link = ag_data
-        # Get the appropriate joint type
-        joint_type = self._get_assisted_grasp_joint_type(ag_obj, ag_link)
-        if joint_type is None:
-            return
-
-        if contact_pos is None:
-            force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
-            for c_link_prim_path, c_contact_pos in force_data:
-                if c_link_prim_path == ag_link.prim_path:
-                    contact_pos = c_contact_pos
-                    break
-
-        assert contact_pos is not None, (
-            "contact_pos in self._find_gripper_contacts(return_contact_positions=True) is not found in "
-            "self._find_gripper_contacts(return_contact_positions=False). This is likely because "
-            "GripperRigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
-        )
-
-        # Joint frame set at the contact point
-        # Need to find distance between robot and contact point in robot link's local frame and
-        # ag link and contact point in ag link's local frame
-        joint_frame_pos = contact_pos
-        joint_frame_orn = th.tensor([0, 0, 0, 1.0])
-        eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
-        parent_frame_pos, parent_frame_orn = T.relative_pose_transform(
-            joint_frame_pos, joint_frame_orn, eef_link_pos, eef_link_orn
-        )
-        obj_link_pos, obj_link_orn = ag_link.get_position_orientation()
-        child_frame_pos, child_frame_orn = T.relative_pose_transform(
-            joint_frame_pos, joint_frame_orn, obj_link_pos, obj_link_orn
-        )
-
-        # Create the joint
-        joint_prim_path = f"{self.eef_links[arm].prim_path}/ag_constraint"
-        joint_prim = create_joint(
-            prim_path=joint_prim_path,
-            joint_type=joint_type,
-            body0=self.eef_links[arm].prim_path,
-            body1=ag_link.prim_path,
-            enabled=True,
-            exclude_from_articulation=True,
-            joint_frame_in_parent_frame_pos=parent_frame_pos / self.scale,
-            joint_frame_in_parent_frame_quat=parent_frame_orn,
-            joint_frame_in_child_frame_pos=child_frame_pos / ag_obj.scale,
-            joint_frame_in_child_frame_quat=child_frame_orn,
-        )
-
-        # Save a reference to this joint prim
-        self._ag_obj_constraints[arm] = joint_prim
-
-        # Modify max force based on user-determined assist parameters
-        # TODO
-        assist_force = m.MIN_ASSIST_FORCE + (m.MAX_ASSIST_FORCE - m.MIN_ASSIST_FORCE) * m.ASSIST_FRACTION
-        max_force = assist_force if joint_type == "FixedJoint" else assist_force * m.ARTICULATED_ASSIST_FRACTION
-        # joint_prim.GetAttribute("physics:breakForce").Set(max_force)
-
-        self._ag_obj_constraint_params[arm] = {
-            "ag_obj_prim_path": ag_obj.prim_path,
-            "ag_link_prim_path": ag_link.prim_path,
-            "ag_joint_prim_path": joint_prim_path,
-            "joint_type": joint_type,
-            "gripper_pos": self.get_joint_positions()[self.gripper_control_idx[arm]],
-            "max_force": max_force,
-            "contact_pos": contact_pos,
-        }
-        self._ag_obj_in_hand[arm] = ag_obj
-        self._ag_freeze_gripper[arm] = True
 
     @property
     def _default_controllers(self):
@@ -3070,10 +2997,19 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        if self._definition.manipulation and self._definition.manipulation.assisted_grasp_start_points:
+        if not self.is_manipulation:
+            return None
+
+        # Use EEF definition if available
+        eef_def = self._get_end_effector_definition()
+        if eef_def is not None and eef_def.ag_start_points is not None:
+            return self._convert_to_grasping_points({self.default_arm: eef_def.ag_start_points})
+
+        # Use manipulation definition if available
+        if self._definition.manipulation.assisted_grasp_start_points:
             return self._convert_to_grasping_points(self._definition.manipulation.assisted_grasp_start_points)
-        if self.is_manipulation and hasattr(self, "_ag_start_points"):
-            return {self.default_arm: self._ag_start_points}
+
+        # No assisted grasp start points found
         return None
 
     @property
@@ -3111,10 +3047,19 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        if self._definition.manipulation and self._definition.manipulation.assisted_grasp_end_points:
+        if not self.is_manipulation:
+            return None
+
+        # Use EEF definition if available
+        eef_def = self._get_end_effector_definition()
+        if eef_def is not None and eef_def.ag_end_points is not None:
+            return self._convert_to_grasping_points({self.default_arm: eef_def.ag_end_points})
+
+        # Use manipulation definition if available
+        if self._definition.manipulation.assisted_grasp_end_points:
             return self._convert_to_grasping_points(self._definition.manipulation.assisted_grasp_end_points)
-        if self.is_manipulation and hasattr(self, "_ag_end_points"):
-            return {self.default_arm: self._ag_end_points}
+
+        # No assisted grasp end points found
         return None
 
     @property
@@ -3280,7 +3225,7 @@ class Robot(USDObject, GymObservable):
         base_link_quat = self.get_position_orientation()[1]
         return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_angular_velocity()
 
-    def _calculate_in_hand_object_rigid(self, arm="default"):
+    def _calculate_in_hand_object(self, arm="default"):
         """
         Calculates which object to assisted-grasp for arm @arm. Returns an (object_id, link_id) tuple or None
         if no valid AG-enabled object can be found.
@@ -3290,22 +3235,18 @@ class Robot(USDObject, GymObservable):
                 Default is "default" which corresponds to the first entry in self.arm_names
 
         Returns:
-            None or 2-tuple: If a valid assisted-grasp object is found, returns the corresponding
-                (object, object_link) (i.e.: (BaseObject, RigidDynamicPrim)) pair to the contacted in-hand object.
-                Otherwise, returns None
+
         """
         assert self.is_manipulation
+        assert self.grasping_mode in ["assisted", "sticky"]
+
         arm = self.default_arm if arm == "default" else arm
 
-        # If we're not using physical grasping, we check for gripper contact
-        if self.grasping_mode != "physical":
-            candidates_set, robot_contact_links = self._find_gripper_contacts(arm=arm)
-            # If we're using assisted grasping, we further filter candidates via ray-casting
-            if self.grasping_mode == "assisted":
-                candidates_set_raycast = self._find_gripper_raycast_collisions(arm=arm)
-                candidates_set = candidates_set.intersection(candidates_set_raycast)
-        else:
-            raise ValueError("Invalid grasping mode for calculating in hand object: {}".format(self.grasping_mode))
+        candidates_set, robot_contact_links = self._find_gripper_contacts(arm=arm)
+        # If we're using assisted grasping, we further filter candidates via ray-casting
+        if self.grasping_mode == "assisted":
+            candidates_set_raycast = self._find_gripper_raycast_collisions(arm=arm)
+            candidates_set = candidates_set.intersection(candidates_set_raycast)
 
         # Immediately return if there are no valid candidates
         if len(candidates_set) == 0:
@@ -3341,18 +3282,20 @@ class Robot(USDObject, GymObservable):
             if self.grasping_mode == "sticky"
             else len({link.prim_path for link in self.finger_links[arm]}.intersection(robot_contacts)) >= 2
         )
+        if not touching_at_least_two_fingers:
+            return None
 
         # TODO: Better heuristic, hacky, we assume the parent object prim path is the prim_path minus the last "/" item
         ag_obj_prim_path = "/".join(ag_prim_path.split("/")[:-1])
         ag_obj_link_name = ag_prim_path.split("/")[-1]
         ag_obj = self.scene.object_registry("prim_path", ag_obj_prim_path)
 
-        # Return None if object cannot be assisted grasped or not touching at least two fingers
-        if ag_obj is None or not touching_at_least_two_fingers:
+        # Return None if object cannot be assisted grasped
+        if ag_obj is None:
             return None
 
         # Get object and its contacted link
-        return ag_obj, ag_obj.links[ag_obj_link_name]
+        return ag_obj, ag_obj_link_name
 
     def _find_gripper_raycast_collisions(self, arm="default"):
         """
@@ -3647,133 +3590,137 @@ class Robot(USDObject, GymObservable):
             }
         return dic
 
-    def _calculate_in_hand_object(self, arm="default"):
-        assert self.is_manipulation
-        if gm.AG_CLOTH:
-            return self._calculate_in_hand_object_cloth(arm)
-        else:
-            return self._calculate_in_hand_object_rigid(arm)
-
-    def _establish_grasp(self, arm="default", ag_data=None, contact_pos=None):
-        assert self.is_manipulation
-        if gm.AG_CLOTH:
-            return self._establish_grasp_cloth(arm, ag_data)
-        else:
-            return self._establish_grasp_rigid(arm, ag_data, contact_pos)
-
-    def _calculate_in_hand_object_cloth(self, arm="default"):
+    def _maybe_establish_grasp(self, target_obj, target_link_name, arm):
         """
-        Same as _calculate_in_hand_object_rigid, except for cloth. Only one should be used at any given time.
+        Establishes an assisted grasp joint between the robot and the target object if the object
+        is assisted-graspable and the robot is in contact with the object.
 
-        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidDynamicPrim, th.Tensor) tuple or
-        None if no valid AG-enabled object can be found.
-
-        1) Check if the gripper is closed enough
-        2) Go through each of the cloth object, and check if its attachment point link position is within the "ghost"
-        box volume of the gripper link.
-
-        Only returns the first valid object and ignore the rest.
+        This is called internally when all of the temporal requirements of the grasp window are met.
+        (Rays have been hitting object for N frames, fingers have been in contact with object, etc.)
+        so we only perform some final checks.
 
         Args:
-            arm (str): specific arm to establish grasp.
-                Default is "default" which corresponds to the first entry in self.arm_names
-
-        Returns:
-            None or 3-tuple: If a valid assisted-grasp object is found,
-                returns the corresponding (object, object_link, attachment_point_position), i.e.
-                ((BaseObject, RigidDynamicPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
+            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_link_name (str): Name of the link of the object to be grasped
+            arm (str): Name of the arm to create the joint for
         """
-        assert self.is_manipulation
-        # TODO (eric): Assume joint_pos = 0 means fully closed
-        GRIPPER_FINGER_CLOSE_THRESHOLD = 0.03
-        gripper_finger_pos = self.get_joint_positions()[self.gripper_control_idx[arm]]
-        gripper_finger_close = th.sum(gripper_finger_pos) < GRIPPER_FINGER_CLOSE_THRESHOLD
-        if not gripper_finger_close:
-            return None
-
-        cloth_objs = self.scene.object_registry("prim_type", PrimType.CLOTH)
-        if cloth_objs is None:
-            return None
-
-        # TODO (eric): Only AG one cloth at any given moment.
-        # Returns the first cloth that overlaps with the "ghost" box volume
-        for cloth_obj in cloth_objs:
-            attachment_point_pos = cloth_obj.links["attachment_point"].get_position_orientation()[0]
-            particles_in_volume = self.eef_links[arm].check_points_in_volume([attachment_point_pos])
-            if particles_in_volume.sum() > 0:
-                return cloth_obj, cloth_obj.links["attachment_point"], attachment_point_pos
-
-        return None
-
-    def _establish_grasp_cloth(self, arm="default", ag_data=None):
-        """
-        Same as _establish_grasp_cloth, except for cloth. Only one should be used at any given time.
-        Establishes an ag-assisted grasp, if enabled.
-
-        Create a fixed joint between the attachment point link of the cloth object and the world.
-        In theory, we could have created a fixed joint to the eef link, but omni doesn't support this as the robot has
-        an articulation root API attached to it, which is incompatible with the attachment API.
-
-        We also store attachment_point_pos_local as the attachment point position in the eef link frame when the fixed
-        joint is created. As the eef link frame changes its pose, we will use attachment_point_pos_local to figure out
-        the new attachment_point_pos in the world frame and set the fixed joint to there. See _update_constraint_cloth
-        for more details.
-
-        Args:
-            arm (str): specific arm to establish grasp.
-                Default is "default" which corresponds to the first entry in self.arm_names
-            ag_data (None or 3-tuple): If specified, should be the corresponding
-                (object, object_link, attachment_point_position), i.e. ((BaseObject, RigidPrim, th.Tensor)) to the]
-                contacted in-hand object
-        """
-        assert self.is_manipulation
-        arm = self.default_arm if arm == "default" else arm
-
-        # Return immediately if ag_data is None
-        if ag_data is None:
+        # Decide what type of joint is needed
+        joint_type = self._get_assisted_grasp_joint_type(target_obj, target_link_name)
+        if joint_type is None:
             return
 
-        ag_obj, ag_link, attachment_point_pos = ag_data
+        # Compute the contact position in world frame
+        target_link_prim_path = target_obj.links[target_link_name].prim_path
+        finger_paths = {link.prim_path for link in self.finger_links[arm]}
+        contact_pos_world = None
+        for finger_path in finger_paths:
+            raw_data = og.sim.contact_sensor.get_rigid_body_raw_data(finger_path)
+            for c in raw_data:
+                # Convert body handles to prim paths for robust matching
+                body0 = og.sim.contact_sensor.decode_body_name(c.body0)
+                body1 = og.sim.contact_sensor.decode_body_name(c.body1)
+                if (body0 == finger_path and body1 == target_link_prim_path) or (
+                    body0 == target_link_prim_path and body1 == finger_path
+                ):
+                    contact_pos_world = th.as_tensor(c.position, dtype=th.float32)
+                    break
+            if contact_pos_world is not None:
+                break
+        if contact_pos_world is None:
+            return
 
-        # Find the attachment point position in the eef frame
+        # Establish the grasp
+        self._establish_grasp(target_obj, target_link_name, arm, contact_pos_world, joint_type)
+
+    def _establish_grasp(self, target_obj, target_link_name, arm, contact_pos_world, joint_type):
+        """
+        Establishes an assisted grasp joint between the robot and the target object at the given contact position.
+
+        This function guarantees that the joint is created, computing the joint's relative position to both
+        the robot and the target object using both sides' current poses, and storing the joint's parameters
+        in the robot's state.
+
+        It can be called externally if desired, e.g. if you want to establish a grasp at a specific contact position
+        for use in symbolic primitive actions. It is also called internally when the robot has decided the physical
+        state of the world is such that it should establish a grasp.
+
+        Args:
+            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_link_name (str): Name of the link of the object to be grasped
+            arm (str): Name of the arm to create the joint for
+            contact_pos_world (th.tensor): Position of the contact point in world frame
+            joint_type (str): Type of joint to create
+        """
+
+        # Find out where the joint should go in the local frame of both the robot and the target object
+        # Note that we can't use scaled transforms here because those are only available through PoseAPI
+        # which cannot be refreshed during a physics step. We instead use the unscaled position and orientation
+        # and divide by the scale of the robot and target object to get the local frame position and orientation.
+        joint_frame_orn = th.tensor([0, 0, 0, 1.0])
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
-        attachment_point_pos_local, _ = T.relative_pose_transform(
-            attachment_point_pos, th.tensor([0, 0, 0, 1], dtype=th.float32), eef_link_pos, eef_link_orn
+        parent_frame_pos, parent_frame_orn = T.relative_pose_transform(
+            contact_pos_world, joint_frame_orn, eef_link_pos, eef_link_orn
         )
+        parent_frame_pos = parent_frame_pos / self.scale
+        obj_link_pos, obj_link_orn = target_obj.links[target_link_name].get_position_orientation()
+        child_frame_pos, child_frame_orn = T.relative_pose_transform(
+            contact_pos_world, joint_frame_orn, obj_link_pos, obj_link_orn
+        )
+        child_frame_pos = child_frame_pos / target_obj.scale
 
+        # Create the constraint params dict
+        constraint_params = {
+            "target_obj": target_obj,
+            "target_link_name": target_link_name,
+            "parent_frame_pos": parent_frame_pos,
+            "parent_frame_orn": parent_frame_orn,
+            "child_frame_pos": child_frame_pos,
+            "child_frame_orn": child_frame_orn,
+            "joint_type": joint_type,
+        }
+
+        # Create the joint. This reads the
+        self._create_assisted_grasp_joint(arm, constraint_params)
+
+    def _create_assisted_grasp_joint(self, arm, constraint_params):
+        """
+        Creates an assisted grasp joint between the robot and the target object at the given contact position.
+
+        This function acts on the relative position and orientation of the joint frame in the local frame of both the robot and the target object.
+        It does not take into account any world frame position or orientation. As a result, its inputs can be safely stored and restored from a saved state.
+
+        The constraint params dictionary is expected to have the following keys:
+        - target_obj: BaseObject: Object targeted for an assisted grasp
+        - target_link_name: str: Name of the link of the object to be grasped
+        - parent_frame_pos: th.tensor: Position of the parent frame
+        - parent_frame_orn: th.tensor: Orientation of the parent frame
+        - child_frame_pos: th.tensor: Position of the child frame
+        - child_frame_orn: th.tensor: Orientation of the child frame
+        - joint_type: str: Type of joint to create
+
+        Args:
+            arm (str): Name of the arm to create the joint for
+            constraint_params (dict): Dictionary containing the constraint parameters
+        """
         # Create the joint
-        joint_prim_path = f"{ag_link.prim_path}/ag_constraint"
-        joint_type = "FixedJoint"
+        joint_prim_path = f"{self.eef_links[arm].prim_path}/ag_constraint"
         joint_prim = create_joint(
             prim_path=joint_prim_path,
-            joint_type=joint_type,
-            body0=ag_link.prim_path,
-            body1=None,
-            enabled=False,
+            joint_type=constraint_params["joint_type"],
+            body0=self.eef_links[arm].prim_path,
+            body1=constraint_params["target_obj"].links[constraint_params["target_link_name"]].prim_path,
+            enabled=True,
             exclude_from_articulation=True,
-            joint_frame_in_child_frame_pos=attachment_point_pos,
+            joint_frame_in_parent_frame_pos=constraint_params["parent_frame_pos"],
+            joint_frame_in_parent_frame_quat=constraint_params["parent_frame_orn"],
+            joint_frame_in_child_frame_pos=constraint_params["child_frame_pos"],
+            joint_frame_in_child_frame_quat=constraint_params["child_frame_orn"],
         )
 
         # Save a reference to this joint prim
         self._ag_obj_constraints[arm] = joint_prim
-
-        # Modify max force based on user-determined assist parameters
-        # TODO
-        max_force = m.MIN_ASSIST_FORCE + (m.MAX_ASSIST_FORCE - m.MIN_ASSIST_FORCE) * m.ASSIST_FRACTION
-        # joint_prim.GetAttribute("physics:breakForce").Set(max_force)
-
-        self._ag_obj_constraint_params[arm] = {
-            "ag_obj_prim_path": ag_obj.prim_path,
-            "ag_link_prim_path": ag_link.prim_path,
-            "ag_joint_prim_path": joint_prim_path,
-            "joint_type": joint_type,
-            "gripper_pos": self.get_joint_positions()[self.gripper_control_idx[arm]],
-            "max_force": max_force,
-            "attachment_point_pos_local": attachment_point_pos_local,
-            "contact_pos": attachment_point_pos,
-        }
-        self._ag_obj_in_hand[arm] = ag_obj
-        self._ag_freeze_gripper[arm] = True
+        self._ag_obj_in_hand[arm] = constraint_params["target_obj"]
+        self._ag_obj_constraint_params[arm] = constraint_params
 
     def _convert_to_math_pi(self, ele):
         """
