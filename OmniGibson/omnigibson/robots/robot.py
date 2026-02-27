@@ -428,12 +428,21 @@ class Robot(USDObject, GymObservable):
             and self._definition.manipulation.supported_end_effector is not None
         )
 
-    def _convert_to_grasping_points(self, li):
-        result = []
-        for item in li:
-            link_name, position = item
-            result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
-        return result
+    def _convert_to_grasping_points(self, points):
+        """Converts raw assisted grasp point definitions into an arm-keyed dict of GraspingPoint entries."""
+
+        def _convert_point_list(point_list):
+            if point_list is None:
+                return None
+            result = []
+            for link_name, position in point_list:
+                result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
+            return result
+
+        if points is None:
+            return None
+
+        return {arm: _convert_point_list(points.get(arm)) for arm in self.arm_names}
 
     def _get_end_effector_definition(self) -> "EndEffectorDefinition | None":
         """Get the current end effector configuration if this robot has end effector variants."""
@@ -2980,7 +2989,7 @@ class Robot(USDObject, GymObservable):
         # Use EEF definition if available
         eef_def = self._get_end_effector_definition()
         if eef_def is not None and eef_def.ag_start_points is not None:
-            return self._convert_to_grasping_points(eef_def.ag_start_points)
+            return self._convert_to_grasping_points({self.default_arm: eef_def.ag_start_points})
 
         # Use manipulation definition if available
         if self._definition.manipulation.assisted_grasp_start_points:
@@ -3030,7 +3039,7 @@ class Robot(USDObject, GymObservable):
         # Use EEF definition if available
         eef_def = self._get_end_effector_definition()
         if eef_def is not None and eef_def.ag_end_points is not None:
-            return self._convert_to_grasping_points(eef_def.ag_end_points)
+            return self._convert_to_grasping_points({self.default_arm: eef_def.ag_end_points})
 
         # Use manipulation definition if available
         if self._definition.manipulation.assisted_grasp_end_points:
