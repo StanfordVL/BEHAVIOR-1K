@@ -346,3 +346,103 @@ def test_grasping_mode():
         env.scene.remove_object(obj=robot)
 
     og.clear()
+
+
+def _setup_assisted_grasp_scene():
+    if og.sim is None:
+        gm.ENABLE_FLATCACHE = True
+    else:
+        og.sim.stop()
+
+    scene_cfg = dict(type="Scene")
+    objects_cfg = [
+        dict(
+            type="DatasetObject",
+            name="table",
+            category="breakfast_table",
+            model="lcsizg",
+            bounding_box=[0.5, 0.5, 0.8],
+            fixed_base=True,
+            position=[0.7, -0.1, 0.6],
+        ),
+        dict(
+            type="PrimitiveObject",
+            name="box",
+            primitive_type="Cube",
+            rgba=[1.0, 0, 0, 1.0],
+            size=0.05,
+            position=[0.53, 0.0, 0.87],
+        ),
+    ]
+
+    env = og.Environment(configs=dict(scene=scene_cfg, objects=objects_cfg))
+    og.sim.stop()
+
+    robot = Robot(
+        name="Fetch",
+        model="fetch",
+        obs_modalities=[],
+        controller_config={"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
+        grasping_mode="assisted",
+    )
+    env.scene.add_object(robot)
+    og.sim.play()
+    env.scene.reset(hard=False)
+
+    robot.reset()
+    robot.keep_still()
+    for _ in range(10):
+        og.sim.step()
+
+    return env, robot, env.scene.object_registry("name", "box")
+
+
+def _grasp_box(env, robot, box):
+    action_primitives = StarterSemanticActionPrimitives(env=env, robot=robot, skip_curobo_initilization=True)
+    target_eef_pos = box.get_position_orientation()[0]
+    target_eef_orn = robot.get_eef_orientation()
+    for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
+        env.step(action)
+
+    gripper_controller = robot.controllers[f"gripper_{robot.default_arm}"]
+    gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
+    for _ in range(10):
+        og.sim.step()
+
+    curr_time = time.time()
+    while time.time() - curr_time < m.robots.manipulation_robot.GRASP_WINDOW:
+        og.sim.step()
+
+
+def _release_box(robot):
+    gripper_controller = robot.controllers[f"gripper_{robot.default_arm}"]
+    gripper_controller.update_goal(cb.array([1]), robot.get_control_dict())
+    for _ in range(20):
+        og.sim.step()
+
+
+def test_assisted_grasp_dump_load():
+    env, robot, box = _setup_assisted_grasp_scene()
+    arm = robot.default_arm
+    try:
+        _grasp_box(env, robot, box)
+        assert robot._ag_obj_in_hand[arm] == box
+
+        non_serialized_state = og.sim.dump_state(serialized=False)
+        serialized_state = og.sim.dump_state(serialized=True)
+
+        _release_box(robot)
+        assert robot._ag_obj_in_hand[arm] is None
+
+        og.sim.load_state(non_serialized_state, serialized=False)
+        assert robot._ag_obj_in_hand[arm] == box
+        assert robot._ag_obj_constraints[arm] is not None
+
+        _release_box(robot)
+        assert robot._ag_obj_in_hand[arm] is None
+
+        og.sim.load_state(serialized_state, serialized=True)
+        assert robot._ag_obj_in_hand[arm] == box
+        assert robot._ag_obj_constraints[arm] is not None
+    finally:
+        og.clear()

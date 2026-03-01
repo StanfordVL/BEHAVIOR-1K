@@ -92,6 +92,10 @@ AG_MODES = {
     "assisted",
     "sticky",
 }
+AG_JOINT_TYPES = ("FixedJoint", "SphericalJoint")
+AG_JOINT_TYPE_TO_IDX = {joint_type: idx for idx, joint_type in enumerate(AG_JOINT_TYPES)}
+AG_IDX_TO_JOINT_TYPE = {idx: joint_type for idx, joint_type in enumerate(AG_JOINT_TYPES)}
+AG_SERIALIZED_VALUES_PER_ARM = 18
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
 
@@ -1251,7 +1255,6 @@ class Robot(USDObject, GymObservable):
                 return
 
             # Load AG state
-            # TODO: add unit tests
             for arm in self.arm_names:
                 current_ag_constraint = self._ag_obj_constraint_params[arm]
 
@@ -1356,6 +1359,48 @@ class Robot(USDObject, GymObservable):
             # No additional serialization needed if we're using physical grasping
             if self.grasping_mode == "physical":
                 return state_flat
+
+            ag_state_flat = []
+            ag_constraint_state = state.get("ag_obj_constraint_params", {})
+            for arm in self.arm_names:
+                arm_constraint = ag_constraint_state.get(arm, None)
+                if arm_constraint is None:
+                    ag_state_flat.extend(
+                        [
+                            th.tensor([0.0, -1.0, -1.0, -1.0], dtype=state_flat.dtype),
+                            th.zeros(3, dtype=state_flat.dtype),
+                            th.zeros(4, dtype=state_flat.dtype),
+                            th.zeros(3, dtype=state_flat.dtype),
+                            th.zeros(4, dtype=state_flat.dtype),
+                        ]
+                    )
+                    continue
+
+                target_obj = self.scene.object_registry("name", arm_constraint["target_obj"])
+                assert target_obj is not None, f"Could not find AG target object {arm_constraint['target_obj']}"
+                target_link_name = arm_constraint["target_link_name"]
+                link_names = list(target_obj.links.keys())
+                assert (
+                    target_link_name in target_obj.links
+                ), f"Could not find AG target link {target_link_name} on object {target_obj.name}"
+                target_link_idx = link_names.index(target_link_name)
+                joint_type = arm_constraint["joint_type"]
+                assert joint_type in AG_JOINT_TYPE_TO_IDX, f"Unsupported AG joint type: {joint_type}"
+
+                ag_state_flat.extend(
+                    [
+                        th.tensor(
+                            [1.0, float(target_obj.uuid), float(target_link_idx), float(AG_JOINT_TYPE_TO_IDX[joint_type])],
+                            dtype=state_flat.dtype,
+                        ),
+                        arm_constraint["parent_frame_pos"].to(dtype=state_flat.dtype),
+                        arm_constraint["parent_frame_orn"].to(dtype=state_flat.dtype),
+                        arm_constraint["child_frame_pos"].to(dtype=state_flat.dtype),
+                        arm_constraint["child_frame_orn"].to(dtype=state_flat.dtype),
+                    ]
+                )
+
+            state_flat = th.cat([state_flat] + ag_state_flat)
         return state_flat
 
     def deserialize(self, state):
@@ -1370,6 +1415,50 @@ class Robot(USDObject, GymObservable):
         state_dict["controllers"] = controller_states
 
         if self.is_manipulation:
+            expected_ag_state_size = len(self.arm_names) * AG_SERIALIZED_VALUES_PER_ARM
+            remaining_state_size = len(state) - idx
+            assert remaining_state_size in {
+                0,
+                expected_ag_state_size,
+            }, (
+                f"Unexpected AG serialized state size for robot {self.name}. "
+                f"Expected 0 or {expected_ag_state_size}, got {remaining_state_size}."
+            )
+
+            if remaining_state_size == expected_ag_state_size:
+                state_dict["ag_obj_constraint_params"] = {}
+                for arm in self.arm_names:
+                    has_constraint = bool(state[idx].item())
+                    target_obj_uuid = int(state[idx + 1].item())
+                    target_link_idx = int(state[idx + 2].item())
+                    joint_type_idx = int(state[idx + 3].item())
+                    parent_frame_pos = state[idx + 4 : idx + 7]
+                    parent_frame_orn = state[idx + 7 : idx + 11]
+                    child_frame_pos = state[idx + 11 : idx + 14]
+                    child_frame_orn = state[idx + 14 : idx + 18]
+                    idx += AG_SERIALIZED_VALUES_PER_ARM
+
+                    if not has_constraint:
+                        continue
+
+                    target_obj = self.scene.object_registry("uuid", target_obj_uuid)
+                    assert target_obj is not None, f"Could not find AG target object with uuid={target_obj_uuid}"
+                    link_names = list(target_obj.links.keys())
+                    assert 0 <= target_link_idx < len(
+                        link_names
+                    ), f"Invalid AG target link index {target_link_idx} for object {target_obj.name}"
+                    assert joint_type_idx in AG_IDX_TO_JOINT_TYPE, f"Invalid AG joint type index: {joint_type_idx}"
+
+                    state_dict["ag_obj_constraint_params"][arm] = {
+                        "target_obj": target_obj.name,
+                        "target_link_name": link_names[target_link_idx],
+                        "parent_frame_pos": parent_frame_pos,
+                        "parent_frame_orn": parent_frame_orn,
+                        "child_frame_pos": child_frame_pos,
+                        "child_frame_orn": child_frame_orn,
+                        "joint_type": AG_IDX_TO_JOINT_TYPE[joint_type_idx],
+                    }
+
             # No additional deserialization needed if we're using physical grasping
             if self.grasping_mode == "physical":
                 return state_dict, idx
