@@ -1390,7 +1390,12 @@ class Robot(USDObject, GymObservable):
                 ag_state_flat.extend(
                     [
                         th.tensor(
-                            [1.0, float(target_obj.uuid), float(target_link_idx), float(AG_JOINT_TYPE_TO_IDX[joint_type])],
+                            [
+                                1.0,
+                                float(target_obj.uuid),
+                                float(target_link_idx),
+                                float(AG_JOINT_TYPE_TO_IDX[joint_type]),
+                            ],
                             dtype=state_flat.dtype,
                         ),
                         arm_constraint["parent_frame_pos"].to(dtype=state_flat.dtype),
@@ -1444,8 +1449,8 @@ class Robot(USDObject, GymObservable):
                     target_obj = self.scene.object_registry("uuid", target_obj_uuid)
                     assert target_obj is not None, f"Could not find AG target object with uuid={target_obj_uuid}"
                     link_names = list(target_obj.links.keys())
-                    assert 0 <= target_link_idx < len(
-                        link_names
+                    assert (
+                        0 <= target_link_idx < len(link_names)
                     ), f"Invalid AG target link index {target_link_idx} for object {target_obj.name}"
                     assert joint_type_idx in AG_IDX_TO_JOINT_TYPE, f"Invalid AG joint type index: {joint_type_idx}"
 
