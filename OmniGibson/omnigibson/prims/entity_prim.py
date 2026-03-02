@@ -224,6 +224,16 @@ class EntityPrim(XFormPrim):
                 # For cloth objects, process Meshes as cloth links
                 links_to_create[link_name] = (PrimType.CLOTH, prim)
 
+        # Also check for joints in a top-level "joints" scope (some URDF converters put them there
+        # instead of nesting them inside their parent link prim)
+        joints_scope = self._prim.GetChild("joints")
+        if joints_scope and joints_scope.IsValid():
+            for joint_prim in joints_scope.GetChildren():
+                if "joint" in joint_prim.GetPrimTypeInfo().GetTypeName().lower():
+                    relationships = {r.GetName(): r for r in joint_prim.GetRelationships()}
+                    if "physics:body0" in relationships and len(relationships["physics:body0"].GetTargets()) > 0:
+                        joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
+
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
         valid_root_links = list(set(links_to_create.keys()) - joint_children)

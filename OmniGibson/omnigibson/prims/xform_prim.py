@@ -70,7 +70,8 @@ class XFormPrim(BasePrim):
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
-        self.original_scale = th.tensor(self.get_attribute("xformOp:scale"))
+        raw_scale = self.get_attribute("xformOp:scale")
+        self.original_scale = th.tensor(raw_scale) if raw_scale is not None else th.ones(3)
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -114,27 +115,36 @@ class XFormPrim(BasePrim):
         for prop_name in prop_names:
             if prop_name in properties_to_remove:
                 self.prim.RemoveProperty(prop_name)
-        if "xformOp:scale" not in prop_names:
+        scale_attr = self._prim.GetAttribute("xformOp:scale") if "xformOp:scale" in prop_names else None
+        if scale_attr is None or not scale_attr.GetTypeName():
+            if scale_attr is not None:
+                self.prim.RemoveProperty("xformOp:scale")
             xform_op_scale = xformable.AddXformOp(
                 lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
             )
             xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
         else:
-            xform_op_scale = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:scale"))
+            xform_op_scale = lazy.pxr.UsdGeom.XformOp(scale_attr)
 
-        if "xformOp:translate" not in prop_names:
+        translate_attr = self._prim.GetAttribute("xformOp:translate") if "xformOp:translate" in prop_names else None
+        if translate_attr is None or not translate_attr.GetTypeName():
+            if translate_attr is not None:
+                self.prim.RemoveProperty("xformOp:translate")
             xform_op_translate = xformable.AddXformOp(
                 lazy.pxr.UsdGeom.XformOp.TypeTranslate, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
             )
         else:
-            xform_op_translate = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:translate"))
+            xform_op_translate = lazy.pxr.UsdGeom.XformOp(translate_attr)
 
-        if "xformOp:orient" not in prop_names:
+        orient_attr = self._prim.GetAttribute("xformOp:orient") if "xformOp:orient" in prop_names else None
+        if orient_attr is None or not orient_attr.GetTypeName():
+            if orient_attr is not None:
+                self.prim.RemoveProperty("xformOp:orient")
             xform_op_rot = xformable.AddXformOp(
                 lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
             )
         else:
-            xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
+            xform_op_rot = lazy.pxr.UsdGeom.XformOp(orient_attr)
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
         if not gm.ENABLE_FLATCACHE:

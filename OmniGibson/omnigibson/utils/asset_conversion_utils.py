@@ -1002,6 +1002,7 @@ def convert_urdf_to_usd(
     obj_category,
     obj_model,
     dataset_name="custom_dataset",
+    dataset_root=None,
     use_omni_convex_decomp=False,
     use_usda=False,
     merge_fixed_joints=False,
@@ -1013,7 +1014,9 @@ def convert_urdf_to_usd(
         urdf_path (str): Path to URDF file to import
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
-        dataset_name (str): The name of the dataset.
+        dataset_name (str): The name of the dataset. Used to compute dataset_root if dataset_root is not provided.
+        dataset_root (None or str): If specified, the absolute path to the dataset root directory.
+            Overrides dataset_name lookup.
         use_omni_convex_decomp (bool): Whether to use omniverse's built-in convex decomposer for collision meshes
         use_usda (bool): If set, will write files to .usda files instead of .usd
             (bigger memory footprint, but human-readable)
@@ -1025,7 +1028,8 @@ def convert_urdf_to_usd(
             - str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for meta links
-    dataset_root = get_dataset_path(dataset_name)
+    if dataset_root is None:
+        dataset_root = get_dataset_path(dataset_name)
     urdf_path = _add_meta_links_to_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
@@ -1147,7 +1151,11 @@ def convert_urdf_to_usd(
         assert referenced_wrapper_prim.IsValid()
 
         child_prim = referenced_wrapper_prim.GetChild("mesh")
-        assert child_prim.IsValid()
+        if not child_prim.IsValid():
+            # Some links (e.g. inertial-only links with no visual/collision geometry) may not have a mesh child.
+            # Delete the wrapper prim so it doesn't leave a dangling reference that trips up downstream code.
+            del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
+            continue
         child_path = child_prim.GetPath()
 
         # Duplicate the properties on the parent prim onto the child.
