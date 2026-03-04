@@ -272,13 +272,13 @@ def find_vid2room_objects(vid2room_root: pathlib.Path):
     objects = []
 
     # Load the interesting scenes dict
-    with open("/home/cgokmen/projects/BEHAVIOR-1K/slurm/interesting_scenes.json", "r") as f:
+    with open("/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/interesting_scenes.json", "r") as f:
         interesting_scenes = [pathlib.Path(k) for k in json.load(f)]
 
     # Find all room directories with pre-processed mesh outputs
     for interesting_scene_root in interesting_scenes:
-        decimated_dir = interesting_scene_root / "obj_meshes_v9_pointmap_decimated"
-        collision_dir = interesting_scene_root / "obj_meshes_v9_pointmap_collision"
+        decimated_dir = interesting_scene_root / "obj_meshes_2"
+        collision_dir = interesting_scene_root / "obj_meshes_2_collision"
 
         for collision_path in collision_dir.glob("*.npz"):
             segment_name = collision_path.stem
@@ -300,7 +300,7 @@ def main():
     parser.add_argument("total_tasks", type=int, help="Total number of tasks")
     parser.add_argument("--vid2room-root", type=str, required=True, help="Root directory of vid2room outputs")
     parser.add_argument("--dataset-name", type=str, default="vid2room", help="Dataset name (defaults to 'vid2room')")
-    parser.add_argument("--success-prefix", default="", help="Prefix for success files")
+    parser.add_argument("--success-file", type=str, default=None, help="Success file")
     parser.add_argument(
         "--restart-every", type=int, default=RESTART_EVERY, help="Restart after processing this many objects"
     )
@@ -315,8 +315,6 @@ def main():
 
     errors_dir = dataset_root / "errors"
     errors_dir.mkdir(exist_ok=True)
-    jobs_dir = dataset_root / "jobs"
-    jobs_dir.mkdir(exist_ok=True)
 
     # Find all objects
     print(f"Finding pre-processed objects in {vid2room_root}...")
@@ -384,8 +382,9 @@ def main():
             return
 
     # If we reach here, we're done. Record the rank success.
-    success_filename = f"{args.success_prefix}_{rank}.success" if args.success_prefix else f"{rank}.success"
-    (jobs_dir / success_filename).touch()
+    success_file = pathlib.Path(args.success_file)
+    success_file.parent.mkdir(parents=True, exist_ok=True)
+    success_file.touch()
 
     og.shutdown()
 

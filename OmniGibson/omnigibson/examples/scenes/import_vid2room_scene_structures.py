@@ -34,10 +34,7 @@ gm.HEADLESS = True
 RESTART_EVERY = 16
 
 # Default interesting scenes list
-DEFAULT_INTERESTING_SCENES_JSON = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/interesting_scenes.json"
-
-# Material paths
-MDL_MATERIAL_ROOT = "/checkpoint/clear/cgokmen/og-materials/Materials/2023_2_1/Base"
+DEFAULT_INTERESTING_SCENES_JSON = "/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/interesting_scenes.json"
 
 # Default wall color (light beige)
 DEFAULT_WALL_COLOR_RGB = [210, 206, 181]
@@ -45,11 +42,11 @@ DEFAULT_WALL_COLOR_RGB = [210, 206, 181]
 # Default ceiling color (off-white)
 DEFAULT_CEILING_COLOR_RGB = [245, 245, 240]
 
-# Mapping from VLM floor_material types to MDL material paths (relative to MDL_MATERIAL_ROOT)
+# Mapping from VLM floor_material types to MDL material paths
 # Format: {vlm_material_type: [(mdl_name, relative_path), ...]}
 FLOOR_MATERIAL_MDL_MAPPING = {
     "dark_wood": [
-        ("Walnut_Planks", "Wood/Walnut_Planks."),
+        ("Walnut_Planks", "Wood/Walnut_Planks"),
         ("Mahogany_Planks", "Wood/Mahogany_Planks"),
         ("Cherry_Planks", "Wood/Cherry_Planks"),
     ],
@@ -111,9 +108,9 @@ def get_floor_mdl_material(floor_material_type):
 
     materials = FLOOR_MATERIAL_MDL_MAPPING[floor_material_type]
     mdl_name, relative_path = random.choice(materials)
-    mdl_path = os.path.join(MDL_MATERIAL_ROOT, relative_path + ".mdl")
+    mdl_path = relative_path + ".mdl"
 
-    assert os.path.exists(mdl_path), f"MDL material path does not exist: {mdl_path}"
+    # assert os.path.exists(mdl_path), f"MDL material path does not exist: {mdl_path}"
     return mdl_name, mdl_path
 
 
@@ -555,7 +552,7 @@ def load_scene_data(scene_dir):
     scene_dir = pathlib.Path(scene_dir)
 
     # Load room parameters (boundary, openings)
-    floorplan_path = scene_dir / "floorplan" / "room_parameters.json"
+    floorplan_path = scene_dir / "floorplan2" / "room_parameters.json"
     if not floorplan_path.exists():
         floorplan_path = scene_dir / "room_parameters.json"
 
@@ -577,7 +574,7 @@ def main():
     parser = argparse.ArgumentParser(description="Import vid2room scene structures as OmniGibson USD assets")
     parser.add_argument("task_id", type=int, help="Task ID (0-indexed)")
     parser.add_argument("total_tasks", type=int, help="Total number of tasks")
-    parser.add_argument("--success-prefix", default="", help="Prefix for success files (e.g., scriptname_jobid)")
+    parser.add_argument("--success-file", type=str, default=None, help="Success file")
     parser.add_argument("--dataset-name", default="vid2room", help="Dataset name (defaults to 'vid2room')")
     parser.add_argument("--restart-every", type=int, default=RESTART_EVERY)
     parser.add_argument("--wall-thickness", type=float, default=DEFAULT_WALL_THICKNESS, help="Wall thickness in meters")
@@ -599,8 +596,6 @@ def main():
 
     errors_dir = dataset_root / "errors"
     errors_dir.mkdir(exist_ok=True)
-    jobs_dir = dataset_root / "jobs"
-    jobs_dir.mkdir(exist_ok=True)
 
     rank = args.task_id
     world_size = args.total_tasks
@@ -618,7 +613,7 @@ def main():
     room_dirs = [x for x in room_dirs if "bathroom" not in str(x)]
 
     # Filter to only rooms where floorplan.success exists (floorplan generation is complete)
-    room_dirs = [x for x in room_dirs if (x / "floorplan.success").exists()]
+    room_dirs = [x for x in room_dirs if (x / "floorplan2.success").exists()]
 
     print(f"Found {len(room_dirs)} rooms with completed floorplans")
 
@@ -708,8 +703,9 @@ def main():
             return
 
     # If we reach here, we're done. Record the rank success with namespace.
-    success_filename = f"{args.success_prefix}_{rank}.success" if args.success_prefix else f"{rank}.success"
-    (jobs_dir / success_filename).touch()
+    success_file = pathlib.Path(args.success_file)
+    success_file.parent.mkdir(parents=True, exist_ok=True)
+    success_file.touch()
 
     og.shutdown()
 

@@ -27,7 +27,7 @@ from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.examples.scenes.load_vid2room_scene import get_scene_id, load_vid2room_scene
 from b1k_pipeline.usd_conversion.make_maps import generate_maps_for_current_scene
 
-DEFAULT_INTERESTING_SCENES_JSON = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/interesting_scenes.json"
+DEFAULT_INTERESTING_SCENES_JSON = "/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/interesting_scenes.json"
 
 
 def should_process(room_dir, task_id, total_tasks, seed="potato"):
@@ -76,7 +76,7 @@ def main():
     parser.add_argument("--total-tasks", type=int, default=1)
     parser.add_argument("--restart-every", type=int, default=16)
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--success-prefix", default="", help="Prefix for success files (e.g., scriptname_jobid)")
+    parser.add_argument("--success-file", default="", help="Path to success file")
     args = parser.parse_args()
 
     output_root = pathlib.Path(get_dataset_path("vid2room"))
@@ -135,10 +135,7 @@ def main():
             break
 
     print(f"Processed {processed} scenes")
-    success_filename = (
-        f"{args.success_prefix}_{args.task_id}.success" if args.success_prefix else f"{args.task_id}.success"
-    )
-    (jobs_dir / success_filename).touch()
+    (jobs_dir / args.success_file).touch()
     og.shutdown()
 
 
