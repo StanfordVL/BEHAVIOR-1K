@@ -102,8 +102,8 @@ class RobotDefinition:
     Root configuration for a robot, with optional capability sub-configs.
     """
 
-    raw_controller_order: Optional[List[str]] = None
-    default_controllers: Optional[Dict[str, str]] = None
+    raw_controller_order: List[str]
+    default_controllers: Dict[str, str]
     default_joint_pos: Optional[List[Any]] = None
     disabled_collision_pairs: Optional[List[List[str]]] = None
     disabled_collision_link_names: Optional[List[Any]] = None
