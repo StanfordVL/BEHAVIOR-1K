@@ -29,6 +29,9 @@ fi
 # Create directories if they don't exist
 mkdir -p "${SUCCESS_DIR}"
 
+# Call NVIDIA-SMI to get the GPU ID
+GPU_ID=$(nvidia-smi --query-gpu=uuid --format=csv,noheader | tail -n 1)
+
 # --- Process Management Function --- 
 SUCCESS_FILE="${SUCCESS_DIR}/${SCRIPT_NAME}_${SLURM_ARRAY_TASK_ID}.success"
 

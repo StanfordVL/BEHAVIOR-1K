@@ -4,13 +4,13 @@ from tqdm import tqdm
 import json
 import hashlib
 
-VAL_FRACTION_ONE_EVERY_N_SCENES = 10
+VAL_FRACTION_ONE_EVERY_N_SCENES = 7
 
 def check_scene_success(scene_path):
     return (scene_path / "import.success").exists()
 
 def main():
-    scenes_dir = pathlib.Path("/checkpoint/clear/cgokmen/behavior-data2/vid2room/scenes")
+    scenes_dir = pathlib.Path("/cvgl2/u/cgokmen/BEHAVIOR-1K/datasets/vid2room/scenes")
 
     successful_scenes = []
     failed_scenes = []
