@@ -10,7 +10,7 @@ In an [`Environment`](./environments.md) instance, actions are passed to control
 - When `env.step(action)` is called, actions are parsed and passed to the respective robot owned by the environment (`env.robots`) via `robot.apply_action(action)`
 - For a given robot, its `action` is parsed and passed to the respective controllers owned by the robot (`robot.controllers`) via `controller.update_goal(command)`
 - For a given controller, the inputted `command` is preprocessed (re-scaled and shifted) and then converted into an internally tracked `goal`
-- Each time a physic step occurs (1), all controllers computes and deploys their desired joint controls via `controller.compute_control()` towards reaching their respective `goal`s
+- Each time a physics step occurs (1), all controllers computes and deploys their desired joint controls via `controller.compute_control()` towards reaching their respective `goal`s
 </div>
 
 1. Note that because environments operate at `action_frequency <= physics_frequency`, this means that a controller may take _multiple_ control steps per single `env.step(action)` call!

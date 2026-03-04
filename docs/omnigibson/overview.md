@@ -10,7 +10,7 @@
 
 We build upon IsaacSim's `Simulator` interface to construct our `Environment` class, which is an [OpenAI gym-compatible](https://gymnasium.farama.org/content/gym_compatibility/) interface and the main entry point into **`OmniGibson`**. An `Environment` instance generally consists of the following:
 
-- A [`Scene`](./scenes.md) instance, which by default is a "dummy" (empty) or a full-populated (`InteractiveTraversableScene`) instance,
+- A [`Scene`](./scenes.md) instance, which by default is a "dummy" (empty) or a fully-populated (`InteractiveTraversableScene`) instance,
 - A [`BaseTask`](./tasks.md) instance, which can range from a complex `BehaviorTask`, navigation `PointNavigationTask`, or no-op `DummyTask`,
 - Optionally, one or more [`BaseRobot`](./robots.md)s, which define the action space for the given environment instance,
 - Optionally, one or more additional [`BaseObject`](./objects.md)s, which are additional object models not explicitly defined in the environment's scene
