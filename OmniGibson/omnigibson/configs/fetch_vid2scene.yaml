@@ -1,0 +1,82 @@
+env:
+  action_frequency: 10
+  physics_frequency: 120
+  device: null
+  automatic_reset: false
+  flatten_action_space: false
+  flatten_obs_space: false
+  use_external_obs: false
+  initial_pos_z_offset: 0.1
+  external_sensors:
+    - sensor_type: VisionSensor
+      name: external_sensor0
+      relative_prim_path: /external_sensor0
+      modalities: [rgb, depth]
+      sensor_kwargs:
+        image_height: 128
+        image_width: 128
+      position: [0, 0, 1.0]
+      orientation: [0.707, 0.0, 0.0, 0.707]
+      pose_frame: parent
+
+render:
+  viewer_width: 1280
+  viewer_height: 720
+
+scene:
+  type: InteractiveTraversableScene
+  scene_model: house_double_floor_lower
+  trav_map_resolution: 0.1
+  default_erosion_radius: 0.0
+  trav_map_with_objects: true
+  num_waypoints: 1
+  waypoint_resolution: 0.2
+  not_load_object_categories: null
+  load_room_types: ["living_room", "kitchen"]
+  load_room_instances: null
+  seg_map_resolution: 1.0
+  scene_source: OG
+  include_robots: true
+
+robots:
+  - type: Fetch
+    obs_modalities: [rgb, seg_instance, depth_linear]
+    include_sensor_names: null
+    exclude_sensor_names: null
+    scale: 1.0
+    self_collision: false
+    action_normalize: true
+    action_type: continuous
+    grasping_mode: sticky
+    default_arm_pose: vertical
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 128
+          image_width: 128
+    controller_config:
+      base:
+        name: NullJointController
+      trunk:
+        name: JointController
+        motor_type: position
+        use_delta_commands: true
+      arm_0:
+        name: InverseKinematicsController
+        command_input_limits: null
+        command_output_limits: null
+        subsume_controllers: [trunk]
+        mode: position_fixed_ori
+        smoothing_filter_size: 4
+      gripper_0:
+        name: MultiFingerGripperController
+        mode: smooth
+        command_input_limits: default
+        command_output_limits: default
+      camera:
+        name: NullJointController
+
+objects: []
+
+task:
+  type: DummyTask

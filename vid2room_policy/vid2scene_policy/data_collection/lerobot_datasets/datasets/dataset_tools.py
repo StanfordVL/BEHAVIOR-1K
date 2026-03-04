@@ -14,15 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dataset tools utilities for LeRobotDataset.
-
-This module provides utilities for:
-- Deleting episodes from datasets
-- Splitting datasets into multiple smaller datasets
-- Adding/removing features from datasets
-- Merging datasets (wrapper around aggregate functionality)
-"""
-
 import logging
 import shutil
 from collections.abc import Callable

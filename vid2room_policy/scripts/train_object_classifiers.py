@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""Train support and graspable object classifiers using SigLIP embeddings.
-
-This script trains two logistic regression classifiers:
-1. Support classifier: predicts if an object is a support surface (table, counter, etc.)
-2. Graspable classifier: predicts if an object is graspable (mug, apple, etc.)
-
-The classifiers use SigLIP text embeddings of object category names as input.
-
-Usage:
-    # Retrain with default settings
-    python scripts/train_object_classifiers.py
-
-    # Custom training examples
-    python scripts/train_object_classifiers.py \
-        --support-positives table counter desk shelf \
-        --graspable-positives apple mug bottle cup
-"""
-
 import argparse
 import json
 import pickle

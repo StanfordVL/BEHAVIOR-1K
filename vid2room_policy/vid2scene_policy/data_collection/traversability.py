@@ -77,22 +77,17 @@ def check_path_exists(scene, pos1: tuple, pos2: tuple, robot=None, eroded_map=No
 
 
 def find_connected_support_pairs(scene, supports: list, robot, eroded_map=None) -> list:
-    """Find support pairs with verified navigable paths between them.
-
-    Uses actual path planning to verify connectivity - only returns pairs
-    where a valid path exists. Tries with robot erosion first, then falls back
-    to default erosion if no pairs found.
-    """
+    """Find support pairs connected by a valid navigable path."""
     trav_map = scene._trav_map
 
-    # Try with robot erosion first
+    # Try robot erosion first.
     if eroded_map is None:
         eroded_map = trav_map._erode_trav_map(trav_map.floor_map[0].clone(), robot=robot)
 
     pairs = _find_pairs_with_eroded_map(scene, supports, robot, eroded_map, trav_map)
 
     if not pairs:
-        # Fallback: try with default erosion (no robot size consideration)
+        # Fallback to default erosion (no robot footprint).
         logger.info("No pairs with robot erosion, trying default erosion")
         default_eroded = trav_map._erode_trav_map(trav_map.floor_map[0].clone(), robot=None)
         pairs = _find_pairs_with_eroded_map(scene, supports, None, default_eroded, trav_map)
@@ -101,8 +96,8 @@ def find_connected_support_pairs(scene, supports: list, robot, eroded_map=None) 
 
 
 def _find_pairs_with_eroded_map(scene, supports, robot, eroded_map, trav_map) -> list:
-    """Helper to find connected pairs using a specific eroded map."""
-    # First, find supports that have a nearby traversable point
+    """Find connected pairs using a specific eroded map."""
+    # Find supports with nearby traversable points.
     valid_supports = []
     for sup in supports:
         sup_pos, _ = sup.get_position_orientation()
@@ -115,7 +110,7 @@ def _find_pairs_with_eroded_map(scene, supports, robot, eroded_map, trav_map) ->
         logger.info("Only %d supports have traversable approach points", len(valid_supports))
         return []
 
-    # Now verify actual path connectivity between each pair
+    # Verify pairwise path connectivity.
     valid_pairs = []
     checked = 0
     for i, (source_sup, source_approach) in enumerate(valid_supports):
@@ -124,7 +119,7 @@ def _find_pairs_with_eroded_map(scene, supports, robot, eroded_map, trav_map) ->
                 continue
 
             checked += 1
-            # Check if path exists using actual path planning
+            # Check path existence via planner.
             if check_path_exists(scene, source_approach, target_approach, robot=robot, eroded_map=eroded_map):
                 valid_pairs.append((source_sup, target_sup))
                 valid_pairs.append((target_sup, source_sup))  # Both directions

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import random
 from pathlib import Path
 
@@ -11,13 +12,40 @@ from omnigibson.object_states import OnTop
 logger = logging.getLogger(__name__)
 
 _GRASPABLE_MODELS = None
+EDGE_MARGIN_M = 0.15
+CENTER_MARGIN_RATIO = 0.30
+SPAWN_SETTLE_STEPS = 5
+POST_PLACEMENT_SETTLE_STEPS = 30
+POST_REPOSITION_STEPS = 10
+POST_RELEASE_STEPS = 10
 
 def _load_graspable_models():
     global _GRASPABLE_MODELS
     if _GRASPABLE_MODELS is None:
         config_path = Path(__file__).parent.parent.parent / "configs" / "graspable_models.json"
-        with open(config_path) as f:
-            _GRASPABLE_MODELS = [tuple(x) for x in json.load(f)]
+        with open(config_path, "r", encoding="utf-8") as f:
+            raw_models = [tuple(x) for x in json.load(f)]
+
+        valid_models = []
+        missing = 0
+        for dataset_name, category, model in raw_models:
+            usd_path = DatasetObject.get_usd_path(
+                category=category,
+                model=model,
+                dataset_name=dataset_name,
+            )
+            encrypted_path = usd_path.replace(".usd", ".encrypted.usd")
+            if os.path.exists(usd_path) or os.path.exists(encrypted_path):
+                valid_models.append((dataset_name, category, model))
+            else:
+                missing += 1
+
+        _GRASPABLE_MODELS = valid_models
+        logger.info(
+            "Loaded %d spawnable models (%d missing assets filtered)",
+            len(valid_models),
+            missing,
+        )
     return _GRASPABLE_MODELS
 
 
@@ -32,8 +60,6 @@ def get_scene_objects_by_category(scene, whitelist: list[str]) -> dict[str, list
 
 def spawn_and_place_object(scene, support, robot_pos: th.Tensor = None) -> DatasetObject | None:
     """Spawn a random graspable object and place it on support surface."""
-    EDGE_MARGIN = 0.15
-
     graspables = _load_graspable_models()
     dataset_name, category, model = random.choice(graspables)
     print(f"[Episode] Spawning {category}/{model}...", flush=True)
@@ -47,13 +73,13 @@ def spawn_and_place_object(scene, support, robot_pos: th.Tensor = None) -> Datas
         )
         scene.add_object(obj)
 
-        for _ in range(5):
+        for _ in range(SPAWN_SETTLE_STEPS):
             og.sim.step()
 
         if OnTop in obj.states:
-            success = obj.states[OnTop].set_value(support, True)
+            success = obj.states[OnTop].set_value(support, True, use_trav_map=True)
             if success:
-                for _ in range(30):
+                for _ in range(POST_PLACEMENT_SETTLE_STEPS):
                     og.sim.step()
 
                 obj_pos, obj_ori = obj.get_position_orientation()
@@ -64,31 +90,30 @@ def spawn_and_place_object(scene, support, robot_pos: th.Tensor = None) -> Datas
 
                 if robot_pos is not None:
                     rx, ry = robot_pos[0].item(), robot_pos[1].item()
-                    # Place closer to the edge near robot
-                    CENTER_MARGIN = 0.30  # Stay away from center by this margin
+                    # Bias spawn toward the robot-facing side.
                     if rx < center_x:
-                        edge_x = min_x + EDGE_MARGIN
-                        inner_x = center_x - (center_x - min_x) * CENTER_MARGIN
+                        edge_x = min_x + EDGE_MARGIN_M
+                        inner_x = center_x - (center_x - min_x) * CENTER_MARGIN_RATIO
                         new_x = random.uniform(edge_x, inner_x)
                     else:
-                        edge_x = max_x - EDGE_MARGIN
-                        inner_x = center_x + (max_x - center_x) * CENTER_MARGIN
+                        edge_x = max_x - EDGE_MARGIN_M
+                        inner_x = center_x + (max_x - center_x) * CENTER_MARGIN_RATIO
                         new_x = random.uniform(inner_x, edge_x)
                     if ry < center_y:
-                        edge_y = min_y + EDGE_MARGIN
-                        inner_y = center_y - (center_y - min_y) * CENTER_MARGIN
+                        edge_y = min_y + EDGE_MARGIN_M
+                        inner_y = center_y - (center_y - min_y) * CENTER_MARGIN_RATIO
                         new_y = random.uniform(edge_y, inner_y)
                     else:
-                        edge_y = max_y - EDGE_MARGIN
-                        inner_y = center_y + (max_y - center_y) * CENTER_MARGIN
+                        edge_y = max_y - EDGE_MARGIN_M
+                        inner_y = center_y + (max_y - center_y) * CENTER_MARGIN_RATIO
                         new_y = random.uniform(inner_y, edge_y)
                 else:
-                    new_x = random.uniform(min_x + EDGE_MARGIN, max_x - EDGE_MARGIN)
-                    new_y = random.uniform(min_y + EDGE_MARGIN, max_y - EDGE_MARGIN)
+                    new_x = random.uniform(min_x + EDGE_MARGIN_M, max_x - EDGE_MARGIN_M)
+                    new_y = random.uniform(min_y + EDGE_MARGIN_M, max_y - EDGE_MARGIN_M)
 
                 new_pos = th.tensor([new_x, new_y, obj_pos[2].item()])
                 obj.set_position_orientation(position=new_pos, orientation=obj_ori)
-                for _ in range(10):
+                for _ in range(POST_REPOSITION_STEPS):
                     og.sim.step()
 
                 return obj
@@ -99,8 +124,8 @@ def spawn_and_place_object(scene, support, robot_pos: th.Tensor = None) -> Datas
             scene.remove_object(obj)
             return None
 
-    except Exception as e:
-        logger.debug("Failed to spawn %s: %s", category, e)
+    except Exception:
+        logger.exception("Failed to spawn object %s/%s", category, model)
         return None
 
 
@@ -113,10 +138,10 @@ def safe_remove_object(scene, obj, robot=None):
                     try:
                         robot.release_grasp_immediately(arm=arm)
                     except Exception:
-                        pass
-                    for _ in range(10):
+                        logger.debug("Failed immediate grasp release for arm %s", arm, exc_info=True)
+                    for _ in range(POST_RELEASE_STEPS):
                         og.sim.step()
                     break
         scene.remove_object(obj)
     except Exception:
-        pass
+        logger.exception("Failed to safely remove object %s", getattr(obj, "name", "<unknown>"))

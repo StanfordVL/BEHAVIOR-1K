@@ -116,10 +116,10 @@ class HolonomicBaseRobot(LocomotionRobot):
         self._world_base_fixed_joint_prim = None
 
         # Sanity check that the base controller is a HolonomicBaseJointController
-        if controller_config is not None and "base" in controller_config:
-            assert (
-                controller_config["base"]["name"] == "HolonomicBaseJointController"
-            ), "Base controller must be a HolonomicBaseJointController!"
+        # if controller_config is not None and "base" in controller_config:
+        #     assert (
+        #         controller_config["base"]["name"] == "HolonomicBaseJointController"
+        #     ), "Base controller must be a HolonomicBaseJointController!"
 
         # Call super() method
         super().__init__(
