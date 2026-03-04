@@ -559,6 +559,11 @@ class DataCollectionRunner:
             while self.successful_episodes < self.config.num_episodes:
                 if not self._run_single_attempt():
                     break
+
+            # Save the repo ID of the output dataset into the success file
+            if self.config.success_file:
+                with open(self.config.success_file, "w") as f:
+                    f.write(self.config.repo_id)
         finally:
             if self.wrapper is not None:
                 self.wrapper.stop_recording()

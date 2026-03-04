@@ -25,6 +25,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output", default="./lerobot_datasets", help="Output directory")
     parser.add_argument("--repo-id", default=None, help="Repository ID (default: {scene}_r1pro_pick_only)")
+    parser.add_argument("--success-file", default=None, help="Path to success file")
     parser.add_argument("--max-nav-steps", type=int, default=1500, help="Max navigation steps per episode")
     parser.add_argument("--max-rotation-steps", type=int, default=300, help="Max steps for rotation")
     parser.add_argument(
@@ -86,6 +87,7 @@ def _build_config(args: argparse.Namespace) -> DataCollectionConfig:
         num_episodes=args.num_episodes,
         output_dir=args.output,
         repo_id=repo_id,
+        success_file=args.success_file,
         whitelist_graspable_path=args._whitelist_graspable_path,
         whitelist_support_path=args._whitelist_support_path,
         max_navigation_steps=args.max_nav_steps,

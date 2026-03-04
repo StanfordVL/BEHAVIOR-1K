@@ -21,6 +21,7 @@ class DataCollectionConfig:
     fps: int = 30
     output_dir: str = "./lerobot_datasets"
     repo_id: str = "pick_place_dataset"
+    success_file: str | None = None
     # Whitelist mode inputs.
     whitelist_graspable_path: str = "configs/whitelist_graspable_objects.json"
     whitelist_support_path: str = "configs/whitelist_support_objects.json"

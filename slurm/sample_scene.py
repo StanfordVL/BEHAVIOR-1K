@@ -23,32 +23,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--datasets-dir",
         type=Path,
-        default="/cvgl2/u/cgokmen/BEHAVIOR-1K/datasets",
+        default="/scr2/datasets",
         help="Path to the datasets directory.",
     )
     parser.add_argument(
         "--dataset-name",
         type=str,
-        default="vid2room",
+        default="spoc",
         help="Name of the dataset to sample the scene from.",
     )
     parser.add_argument(
         "--num-scenes",
         "-n",
         type=int,
-        default=20,
+        default=120,
         help="Number of scenes to randomly sample (default: 10).",
     )
     parser.add_argument(
         "--seed",
         type=int,
-        default=None,
+        default=42,
         help="Random seed for reproducibility.",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default="./sample.zip",
+        default="/cvgl2/u/cgokmen/BEHAVIOR-1K/datasets",
         help="Output directory or zip path. Defaults to ./sample.zip",
     )
     return parser.parse_args()
@@ -62,7 +62,7 @@ def get_available_scenes(dataset_root: Path) -> list[str]:
     
     scenes = []
     for scene_dir in scenes_dir.iterdir():
-        if (scene_dir / "import.success").exists():
+        if "train" in str(scene_dir):  # (scene_dir / "import.success").exists():
             scenes.append(scene_dir.name)
     return sorted(scenes)
 
@@ -179,13 +179,13 @@ def main() -> int:
         for scene_name, scene_json in scene_jsons:
             scene_dir = dataset_root / "scenes" / scene_name
             if scene_dir.exists():
-                shutil.copytree(scene_dir, output_path / "scenes" / scene_name)
+                shutil.copytree(scene_dir, output_path / args.dataset_name / "scenes" / scene_name)
 
         # Copy all object categories
         for dataset_name, category, model in sorted(all_models):
             model_dir = datasets_dir / dataset_name / "objects" / category / model
             assert model_dir.exists(), f"Model directory not found: {model_dir}"
-            shutil.copytree(model_dir, output_path / "objects" / category / model, dirs_exist_ok=True)
+            shutil.copytree(model_dir, output_path / dataset_name / "objects" / category / model, dirs_exist_ok=True)
 
     print(f"\nWrote sample zip: {output_path}")
     print(f"Scenes included: {len(scene_jsons)}")
