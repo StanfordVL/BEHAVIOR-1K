@@ -1,6 +1,6 @@
 import logging
 
-from .robot_context import RobotContext, MODE_MANIPULATION
+from .robot_context import RobotContext
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class GripperController:
                      self.ctx.robot.grasping_mode, max_steps)
 
         for step in range(max_steps):
-            action = self.ctx.empty_action(mode=MODE_MANIPULATION)
+            action = self.ctx.empty_action()
             action[self.ctx.gripper_idx] = -1.0
 
             obs, _, terminated, truncated, _ = self.ctx.env.step(action.numpy())
@@ -48,7 +48,7 @@ class GripperController:
         actions = []
 
         for step in range(num_steps):
-            action = self.ctx.empty_action(mode=MODE_MANIPULATION)
+            action = self.ctx.empty_action()
             action[self.ctx.gripper_idx] = 1.0
 
             obs, _, terminated, truncated, _ = self.ctx.env.step(action.numpy())

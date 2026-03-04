@@ -1,5 +1,3 @@
-"""Object classifiers for support and graspable object detection using SigLIP embeddings."""
-
 import logging
 import pickle
 from pathlib import Path
@@ -9,12 +7,12 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Default directory for classifier resources
+# Default classifier resource directory.
 DEFAULT_CLASSIFIERS_DIR = Path(__file__).parent / "classifiers"
 
 
 class ObjectClassifier:
-    """Classifies objects as support or graspable based on SigLIP embeddings."""
+    """Classifier wrapper over precomputed SigLIP embeddings."""
 
     def __init__(self, embeddings_path: str | Path, models_dir: str | Path | None = None):
         data = np.load(embeddings_path)
@@ -108,19 +106,7 @@ def get_object_filter(
     graspable_whitelist: list[str] | None = None,
     threshold: float = 0.5,
 ) -> tuple[Callable[[str], bool], Callable[[str], bool]]:
-    """Factory function to get appropriate object filter.
-
-    Args:
-        method: Either "whitelist" or "classifier"
-        embeddings_path: Path to object_embeddings.npz (required for classifier)
-        models_dir: Path to trained models directory (required for classifier)
-        support_whitelist: List of support object categories (required for whitelist)
-        graspable_whitelist: List of graspable object categories (required for whitelist)
-        threshold: Classification threshold for classifier method
-
-    Returns:
-        Tuple of (is_support_fn, is_graspable_fn) functions
-    """
+    """Create support and graspable category filter callables."""
     if method == "whitelist":
         if support_whitelist is None or graspable_whitelist is None:
             raise ValueError("Whitelists required for whitelist method")

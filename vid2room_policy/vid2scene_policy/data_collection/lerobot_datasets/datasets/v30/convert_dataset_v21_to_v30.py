@@ -14,34 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This script will help you convert any LeRobot dataset already pushed to the hub from codebase version 2.1 to
-3.0. It will:
-
-- Generate per-episodes stats and writes them in `episodes_stats.jsonl`
-- Check consistency between these new stats and the old ones.
-- Remove the deprecated `stats.json`.
-- Update codebase_version in `info.json`.
-- Push this new version to the hub on the 'main' branch and tags it with "v3.0".
-
-Usage:
-
-Convert a dataset from the hub:
-```bash
-python src/lerobot/datasets/v30/convert_dataset_v21_to_v30.py \
-    --repo-id=lerobot/pusht
-```
-
-Convert a local dataset (works in place):
-```bash
-python src/lerobot/datasets/v30/convert_dataset_v21_to_v30.py \
-    --repo-id=lerobot/pusht \
-    --root=/path/to/local/dataset/directory
-    --push-to-hub=false
-```
-
-"""
-
 import argparse
 import logging
 import shutil

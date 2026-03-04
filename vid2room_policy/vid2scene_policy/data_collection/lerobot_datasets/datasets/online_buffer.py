@@ -13,14 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""An online buffer for the online training loop in train.py
-
-Note to maintainers: This duplicates some logic from LeRobotDataset and EpisodeAwareSampler. We should
-consider converging to one approach. Here we have opted to use numpy.memmap to back the data buffer. It's much
-faster than using HuggingFace Datasets as there's no conversion to an intermediate non-python object. Also it
-supports in-place slicing and mutation which is very handy for a dynamic buffer.
-"""
-
 import os
 from pathlib import Path
 from typing import Any

@@ -226,7 +226,10 @@ class InverseKinematicsController(JointController, ManipulationController):
         # If self._goal is populated, then set fixed_quat_target as well if the mode uses it
         if self._goal is not None:
             if self.mode == "position_fixed_ori":
-                self._fixed_quat_target = self._goal["target_quat"]
+                if "target_quat" in self._goal:
+                    self._fixed_quat_target = self._goal["target_quat"]
+                elif "target_ori_mat" in self._goal:
+                    self._fixed_quat_target = cb.T.mat2quat(self._goal["target_ori_mat"])
 
             # Load relevant info for this controller
             if self.control_filter is not None:
@@ -275,7 +278,17 @@ class InverseKinematicsController(JointController, ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_target is None:
-                self._fixed_quat_target = quat_relative if (self._goal is None) else self._goal["target_quat"]
+                if self._goal is None:
+                    self._fixed_quat_target = quat_relative
+                elif "target_quat" in self._goal:
+                    # Backward compatibility: older goals may store quaternion directly.
+                    self._fixed_quat_target = self._goal["target_quat"]
+                elif "target_ori_mat" in self._goal:
+                    # Current goals store orientation matrix.
+                    self._fixed_quat_target = cb.T.mat2quat(self._goal["target_ori_mat"])
+                else:
+                    # Fallback to current relative orientation if goal format is unexpected.
+                    self._fixed_quat_target = quat_relative
             target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation

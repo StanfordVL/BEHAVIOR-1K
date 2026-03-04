@@ -8,11 +8,6 @@ from .config import DataCollectionConfig
 
 logger = logging.getLogger(__name__)
 
-# Mode flags for extra action dimension
-MODE_NAVIGATION = 0.0
-MODE_MANIPULATION = 1.0
-
-
 class RobotContext:
     KP_LIN_VEL = 0.6
     KP_ANGLE_VEL = 2.95
@@ -22,30 +17,73 @@ class RobotContext:
         self.env = env
         self.robot = robot
         self.config = config
-        self.arm = robot.default_arm if hasattr(robot, 'default_arm') else "right"
+        default_arm = robot.default_arm if hasattr(robot, "default_arm") else "right"
+        self.arm = self._select_active_arm(default_arm)
 
         self.base_idx = robot.controller_action_idx["base"]
         self.arm_idx = robot.controller_action_idx[f"arm_{self.arm}"]
         self.gripper_idx = robot.controller_action_idx[f"gripper_{self.arm}"]
+        self.arm_controller_name = (
+            type(self.robot.controllers[f"arm_{self.arm}"]).__name__
+            if hasattr(self.robot, "controllers") and f"arm_{self.arm}" in self.robot.controllers
+            else "Unknown"
+        )
 
-        # Extra dimension index for mode flag (appended at end)
-        self.mode_idx = robot.action_dim  # Will be the last dimension
-        self.extended_action_dim = robot.action_dim + 1
+        self.action_dim = int(
+            sum(int(self.robot.controllers[name].command_dim) for name in self.robot.controller_order)
+        )
+        self.controller_action_dim = int(
+            sum(int(self.robot.controllers[name].command_dim) for name in self.robot.controller_order)
+        )
 
-        logger.info("RobotContext initialized: base_idx=%s, arm_idx=%s, gripper_idx=%s, mode_idx=%d",
-                    self.base_idx, self.arm_idx, self.gripper_idx, self.mode_idx)
+        print(
+            f"[RobotContext] arm={self.arm}, arm_ctrl={self.arm_controller_name}, "
+            f"base_idx={self.base_idx}, arm_idx={self.arm_idx}, "
+            f"gripper_idx={self.gripper_idx}, "
+            f"action_dim={self.action_dim}, controller_action_dim={self.controller_action_dim}",
+            flush=True,
+        )
 
-    def empty_action(self, mode: float = MODE_NAVIGATION) -> th.Tensor:
-        """Create empty action with mode flag. Default is navigation mode."""
-        action = th.zeros(self.extended_action_dim)
-        for name, controller in self.robot._controllers.items():
-            action_idx = self.robot.controller_action_idx[name]
-            if len(action_idx) == 0:
-                continue
-            partial_action = controller.compute_no_op_action(self.robot.get_control_dict())
-            action[action_idx] = partial_action
-        action[self.mode_idx] = mode
+    def _idx_len(self, idx) -> int:
+        try:
+            return len(idx)
+        except TypeError:
+            return 0
+
+    def _select_active_arm(self, default_arm: str) -> str:
+        candidates = [default_arm, "right", "left"]
+        seen = set()
+        ordered = []
+        for arm in candidates:
+            if arm not in seen:
+                seen.add(arm)
+                ordered.append(arm)
+
+        for arm in ordered:
+            arm_key = f"arm_{arm}"
+            grip_key = f"gripper_{arm}"
+            arm_idx = self.robot.controller_action_idx.get(arm_key, [])
+            gripper_idx = self.robot.controller_action_idx.get(grip_key, [])
+            if self._idx_len(arm_idx) > 0 and self._idx_len(gripper_idx) > 0:
+                return arm
+
+        raise RuntimeError(
+            "No active arm controller found with non-empty action indices. "
+            f"Available keys: {list(self.robot.controller_action_idx.keys())}"
+        )
+
+    def empty_action(self) -> th.Tensor:
+        """Return a zero action in controller-action space."""
+        action = th.zeros(self.action_dim)
         return action
+
+    @property
+    def has_base_control(self) -> bool:
+        return self._idx_len(self.base_idx) >= 2
+
+    @property
+    def is_ik_arm(self) -> bool:
+        return "InverseKinematicsController" in self.arm_controller_name
 
     def get_robot_yaw(self) -> float:
         _, robot_quat = self.robot.get_position_orientation()

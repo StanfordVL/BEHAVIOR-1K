@@ -14,25 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This script augments existing LeRobot datasets with quantile statistics.
-
-Most datasets created before the quantile feature was added do not contain
-quantile statistics (q01, q10, q50, q90, q99) in their metadata. This script:
-
-1. Loads an existing LeRobot dataset in v3.0 format
-2. Checks if it already contains quantile statistics
-3. If missing, computes quantile statistics for all features
-4. Updates the dataset metadata with the new quantile statistics
-
-Usage:
-
-```bash
-python src/lerobot/datasets/v30/augment_dataset_quantile_stats.py \
-    --repo-id=lerobot/pusht \
-```
-"""
-
 import argparse
 import concurrent.futures
 import logging

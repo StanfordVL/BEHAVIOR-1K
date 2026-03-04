@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Custom rotation utilities to replace scipy.spatial.transform.Rotation."""
-
 import numpy as np
 
 
