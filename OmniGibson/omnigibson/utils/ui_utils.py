@@ -24,7 +24,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-
+from omnigibson.controllers import ControllerView
 
 def print_icon():
     raw_texts = [
@@ -592,15 +592,17 @@ class KeyboardRobotController:
         self.controller_info = dict()
         self.joint_idx_to_controller = dict()
         idx = 0
-        for name, controller in robot._controllers.items():
+        
+        for name, (group_key, _) in robot.controllers.items():
+            controller = ControllerView.get_controller(group_key)
             self.controller_info[name] = {
                 "name": type(controller).__name__,
                 "start_idx": idx,
-                "dofs": controller.dof_idx,
-                "command_dim": controller.command_dim,
+                "dofs": ControllerView.get_dof_idx(group_key),
+                "command_dim": ControllerView.get_command_dim(group_key),
             }
-            idx += controller.command_dim
-            for i in controller.dof_idx.tolist():
+            idx += ControllerView.get_command_dim(group_key)
+            for i in ControllerView.get_dof_idx(group_key).tolist():
                 self.joint_idx_to_controller[i] = controller
 
         # Other persistent variables we need to keep track of

@@ -54,6 +54,7 @@ class _ComputeBackend:
     arange = None
     where = None
     squeeze = None
+    stack = None
     T = None
 
     @classmethod
@@ -120,6 +121,7 @@ class _ComputeTorchBackend(_ComputeBackend):
     arange = th.arange
     where = th.where
     squeeze = lambda arr, dim=None: arr.squeeze(dim=dim)
+    stack = lambda arrays, dim=0: th.stack(arrays, dim=dim)
     T = TT
 
 
@@ -154,6 +156,7 @@ class _ComputeNumpyBackend(_ComputeBackend):
     arange = np.arange
     where = np.where
     squeeze = lambda arr, dim=None: arr.squeeze(axis=dim)
+    stack = lambda arrays, dim=0: np.stack(arrays, axis=dim)
     T = NT
 
 

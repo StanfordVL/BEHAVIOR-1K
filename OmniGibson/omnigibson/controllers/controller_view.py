@@ -1,0 +1,247 @@
+import torch as th
+from typing import Dict, Optional, Tuple
+
+
+class ControllerView:
+    """
+    A registry that maps group keys to batched controller instances.
+
+    Controllers with the same (kinematic_tree_identifier, body_part, controller_config) key are
+    grouped into a single controller instance. Each member is assigned a controller_idx that
+    indexes into the group's batched state.
+
+    Usage:
+        # At controller load time:
+        group_key, controller_idx = ControllerView.register(
+            kinematic_tree_identifier, body_part, controller_cfg,
+            articulation_root_path, eef_link_name
+        )
+
+        # At action time:
+        ControllerView.update_goal(group_key, controller_idx, command)
+
+        # At sim step time (called once for all groups):
+        ControllerView.step_all()
+    """
+
+    # Maps group_key -> BaseController instance
+    _controller_groups: Dict[str, object] = {}
+
+    @classmethod
+    def register(
+        cls,
+        kinematic_tree_identifier: str,
+        body_part: str,
+        controller_cfg: dict,
+        articulation_root_path: str,
+        eef_link_name: Optional[str] = None,
+        control_enabled: bool = True,
+    ) -> Tuple[str, int]:
+        """
+        Register a controller into the appropriate group.
+
+        If no group exists for the given key, one is created. A new member is then
+        added to that group's controller via add_member().
+
+        Args:
+            kinematic_tree_identifier (str): unique identifier for the kinematic tree
+            body_part (str): name of the body part being controlled (e.g., "arm_right", "base")
+            controller_cfg (dict): controller configuration dict (must include "name" key)
+            articulation_root_path (str): articulation root prim path of the new group member
+            eef_link_name (None or str): if specified, the name of the EEF link (for IK/OSC controllers)
+
+        Returns:
+            2-tuple:
+                - str: group_key identifying the controller group
+                - int: controller_idx — the member's index within that group
+        """
+        # Build a unique string key for a controller group.
+        group_key = cls._make_key(kinematic_tree_identifier, body_part, controller_cfg)
+        
+        if group_key not in cls._controller_groups:
+            from omnigibson.controllers import create_controller
+            cls._controller_groups[group_key] = create_controller(**controller_cfg)
+
+        controller = cls._controller_groups[group_key]
+        controller_idx = controller.add_member(
+            articulation_root_path,
+            eef_link_name,
+            control_enabled=control_enabled,
+        )
+
+        return group_key, controller_idx
+
+    @classmethod
+    def step_all(cls):
+        """
+        Run a batched controller step for all registered controller groups.
+        """
+        for controller in cls._controller_groups.values():
+            controller.step()
+
+    @classmethod
+    def update_goal(cls, group_key: str, controller_idx: int, command):
+        """
+        Update the goal for the controller at @controller_idx in the group identified by @group_key.
+
+        Args:
+            group_key (str): key identifying the controller group
+            controller_idx (int): index of the controller within the group
+            command (Array): action command for this controller
+        """
+        cls._controller_groups[group_key].update_goal(controller_idx, command)
+
+    @classmethod
+    def set_control_enabled(cls, group_key: str, controller_idx: int, enabled: bool):
+        cls._controller_groups[group_key].set_control_enabled(controller_idx, enabled)
+
+    @classmethod
+    def compute_no_op_action(cls, group_key: str, controller_idx: int):
+        """
+        Compute the no-op action command for the controller at @controller_idx in group @group_key.
+
+        Args:
+            group_key (str): key identifying the controller group
+            controller_idx (int): index of the controller within the group
+
+        Returns:
+            Array: no-op command for this controller
+        """
+        return cls._controller_groups[group_key].compute_no_op_action(controller_idx)
+
+    @classmethod
+    def reset(cls, group_key: str, controller_idx: int):
+        """
+        Reset the goal state for the controller at @controller_idx in the group @group_key.
+
+        Args:
+            group_key (str): key identifying the controller group
+            controller_idx (int): index of the controller within the group
+        """
+        cls._controller_groups[group_key].reset(controller_idx)
+
+    @classmethod
+    def clear(cls):
+        """
+        Remove all registered controller groups. Call this when the scene is reset.
+        """
+        cls._controller_groups.clear()
+
+    @classmethod
+    def unregister_robot(cls, controllers: dict):
+        """
+        Remove all controller that belong to a robot identified by @controllers.
+
+        Args:
+            controllers (dict): The robot's _controllers dict mapping name -> (group_key, controller_idx)
+        """
+        for group_key, controller_idx in controllers.values():
+            if group_key not in cls._controller_groups:
+                continue
+            controller = cls._controller_groups[group_key]
+            # TODO do with masking
+           
+            del cls._controller_groups[group_key]
+
+    @classmethod
+    def get_command_dim(cls, group_key: str) -> int:
+        return cls._controller_groups[group_key].command_dim
+
+    @classmethod
+    def get_control_dim(cls, group_key: str) -> int:
+        return cls._controller_groups[group_key].control_dim
+
+    @classmethod
+    def get_dof_idx(cls, group_key: str):
+        return cls._controller_groups[group_key].dof_idx
+
+    @classmethod
+    def get_control_type(cls, group_key: str):
+        return cls._controller_groups[group_key].control_type
+
+    @classmethod
+    def get_mode(cls, group_key: str) -> str:
+        controller = cls._controller_groups[group_key]
+        assert hasattr(controller, "mode"), (
+            f"Controller {type(controller).__name__} does not have a 'mode' attribute"
+        )
+        return controller.mode
+
+    @classmethod
+    def get_goal_dim(cls, group_key: str) -> int:
+        return cls._controller_groups[group_key].goal_dim
+
+    @classmethod
+    def get_goal(cls, group_key: str, controller_idx: int) -> dict:
+        return cls._controller_groups[group_key].get_goal(controller_idx)
+
+    @classmethod
+    def get_controller(cls, group_key: str):
+        return cls._controller_groups[group_key]
+
+    @classmethod
+    def is_controller_type(cls, group_key: str, controller_cls) -> bool:
+        return isinstance(cls._controller_groups[group_key], controller_cls)
+
+    @classmethod
+    def get_isaac_kp(cls, group_key: str):
+        return cls._controller_groups[group_key].isaac_kp
+
+    @classmethod
+    def get_isaac_kd(cls, group_key: str):
+        return cls._controller_groups[group_key].isaac_kd
+
+    @classmethod
+    def get_command_input_limits(cls, group_key: str):
+        return cls._controller_groups[group_key].command_input_limits
+
+    @classmethod
+    def get_motor_type(cls, group_key: str) -> str:
+        controller = cls._controller_groups[group_key]
+        assert hasattr(controller, "motor_type"), (
+            f"Controller {type(controller).__name__} does not have a 'motor_type' attribute"
+        )
+        return controller.motor_type
+
+    @classmethod
+    def is_grasping(cls, group_key: str, controller_idx: int):
+        return cls._controller_groups[group_key].is_grasping(controller_idx)
+
+    @classmethod
+    def dump_state(cls, group_key: str) -> dict:
+        return cls._controller_groups[group_key].dump_state()
+
+    @classmethod
+    def load_state(cls, group_key: str, state: dict):
+        cls._controller_groups[group_key].load_state(state)
+
+    @classmethod
+    def serialize(cls, group_key: str, state: dict) -> th.Tensor:
+        return cls._controller_groups[group_key].serialize(state)
+
+    @classmethod
+    def deserialize(cls, group_key: str, state: th.Tensor) -> Tuple[dict, int]:
+        return cls._controller_groups[group_key].deserialize(state)
+
+    @staticmethod
+    def _freeze_for_hash(value):
+        """
+        Recursively convert nested structures into hashable representations.
+        """
+        if isinstance(value, dict):
+            return tuple(sorted((k, ControllerView._freeze_for_hash(v)) for k, v in value.items()))
+        if isinstance(value, (list, tuple)):
+            return tuple(ControllerView._freeze_for_hash(v) for v in value)
+        if isinstance(value, set):
+            return tuple(sorted(ControllerView._freeze_for_hash(v) for v in value))
+        # Fallback for custom / array-like objects
+        try:
+            hash(value)
+            return value
+        except TypeError:
+            return str(value)
+
+    @classmethod
+    def _make_key(cls, kinematic_tree_identifier: str, body_part: str, controller_cfg: dict) -> str:
+        cfg_hash = hash(cls._freeze_for_hash(controller_cfg))
+        return f"{kinematic_tree_identifier}__{body_part}__{cfg_hash}"

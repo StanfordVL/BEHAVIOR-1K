@@ -38,7 +38,7 @@ class DifferentialDriveController(LocomotionController):
                 "has_limit": [...bool...]
 
                 Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+            dof_idx (Array[int]): specific dof indices controlled by this controller. Used for inferring
                 controller-relevant values during control computations
             command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
                 if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
@@ -88,41 +88,40 @@ class DifferentialDriveController(LocomotionController):
             isaac_kd=isaac_kd,
         )
 
-    def _update_goal(self, command, control_dict):
+    def _update_goal(self, controller_idx, command):
         # Directly store command as the velocity goal
         return dict(vel=command)
 
-    def compute_control(self, goal_dict, control_dict):
+    def compute_control(self, goals):
         """
-        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal.
-        This processes converts the desired (lin_vel, ang_vel) command into (left, right) wheel joint velocity control
-        signals.
+        Converts the (already preprocessed) batched goals into deployable (non-clipped!) joint control signals
+        for all N group members.
 
         Args:
-            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                goals necessary for controller computation. Must include the following keys:
-                    vel: desired (lin_vel, ang_vel) of the controlled body
-            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                states necessary for controller computation. Must include the following keys:
+            goals (Dict[str, Tensor]): batched goals with shape (N, *shape) per key.
+                Must include:
+                    vel: (N, 2) desired (lin_vel, ang_vel) of the controlled bodies
 
         Returns:
-            Array[float]: outputted (non-clipped!) velocity control signal to deploy
-                to the [left, right] wheel joints
+            Tensor: (N, 2) outputted (non-clipped!) velocity control signal to deploy to the [left, right] wheel joints
         """
-        lin_vel, ang_vel = goal_dict["vel"]
+        vel_batch = goals["vel"]  # (N, 2)
+        lin_vel = vel_batch[:, 0:1]
+        ang_vel = vel_batch[:, 1:2]
 
-        # Convert to wheel velocities
         left_wheel_joint_vel = (lin_vel - ang_vel * self._wheel_axle_halflength) / self._wheel_radius
         right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
 
-        # Return desired velocities
-        return cb.array([left_wheel_joint_vel, right_wheel_joint_vel])
+        # Backend-safe concat: numpy backend does not accept torch-style `dim` kwarg in concatenate.
+        left_wheel_joint_vel = cb.squeeze(left_wheel_joint_vel, dim=-1)   # (N,)
+        right_wheel_joint_vel = cb.squeeze(right_wheel_joint_vel, dim=-1)  # (N,)
+        return cb.stack([left_wheel_joint_vel, right_wheel_joint_vel], dim=-1)  # (N, 2)
 
-    def compute_no_op_goal(self, control_dict):
+    def compute_no_op_goal(self, controller_idx):
         # This is zero-vector, since we want zero linear / angular velocity
         return dict(vel=cb.zeros(2))
 
-    def _compute_no_op_command(self, control_dict):
+    def _compute_no_op_command(self, controller_idx):
         return cb.zeros(2)
 
     def _get_goal_shapes(self):

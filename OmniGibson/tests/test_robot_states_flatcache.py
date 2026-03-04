@@ -5,6 +5,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
+from omnigibson.controllers import ControllerView
 from omnigibson.macros import gm
 from omnigibson.macros import macros as m
 from omnigibson.robots import REGISTERED_ROBOTS, Robot
@@ -307,10 +308,10 @@ def test_grasping_mode():
         for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
             env.step(action)
 
-        gripper_controller = robot.controllers["gripper_0"]
+        group_key, controller_idx = robot.controllers["gripper_0"]
 
         # Grasp the box
-        gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
+        ControllerView.update_goal(group_key, controller_idx, cb.array([-1]))
         for _ in range(10):
             og.sim.step()
 
@@ -333,7 +334,7 @@ def test_grasping_mode():
         ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
         # Release the box
-        gripper_controller.update_goal(cb.array([1]), robot.get_control_dict())
+        ControllerView.update_goal(group_key, controller_idx, cb.array([1]))
         for _ in range(20):
             og.sim.step()
 

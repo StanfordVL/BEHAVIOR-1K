@@ -3,7 +3,9 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
+from omnigibson.controllers import ControllerView
 from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 def test_arm_control():
@@ -186,8 +188,9 @@ def test_arm_control():
         # We need to explicitly reset the controllers to unify the initial state that will be seen
         # during downstream action executions -- i.e.: the state seen after robot.reload_controllers()
         # is called each time
-        for controller in robot.controllers.values():
-            controller.reset()
+        for name in robot.controller_order:
+            group_key, controller_idx = robot.controllers[name]
+            ControllerView.reset(group_key, controller_idx)
 
     # Update initial state (robot should be stable and still)
     env.scene.update_initial_file()
@@ -238,7 +241,7 @@ def test_arm_control():
                     for c in robot.controller_order:
                         if c == c_name:
                             break
-                        start_idx += robot.controllers[c].command_dim
+                        start_idx += ControllerView.get_command_dim(robot.controllers[c][0])
                     if controller_mode == "pose_delta_ori":
                         forward_action[start_idx] = 0.02
                         side_action[start_idx + 1] = 0.02
@@ -271,7 +274,7 @@ def test_arm_control():
                     for c in robot.controller_order:
                         if c == c_name:
                             break
-                        start_idx += robot.controllers[c].command_dim
+                        start_idx += ControllerView.get_command_dim(robot.controllers[c][0])
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
 
@@ -299,8 +302,8 @@ def test_arm_control():
 
                         init_pos, init_quat = initial_eef_pose[robot.name][arm]
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
-                        arm_controller = robot.controllers[f"arm_{arm}"]
-                        arm_goal = arm_controller.goal
+                        arm_gk, arm_ci = robot.controllers[f"arm_{arm}"]
+                        arm_goal = ControllerView.get_goal(arm_gk, arm_ci)
                         target_pos = cb.to_torch(arm_goal["target_pos"])
                         target_quat = T.mat2quat(cb.to_torch(arm_goal["target_ori_mat"]))
                         pos_check = err_checks[controller_mode][action_name]["pos"]

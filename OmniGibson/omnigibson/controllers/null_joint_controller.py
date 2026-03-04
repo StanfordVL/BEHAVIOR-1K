@@ -37,7 +37,7 @@ class NullJointController(JointController):
                 "has_limit": [...bool...]
 
                 Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+            dof_idx (Array[int]): specific dof indices controlled by this controller. Used for inferring
                 controller-relevant values during control computations
             command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
                 if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
@@ -84,7 +84,7 @@ class NullJointController(JointController):
             use_delta_commands=False,
         )
 
-    def compute_no_op_goal(self, control_dict):
+    def compute_no_op_goal(self, controller_idx):
         # Set the goal to be internal stored default value
         return dict(target=self.default_goal)
 
@@ -106,7 +106,7 @@ class NullJointController(JointController):
 
         self.default_goal = cb.array(target)
 
-    def _compute_no_op_command(self, control_dict):
+    def _compute_no_op_command(self, controller_idx):
         # Empty tensor since no action should be received
         return cb.array([])
 

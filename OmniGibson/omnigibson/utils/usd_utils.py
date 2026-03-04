@@ -1111,17 +1111,84 @@ class BatchControlViewAPIImpl:
         # base corresponds to final index
         return self._get_relative_velocities(prim_path, estimate=estimate)[-1, 3:]
 
-    def get_joint_positions(self, prim_path):
+    def get_link_index(self, link_name):
+        """Returns the integer body index for the named link in the articulation view's link_paths."""
+        return self._link_idx[0][link_name]
+
+    def get_all_relative_jacobians(self):
+        """Returns (N, n_links, 6, n_dof_total) relative jacobians for all robots in this view."""
+        if "all_relative_jacobians" not in self._read_cache:
+            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
+            self._read_cache["all_relative_jacobians"] = cb.stack(
+                [self.get_relative_jacobian(p) for p in prim_paths_sorted], dim=0
+            )
+        return self._read_cache["all_relative_jacobians"]
+
+    def get_all_link_relative_position_orientation(self, link_name):
+        """Returns (N, 3) positions and (N, 4) quaternions for the given link across all robots."""
+        cache_key = f"all_link_rel_pose_{link_name}"
+        if cache_key not in self._read_cache:
+            link_idx = self._link_idx[0][link_name]
+            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
+            poses = cb.stack([self._get_relative_poses(p)[link_idx] for p in prim_paths_sorted], dim=0)
+            self._read_cache[cache_key] = poses
+        poses = self._read_cache[cache_key]
+        return poses[:, :3], poses[:, 3:]
+
+    def get_all_link_relative_linear_velocity(self, link_name, estimate=False):
+        """Returns (N, 3) link linear velocities for all robots."""
+        cache_key = f"all_link_rel_lin_vel{'_est' if estimate else ''}_{link_name}"
+        if cache_key not in self._read_cache:
+            link_idx = self._link_idx[0][link_name]
+            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
+            self._read_cache[cache_key] = cb.stack(
+                [self._get_relative_velocities(p, estimate=estimate)[link_idx, :3] for p in prim_paths_sorted], dim=0
+            )
+        return self._read_cache[cache_key]
+
+    def get_all_link_relative_angular_velocity(self, link_name, estimate=False):
+        """Returns (N, 3) link angular velocities for all robots."""
+        cache_key = f"all_link_rel_ang_vel{'_est' if estimate else ''}_{link_name}"
+        if cache_key not in self._read_cache:
+            link_idx = self._link_idx[0][link_name]
+            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
+            self._read_cache[cache_key] = cb.stack(
+                [self._get_relative_velocities(p, estimate=estimate)[link_idx, 3:] for p in prim_paths_sorted], dim=0
+            )
+        return self._read_cache[cache_key]
+
+    def get_all_relative_linear_velocity(self, estimate=False):
+        """Returns (N, 3) base linear velocities for all robots in this view."""
+        cache_key = f"all_relative_lin_vel{'_est' if estimate else ''}"
+        if cache_key not in self._read_cache:
+            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
+            self._read_cache[cache_key] = cb.stack(
+                [self._get_relative_velocities(p, estimate=estimate)[-1, :3] for p in prim_paths_sorted], dim=0
+            )
+        return self._read_cache[cache_key]
+
+    def get_all_relative_angular_velocity(self, estimate=False):
+        """Returns (N, 3) base angular velocities for all robots in this view."""
+        cache_key = f"all_relative_ang_vel{'_est' if estimate else ''}"
+        if cache_key not in self._read_cache:
+            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
+            self._read_cache[cache_key] = cb.stack(
+                [self._get_relative_velocities(p, estimate=estimate)[-1, 3:] for p in prim_paths_sorted], dim=0
+            )
+        return self._read_cache[cache_key]
+
+    def get_all_joint_positions(self):
+        """Returns (N, n_dof) joint positions for all robots in this view."""
         if "dof_positions" not in self._read_cache:
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
+        return self._read_cache["dof_positions"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["dof_positions"][idx]
+    def get_joint_positions(self, prim_path):
+        return self.get_all_joint_positions()[self._idx[prim_path]]
 
-    def get_joint_velocities(self, prim_path, estimate=False):
+    def get_all_joint_velocities(self, estimate=False):
+        """Returns (N, n_dof) joint velocities for all robots in this view."""
         vel_str = "velocities_estimate" if estimate else "velocities"
-
-        # Use estimated calculation if requested and we have prior history info
         if f"dof_{vel_str}" not in self._read_cache:
             if estimate and self._last_state is not None:
                 if "dof_positions" not in self._read_cache:
@@ -1131,39 +1198,48 @@ class BatchControlViewAPIImpl:
                 ) / og.sim.get_physics_dt()
             else:
                 self._read_cache[f"dof_{vel_str}"] = cb.from_torch(self._view.get_dof_velocities())
+        return self._read_cache[f"dof_{vel_str}"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache[f"dof_{vel_str}"][idx]
+    def get_joint_velocities(self, prim_path, estimate=False):
+        return self.get_all_joint_velocities(estimate=estimate)[self._idx[prim_path]]
 
-    def get_joint_efforts(self, prim_path):
+    def get_all_joint_efforts(self):
+        """Returns (N, n_dof) joint efforts for all robots in this view."""
         if "dof_projected_joint_forces" not in self._read_cache:
             self._read_cache["dof_projected_joint_forces"] = cb.from_torch(self._view.get_dof_projected_joint_forces())
+        return self._read_cache["dof_projected_joint_forces"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["dof_projected_joint_forces"][idx]
+    def get_joint_efforts(self, prim_path):
+        return self.get_all_joint_efforts()[self._idx[prim_path]]
 
-    def get_generalized_mass_matrices(self, prim_path):
+    def get_all_generalized_mass_matrices(self):
+        """Returns (N, n_dof, n_dof) mass matrices for all robots in this view."""
         if "mass_matrices" not in self._read_cache:
             self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_generalized_mass_matrices())
+        return self._read_cache["mass_matrices"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["mass_matrices"][idx]
+    def get_generalized_mass_matrices(self, prim_path):
+        return self.get_all_generalized_mass_matrices()[self._idx[prim_path]]
 
-    def get_gravity_compensation_forces(self, prim_path):
+    def get_all_gravity_compensation_forces(self):
+        """Returns (N, n_dof) gravity compensation forces for all robots in this view."""
         if "generalized_gravity_forces" not in self._read_cache:
             self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_gravity_compensation_forces())
+        return self._read_cache["generalized_gravity_forces"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["generalized_gravity_forces"][idx]
+    def get_gravity_compensation_forces(self, prim_path):
+        return self.get_all_gravity_compensation_forces()[self._idx[prim_path]]
 
-    def get_coriolis_and_centrifugal_compensation_forces(self, prim_path):
+    def get_all_coriolis_and_centrifugal_compensation_forces(self):
+        """Returns (N, n_dof) Coriolis/centrifugal forces for all robots in this view."""
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
             self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
                 self._view.get_coriolis_and_centrifugal_compensation_forces()
             )
+        return self._read_cache["coriolis_and_centrifugal_forces"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["coriolis_and_centrifugal_forces"][idx]
+    def get_coriolis_and_centrifugal_compensation_forces(self, prim_path):
+        return self.get_all_coriolis_and_centrifugal_compensation_forces()[self._idx[prim_path]]
 
     def get_link_transform(self, prim_path, link_name):
         if "link_transforms" not in self._read_cache:
@@ -1426,8 +1502,20 @@ class ControllableObjectViewAPI:
         )
 
     @classmethod
+    def get_all_joint_positions(cls, prim_path):
+        """Returns (N, n_dof) joint positions for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_joint_positions()
+
+    @classmethod
     def get_joint_positions(cls, prim_path):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
+
+    @classmethod
+    def get_all_joint_velocities(cls, prim_path, estimate=False):
+        """Returns (N, n_dof) joint velocities for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_joint_velocities(
+            estimate=estimate
+        )
 
     @classmethod
     def get_joint_velocities(cls, prim_path, estimate=False):
@@ -1436,8 +1524,18 @@ class ControllableObjectViewAPI:
         )
 
     @classmethod
+    def get_all_joint_efforts(cls, prim_path):
+        """Returns (N, n_dof) joint efforts for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_joint_efforts()
+
+    @classmethod
     def get_joint_efforts(cls, prim_path):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
+
+    @classmethod
+    def get_all_generalized_mass_matrices(cls, prim_path):
+        """Returns (N, n_dof, n_dof) mass matrices for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_generalized_mass_matrices()
 
     @classmethod
     def get_generalized_mass_matrices(cls, prim_path):
@@ -1446,10 +1544,22 @@ class ControllableObjectViewAPI:
         )
 
     @classmethod
+    def get_all_gravity_compensation_forces(cls, prim_path):
+        """Returns (N, n_dof) gravity compensation forces for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_gravity_compensation_forces()
+
+    @classmethod
     def get_gravity_compensation_forces(cls, prim_path):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_gravity_compensation_forces(
             prim_path
         )
+
+    @classmethod
+    def get_all_coriolis_and_centrifugal_compensation_forces(cls, prim_path):
+        """Returns (N, n_dof) Coriolis/centrifugal forces for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[
+            cls._get_pattern_from_prim_path(prim_path)
+        ].get_all_coriolis_and_centrifugal_compensation_forces()
 
     @classmethod
     def get_coriolis_and_centrifugal_compensation_forces(cls, prim_path):
@@ -1492,6 +1602,41 @@ class ControllableObjectViewAPI:
     @classmethod
     def get_relative_jacobian(cls, prim_path):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_jacobian(prim_path)
+
+    @classmethod
+    def get_link_index(cls, prim_path, link_name):
+        """Returns the integer body index for the named link in the articulation view's link_paths."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_index(link_name)
+
+    @classmethod
+    def get_all_relative_jacobians(cls, prim_path):
+        """Returns (N, n_links, 6, n_dof_total) relative jacobians for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_relative_jacobians()
+
+    @classmethod
+    def get_all_link_relative_position_orientation(cls, prim_path, link_name):
+        """Returns (N, 3) positions and (N, 4) quaternions for the given link across all robots."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_link_relative_position_orientation(link_name)
+
+    @classmethod
+    def get_all_link_relative_linear_velocity(cls, prim_path, link_name, estimate=False):
+        """Returns (N, 3) link linear velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_link_relative_linear_velocity(link_name, estimate=estimate)
+
+    @classmethod
+    def get_all_link_relative_angular_velocity(cls, prim_path, link_name, estimate=False):
+        """Returns (N, 3) link angular velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_link_relative_angular_velocity(link_name, estimate=estimate)
+
+    @classmethod
+    def get_all_relative_linear_velocity(cls, prim_path, estimate=False):
+        """Returns (N, 3) base linear velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_relative_linear_velocity(estimate=estimate)
+
+    @classmethod
+    def get_all_relative_angular_velocity(cls, prim_path, estimate=False):
+        """Returns (N, 3) base angular velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_all_relative_angular_velocity(estimate=estimate)
 
 
 def clear():

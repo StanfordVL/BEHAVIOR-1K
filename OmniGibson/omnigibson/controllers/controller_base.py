@@ -7,6 +7,7 @@ import torch as th
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -75,6 +76,11 @@ class ControlType:
 class BaseController(Serializable, Registerable, Recreatable):
     """
     An abstract class with interface for mapping specific types of commands to deployable control signals.
+
+    Each instance represents a group of controllers that share the same
+    (kinematic_tree_identifier, body_part, controller_config) key. Members are added via
+    add_member() and assigned a controller_idx. All members are stepped together in a single
+    batched call, with per-member state stored in indexed tensors.
     """
 
     def __init__(
@@ -135,9 +141,19 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._goal_shapes = self._get_goal_shapes()
         self._goal_dim = int(sum(cb.prod(cb.array(shape)) for shape in self._goal_shapes.values()))
 
-        # Initialize some other variables that will be filled in during runtime
-        self._control = None
-        self._goal = None
+        # Multi-controller batching state
+        # List of articulation root paths for each group member
+        self._articulation_root_paths = []
+        # Batched goals: key -> (N, *shape) tensor, built lazily as members are added
+        self._goals = {}
+        # Per-member flag indicating whether goal has been set this step
+        self._goal_set = []
+        # Per-member control enabled mask (1 enabled, 0 disabled)
+        self._control_enabled = []
+        # Per-member last deployed control tensor (set in _write_control)
+        self._controls = []
+
+        # Initialize command scaling variables
         self._command_scale_factor = None
         self._command_output_transform = None
         self._command_input_transform = None
@@ -196,6 +212,41 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         self._isaac_kp = None if isaac_kp is None else self.nums2array(isaac_kp, self.control_dim)
         self._isaac_kd = None if isaac_kd is None else self.nums2array(isaac_kd, self.control_dim)
+
+    def add_member(self, articulation_root_path, eef_link_name=None, control_enabled=True):
+        """
+        Register a controller as a member of this controller group.
+
+        Args:
+            articulation_root_path (str): articulation root prim path of the new group member
+            eef_link_name (None or str): EEF link name — ignored by default; overridden by IK/OSC.
+
+        Returns:
+            int: controller_idx — index into this group's member arrays for the added controller,
+                used to access goal, control, and articulation_root_path
+        """
+        controller_idx = len(self._articulation_root_paths)
+        self._articulation_root_paths.append(articulation_root_path)
+        self._goal_set.append(False)
+        self._control_enabled.append(1 if control_enabled else 0)
+        self._controls.append(None)
+
+        for key, shape in self._goal_shapes.items():
+            new_row = cb.zeros((1, *shape))
+            if key in self._goals:
+                self._goals[key] = cb.cat([self._goals[key], new_row], dim=0)
+            else:
+                self._goals[key] = new_row
+
+        return controller_idx
+
+    @property
+    def n_members(self):
+        """
+        Returns:
+            int: Number of controllers registered in this controller group
+        """
+        return len(self._articulation_root_paths)
 
     def _generate_default_command_input_limits(self):
         """
@@ -289,180 +340,248 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         return original_command
 
-    def update_goal(self, command, control_dict):
+    def update_goal(self, controller_idx, command):
         """
-        Updates inputted @command internally, writing any necessary internal variables as needed.
+        Updates the goal for controller at @controller_idx with the given @command.
 
         Args:
-            command (Array[float]): inputted command to preprocess and extract relevant goal(s) to store
-                internally in this controller
-            control_dict (dict): Current state
+            controller_idx (int): index of the controller in this controller group
+            command (Array[float]): inputted command to preprocess and extract relevant goal(s)
         """
         # Sanity check the command
         assert (
             len(command) == self.command_dim
         ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
 
-        # Preprocess and run internal command
-        self._goal = self._update_goal(command=self._preprocess_command(command), control_dict=control_dict)
+        prim_path = self._articulation_root_paths[controller_idx]
+        preprocessed = self._preprocess_command(command)
+        goal_dict = self._update_goal(controller_idx, preprocessed)
+        for k, v in goal_dict.items():
+            self._goals[k][controller_idx] = v
+        
+        self._goal_set[controller_idx] = True
 
-    def _update_goal(self, command, control_dict):
+    def _update_goal(self, controller_idx, command):
         """
-        Updates inputted @command internally, writing any necessary internal variables as needed.
+        Updates the goal for the controller at @controller_idx.
 
         Args:
-            command (Array[float]): inputted (preprocessed!) command and extract relevant goal(s) to store
-                internally in this controller
-            control_dict (dict): Current state
+            controller_idx (int): index of the controller in this controller group
+            command (Array[float]): preprocessed command
 
         Returns:
-            dict: Keyword-mapped goals to store internally in this controller
+            dict: Keyword-mapped goal values for controller at controller_idx
         """
         raise NotImplementedError
 
-    def compute_control(self, goal_dict, control_dict):
+
+    def compute_control(self, goals):
         """
-        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) control signal.
-        Should be implemented by subclass.
+        Converts batched @goals into deployable (non-clipped!) control signals for all member controllers.
 
         Args:
-            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                goals necessary for controller computation
-            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                states necessary for controller computation
+            goals (Dict[str, Tensor]): batched goals, each value has shape (N, *shape)
 
         Returns:
-            Array[float]: outputted (non-clipped!) control signal to deploy
+            Tensor: (N, control_dim) control signals
         """
         raise NotImplementedError
+
+    # TODO should be in batch
+    def _write_control(self, control):
+        """
+        Write batched control signals to Isaac via ControllableObjectViewAPI.
+
+        Args:
+            control (Tensor): (N, control_dim) control signals
+        """
+        
+
+        for i, prim_path in enumerate(self._articulation_root_paths):
+            # skip control_disabled members
+            if self._control_enabled[i] == 0:
+                continue
+            ctrl = control[i]
+            if isinstance(ctrl, th.Tensor):
+                ctrl_backend = cb.from_torch(ctrl)
+            elif isinstance(ctrl, cb.arr_type):
+                ctrl_backend = ctrl
+            else:
+                ctrl_backend = cb.array(ctrl)
+            # Keep last deployed control in backend-native type so controller-side cb.* ops stay type-consistent.
+            self._controls[i] = ctrl_backend
+            if self.control_type == ControlType.POSITION:
+                ControllableObjectViewAPI.set_joint_position_targets(prim_path, ctrl_backend, self.dof_idx)
+                ControllableObjectViewAPI.set_joint_velocity_targets(prim_path, cb.zeros(ctrl_backend.shape), self.dof_idx)
+            elif self.control_type == ControlType.VELOCITY:
+                ControllableObjectViewAPI.set_joint_velocity_targets(prim_path, ctrl_backend, self.dof_idx)
+            elif self.control_type == ControlType.EFFORT:
+                ControllableObjectViewAPI.set_joint_efforts(prim_path, ctrl_backend, self.dof_idx)
 
     def clip_control(self, control):
         """
         Clips the inputted @control signal based on @control_limits.
 
         Args:
-            control (Array[float]): control signal to clip
+            control (Tensor): (N, control_dim) control signal to clip
 
         Returns:
-            Array[float]: Clipped control signal
+            Tensor: Clipped (N, control_dim) control signal
         """
-        clipped_control = control.clip(
-            self._control_limits[self.control_type][0][self.dof_idx],
-            self._control_limits[self.control_type][1][self.dof_idx],
-        )
+        lo = self._control_limits[self.control_type][0][self.dof_idx]
+        hi = self._control_limits[self.control_type][1][self.dof_idx]
+        # Broadcast limits: (control_dim,) -> (1, control_dim) for N-dim clipping
+        clipped_control = control.clip(lo, hi)
         idx = (
             self._dof_has_limits[self.dof_idx]
             if self.control_type == ControlType.POSITION
-            else [True] * self.control_dim
+            else (cb.ones(self.control_dim) > 0)
         )
-        control[idx] = clipped_control[idx]
+        control[:, idx] = clipped_control[:, idx]
         return control
 
-    def step(self, control_dict):
+    def step(self):
         """
-        Take a controller step.
+        Take a batched controller step across all member controller.
+
+        For any controller that has not received a goal this step, a no-op goal is computed.
+        The control is then computed for all controllers, clipped, written to Isaac, and the
+        goal_set flags are reset.
+        """
+        N = self.n_members
+        # If all members in this group is disabled, early return
+        if sum(self._control_enabled) == 0:
+            return
+
+        # Fill in no-op goals for any controllers that haven't received a goal.
+        # Do NOT set _goal_set[i] = True here — only update_goal() should do that,
+        # mirroring the old behavior where self._goal was only set by update_goal().
+        for i in range(N):
+            # Skip control_disabled members
+            if self._control_enabled[i] == 0:
+                continue
+            if not self._goal_set[i]:
+                no_op = self.compute_no_op_goal(i)
+                for k, v in no_op.items():
+                    self._goals[k][i] = v
+                self._goal_set[i] = True
+
+        # Compute batched control: (N, control_dim)
+        control_output = self.compute_control(self._goals)
+        assert control_output.shape == (N, self.control_dim), (
+            f"compute_control must return shape ({N}, {self.control_dim}), got {control_output.shape}"
+        )
+
+        # Clip and write
+        control_output = self.clip_control(control_output)
+        self._write_control(control_output)
+    
+    def reset(self, controller_idx):
+        """
+        Resets the goal state for the controller at @controller_idx. Can be extended by subclass
 
         Args:
-            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                states necessary for controller computation
-
-        Returns:
-            Array[float]: numpy array of outputted control signals
+            controller_idx (int): index of the controller in this controller group
         """
-        # Generate no-op goal if not specified
-        if self._goal is None:
-            self._goal = self.compute_no_op_goal(control_dict=control_dict)
+        self._goal_set[controller_idx] = False
+        self._controls[controller_idx] = None
+        for k in self._goals:
+            self._goals[k][controller_idx] = cb.zeros(self._goal_shapes[k])
 
-        # Compute control, then clip and return
-        control = self.compute_control(goal_dict=self._goal, control_dict=control_dict)
-        assert (
-            len(control) == self.control_dim
-        ), f"Control signal must be of length {self.control_dim}, got {len(control)} instead."
-        self._control = self.clip_control(control=control)
-        return self._control
+    def set_control_enabled(self, controller_idx, enabled):
+        self._control_enabled[controller_idx] = 1 if enabled else 0
 
-    def reset(self):
+    def compute_no_op_goal(self, controller_idx):
         """
-        Resets this controller. Can be extended by subclass
-        """
-        self._goal = None
-
-    def compute_no_op_goal(self, control_dict):
-        """
-        Compute no-op goal given the current state @control_dict
+        Compute no-op goal for the controller at @controller_idx.
 
         Args:
-            control_dict (dict): Current state
+            controller_idx (int): index of the controller in this controller group
 
         Returns:
-            dict: Maps relevant goal keys (from self._goal_shapes.keys()) to relevant goal data to be used
-                in controller computations
+            dict: Maps relevant goal keys to goal data for that controller
         """
         raise NotImplementedError
-
-    def compute_no_op_action(self, control_dict):
+    def compute_no_op_action(self, controller_idx):
         """
         Compute a no-op action that updates the goal to match the current position
         Disclaimer: this no-op might cause drift under external load (e.g. when the controller cannot reach the goal position)
+        
+        Args:
+            controller_idx (int): index of the controller in this group
+
+        Returns:
+            Tensor: no-op action command
         """
-        if self._goal is None:
-            self._goal = self.compute_no_op_goal(control_dict=control_dict)
-        command = self._compute_no_op_command(control_dict=control_dict)
+        if not self._goal_set[controller_idx]:
+            no_op_goal = self.compute_no_op_goal(controller_idx)
+            for k, v in no_op_goal.items():
+                self._goals[k][controller_idx] = v
+        command = self._compute_no_op_command(controller_idx)
         return cb.to_torch(self._reverse_preprocess_command(command))
 
-    def _compute_no_op_command(self, control_dict):
+    def _compute_no_op_command(self, controller_idx):
         """
-        Compute no-op command given the goal
+        Compute no-op command for the controller at @controller_idx.
+
+        Args:
+            controller_idx (int): index of the controller in this group
+
+        Returns:
+            Array: no-op command
         """
         raise NotImplementedError
 
-    def _dump_state(self):
-        # Default is just the command
-        return dict(
-            goal_is_valid=self._goal is not None,
-            goal=None if self._goal is None else {k: cb.to_torch(v) for k, v in self._goal.items()},
-        )
+    def _dump_state(self) -> dict:
+        """Dump state for all group members."""
+        goals = dict()
+        for k, v in self._goals.items():
+            # Clone batched goal tensors to avoid sharing views with live controller state.
+            goals[k] = cb.to_torch(v).clone()
+        return {
+            "n_members": self.n_members,
+            "goal_set": list(self._goal_set),
+            "goals": goals,
+        }
 
-    def _load_state(self, state):
-        # Make sure every entry in goal is a numpy array
-        # Load goal
-        if state["goal"] is None:
-            self._goal = None
-        else:
-            self._goal = dict()
-            for name, goal_state in state["goal"].items():
-                if isinstance(goal_state, th.Tensor):
-                    self._goal[name] = cb.from_torch(goal_state)
-                else:
-                    self._goal[name] = goal_state
-
+    def _load_state(self, state: dict):
+        """Load state for all group members."""
+        goal_set = state["goal_set"]
+        if isinstance(goal_set, th.Tensor):
+            goal_set = goal_set.reshape(-1).tolist()
+        for controller_idx, goal_set_val in enumerate(goal_set):
+            if isinstance(goal_set_val, th.Tensor):
+                goal_set_val = goal_set_val.item()
+            # Do not reactivate loaded goals. They can be stale by the time physics resumes
+            # (especially across scene reset / controller reload), and may induce pre-action drift.
+            self._goal_set[controller_idx] = False
+            self._controls[controller_idx] = None
+        for name, val in state["goals"].items():
+            if name in self._goals:
+                if isinstance(val, th.Tensor):
+                    val = cb.from_torch(val)
+                elif not isinstance(val, cb.arr_type):
+                    val = cb.array(val)
+                self._goals[name][:] = val
+        
     def serialize(self, state):
-        # Make sure size of the state is consistent, even if we have no goal
-        goal_state_flattened = (
-            th.cat([goal_state.flatten() for goal_state in state["goal"].values()])
-            if (state)["goal_is_valid"]
-            else th.zeros(self.goal_dim)
-        )
-
-        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
+        # Serialize goal state for all members
+        n = state["n_members"]
+        goal_set_tensor = th.tensor(state["goal_set"], dtype=th.float32)
+        goals = state["goals"]
+        goal_flat = th.cat([v.flatten() for v in goals.values()]) if goals else th.zeros(n * self.goal_dim)
+        return th.cat([goal_set_tensor, goal_flat])
 
     def deserialize(self, state):
-        goal_is_valid = bool(state[0])
-        if goal_is_valid:
-            # Un-flatten all the keys
-            idx = 1
-            goal = dict()
-            for key, shape in self._goal_shapes.items():
-                length = math.prod(shape)
-                goal[key] = state[idx : idx + length].reshape(shape)
-                idx += length
-        else:
-            goal = None
-        state_dict = dict(
-            goal_is_valid=goal_is_valid,
-            goal=goal,
-        )
-        return state_dict, self.goal_dim + 1
+        n = self.n_members
+        goal_set = state[:n].bool().tolist()
+        idx = n
+        goals = {}
+        for key, shape in self._goal_shapes.items():
+            length = n * math.prod(shape)
+            goals[key] = state[idx: idx + length].reshape(n, *shape)
+            idx += length
+        return dict(n_members=n, goal_set=goal_set, goals=goals), idx
 
     def _get_goal_shapes(self):
         """
@@ -501,33 +620,40 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     @property
     def state_size(self):
-        # Default is goal dim + 1 (for whether the goal is valid or not)
-        return self.goal_dim + 1
+        # n_members (goal_set flags) + n_members * goal_dim
+        return self.n_members + self.n_members * self.goal_dim
 
-    @property
-    def goal(self):
+    def get_goal(self, controller_idx):
         """
+        Returns the current goal for the controller at @controller_idx.
+
+        Args:
+            controller_idx (int): index of the controller in this group
+
         Returns:
-            dict: Current goal for this controller. Maps relevant goal keys to goal values to be
-                used during controller step computations
+            dict: Maps goal keys to per-controller tensors of shape (*shape).
         """
-        return self._goal
+        return {k: v[controller_idx] for k, v in self._goals.items()}
 
     @property
     def goal_dim(self):
         """
         Returns:
-            int: Expected size of flattened, internal goals
+            int: Expected size of flattened goals for a single group member
         """
         return self._goal_dim
 
-    @property
-    def control(self):
+    def get_control(self, controller_idx):
         """
+        Returns the last deployed control signal for the controller at @controller_idx.
+
+        Args:
+            controller_idx (int): index of the controller in this group
+
         Returns:
-            n-array: Array of most recent controls deployed by this controller
+            Tensor or None: last control tensor of shape (control_dim,), or None if not yet stepped.
         """
-        return self._control
+        return self._controls[controller_idx]
 
     @property
     def control_freq(self):
@@ -601,7 +727,7 @@ class BaseController(Serializable, Registerable, Recreatable):
     def dof_idx(self):
         """
         Returns:
-            Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
+            Array[int]: DOF indices corresponding to the specific DOFs being controlled by this controller group
         """
         return self._dof_idx
 
@@ -668,10 +794,13 @@ class GripperController(BaseController):
         super().__init_subclass__(**kwargs)
         register_gripper_controller(cls)
 
-    def is_grasping(self):
+    def is_grasping(self, controller_idx):
         """
         Checks whether the current state of this gripper being controlled is in a grasping state.
         Should be implemented by subclass.
+
+        Args:
+            controller_idx (int): index of the controller in this group. Used for MultiFingerGripperController.
 
         Returns:
             IsGraspingState: Grasping state of gripper
