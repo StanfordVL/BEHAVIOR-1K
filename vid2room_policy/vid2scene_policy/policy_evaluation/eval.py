@@ -314,38 +314,6 @@ def _check_target_contact(robot, arm_name: str, target_obj) -> bool:
     return _eef_touches_target_bbox(robot=robot, arm_name=arm_name, target_obj=target_obj)
 
 
-def _load_episode_indices(dataset_root: Path, episode_idx: int | None, episodes_file: Path | None) -> list[int]:
-    if episode_idx is not None and episodes_file is not None:
-        raise ValueError("Specify either --episode-idx or --episodes-file, not both.")
-    if episode_idx is not None:
-        return [episode_idx]
-    if episodes_file is not None:
-        text = episodes_file.read_text(encoding="utf-8")
-        tokens = [tok.strip() for tok in text.replace(",", "\n").splitlines() if tok.strip()]
-        if not tokens:
-            raise ValueError(f"Episodes file is empty: {episodes_file}")
-        return [int(tok) for tok in tokens]
-    # Default: evaluate every episode that has metadata.
-    meta_dir = dataset_root / "meta"
-    if not meta_dir.exists():
-        raise FileNotFoundError(f"Missing dataset metadata directory: {meta_dir}")
-    episode_files = sorted(meta_dir.glob("episode_metadata_*.json"))
-    if not episode_files:
-        raise RuntimeError(f"No episode metadata files found under: {meta_dir}")
-    episode_ids = []
-    for p in episode_files:
-        stem = p.stem
-        prefix = "episode_metadata_"
-        if not stem.startswith(prefix):
-            continue
-        suffix = stem[len(prefix) :]
-        if suffix.isdigit():
-            episode_ids.append(int(suffix))
-    if not episode_ids:
-        raise RuntimeError(f"Could not parse episode indices from metadata files in: {meta_dir}")
-    return sorted(set(episode_ids))
-
-
 def evaluate_episode(
     dataset_root: Path,
     episode_idx: int,
@@ -359,7 +327,7 @@ def evaluate_episode(
     obs_horizon: int,
     pred_horizon: int,
     num_diffusion_iters: int,
-    max_steps: int | None,
+    max_steps_multiplier: float,
     output_dir: Path,
     debug: bool,
     device: torch.device,
@@ -375,7 +343,7 @@ def evaluate_episode(
             f"but got ({dataset_name}, {scene_model}). This eval run reuses one loaded scene."
         )
 
-    target_steps = len(gt_actions) if max_steps is None else max_steps
+    target_steps = int(len(gt_actions) * max_steps_multiplier)
     episode_out_dir = output_dir / f"episode_{episode_idx:04d}"
     episode_out_dir.mkdir(parents=True, exist_ok=True)
     steps_path = episode_out_dir / "steps.jsonl"
@@ -501,10 +469,7 @@ def evaluate_episode(
             elif truncated:
                 failure_reason = "episode truncated before target contact / grasp was achieved"
             elif steps_run >= target_steps:
-                if max_steps is None:
-                    failure_reason = "no target contact / grasp within ground-truth episode length"
-                else:
-                    failure_reason = f"no target contact / grasp within max_steps={target_steps}"
+                failure_reason = f"no target contact / grasp within max_steps={target_steps}"
             else:
                 failure_reason = "episode ended without target contact / grasp"
         summary = {
@@ -554,27 +519,13 @@ def evaluate_episode(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate diffusion policy in OmniGibson scenes from dataset metadata.")
-    parser.add_argument("--dataset-root", type=Path, required=True, help="Path to saved LeRobot dataset root")
-    parser.add_argument(
-        "--checkpoint",
-        type=Path,
-        default=Path("/home/behavior/workspace/BEHAVIOR-1K/runs/diffusion_policy_100/checkpoints/epoch_0020.pt"),
-        help="Path to diffusion policy checkpoint .pt file",
-    )
-    parser.add_argument(
-        "--env-config",
-        type=Path,
-        default=Path("/home/behavior/workspace/BEHAVIOR-1K/OmniGibson/omnigibson/configs/fetch_vid2scene.yaml"),
-        help="Path to OmniGibson env config yaml",
-    )
-    parser.add_argument("--episode-idx", type=int, default=None, help="Single episode index to evaluate")
     parser.add_argument(
         "--episodes-file",
         type=Path,
-        default=None,
-        help="Path to text/csv file containing episode indices",
+        required=True,
+        help="Path to JSON file containing episode indices",
     )
-    parser.add_argument("--max-steps", type=int, default=None, help="Max rollout steps (default: GT episode length)")
+    parser.add_argument("--max-steps-multiplier", type=float, default=1.2, help="Multiplier for max rollout steps (default: 1.0)")
     parser.add_argument("--num-diffusion-iters", type=int, default=100, help="Reverse diffusion iterations")
     parser.add_argument("--obs-horizon", type=int, default=None, help="Override checkpoint obs_horizon")
     parser.add_argument("--pred-horizon", type=int, default=None, help="Override checkpoint pred_horizon")
@@ -583,19 +534,28 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=None,
-        help="Output directory for eval logs (default: outputs/policy_eval/<timestamp>)",
+        required=True,
+        help="Output directory for eval logs",
     )
     parser.add_argument(
         "--no-sticky-grasp",
         action="store_true",
         help="Disable forcing sticky grasp mode for replay/eval environment",
     )
+    parser.add_argument(
+        "--success-file",
+        type=Path,
+        required=True,
+        help="Path to success file",
+    )
     args = parser.parse_args()
 
-    dataset_root = args.dataset_root.resolve()
-    checkpoint_path = args.checkpoint.resolve()
-    env_config_path = args.env_config.resolve()
+    run_config = json.loads(args.episodes_file.read_text())
+    dataset_root = Path(run_config["lr_dataset_path"])
+    episodes = run_config["rollout_ids"]
+    checkpoint_path = Path(run_config["checkpoint_path"])
+
+    env_config_path = Path("/cvgl2/u/cgokmen/BEHAVIOR-1K/OmniGibson/omnigibson/configs/fetch_vid2scene.yaml")
     if not dataset_root.exists():
         raise FileNotFoundError(f"Dataset root not found: {dataset_root}")
     if not checkpoint_path.exists():
@@ -610,15 +570,9 @@ def main() -> None:
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("Requested --device cuda but CUDA is not available.")
 
-    if args.output_dir is None:
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = Path("outputs") / "policy_eval" / stamp
-    else:
-        output_dir = args.output_dir
-    output_dir = output_dir.resolve()
+    output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    episodes = _load_episode_indices(dataset_root=dataset_root, episode_idx=args.episode_idx, episodes_file=args.episodes_file)
     print(f"[Eval] Selected {len(episodes)} episode(s): {episodes}", flush=True)
     nets, action_normalizer, ckpt_args = _load_policy(checkpoint_path=checkpoint_path, device=device)
     ckpt_obs_horizon = int(ckpt_args.get("obs_horizon", 2))
@@ -661,7 +615,7 @@ def main() -> None:
                     obs_horizon=obs_horizon,
                     pred_horizon=pred_horizon,
                     num_diffusion_iters=args.num_diffusion_iters,
-                    max_steps=args.max_steps,
+                    max_steps_multiplier=args.max_steps_multiplier,
                     output_dir=output_dir,
                     debug=args.debug,
                     device=device,
@@ -683,6 +637,9 @@ def main() -> None:
         run_summary_path = output_dir / "run_summary.json"
         with open(run_summary_path, "w", encoding="utf-8") as f:
             json.dump(run_summaries, f, indent=2)
+
+        args.success_file.touch()
+
         print(f"[Eval] Completed {len(run_summaries)} episode(s). Run summary: {run_summary_path}", flush=True)
     finally:
         if og.sim is not None:

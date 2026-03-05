@@ -4,52 +4,45 @@ import random
 import json
 import pathlib
 
-policy_paths = {
-    "pi05ddp-b": "/checkpoint/clear/cgokmen/policies-bigrun2/pi05ddp-b-2123187/checkpoints/004000/pretrained_model",
-    "pi05ddp-bv": "/checkpoint/clear/cgokmen/policies-bigrun2/pi05ddp-bv-2123675/checkpoints/004000/pretrained_model",
-    "pi05ddp-bp": "/checkpoint/clear/cgokmen/policies-bigrun2/pi05ddp-bp-2123619/checkpoints/004000/pretrained_model",
-    "pi05ddp-bpv": "/checkpoint/clear/cgokmen/policies-bigrun2/pi05ddp-bpv-2123618/checkpoints/003000/pretrained_model",
-    "actddp-bpv": "/checkpoint/clear/cgokmen/policies-bigrun2/actddp-bpv-2123242/checkpoints/004000/pretrained_model",
-    # "customdp-bpv": "/checkpoint/clear/cgokmen/policies-bigrun2/customdpddp-bpv-212888/x/pretrained_model",
-    "customdp-bv": "/checkpoint/clear/cgokmen/policies-bigrun/customdp-bv-2117603/checkpoints/010000/pretrained_model",
-    # "dpddp-bpv": "/checkpoint/clear/cgokmen/policies-bigrun2/dpddp-bpv-2123522/x/pretrained_model",
-    "dpddp-b": "/checkpoint/clear/cgokmen/policies-bigrun2/dpddp-b-2123185/checkpoints/004000/pretrained_model",
+policy_names = {
+    "behavior-1k-assets-1",
+    "behavior-1k-assets-5",
+    "behavior-1k-assets-10",
+    "spoc-1",
+    "spoc-5",
+    "spoc-10",
+    "spoc-20",
+    "spoc-50",
+    "vid2room-1",
+    "vid2room-5",
+    "vid2room-10",
+    "vid2room-20",
+    "vid2room-50",
 }
 
-num_jobs = (156) * 1
-max_eval_instances = 50
-outputs_path = pathlib.Path("/checkpoint/clear/cgokmen/eval-results")
+outputs_path = pathlib.Path("/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/eval_jobs_norgb")
+assert not outputs_path.exists(), f"Outputs path already exists: {outputs_path}"
+outputs_path.mkdir(parents=True, exist_ok=True)
 
 def main():
-    all_episodes = []
-    eval_json_files = [f for f in pathlib.Path("/home/cgokmen/projects/BEHAVIOR-1K/slurm/eval-starts").glob("*.json")]
-    random.seed(42)
-    random.shuffle(eval_json_files)
-    eval_json_files = eval_json_files[:max_eval_instances]
+    with open("/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/eval_configurations.json", "r") as f:
+        eval_configurations = json.load(f)
 
-    for policy_name, policy_checkpoint_path in policy_paths.items():
+    all_eval_jobs = []
+    for policy_name in policy_names:
+        policy_checkpoint_path = pathlib.Path("/vision/group/vid2room/vid2room_pick_policies_norgb") / policy_name / "checkpoints" / "step_03000.pt"
         assert os.path.exists(policy_checkpoint_path), f"Policy checkpoint path does not exist: {policy_checkpoint_path}"
-        policy_output_path = outputs_path / policy_name
-        policy_output_path.mkdir(parents=True, exist_ok=True)
-        for eval_json_file in eval_json_files:
-            target_output_path = policy_output_path / eval_json_file.stem
-            if (target_output_path / "eval_results.json").exists():
-                continue
-            all_episodes.append((policy_checkpoint_path, str(eval_json_file), str(target_output_path)))
-    
-    # Divide up the episodes into num_jobs
-    batch_size = len(all_episodes) // num_jobs
-    assert batch_size * num_jobs == len(all_episodes), f"Number of episode {len(all_episodes)} must be divisible by number of jobs {num_jobs}"
-    batches = []
-    for i in range(num_jobs):
-        this_batch = all_episodes[i * batch_size:(i + 1) * batch_size]
-        batches.append(this_batch)
-    
-    # Save the batches to a json file
-    for i, batch in enumerate(batches):
-        with open(f"eval_jobs/{i}.csv", "w") as f:
-            for item in batch:
-                f.write(f"{item[0]},{item[1]},{item[2]}\n")
+
+        for eval_configuration in eval_configurations:
+            job = dict(eval_configuration)
+            job["checkpoint_path"] = str(policy_checkpoint_path)
+            all_eval_jobs.append(job)
+
+    random.shuffle(all_eval_jobs)
+
+    for i, job in enumerate(all_eval_jobs):
+        with open(outputs_path / f"{i}.json", "w") as f:
+            json.dump(job, f)
 
 if __name__ == "__main__":
     main()

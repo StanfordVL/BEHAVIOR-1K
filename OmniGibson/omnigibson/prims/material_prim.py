@@ -87,13 +87,6 @@ class MaterialPrim(BasePrim):
                     if len(compatible_classes) == 1:
                         # Use the only found compatible class
                         material_class = compatible_classes[0]
-                    else:
-                        # Fall back to MaterialPrim
-                        log.warning(
-                            f"No compatible material prim class found for material at {prim_path} with "
-                            f"asset path {asset_path} and sub-identifier {asset_sub_identifier}. "
-                            f"Using MaterialPrim as a fallback."
-                        )
                 else:
                     # If this function is called on a subclass of MaterialPrim, then we check if the subclass supports the material.
                     assert material_class.supports_material(asset_path, asset_sub_identifier), (

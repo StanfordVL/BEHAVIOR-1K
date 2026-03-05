@@ -12,7 +12,8 @@ slurm/rollout_successes
 slurm/sample.zip
 slurm/policy-training/logs*
 eval_results/
-slurm/eval_logs/
-slurm/eval_jobs/
+slurm/eval_logs*
+slurm/eval_jobs*
+slurm/eval_successes*
 
 __pycache__/
