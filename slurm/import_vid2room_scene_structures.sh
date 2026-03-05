@@ -9,7 +9,7 @@
 #SBATCH --job-name=import_vid2room_scene_structures
 #SBATCH --output=/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
 #SBATCH --error=/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
-#SBATCH --array=0-15
+#SBATCH --array=0-23
 
 # This script launches a configurable number of concurrent python processes.
 # Each process is managed by a separate function call running in the background.

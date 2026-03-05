@@ -908,7 +908,7 @@ def load_structure_objects(room_dir):
     in_rooms = [room_dir.name]
     dataset_root = pathlib.Path(gm.DATA_PATH) / "vid2room"
     objects = []
-    for category in ("floors", "walls"):
+    for category in ("floors", "walls", "ceilings"):
         category_root = dataset_root / "objects" / category
         model_prefix = f"vid2room_{scene_id}_".replace("-", "_")
         models = []

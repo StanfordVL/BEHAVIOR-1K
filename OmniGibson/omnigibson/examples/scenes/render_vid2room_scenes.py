@@ -224,7 +224,7 @@ def main():
 
     processed = 0
     scene_list = json.loads(pathlib.Path("/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/interesting_scenes.json").read_text())
-    scene_list = [pathlib.Path(k) for k in scene_list if int(hashlib.md5(f"{k}-potato".encode()).hexdigest(), 16) % args.total_tasks == args.task_id][:1]
+    scene_list = [pathlib.Path(k) for k in scene_list if int(hashlib.md5(f"{k}-potato".encode()).hexdigest(), 16) % args.total_tasks == args.task_id]
 
     for room_dir in scene_list:
         scene_id = get_scene_id(room_dir)

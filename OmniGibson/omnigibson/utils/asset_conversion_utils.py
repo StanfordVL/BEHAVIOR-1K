@@ -2399,10 +2399,6 @@ def bind_custom_mdl_material(prim, mdl_path, mdl_material_name):
     Returns:
         bool: True if material was successfully bound, False otherwise
     """
-    if not mdl_path or not os.path.exists(mdl_path):
-        log.warning(f"MDL path does not exist: {mdl_path}")
-        return False
-
     stage = prim.GetStage()
     root_prim_path = prim.GetPrimPath().pathString
 

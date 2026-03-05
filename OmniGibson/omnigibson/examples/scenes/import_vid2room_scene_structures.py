@@ -315,9 +315,9 @@ def extract_vid2room_scene_structures(
     # Get ceiling height from scene data (may come from vlm_analysis.json)
     ceiling_height = scene_data.get("ceiling_height", 2.7)  # Default to 2.7m if not specified
 
-    # Get VLM analysis data for materials
-    wall_color_rgb = scene_data.get("wall_color_rgb", DEFAULT_WALL_COLOR_RGB)
-    floor_material = scene_data.get("floor_material", "light_wood")
+    # VLM analysis data for materials (required; load_scene_data enforces presence)
+    wall_color_rgb = scene_data["wall_color_rgb"]
+    floor_material = scene_data["floor_material"]
 
     # Use only the first half of boundary points (floor vertices, not ceiling)
     vertices = np.array([x[:2] for x in boundary3d])
@@ -429,7 +429,7 @@ def import_structure_object(
     category: str,
     model: str,
     dataset_name: str,
-    material_info: dict = None,
+    material_info: dict,
 ):
     """
     Imports a structure mesh into an OmniGibson-compatible USD format.
@@ -439,38 +439,34 @@ def import_structure_object(
         category: Object category (floors, walls, ceilings)
         model: Model name
         dataset_name: Name of the dataset (e.g., "vid2room")
-        material_info: Material information dict with keys:
-            - 'type': 'wall_color' | 'floor_mdl' | 'ceiling_mdl'
-            - 'wall_color_rgb': [R, G, B] for wall_color type
-            - 'floor_material': VLM floor material type for floor_mdl type
+        material_info: Material information dict (required). Keys:
+            - 'type': 'wall_color' | 'floor_mdl' | 'ceiling_color'
+            - 'wall_color_rgb': [R, G, B] for wall_color type (required for walls)
+            - 'floor_material': VLM floor material type for floor_mdl type (required for floors)
     """
     dataset_root = pathlib.Path(gm.DATA_PATH) / dataset_name
     model_root = dataset_root / "objects" / category / model
     success_file = model_root / "import.success"
 
-    # Determine MDL material based on material_info type
+    material_type = material_info["type"]
     mdl_material_name, mdl_path = None, None
     wall_color_rgb = None
     ceiling_color_rgb = None
 
-    if material_info:
-        material_type = material_info.get("type")
+    if material_type == "floor_mdl":
+        floor_material = material_info["floor_material"]
+        mdl_material_name, mdl_path = get_floor_mdl_material(floor_material)
+        if not mdl_material_name or not mdl_path:
+            raise ValueError(f"Failed to resolve MDL material for floor type: {floor_material}")
+        print(f"  Floor material: {floor_material} -> {mdl_material_name}")
 
-        if material_type == "floor_mdl":
-            # Get random MDL material for the floor type
-            floor_material = "light_wood"  # material_info.get("floor_material", "light_wood")
-            mdl_material_name, mdl_path = get_floor_mdl_material(floor_material)
-            print(f"  Floor material: {floor_material} -> {mdl_material_name}")
+    elif material_type == "ceiling_color":
+        ceiling_color_rgb = material_info["ceiling_color_rgb"]
+        print(f"  Ceiling color: RGB{ceiling_color_rgb}")
 
-        elif material_type == "ceiling_color":
-            # Get ceiling color for OmniPBR material (applied after USD import)
-            ceiling_color_rgb = material_info.get("ceiling_color_rgb", DEFAULT_CEILING_COLOR_RGB)
-            print(f"  Ceiling color: RGB{ceiling_color_rgb}")
-
-        elif material_type == "wall_color":
-            # Get wall color for OmniPBR material (applied after USD import)
-            wall_color_rgb = material_info.get("wall_color_rgb", DEFAULT_WALL_COLOR_RGB)
-            print(f"  Wall color: RGB{wall_color_rgb}")
+    elif material_type == "wall_color":
+        wall_color_rgb = material_info["wall_color_rgb"]
+        print(f"  Wall color: RGB{wall_color_rgb}")
 
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -507,13 +503,13 @@ def import_structure_object(
                 mdl_material_name=mdl_material_name,
             )
 
-            # For walls, apply OmniPBR material with the wall color
-            if wall_color_rgb is not None and prim is not None:
-                create_omnipbr_material_with_color(prim, wall_color_rgb, f"{model}_wall_material")
+            # Walls MUST have wall color applied
+            if material_type == "wall_color":
+                assert create_omnipbr_material_with_color(prim, wall_color_rgb, f"{model}_wall_material"), f"Failed to apply wall color to {model}"
 
-            # For ceilings, apply OmniPBR material with the ceiling color
-            if ceiling_color_rgb is not None and prim is not None:
-                create_omnipbr_material_with_color(prim, ceiling_color_rgb, f"{model}_ceiling_material")
+            # Ceiling color
+            if material_type == "ceiling_color" and prim is not None:
+                assert create_omnipbr_material_with_color(prim, ceiling_color_rgb, f"{model}_ceiling_material"), f"Failed to apply ceiling color to {model}"
 
             success_file.touch()
     finally:
@@ -544,10 +540,15 @@ def load_scene_data(scene_dir):
 
     Args:
         scene_dir: Path to the scene directory containing room_parameters.json
-                   and optionally vlm_analysis.json
+                   and vlm_analysis.json (required for floor_material and wall_color_rgb)
 
     Returns:
-        dict: Combined scene data with boundary, openings, and ceiling height
+        dict: Combined scene data with boundary, openings, ceiling height,
+              floor_material, and wall_color_rgb
+
+    Raises:
+        FileNotFoundError: If room_parameters.json or vlm_analysis.json is missing
+        ValueError: If floor_material or wall_color_rgb is missing from vlm_analysis.json
     """
     scene_dir = pathlib.Path(scene_dir)
 
@@ -561,11 +562,21 @@ def load_scene_data(scene_dir):
 
     scene_data = json.loads(floorplan_path.read_text())
 
-    # Load VLM analysis for ceiling height (optional)
+    # VLM analysis is REQUIRED for floor material and wall color
     vlm_analysis_path = scene_dir / "vlm_analysis.json"
-    if vlm_analysis_path.exists():
-        vlm_data = json.loads(vlm_analysis_path.read_text())
-        scene_data["ceiling_height"] = vlm_data.get("ceiling_height", 2.7)
+    if not vlm_analysis_path.exists():
+        raise FileNotFoundError(f"vlm_analysis.json required but not found in {scene_dir}")
+
+    vlm_data = json.loads(vlm_analysis_path.read_text())
+    scene_data["ceiling_height"] = vlm_data.get("ceiling_height", 2.7)
+
+    if "floor_material" not in vlm_data:
+        raise ValueError(f"floor_material required but missing in {vlm_analysis_path}")
+    scene_data["floor_material"] = vlm_data["floor_material"]
+
+    if "wall_color_rgb" not in vlm_data:
+        raise ValueError(f"wall_color_rgb required but missing in {vlm_analysis_path}")
+    scene_data["wall_color_rgb"] = vlm_data["wall_color_rgb"]
 
     return scene_data
 

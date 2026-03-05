@@ -9,7 +9,7 @@
 #SBATCH --job-name=render_vid2room_scenes
 #SBATCH --output=/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/logs/render_vid2room_scenes-%A_%a.log
 #SBATCH --error=/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/logs/render_vid2room_scenes-%A_%a.log
-#SBATCH --array=0-0
+#SBATCH --array=0-47
 
 # --- Configuration ---
 SCRIPT_NAME="render_vid2room_scenes"
