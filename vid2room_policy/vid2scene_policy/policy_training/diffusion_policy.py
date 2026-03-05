@@ -6,15 +6,14 @@ from typing import Callable
 import torch
 import torch.nn as nn
 import torchvision
+import wandb
 from diffusers.optimization import get_scheduler
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.training_utils import EMAModel
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from vid2scene_policy.policy_training.data_loader import PickDataset
+from data_loader import PickDataset
 
 
 def get_resnet(name: str, weights=None, in_channels: int = 3, **kwargs) -> nn.Module:
@@ -83,8 +82,6 @@ class SinusoidalPosEmb(nn.Module):
 
 
 class ConvBlock1D(nn.Module):
-    """Conv1d → GroupNorm → SiLU with an optional conditioning injection."""
-
     def __init__(self, in_ch: int, out_ch: int, kernel_size: int = 3, cond_dim: int = 0):
         super().__init__()
         self.conv = nn.Conv1d(in_ch, out_ch, kernel_size, padding=kernel_size // 2)
@@ -111,7 +108,6 @@ class ConditionalUnet1D(nn.Module):
             nn.SiLU(),
             nn.Linear(H * 2, H),
         )
-
         self.cond_proj = nn.Sequential(
             nn.Linear(global_cond_dim, H * 2),
             nn.SiLU(),
@@ -152,12 +148,7 @@ class ConditionalUnet1D(nn.Module):
 
         self.out_proj = nn.Conv1d(H, input_dim, 1)
 
-    def forward(
-        self,
-        sample: torch.Tensor,
-        timestep: torch.Tensor,
-        global_cond: torch.Tensor,
-    ) -> torch.Tensor:
+    def forward(self, sample, timestep, global_cond):
         cond = self.time_embed(timestep) + self.cond_proj(global_cond)
         x = self.in_proj(sample.permute(0, 2, 1))
         s1 = self.enc1(x, cond)
@@ -174,8 +165,7 @@ class ConditionalUnet1D(nn.Module):
         x = self.dec2(torch.cat([x, s2[..., :x.shape[-1]]], dim=1), cond)
         x = self.up1(x)
         x = self.dec1(torch.cat([x, s1[..., :x.shape[-1]]], dim=1), cond)
-        out = self.out_proj(x)
-        return out.permute(0, 2, 1)
+        return self.out_proj(x).permute(0, 2, 1)
 
 
 class ActionNormalizer:
@@ -185,7 +175,6 @@ class ActionNormalizer:
 
     @classmethod
     def from_dataset(cls, dataset, max_samples: int = 50_000) -> "ActionNormalizer":
-        """Prefer dataset.compute_action_stats() when available (no video load)."""
         if hasattr(dataset, "compute_action_stats"):
             print("Computing action normalization statistics (from action column only) …")
             mean, std = dataset.compute_action_stats(max_samples=max_samples)
@@ -206,33 +195,43 @@ class ActionNormalizer:
         print(f"  action std : {std.tolist()}")
         return cls(mean, std)
 
-    def normalize(self, actions: torch.Tensor) -> torch.Tensor:
+    def normalize(self, actions):
         return (actions - self.mean.to(actions.device)) / self.std.to(actions.device)
 
-    def denormalize(self, actions: torch.Tensor) -> torch.Tensor:
+    def denormalize(self, actions):
         return actions * self.std.to(actions.device) + self.mean.to(actions.device)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Diffusion Policy Training")
     parser.add_argument("--dataset_path", type=str, required=True)
-    parser.add_argument("--num_workers", type=int, default=8, help="DataLoader workers (more = better throughput)")
+    parser.add_argument("--num_workers", type=int, default=8)
     parser.add_argument("--batch_size", type=int, default=256)
-    parser.add_argument("--num_epochs", type=int, default=60)
+    parser.add_argument("--max_steps", type=int, default=3000)
+    parser.add_argument("--save_every_steps", type=int, default=300)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--weight_decay", type=float, default=1e-6)
     parser.add_argument("--pred_horizon", type=int, default=16)
     parser.add_argument("--obs_horizon", type=int, default=2)
-    parser.add_argument("--cache_size", type=int, default=2048, help="Per-worker frame cache size (larger = fewer video decodes)")
-    parser.add_argument("--max_grad_norm", type=float, default=1.0, help="Gradient clipping norm (0 = disabled)")
-    parser.add_argument("--amp", action="store_true", help="Use automatic mixed precision (faster on GPU)")
-    parser.add_argument("--output_dir", type=str, default="runs/diffusion_policy_100")
-    parser.add_argument("--save_every_epochs", type=int, default=20, help="0 disables periodic checkpointing")
-    parser.add_argument("--overfit_single_batch", action="store_true", help="Train repeatedly on one fixed batch for debugging")
+    parser.add_argument("--cache_size", type=int, default=2048)
+    parser.add_argument("--max_grad_norm", type=float, default=1.0)
+    parser.add_argument("--amp", action="store_true")
+    parser.add_argument("--output_dir", type=str, default="runs/diffusion_policy")
+    parser.add_argument("--overfit_single_batch", action="store_true")
+    parser.add_argument("--no_rgb", action="store_true", help="Use only seg_depth channels (no RGB)")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    run_name = Path(args.dataset_path).name + ("_no_rgb" if args.no_rgb else "_rgb")
+    wandb.init(
+        entity="cy-research",
+        project="vid2room",
+        name=run_name,
+        config=vars(args),
+        dir=str(output_dir),
+    )
 
     dataset = PickDataset(
         dataset_path=args.dataset_path,
@@ -255,6 +254,15 @@ def main():
     dataloader = DataLoader(dataset, **dataloader_kwargs)
 
     first_sample = dataset[0]
+
+    # shape is (obs_horizon, C, H, W) — index [1] gives channels
+    if args.no_rgb:
+        in_channels = first_sample["observation.images.wrist_seg_depth"].shape[1]
+        print(f"Mode: seg_depth only | in_channels={in_channels}")
+    else:
+        in_channels = first_sample["wrist"].shape[1]
+        print(f"Mode: RGB + seg_depth | in_channels={in_channels}")
+
     print("wrist:", tuple(first_sample["wrist"].shape))
     print("head:", tuple(first_sample["head"].shape))
     print("action:", tuple(first_sample["action"].shape))
@@ -263,10 +271,10 @@ def main():
     action_normalizer = ActionNormalizer.from_dataset(dataset)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    action_dim = first_sample["action"].shape[-1] - 1  # skip the last action dim (constant gripper)
+    action_dim = first_sample["action"].shape[-1] - 1
 
-    wrist_encoder = replace_bn_with_gn(get_resnet("resnet18", in_channels=6))
-    head_encoder = replace_bn_with_gn(get_resnet("resnet18", in_channels=6))
+    wrist_encoder = replace_bn_with_gn(get_resnet("resnet18", in_channels=in_channels))
+    head_encoder  = replace_bn_with_gn(get_resnet("resnet18", in_channels=in_channels))
     noise_pred_net = ConditionalUnet1D(
         input_dim=action_dim,
         global_cond_dim=(512 + 512) * args.obs_horizon,
@@ -275,7 +283,7 @@ def main():
 
     nets = nn.ModuleDict({
         "wrist_encoder": wrist_encoder,
-        "head_encoder": head_encoder,
+        "head_encoder":  head_encoder,
         "noise_pred_net": noise_pred_net,
     }).to(device)
 
@@ -296,7 +304,7 @@ def main():
         name="cosine",
         optimizer=optimizer,
         num_warmup_steps=500,
-        num_training_steps=len(dataloader) * args.num_epochs,
+        num_training_steps=args.max_steps,
     )
 
     fixed_batch = None
@@ -306,13 +314,13 @@ def main():
 
     scaler = torch.amp.GradScaler("cuda") if (args.amp and device.type == "cuda") else None
 
-    def save_checkpoint(epoch: int, mean_loss: float, tag: str):
+    def save_checkpoint(step: int, loss: float, tag: str):
         ckpt_dir = output_dir / "checkpoints"
         ckpt_dir.mkdir(parents=True, exist_ok=True)
         ckpt_path = ckpt_dir / f"{tag}.pt"
         payload = {
-            "epoch": epoch,
-            "mean_loss": float(mean_loss),
+            "step": step,
+            "loss": float(loss),
             "args": vars(args),
             "model": nets.state_dict(),
             "ema": ema.state_dict(),
@@ -327,34 +335,39 @@ def main():
         torch.save(payload, ckpt_path)
         return ckpt_path
 
-    for epoch_idx in range(args.num_epochs):
-        epoch_losses = []
-        iter_source = [fixed_batch] * len(dataloader) if fixed_batch is not None else dataloader
-        batch_bar = tqdm(
-            iter_source,
-            desc=f"Epoch {epoch_idx + 1}/{args.num_epochs}",
-            leave=False,
-            dynamic_ncols=True,
-        )
+    global_step = 0
+    loss_value = 0.0
+    done = False
+    pbar = tqdm(total=args.max_steps, desc="Training", dynamic_ncols=True)
 
-        for nbatch in batch_bar:
-            wrist = nbatch["wrist"][:, :args.obs_horizon].to(device).float()
-            head = nbatch["head"][:, :args.obs_horizon].to(device).float()
-            actions = nbatch["action"].to(device).float()[..., :-1]  # drop constant gripper dim
+    while not done:
+        iter_source = [fixed_batch] * len(dataloader) if fixed_batch is not None else dataloader
+        for nbatch in iter_source:
+            if global_step >= args.max_steps:
+                done = True
+                break
+
+            if args.no_rgb:
+                wrist = nbatch["observation.images.wrist_seg_depth"][:, :args.obs_horizon].to(device).float()
+                head  = nbatch["observation.images.head_seg_depth"][:, :args.obs_horizon].to(device).float()
+            else:
+                wrist = nbatch["wrist"][:, :args.obs_horizon].to(device).float()
+                head  = nbatch["head"][:, :args.obs_horizon].to(device).float()
+
+            actions = nbatch["action"].to(device).float()[..., :-1]
 
             wrist = wrist / 255.0
-            head = head / 255.0
+            head  = head  / 255.0
 
             batch_size = actions.shape[0]
-
             actions = action_normalizer.normalize(actions)
 
             with torch.amp.autocast("cuda", enabled=args.amp and device.type == "cuda"):
                 wrist_feat = nets["wrist_encoder"](wrist.flatten(end_dim=1))
-                head_feat = nets["head_encoder"](head.flatten(end_dim=1))
+                head_feat  = nets["head_encoder"](head.flatten(end_dim=1))
                 wrist_feat = wrist_feat.reshape(batch_size, args.obs_horizon, -1)
-                head_feat = head_feat.reshape(batch_size, args.obs_horizon, -1)
-                obs_cond = torch.cat([wrist_feat, head_feat], dim=-1).flatten(start_dim=1)
+                head_feat  = head_feat.reshape(batch_size, args.obs_horizon, -1)
+                obs_cond   = torch.cat([wrist_feat, head_feat], dim=-1).flatten(start_dim=1)
 
                 noise = torch.randn_like(actions)
                 timesteps = torch.randint(
@@ -390,17 +403,24 @@ def main():
             ema.step(nets.parameters())
 
             loss_value = loss.item()
-            epoch_losses.append(loss_value)
-            batch_bar.set_postfix(loss=f"{loss_value:.4f}")
+            global_step += 1
+            pbar.update(1)
+            pbar.set_postfix(loss=f"{loss_value:.4f}", step=global_step)
 
-        mean_loss = sum(epoch_losses) / max(1, len(epoch_losses))
-        tqdm.write(f"Epoch {epoch_idx + 1}/{args.num_epochs} - mean loss: {mean_loss:.4f}")
-        if args.save_every_epochs > 0 and ((epoch_idx + 1) % args.save_every_epochs == 0):
-            ckpt_path = save_checkpoint(epoch=epoch_idx + 1, mean_loss=mean_loss, tag=f"epoch_{epoch_idx + 1:04d}")
-            tqdm.write(f"Saved checkpoint: {ckpt_path}")
+            wandb.log({
+                "train/loss": loss_value,
+                "train/lr": lr_scheduler.get_last_lr()[0],
+                "step": global_step,
+            })
 
-    ckpt_path = save_checkpoint(epoch=args.num_epochs, mean_loss=mean_loss, tag="final")
+            if global_step % args.save_every_steps == 0:
+                ckpt_path = save_checkpoint(step=global_step, loss=loss_value, tag=f"step_{global_step:05d}")
+                tqdm.write(f"Step {global_step}: saved checkpoint {ckpt_path}")
+
+    pbar.close()
+    ckpt_path = save_checkpoint(step=global_step, loss=loss_value, tag="final")
     tqdm.write(f"Saved final checkpoint: {ckpt_path}")
+    wandb.finish()
 
 
 if __name__ == "__main__":

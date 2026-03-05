@@ -153,9 +153,14 @@ def _setup_scene_state(scene, robot, metadata: dict):
     return target_obj, support_obj
 
 
-def _build_policy_nets(obs_horizon: int, action_dim: int, device: torch.device) -> nn.ModuleDict:
-    wrist_encoder = replace_bn_with_gn(get_resnet("resnet18", in_channels=6))
-    head_encoder = replace_bn_with_gn(get_resnet("resnet18", in_channels=6))
+def _build_policy_nets(
+    obs_horizon: int,
+    action_dim: int,
+    in_channels: int,
+    device: torch.device,
+) -> nn.ModuleDict:
+    wrist_encoder = replace_bn_with_gn(get_resnet("resnet18", in_channels=in_channels))
+    head_encoder = replace_bn_with_gn(get_resnet("resnet18", in_channels=in_channels))
     noise_pred_net = ConditionalUnet1D(
         input_dim=action_dim,
         global_cond_dim=(512 + 512) * obs_horizon,
@@ -173,7 +178,8 @@ def _build_policy_nets(obs_horizon: int, action_dim: int, device: torch.device) 
 def _load_policy(
     checkpoint_path: Path,
     device: torch.device,
-) -> tuple[nn.ModuleDict, ActionNormalizer, dict]:
+    observation_mode: str,
+) -> tuple[nn.ModuleDict, ActionNormalizer, dict, bool]:
     ckpt = torch.load(checkpoint_path, map_location=device)
     ckpt_args = ckpt.get("args", {})
     obs_horizon = int(ckpt_args.get("obs_horizon", 2))
@@ -185,7 +191,36 @@ def _load_policy(
     std = torch.as_tensor(norm_payload["std"], dtype=torch.float32, device=device)
     action_dim = int(mean.numel())
 
-    nets = _build_policy_nets(obs_horizon=obs_horizon, action_dim=action_dim, device=device)
+    model_state = ckpt["model"]
+    conv1_key = "wrist_encoder.conv1.weight"
+    if conv1_key not in model_state:
+        raise RuntimeError(f"Checkpoint missing expected model key: {conv1_key}")
+    ckpt_in_channels = int(model_state[conv1_key].shape[1])
+    ckpt_no_rgb = bool(ckpt_args.get("no_rgb", ckpt_in_channels != 6))
+
+    if observation_mode == "auto":
+        no_rgb = ckpt_no_rgb
+    elif observation_mode == "no_rgb":
+        no_rgb = True
+    elif observation_mode == "rgb":
+        no_rgb = False
+    else:
+        raise ValueError(f"Unsupported observation mode: {observation_mode}")
+
+    expected_in_channels = ckpt_in_channels
+    requested_in_channels = 3 if no_rgb else 6
+    if requested_in_channels != expected_in_channels:
+        raise ValueError(
+            f"Requested observation mode '{observation_mode}' expects in_channels={requested_in_channels}, "
+            f"but checkpoint was trained with in_channels={expected_in_channels}."
+        )
+
+    nets = _build_policy_nets(
+        obs_horizon=obs_horizon,
+        action_dim=action_dim,
+        in_channels=expected_in_channels,
+        device=device,
+    )
     nets.load_state_dict(ckpt["model"], strict=True)
     nets.eval()
 
@@ -196,15 +231,19 @@ def _load_policy(
         nets.eval()
 
     action_normalizer = ActionNormalizer(mean=mean, std=std)
-    return nets, action_normalizer, ckpt_args
+    return nets, action_normalizer, ckpt_args, no_rgb
 
 
-def _extract_fused_obs(lerobot_obs: dict) -> dict:
-    wrist_rgb = np.asarray(lerobot_obs["observation.images.wrist"], dtype=np.uint8)
+def _extract_policy_obs(lerobot_obs: dict, no_rgb: bool) -> dict:
     wrist_seg = np.asarray(lerobot_obs["observation.images.wrist_seg_depth"], dtype=np.uint8)
-    head_rgb = np.asarray(lerobot_obs["observation.images.head"], dtype=np.uint8)
     head_seg = np.asarray(lerobot_obs["observation.images.head_seg_depth"], dtype=np.uint8)
+    if no_rgb:
+        wrist = wrist_seg.transpose(2, 0, 1)
+        head = head_seg.transpose(2, 0, 1)
+        return {"wrist": wrist, "head": head}
 
+    wrist_rgb = np.asarray(lerobot_obs["observation.images.wrist"], dtype=np.uint8)
+    head_rgb = np.asarray(lerobot_obs["observation.images.head"], dtype=np.uint8)
     wrist = np.concatenate([wrist_rgb, wrist_seg], axis=2).transpose(2, 0, 1)
     head = np.concatenate([head_rgb, head_seg], axis=2).transpose(2, 0, 1)
     return {"wrist": wrist, "head": head}
@@ -330,6 +369,7 @@ def evaluate_episode(
     max_steps_multiplier: float,
     output_dir: Path,
     debug: bool,
+    no_rgb: bool,
     device: torch.device,
 ) -> dict:
     metadata = _load_episode_metadata(dataset_root=dataset_root, episode_idx=episode_idx)
@@ -379,7 +419,7 @@ def evaluate_episode(
         wrapper.set_target_objects(target_object=target_obj, support_object=support_obj)
         lerobot_obs = wrapper._convert_observation(og_obs)
 
-        obs0 = _extract_fused_obs(lerobot_obs)
+        obs0 = _extract_policy_obs(lerobot_obs, no_rgb=no_rgb)
         obs_deque = collections.deque([obs0] * obs_horizon, maxlen=obs_horizon)
 
         robot_action_dim = int(robot.action_dim)
@@ -413,7 +453,7 @@ def evaluate_episode(
                 final_reward = float(reward)
 
                 lerobot_obs = wrapper._convert_observation(og_obs)
-                obs_deque.append(_extract_fused_obs(lerobot_obs))
+                obs_deque.append(_extract_policy_obs(lerobot_obs, no_rgb=no_rgb))
 
                 eef_pos, _ = robot.get_eef_pose(arm_name)
                 in_hand_obj = robot._ag_obj_in_hand.get(arm_name)
@@ -530,6 +570,13 @@ def main() -> None:
     parser.add_argument("--obs-horizon", type=int, default=None, help="Override checkpoint obs_horizon")
     parser.add_argument("--pred-horizon", type=int, default=None, help="Override checkpoint pred_horizon")
     parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"], help="Inference device")
+    parser.add_argument(
+        "--observation-mode",
+        type=str,
+        default="auto",
+        choices=["auto", "rgb", "no_rgb"],
+        help="Policy observation mode. 'auto' infers from checkpoint training config.",
+    )
     parser.add_argument("--debug", action="store_true", help="Print per-step debug logs")
     parser.add_argument(
         "--output-dir",
@@ -574,7 +621,12 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[Eval] Selected {len(episodes)} episode(s): {episodes}", flush=True)
-    nets, action_normalizer, ckpt_args = _load_policy(checkpoint_path=checkpoint_path, device=device)
+    nets, action_normalizer, ckpt_args, no_rgb = _load_policy(
+        checkpoint_path=checkpoint_path,
+        device=device,
+        observation_mode=args.observation_mode,
+    )
+    print(f"[Eval] Policy observation mode: {'no_rgb' if no_rgb else 'rgb'}", flush=True)
     ckpt_obs_horizon = int(ckpt_args.get("obs_horizon", 2))
     if args.obs_horizon is not None and int(args.obs_horizon) != ckpt_obs_horizon:
         raise ValueError(
@@ -618,6 +670,7 @@ def main() -> None:
                     max_steps_multiplier=args.max_steps_multiplier,
                     output_dir=output_dir,
                     debug=args.debug,
+                    no_rgb=no_rgb,
                     device=device,
                 )
                 run_summaries.append(summary)
