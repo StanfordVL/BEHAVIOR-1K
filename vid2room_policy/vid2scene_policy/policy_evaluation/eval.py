@@ -264,7 +264,57 @@ def _parse_step_output(step_out):
     return step_out, 0.0, False, False, {}
 
 
-def _load_episode_indices(episode_idx: int | None, episodes_file: Path | None) -> list[int]:
+def _reset_scene_episode_state(env, scene, robot) -> None:
+    """
+    Reset episode state in-place without reloading a new scene.
+    Mirrors the data-collection reset strategy.
+    """
+    _ = _parse_reset_output(env.reset())
+
+    for arm in robot.arm_names:
+        if robot._ag_obj_in_hand.get(arm) is not None:
+            try:
+                robot.release_grasp_immediately(arm=arm)
+            except Exception:
+                pass
+
+    robot.reset()
+    scene.reset()
+    _step_sim(30)
+
+
+def _is_target_contact_path(contact_prim_path: str, target_obj) -> bool:
+    target_root = getattr(target_obj, "prim_path", "")
+    target_name = getattr(target_obj, "name", "")
+    return (bool(target_root) and contact_prim_path.startswith(target_root)) or (
+        bool(target_name) and target_name in contact_prim_path
+    )
+
+
+def _eef_touches_target_bbox(robot, arm_name: str, target_obj, margin_m: float = 0.01) -> bool:
+    try:
+        eef_pos, _ = robot.get_eef_pose(arm_name)
+        aabb = target_obj.aabb
+        min_xyz = torch.as_tensor(aabb[0], dtype=torch.float32) - margin_m
+        max_xyz = torch.as_tensor(aabb[1], dtype=torch.float32) + margin_m
+        eef = torch.as_tensor(eef_pos, dtype=torch.float32)
+        return bool(((eef >= min_xyz) & (eef <= max_xyz)).all().item())
+    except Exception:
+        return False
+
+
+def _check_target_contact(robot, arm_name: str, target_obj) -> bool:
+    try:
+        contacts, _ = robot._find_gripper_contacts(arm=arm_name)
+        if contacts and any(_is_target_contact_path(contact_path, target_obj) for contact_path in contacts):
+            return True
+    except Exception:
+        pass
+    # Fallback when contact path matching is unreliable.
+    return _eef_touches_target_bbox(robot=robot, arm_name=arm_name, target_obj=target_obj)
+
+
+def _load_episode_indices(dataset_root: Path, episode_idx: int | None, episodes_file: Path | None) -> list[int]:
     if episode_idx is not None and episodes_file is not None:
         raise ValueError("Specify either --episode-idx or --episodes-file, not both.")
     if episode_idx is not None:
@@ -275,14 +325,35 @@ def _load_episode_indices(episode_idx: int | None, episodes_file: Path | None) -
         if not tokens:
             raise ValueError(f"Episodes file is empty: {episodes_file}")
         return [int(tok) for tok in tokens]
-    return [0]
+    # Default: evaluate every episode that has metadata.
+    meta_dir = dataset_root / "meta"
+    if not meta_dir.exists():
+        raise FileNotFoundError(f"Missing dataset metadata directory: {meta_dir}")
+    episode_files = sorted(meta_dir.glob("episode_metadata_*.json"))
+    if not episode_files:
+        raise RuntimeError(f"No episode metadata files found under: {meta_dir}")
+    episode_ids = []
+    for p in episode_files:
+        stem = p.stem
+        prefix = "episode_metadata_"
+        if not stem.startswith(prefix):
+            continue
+        suffix = stem[len(prefix) :]
+        if suffix.isdigit():
+            episode_ids.append(int(suffix))
+    if not episode_ids:
+        raise RuntimeError(f"Could not parse episode indices from metadata files in: {meta_dir}")
+    return sorted(set(episode_ids))
 
 
 def evaluate_episode(
     dataset_root: Path,
     episode_idx: int,
-    env_config_path: Path,
-    sticky_grasp: bool,
+    env,
+    wrapper,
+    robot,
+    expected_scene_model: str,
+    expected_dataset_name: str,
     nets: nn.ModuleDict,
     action_normalizer: ActionNormalizer,
     obs_horizon: int,
@@ -298,12 +369,11 @@ def evaluate_episode(
 
     scene_model = metadata["scene_name"]
     dataset_name = metadata["dataset_name"]
-    env_cfg = _build_og_config(
-        scene_model=scene_model,
-        dataset_name=dataset_name,
-        sticky_grasp=sticky_grasp,
-        config_path=env_config_path,
-    )
+    if scene_model != expected_scene_model or dataset_name != expected_dataset_name:
+        raise RuntimeError(
+            f"Episode {episode_idx} scene mismatch: expected ({expected_dataset_name}, {expected_scene_model}) "
+            f"but got ({dataset_name}, {scene_model}). This eval run reuses one loaded scene."
+        )
 
     target_steps = len(gt_actions) if max_steps is None else max_steps
     episode_out_dir = output_dir / f"episode_{episode_idx:04d}"
@@ -312,9 +382,7 @@ def evaluate_episode(
     summary_path = episode_out_dir / "episode_summary.json"
 
     print(f"[Eval] Episode {episode_idx}: target_steps={target_steps} gt_steps={len(gt_actions)}", flush=True)
-    env = og.Environment(configs=env_cfg)
-    wrapper = OmniGibsonLeRobotWrapper(env, OmniGibsonLeRobotConfig())
-    robot = env.robots[0]
+    scene = env.scene
     arm_name = robot.default_arm
     noise_scheduler = DDPMScheduler(
         num_train_timesteps=100,
@@ -329,12 +397,14 @@ def evaluate_episode(
     truncated = False
     final_reward = 0.0
     final_obj_in_hand = None
+    final_target_contact = False
+    ever_target_in_hand = False
+    ever_target_contact = False
     action_l2_errors: list[float] = []
 
     try:
-        _ = _parse_reset_output(env.reset())
-        robot.reset()
-        target_obj, support_obj = _setup_scene_state(scene=env.scene, robot=robot, metadata=metadata)
+        _reset_scene_episode_state(env=env, scene=scene, robot=robot)
+        target_obj, support_obj = _setup_scene_state(scene=scene, robot=robot, metadata=metadata)
 
         og_obs, _ = env.get_obs()
         wrapper._infer_observation_structure(og_obs)
@@ -381,7 +451,11 @@ def evaluate_episode(
                 in_hand_obj = robot._ag_obj_in_hand.get(arm_name)
                 final_obj_in_hand = None if in_hand_obj is None else in_hand_obj.name
                 target_name = metadata.get("target_object_name")
-                success_now = final_obj_in_hand == target_name
+                target_in_hand_now = final_obj_in_hand == target_name
+                target_contact_now = _check_target_contact(robot=robot, arm_name=arm_name, target_obj=target_obj)
+                final_target_contact = bool(target_contact_now)
+                ever_target_in_hand = ever_target_in_hand or bool(target_in_hand_now)
+                ever_target_contact = ever_target_contact or bool(target_contact_now)
 
                 gt_action = gt_actions[steps_run] if steps_run < len(gt_actions) else None
                 l2_error = None
@@ -402,7 +476,8 @@ def evaluate_episode(
                     "eef_pos": [float(x) for x in eef_pos.tolist()],
                     "obj_in_hand": final_obj_in_hand,
                     "target_name": target_name,
-                    "target_in_hand": bool(success_now),
+                    "target_in_hand": bool(target_in_hand_now),
+                    "target_contact": bool(target_contact_now),
                 }
                 steps_file.write(json.dumps(step_record) + "\n")
                 if debug and (steps_run < 5 or steps_run % 10 == 0 or terminated or truncated):
@@ -417,6 +492,21 @@ def evaluate_episode(
                     break
 
         mean_l2 = None if not action_l2_errors else float(np.mean(action_l2_errors))
+        final_target_in_hand = final_obj_in_hand == metadata.get("target_object_name")
+        success = bool(ever_target_in_hand or ever_target_contact)
+        failure_reason = None
+        if not success:
+            if terminated:
+                failure_reason = "episode terminated before target contact / grasp was achieved"
+            elif truncated:
+                failure_reason = "episode truncated before target contact / grasp was achieved"
+            elif steps_run >= target_steps:
+                if max_steps is None:
+                    failure_reason = "no target contact / grasp within ground-truth episode length"
+                else:
+                    failure_reason = f"no target contact / grasp within max_steps={target_steps}"
+            else:
+                failure_reason = "episode ended without target contact / grasp"
         summary = {
             "episode_idx": episode_idx,
             "scene_name": scene_model,
@@ -428,12 +518,22 @@ def evaluate_episode(
             "final_reward": final_reward,
             "target_object_name": metadata.get("target_object_name"),
             "final_obj_in_hand": final_obj_in_hand,
-            "target_in_hand": final_obj_in_hand == metadata.get("target_object_name"),
+            "final_target_in_hand": bool(final_target_in_hand),
+            "final_target_contact": bool(final_target_contact),
+            "ever_target_in_hand": bool(ever_target_in_hand),
+            "ever_target_contact": bool(ever_target_contact),
+            "success": success,
+            "result_label": "success" if success else "failure",
+            "failure_reason": failure_reason,
             "mean_action_l2_error": mean_l2,
             "steps_log_path": str(steps_path),
         }
         with open(summary_path, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
+        if success:
+            print(f"[Eval][RESULT] Episode {episode_idx}: success", flush=True)
+        else:
+            print(f"[Eval][RESULT] Episode {episode_idx}: failure - {failure_reason}", flush=True)
         print(f"[Eval] Wrote {summary_path}", flush=True)
         return summary
     except Exception as exc:
@@ -449,8 +549,7 @@ def evaluate_episode(
         print(f"[Eval][ERROR] Episode {episode_idx} failed: {type(exc).__name__}: {exc}", flush=True)
         print(f"[Eval][ERROR] Wrote traceback to {err_path}", flush=True)
         raise
-    finally:
-        og.shutdown()
+
 
 
 def main() -> None:
@@ -519,7 +618,8 @@ def main() -> None:
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    episodes = _load_episode_indices(episode_idx=args.episode_idx, episodes_file=args.episodes_file)
+    episodes = _load_episode_indices(dataset_root=dataset_root, episode_idx=args.episode_idx, episodes_file=args.episodes_file)
+    print(f"[Eval] Selected {len(episodes)} episode(s): {episodes}", flush=True)
     nets, action_normalizer, ckpt_args = _load_policy(checkpoint_path=checkpoint_path, device=device)
     ckpt_obs_horizon = int(ckpt_args.get("obs_horizon", 2))
     if args.obs_horizon is not None and int(args.obs_horizon) != ckpt_obs_horizon:
@@ -530,34 +630,63 @@ def main() -> None:
     obs_horizon = ckpt_obs_horizon
     pred_horizon = int(args.pred_horizon if args.pred_horizon is not None else ckpt_args.get("pred_horizon", 16))
 
-    run_summaries = []
-    for epi in episodes:
-        try:
-            summary = evaluate_episode(
-                dataset_root=dataset_root,
-                episode_idx=epi,
-                env_config_path=env_config_path,
-                sticky_grasp=not args.no_sticky_grasp,
-                nets=nets,
-                action_normalizer=action_normalizer,
-                obs_horizon=obs_horizon,
-                pred_horizon=pred_horizon,
-                num_diffusion_iters=args.num_diffusion_iters,
-                max_steps=args.max_steps,
-                output_dir=output_dir,
-                debug=args.debug,
-                device=device,
-            )
-            run_summaries.append(summary)
-        except Exception:
-            print(f"[Eval][FATAL] Episode {epi} crashed.", flush=True)
-            print(traceback.format_exc(), flush=True)
-            raise
+    first_metadata = _load_episode_metadata(dataset_root=dataset_root, episode_idx=episodes[0])
+    shared_scene_model = first_metadata["scene_name"]
+    shared_dataset_name = first_metadata["dataset_name"]
+    shared_env_cfg = _build_og_config(
+        scene_model=shared_scene_model,
+        dataset_name=shared_dataset_name,
+        sticky_grasp=not args.no_sticky_grasp,
+        config_path=env_config_path,
+    )
+    env = og.Environment(configs=shared_env_cfg)
+    wrapper = OmniGibsonLeRobotWrapper(env, OmniGibsonLeRobotConfig())
+    robot = env.robots[0]
 
-    run_summary_path = output_dir / "run_summary.json"
-    with open(run_summary_path, "w", encoding="utf-8") as f:
-        json.dump(run_summaries, f, indent=2)
-    print(f"[Eval] Completed {len(run_summaries)} episode(s). Run summary: {run_summary_path}", flush=True)
+    run_summaries = []
+    try:
+        for epi_idx, epi in enumerate(episodes, start=1):
+            print(f"[Eval] Starting episode {epi_idx}/{len(episodes)} (episode_idx={epi})", flush=True)
+            try:
+                summary = evaluate_episode(
+                    dataset_root=dataset_root,
+                    episode_idx=epi,
+                    env=env,
+                    wrapper=wrapper,
+                    robot=robot,
+                    expected_scene_model=shared_scene_model,
+                    expected_dataset_name=shared_dataset_name,
+                    nets=nets,
+                    action_normalizer=action_normalizer,
+                    obs_horizon=obs_horizon,
+                    pred_horizon=pred_horizon,
+                    num_diffusion_iters=args.num_diffusion_iters,
+                    max_steps=args.max_steps,
+                    output_dir=output_dir,
+                    debug=args.debug,
+                    device=device,
+                )
+                run_summaries.append(summary)
+            except Exception as exc:
+                print(f"[Eval][FATAL] Episode {epi} crashed.", flush=True)
+                print(traceback.format_exc(), flush=True)
+                run_summaries.append(
+                    {
+                        "episode_idx": epi,
+                        "success": False,
+                        "result_label": "failure",
+                        "failure_reason": f"exception: {type(exc).__name__}: {exc}",
+                    }
+                )
+                continue
+
+        run_summary_path = output_dir / "run_summary.json"
+        with open(run_summary_path, "w", encoding="utf-8") as f:
+            json.dump(run_summaries, f, indent=2)
+        print(f"[Eval] Completed {len(run_summaries)} episode(s). Run summary: {run_summary_path}", flush=True)
+    finally:
+        if og.sim is not None:
+            og.shutdown()
 
 
 if __name__ == "__main__":
