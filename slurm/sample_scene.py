@@ -14,7 +14,7 @@ import random
 import sys
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
-
+import shutil
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -23,33 +23,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--datasets-dir",
         type=Path,
-        default="/home/cgokmen/projects/BEHAVIOR-1K/datasets",
+        default="/scr2/datasets",
         help="Path to the datasets directory.",
     )
     parser.add_argument(
         "--dataset-name",
         type=str,
-        default="vid2room",
+        default="spoc",
         help="Name of the dataset to sample the scene from.",
     )
     parser.add_argument(
         "--num-scenes",
         "-n",
         type=int,
-        default=1,
+        default=120,
         help="Number of scenes to randomly sample (default: 10).",
     )
     parser.add_argument(
         "--seed",
         type=int,
-        default=None,
+        default=42,
         help="Random seed for reproducibility.",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default="vid2room_sample.zip",
-        help="Output zip path. Defaults to ./sample.zip",
+        default="/cvgl2/u/cgokmen/BEHAVIOR-1K/datasets",
+        help="Output directory or zip path. Defaults to ./sample.zip",
     )
     return parser.parse_args()
 
@@ -62,7 +62,7 @@ def get_available_scenes(dataset_root: Path) -> list[str]:
     
     scenes = []
     for scene_dir in scenes_dir.iterdir():
-        if (scene_dir / "import.success").exists():
+        if "train" in str(scene_dir):  # (scene_dir / "import.success").exists():
             scenes.append(scene_dir.name)
     return sorted(scenes)
 
@@ -128,22 +128,30 @@ def main() -> int:
     if num_scenes < args.num_scenes:
         print(f"Warning: only {len(available_scenes)} scenes available, sampling all.", file=sys.stderr)
     
-    sampled_scenes = random.sample(available_scenes, num_scenes)
-    print(f"Sampled {num_scenes} scenes: {sampled_scenes}")
+    random.shuffle(available_scenes)
 
     # Collect all models from all sampled scenes
+    sampled_scenes = []
     all_models: set[tuple[str, str, str]] = set()
     scene_jsons: list[tuple[str, Path]] = []
 
-    for scene_name in sampled_scenes:
+    for scene_name in available_scenes:
         try:
             scene_json, _ = find_scene_json(dataset_root, scene_name)
-            scene_jsons.append((scene_name, scene_json))
             models = extract_used_models(scene_json)
+            for dataset_name, category, model in models:
+                model_dir = datasets_dir / dataset_name / "objects" / category / model
+                assert model_dir.exists(), f"Model directory not found: {model_dir}"
             all_models.update(models)
-        except (FileNotFoundError, ValueError) as exc:
+            sampled_scenes.append(scene_name)
+            scene_jsons.append((scene_name, scene_json))
+            if len(sampled_scenes) == num_scenes:
+                break
+        except (FileNotFoundError, ValueError, AssertionError) as exc:
             print(f"Warning: skipping scene {scene_name}: {exc}", file=sys.stderr)
             continue
+
+    print(f"Sampled {num_scenes} scenes: {sampled_scenes}")
 
     if not scene_jsons:
         print("Error: no valid scenes could be processed", file=sys.stderr)
@@ -151,19 +159,33 @@ def main() -> int:
 
     output_path = args.output
 
-    with ZipFile(output_path, "w", compression=ZIP_DEFLATED) as zipf:
-        # Include all sampled scene directories
+    if str(output_path).endswith(".zip"):
+        with ZipFile(output_path, "w", compression=ZIP_DEFLATED) as zipf:
+            # Include all sampled scene directories
+            for scene_name, scene_json in scene_jsons:
+                scene_dir = dataset_root / "scenes" / scene_name
+                if scene_dir.exists():
+                    add_directory(zipf, scene_dir, datasets_dir)
+                    print(f"  Added scene: {scene_name}")
+
+            # Include only used object categories
+            for dataset_name, category, model in sorted(all_models):
+                model_dir = datasets_dir / dataset_name / "objects" / category / model
+                assert model_dir.exists(), f"Model directory not found: {model_dir}"
+                add_directory(zipf, model_dir, datasets_dir)
+
+    else:
+        output_path.mkdir(parents=True, exist_ok=True)
         for scene_name, scene_json in scene_jsons:
             scene_dir = dataset_root / "scenes" / scene_name
             if scene_dir.exists():
-                add_directory(zipf, scene_dir, datasets_dir)
-                print(f"  Added scene: {scene_name}")
+                shutil.copytree(scene_dir, output_path / args.dataset_name / "scenes" / scene_name)
 
-        # Include only used object categories
+        # Copy all object categories
         for dataset_name, category, model in sorted(all_models):
             model_dir = datasets_dir / dataset_name / "objects" / category / model
             assert model_dir.exists(), f"Model directory not found: {model_dir}"
-            add_directory(zipf, model_dir, datasets_dir)
+            shutil.copytree(model_dir, output_path / dataset_name / "objects" / category / model, dirs_exist_ok=True)
 
     print(f"\nWrote sample zip: {output_path}")
     print(f"Scenes included: {len(scene_jsons)}")

@@ -1,5 +1,6 @@
 env:
   action_frequency: 10
+  rendering_frequency: 10
   physics_frequency: 120
   device: null
   automatic_reset: false

@@ -1,15 +1,15 @@
 #!/bin/bash
-#SBATCH --cpus-per-task=32
-#SBATCH --gpus-per-task=1
-#SBATCH --time=1-00:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --gpus-per-task=titanrtx:1
+#SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --qos=h200_core_shared
-#SBATCH --account=clear
+#SBATCH --partition=svl
+#SBATCH --account=cvgl
 #SBATCH --job-name=import_vid2room_scene_structures
-#SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
-#SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
-#SBATCH --array=0-0
+#SBATCH --output=/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
+#SBATCH --error=/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
+#SBATCH --array=0-15
 
 # This script launches a configurable number of concurrent python processes.
 # Each process is managed by a separate function call running in the background.
@@ -17,10 +17,12 @@
 
 # --- Configuration ---
 SCRIPT_NAME="import_vid2room_scene_structures"
-NUM_JOBS=${1:-1}
-TOTAL_JOBS_IN_ARRAY=$((NUM_JOBS * SLURM_ARRAY_TASK_COUNT))
-DATASET_ROOT="/home/cgokmen/projects/BEHAVIOR-1K/datasets"
-SUCCESS_DIR="${DATASET_ROOT}/vid2room/jobs"
+
+# Paths - adjust these as needed
+VID2ROOM_ROOT="/vision/group/vid2room/raw/RealEstate10K"
+DATASET_NAME="vid2room"
+DATASET_ROOT="/cvgl2/u/cgokmen/BEHAVIOR-1K/datasets"
+SUCCESS_DIR="${DATASET_ROOT}/${DATASET_NAME}/jobs"
 
 # --- Sanity Check ---
 if [ -z "${SLURM_ARRAY_TASK_ID}" ]; then
@@ -30,45 +32,28 @@ fi
 
 # Create success directory if it doesn't exist
 mkdir -p "${SUCCESS_DIR}"
-mkdir -p "/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs"
+
+# Call NVIDIA-SMI to get the GPU ID
+GPU_ID=$(nvidia-smi --query-gpu=uuid --format=csv,noheader | tail -n 1)
 
 # --- Process Management Function ---
-manage_process() {
-  local process_id=$1
-  # Namespace success file by script name and SLURM array job ID
-  local success_file="${SUCCESS_DIR}/${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.success"
-  local log_file="/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/process-${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.log"
+# Namespace success file by script name and SLURM array job ID
+SUCCESS_FILE="${SUCCESS_DIR}/${SCRIPT_NAME}_${SLURM_ARRAY_TASK_ID}.success"
 
-  # Remove stale files from previous runs
-  if [ -f "${success_file}" ]; then
-    rm -f "${success_file}"
-  fi
-  if [ -f "${log_file}" ]; then
-    rm -f "${log_file}"
-  fi
+# Remove stale files from previous runs
+if [ -f "${SUCCESS_FILE}" ]; then
+  rm -f "${SUCCESS_FILE}"
+fi
 
-  # Loop until success file exists
-  while [ ! -f "${success_file}" ]; do
-    echo "[$(date)] Launching process for ID: ${process_id} / ${TOTAL_JOBS_IN_ARRAY}"
-    
-    cd /home/cgokmen/projects/BEHAVIOR-1K
-    OMNIGIBSON_APPDATA_PATH=/tmp/omnigibson/${process_id} OMNIGIBSON_HEADLESS=1 python -u -m omnigibson.examples.scenes.import_vid2room_scene_structures \
-      "${process_id}" "${TOTAL_JOBS_IN_ARRAY}" \
-      --success-prefix "${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}" \
-      >> "${log_file}" 2>&1
-  done
+# Loop until success file exists
+while [ ! -f "${SUCCESS_FILE}" ]; do
+  echo "[$(date)] Launching process for ID: ${SLURM_ARRAY_TASK_ID} / ${SLURM_ARRAY_TASK_COUNT}"
   
-  echo "[$(date)] Success file found for ID: ${process_id}. Process complete."
-}
-
-# --- Main Execution ---
-echo "Starting process manager for SLURM_ARRAY_TASK_ID: ${SLURM_ARRAY_TASK_ID} with ${NUM_JOBS} jobs"
-
-for (( i=0; i<NUM_JOBS; i++ )); do
-  task_id=$((SLURM_ARRAY_TASK_ID * NUM_JOBS + i))
-  manage_process "${task_id}" &
+  cd /cvgl2/u/cgokmen/BEHAVIOR-1K
+  OMNIGIBSON_APPDATA_PATH=/scr/cgokmen/omnigibson_${GPU_ID}_cache python -u -m omnigibson.examples.scenes.import_vid2room_scene_structures \
+    "${SLURM_ARRAY_TASK_ID}" "${SLURM_ARRAY_TASK_COUNT}" \
+    --dataset-name "${DATASET_NAME}" \
+    --success-file "${SUCCESS_FILE}"
 done
 
-echo "Waiting for all ${NUM_JOBS} background processes to complete..."
-wait
-echo "All processes finished successfully. Exiting."
+echo "[$(date)] Success file found for ID: ${SLURM_ARRAY_TASK_ID}. Process complete."
