@@ -6,14 +6,14 @@ class ControllerView:
     """
     A registry that maps group keys to batched controller instances.
 
-    Controllers with the same (kinematic_tree_identifier, body_part, controller_config) key are
+    Controllers with the same (robot kinematic tree pattern, body_part, controller_config) key are
     grouped into a single controller instance. Each member is assigned a controller_idx that
     indexes into the group's batched state.
 
     Usage:
         # At controller load time:
         group_key, controller_idx = ControllerView.register(
-            kinematic_tree_identifier, body_part, controller_cfg,
+            body_part, controller_cfg,
             articulation_root_path, eef_link_name
         )
 
@@ -30,7 +30,6 @@ class ControllerView:
     @classmethod
     def register(
         cls,
-        kinematic_tree_identifier: str,
         body_part: str,
         controller_cfg: dict,
         articulation_root_path: str,
@@ -44,7 +43,6 @@ class ControllerView:
         added to that group's controller via add_member().
 
         Args:
-            kinematic_tree_identifier (str): unique identifier for the kinematic tree
             body_part (str): name of the body part being controlled (e.g., "arm_right", "base")
             controller_cfg (dict): controller configuration dict (must include "name" key)
             articulation_root_path (str): articulation root prim path of the new group member
@@ -56,7 +54,7 @@ class ControllerView:
                 - int: controller_idx — the member's index within that group
         """
         # Build a unique string key for a controller group.
-        group_key = cls._make_key(kinematic_tree_identifier, body_part, controller_cfg)
+        group_key = cls._make_key(articulation_root_path, body_part, controller_cfg)
         
         if group_key not in cls._controller_groups:
             from omnigibson.controllers import create_controller
@@ -242,6 +240,8 @@ class ControllerView:
             return str(value)
 
     @classmethod
-    def _make_key(cls, kinematic_tree_identifier: str, body_part: str, controller_cfg: dict) -> str:
+    def _make_key(cls, articulation_root_path: str, body_part: str, controller_cfg: dict) -> str:
+        from omnigibson.utils.usd_utils import get_robot_kinematic_tree_pattern
+        pattern = get_robot_kinematic_tree_pattern(articulation_root_path)
         cfg_hash = hash(cls._freeze_for_hash(controller_cfg))
-        return f"{kinematic_tree_identifier}__{body_part}__{cfg_hash}"
+        return f"{pattern}__{body_part}__{cfg_hash}"

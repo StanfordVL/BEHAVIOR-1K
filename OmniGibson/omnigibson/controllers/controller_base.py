@@ -78,7 +78,7 @@ class BaseController(Serializable, Registerable, Recreatable):
     An abstract class with interface for mapping specific types of commands to deployable control signals.
 
     Each instance represents a group of controllers that share the same
-    (kinematic_tree_identifier, body_part, controller_config) key. Members are added via
+    (robot kinematic tree pattern, body_part, controller_config) key. Members are added via
     add_member() and assigned a controller_idx. All members are stepped together in a single
     batched call, with per-member state stored in indexed tensors.
     """
@@ -152,6 +152,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._control_enabled = []
         # Per-member last deployed control tensor (set in _write_control)
         self._controls = []
+        # Lazy-init: row indices of each member in the shared view (None until first _write_control call)
+        self._view_row_indices = None
 
         # Initialize command scaling variables
         self._command_scale_factor = None
@@ -227,6 +229,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         controller_idx = len(self._articulation_root_paths)
         self._articulation_root_paths.append(articulation_root_path)
+        self._view_row_indices = None  # force lazy re-init on next _write_control
         self._goal_set.append(False)
         self._control_enabled.append(1 if control_enabled else 0)
         self._controls.append(None)
@@ -387,36 +390,38 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         raise NotImplementedError
 
-    # TODO should be in batch
-    def _write_control(self, control):
-        """
-        Write batched control signals to Isaac via ControllableObjectViewAPI.
+    def _write_control(self):
+        """Write batched control signals to Isaac via a single tensor op per control type."""
+        # Lazy-init: resolve each member's row index in the shared view via public API.
+        if self._view_row_indices is None:
+            self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
+                self._articulation_root_paths[0], self._articulation_root_paths
+            )
 
-        Args:
-            control (Tensor): (N, control_dim) control signals
-        """
-        
+        # Filter to enabled members
+        enabled_indices = [i for i, e in enumerate(self._control_enabled) if e != 0]
+        if not enabled_indices:
+            return
 
-        for i, prim_path in enumerate(self._articulation_root_paths):
-            # skip control_disabled members
-            if self._control_enabled[i] == 0:
-                continue
-            ctrl = control[i]
-            if isinstance(ctrl, th.Tensor):
-                ctrl_backend = cb.from_torch(ctrl)
-            elif isinstance(ctrl, cb.arr_type):
-                ctrl_backend = ctrl
-            else:
-                ctrl_backend = cb.array(ctrl)
-            # Keep last deployed control in backend-native type so controller-side cb.* ops stay type-consistent.
-            self._controls[i] = ctrl_backend
-            if self.control_type == ControlType.POSITION:
-                ControllableObjectViewAPI.set_joint_position_targets(prim_path, ctrl_backend, self.dof_idx)
-                ControllableObjectViewAPI.set_joint_velocity_targets(prim_path, cb.zeros(ctrl_backend.shape), self.dof_idx)
-            elif self.control_type == ControlType.VELOCITY:
-                ControllableObjectViewAPI.set_joint_velocity_targets(prim_path, ctrl_backend, self.dof_idx)
-            elif self.control_type == ControlType.EFFORT:
-                ControllableObjectViewAPI.set_joint_efforts(prim_path, ctrl_backend, self.dof_idx)
+        enabled_rows = [self._view_row_indices[i] for i in enabled_indices]
+        enabled_controls = cb.stack([self._controls[i] for i in enabled_indices])  # (N_en, K)
+        routing_path = self._articulation_root_paths[0]
+
+        if self.control_type == ControlType.POSITION:
+            ControllableObjectViewAPI.set_all_joint_position_targets(
+                routing_path, enabled_rows, enabled_controls, self.dof_idx
+            )
+            ControllableObjectViewAPI.set_all_joint_velocity_targets(
+                routing_path, enabled_rows, cb.zeros(enabled_controls.shape), self.dof_idx
+            )
+        elif self.control_type == ControlType.VELOCITY:
+            ControllableObjectViewAPI.set_all_joint_velocity_targets(
+                routing_path, enabled_rows, enabled_controls, self.dof_idx
+            )
+        elif self.control_type == ControlType.EFFORT:
+            ControllableObjectViewAPI.set_all_joint_efforts(
+                routing_path, enabled_rows, enabled_controls, self.dof_idx
+            )
 
     def clip_control(self, control):
         """
@@ -472,9 +477,13 @@ class BaseController(Serializable, Registerable, Recreatable):
             f"compute_control must return shape ({N}, {self.control_dim}), got {control_output.shape}"
         )
 
-        # Clip and write
+        # Clip, store per-member controls, then write batched
         control_output = self.clip_control(control_output)
-        self._write_control(control_output)
+        for i in range(N):
+            if self._control_enabled[i] != 0:
+                ctrl = control_output[i]
+                self._controls[i] = cb.from_torch(ctrl) if isinstance(ctrl, th.Tensor) else (ctrl if isinstance(ctrl, cb.arr_type) else cb.array(ctrl))
+        self._write_control()
     
     def reset(self, controller_idx):
         """

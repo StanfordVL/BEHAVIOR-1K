@@ -314,7 +314,7 @@ class Robot(USDObject, GymObservable):
         self.dof_names_ordered = None
         self._control_enabled = True
 
-        class_name = self.kinematic_tree_identifier.lower()
+        class_name = self.robot_type.lower()
         if relative_prim_path:
             # If prim path is specified, assert that the last element starts with the right prefix to ensure that
             # the object will be included in the ControllableObjectViewAPI.
@@ -457,14 +457,17 @@ class Robot(USDObject, GymObservable):
         return self._definition.manipulation.end_effectors.get(self.end_effector)
 
     @property
-    def kinematic_tree_identifier(self):
+    def robot_type(self):
         """
-        A string that uniquely identifies the kinematic tree of this particular robot+endeffector combination.
-        This is used to generate the prim path of the robot, which is then used for glob matching by the batched
-        controller APIs. This allows robots to be grouped into views based on their number, and type, of joints.
+        A string identifying this robot's physical configuration type, embedded in its USD
+        prim path as ``controllable__{robot_type}__<name>``.
 
-        If the robot has a manipulation config with a supported end effector that defines
-        a model, that end-effector model is returned; otherwise the robot's base model.
+        Unlike :attr:`model` (always this robot's own model name), this returns the active
+        end-effector's model name when an EEF variant is configured — because EEF swaps
+        change the joint structure and must be grouped separately in batched articulation views.
+
+        Used by `omnigibson.utils.usd_utils.get_robot_kinematic_tree_pattern` to generate
+        glob patterns for batched view grouping.
         """
         if self._definition.manipulation and self._definition.manipulation.supported_end_effector:
             eef_def = self._get_end_effector_definition()
@@ -615,7 +618,6 @@ class Robot(USDObject, GymObservable):
             # Register with ControllerView — creates the shared controller if it doesn't exist yet,
             # then adds this robot as a member and returns its per-member index.
             group_key, controller_idx = ControllerView.register(
-                kinematic_tree_identifier=self.kinematic_tree_identifier,
                 body_part=name,
                 controller_cfg=cb.from_torch_recursive(cfg),
                 articulation_root_path=self.articulation_root_path,
@@ -1012,142 +1014,6 @@ class Robot(USDObject, GymObservable):
                 # Not trying to grasp, reset any pending grasp window
                 self._ag_grasp_counter[arm] = None
 
-    def get_control_dict(self):
-        """
-        Grabs all relevant information that should be passed to each controller during each controller step. This
-        automatically caches information
-
-        Returns:
-            CachedFunctions: Keyword-mapped control values for this object, mapping names to n-arrays.
-                By default, returns the following (can be queried via [] or get()):
-
-                - joint_position: (n_dof,) joint positions
-                - joint_velocity: (n_dof,) joint velocities
-                - joint_effort: (n_dof,) joint efforts
-                - root_pos: (3,) (x,y,z) global cartesian position of the object's root link
-                - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
-                - mass_matrix: (n_dof, n_dof) mass matrix
-                - gravity_force: (n_dof,) per-joint generalized gravity forces
-                - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
-        """
-        # Note that everything here uses the ControllableObjectViewAPI because these are faster implementations of
-        # the functions that this class also implements. The API centralizes access for all of the robots in the scene
-        # removing the need for multiple reads and writes.
-        # TODO(cgokmen): CachedFunctions can now be entirely removed since the ControllableObjectViewAPI already implements caching.
-        fcns = CachedFunctions()
-        fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
-        fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
-        fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-
-        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
-        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
-        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
-        # which is not used anywhere else in the codebase
-        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(
-            self.articulation_root_path, estimate=True
-        )
-        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(
-            self.articulation_root_path, estimate=True
-        )
-        fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
-            self.articulation_root_path,
-            estimate=True,
-        )
-        fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
-            self.articulation_root_path,
-            estimate=True,
-        )
-        fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(
-            self.articulation_root_path, estimate=True
-        )
-        fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
-        # Similar to the jacobians, there may be an additional 6 entries at the beginning of the mass matrix, if this robot does
-        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
-        fcns["mass_matrix"] = lambda: (
-            ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)
-            if self.fixed_base
-            else ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)[6:, 6:]
-        )
-        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_gravity_compensation_forces(
-            self.articulation_root_path
-        )
-        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_compensation_forces(
-            self.articulation_root_path
-        )
-
-        if self.is_holonomic_base:
-            # Add canonical position and orientation
-            fcns["_canonical_pos_quat"] = lambda: ControllableObjectViewAPI.get_root_position_orientation(
-                self.articulation_root_path
-            )
-            fcns["canonical_pos"] = lambda: fcns["_canonical_pos_quat"][0]
-            fcns["canonical_quat"] = lambda: fcns["_canonical_pos_quat"][1]
-
-        if self.is_articulated_trunk:
-            self._add_task_frame_control_dict(
-                fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
-            )
-
-        if self.is_manipulation:
-            for arm in self.arm_names:
-                eef_link_name = self.eef_link_names[arm] if self.eef_link_names else None
-                if eef_link_name is None:
-                    raise ValueError(f"eef_link_names is None for arm {arm}. Check robot definition YAML.")
-                # Verify the link actually exists
-                if eef_link_name not in self._links:
-                    raise ValueError(
-                        f"EEF link '{eef_link_name}' for arm '{arm}' not found in robot links. Available links: {list(self._links.keys())}"
-                    )
-
-                self._add_task_frame_control_dict(fcns=fcns, task_name=f"eef_{arm}", link_name=eef_link_name)
-
-        return fcns
-
-    def _add_task_frame_control_dict(self, fcns, task_name, link_name):
-        """
-        Internally helper function to generate per-link control dictionary entries. Useful for generating relevant
-        control values needed for IK / OSC for a given @task_name. Should be called within @get_control_dict()
-
-        Args:
-            fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
-            task_name (str): name to assign for this task_frame. It will be prepended to all fcns generated
-            link_name (str): the corresponding link name from this controllable object that @task_name is referencing
-        """
-        fcns[f"_{task_name}_pos_quat_relative"] = (
-            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
-                self.articulation_root_path, link_name
-            )
-        )
-        fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
-        fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
-
-        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
-        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
-        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
-        # which is not used anywhere else in the codebase
-        fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
-            self.articulation_root_path,
-            link_name,
-            estimate=True,
-        )
-        fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
-            self.articulation_root_path,
-            link_name,
-            estimate=True,
-        )
-        # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
-        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
-        # see self.get_relative_jacobian() for more info
-        # We also count backwards for the link frame because if the robot is fixed base, the jacobian returned has one
-        # less index than the number of links. This is presumably because the 1st link of a fixed base robot will
-        # always have a zero jacobian since it can't move. Counting backwards resolves this issue.
-        start_idx = 0 if self.fixed_base else 6
-        link_idx = self._articulation_view.get_body_index(link_name)
-        fcns[f"{task_name}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
-            self.articulation_root_path
-        )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
-
     def dump_action(self):
         """
         Dump the last action applied to this object. For use in demo collection.
@@ -1384,7 +1250,7 @@ class Robot(USDObject, GymObservable):
             robot_name_components[0] == "controllable"
         ), "Third component of articulation root path (robot name) must start with 'controllable'"
         assert (
-            robot_name_components[1] == self.kinematic_tree_identifier.lower()
+            robot_name_components[1] == self.robot_type.lower()
         ), "Third component of articulation root path (robot name) must contain the class name as the second part"
         # Run super
         super()._initialize()
@@ -1632,7 +1498,6 @@ class Robot(USDObject, GymObservable):
         """
         Returns:
             dict: keyword-mapped proprioception observations available for this robot.
-                Can be extended by subclasses
         """
         joint_positions = cb.to_torch(
             cb.copy(ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path))
