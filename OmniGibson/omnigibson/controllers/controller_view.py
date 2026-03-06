@@ -14,7 +14,7 @@ class ControllerView:
         # At controller load time:
         group_key, controller_idx = ControllerView.register(
             body_part, controller_cfg,
-            articulation_root_path, eef_link_name
+            articulation_root_path, link_name
         )
 
         # At action time:
@@ -33,7 +33,7 @@ class ControllerView:
         body_part: str,
         controller_cfg: dict,
         articulation_root_path: str,
-        eef_link_name: Optional[str] = None,
+        link_name: Optional[str] = None,
         control_enabled: bool = True,
     ) -> Tuple[str, int]:
         """
@@ -46,7 +46,7 @@ class ControllerView:
             body_part (str): name of the body part being controlled (e.g., "arm_right", "base")
             controller_cfg (dict): controller configuration dict (must include "name" key)
             articulation_root_path (str): articulation root prim path of the new group member
-            eef_link_name (None or str): if specified, the name of the EEF link (for IK/OSC controllers)
+            link_name (None or str): if specified, the name of the EEF or trunk link (for IK/OSC controllers)
 
         Returns:
             2-tuple:
@@ -63,7 +63,7 @@ class ControllerView:
         controller = cls._controller_groups[group_key]
         controller_idx = controller.add_member(
             articulation_root_path,
-            eef_link_name,
+            link_name,
             control_enabled=control_enabled,
         )
 

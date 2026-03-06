@@ -217,13 +217,13 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._isaac_kp = None if isaac_kp is None else self.nums2array(isaac_kp, self.control_dim)
         self._isaac_kd = None if isaac_kd is None else self.nums2array(isaac_kd, self.control_dim)
 
-    def add_member(self, articulation_root_path, eef_link_name=None, control_enabled=True):
+    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
         """
         Register a controller as a member of this controller group.
 
         Args:
             articulation_root_path (str): articulation root prim path of the new group member
-            eef_link_name (None or str): EEF link name — ignored by default; overridden by IK/OSC.
+            link_name (None or str): EEF link name — ignored by default; overridden by IK/OSC.
 
         Returns:
             int: controller_idx — index into this group's member arrays for the added controller,
@@ -392,13 +392,16 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         raise NotImplementedError
 
-    def _write_control(self):
-        """Write batched control signals to Isaac via a single tensor op per control type."""
-        # Lazy-init: resolve each member's row index in the shared view via public API.
+    def _ensure_view_row_indices(self):
+        """Lazy-init: resolve each member's row index in the shared physics view."""
         if self._view_row_indices is None:
             self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
                 self.routing_path, self._articulation_root_paths
             )
+
+    def _write_control(self):
+        """Write batched control signals to Isaac via a single tensor op per control type."""
+        self._ensure_view_row_indices()
 
         # Filter to enabled and non-unregistered members
         enabled_indices = [

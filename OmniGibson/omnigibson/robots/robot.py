@@ -605,15 +605,21 @@ class Robot(USDObject, GymObservable):
             if self._action_normalize:
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
 
-            # Determine eef_link_name for arm controllers (used by IK/OSC)
-            eef_link_name = None
+            # Determine link_name for arm or trunk controllers (used by IK/OSC)
+            link_name = None
             if self.is_manipulation:
                 for arm in self.arm_names:
                     if name == f"arm_{arm}":
                         try:
-                            eef_link_name = self.eef_link_names[arm]
+                            link_name = self.eef_link_names[arm]
                         except (ValueError, AttributeError, KeyError):
                             pass
+            if self.is_articulated_trunk:
+                if name == "trunk":
+                    try:
+                        link_name = self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
+                    except (ValueError, AttributeError, KeyError):
+                        pass
 
             # Register with ControllerView — creates the shared controller if it doesn't exist yet,
             # then adds this robot as a member and returns its per-member index.
@@ -621,7 +627,7 @@ class Robot(USDObject, GymObservable):
                 body_part=name,
                 controller_cfg=cb.from_torch_recursive(cfg),
                 articulation_root_path=self.articulation_root_path,
-                eef_link_name=eef_link_name,
+                link_name=link_name,
                 control_enabled=self.control_enabled,
             )
             # Verify the controller's DOFs can all be driven
@@ -835,100 +841,7 @@ class Robot(USDObject, GymObservable):
         2. Override frozen gripper joint targets in the buffer (assisted grasping freeze).
         3. Run assisted grasping logic (_handle_assisted_grasping).
         """
-        # TODO modify and delete
-        # Skip if we don't have control enabled
-        if not self.control_enabled:
-            return
-
         if self.is_manipulation:
-            if self.grasping_mode != "physical" and not self._disable_grasp_handling:
-                self._handle_assisted_grasping()
-    def _postprocess_control(self, control, control_type):
-        """
-        Runs any postprocessing on @control with corresponding @control_type on this entity. Default is no-op.
-        Deploys control signals @control with corresponding @control_type on this entity.
-
-        Args:
-            control (k- or n-array): control signals to deploy. This should be n-DOF length if all joints are being set,
-                or k-length (k < n) if specific indices are being set. In this case, the length of @control must
-                be the same length as @indices!
-            control_type (k- or n-array): control types for each DOF. Each entry should be one of ControlType.
-                 This should be n-DOF length if all joints are being set, or k-length (k < n) if specific
-                 indices are being set. In this case, the length of @control must be the same length as @indices!
-
-        Returns:
-            2-tuple:
-                - n-array: raw control signals to send to the object's joints
-                - list: control types for each joint
-        """
-        return control, control_type
-
-    def deploy_control(self, control, control_type):
-        """
-        Deploys control signals @control with corresponding @control_type on this entity.
-
-        Note: This is DIFFERENT than self.set_joint_positions/velocities/efforts, because in this case we are only
-            setting target values (i.e.: we subject this entity to physical dynamics in order to reach the desired
-            @control setpoints), compared to set_joint_XXXX which manually sets the actual state of the joints.
-
-            This function is intended to be used with motorized entities, e.g.: robot agents or machines (e.g.: a
-            conveyor belt) to simulation physical control of these entities.
-
-            In contrast, use set_joint_XXXX for simulation-specific logic, such as simulator resetting or "magic"
-            action implementations.
-
-        Args:
-            control (n-array): control signals to deploy. This should be n-DOF length for all joints being set.
-            control_type (n-array): control types for each DOF. Each entry should be one of ControlType.
-                 This should be n-DOF length for all joints being set.
-        """
-        if self.is_manipulation:
-            # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
-            for arm in self.arm_names:
-                if self._ag_freeze_gripper[arm]:
-                    gripper_group_key, _ = self._controllers[f"gripper_{arm}"]
-                    control[self.gripper_control_idx[arm]] = (
-                        self._ag_obj_constraint_params[arm]["gripper_pos"]
-                        if ControllerView.get_control_type(gripper_group_key) == ControlType.POSITION
-                        else 0.0
-                    )
-        # Run sanity check
-        assert len(control) == len(control_type) == self.n_dof, (
-            f"Control signals, control types, and number of DOF should all be the same!"
-            f"Got {len(control)}, {len(control_type)}, and {self.n_dof} respectively."
-        )
-
-        # set the targets for joints
-        pos_idxs = cb.where(control_type == ControlType.POSITION)[0]
-        if len(pos_idxs) > 0:
-            ControllableObjectViewAPI.set_joint_position_targets(
-                self.articulation_root_path,
-                positions=control[pos_idxs],
-                indices=pos_idxs,
-            )
-            # If we're setting joint position targets, we should also set velocity targets to 0
-            ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path,
-                velocities=cb.zeros(len(pos_idxs)),
-                indices=pos_idxs,
-            )
-        vel_idxs = cb.where(control_type == ControlType.VELOCITY)[0]
-        if len(vel_idxs) > 0:
-            ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path,
-                velocities=control[vel_idxs],
-                indices=vel_idxs,
-            )
-        eff_idxs = cb.where(control_type == ControlType.EFFORT)[0]
-        if len(eff_idxs) > 0:
-            ControllableObjectViewAPI.set_joint_efforts(
-                self.articulation_root_path,
-                efforts=control[eff_idxs],
-                indices=eff_idxs,
-            )
-
-        if self.is_manipulation:
-            # Then run assisted grasping
             if self.grasping_mode != "physical" and not self._disable_grasp_handling:
                 self._handle_assisted_grasping()
 
@@ -3402,7 +3315,6 @@ class Robot(USDObject, GymObservable):
         for arm in self.arm_names:
             dic[arm] = {
                 "name": "InverseKinematicsController",
-                "task_name": f"eef_{arm}",
                 "control_freq": self._control_freq,
                 "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
@@ -3429,7 +3341,6 @@ class Robot(USDObject, GymObservable):
         for arm in self.arm_names:
             dic[arm] = {
                 "name": "OperationalSpaceController",
-                "task_name": f"eef_{arm}",
                 "control_freq": self._control_freq,
                 "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
@@ -4098,7 +4009,6 @@ class Robot(USDObject, GymObservable):
         assert self.is_articulated_trunk
         return {
             "name": "InverseKinematicsController",
-            "task_name": "trunk",
             "control_freq": self._control_freq,
             "reset_joint_pos": self.reset_joint_pos,
             "control_limits": self.control_limits,
@@ -4121,7 +4031,6 @@ class Robot(USDObject, GymObservable):
         assert self.is_articulated_trunk
         return {
             "name": "OperationalSpaceController",
-            "task_name": "trunk",
             "control_freq": self._control_freq,
             "reset_joint_pos": self.reset_joint_pos,
             "control_limits": self.control_limits,

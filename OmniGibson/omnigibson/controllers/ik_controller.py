@@ -41,7 +41,6 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def __init__(
         self,
-        task_name, # TODO delete
         control_freq,
         reset_joint_pos,
         control_limits,
@@ -141,7 +140,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         self.reset_joint_pos = reset_joint_pos[dof_idx]
         self.condition_on_current_position = condition_on_current_position
 
-        self._eef_link_names = []  # list of eef link names per member
+        self._link_name = None  # eef/trunk link name (same for all members in the group)
         self._fixed_quat_targets = []  # per-member fixed quat target for position_fixed_ori mode
         self._control_filters = [] # per-member control filter
         
@@ -190,19 +189,20 @@ class InverseKinematicsController(JointController, ManipulationController):
             isaac_kd=isaac_kd,
         )
 
-    def add_member(self, articulation_root_path, eef_link_name=None, control_enabled=True):
+    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
         """
         Register a member and store its EEF link name.
 
         Args:
             articulation_root_path (str): articulation root prim path of the new group member
-            eef_link_name (str or None): name of the EEF link for this member
+            link_name (str or None): name of the EEF or trunk link for this member
 
         Returns:
             int: controller_idx
         """
         idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
-        self._eef_link_names.append(eef_link_name)
+        if self._link_name is None:
+            self._link_name = link_name
         self._fixed_quat_targets.append(None)
         self._control_filters.append(
             None
@@ -293,11 +293,11 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def _update_goal(self, controller_idx, command):
         prim_path = self._articulation_root_paths[controller_idx]
-        eef_link_name = self._eef_link_names[controller_idx]
+        link_name = self._link_name
 
         # Get current EEF pose relative to robot base
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
-            prim_path, eef_link_name
+            prim_path, link_name
         )
 
         # Convert position command to absolute values if needed
@@ -350,18 +350,15 @@ class InverseKinematicsController(JointController, ManipulationController):
         """
         
         N = self.n_members
-        eef_link_name = self._eef_link_names[0]  # same for all members in the group
-        if self._view_row_indices is None:
-            self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
-                self.routing_path, self._articulation_root_paths
-            )
+        link_name = self._link_name
+        self._ensure_view_row_indices()
         rows = self._view_row_indices
 
         # Batched state reads
         all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)
         q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
         jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(self.routing_path)  # (N_view, n_links, 6, n_dof_total)
-        eef_body_idx = ControllableObjectViewAPI.get_link_index(self.routing_path, eef_link_name)
+        eef_body_idx = ControllableObjectViewAPI.get_link_index(self.routing_path, link_name)
         jac_row = eef_body_idx - 1  # Jacobian excludes root body (index 0)
         # Floating-base robots expose Jacobian columns as [virtual_base(6), joints].
         # dof_idx indexes the joint block, so we need an offset for the Jacobian columns.
@@ -370,7 +367,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         jac_dof_idx = self.dof_idx + jac_col_offset
         j_eef_all = jac_all[rows][:, jac_row, :, :][:, :, jac_dof_idx]  # (N, 6, ctrl_dim)
         ee_pos_all, ee_quat_all = ControllableObjectViewAPI.get_all_link_relative_position_orientation(
-            self.routing_path, eef_link_name
+            self.routing_path, link_name
         )  # (N_view, 3), (N_view, 4)
         ee_pos_all = ee_pos_all[rows]
         ee_quat_all = ee_quat_all[rows]
@@ -409,10 +406,10 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def compute_no_op_goal(self, controller_idx):
         prim_path = self._articulation_root_paths[controller_idx]
-        eef_link_name = self._eef_link_names[controller_idx]
+        link_name = self._link_name
 
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
-            prim_path, eef_link_name
+            prim_path, link_name
         )
         goal_dict = dict(
             target_pos=cb.as_float32(pos_relative),
@@ -422,10 +419,10 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def _compute_no_op_command(self, controller_idx):
         prim_path = self._articulation_root_paths[controller_idx]
-        eef_link_name = self._eef_link_names[controller_idx]
+        link_name = self._link_name
 
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
-            prim_path, eef_link_name
+            prim_path, link_name
         )
 
         command = cb.zeros(6)

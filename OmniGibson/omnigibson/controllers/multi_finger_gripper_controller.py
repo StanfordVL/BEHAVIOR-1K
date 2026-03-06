@@ -129,7 +129,7 @@ class MultiFingerGripperController(GripperController):
             isaac_kd=isaac_kd,
         )
 
-    def add_member(self, articulation_root_path, eef_link_name=None, control_enabled=True):
+    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
         idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
         self._is_grasping.append(IsGraspingState.FALSE)
         self._vel_filters.append(MovingAverageFilter(obs_dim=len(self.dof_idx), filter_width=5))
@@ -201,10 +201,7 @@ class MultiFingerGripperController(GripperController):
         N = self.n_members
         target_batch = goals["target"]  # (N, command_dim)
 
-        if self._view_row_indices is None:
-            self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
-                self.routing_path, self._articulation_root_paths
-            )
+        self._ensure_view_row_indices()
         rows = self._view_row_indices
         all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
 
