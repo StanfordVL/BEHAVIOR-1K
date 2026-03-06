@@ -128,18 +128,34 @@ class ControllerView:
     @classmethod
     def unregister_robot(cls, controllers: dict):
         """
-        Remove all controller that belong to a robot identified by @controllers.
+            Unregister one robot from controller groups without reindexing members.
 
-        Args:
-            controllers (dict): The robot's _controllers dict mapping name -> (group_key, controller_idx)
+            For each (group_key, controller_idx) in @controllers:
+            - Locate the shared controller group.
+            - Mark controller_idx as a tombstoned (unregistered) slot.
+            - Keep the group if any active members remain; delete it only when all members
+            are tombstoned.
+
+            Why tombstones:
+            - Preserve stable controller_idx assignments for remaining robots.
+            - Avoid shifting arrays / remapping indices across robots in the same group.
+
+            Tombstoned slots are never reused.
+            Controller logic must mask tombstoned slots during goal updates, batched
+            compute, and writeback.
+
+            Args:
+                controllers (dict): The robot.controllers dict, 
+                    mapping controller_name -> (group_key, controller_idx)
+
         """
         for group_key, controller_idx in controllers.values():
             if group_key not in cls._controller_groups:
                 continue
             controller = cls._controller_groups[group_key]
-            # TODO do with masking
-           
-            del cls._controller_groups[group_key]
+            controller.unregister_member(controller_idx)
+            if controller.has_no_active_members():
+                del cls._controller_groups[group_key]
 
     @classmethod
     def get_command_dim(cls, group_key: str) -> int:

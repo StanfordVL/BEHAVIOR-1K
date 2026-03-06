@@ -350,23 +350,30 @@ class InverseKinematicsController(JointController, ManipulationController):
         """
         
         N = self.n_members
-        routing_path = self._articulation_root_paths[0]
         eef_link_name = self._eef_link_names[0]  # same for all members in the group
+        if self._view_row_indices is None:
+            self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
+                self.routing_path, self._articulation_root_paths
+            )
+        rows = self._view_row_indices
 
         # Batched state reads
-        all_q = ControllableObjectViewAPI.get_all_joint_positions(routing_path)  # (N, n_joint_dof)
-        q_all = all_q[:, self.dof_idx]  # (N, ctrl_dim)
-        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(routing_path)  # (N, n_links, 6, n_dof_total)
-        eef_body_idx = ControllableObjectViewAPI.get_link_index(routing_path, eef_link_name)
+        all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)
+        q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
+        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(self.routing_path)  # (N_view, n_links, 6, n_dof_total)
+        eef_body_idx = ControllableObjectViewAPI.get_link_index(self.routing_path, eef_link_name)
         jac_row = eef_body_idx - 1  # Jacobian excludes root body (index 0)
         # Floating-base robots expose Jacobian columns as [virtual_base(6), joints].
         # dof_idx indexes the joint block, so we need an offset for the Jacobian columns.
+        # Compute offset from full tensor shapes before row-slicing.
         jac_col_offset = jac_all.shape[-1] - all_q.shape[-1]
         jac_dof_idx = self.dof_idx + jac_col_offset
-        j_eef_all = jac_all[:, jac_row, :, :][:, :, jac_dof_idx]  # (N, 6, ctrl_dim)
+        j_eef_all = jac_all[rows][:, jac_row, :, :][:, :, jac_dof_idx]  # (N, 6, ctrl_dim)
         ee_pos_all, ee_quat_all = ControllableObjectViewAPI.get_all_link_relative_position_orientation(
-            routing_path, eef_link_name
-        )  # (N, 3), (N, 4)
+            self.routing_path, eef_link_name
+        )  # (N_view, 3), (N_view, 4)
+        ee_pos_all = ee_pos_all[rows]
+        ee_quat_all = ee_quat_all[rows]
         ee_mat_all = cb.as_float32(cb.T.quat2mat(ee_quat_all))  # (N, 3, 3)
 
         q_lower = self._control_limits[ControlType.get_type("position")][0][self.dof_idx]  # (ctrl_dim,)

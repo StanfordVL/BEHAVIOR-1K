@@ -152,6 +152,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._control_enabled = []
         # Per-member last deployed control tensor (set in _write_control)
         self._controls = []
+        # Per-member tombstone mask: 0 = active, 1 = unregistered (permanently ignored)
+        self._unregistered_controllers = []
         # Lazy-init: row indices of each member in the shared view (None until first _write_control call)
         self._view_row_indices = None
 
@@ -233,11 +235,12 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._goal_set.append(False)
         self._control_enabled.append(1 if control_enabled else 0)
         self._controls.append(None)
+        self._unregistered_controllers.append(0)
 
         for key, shape in self._goal_shapes.items():
             new_row = cb.zeros((1, *shape))
             if key in self._goals:
-                self._goals[key] = cb.cat([self._goals[key], new_row], dim=0)
+                self._goals[key] = cb.cat([self._goals[key], new_row], 0)
             else:
                 self._goals[key] = new_row
 
@@ -356,7 +359,6 @@ class BaseController(Serializable, Registerable, Recreatable):
             len(command) == self.command_dim
         ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
 
-        prim_path = self._articulation_root_paths[controller_idx]
         preprocessed = self._preprocess_command(command)
         goal_dict = self._update_goal(controller_idx, preprocessed)
         for k, v in goal_dict.items():
@@ -395,17 +397,20 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Lazy-init: resolve each member's row index in the shared view via public API.
         if self._view_row_indices is None:
             self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
-                self._articulation_root_paths[0], self._articulation_root_paths
+                self.routing_path, self._articulation_root_paths
             )
 
-        # Filter to enabled members
-        enabled_indices = [i for i, e in enumerate(self._control_enabled) if e != 0]
+        # Filter to enabled and non-unregistered members
+        enabled_indices = [
+            i for i, (e, u) in enumerate(zip(self._control_enabled, self._unregistered_controllers))
+            if e != 0 and u == 0
+        ]
         if not enabled_indices:
             return
 
         enabled_rows = [self._view_row_indices[i] for i in enabled_indices]
         enabled_controls = cb.stack([self._controls[i] for i in enabled_indices])  # (N_en, K)
-        routing_path = self._articulation_root_paths[0]
+        routing_path = self.routing_path
 
         if self.control_type == ControlType.POSITION:
             ControllableObjectViewAPI.set_all_joint_position_targets(
@@ -454,16 +459,16 @@ class BaseController(Serializable, Registerable, Recreatable):
         goal_set flags are reset.
         """
         N = self.n_members
-        # If all members in this group is disabled, early return
-        if sum(self._control_enabled) == 0:
+        # If all active (non-unregistered) members are disabled, early return
+        if all(self._control_enabled[i] == 0 or self._unregistered_controllers[i] == 1 for i in range(N)):
             return
 
         # Fill in no-op goals for any controllers that haven't received a goal.
         # Do NOT set _goal_set[i] = True here — only update_goal() should do that,
         # mirroring the old behavior where self._goal was only set by update_goal().
         for i in range(N):
-            # Skip control_disabled members
-            if self._control_enabled[i] == 0:
+            # Skip control_disabled or unregistered members
+            if self._control_enabled[i] == 0 or self._unregistered_controllers[i] == 1:
                 continue
             if not self._goal_set[i]:
                 no_op = self.compute_no_op_goal(i)
@@ -480,7 +485,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Clip, store per-member controls, then write batched
         control_output = self.clip_control(control_output)
         for i in range(N):
-            if self._control_enabled[i] != 0:
+            if self._control_enabled[i] != 0 and self._unregistered_controllers[i] == 0:
                 ctrl = control_output[i]
                 self._controls[i] = cb.from_torch(ctrl) if isinstance(ctrl, th.Tensor) else (ctrl if isinstance(ctrl, cb.arr_type) else cb.array(ctrl))
         self._write_control()
@@ -492,10 +497,21 @@ class BaseController(Serializable, Registerable, Recreatable):
         Args:
             controller_idx (int): index of the controller in this controller group
         """
+        if self._unregistered_controllers[controller_idx] == 1:
+            return
         self._goal_set[controller_idx] = False
         self._controls[controller_idx] = None
         for k in self._goals:
             self._goals[k][controller_idx] = cb.zeros(self._goal_shapes[k])
+
+    def unregister_member(self, controller_idx):
+        """Mark member at controller_idx as a tombstone (permanently ignored)."""
+        self._unregistered_controllers[controller_idx] = 1
+
+    def has_no_active_members(self):
+        """Return True if all members have been unregistered."""
+        no_active = all(u == 1 for u in self._unregistered_controllers)
+        return no_active
 
     def set_control_enabled(self, controller_idx, enabled):
         self._control_enabled[controller_idx] = 1 if enabled else 0
@@ -550,6 +566,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         return {
             "n_members": self.n_members,
             "goal_set": list(self._goal_set),
+            "unregistered_controllers": list(self._unregistered_controllers),
             "goals": goals,
         }
 
@@ -565,6 +582,9 @@ class BaseController(Serializable, Registerable, Recreatable):
             # (especially across scene reset / controller reload), and may induce pre-action drift.
             self._goal_set[controller_idx] = False
             self._controls[controller_idx] = None
+        unregistered = state.get("unregistered_controllers", [0] * self.n_members)
+        for i, u in enumerate(unregistered):
+            self._unregistered_controllers[i] = int(u)
         for name, val in state["goals"].items():
             if name in self._goals:
                 if isinstance(val, th.Tensor):
@@ -577,20 +597,22 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Serialize goal state for all members
         n = state["n_members"]
         goal_set_tensor = th.tensor(state["goal_set"], dtype=th.float32)
+        unreg_tensor = th.tensor(state.get("unregistered_controllers", [0] * n), dtype=th.float32)
         goals = state["goals"]
         goal_flat = th.cat([v.flatten() for v in goals.values()]) if goals else th.zeros(n * self.goal_dim)
-        return th.cat([goal_set_tensor, goal_flat])
+        return th.cat([goal_set_tensor, unreg_tensor, goal_flat])
 
     def deserialize(self, state):
         n = self.n_members
         goal_set = state[:n].bool().tolist()
-        idx = n
+        unregistered_controllers = state[n:2*n].long().tolist()
+        idx = 2 * n
         goals = {}
         for key, shape in self._goal_shapes.items():
             length = n * math.prod(shape)
             goals[key] = state[idx: idx + length].reshape(n, *shape)
             idx += length
-        return dict(n_members=n, goal_set=goal_set, goals=goals), idx
+        return dict(n_members=n, goal_set=goal_set, unregistered_controllers=unregistered_controllers, goals=goals), idx
 
     def _get_goal_shapes(self):
         """
@@ -629,8 +651,8 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     @property
     def state_size(self):
-        # n_members (goal_set flags) + n_members * goal_dim
-        return self.n_members + self.n_members * self.goal_dim
+        # n_members (goal_set) + n_members (unregistered_controllers) + n_members * goal_dim
+        return self.n_members + self.n_members + self.n_members * self.goal_dim
 
     def get_goal(self, controller_idx):
         """
@@ -731,6 +753,16 @@ class BaseController(Serializable, Registerable, Recreatable):
             int: Expected size of inputted commands
         """
         raise NotImplementedError
+
+    @property
+    def routing_path(self):
+        """
+        Returns:
+            str: Articulation root path of the first member, used as a routing key for
+                ControllableObjectViewAPI pattern lookups. All members in a group share the
+                same view pattern, so any member's path works; index 0 is canonical.
+        """
+        return self._articulation_root_paths[0]
 
     @property
     def dof_idx(self):

@@ -200,11 +200,20 @@ class MultiFingerGripperController(GripperController):
         """
         N = self.n_members
         target_batch = goals["target"]  # (N, command_dim)
-        routing_path = self._articulation_root_paths[0]
-        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(routing_path)[:, self.dof_idx]  # (N, ctrl_dim)
+
+        if self._view_row_indices is None:
+            self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
+                self.routing_path, self._articulation_root_paths
+            )
+        rows = self._view_row_indices
+        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
 
         u_list = []
         for i in range(N):
+            if self._unregistered_controllers[i] == 1:
+                u_list.append(cb.zeros(self.control_dim))
+                continue
+
             target = target_batch[i]
             joint_pos = all_joint_pos[i]
 

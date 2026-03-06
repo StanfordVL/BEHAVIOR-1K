@@ -401,51 +401,59 @@ class OperationalSpaceController(ManipulationController):
         # TODO: Update to possibly grab parameters from dict
         # For now, always use internal values
         N = self.n_members
-        routing_path = self._articulation_root_paths[0]
         eef_link_name = self._eef_link_names[0]  # same for all members in the group
+        if self._view_row_indices is None:
+            self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
+                self.routing_path, self._articulation_root_paths
+            )
+        rows = self._view_row_indices
 
         kp = self.kp
         kd = 2 * cb.sqrt(kp) * self.damping_ratio
 
         # Batched joint state reads
-        all_q = ControllableObjectViewAPI.get_all_joint_positions(routing_path)  # (N, n_joint_dof)
-        q_all = all_q[:, self.dof_idx]  # (N, ctrl_dim)
-        qd_all = ControllableObjectViewAPI.get_all_joint_velocities(routing_path, estimate=True)[:, self.dof_idx]  # (N, ctrl_dim)
+        # Keep all_q as full (N_view, n_dof) to preserve shape for downstream offset computation.
+        all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)
+        q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
+        qd_all = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
 
         # Batched mass matrix: slice to (N, ctrl_dim, ctrl_dim)
-        all_mm_full = ControllableObjectViewAPI.get_all_generalized_mass_matrices(routing_path)  # (N, n_dof_total, n_dof_total)
+        all_mm_full = ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)  # (N_view, n_dof_total, n_dof_total)
         # Floating-base robots can expose 6 virtual base DOFs in dynamics tensors.
         # dof_idx indexes the joint block, so we align indices with a dynamic offset.
+        # Compute offsets from full tensor shapes before row-slicing.
         mm_col_offset = all_mm_full.shape[-1] - all_q.shape[-1]
         mm_dof_idx = self.dof_idx + mm_col_offset
         dof_idxs_mat = tuple(cb.meshgrid(mm_dof_idx, mm_dof_idx))
-        mm_all = all_mm_full[:, dof_idxs_mat[0], dof_idxs_mat[1]]  # (N, ctrl_dim, ctrl_dim)
+        mm_all = all_mm_full[rows, :, :][:, dof_idxs_mat[0], dof_idxs_mat[1]]  # (N, ctrl_dim, ctrl_dim)
 
         # Batched jacobians
-        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(routing_path)  # (N, n_links, 6, n_dof_total)
-        eef_body_idx = ControllableObjectViewAPI.get_link_index(routing_path, eef_link_name)
+        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(self.routing_path)  # (N_view, n_links, 6, n_dof_total)
+        eef_body_idx = ControllableObjectViewAPI.get_link_index(self.routing_path, eef_link_name)
         jac_row = eef_body_idx - 1  # Jacobian excludes root body (index 0)
         # Floating-base robots expose Jacobian columns as [virtual_base(6), joints].
         # dof_idx indexes the joint block, so we need an offset for the Jacobian columns.
         jac_col_offset = jac_all.shape[-1] - all_q.shape[-1]
         jac_dof_idx = self.dof_idx + jac_col_offset
-        j_eef_all = jac_all[:, jac_row, :, :][:, :, jac_dof_idx]  # (N, 6, ctrl_dim)
+        j_eef_all = jac_all[rows][:, jac_row, :, :][:, :, jac_dof_idx]  # (N, 6, ctrl_dim)
 
         # Batched EEF pose and velocities
         ee_pos_all, ee_quat_all = ControllableObjectViewAPI.get_all_link_relative_position_orientation(
-            routing_path, eef_link_name
-        )  # (N, 3), (N, 4)
+            self.routing_path, eef_link_name
+        )  # (N_view, 3), (N_view, 4)
+        ee_pos_all = ee_pos_all[rows]
+        ee_quat_all = ee_quat_all[rows]
         ee_mat_all = cb.as_float32(cb.T.quat2mat(ee_quat_all))  # (N, 3, 3)
         ee_lin_vel_all = cb.as_float32(
-            ControllableObjectViewAPI.get_all_link_relative_linear_velocity(routing_path, eef_link_name, estimate=True)
+            ControllableObjectViewAPI.get_all_link_relative_linear_velocity(self.routing_path, eef_link_name, estimate=True)[rows]
         )  # (N, 3)
         ee_ang_vel_all = ControllableObjectViewAPI.get_all_link_relative_angular_velocity(
-            routing_path, eef_link_name, estimate=True
-        )  # (N, 3)
+            self.routing_path, eef_link_name, estimate=True
+        )[rows]  # (N, 3)
         base_lin_vel_all = cb.as_float32(
-            ControllableObjectViewAPI.get_all_relative_linear_velocity(routing_path, estimate=True)
+            ControllableObjectViewAPI.get_all_relative_linear_velocity(self.routing_path, estimate=True)[rows]
         )  # (N, 3)
-        base_ang_vel_all = ControllableObjectViewAPI.get_all_relative_angular_velocity(routing_path, estimate=True)  # (N, 3)
+        base_ang_vel_all = ControllableObjectViewAPI.get_all_relative_angular_velocity(self.routing_path, estimate=True)[rows]  # (N, 3)
 
         # Batched angular velocity error: quat_multiply(axisangle2quat(-ee_ang_vel), axisangle2quat(base_ang_vel))
         ee_ang_vel_err_all = cb.as_float32(
@@ -487,16 +495,16 @@ class OperationalSpaceController(ManipulationController):
         )  # (N, ctrl_dim)
 
         if self._use_gravity_compensation:
-            all_gravity = ControllableObjectViewAPI.get_all_gravity_compensation_forces(routing_path)
+            all_gravity = ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)
             gravity_col_offset = all_gravity.shape[-1] - all_q.shape[-1]
             gravity_dof_idx = self.dof_idx + gravity_col_offset
-            u = u + all_gravity[:, gravity_dof_idx]
+            u = u + all_gravity[rows][:, gravity_dof_idx]
 
         if self._use_cc_compensation:
-            all_cc = ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(routing_path)
+            all_cc = ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)
             cc_col_offset = all_cc.shape[-1] - all_q.shape[-1]
             cc_dof_idx = self.dof_idx + cc_col_offset
-            u = u + all_cc[:, cc_dof_idx]
+            u = u + all_cc[rows][:, cc_dof_idx]
 
         return u
 
