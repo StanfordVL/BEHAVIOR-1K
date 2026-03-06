@@ -1,7 +1,7 @@
 [package]
 description = "A platform for accelerating Embodied AI research"
 title = "OmniGibson"
-version = "1.5.0"
+version = "3.8.0"
 
 keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in UI with "experience" filter
 
@@ -9,15 +9,18 @@ keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in
 [dependencies]
 "isaacsim.exp.base" = {}
 "omni.flowusd" = {}
-"omni.kit.xr.profile.vr" = {}
+#"omni.kit.xr.profile.vr" = {}
+"omni.physx.supportui" = {}
+#"omni.isaac.physics_inspector" = {}
 
 [settings.app]
 name = "OmniGibson"
-version = "3.7.2"
+version = "3.8.0"
 settings.persistent = false       # settings reset on each run with this app
 window.title = "OmniGibson"
 vulkan = true # Explicitly enable Vulkan (on by default on Linux, off by default on Windows)
 window.iconPath = "${app}/OmniGibson_logo.png"
+enableDeveloperWarnings = false    # disable developer warnings to reduce log noise
 
 [settings.app.livestream]
 proto = "ws"
@@ -26,6 +29,7 @@ outDirectory = "${data}"
 
 [settings.app.exts.folders]
 '++' = [
+    "${app}",
     "${app}/../exts",
     "${app}/../extscache",
     "${app}/../extsPhysics",
@@ -35,11 +39,10 @@ outDirectory = "${data}"
 
 [settings.exts."omni.kit.registry.nucleus"]
 registries = [
-	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/106/shared" },
+	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/107/shared" },
 	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
 	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
 ]
 
 [settings.app.extensions]
 pathStatCacheEnabled = false
-fsWatcherEnabled = false
