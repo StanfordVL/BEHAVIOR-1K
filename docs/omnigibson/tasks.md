@@ -6,7 +6,7 @@
 
 `Task`s have two important internal variables:
 
-- `_termination_conditions`: a dict of {`str`: `TerminationCondition`} that define when an episode should be terminated. For each of the termination conditions, `termination_condition.step(...)` returns a tuple of `(done [bool], success [bool])`. If any of the termination conditions returns `done = True`, the episode is terminated. If any returns `success = True`, the episode is cnosidered successful.
+- `_termination_conditions`: a dict of {`str`: `TerminationCondition`} that define when an episode should be terminated. For each of the termination conditions, `termination_condition.step(...)` returns a tuple of `(done [bool], success [bool])`. If any of the termination conditions returns `done = True`, the episode is terminated. If any returns `success = True`, the episode is considered successful.
 - `_reward_functions`: a dict of {`str`: `RewardFunction`} that define how the agent is rewarded. Each reward function has a `reward_function.step(...)` method that returns a tuple of `(reward [float], info [dict])`. The `reward` is a scalar value that is added to the agent's total reward for the current step. The `info` is a dictionary that can contain additional information about the reward.
 
 `Task`s usually specify task-relevant observations (e.g. goal location for a navigation task) via the `_get_obs` method, which returns a tuple of `(low_dim_obs [dict], obs [dict])`, where the first element is a dict of low-dimensional observations that will be automatically flattened into a 1D array, and the second element is everything else that shouldn't be flattened. Different types of tasks should overwrite the `_get_obs` method to return the appropriate observations.

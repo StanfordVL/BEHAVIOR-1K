@@ -21,8 +21,9 @@ parser.add_argument("-c", "--cloth", action="store_true")
 parser.add_argument("-w", "--fluids", action="store_true")
 parser.add_argument("-g", "--gpu_dynamics", action="store_true")
 parser.add_argument("-p", "--macro_particle_system", action="store_true")
+parser.add_argument("-f", "--flatcache", action="store_true")
 
-PROFILING_FIELDS = ["FPS", "Omni step time", "Non-omni step time", "Memory usage", "Vram usage"]
+PROFILING_FIELDS = ["FPS", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
 NUM_CLOTH = 5
 NUM_SLICE_OBJECT = 3
 
@@ -39,10 +40,10 @@ SCENE_OFFSET = {
 def main():
     args = parser.parse_args()
     # Modify macros settings
-    gm.ENABLE_HQ_RENDERING = args.fluids
+    # gm.ENABLE_HQ_RENDERING = args.fluids  # Temporarily disabled, since it requires >= 60 FPS
     gm.ENABLE_OBJECT_STATES = True
     gm.ENABLE_TRANSITION_RULES = True
-    gm.ENABLE_FLATCACHE = not args.cloth
+    gm.ENABLE_FLATCACHE = args.flatcache
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
 
     cfg = {
@@ -56,7 +57,7 @@ def main():
         for i in range(args.robot):
             cfg["robots"].append(
                 {
-                    "type": "Fetch",
+                    "model": "r1pro",
                     "obs_modalities": ["rgb"],
                     "position": [-1.3 + 0.75 * i + SCENE_OFFSET[args.scene][0], 0.5 + SCENE_OFFSET[args.scene][1], 0],
                     "orientation": [0.0, 0.0, 0.7071, -0.7071],
@@ -148,7 +149,7 @@ def main():
         )
         knife.keep_still()
     if args.fluids:
-        table.states[Covered].set_value(env.scene.get_system("water"))
+        table.states[Covered].set_value(env.scene.get_system("water"), True)
 
     output, results = [], []
 

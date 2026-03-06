@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e -x
+set -e
 
 # Parse arguments
 HELP=false
