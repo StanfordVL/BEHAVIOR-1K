@@ -3971,7 +3971,7 @@ class Robot(USDObject, GymObservable):
         """
         if self.is_holonomic_base:
             return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
-        return super().get_position_orientation()
+        return super().get_position_orientation(frame=frame, clone=clone)
 
     def set_linear_velocity(self, velocity: th.Tensor):
         if self.is_holonomic_base:
