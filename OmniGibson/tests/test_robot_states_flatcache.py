@@ -1,12 +1,9 @@
-import time
-
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.macros import gm
-from omnigibson.macros import macros as m
 from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -150,11 +147,11 @@ def test_robot_load_drive():
 
     # Iterate over all robots and test their motion
     for robot_name in REGISTERED_ROBOTS:
-        if robot_name in ["FrankaMounted", "Stretch"]:
-            # TODO: skipping FrankaMounted and Stretch for now because CI doesn't have the required assets
+        if robot_name in ["stretch"]:
+            # TODO: skipping stretch for now
             continue
 
-        if robot_name in ["Husky", "BehaviorRobot"]:
+        if robot_name in ["husky"]:
             # Husky base motion is a little messed up because of the 4-wheel drive; skipping for now
             # BehaviorRobot does not work with the primitive actions at the moment
             continue
@@ -311,12 +308,7 @@ def test_grasping_mode():
 
         # Grasp the box
         gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
-        for _ in range(10):
-            og.sim.step()
-
-        curr_time = time.time()
-        time_required = m.robots.manipulation_robot.GRASP_WINDOW
-        while time.time() - curr_time < time_required:
+        for _ in range(30):
             og.sim.step()
 
         assert object_is_in_hand(
