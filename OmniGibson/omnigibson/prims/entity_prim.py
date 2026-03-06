@@ -156,7 +156,19 @@ class EntityPrim(XFormPrim):
         # Run super
         super()._post_load()
 
-        assert th.all(self.original_scale == 1.0), "scale should be [1, 1, 1] at the EntityPrim (object) level"
+        if not th.all(self.original_scale == 1.0):
+            print(f"WARNING: scale is not [1, 1, 1] at the EntityPrim (object) level for {self.name} -- manually setting to [1, 1, 1] and setting all child links to desired scale")
+            self.set_attribute("xformOp:scale", lazy.pxr.Gf.Vec3d(1.0, 1.0, 1.0))
+            for link in self._links.values():
+                # Rotate the original scale by the orientation of the link
+                # link_orn = link.get_attribute("xformOp:orient")
+                # link_orn = th.tensor(lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(link_orn))
+                link_orn = XFormPrim.get_position_orientation(link, frame="parent")[1]
+                link_orn = T.quat2mat(link_orn)
+                link_scale = link_orn.T @ self.original_scale
+                link.scale = link_scale.abs()
+
+        # assert th.all(self.original_scale == 1.0), "scale should be [1, 1, 1] at the EntityPrim (object) level"
 
         # Cache material information
         materials = set()
