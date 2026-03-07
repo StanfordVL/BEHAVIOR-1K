@@ -29,7 +29,7 @@ from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
-from omnigibson.utils.python_utils import merge_nested_dicts, CachedFunctions, assert_valid_key
+from omnigibson.utils.python_utils import merge_nested_dicts, assert_valid_key
 from omnigibson.utils.vision_utils import segmentation_to_rgb, change_pcd_frame
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.controllers import (
