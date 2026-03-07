@@ -74,7 +74,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
 
     # Choose robot to create
-    robot_name = "Fetch"
+    robot_name = "fetch"
     if not quickstart:
         robot_name = choose_from_options(
             options=list(sorted(REGISTERED_ROBOTS)), name="robot", random_selection=random_selection
