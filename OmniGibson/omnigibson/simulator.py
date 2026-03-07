@@ -62,6 +62,7 @@ from omnigibson.utils.ui_utils import (
     print_logo,
     suppress_omni_log,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
@@ -87,7 +88,7 @@ m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 m.KIT_FILES = {
-    (4, 5, 0): "omnigibson_4_5_0.kit",
+    (5, 1, 0): "omnigibson_5_1_0.kit",
 }
 
 
@@ -217,6 +218,8 @@ def _launch_app():
             isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
             assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
             kit_file_name = m.KIT_FILES[isaac_version_tuple]
+            if gm.ENABLE_VR:
+                kit_file_name = kit_file_name.replace(".kit", "_vr.kit")
 
         # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
         # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
@@ -235,6 +238,7 @@ def _launch_app():
             shutil.copyfile(icon_file, icon_file_target)
         except Exception as e:
             raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
+    
 
         # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
         os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
@@ -525,18 +529,25 @@ def _launch_simulator(*args, **kwargs):
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
-                self._set_viewer_camera()
+                self._set_viewer_camera(
+                    viewer_width=viewer_width,
+                    viewer_height=viewer_height,
+                )
                 self.viewer_camera.set_position_orientation(
                     position=th.tensor(m.DEFAULT_VIEWER_CAMERA_POS),
                     orientation=th.tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
-                self.viewer_width = viewer_width
-                self.viewer_height = viewer_height
 
             # Acquire contact sensor interface
             self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()
 
-        def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
+        def _set_viewer_camera(
+            self,
+            relative_prim_path="/viewer_camera",
+            viewport_name="Viewport",
+            viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
+            viewer_width=gm.DEFAULT_VIEWER_WIDTH,
+        ):
             """
             Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
             and sets this camera as the active camera for the viewer
@@ -550,8 +561,8 @@ def _launch_simulator(*args, **kwargs):
                 relative_prim_path=relative_prim_path,
                 name=relative_prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
                 modalities="rgb",
-                image_height=self.viewer_height,
-                image_width=self.viewer_width,
+                image_height=viewer_height,
+                image_width=viewer_width,
                 viewport_name=viewport_name,
             )
             self._viewer_camera.load(None)
@@ -738,11 +749,7 @@ def _launch_simulator(*args, **kwargs):
             self._floor_plane.load(None)
 
             # Assign floors category to the floor plane
-            lazy.isaacsim.core.utils.semantics.add_update_semantics(
-                prim=self._floor_plane.prim,
-                semantic_label="floors",
-                type_label="class",
-            )
+            add_semantic_label(prim=self._floor_plane.prim, label="floors")
 
         def add_skybox(self):
             """
@@ -1029,8 +1036,8 @@ def _launch_simulator(*args, **kwargs):
                 SimulationManager._backend
             )
             SimulationManager._physics_sim_view.set_subspace_roots("/")
-            SimulationManager._message_bus.dispatch(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
-            SimulationManager._message_bus.dispatch(IsaacEvents.PHYSICS_READY.value, payload={})
+            SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
+            SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
 
         def update_handles(self):
             # Handles are only relevant when physx is running

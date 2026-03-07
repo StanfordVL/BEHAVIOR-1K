@@ -15,8 +15,8 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.constants import ROBOT_CATEGORY
+from omnigibson.robots import REGISTERED_ROBOTS, Robot
+from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -30,7 +30,7 @@ from omnigibson.systems.system_base import (
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
+from omnigibson.utils.constants import ROBOT_CATEGORY, STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -505,6 +505,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Remove all of the scene's objects.
         og.sim.batch_remove_objects(list(self.objects))
 
+        # Remove any vision sensors attached to this scene
+        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+        for sensor in tuple(VisionSensor.SENSORS.values()):
+            if self.prim_path in sensor.prim_path:
+                sensor.remove()
+
         # Remove the scene prim.
         self._scene_prim.remove()
 
@@ -706,6 +712,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
             if self.object_registry.object_is_registered(obj):
                 self.object_registry.remove(obj)
+
+            # Delete any (extra) vision sensors that were externally added to this object
+            # This needs to happen BEFORE the object is removed or else the path to the sensor will become stale
+            sensor_prim_paths = set(VisionSensor.SENSORS.keys())
+            if isinstance(obj, Robot):
+                # However, for robots, we don't want to pre-emptively remove its own sensors since those are handled
+                # internally
+                sensor_prim_paths -= set([sensor.prim_path for sensor in obj.sensors.values()])
+            # Only delete sensors attached to the object (nested prim path)
+            sensor_prim_paths = {spp for spp in sensor_prim_paths if obj.prim_path in spp}
+            for prim_path in sensor_prim_paths:
+                VisionSensor.SENSORS[prim_path].remove()
 
             # Remove from omni stage
             obj.remove()
@@ -1163,6 +1181,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
+            # We need to propagate these changes or else we get a crash
+            og.sim.pi.update_simulation(elapsedStep=0.0, currentTime=og.sim.current_time)
+            og.sim.psi.fetch_results()
+            # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
             self._registry.load_state(state=state, serialized=False)

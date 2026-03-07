@@ -1061,8 +1061,16 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
 
 # This is a faster version than the native implementation, as it avoids pre-processing initially
 def _get_world_pose_transform_w_scale(fabric_prim):
+    # Local import here to avoid circular imports
+    from omnigibson.macros import gm
+
     # This will return a transformation matrix with translation as the last row and scale included
     xformable_prim = usdrt.Rt.Xformable(fabric_prim)
+
+    # If using Fabric, directly use hierarchy world matrix attribute and return that value
+    if gm.ENABLE_FLATCACHE:
+        return xformable_prim.GetFabricHierarchyWorldMatrixAttr().Get(usdrt.Usd.TimeCode.Default())
+
     if xformable_prim.HasWorldXform():
         world_pos_attr = xformable_prim.GetWorldPositionAttr()
         if not world_pos_attr.IsValid():

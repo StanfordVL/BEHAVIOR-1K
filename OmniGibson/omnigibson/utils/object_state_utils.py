@@ -148,7 +148,8 @@ def sample_kinematics(
     if use_trav_map:
         trav_map = objB.scene.trav_map
         trav_map_floor_map = trav_map.floor_map[0]
-        eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=objB.scene.robots[0])
+        robot = objB.scene.robots[0] if len(objB.scene.robots) > 0 else None
+        eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=robot)
 
         # Hardcoding R1 robot arm length for now
         arm_length_xy = 0.8

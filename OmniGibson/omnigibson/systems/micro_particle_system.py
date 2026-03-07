@@ -18,6 +18,7 @@ from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     scene_relative_prim_path_to_absolute,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -946,11 +947,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             )
 
         # Update semantics
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path),
-            semantic_label=self.name,
-            type_label="class",
-        )
+        prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+        add_semantic_label(prim=prim, label=self.name)
 
         return inst
 
@@ -1446,11 +1444,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype = GeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
         prototype.visible = False
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=prototype.prim,
-            semantic_label=self.name,
-            type_label="class",
-        )
+        add_semantic_label(prim=prototype.prim, label=self.name)
         return [prototype]
 
     def _get_particle_material_template(self):
@@ -1555,11 +1549,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=prototype.prim,
-            semantic_label=self.name,
-            type_label="class",
-        )
+        add_semantic_label(prim=prototype.prim, label=self.name)
 
         # Store the contact offset based on a minimum sphere
         # Threshold the lower-bound to avoid super small particles

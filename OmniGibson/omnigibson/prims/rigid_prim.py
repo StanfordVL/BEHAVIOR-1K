@@ -118,6 +118,7 @@ class RigidPrim(XFormPrim):
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
+
         self.update_meshes()
 
         # Possibly set the mass / density
@@ -255,8 +256,7 @@ class RigidPrim(XFormPrim):
                         # Make sure particlesource, particlesink and fillable meshes are not visible
                         mesh.purpose = "guide"
 
-        # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
-        # for this link
+        # If we have any collision meshes, compute the center of mass from collision geometry
         if len(coms) > 0:
             coms_tensor = th.stack(coms)
             vols_tensor = th.tensor(vols).unsqueeze(1)

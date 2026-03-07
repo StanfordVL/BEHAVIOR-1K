@@ -59,9 +59,9 @@ class InteractiveTraversableScene(TraversableScene):
             include_robots (bool): whether to also include the robot(s) defined in the scene
         """
 
+        self.scene_model = scene_model
         # Infer scene directory
         self.scene_dir = get_scene_path(scene_model, dataset_name=dataset_name)
-        self.task_dir = get_task_instance_path(scene_model)
 
         # Other values that will be loaded at runtime
         self.load_object_categories = None
@@ -209,6 +209,14 @@ class InteractiveTraversableScene(TraversableScene):
 
         # We only load this model if all the above conditions are met
         return (not_blacklisted and whitelisted and valid_room and agent_ok) or is_building_structure
+
+    @property
+    def task_dir(self):
+        """
+        Returns:
+            str: Path to task directory. This requires B1K challenge dataset to be downloaded
+        """
+        return get_task_instance_path(self.scene_model)
 
     @property
     def seg_map(self):
