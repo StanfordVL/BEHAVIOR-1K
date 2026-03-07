@@ -47,6 +47,7 @@ class ControllerView:
             controller_cfg (dict): controller configuration dict (must include "name" key)
             articulation_root_path (str): articulation root prim path of the new group member
             link_name (None or str): if specified, the name of the EEF or trunk link (for IK/OSC controllers)
+            control_enabled (bool): if set to False, the controller is disabled. Default is true.
 
         Returns:
             2-tuple:

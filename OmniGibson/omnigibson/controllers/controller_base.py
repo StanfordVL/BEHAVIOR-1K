@@ -465,8 +465,6 @@ class BaseController(Serializable, Registerable, Recreatable):
             return
 
         # Fill in no-op goals for any controllers that haven't received a goal.
-        # Do NOT set _goal_set[i] = True here — only update_goal() should do that,
-        # mirroring the old behavior where self._goal was only set by update_goal().
         for i in range(N):
             # Skip control_disabled or unregistered members
             if self._control_enabled[i] == 0 or self._unregistered_controllers[i] == 1:

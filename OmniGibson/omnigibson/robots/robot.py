@@ -824,18 +824,13 @@ class Robot(USDObject, GymObservable):
     @control_enabled.setter
     def control_enabled(self, value):
         self._control_enabled = value
-        if hasattr(self, "_controllers"):
-            for group_key, controller_idx in self._controllers.values():
-                ControllerView.set_control_enabled(group_key, controller_idx, value)
+        for group_key, controller_idx in self._controllers.values():
+            ControllerView.set_control_enabled(group_key, controller_idx, value)
 
     def post_step(self):
         """
-        Handle per-robot concerns after ControllerView.step_all() writes controls to the Isaac buffer
+        Run per-robot assisted grasping logic after ControllerView.step_all() writes controls to the Isaac buffer
         but before ControllableObjectViewAPI.flush_control() flushes them.
-
-        1. If control is disabled or the articulation view is not ready, skip.
-        2. Override frozen gripper joint targets in the buffer (assisted grasping freeze).
-        3. Run assisted grasping logic (_handle_assisted_grasping).
         """
         if self.is_manipulation:
             if self.grasping_mode != "physical" and not self._disable_grasp_handling:
