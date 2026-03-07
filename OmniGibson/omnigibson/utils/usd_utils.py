@@ -1402,20 +1402,19 @@ def get_robot_kinematic_tree_pattern(articulation_root_path: str) -> str:
             -> "/World/scene_*/controllable__fetch__*/base_link"
     """
     scene_id, robot_name = articulation_root_path.split("/")[2:4]
-    assert scene_id.startswith("scene_"), (
-        f"Prim path 2nd component {articulation_root_path} does not start with scene_"
-    )
+    assert scene_id.startswith("scene_"), f"Prim path 2nd component {articulation_root_path} does not start with scene_"
     components = robot_name.split("__")
     assert len(components) == 3, (
         f"Robot prim path's 3rd component {robot_name} does not match "
         "expected format of prefix__robottype__robotname."
     )
-    assert components[0] == "controllable", (
-        f"Prim path {articulation_root_path} 3rd component does not start with 'controllable__'"
-    )
+    assert (
+        components[0] == "controllable"
+    ), f"Prim path {articulation_root_path} 3rd component does not start with 'controllable__'"
     return articulation_root_path.replace(f"/{scene_id}/", "/scene_*/").replace(
         f"/{robot_name}", f"/{components[0]}__{components[1]}__*"
     )
+
 
 class ControllableObjectViewAPI:
     """
@@ -1507,7 +1506,9 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def set_joint_efforts(cls, prim_path, efforts, indices):
-        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].set_joint_efforts(prim_path, efforts, indices)
+        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].set_joint_efforts(
+            prim_path, efforts, indices
+        )
 
     @classmethod
     def get_member_view_indices(cls, routing_path, prim_paths):
@@ -1602,9 +1603,9 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def get_link_relative_position_orientation(cls, prim_path, link_name):
-        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_link_relative_position_orientation(
-            prim_path, link_name
-        )
+        return cls._VIEWS_BY_PATTERN[
+            get_robot_kinematic_tree_pattern(prim_path)
+        ].get_link_relative_position_orientation(prim_path, link_name)
 
     @classmethod
     def get_link_index(cls, prim_path, link_name):
@@ -1619,27 +1620,37 @@ class ControllableObjectViewAPI:
     @classmethod
     def get_all_link_relative_position_orientation(cls, prim_path, link_name):
         """Returns (N, 3) positions and (N, 4) quaternions for the given link across all robots."""
-        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_link_relative_position_orientation(link_name)
+        return cls._VIEWS_BY_PATTERN[
+            get_robot_kinematic_tree_pattern(prim_path)
+        ].get_all_link_relative_position_orientation(link_name)
 
     @classmethod
     def get_all_link_relative_linear_velocity(cls, prim_path, link_name, estimate=False):
         """Returns (N, 3) link linear velocities for all robots of the same type."""
-        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_link_relative_linear_velocity(link_name, estimate=estimate)
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_link_relative_linear_velocity(
+            link_name, estimate=estimate
+        )
 
     @classmethod
     def get_all_link_relative_angular_velocity(cls, prim_path, link_name, estimate=False):
         """Returns (N, 3) link angular velocities for all robots of the same type."""
-        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_link_relative_angular_velocity(link_name, estimate=estimate)
+        return cls._VIEWS_BY_PATTERN[
+            get_robot_kinematic_tree_pattern(prim_path)
+        ].get_all_link_relative_angular_velocity(link_name, estimate=estimate)
 
     @classmethod
     def get_all_relative_linear_velocity(cls, prim_path, estimate=False):
         """Returns (N, 3) base linear velocities for all robots of the same type."""
-        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_relative_linear_velocity(estimate=estimate)
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_relative_linear_velocity(
+            estimate=estimate
+        )
 
     @classmethod
     def get_all_relative_angular_velocity(cls, prim_path, estimate=False):
         """Returns (N, 3) base angular velocities for all robots of the same type."""
-        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_relative_angular_velocity(estimate=estimate)
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_relative_angular_velocity(
+            estimate=estimate
+        )
 
 
 def clear():

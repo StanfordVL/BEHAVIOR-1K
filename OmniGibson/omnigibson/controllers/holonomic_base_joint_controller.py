@@ -3,6 +3,7 @@ from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
+
 class HolonomicBaseJointController(JointController):
     """
     Controller class for holonomic base joint control. This is a very specific type of controller used to model control of a 3DOF

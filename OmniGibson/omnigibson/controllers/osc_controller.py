@@ -294,6 +294,7 @@ class OperationalSpaceController(ManipulationController):
             for i in range(self.n_members):
                 if self._goal_set[i]:
                     self._fixed_quat_targets[i] = cb.T.mat2quat(self._goals["target_ori_mat"][i])
+
     def _clear_variable_gains(self):
         """
         Helper function to clear any gains that are variable and considered part of actions
@@ -331,7 +332,7 @@ class OperationalSpaceController(ManipulationController):
 
         Args:
             command (n-array): Preprocessed command
-            controller_idx (int): idx of the controller that need to update goal 
+            controller_idx (int): idx of the controller that need to update goal
         """
         prim_path = self._articulation_root_paths[controller_idx]
         link_name = self._link_name
@@ -412,10 +413,14 @@ class OperationalSpaceController(ManipulationController):
         # Keep all_q as full (N_view, n_dof) to preserve shape for downstream offset computation.
         all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)
         q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
-        qd_all = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
+        qd_all = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
+            :, self.dof_idx
+        ]  # (N, ctrl_dim)
 
         # Batched mass matrix: slice to (N, ctrl_dim, ctrl_dim)
-        all_mm_full = ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)  # (N_view, n_dof_total, n_dof_total)
+        all_mm_full = ControllableObjectViewAPI.get_all_generalized_mass_matrices(
+            self.routing_path
+        )  # (N_view, n_dof_total, n_dof_total)
         # Floating-base robots can expose 6 virtual base DOFs in dynamics tensors.
         # dof_idx indexes the joint block, so we align indices with a dynamic offset.
         # Compute offsets from full tensor shapes before row-slicing.
@@ -425,7 +430,9 @@ class OperationalSpaceController(ManipulationController):
         mm_all = all_mm_full[rows, :, :][:, dof_idxs_mat[0], dof_idxs_mat[1]]  # (N, ctrl_dim, ctrl_dim)
 
         # Batched jacobians
-        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(self.routing_path)  # (N_view, n_links, 6, n_dof_total)
+        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(
+            self.routing_path
+        )  # (N_view, n_links, 6, n_dof_total)
         eef_body_idx = ControllableObjectViewAPI.get_link_index(self.routing_path, link_name)
         jac_row = eef_body_idx - 1  # Jacobian excludes root body (index 0)
         # Floating-base robots expose Jacobian columns as [virtual_base(6), joints].
@@ -442,7 +449,9 @@ class OperationalSpaceController(ManipulationController):
         ee_quat_all = ee_quat_all[rows]
         ee_mat_all = cb.as_float32(cb.T.quat2mat(ee_quat_all))  # (N, 3, 3)
         ee_lin_vel_all = cb.as_float32(
-            ControllableObjectViewAPI.get_all_link_relative_linear_velocity(self.routing_path, link_name, estimate=True)[rows]
+            ControllableObjectViewAPI.get_all_link_relative_linear_velocity(
+                self.routing_path, link_name, estimate=True
+            )[rows]
         )  # (N, 3)
         ee_ang_vel_all = ControllableObjectViewAPI.get_all_link_relative_angular_velocity(
             self.routing_path, link_name, estimate=True
@@ -450,7 +459,9 @@ class OperationalSpaceController(ManipulationController):
         base_lin_vel_all = cb.as_float32(
             ControllableObjectViewAPI.get_all_relative_linear_velocity(self.routing_path, estimate=True)[rows]
         )  # (N, 3)
-        base_ang_vel_all = ControllableObjectViewAPI.get_all_relative_angular_velocity(self.routing_path, estimate=True)[rows]  # (N, 3)
+        base_ang_vel_all = ControllableObjectViewAPI.get_all_relative_angular_velocity(
+            self.routing_path, estimate=True
+        )[rows]  # (N, 3)
 
         # Batched angular velocity error: quat_multiply(axisangle2quat(-ee_ang_vel), axisangle2quat(base_ang_vel))
         ee_ang_vel_err_all = cb.as_float32(
@@ -521,11 +532,12 @@ class OperationalSpaceController(ManipulationController):
         )
 
     def _compute_no_op_command(self, controller_idx):
-        
         prim_path = self._articulation_root_paths[controller_idx]
         link_name = self._link_name
 
-        pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(prim_path, link_name)
+        pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
+            prim_path, link_name
+        )
 
         command = cb.zeros(6)
 

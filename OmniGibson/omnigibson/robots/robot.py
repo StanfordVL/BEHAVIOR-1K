@@ -44,7 +44,7 @@ from omnigibson.controllers import (
     JointController,
     HolonomicBaseJointController,
     DifferentialDriveController,
-    ControllerView
+    ControllerView,
 )
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.object_states import ContactBodies
@@ -1986,7 +1986,7 @@ class Robot(USDObject, GymObservable):
         if self.is_two_wheel:
             action = th.zeros(self.action_dim)
             assert isinstance(
-               ControllerView.get_controller(self._controllers["base"][0]), DifferentialDriveController
+                ControllerView.get_controller(self._controllers["base"][0]), DifferentialDriveController
             ), "Only DifferentialDriveController is supported!"
             action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
             return action
@@ -1998,9 +1998,10 @@ class Robot(USDObject, GymObservable):
                 arm_name = self.arm_names[i]
                 arm_action = th.tensor(teleop_action[hand]).float()
                 # arm action
-                assert (
-                    ControllerView.is_controller_type(self._controllers[f"arm_{arm_name}"][0], InverseKinematicsController)
-                    or ControllerView.is_controller_type(self._controllers[f"arm_{arm_name}"][0], OperationalSpaceController)
+                assert ControllerView.is_controller_type(
+                    self._controllers[f"arm_{arm_name}"][0], InverseKinematicsController
+                ) or ControllerView.is_controller_type(
+                    self._controllers[f"arm_{arm_name}"][0], OperationalSpaceController
                 ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
                 target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
                 action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
@@ -2019,9 +2020,10 @@ class Robot(USDObject, GymObservable):
                 arm_name = self.arm_names[i]
                 arm_action = th.tensor(teleop_action[hand]).float()
                 # arm action
-                assert (
-                    ControllerView.is_controller_type(self._controllers[f"arm_{arm_name}"][0], InverseKinematicsController)
-                    or ControllerView.is_controller_type(self._controllers[f"arm_{arm_name}"][0], OperationalSpaceController)
+                assert ControllerView.is_controller_type(
+                    self._controllers[f"arm_{arm_name}"][0], InverseKinematicsController
+                ) or ControllerView.is_controller_type(
+                    self._controllers[f"arm_{arm_name}"][0], OperationalSpaceController
                 ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
                 target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
                 action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
@@ -3706,8 +3708,7 @@ class Robot(USDObject, GymObservable):
         assert self.is_locomotion
         c_order_idx = self.controller_order.index("base")
         action_start_idx = sum(
-            ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0])
-            for i in range(c_order_idx)
+            ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0]) for i in range(c_order_idx)
         )
         base_gk = self._controllers["base"][0]
         return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(base_gk))
@@ -3937,8 +3938,7 @@ class Robot(USDObject, GymObservable):
         assert self.is_articulated_trunk
         c_order_idx = self.controller_order.index("trunk")
         action_start_idx = sum(
-            ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0])
-            for i in range(c_order_idx)
+            ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0]) for i in range(c_order_idx)
         )
         trunk_gk = self._controllers["trunk"][0]
         return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(trunk_gk))

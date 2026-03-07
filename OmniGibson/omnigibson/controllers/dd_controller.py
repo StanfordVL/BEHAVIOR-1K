@@ -113,7 +113,7 @@ class DifferentialDriveController(LocomotionController):
         right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
 
         # Backend-safe concat: numpy backend does not accept torch-style `dim` kwarg in concatenate.
-        left_wheel_joint_vel = cb.squeeze(left_wheel_joint_vel, dim=-1)   # (N,)
+        left_wheel_joint_vel = cb.squeeze(left_wheel_joint_vel, dim=-1)  # (N,)
         right_wheel_joint_vel = cb.squeeze(right_wheel_joint_vel, dim=-1)  # (N,)
         return cb.stack([left_wheel_joint_vel, right_wheel_joint_vel], dim=-1)  # (N, 2)
 

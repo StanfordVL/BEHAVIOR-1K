@@ -1658,7 +1658,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     base_action = th.tensor([self.robot.linear_velocity_gain_for_primitives, 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
-                    raise ValueError(f"Unsupported base controller: {ControllerView.get_controller(base_gk).__class__.__name__}")
+                    raise ValueError(
+                        f"Unsupported base controller: {ControllerView.get_controller(base_gk).__class__.__name__}"
+                    )
 
                 yield self._postprocess_action(action)
         else:
@@ -1707,7 +1709,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 base_action[0] = 0.0
                 base_action[1] = ang_vel
             else:
-                raise ValueError(f"Unsupported base controller: {ControllerView.get_controller(base_gk).__class__.__name__}")
+                raise ValueError(
+                    f"Unsupported base controller: {ControllerView.get_controller(base_gk).__class__.__name__}"
+                )
 
             action[self.robot.controller_action_idx["base"]] = base_action
             yield self._postprocess_action(action)

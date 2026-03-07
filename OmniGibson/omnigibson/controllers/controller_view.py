@@ -55,9 +55,10 @@ class ControllerView:
         """
         # Build a unique string key for a controller group.
         group_key = cls._make_key(articulation_root_path, body_part, controller_cfg)
-        
+
         if group_key not in cls._controller_groups:
             from omnigibson.controllers import create_controller
+
             cls._controller_groups[group_key] = create_controller(**controller_cfg)
 
         controller = cls._controller_groups[group_key]
@@ -128,25 +129,25 @@ class ControllerView:
     @classmethod
     def unregister_robot(cls, controllers: dict):
         """
-            Unregister one robot from controller groups without reindexing members.
+        Unregister one robot from controller groups without reindexing members.
 
-            For each (group_key, controller_idx) in @controllers:
-            - Locate the shared controller group.
-            - Mark controller_idx as a tombstoned (unregistered) slot.
-            - Keep the group if any active members remain; delete it only when all members
-            are tombstoned.
+        For each (group_key, controller_idx) in @controllers:
+        - Locate the shared controller group.
+        - Mark controller_idx as a tombstoned (unregistered) slot.
+        - Keep the group if any active members remain; delete it only when all members
+        are tombstoned.
 
-            Why tombstones:
-            - Preserve stable controller_idx assignments for remaining robots.
-            - Avoid shifting arrays / remapping indices across robots in the same group.
+        Why tombstones:
+        - Preserve stable controller_idx assignments for remaining robots.
+        - Avoid shifting arrays / remapping indices across robots in the same group.
 
-            Tombstoned slots are never reused.
-            Controller logic must mask tombstoned slots during goal updates, batched
-            compute, and writeback.
+        Tombstoned slots are never reused.
+        Controller logic must mask tombstoned slots during goal updates, batched
+        compute, and writeback.
 
-            Args:
-                controllers (dict): The robot.controllers dict, 
-                    mapping controller_name -> (group_key, controller_idx)
+        Args:
+            controllers (dict): The robot.controllers dict,
+                mapping controller_name -> (group_key, controller_idx)
 
         """
         for group_key, controller_idx in controllers.values():
@@ -176,9 +177,7 @@ class ControllerView:
     @classmethod
     def get_mode(cls, group_key: str) -> str:
         controller = cls._controller_groups[group_key]
-        assert hasattr(controller, "mode"), (
-            f"Controller {type(controller).__name__} does not have a 'mode' attribute"
-        )
+        assert hasattr(controller, "mode"), f"Controller {type(controller).__name__} does not have a 'mode' attribute"
         return controller.mode
 
     @classmethod
@@ -212,9 +211,9 @@ class ControllerView:
     @classmethod
     def get_motor_type(cls, group_key: str) -> str:
         controller = cls._controller_groups[group_key]
-        assert hasattr(controller, "motor_type"), (
-            f"Controller {type(controller).__name__} does not have a 'motor_type' attribute"
-        )
+        assert hasattr(
+            controller, "motor_type"
+        ), f"Controller {type(controller).__name__} does not have a 'motor_type' attribute"
         return controller.motor_type
 
     @classmethod
@@ -258,6 +257,7 @@ class ControllerView:
     @classmethod
     def _make_key(cls, articulation_root_path: str, body_part: str, controller_cfg: dict) -> str:
         from omnigibson.utils.usd_utils import get_robot_kinematic_tree_pattern
+
         pattern = get_robot_kinematic_tree_pattern(articulation_root_path)
         cfg_hash = hash(cls._freeze_for_hash(controller_cfg))
         return f"{pattern}__{body_part}__{cfg_hash}"

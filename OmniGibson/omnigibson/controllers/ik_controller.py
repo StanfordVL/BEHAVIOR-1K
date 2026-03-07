@@ -142,8 +142,8 @@ class InverseKinematicsController(JointController, ManipulationController):
 
         self._link_name = None  # eef/trunk link name (same for all members in the group)
         self._fixed_quat_targets = []  # per-member fixed quat target for position_fixed_ori mode
-        self._control_filters = [] # per-member control filter
-        
+        self._control_filters = []  # per-member control filter
+
         # If the mode is set as absolute orientation and using default config,
         # change input and output limits accordingly.
         # By default, the input limits are set as 1, so we modify this to have a correct range.
@@ -348,7 +348,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         Returns:
             Tensor: (N, control_dim) outputted (non-clipped!) control signal to deploy
         """
-        
+
         N = self.n_members
         link_name = self._link_name
         self._ensure_view_row_indices()
@@ -357,7 +357,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         # Batched state reads
         all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)
         q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
-        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(self.routing_path)  # (N_view, n_links, 6, n_dof_total)
+        jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(
+            self.routing_path
+        )  # (N_view, n_links, 6, n_dof_total)
         eef_body_idx = ControllableObjectViewAPI.get_link_index(self.routing_path, link_name)
         jac_row = eef_body_idx - 1  # Jacobian excludes root body (index 0)
         # Floating-base robots expose Jacobian columns as [virtual_base(6), joints].

@@ -363,7 +363,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         goal_dict = self._update_goal(controller_idx, preprocessed)
         for k, v in goal_dict.items():
             self._goals[k][controller_idx] = v
-        
+
         self._goal_set[controller_idx] = True
 
     def _update_goal(self, controller_idx, command):
@@ -378,7 +378,6 @@ class BaseController(Serializable, Registerable, Recreatable):
             dict: Keyword-mapped goal values for controller at controller_idx
         """
         raise NotImplementedError
-
 
     def compute_control(self, goals):
         """
@@ -405,7 +404,8 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Filter to enabled and non-unregistered members
         enabled_indices = [
-            i for i, (e, u) in enumerate(zip(self._control_enabled, self._unregistered_controllers))
+            i
+            for i, (e, u) in enumerate(zip(self._control_enabled, self._unregistered_controllers))
             if e != 0 and u == 0
         ]
         if not enabled_indices:
@@ -427,9 +427,7 @@ class BaseController(Serializable, Registerable, Recreatable):
                 routing_path, enabled_rows, enabled_controls, self.dof_idx
             )
         elif self.control_type == ControlType.EFFORT:
-            ControllableObjectViewAPI.set_all_joint_efforts(
-                routing_path, enabled_rows, enabled_controls, self.dof_idx
-            )
+            ControllableObjectViewAPI.set_all_joint_efforts(routing_path, enabled_rows, enabled_controls, self.dof_idx)
 
     def clip_control(self, control):
         """
@@ -481,18 +479,23 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Compute batched control: (N, control_dim)
         control_output = self.compute_control(self._goals)
-        assert control_output.shape == (N, self.control_dim), (
-            f"compute_control must return shape ({N}, {self.control_dim}), got {control_output.shape}"
-        )
+        assert control_output.shape == (
+            N,
+            self.control_dim,
+        ), f"compute_control must return shape ({N}, {self.control_dim}), got {control_output.shape}"
 
         # Clip, store per-member controls, then write batched
         control_output = self.clip_control(control_output)
         for i in range(N):
             if self._control_enabled[i] != 0 and self._unregistered_controllers[i] == 0:
                 ctrl = control_output[i]
-                self._controls[i] = cb.from_torch(ctrl) if isinstance(ctrl, th.Tensor) else (ctrl if isinstance(ctrl, cb.arr_type) else cb.array(ctrl))
+                self._controls[i] = (
+                    cb.from_torch(ctrl)
+                    if isinstance(ctrl, th.Tensor)
+                    else (ctrl if isinstance(ctrl, cb.arr_type) else cb.array(ctrl))
+                )
         self._write_control()
-    
+
     def reset(self, controller_idx):
         """
         Resets the goal state for the controller at @controller_idx. Can be extended by subclass
@@ -530,11 +533,12 @@ class BaseController(Serializable, Registerable, Recreatable):
             dict: Maps relevant goal keys to goal data for that controller
         """
         raise NotImplementedError
+
     def compute_no_op_action(self, controller_idx):
         """
         Compute a no-op action that updates the goal to match the current position
         Disclaimer: this no-op might cause drift under external load (e.g. when the controller cannot reach the goal position)
-        
+
         Args:
             controller_idx (int): index of the controller in this group
 
@@ -595,7 +599,7 @@ class BaseController(Serializable, Registerable, Recreatable):
                 elif not isinstance(val, cb.arr_type):
                     val = cb.array(val)
                 self._goals[name][:] = val
-        
+
     def serialize(self, state):
         # Serialize goal state for all members
         n = state["n_members"]
@@ -608,12 +612,12 @@ class BaseController(Serializable, Registerable, Recreatable):
     def deserialize(self, state):
         n = self.n_members
         goal_set = state[:n].bool().tolist()
-        unregistered_controllers = state[n:2*n].long().tolist()
+        unregistered_controllers = state[n : 2 * n].long().tolist()
         idx = 2 * n
         goals = {}
         for key, shape in self._goal_shapes.items():
             length = n * math.prod(shape)
-            goals[key] = state[idx: idx + length].reshape(n, *shape)
+            goals[key] = state[idx : idx + length].reshape(n, *shape)
             idx += length
         return dict(n_members=n, goal_set=goal_set, unregistered_controllers=unregistered_controllers, goals=goals), idx
 

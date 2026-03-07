@@ -6,6 +6,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControllerView
 from omnigibson.utils.backend_utils import _compute_backend as cb
 
+
 # -------------------- Helper Functions --------------------
 def _make_two_fetch_env():
     cfg = {
@@ -64,6 +65,7 @@ def _arm_start_idx(robot, arm):
 def _distance(a, b):
     return th.norm(a - b).item()
 
+
 # -------------------- Test Cases --------------------
 def test_arm_control():
     # Create env
@@ -120,7 +122,7 @@ def test_arm_control():
                 "model": "fetch",
                 "name": "robot_5",
                 "obs_modalities": [],
-                "position": [150, 150, 125],  
+                "position": [150, 150, 125],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
                 "fixed_base": False,
@@ -403,12 +405,16 @@ def test_two_fetch_reload_noncontiguous_slots():
     _stabilize_and_reset(env.robots)
 
     for robot in env.robots:
-        controller_config = {f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names}
+        controller_config = {
+            f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names
+        }
         robot.reload_controllers(controller_config)
 
     # Reload each robot once more to force tombstones in shared groups.
     for robot in env.robots:
-        controller_config = {f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names}
+        controller_config = {
+            f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names
+        }
         robot.reload_controllers(controller_config)
 
     arm_name = env.robots[0].arm_names[0]
@@ -429,7 +435,7 @@ def test_two_fetch_reload_noncontiguous_slots():
     actions = {r.name: th.zeros(r.action_dim) for r in env.robots}
     for _ in range(5):
         env.step(actions)
-    
+
     og.clear()
 
 
@@ -445,7 +451,9 @@ def test_shared_group_disable_one_member():
     _stabilize_and_reset(env.robots)
 
     for robot in env.robots:
-        controller_config = {f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names}
+        controller_config = {
+            f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names
+        }
         robot.reload_controllers(controller_config)
 
     robot_a, robot_b = env.robots
@@ -552,7 +560,9 @@ def test_mixed_models_no_cross_group_contamination():
     env = og.Environment(configs=cfg)
 
     for i, robot in enumerate(env.robots):
-        robot.set_position_orientation(position=th.tensor([0.0, i * 5.0, 0.0]), orientation=th.tensor([0.0, 0.0, 0.0, 1.0]))
+        robot.set_position_orientation(
+            position=th.tensor([0.0, i * 5.0, 0.0]), orientation=th.tensor([0.0, 0.0, 0.0, 1.0])
+        )
         robot.reset()
     for _ in range(5):
         og.sim.step()

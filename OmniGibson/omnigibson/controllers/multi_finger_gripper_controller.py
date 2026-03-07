@@ -203,7 +203,9 @@ class MultiFingerGripperController(GripperController):
 
         self._ensure_view_row_indices()
         rows = self._view_row_indices
-        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
+        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][
+            :, self.dof_idx
+        ]  # (N, ctrl_dim)
 
         u_list = []
         for i in range(N):
@@ -391,7 +393,11 @@ class MultiFingerGripperController(GripperController):
         state_flat = super().serialize(state=state)
         # Serialize each vel filter
         filter_states = state.get("vel_filter", [])
-        filter_flat = th.cat([vf.serialize(state=fs) for vf, fs in zip(self._vel_filters, filter_states)]) if filter_states else th.tensor([])
+        filter_flat = (
+            th.cat([vf.serialize(state=fs) for vf, fs in zip(self._vel_filters, filter_states)])
+            if filter_states
+            else th.tensor([])
+        )
         return th.cat([state_flat, filter_flat])
 
     def deserialize(self, state):

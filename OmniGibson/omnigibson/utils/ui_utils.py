@@ -26,6 +26,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.controllers import ControllerView
 
+
 def print_icon():
     raw_texts = [
         # Lgrey, grey, lgrey, grey, red, lgrey, red
@@ -592,7 +593,7 @@ class KeyboardRobotController:
         self.controller_info = dict()
         self.joint_idx_to_controller = dict()
         idx = 0
-        
+
         for name, (group_key, _) in robot.controllers.items():
             controller = ControllerView.get_controller(group_key)
             self.controller_info[name] = {
