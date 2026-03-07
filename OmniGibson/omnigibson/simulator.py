@@ -14,25 +14,6 @@ from contextlib import nullcontext
 from pathlib import Path
 from cProfile import Profile
 
-
-def with_profiler(name):
-    def decorator(fn):
-        @functools.wraps(fn)
-        def wrapper(self, *args, **kwargs):
-            profiler = getattr(self, name)
-            if profiler is not None:
-                profiler.enable()
-            try:
-                return fn(self, *args, **kwargs)
-            finally:
-                if profiler is not None:
-                    profiler.disable()
-
-        return wrapper
-
-    return decorator
-
-
 import torch as th
 
 import omnigibson as og
@@ -90,6 +71,24 @@ m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 m.KIT_FILES = {
     (5, 1, 0): "omnigibson_5_1_0.kit",
 }
+
+
+def with_profiler(name):
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            profiler = getattr(self, name)
+            if profiler is not None:
+                profiler.enable()
+            try:
+                return fn(self, *args, **kwargs)
+            finally:
+                if profiler is not None:
+                    profiler.disable()
+
+        return wrapper
+
+    return decorator
 
 
 # Helper functions for starting omnigibson
@@ -238,7 +237,6 @@ def _launch_app():
             shutil.copyfile(icon_file, icon_file_target)
         except Exception as e:
             raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
-    
 
         # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
         os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())

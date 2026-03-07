@@ -18,7 +18,6 @@ from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
-from omnigibson.utils.processing_utils import MovingAverageFilter
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -60,7 +59,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         use_cc_compensation=True,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
-        smoothing_filter_size=None,
     ):
         """
         Args:

@@ -185,7 +185,6 @@ class InverseKinematicsController(JointController, ManipulationController):
             command_output_limits=command_output_limits,
             isaac_kp=isaac_kp,
             isaac_kd=isaac_kd,
-            smoothing_filter_size=smoothing_filter_size,
         )
         # Reuse the limits already cached by the base class; adding a leading dim lets clip() broadcast over N
         self._q_lower = cb.view(self._clip_lo, (1, -1))

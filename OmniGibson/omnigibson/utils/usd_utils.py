@@ -1010,6 +1010,10 @@ class PoseAPI:
             # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
+            # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
+            # check if this is still the case for later versions
+            og.sim.render()
+
             # when flatcache is on
             if og.sim._physx_fabric_interface:
                 # no time step is taken here
@@ -2340,7 +2344,7 @@ def add_asset_to_stage(asset_path, prim_path):
     """
     # Make sure this is actually a supported asset type
     asset_type = asset_path.split(".")[-1]
-    assert asset_type in {"usd", "usda", "obj"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
+    assert asset_type in {"usd", "usda", "obj", "usdz"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
