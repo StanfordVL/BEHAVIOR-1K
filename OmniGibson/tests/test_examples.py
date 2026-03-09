@@ -1,14 +1,16 @@
+import importlib
 import os
-import subprocess
-import sys
 
 import pytest
 
+# Must be set before omnigibson is imported so that gm.HEADLESS is True
+os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
+
 from omnigibson.utils.asset_utils import download_omnigibson_robot_assets
 
-# Explicit list of examples to test. Each example is run in a subprocess to
-# work around Isaac Sim being a singleton (can't be instantiated twice in the
-# same process).
+# Explicit list of examples to test. In CI each example runs in its own matrix
+# job (isolated process), so the Isaac Sim singleton is not an issue. When
+# running locally always use -k to run a single example at a time.
 EXAMPLES = [
     # --- BEGIN AUTO-GENERATED EXAMPLES ---
     "environments.navigation_env_demo",
@@ -64,14 +66,5 @@ def download_assets():
 
 @pytest.mark.parametrize("example_name", EXAMPLES)
 def test_example(example_name):
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            f"import omnigibson.examples.{example_name} as m; "
-            f"m.main(random_selection=True, headless=True, short_exec=True)",
-        ],
-        env={**os.environ, "OMNIGIBSON_HEADLESS": "1"},
-        timeout=1200,
-    )
-    assert result.returncode == 0, f"Example {example_name} exited with return code {result.returncode}"
+    module = importlib.import_module(f"omnigibson.examples.{example_name}")
+    module.main(random_selection=True, headless=True, short_exec=True)
