@@ -24,8 +24,8 @@ jobs:
       - name: Install BDDL
         run: pip install -e .
         working-directory: ${{ github.workspace }}/bddl3
-      - name: Install OmniGibson (no extras needed for discovery)
-        run: pip install -e . --no-build-isolation
+      - name: Install OmniGibson
+        run: pip install -e .[dev,primitives,eval] --no-build-isolation
         working-directory: ${{ github.workspace }}/OmniGibson
       - name: Check example lists are up to date
         run: python tests/update_example_tests.py --check
