@@ -58,17 +58,11 @@ jobs:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
           - {test_file: test_examples, example: "environments.vector_env_demo"}
-          - {test_file: test_examples, example: "objects.draw_bounding_box"}
-          - {test_file: test_examples, example: "objects.highlight_objects"}
-          - {test_file: test_examples, example: "objects.import_custom_object"}
-          - {test_file: test_examples, example: "objects.load_object_selector"}
-          - {test_file: test_examples, example: "objects.view_cloth_configurations"}
-          - {test_file: test_examples, example: "objects.visualize_object"}
           - {test_file: test_examples, example: "object_states.attachment_demo"}
           - {test_file: test_examples, example: "object_states.dicing_demo"}
           - {test_file: test_examples, example: "object_states.folded_unfolded_state_demo"}
-          - {test_file: test_examples, example: "object_states.heated_state_demo"}
           - {test_file: test_examples, example: "object_states.heat_source_or_sink_demo"}
+          - {test_file: test_examples, example: "object_states.heated_state_demo"}
           - {test_file: test_examples, example: "object_states.object_state_texture_demo"}
           - {test_file: test_examples, example: "object_states.onfire_demo"}
           - {test_file: test_examples, example: "object_states.overlaid_demo"}
@@ -77,6 +71,12 @@ jobs:
           - {test_file: test_examples, example: "object_states.sample_kinematics_demo"}
           - {test_file: test_examples, example: "object_states.slicing_demo"}
           - {test_file: test_examples, example: "object_states.temperature_demo"}
+          - {test_file: test_examples, example: "objects.draw_bounding_box"}
+          - {test_file: test_examples, example: "objects.highlight_objects"}
+          - {test_file: test_examples, example: "objects.import_custom_object"}
+          - {test_file: test_examples, example: "objects.load_object_selector"}
+          - {test_file: test_examples, example: "objects.view_cloth_configurations"}
+          - {test_file: test_examples, example: "objects.visualize_object"}
           - {test_file: test_examples, example: "robots.all_robots_visualizer"}
           - {test_file: test_examples, example: "robots.curobo_example"}
           - {test_file: test_examples, example: "robots.grasping_mode_example"}

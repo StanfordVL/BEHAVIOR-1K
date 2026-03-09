@@ -21,8 +21,8 @@ TEST_EXAMPLES_PY = Path(__file__).parent / "test_examples.py"
 TESTS_YML = REPO_ROOT / ".github" / "workflows" / "tests.yml"
 
 # Markers used to delimit the auto-generated sections
-EXAMPLES_START = "# --- BEGIN AUTO-GENERATED EXAMPLES ---"
-EXAMPLES_END = "# --- END AUTO-GENERATED EXAMPLES ---"
+EXAMPLES_START = "    # --- BEGIN AUTO-GENERATED EXAMPLES ---"
+EXAMPLES_END = "    # --- END AUTO-GENERATED EXAMPLES ---"
 INCLUDE_START = "# --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---"
 INCLUDE_END = "# --- END AUTO-GENERATED EXAMPLE INCLUDES ---"
 
@@ -50,13 +50,12 @@ def get_skip_reasons(content):
 
 
 def generate_examples_list(examples, skip_reasons):
-    """Generate the EXAMPLES = [...] block content."""
-    lines = ["EXAMPLES = [", EXAMPLES_START]
+    """Generate content between (and including) the marker lines."""
+    lines = [EXAMPLES_START]
     for name in examples:
         if name not in skip_reasons:
             lines.append(f'    "{name}",')
     lines.append(EXAMPLES_END)
-    lines.append("]")
     return "\n".join(lines)
 
 
@@ -71,9 +70,9 @@ def generate_yml_includes(examples, skip_reasons):
 
 
 def replace_section(content, start_marker, end_marker, new_block):
-    """Replace everything between (and including) the marker lines."""
+    """Replace from the start marker line to the end marker line (inclusive)."""
     pattern = re.compile(
-        rf"^.*{re.escape(start_marker)}.*$.*^.*{re.escape(end_marker)}.*$",
+        rf"^[^\n]*{re.escape(start_marker)}[^\n]*$.*?^[^\n]*{re.escape(end_marker)}[^\n]*$",
         re.MULTILINE | re.DOTALL,
     )
     if not pattern.search(content):
