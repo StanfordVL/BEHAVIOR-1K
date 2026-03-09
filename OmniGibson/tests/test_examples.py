@@ -6,8 +6,6 @@ import pytest
 # Must be set before omnigibson is imported so that gm.HEADLESS is True
 os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
 
-from omnigibson.utils.asset_utils import download_omnigibson_robot_assets
-
 # Explicit list of examples to test. In CI each example runs in its own matrix
 # job (isolated process), so the Isaac Sim singleton is not an issue. When
 # running locally always use -k to run a single example at a time.
@@ -57,11 +55,6 @@ EXAMPLES_TO_SKIP = [
     "teleoperation.vr_robot_control_demo",  # requires VR hardware
     "teleoperation.vr_scene_tour_demo",  # requires VR hardware
 ]
-
-
-@pytest.fixture(scope="session", autouse=True)
-def download_assets():
-    download_omnigibson_robot_assets()
 
 
 @pytest.mark.parametrize("example_name", EXAMPLES)
