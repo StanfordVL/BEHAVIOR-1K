@@ -14,22 +14,24 @@ jobs:
   check_example_list:
     name: Check Example List Up To Date
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/OmniGibson
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
         with:
-          submodules: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+          submodules: true
+
       - name: Install BDDL
         run: pip install -e .
         working-directory: ${{ github.workspace }}/bddl3
+
       - name: Install OmniGibson
         run: pip install -e .[dev,primitives,eval] --no-build-isolation
-        working-directory: ${{ github.workspace }}/OmniGibson
       - name: Check example lists are up to date
         run: python tests/update_example_tests.py --check
-        working-directory: ${{ github.workspace }}/OmniGibson
 
   run_test:
     name: Run Tests
