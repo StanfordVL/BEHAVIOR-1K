@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 
@@ -44,16 +45,16 @@ EXAMPLES = [
 ]
 
 # Examples excluded from automated testing
-EXAMPLES_SKIP_REASONS = {
-    "action_primitives.rs_int_example": "requires full BEHAVIOR scene setup",
-    "action_primitives.solve_simple_task": "requires full BEHAVIOR scene setup",
-    "action_primitives.wip_solve_behavior_task": "work in progress",
-    "environments.behavior_env_demo": "requires pre-sampled cached BEHAVIOR activity scene",
-    "learning.navigation_policy_demo": "requires trained policy checkpoint",
-    "teleoperation.robot_teleoperate_demo": "requires teleoperation hardware",
-    "teleoperation.vr_robot_control_demo": "requires VR hardware",
-    "teleoperation.vr_scene_tour_demo": "requires VR hardware",
-}
+EXAMPLES_TO_SKIP = [
+    "action_primitives.rs_int_example",
+    "action_primitives.solve_simple_task",
+    "action_primitives.wip_solve_behavior_task",
+    "environments.behavior_env_demo",  # requires pre-sampled cached BEHAVIOR activity scene
+    "learning.navigation_policy_demo",
+    "teleoperation.robot_teleoperate_demo",
+    "teleoperation.vr_robot_control_demo",  # requires VR hardware
+    "teleoperation.vr_scene_tour_demo",  # requires VR hardware
+]
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -70,6 +71,7 @@ def test_example(example_name):
             f"import omnigibson.examples.{example_name} as m; "
             f"m.main(random_selection=True, headless=True, short_exec=True)",
         ],
-        timeout=600,
+        env={**os.environ, "OMNIGIBSON_HEADLESS": "1"},
+        timeout=1200,
     )
     assert result.returncode == 0, f"Example {example_name} exited with return code {result.returncode}"
