@@ -52,8 +52,6 @@ EXAMPLES_TO_SKIP = [
     "environments.behavior_env_demo",  # requires pre-sampled cached BEHAVIOR activity scene
     "learning.navigation_policy_demo",
     "teleoperation.robot_teleoperate_demo",
-    "teleoperation.vr_robot_control_demo",  # requires VR hardware
-    "teleoperation.vr_scene_tour_demo",  # requires VR hardware
 ]
 
 
