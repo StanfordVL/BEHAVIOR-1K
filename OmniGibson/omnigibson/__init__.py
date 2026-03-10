@@ -6,7 +6,7 @@ import signal
 import tempfile
 
 from omnigibson.controllers import REGISTERED_CONTROLLERS
-from omnigibson.envs import Environment, VectorEnvironment
+from omnigibson.envs import Environment
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
@@ -183,5 +183,4 @@ __all__ = [
     "shutdown",
     "sim",
     "tempdir",
-    "VectorEnvironment",
 ]

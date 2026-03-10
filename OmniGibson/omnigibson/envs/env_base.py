@@ -40,7 +40,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
     Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
 
-    def __init__(self, configs, in_vec_env=False):
+    def __init__(self, configs):
         """
         Args:
             configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
@@ -55,9 +55,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.render_mode = "rgb_array"
         self.metadata = {"render.modes": ["rgb_array"]}
 
-        # Store if we are part of a vec env
-        self.in_vec_env = in_vec_env
-
         # Convert config file(s) into a single parsed dict
         configs = configs if isinstance(configs, list) or isinstance(configs, tuple) else [configs]
 
@@ -67,6 +64,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Merge in specified configs
         for config in configs:
             merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
+
+        # Store number of environments
+        self.num_envs = self.env_config.get("num_envs", 1)
 
         # Store settings and other initialized values
         self._automatic_reset = self.env_config["automatic_reset"]
@@ -111,10 +111,13 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._external_sensors = None
         self._external_sensors_include_in_obs = None
         self._loaded = None
-        self._current_episode = 0
+        self._current_episodes = th.zeros(self.num_envs, dtype=th.int64)
 
         # Variables reset at the beginning of each episode
-        self._current_step = 0
+        self._current_steps = th.zeros(self.num_envs, dtype=th.int64)
+
+        # Scene list
+        self._scenes = []
 
         # Create the scene graph builder
         self._scene_graph_builder = None
@@ -124,10 +127,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Load this environment
         self.load()
 
-        # If we are not in a vec env, we can play ourselves. Otherwise we wait for the vec env to play.
-        if not self.in_vec_env:
-            og.sim.play()
-            self.post_play_load()
+        # Play and complete loading
+        og.sim.play()
+        self.post_play_load()
 
     def reload(self, configs, overwrite_old=True):
         """
@@ -178,7 +180,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Reset bookkeeping variables
         self._reset_variables()
-        self._current_episode = 0  # Manually set this to 0 since resetting actually increments this
+        self._current_episodes = th.zeros(self.num_envs, dtype=th.int64)
 
         # - Potentially overwrite the USD entry for the scene if none is specified and we're online sampling -
 
@@ -232,14 +234,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
 
-        # Create the scene from our scene config
-        self._scene = create_class_from_registry_and_config(
-            cls_name=self.scene_config["type"],
-            cls_registry=REGISTERED_SCENES,
-            cfg=self.scene_config,
-            cls_type_descriptor="scene",
-        )
-        og.sim.import_scene(self._scene)
+        # Create the scene(s) from our scene config
+        self._scenes = []
+        for i in range(self.num_envs):
+            scene = create_class_from_registry_and_config(
+                cls_name=self.scene_config["type"],
+                cls_registry=REGISTERED_SCENES,
+                cfg=deepcopy(self.scene_config),
+                cls_type_descriptor="scene",
+            )
+            og.sim.import_scene(scene)
+            self._scenes.append(scene)
+
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
     def _load_robots(self):
@@ -247,40 +253,41 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Load robots into the scene
         """
         # Only actually load robots if no robot has been imported from the scene loading directly yet
-        if len(self.scene.robots) == 0:
-            assert og.sim.is_stopped(), "Simulator must be stopped before loading robots!"
+        for scene in self._scenes:
+            if len(scene.robots) == 0:
+                assert og.sim.is_stopped(), "Simulator must be stopped before loading robots!"
 
-            # Iterate over all robots to generate in the robot config
-            for robot_config in self.robots_config:
-                # Add a name for the robot if necessary
-                if "name" not in robot_config:
-                    robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
-                if "model" in robot_config:
-                    assert (
-                        "type" not in robot_config
-                    ), "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
-                elif "type" in robot_config:
-                    log.warning(
-                        "Robot config key 'type' is deprecated; use 'model' instead. "
-                        "Model IDs are lowercase (e.g. 'model': 'fetch'). "
-                    )
-                    robot_config["model"] = robot_config["type"].lower()
-                    del robot_config["type"]
-                assert robot_config["model"] in REGISTERED_ROBOTS, f"{robot_config['model']} is not a registered robot."
-                robot_config = deepcopy(robot_config)
-                position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
-                pose_frame = robot_config.pop("pose_frame", "scene")
-                if position is not None:
-                    position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-                if orientation is not None:
-                    orientation = (
-                        orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
-                    )
+                # Iterate over all robots to generate in the robot config
+                for robot_config in self.robots_config:
+                    robot_config = deepcopy(robot_config)
+                    # Add a name for the robot if necessary
+                    if "name" not in robot_config:
+                        robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
+                    if "model" in robot_config:
+                        assert (
+                            "type" not in robot_config
+                        ), "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
+                    elif "type" in robot_config:
+                        log.warning(
+                            "Robot config key 'type' is deprecated; use 'model' instead. "
+                            "Model IDs are lowercase (e.g. 'model': 'fetch'). "
+                        )
+                        robot_config["model"] = robot_config["type"].lower()
+                        del robot_config["type"]
+                    assert robot_config["model"] in REGISTERED_ROBOTS, f"{robot_config['model']} is not a registered robot."
+                    position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
+                    pose_frame = robot_config.pop("pose_frame", "scene")
+                    if position is not None:
+                        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+                    if orientation is not None:
+                        orientation = (
+                            orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+                        )
 
-                robot = Robot(**robot_config)
-                # Import the robot into the simulator
-                self.scene.add_object(robot)
-                robot.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
+                    robot = Robot(**robot_config)
+                    # Import the robot into the simulator
+                    scene.add_object(robot)
+                    robot.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -289,23 +296,24 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Load any additional custom objects into the scene
         """
         assert og.sim.is_stopped(), "Simulator must be stopped before loading objects!"
-        for i, obj_config in enumerate(self.objects_config):
-            # Add a name for the object if necessary
-            if "name" not in obj_config:
-                obj_config["name"] = f"obj{i}"
-            # Pop the desired position and orientation
-            obj_config = deepcopy(obj_config)
-            position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
-            # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
-            obj = create_class_from_registry_and_config(
-                cls_name=obj_config["type"],
-                cls_registry=REGISTERED_OBJECTS,
-                cfg=obj_config,
-                cls_type_descriptor="object",
-            )
-            # Import the robot into the simulator and set the pose
-            self.scene.add_object(obj)
-            obj.set_position_orientation(position=position, orientation=orientation, frame="scene")
+        for scene in self._scenes:
+            for i, obj_config in enumerate(self.objects_config):
+                obj_config = deepcopy(obj_config)
+                # Add a name for the object if necessary
+                if "name" not in obj_config:
+                    obj_config["name"] = f"obj{i}"
+                # Pop the desired position and orientation
+                position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
+                # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
+                obj = create_class_from_registry_and_config(
+                    cls_name=obj_config["type"],
+                    cls_registry=REGISTERED_OBJECTS,
+                    cfg=obj_config,
+                    cls_type_descriptor="object",
+                )
+                # Import the robot into the simulator and set the pose
+                scene.add_object(obj)
+                obj.set_position_orientation(position=position, orientation=orientation, frame="scene")
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
@@ -334,7 +342,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
                 sensor = create_sensor(**sensor_config)
                 # Load an initialize this sensor
-                sensor.load(self.scene)
+                sensor.load(self._scenes[0])
                 sensor.initialize()
                 sensor.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
                 self._external_sensors[sensor.name] = sensor
@@ -346,7 +354,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab robot(s) and task obs spaces
         obs_space = dict()
 
-        for robot in self.robots:
+        for robot in self._scenes[0].robots:
             # Load the observation space for the robot
             robot_obs = robot.load_observation_space()
             if maxdim(robot_obs) > 0:
@@ -384,7 +392,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load action space for each robot
         """
-        action_space = gym.spaces.Dict({robot.name: robot.action_space for robot in self.robots})
+        action_space = gym.spaces.Dict({robot.name: robot.action_space for robot in self._scenes[0].robots})
 
         # Convert into flattened 1D Box space if requested
         if self._flatten_action_space:
@@ -431,7 +439,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.task.post_play_load(env=self)
 
         # Save the state for objects from load_robots / load_objects / load_task
-        self.scene.update_initial_file()
+        for scene in self._scenes:
+            scene.update_initial_file()
 
         # Load the obs / action spaces
         self.load_observation_space()
@@ -441,7 +450,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Start the scene graph builder
         if self._scene_graph_builder:
-            self._scene_graph_builder.start(self.scene)
+            self._scene_graph_builder.start(self._scenes[0])
 
         # Denote that the scene is loaded
         self._loaded = True
@@ -472,44 +481,56 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """No-op to satisfy certain RL frameworks."""
         pass
 
-    def get_obs(self):
+    def get_obs(self, env_indices=None):
         """
         Get the current environment observation.
 
+        Args:
+            env_indices (None or th.Tensor): Indices of envs to get observations for. If None, gets all.
+
         Returns:
             2-tuple:
-                dict: Keyword-mapped observations, which are possibly nested
-                dict: Additional information about the observations
+                list[dict]: Keyword-mapped observations per env
+                list[dict]: Additional information about the observations per env
         """
-        obs = dict()
-        info = dict()
+        if env_indices is None:
+            env_indices = range(self.num_envs)
+        all_obs = []
+        all_info = []
+        for env_idx in env_indices:
+            obs = dict()
+            info = dict()
+            scene = self._scenes[env_idx]
 
-        # Grab all observations from each robot
-        for robot in self.robots:
-            if maxdim(robot.observation_space) > 0:
-                obs[robot.name], info[robot.name] = robot.get_obs()
+            # Grab all observations from each robot
+            for robot in scene.robots:
+                if maxdim(robot.observation_space) > 0:
+                    obs[robot.name], info[robot.name] = robot.get_obs()
 
-        # Add task observations
-        if maxdim(self._task.observation_space) > 0:
-            obs["task"] = self._task.get_obs(env=self)
+            # Add task observations
+            if maxdim(self._task.observation_space) > 0:
+                obs["task"] = self._task.get_obs(env=self, env_idx=env_idx)
 
-        # Add external sensor observations if they exist
-        if self._external_sensors is not None:
-            external_obs = dict()
-            external_info = dict()
-            for sensor_name, sensor in self._external_sensors.items():
-                if not self._external_sensors_include_in_obs[sensor_name]:
-                    continue
+            # Add external sensor observations if they exist
+            if env_idx == 0 and self._external_sensors is not None:
+                external_obs = dict()
+                external_info = dict()
+                for sensor_name, sensor in self._external_sensors.items():
+                    if not self._external_sensors_include_in_obs[sensor_name]:
+                        continue
 
-                external_obs[sensor_name], external_info[sensor_name] = sensor.get_obs()
-            obs["external"] = external_obs
-            info["external"] = external_info
+                    external_obs[sensor_name], external_info[sensor_name] = sensor.get_obs()
+                obs["external"] = external_obs
+                info["external"] = external_info
 
-        # Possibly flatten obs if requested
-        if self._flatten_obs_space:
-            obs = recursively_generate_flat_dict(dic=obs)
+            # Possibly flatten obs if requested
+            if self._flatten_obs_space:
+                obs = recursively_generate_flat_dict(dic=obs)
 
-        return obs, info
+            all_obs.append(obs)
+            all_info.append(info)
+
+        return all_obs, all_info
 
     def get_scene_graph(self):
         """
@@ -521,97 +542,133 @@ class Environment(gym.Env, GymObservable, Recreatable):
         assert self._scene_graph_builder is not None, "Scene graph builder must be specified in config!"
         return self._scene_graph_builder.get_scene_graph()
 
-    def _populate_info(self, info):
+    def _populate_info(self, infos):
         """
         Populate info dictionary with any useful information.
 
         Args:
-            info (dict): Information dictionary to populate
+            infos (list[dict]): Information dictionaries to populate, one per env
 
         Returns:
-            dict: Information dictionary with added info
+            list[dict]: Information dictionaries with added info
         """
-        info["episode_length"] = self._current_step
+        for env_idx in range(self.num_envs):
+            infos[env_idx]["episode_length"] = self._current_steps[env_idx].item()
 
         if self._scene_graph_builder is not None:
-            info["scene_graph"] = self.get_scene_graph()
+            infos[0]["scene_graph"] = self.get_scene_graph()
+
+    def _convert_action_dict_to_tensor(self, action_dict):
+        """Convert a single action dict's values to tensors.
+
+        Args:
+            action_dict (dict): Maps robot name to action (array, list, or tensor).
+
+        Returns:
+            dict: Same keys, with values converted to flattened float tensors.
+        """
+        return {
+            k: th.as_tensor(v, dtype=th.float).flatten()
+            if isinstance(v, Iterable) and not isinstance(v, (dict, OrderedDict, str))
+            else v
+            for k, v in action_dict.items()
+        }
 
     def _convert_action_to_tensor(self, action):
         """Convert action to torch tensor format.
 
         Args:
-            action: Action in various formats (dict, numpy array, list, torch tensor)
+            action: Action in various formats (dict, list of dicts, numpy array, list, torch tensor).
+                    For tensors/arrays, should be (num_envs, action_dim) shaped.
+                    A flat (action_dim,) tensor is accepted for single-env and reshaped to (1, action_dim).
+                    For dicts, should be a list of dicts (one per env), or a single dict for single-env.
 
         Returns:
-            Converted action (dict with tensor values or flattened tensor)
+            th.Tensor of shape (num_envs, action_dim), or list of dicts (one per env).
         """
         if isinstance(action, dict):
-            # Convert iterable values in dict to tensors
-            return {
-                k: th.as_tensor(v, dtype=th.float).flatten()
-                if isinstance(v, Iterable) and not isinstance(v, (dict, OrderedDict, str))
-                else v
-                for k, v in action.items()
-            }
+            return [self._convert_action_dict_to_tensor(action)]
+        elif isinstance(action, list) and len(action) > 0 and isinstance(action[0], dict):
+            return [self._convert_action_dict_to_tensor(a) for a in action]
         elif isinstance(action, Iterable):
             # Convert numpy arrays and lists to tensors
-            return th.as_tensor(action, dtype=th.float).flatten()
+            action = th.as_tensor(action, dtype=th.float)
+            if action.dim() == 1:
+                action = action.unsqueeze(0)
+            return action
         return action
 
     def _pre_step(self, action):
-        """Apply the pre-sim-step part of an environment step, i.e. apply the robot actions."""
-        # Convert action to tensor format
-        action = self._convert_action_to_tensor(action)
+        """Apply the pre-sim-step part of an environment step, i.e. apply the robot actions.
 
-        # If the action is not a dictionary, convert into a dictionary
-        if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
-            action_dict = dict()
-            idx = 0
-            for robot in self.robots:
-                action_dim = robot.action_dim
-                action_dict[robot.name] = action[idx : idx + action_dim]
-                idx += action_dim
-        else:
-            # Our inputted action is the action dictionary
-            action_dict = action
+        Args:
+            action (th.Tensor or list[dict]): Robot actions, already converted by _convert_action_to_tensor.
+                For tensors, shape is (num_envs, action_dim).
+                For dicts, a list of dicts (one per env), each mapping robot name to action.
+        """
+        for env_idx in range(self.num_envs):
+            env_action = action[env_idx]
 
-        # Iterate over all robots and apply actions
-        for robot in self.robots:
-            robot.apply_action(action_dict[robot.name])
+            scene = self._scenes[env_idx]
+
+            # If the action is not a dictionary, convert into a dictionary
+            if not isinstance(env_action, dict) and not isinstance(env_action, gym.spaces.Dict):
+                action_dict = dict()
+                idx = 0
+                for robot in scene.robots:
+                    action_dim = robot.action_dim
+                    action_dict[robot.name] = env_action[idx : idx + action_dim]
+                    idx += action_dim
+            else:
+                # Our inputted action is the action dictionary
+                action_dict = env_action
+
+            # Iterate over all robots and apply actions
+            for robot in scene.robots:
+                robot.apply_action(action_dict[robot.name])
 
     def _post_step(self, action):
         """Apply the post-sim-step part of an environment step, i.e. grab observations and return the step results."""
         # Grab observations
-        obs, obs_info = self.get_obs()
+        obs_list, obs_info_list = self.get_obs()
 
         # Step the scene graph builder if necessary
         if self._scene_graph_builder is not None:
-            self._scene_graph_builder.step(self.scene)
+            self._scene_graph_builder.step(self._scenes[0])
 
         # Grab reward, done, and info, and populate with internal info
-        reward, done, info = self.task.step(self, action)
-        self._populate_info(info)
-        info["obs_info"] = obs_info
+        rewards, dones, infos = self.task.step(self, action)
+        self._populate_info(infos)
+        for env_idx in range(self.num_envs):
+            infos[env_idx]["obs_info"] = obs_info_list[env_idx]
 
-        if done and self._automatic_reset:
-            # Add lost observation to our information dict, and reset
-            info["last_observation"] = obs
-            obs = self.reset()
+        # Split terminated vs truncated per env
+        terminateds = th.zeros(self.num_envs, dtype=th.bool)
+        truncateds = th.zeros(self.num_envs, dtype=th.bool)
+        for env_idx in range(self.num_envs):
+            for tc_name, tc_data in infos[env_idx]["done"]["termination_conditions"].items():
+                if tc_data["done"]:
+                    if tc_name == "timeout":
+                        truncateds[env_idx] = True
+                    else:
+                        terminateds[env_idx] = True
 
-        # Hacky way to check for time limit info to split terminated and truncated
-        terminated = False
-        truncated = False
-        for tc, tc_data in info["done"]["termination_conditions"].items():
-            if tc_data["done"]:
-                if tc == "timeout":
-                    truncated = True
-                else:
-                    terminated = True
-        assert (terminated or truncated) == done, "Terminated and truncated must match done!"
+        assert th.all((terminateds | truncateds) == dones), "Terminated and truncated must match done!"
+
+        # Auto-reset only done envs
+        done_mask = dones
+        if self._automatic_reset and done_mask.any():
+            done_indices = th.where(done_mask)[0]
+            for env_idx in done_indices:
+                # Add lost observation to our information dict, and reset
+                infos[env_idx.item()]["last_observation"] = obs_list[env_idx.item()]
+            reset_obs_list, reset_info = self.reset(env_indices=done_indices)
+            for i, env_idx in enumerate(done_indices):
+                obs_list[env_idx.item()] = reset_obs_list[i]
 
         # Increment step
-        self._current_step += 1
-        return obs, reward, terminated, truncated, info
+        self._current_steps += 1
+        return obs_list, rewards, terminateds, truncateds, infos
 
     def step(self, action, n_render_iterations=1):
         """
@@ -619,18 +676,19 @@ class Environment(gym.Env, GymObservable, Recreatable):
         following OpenAI Gym's convention
 
         Args:
-            action (gym.spaces.Dict or dict or th.tensor): robot actions. If a dict is specified, each entry should
-                map robot name to corresponding action. If a th.tensor, it should be the flattened, concatenated set
-                of actions
+            action (gym.spaces.Dict or dict or list[dict] or th.tensor): robot actions. If a dict is specified,
+                each entry should map robot name to corresponding action. If a th.tensor, it should be the flattened,
+                concatenated set of actions. For multi-env, should be (num_envs, action_dim) shaped for tensors,
+                or a list of dicts (one per env) for dict actions.
             n_render_iterations (int): Number of rendering iterations to use before returning observations
 
         Returns:
             5-tuple:
-                - dict: state, i.e. next observation
-                - float: reward, i.e. reward at this current timestep
-                - bool: terminated, i.e. whether this episode ended due to a failure or success
-                - bool: truncated, i.e. whether this episode ended due to a time limit etc.
-                - dict: info, i.e. dictionary with any useful information
+                - list[dict]: states, i.e. next observations per env
+                - th.Tensor: (num_envs,) rewards, i.e. reward at this current timestep
+                - th.Tensor: (num_envs,) terminated bool, i.e. whether this episode ended due to a failure or success
+                - th.Tensor: (num_envs,) truncated bool, i.e. whether this episode ended due to a time limit etc.
+                - list[dict]: info per env, i.e. dictionary with any useful information
         """
         # Pre-processing before stepping simulation
         action = self._convert_action_to_tensor(action)
@@ -672,18 +730,26 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Reset bookkeeping variables for the next new episode.
         """
-        self._current_episode += 1
-        self._current_step = 0
+        self._current_episodes += 1
+        self._current_steps[:] = 0
 
-    def reset(self, get_obs=True, **kwargs):
+    def reset(self, env_indices=None, get_obs=True, **kwargs):
         """
         Reset episode.
+
+        Args:
+            env_indices (None or th.Tensor): Indices of envs to reset. If None, resets all.
+            get_obs (bool): Whether to return observations after reset.
         """
+        if env_indices is None:
+            env_indices = th.arange(self.num_envs)
+
         # Reset the task
-        self.task.reset(self)
+        self.task.reset(self, env_indices=env_indices)
 
         # Reset internal variables
-        self._reset_variables()
+        self._current_episodes[env_indices] += 1
+        self._current_steps[env_indices] = 0
 
         if get_obs:
             # Run a single simulator step and a replicator step
@@ -692,11 +758,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for _ in range(3):
                 og.sim.render()
             # Grab and return observations
-            obs, info = self.get_obs()
+            obs_list, info_list = self.get_obs(env_indices=env_indices)
 
             if self._loaded:
                 # Sanity check to make sure received observations match expected observation space
-                check_obs = recursively_generate_compatible_dict(dic=obs)
+                check_obs = recursively_generate_compatible_dict(dic=obs_list[0])
                 if not self.observation_space.contains(check_obs):
                     exp_obs = dict()
                     for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
@@ -731,15 +797,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
                     raise ValueError("Observation space does not match returned observations!")
 
-            return obs, {"obs_info": info}
+            return obs_list, {"obs_info": info_list}
 
     @property
     def episode_steps(self):
         """
         Returns:
-            int: Current number of steps in episode
+            th.Tensor: (num_envs,) current step count per env
         """
-        return self._current_step
+        return self._current_steps
 
     @property
     def task(self):
@@ -750,20 +816,28 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self._task
 
     @property
+    def scenes(self):
+        """
+        Returns:
+            list[Scene]: All scene instances in this environment
+        """
+        return self._scenes
+
+    @property
     def scene(self):
         """
         Returns:
-            Scene: Active scene in this environment
+            Scene: Active scene in this environment (first scene, for backward compatibility)
         """
-        return self._scene
+        return self._scenes[0]
 
     @property
     def robots(self):
         """
         Returns:
-            list of BaseRobot: Robots in the current scene
+            list[list[BaseRobot]]: Robots per scene. robots[env_idx] -> list of robots in that scene.
         """
-        return self.scene.robots
+        return [s.robots for s in self._scenes]
 
     @property
     def external_sensors(self):
@@ -848,6 +922,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "flatten_action_space": False,
                 "flatten_obs_space": False,
                 "external_sensors": None,
+                "num_envs": 1,
             },
             # Rendering kwargs
             "render": {
