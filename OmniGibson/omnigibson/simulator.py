@@ -1101,7 +1101,7 @@ def _launch_simulator(*args, **kwargs):
                     for scene in self.scenes:
                         for obj in scene.objects:
                             # Only update visuals for objects that have been initialized so far
-                            if isinstance(obj, BaseObject) and obj.initialized:
+                            if obj.initialized:
                                 obj.update_visuals()
 
                 # Possibly run transition rule step
@@ -1272,9 +1272,6 @@ def _launch_simulator(*args, **kwargs):
                     # If any of the objects is not initialized, skip
                     if not actor0_obj.initialized or not actor1_obj.initialized:
                         continue
-                    # If any of the objects is not stateful, skip
-                    if not isinstance(actor0_obj, BaseObject) or not isinstance(actor1_obj, BaseObject):
-                        continue
                     # If any of the objects doesn't have states that require on_contact callbacks, skip
                     if (
                         len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0
@@ -1320,7 +1317,7 @@ def _launch_simulator(*args, **kwargs):
                         if obj is not None:
                             break
 
-                    if obj is None or not obj.initialized or not isinstance(obj, BaseObject):
+                    if obj is None or not obj.initialized:
                         return
                     if len(obj.states.keys() & self.object_state_types_on_joint_break) == 0:
                         return
