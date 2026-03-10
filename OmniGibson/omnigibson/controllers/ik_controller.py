@@ -283,8 +283,7 @@ class InverseKinematicsController(JointController, ManipulationController):
 
         N = self.n_members
         link_name = self._link_name
-        self._ensure_view_row_indices()
-        rows = self._view_row_indices
+        rows = self.view_row_indices
 
         # Batched state reads
         all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)

@@ -317,8 +317,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         target = goals["target"]  # (N, control_dim)
 
         if self._use_impedances:
-            self._ensure_view_row_indices()
-            rows = self._view_row_indices
+            rows = self.view_row_indices
 
             if self._motor_type == "position":
                 base_value = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][

@@ -154,8 +154,6 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._controls = []
         # Per-member tombstone mask: 0 = active, 1 = unregistered (permanently ignored)
         self._unregistered_controllers = th.zeros(0, dtype=th.long)
-        # Lazy-init: row indices of each member in the shared view (None until first _write_control call)
-        self._view_row_indices = None
 
         # Initialize command scaling variables
         self._command_scale_factor = None
@@ -257,8 +255,6 @@ class BaseController(Serializable, Registerable, Recreatable):
                 else:
                     self._goals[key] = new_row
 
-        # Always invalidate cached view indices so the next _write_control re-resolves them
-        self._view_row_indices = None
         return controller_idx
 
     @property
@@ -406,43 +402,9 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         raise NotImplementedError
 
-    def _ensure_view_row_indices(self):
-        """Lazy-init: resolve each member's row index in the shared physics view."""
-        if self._view_row_indices is None:
-            self._view_row_indices = ControllableObjectViewAPI.get_member_view_indices(
-                self.routing_path, self._articulation_root_paths
-            )
-
-    def _write_control(self):
-        """Write batched control signals to Isaac via a single tensor op per control type."""
-        self._ensure_view_row_indices()
-
-        # Filter to enabled and non-unregistered members
-        enabled_indices = [
-            i
-            for i, (e, u) in enumerate(zip(self._control_enabled, self._unregistered_controllers))
-            if e != 0 and u == 0
-        ]
-        if not enabled_indices:
-            return
-
-        enabled_rows = [self._view_row_indices[i] for i in enabled_indices]
-        enabled_controls = cb.stack([self._controls[i] for i in enabled_indices])  # (N_en, K)
-        routing_path = self.routing_path
-
-        if self.control_type == ControlType.POSITION:
-            ControllableObjectViewAPI.set_all_joint_position_targets(
-                routing_path, enabled_rows, enabled_controls, self.dof_idx
-            )
-            ControllableObjectViewAPI.set_all_joint_velocity_targets(
-                routing_path, enabled_rows, cb.zeros(enabled_controls.shape), self.dof_idx
-            )
-        elif self.control_type == ControlType.VELOCITY:
-            ControllableObjectViewAPI.set_all_joint_velocity_targets(
-                routing_path, enabled_rows, enabled_controls, self.dof_idx
-            )
-        elif self.control_type == ControlType.EFFORT:
-            ControllableObjectViewAPI.set_all_joint_efforts(routing_path, enabled_rows, enabled_controls, self.dof_idx)
+    @property
+    def view_row_indices(self):
+        return ControllableObjectViewAPI.get_member_view_indices(self.routing_path, self._articulation_root_paths)
 
     def clip_control(self, control):
         """
@@ -507,7 +469,35 @@ class BaseController(Serializable, Registerable, Recreatable):
                     if isinstance(ctrl, th.Tensor)
                     else (ctrl if isinstance(ctrl, cb.arr_type) else cb.array(ctrl))
                 )
-        self._write_control()
+
+        # Write batched control signals to Isaac via a single tensor op per control type.
+
+        # Filter to enabled and non-unregistered members
+        enabled_indices = [
+            i
+            for i, (e, u) in enumerate(zip(self._control_enabled, self._unregistered_controllers))
+            if e != 0 and u == 0
+        ]
+        if not enabled_indices:
+            return
+
+        enabled_rows = [self.view_row_indices[i] for i in enabled_indices]
+        enabled_controls = cb.stack([self._controls[i] for i in enabled_indices])  # (N_en, K)
+        routing_path = self.routing_path
+
+        if self.control_type == ControlType.POSITION:
+            ControllableObjectViewAPI.set_all_joint_position_targets(
+                routing_path, enabled_rows, enabled_controls, self.dof_idx
+            )
+            ControllableObjectViewAPI.set_all_joint_velocity_targets(
+                routing_path, enabled_rows, cb.zeros(enabled_controls.shape), self.dof_idx
+            )
+        elif self.control_type == ControlType.VELOCITY:
+            ControllableObjectViewAPI.set_all_joint_velocity_targets(
+                routing_path, enabled_rows, enabled_controls, self.dof_idx
+            )
+        elif self.control_type == ControlType.EFFORT:
+            ControllableObjectViewAPI.set_all_joint_efforts(routing_path, enabled_rows, enabled_controls, self.dof_idx)
 
     def reset(self, controller_idx):
         """

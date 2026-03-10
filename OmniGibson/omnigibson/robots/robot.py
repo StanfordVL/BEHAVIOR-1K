@@ -101,7 +101,6 @@ class Robot(USDObject, GymObservable):
         # Shared kwargs in hierarchy
         name,
         model,
-        relative_prim_path=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -142,7 +141,6 @@ class Robot(USDObject, GymObservable):
         Args:
             name (str): Name for the object. Names need to be unique per scene
             model (str): Model of Robot.
-            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -310,23 +308,7 @@ class Robot(USDObject, GymObservable):
         self.dof_names_ordered = None
         self._control_enabled = True
 
-        class_name = self.robot_type.lower()
-        if relative_prim_path:
-            # If prim path is specified, assert that the last element starts with the right prefix to ensure that
-            # the object will be included in the ControllableObjectViewAPI.
-            assert relative_prim_path.split("/")[-1].startswith(f"controllable__{class_name}__"), (
-                "If relative_prim_path is specified, the last element of the path must look like "
-                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
-                "string containing no double underscores."
-            )
-            assert relative_prim_path.split("/")[-1].count("__") == 2, (
-                "If relative_prim_path is specified, the last element of the path must look like "
-                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
-                "string containing no double underscores."
-            )
-        else:
-            # If prim path is not specified, set it to the default path, but prepend controllable.
-            relative_prim_path = f"/controllable__{class_name}__{name}"
+        relative_prim_path = f"/controllable__{self.robot_type.lower()}__{name}"
 
         # Run super init
         super().__init__(
@@ -1170,21 +1152,6 @@ class Robot(USDObject, GymObservable):
         return state_dict, idx
 
     def _initialize(self):
-        # Assert that the prim path matches ControllableObjectViewAPI's expected format
-        scene_id, robot_name = self.articulation_root_path.split("/")[2:4]
-        assert scene_id.startswith(
-            "scene_"
-        ), "Second component of articulation root path (scene ID) must start with 'scene_'"
-        robot_name_components = robot_name.split("__")
-        assert (
-            len(robot_name_components) == 3
-        ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
-        assert (
-            robot_name_components[0] == "controllable"
-        ), "Third component of articulation root path (robot name) must start with 'controllable'"
-        assert (
-            robot_name_components[1] == self.robot_type.lower()
-        ), "Third component of articulation root path (robot name) must contain the class name as the second part"
         # Run super
         super()._initialize()
         # Fill in the DOF to joint mapping

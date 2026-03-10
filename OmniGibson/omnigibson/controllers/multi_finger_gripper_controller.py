@@ -221,8 +221,7 @@ class MultiFingerGripperController(GripperController):
         N = self.n_members
         target_batch = goals["target"]  # (N, command_dim)
 
-        self._ensure_view_row_indices()
-        rows = self._view_row_indices
+        rows = self.view_row_indices
         all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][
             :, self.dof_idx
         ]  # (N, ctrl_dim)

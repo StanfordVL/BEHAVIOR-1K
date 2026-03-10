@@ -407,8 +407,7 @@ class OperationalSpaceController(ManipulationController):
         # For now, always use internal values
         N = self.n_members
         link_name = self._link_name
-        self._ensure_view_row_indices()
-        rows = self._view_row_indices
+        rows = self.view_row_indices
 
         kp = self.kp
         kd = 2 * cb.sqrt(kp) * self.damping_ratio
