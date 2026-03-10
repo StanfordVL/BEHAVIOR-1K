@@ -1001,12 +1001,15 @@ class Robot(USDObject, GymObservable):
         # Grab super state
         state = super()._dump_state()
 
-        # Dump each unique controller group once (keyed by group_key)
-        group_states = {}
-        for group_key, _ in self._controllers.values():
-            if group_key not in group_states:
-                group_states[group_key] = ControllerView.dump_state(group_key)
-        state["controller_groups"] = group_states
+        # Dump controllers
+        controller_states = {}
+        for controller_name, (group_key, controller_idx) in self._controllers.items():
+            print(
+                f"[Robot._dump_state] robot={self.name} "
+                f"controller={controller_name} group_key={group_key} idx={controller_idx}"
+            )
+            controller_states[controller_name] = ControllerView.dump_state(group_key, controller_idx)
+        state["controller_groups"] = controller_states
 
         # If we're using actual physical grasping, no extra state needed to save
         if self.is_manipulation and self.grasping_mode != "physical":
@@ -1028,12 +1031,16 @@ class Robot(USDObject, GymObservable):
         # Run super first
         super()._load_state(state=state)
 
-        # Load each unique controller group once
-        loaded_groups = set()
-        for group_key, _ in self._controllers.values():
-            if group_key not in loaded_groups:
-                ControllerView.load_state(group_key, state["controller_groups"][group_key])
-                loaded_groups.add(group_key)
+        # Load controllers
+        for controller_name, (group_key, controller_idx) in self._controllers.items():
+            controller_state = state["controller_groups"].get(controller_name)
+            if controller_state is not None:
+                print(
+                    f"[Robot._load_state] robot={self.name} "
+                    f"controller={controller_name} group_key={group_key} idx={controller_idx} "
+                    f"incoming_goal_set={controller_state.get('goal_set', None)}"
+                )
+                ControllerView.load_state(group_key, controller_idx, controller_state)
 
         if self.is_manipulation:
             # No additional loading needed if we're using physical grasping
@@ -1135,14 +1142,16 @@ class Robot(USDObject, GymObservable):
         # Run super first
         state_flat = super().serialize(state=state)
 
-        # Serialize each unique controller group once
-        seen_groups = set()
+        # Serialize each controller entry separately
         group_parts = []
-        for group_key, _ in self._controllers.values():
-            if group_key not in seen_groups:
-                group_parts.append(ControllerView.serialize(group_key, state["controller_groups"][group_key]))
-                seen_groups.add(group_key)
-        state_flat = th.cat([state_flat] + group_parts)
+        for controller_name, (group_key, controller_idx) in self._controllers.items():
+            controller_state = state["controller_groups"].get(controller_name)
+            if controller_state is None and group_key in state["controller_groups"]:
+                controller_state = state["controller_groups"][group_key]
+            if controller_state is not None:
+                group_parts.append(ControllerView.serialize(group_key, controller_idx, controller_state))
+        if group_parts:
+            state_flat = th.cat([state_flat] + group_parts)
         if self.is_manipulation:
             # No additional serialization needed if we're using physical grasping
             if self.grasping_mode == "physical":
@@ -1153,14 +1162,11 @@ class Robot(USDObject, GymObservable):
         # Run super first
         state_dict, idx = super().deserialize(state=state)
 
-        # Deserialize each unique controller group once
+        # Deserialize each controller entry separately
         group_states = {}
-        seen_groups = set()
-        for group_key, _ in self._controllers.values():
-            if group_key not in seen_groups:
-                group_states[group_key], n = ControllerView.deserialize(group_key, state[idx:])
-                idx += n
-                seen_groups.add(group_key)
+        for controller_name, (group_key, controller_idx) in self._controllers.items():
+            group_states[controller_name], n = ControllerView.deserialize(group_key, controller_idx, state[idx:])
+            idx += n
         state_dict["controller_groups"] = group_states
 
         if self.is_manipulation:
@@ -2221,7 +2227,7 @@ class Robot(USDObject, GymObservable):
             int: Dimension of action space for this object. By default,
                 is the sum over all controller action dimensions
         """
-        return sum(ControllerView.get_command_dim(gk) for gk, _ in self._controllers.values())
+        return sum(ControllerView.get_command_dim(group_key) for group_key, _ in self._controllers.values())
 
     @property
     def action_space(self):
@@ -2564,9 +2570,9 @@ class Robot(USDObject, GymObservable):
                 ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0])
                 for i in range(c_order_idx)
             )
-            arm_gk = self._controllers[f"arm_{arm_name}"][0]
+            arm_group_key = self._controllers[f"arm_{arm_name}"][0]
             arm_action_idx[arm_name] = th.arange(
-                action_start_idx, action_start_idx + ControllerView.get_command_dim(arm_gk)
+                action_start_idx, action_start_idx + ControllerView.get_command_dim(arm_group_key)
             )
         return arm_action_idx
 
@@ -2580,9 +2586,9 @@ class Robot(USDObject, GymObservable):
                 ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0])
                 for i in range(c_order_idx)
             )
-            gripper_gk = self._controllers[f"gripper_{arm_name}"][0]
+            gripper_group_key = self._controllers[f"gripper_{arm_name}"][0]
             gripper_action_idx[arm_name] = th.arange(
-                action_start_idx, action_start_idx + ControllerView.get_command_dim(gripper_gk)
+                action_start_idx, action_start_idx + ControllerView.get_command_dim(gripper_group_key)
             )
         return gripper_action_idx
 
@@ -3705,8 +3711,8 @@ class Robot(USDObject, GymObservable):
         action_start_idx = sum(
             ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0]) for i in range(c_order_idx)
         )
-        base_gk = self._controllers["base"][0]
-        return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(base_gk))
+        base_group_key = self._controllers["base"][0]
+        return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(base_group_key))
 
     @property
     def base_joint_names(self):
@@ -3935,8 +3941,8 @@ class Robot(USDObject, GymObservable):
         action_start_idx = sum(
             ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0]) for i in range(c_order_idx)
         )
-        trunk_gk = self._controllers["trunk"][0]
-        return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(trunk_gk))
+        trunk_group_key = self._controllers["trunk"][0]
+        return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(trunk_group_key))
 
     @property
     def _default_trunk_ik_controller_config(self):

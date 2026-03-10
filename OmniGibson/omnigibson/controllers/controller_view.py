@@ -222,20 +222,24 @@ class ControllerView:
         return cls._controller_groups[group_key].is_grasping(controller_idx)
 
     @classmethod
-    def dump_state(cls, group_key: str) -> dict:
-        return cls._controller_groups[group_key].dump_state()
+    def dump_state(cls, group_key: str, controller_idx: int) -> dict:
+        controller = cls._controller_groups[group_key]
+        return controller.dump_state(controller_idx=controller_idx)
 
     @classmethod
-    def load_state(cls, group_key: str, state: dict):
-        cls._controller_groups[group_key].load_state(state)
+    def load_state(cls, group_key: str, controller_idx: int, state: dict):
+        controller = cls._controller_groups[group_key]
+        controller.load_state(controller_idx=controller_idx, state=state)
 
     @classmethod
-    def serialize(cls, group_key: str, state: dict) -> th.Tensor:
-        return cls._controller_groups[group_key].serialize(state)
+    def serialize(cls, group_key: str, controller_idx: int, state: dict) -> th.Tensor:
+        controller = cls._controller_groups[group_key]
+        return controller.serialize(state=state, controller_idx=controller_idx)
 
     @classmethod
-    def deserialize(cls, group_key: str, state: th.Tensor) -> Tuple[dict, int]:
-        return cls._controller_groups[group_key].deserialize(state)
+    def deserialize(cls, group_key: str, controller_idx: int, state: th.Tensor) -> Tuple[dict, int]:
+        controller = cls._controller_groups[group_key]
+        return controller.deserialize(state=state, controller_idx=controller_idx)
 
     @staticmethod
     def _freeze_for_hash(value):

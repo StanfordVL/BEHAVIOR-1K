@@ -55,70 +55,132 @@ class MovingAverageFilter(Filter):
     """
     This class uses a moving average to de-noise a noisy data stream in an online fashion.
     This is a FIR filter.
+
+    Supports a batch of n_members independent filter rows. Each member has its own circular
+    buffer row; estimate() targets one member, estimate_batch() processes all rows at once
+    using matrix operations and broadcasting with no intermediate large allocations.
     """
 
-    def __init__(self, obs_dim, filter_width):
+    def __init__(self, obs_dim, filter_width, n_members):
         """
-
         Args:
             obs_dim (int): The dimension of the points to filter.
             filter_width (int): The number of past samples to take the moving average over.
+            n_members (int): Number of independent filter rows (one per controller member).
         """
         self.obs_dim = obs_dim
         assert filter_width > 0, f"MovingAverageFilter must have a non-zero size! Got: {filter_width}"
         self.filter_width = filter_width
-        self.past_samples = cb.zeros((filter_width, obs_dim))
-        self.current_idx = 0
-        self.fully_filled = False  # Whether the entire filter buffer is filled or not
+        self.n_members = n_members
+        # (n_members, filter_width, obs_dim) — unfilled slots stay zero so sum/count gives correct mean
+        self.past_samples = th.zeros(n_members, filter_width, obs_dim)
+        self.current_idx = th.zeros(n_members, dtype=th.long)
+        # bool tensor enables in-place updates and broadcasting in estimate_batch
+        self.fully_filled = th.zeros(n_members, dtype=th.bool)
+        # cached row indices to avoid re-allocating in estimate_batch
+        self._member_arange = th.arange(n_members)
 
         super().__init__()
 
-    def estimate(self, observation):
+    def add_member(self):
+        """Grow the filter by one row for a newly registered controller member."""
+        self.past_samples = th.cat([self.past_samples, th.zeros(1, self.filter_width, self.obs_dim)], dim=0)
+        self.current_idx = th.cat([self.current_idx, th.zeros(1, dtype=th.long)])
+        self.fully_filled = th.cat([self.fully_filled, th.zeros(1, dtype=th.bool)])
+        # rebuild arange to include the new member
+        self._member_arange = th.arange(self.n_members + 1)
+        self.n_members += 1
+
+    def estimate(self, member_idx, observation):
         """
-        Do an online hold for state estimation given a recent observation.
+        Do an online hold for state estimation given a recent observation for one member.
 
         Args:
-            observation (n-array): New observation to hold internal estimate of state.
+            member_idx (int): Index of the controller member whose row to update.
+            observation (n-array): New observation of shape (obs_dim,).
 
         Returns:
             n-array: New estimate of state.
         """
-        # Write the newest observation at the appropriate index
-        self.past_samples[self.current_idx, :] = observation
+        idx = self.current_idx[member_idx].item()
+        self.past_samples[member_idx, idx, :] = observation
 
         # Compute value based on whether we're fully filled or not
-        if not self.fully_filled:
-            val = cb.mean(self.past_samples[: self.current_idx + 1, :], dim=0)
+        if not self.fully_filled[member_idx]:
+            val = self.past_samples[member_idx, : idx + 1, :].mean(dim=0)
             # Denote that we're fully filled if we're at the end of the buffer
-            if self.current_idx == self.filter_width - 1:
-                self.fully_filled = True
+            if idx == self.filter_width - 1:
+                self.fully_filled[member_idx] = True
         else:
-            val = cb.mean(self.past_samples, dim=0)
+            val = self.past_samples[member_idx].mean(dim=0)
 
         # Increment the index to write the next sample to
-        self.current_idx = (self.current_idx + 1) % self.filter_width
-
+        self.current_idx[member_idx] = (idx + 1) % self.filter_width
         return val
 
-    def reset(self):
-        # Clear internal state
-        self.past_samples *= 0.0
-        self.current_idx = 0
-        self.fully_filled = False
+    def estimate_batch(self, observations):
+        """
+        Process all N member rows at once using batched matrix operations.
+
+        Unfilled slots in past_samples are zero, so sum(dim=1) / fill_count gives the correct
+        per-member mean without any masking matrix. Broadcasting is used throughout to avoid
+        allocating intermediate large tensors.
+
+        Args:
+            observations (Tensor): (N, obs_dim) new observations for all members.
+
+        Returns:
+            Tensor: (N, obs_dim) smoothed estimates.
+        """
+        # Write new observations in-place via advanced indexing — no new large tensor
+        self.past_samples[self._member_arange, self.current_idx] = observations
+
+        # fill_count: filter_width for fully-filled rows, current_idx+1 for partial rows
+        # th.where produces a (N,) tensor — unavoidable but small
+        fill_count = th.where(self.fully_filled, self.filter_width, self.current_idx + 1)
+
+        # Sum over the filter dimension; unfilled slots contribute 0, so result is correct.
+        # unsqueeze(-1) broadcasts fill_count (N,) against (N, obs_dim) — no copy
+        vals = self.past_samples.sum(dim=1) / fill_count.unsqueeze(-1)
+
+        # Update fully_filled in-place for any rows that just hit the last slot
+        self.fully_filled |= self.current_idx == self.filter_width - 1
+
+        # Advance circular buffer pointer in-place
+        self.current_idx += 1
+        self.current_idx %= self.filter_width
+
+        return vals
+
+    def reset(self, member_idx=None):
+        """
+        Reset one member's filter row, or all rows if member_idx is None.
+
+        Args:
+            member_idx (int or None): Member to reset. Resets all members if None.
+        """
+        if member_idx is None:
+            self.past_samples.zero_()
+            self.current_idx.zero_()
+            self.fully_filled.zero_()
+        else:
+            self.past_samples[member_idx].zero_()
+            self.current_idx[member_idx] = 0
+            self.fully_filled[member_idx] = False
 
     @property
     def state_size(self):
-        # This is the size of the internal buffer plus the current index and fully filled single values
-        return cb.prod(self.past_samples.shape) + 2
+        # This is the size of the internal buffer plus the current index and fully filled values
+        return self.n_members * self.filter_width * self.obs_dim + 2 * self.n_members
 
     def _dump_state(self):
         # Run super init first
         state = super()._dump_state()
 
         # Add info from this filter
-        state["past_samples"] = cb.to_torch(cb.copy(self.past_samples))
-        state["current_idx"] = self.current_idx
-        state["fully_filled"] = self.fully_filled
+        state["past_samples"] = self.past_samples.clone()
+        state["current_idx"] = self.current_idx.clone()
+        state["fully_filled"] = self.fully_filled.clone()
 
         return state
 
@@ -127,9 +189,9 @@ class MovingAverageFilter(Filter):
         super()._load_state(state=state)
 
         # Load relevant info for this filter
-        self.past_samples = cb.copy(cb.from_torch(state["past_samples"]))
-        self.current_idx = state["current_idx"]
-        self.fully_filled = state["fully_filled"]
+        self.past_samples = state["past_samples"].clone()
+        self.current_idx = state["current_idx"].clone()
+        self.fully_filled = state["fully_filled"].clone()
 
     def serialize(self, state):
         # Run super first
@@ -140,8 +202,8 @@ class MovingAverageFilter(Filter):
             [
                 state_flat,
                 state["past_samples"].flatten(),
-                th.tensor([state["current_idx"]]),
-                th.tensor([state["fully_filled"]]),
+                state["current_idx"].float(),
+                state["fully_filled"].float(),
             ]
         )
 
@@ -150,12 +212,16 @@ class MovingAverageFilter(Filter):
         state_dict, idx = super().deserialize(state=state)
 
         # Deserialize state for this filter
-        samples_len = self.filter_width * self.obs_dim
-        state_dict["past_samples"] = state[idx : idx + samples_len].reshape(self.filter_width, self.obs_dim)
-        state_dict["current_idx"] = int(state[idx + samples_len])
-        state_dict["fully_filled"] = bool(state[idx + samples_len + 1])
-
-        return state_dict, idx + samples_len + 2
+        samples_len = self.n_members * self.filter_width * self.obs_dim
+        state_dict["past_samples"] = state[idx : idx + samples_len].reshape(
+            self.n_members, self.filter_width, self.obs_dim
+        )
+        idx += samples_len
+        state_dict["current_idx"] = state[idx : idx + self.n_members].long()
+        idx += self.n_members
+        state_dict["fully_filled"] = state[idx : idx + self.n_members].bool()
+        idx += self.n_members
+        return state_dict, idx
 
 
 class ExponentialAverageFilter(Filter):

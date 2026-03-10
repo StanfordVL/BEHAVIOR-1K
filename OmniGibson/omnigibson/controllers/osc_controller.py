@@ -285,15 +285,14 @@ class OperationalSpaceController(ManipulationController):
         self._fixed_quat_targets[controller_idx] = None
         self._clear_variable_gains()
 
-    def _load_state(self, state):
+    def _load_state(self, controller_idx, state):
         # Run super first
-        super()._load_state(state=state)
+        super()._load_state(controller_idx=controller_idx, state=state)
 
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
-            for i in range(self.n_members):
-                if self._goal_set[i]:
-                    self._fixed_quat_targets[i] = cb.T.mat2quat(self._goals["target_ori_mat"][i])
+            if self._goal_set[controller_idx]:
+                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(self._goals["target_ori_mat"][controller_idx])
 
     def _clear_variable_gains(self):
         """

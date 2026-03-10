@@ -110,7 +110,7 @@ class MultiFingerGripperController(GripperController):
 
         # Per-member grasping state and velocity filters (indexed by controller_idx)
         self._is_grasping = []  # list of IsGraspingState per member
-        self._vel_filters = []  # list of MovingAverageFilter per member
+        self._vel_filter = None  # single batched MovingAverageFilter for all members
         # Last control per member (for grasping heuristic)
         self._controls = []
 
@@ -132,7 +132,10 @@ class MultiFingerGripperController(GripperController):
     def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
         idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
         self._is_grasping.append(IsGraspingState.FALSE)
-        self._vel_filters.append(MovingAverageFilter(obs_dim=len(self.dof_idx), filter_width=5))
+        if self._vel_filter is None:
+            self._vel_filter = MovingAverageFilter(obs_dim=len(self.dof_idx), filter_width=5, n_members=1)
+        else:
+            self._vel_filter.add_member()
         self._controls.append(None)
         return idx
 
@@ -161,7 +164,7 @@ class MultiFingerGripperController(GripperController):
         super().reset(controller_idx)
 
         # Reset the filter and grasping state
-        self._vel_filters[controller_idx].reset()
+        self._vel_filter.reset(controller_idx)
         self._is_grasping[controller_idx] = IsGraspingState.FALSE
         self._controls[controller_idx] = None
 
@@ -266,7 +269,7 @@ class MultiFingerGripperController(GripperController):
         joint_vel = ControllableObjectViewAPI.get_joint_velocities(prim_path, estimate=True)[self.dof_idx]
 
         # Update velocity history
-        finger_vel = self._vel_filters[controller_idx].estimate(joint_vel)
+        finger_vel = self._vel_filter.estimate(controller_idx, cb.to_torch(joint_vel))
         last_ctrl = self._controls[controller_idx]
 
         # Calculate grasping state based on mode of this controller
@@ -370,45 +373,74 @@ class MultiFingerGripperController(GripperController):
         # Return cached value for this member
         return self._is_grasping[controller_idx]
 
-    def _dump_state(self):
+    def _dump_state(self, controller_idx):
         # Run super first
-        state = super()._dump_state()
+        state = super()._dump_state(controller_idx=controller_idx)
 
         # Add filter state
-        state["vel_filter"] = [vf.dump_state(serialized=False) for vf in self._vel_filters]
+        if self._vel_filter is None:
+            state["vel_filter"] = None
+        else:
+            vel_filter_state = self._vel_filter.dump_state(serialized=False)
+            state["vel_filter"] = {
+                "past_samples": vel_filter_state["past_samples"][controller_idx].clone(),
+                "current_idx": vel_filter_state["current_idx"][controller_idx].clone(),
+                "fully_filled": vel_filter_state["fully_filled"][controller_idx].clone(),
+            }
 
         return state
 
-    def _load_state(self, state):
+    def _load_state(self, controller_idx, state):
         # Run super first
-        super()._load_state(state=state)
+        super()._load_state(controller_idx=controller_idx, state=state)
 
-        # Also load velocity filter state, but only for members whose goal was set
-        for vf, vf_state, goal_set in zip(self._vel_filters, state["vel_filter"], state["goal_set"]):
-            if goal_set:
-                vf.load_state(vf_state, serialized=False)
+        # Also load velocity filter state for this single member.
+        if self._vel_filter is not None and state.get("vel_filter") is not None:
+            vel_filter_state = self._vel_filter.dump_state(serialized=False)
+            loaded_filter_state = state["vel_filter"]
+            vel_filter_state["past_samples"][controller_idx] = loaded_filter_state["past_samples"]
+            vel_filter_state["current_idx"][controller_idx] = loaded_filter_state["current_idx"]
+            vel_filter_state["fully_filled"][controller_idx] = loaded_filter_state["fully_filled"]
+            self._vel_filter.load_state(vel_filter_state, serialized=False)
+        elif self._vel_filter is not None and not state["goal_set"]:
+            self._vel_filter.reset(controller_idx)
 
-    def serialize(self, state):
+    def serialize(self, state, controller_idx):
         # Run super first
-        state_flat = super().serialize(state=state)
-        # Serialize each vel filter
-        filter_states = state.get("vel_filter", [])
+        state_flat = super().serialize(state=state, controller_idx=controller_idx)
         filter_flat = (
-            th.cat([vf.serialize(state=fs) for vf, fs in zip(self._vel_filters, filter_states)])
-            if filter_states
+            th.cat(
+                [
+                    state["vel_filter"]["past_samples"].flatten(),
+                    state["vel_filter"]["current_idx"].float().reshape(1),
+                    state["vel_filter"]["fully_filled"].float().reshape(1),
+                ]
+            )
+            if self._vel_filter is not None and state.get("vel_filter") is not None
             else th.tensor([])
         )
         return th.cat([state_flat, filter_flat])
 
-    def deserialize(self, state):
-        state_dict, idx = super().deserialize(state=state)
-        filter_states = []
-        for vf in self._vel_filters:
-            filter_state, n = vf.deserialize(state=state[idx:])
-            filter_states.append(filter_state)
-            idx += n
-        state_dict["vel_filter"] = filter_states
+    def deserialize(self, state, controller_idx):
+        state_dict, idx = super().deserialize(state=state, controller_idx=controller_idx)
+        state_dict["vel_filter"] = None
+        if self._vel_filter is not None:
+            samples_len = self._vel_filter.filter_width * self._vel_filter.obs_dim
+            state_dict["vel_filter"] = {
+                "past_samples": state[idx : idx + samples_len].reshape(
+                    self._vel_filter.filter_width, self._vel_filter.obs_dim
+                ),
+                "current_idx": state[idx + samples_len].long(),
+                "fully_filled": state[idx + samples_len + 1].bool(),
+            }
+            idx += samples_len + 2
         return state_dict, idx
+
+    @property
+    def state_size(self):
+        if self._vel_filter is None:
+            return super().state_size
+        return super().state_size + self._vel_filter.state_size
 
     @property
     def control_type(self):

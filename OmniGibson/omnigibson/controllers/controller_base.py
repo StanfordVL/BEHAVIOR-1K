@@ -562,62 +562,79 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         raise NotImplementedError
 
-    def _dump_state(self) -> dict:
-        """Dump state for all group members."""
-        goals = dict()
-        for k, v in self._goals.items():
-            # Clone batched goal tensors to avoid sharing views with live controller state.
-            goals[k] = cb.to_torch(v).clone()
+    def _dump_state(self, controller_idx: int) -> dict:
+        """Dump state for one controller member."""
+        goals = {k: cb.to_torch(v[controller_idx]).clone() for k, v in self._goals.items()}
         return {
-            "n_members": self.n_members,
-            "goal_set": list(self._goal_set),
-            "unregistered_controllers": list(self._unregistered_controllers),
+            "goal_set": bool(self._goal_set[controller_idx]),
             "goals": goals,
         }
 
-    def _load_state(self, state: dict):
-        """Load state for all group members."""
+    def dump_state(self, controller_idx: int, serialized: bool = False):
+        """
+        Dumps the state for a single controller member.
+
+        Args:
+            controller_idx (int): member index in this controller group
+            serialized (bool): whether to return flattened serialized state
+
+        Returns:
+            dict or th.Tensor: member state for this controller_idx
+        """
+        state = self._dump_state(controller_idx=controller_idx)
+        return self.serialize(state=state, controller_idx=controller_idx) if serialized else state
+
+    def _load_state(self, controller_idx: int, state: dict):
+        """Load state for one controller member."""
         goal_set = state["goal_set"]
         if isinstance(goal_set, th.Tensor):
-            goal_set = goal_set.reshape(-1).tolist()
-        for controller_idx, goal_set_val in enumerate(goal_set):
-            if isinstance(goal_set_val, th.Tensor):
-                goal_set_val = goal_set_val.item()
-            # Do not reactivate loaded goals. They can be stale by the time physics resumes
-            # (especially across scene reset / controller reload), and may induce pre-action drift.
-            self._goal_set[controller_idx] = False
-            self._controls[controller_idx] = None
-        unregistered = state.get("unregistered_controllers", [0] * self.n_members)
-        for i, u in enumerate(unregistered):
-            self._unregistered_controllers[i] = int(u)
+            goal_set = bool(goal_set.item())
+        # Loaded goals can be stale after scene reset / controller reload.
+        # Force a fresh no-op goal on next step for this member.
+        self._goal_set[controller_idx] = False
+        self._controls[controller_idx] = None
+        self._unregistered_controllers[controller_idx] = 0  # we won't load a unregistered controller
         for name, val in state["goals"].items():
             if name in self._goals:
                 if isinstance(val, th.Tensor):
                     val = cb.from_torch(val)
                 elif not isinstance(val, cb.arr_type):
                     val = cb.array(val)
-                self._goals[name][:] = val
+                self._goals[name][controller_idx] = val
 
-    def serialize(self, state):
-        # Serialize goal state for all members
-        n = state["n_members"]
-        goal_set_tensor = th.tensor(state["goal_set"], dtype=th.float32)
-        unreg_tensor = th.tensor(state.get("unregistered_controllers", [0] * n), dtype=th.float32)
+    def load_state(self, controller_idx: int, state, serialized: bool = False):
+        """
+        Loads state for a single controller member.
+
+        Args:
+            controller_idx (int): member index in this controller group
+            state (dict or th.Tensor): member state payload
+            serialized (bool): whether @state is serialized
+        """
+        if serialized:
+            orig_state_len = len(state)
+            state, deserialized_items = self.deserialize(state=state, controller_idx=controller_idx)
+            assert deserialized_items == orig_state_len, (
+                f"Invalid state deserialization occurred! Expected {orig_state_len} total "
+                f"values to be deserialized, only {deserialized_items} were."
+            )
+        self._load_state(controller_idx=controller_idx, state=state)
+
+    def serialize(self, state, controller_idx: int):
+        goal_set_tensor = th.tensor([float(state["goal_set"])], dtype=th.float32)
         goals = state["goals"]
-        goal_flat = th.cat([v.flatten() for v in goals.values()]) if goals else th.zeros(n * self.goal_dim)
-        return th.cat([goal_set_tensor, unreg_tensor, goal_flat])
+        goal_flat = th.cat([v.flatten() for v in goals.values()]) if goals else th.zeros(self.goal_dim)
+        return th.cat([goal_set_tensor, goal_flat])
 
-    def deserialize(self, state):
-        n = self.n_members
-        goal_set = state[:n].bool().tolist()
-        unregistered_controllers = state[n : 2 * n].long().tolist()
-        idx = 2 * n
+    def deserialize(self, state, controller_idx: int):
+        goal_set = bool(state[0].item())
+        idx = 1
         goals = {}
         for key, shape in self._goal_shapes.items():
-            length = n * math.prod(shape)
-            goals[key] = state[idx : idx + length].reshape(n, *shape)
+            length = math.prod(shape)
+            goals[key] = state[idx : idx + length].reshape(*shape)
             idx += length
-        return dict(n_members=n, goal_set=goal_set, unregistered_controllers=unregistered_controllers, goals=goals), idx
+        return dict(goal_set=goal_set, goals=goals), idx
 
     def _get_goal_shapes(self):
         """
@@ -656,8 +673,8 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     @property
     def state_size(self):
-        # n_members (goal_set) + n_members (unregistered_controllers) + n_members * goal_dim
-        return self.n_members + self.n_members + self.n_members * self.goal_dim
+        # goal_set + goal vector for one controller_idx
+        return 1 + self.goal_dim
 
     def get_goal(self, controller_idx):
         """

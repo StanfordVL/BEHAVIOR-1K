@@ -370,8 +370,8 @@ def test_arm_control():
 
                         init_pos, init_quat = initial_eef_pose[robot.name][arm]
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
-                        arm_gk, arm_ci = robot.controllers[f"arm_{arm}"]
-                        arm_goal = ControllerView.get_goal(arm_gk, arm_ci)
+                        arm_group_key, arm_ci = robot.controllers[f"arm_{arm}"]
+                        arm_goal = ControllerView.get_goal(arm_group_key, arm_ci)
                         target_pos = cb.to_torch(arm_goal["target_pos"])
                         target_quat = T.mat2quat(cb.to_torch(arm_goal["target_ori_mat"]))
                         pos_check = err_checks[controller_mode][action_name]["pos"]
@@ -571,15 +571,15 @@ def test_mixed_models_no_cross_group_contamination():
     fetch_arm = fetch_a.arm_names[0]
     franka_arm = franka.arm_names[0]
 
-    gk_fetch_a, _ = fetch_a.controllers[f"arm_{fetch_arm}"]
-    gk_fetch_b, _ = fetch_b.controllers[f"arm_{fetch_arm}"]
-    gk_franka, _ = franka.controllers[f"arm_{franka_arm}"]
+    group_key_fetch_a, _ = fetch_a.controllers[f"arm_{fetch_arm}"]
+    group_key_fetch_b, _ = fetch_b.controllers[f"arm_{fetch_arm}"]
+    group_key_franka, _ = franka.controllers[f"arm_{franka_arm}"]
 
-    assert gk_fetch_a == gk_fetch_b
-    assert gk_fetch_a != gk_franka
+    assert group_key_fetch_a == group_key_fetch_b
+    assert group_key_fetch_a != group_key_franka
 
-    ctrl_fetch = ControllerView.get_controller(gk_fetch_a)
-    ctrl_franka = ControllerView.get_controller(gk_franka)
+    ctrl_fetch = ControllerView.get_controller(group_key_fetch_a)
+    ctrl_franka = ControllerView.get_controller(group_key_franka)
     assert ctrl_fetch.n_members >= 2
     assert ctrl_franka.n_members == 1
 

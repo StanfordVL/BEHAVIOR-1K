@@ -11,7 +11,6 @@ from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
-from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
@@ -125,9 +124,6 @@ class InverseKinematicsController(JointController, ManipulationController):
                 Otherwise, will use the reset_joint_pos as the initial guess.
         """
         # Store arguments
-        control_dim = len(dof_idx)
-        self._smoothing_filter_size = smoothing_filter_size
-        self._filter_obs_dim = control_dim
         assert mode in IK_MODES, f"Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
 
         # If mode is absolute pose, make sure command input limits / output limits are None
@@ -142,7 +138,6 @@ class InverseKinematicsController(JointController, ManipulationController):
 
         self._link_name = None  # eef/trunk link name (same for all members in the group)
         self._fixed_quat_targets = []  # per-member fixed quat target for position_fixed_ori mode
-        self._control_filters = []  # per-member control filter
 
         # If the mode is set as absolute orientation and using default config,
         # change input and output limits accordingly.
@@ -187,6 +182,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             command_output_limits=command_output_limits,
             isaac_kp=isaac_kp,
             isaac_kd=isaac_kd,
+            smoothing_filter_size=smoothing_filter_size,
         )
 
     def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
@@ -204,92 +200,23 @@ class InverseKinematicsController(JointController, ManipulationController):
         if self._link_name is None:
             self._link_name = link_name
         self._fixed_quat_targets.append(None)
-        self._control_filters.append(
-            None
-            if self._smoothing_filter_size in {None, 0}
-            else MovingAverageFilter(obs_dim=self._filter_obs_dim, filter_width=self._smoothing_filter_size)
-        )
         return idx
 
     def reset(self, controller_idx):
         # Call super first
         super().reset(controller_idx)
-
-        # Reset the filter and clear internal control state
-        if self._control_filters[controller_idx] is not None:
-            self._control_filters[controller_idx].reset()
         self._fixed_quat_targets[controller_idx] = None
 
-    @property
-    def state_size(self):
-        # Add state size from the control filter
-        return super().state_size + sum(
-            0 if control_filter is None else control_filter.state_size for control_filter in self._control_filters
-        )
-
-    def _dump_state(self):
+    def _load_state(self, controller_idx, state):
         # Run super first
-        state = super()._dump_state()
-
-        # Add internal quaternion target and filter state
-        state["control_filter"] = [
-            None if control_filter is None else control_filter.dump_state(serialized=False)
-            for control_filter in self._control_filters
-        ]
-
-        return state
-
-    def _load_state(self, state):
-        # Run super first
-        super()._load_state(state=state)
+        super()._load_state(controller_idx=controller_idx, state=state)
 
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
-            for i in range(self.n_members):
-                if self._goal_set[i]:
-                    self._fixed_quat_targets[i] = cb.T.mat2quat(self._goals["target_ori_mat"][i])
-
-        # Load relevant info for this controller
-        assert "control_filter" in state
-        filter_states = state["control_filter"]
-        for i in range(self.n_members):
-            if self._control_filters[i] is not None and filter_states[i] is not None:
-                self._control_filters[i].load_state(filter_states[i], serialized=False)
-
-    def serialize(self, state):
-        # Run super first
-        state_flat = super().serialize(state=state)
-
-        # Serialize state for this controller
-        return th.cat(
-            [
-                state_flat,
-                *[
-                    (
-                        th.tensor([])
-                        if control_filter is None or filter_state is None
-                        else control_filter.serialize(state=filter_state)
-                    )
-                    for control_filter, filter_state in zip(
-                        self._control_filters,
-                        state["control_filter"],
-                    )
-                ],
-            ]
-        )
-
-    def deserialize(self, state):
-        # Run super first
-        state_dict, idx = super().deserialize(state=state)
-
-        # Deserialize state for this controller
-        state_dict["control_filter"] = [None] * self.n_members
-        for i, control_filter in enumerate(self._control_filters):
-            if control_filter is not None:
-                state_dict["control_filter"][i], deserialized_items = control_filter.deserialize(state=state[idx:])
-                idx += deserialized_items
-
-        return state_dict, idx
+            if self._goal_set[controller_idx]:
+                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(self._goals["target_ori_mat"][controller_idx])
+            else:
+                self._fixed_quat_targets[controller_idx] = None
 
     def _update_goal(self, controller_idx, command):
         prim_path = self._articulation_root_paths[controller_idx]
@@ -391,17 +318,11 @@ class InverseKinematicsController(JointController, ManipulationController):
             q_upper_limit=q_upper_batch,
         )  # (N, ctrl_dim)
 
-        # Apply smoothing filter if present (per-member, unavoidably sequential)
-        if any(control_filter is not None for control_filter in self._control_filters):
-            filtered = [
-                (
-                    target_joint_pos_batch[i]
-                    if self._control_filters[i] is None
-                    else self._control_filters[i].estimate(target_joint_pos_batch[i])
-                )
-                for i in range(N)
-            ]
-            target_joint_pos_batch = cb.stack(filtered, dim=0)
+        # Apply smoothing filter if present
+        if self._control_filter is not None:
+            # MovingAverageFilter stores torch buffers; ensure dtype/backend compatibility.
+            target_joint_pos_batch_torch = cb.to_torch(target_joint_pos_batch)
+            target_joint_pos_batch = cb.from_torch(self._control_filter.estimate_batch(target_joint_pos_batch_torch))
 
         # Delegate to JointController.compute_control for impedance handling
         return super().compute_control(dict(target=target_joint_pos_batch))

@@ -183,14 +183,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for arm_name in self.robot.arm_names:
                 eef = f"eef_{arm_name}"
                 arm = f"arm_{arm_name}"
-                arm_gk, arm_ci = self.robot.controllers[arm]
-                if ControllerView.is_controller_type(arm_gk, InverseKinematicsController):
+                arm_group_key, _ = self.robot.controllers[arm]
+                if ControllerView.is_controller_type(arm_group_key, InverseKinematicsController):
                     pos_relative = cb.to_torch(control_dict[f"{eef}_pos_relative"])
                     quat_relative = cb.to_torch(control_dict[f"{eef}_quat_relative"])
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
-                    arm_target = cb.to_torch(control_dict["joint_position"])[ControllerView.get_dof_idx(arm_gk)]
+                    arm_target = cb.to_torch(control_dict["joint_position"])[ControllerView.get_dof_idx(arm_group_key)]
                     self._arm_targets[arm] = arm_target
 
                 self._reset_eef_pose[arm_name] = self.robot.get_relative_eef_pose(arm_name)
@@ -1642,10 +1642,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD)
             else:
                 action = self._empty_action()
-                base_gk, _ = self.robot.controllers["base"]
-                if ControllerView.is_controller_type(base_gk, HolonomicBaseJointController):
+                base_group_key, _ = self.robot.controllers["base"]
+                if ControllerView.is_controller_type(base_group_key, HolonomicBaseJointController):
                     assert (
-                        ControllerView.get_motor_type(base_gk) == "velocity"
+                        ControllerView.get_motor_type(base_group_key) == "velocity"
                     ), "Holonomic base controller must be in velocity mode"
                     direction_vec = (
                         body_target_pose[0][:2]
@@ -1654,12 +1654,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     )
                     base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
-                elif ControllerView.is_controller_type(base_gk, DifferentialDriveController):
+                elif ControllerView.is_controller_type(base_group_key, DifferentialDriveController):
                     base_action = th.tensor([self.robot.linear_velocity_gain_for_primitives, 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     raise ValueError(
-                        f"Unsupported base controller: {ControllerView.get_controller(base_gk).__class__.__name__}"
+                        f"Unsupported base controller: {ControllerView.get_controller(base_group_key).__class__.__name__}"
                     )
 
                 yield self._postprocess_action(action)
@@ -1697,20 +1697,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             base_action = action[self.robot.controller_action_idx["base"]]
 
-            base_gk, _ = self.robot.controllers["base"]
-            if ControllerView.is_controller_type(base_gk, HolonomicBaseJointController):
+            base_group_key, _ = self.robot.controllers["base"]
+            if ControllerView.is_controller_type(base_group_key, HolonomicBaseJointController):
                 assert (
-                    ControllerView.get_motor_type(base_gk) == "velocity"
+                    ControllerView.get_motor_type(base_group_key) == "velocity"
                 ), "Holonomic base controller must be in velocity mode"
                 base_action[0] = 0.0
                 base_action[1] = 0.0
                 base_action[2] = ang_vel
-            elif ControllerView.is_controller_type(base_gk, DifferentialDriveController):
+            elif ControllerView.is_controller_type(base_group_key, DifferentialDriveController):
                 base_action[0] = 0.0
                 base_action[1] = ang_vel
             else:
                 raise ValueError(
-                    f"Unsupported base controller: {ControllerView.get_controller(base_gk).__class__.__name__}"
+                    f"Unsupported base controller: {ControllerView.get_controller(base_group_key).__class__.__name__}"
                 )
 
             action[self.robot.controller_action_idx["base"]] = base_action

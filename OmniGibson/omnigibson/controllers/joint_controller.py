@@ -17,6 +17,7 @@ from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
+from omnigibson.utils.processing_utils import MovingAverageFilter
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -57,6 +58,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         use_cc_compensation=True,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
+        smoothing_filter_size=None,
     ):
         """
         Args:
@@ -129,6 +131,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self._use_impedances = use_impedances
         self._use_gravity_compensation = use_gravity_compensation
         self._use_cc_compensation = use_cc_compensation
+        self._smoothing_filter_size = smoothing_filter_size
+        self._filter_obs_dim = len(dof_idx)
+        self._control_filter = None  # single batched filter for all members
 
         # Warn the user about gravity compensation being experimental.
         if self._use_gravity_compensation:
@@ -153,6 +158,83 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             isaac_kp=isaac_kp,
             isaac_kd=isaac_kd,
         )
+
+    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
+        idx = super().add_member(articulation_root_path, link_name=link_name, control_enabled=control_enabled)
+        if self._smoothing_filter_size not in {None, 0}:
+            if self._control_filter is None:
+                self._control_filter = MovingAverageFilter(
+                    obs_dim=self._filter_obs_dim,
+                    filter_width=self._smoothing_filter_size,
+                    n_members=1,
+                )
+            else:
+                self._control_filter.add_member()
+        return idx
+
+    def reset(self, controller_idx):
+        super().reset(controller_idx)
+        if self._control_filter is not None:
+            self._control_filter.reset(controller_idx)
+
+    @property
+    def state_size(self):
+        if self._control_filter is None:
+            return super().state_size
+        return super().state_size + self._control_filter.state_size
+
+    def _dump_state(self, controller_idx):
+        state = super()._dump_state(controller_idx=controller_idx)
+        if self._control_filter is None:
+            state["control_filter"] = None
+        else:
+            filter_state = self._control_filter.dump_state(serialized=False)
+            state["control_filter"] = {
+                "past_samples": filter_state["past_samples"][controller_idx].clone(),
+                "current_idx": filter_state["current_idx"][controller_idx].clone(),
+                "fully_filled": filter_state["fully_filled"][controller_idx].clone(),
+            }
+        return state
+
+    def _load_state(self, controller_idx, state):
+        super()._load_state(controller_idx=controller_idx, state=state)
+        if self._control_filter is not None and state.get("control_filter") is not None:
+            filter_state = self._control_filter.dump_state(serialized=False)
+            loaded_filter_state = state["control_filter"]
+            filter_state["past_samples"][controller_idx] = loaded_filter_state["past_samples"]
+            filter_state["current_idx"][controller_idx] = loaded_filter_state["current_idx"]
+            filter_state["fully_filled"][controller_idx] = loaded_filter_state["fully_filled"]
+            self._control_filter.load_state(filter_state, serialized=False)
+
+    def serialize(self, state, controller_idx):
+        state_flat = super().serialize(state=state, controller_idx=controller_idx)
+        filter_part = (
+            th.tensor([])
+            if self._control_filter is None or state.get("control_filter") is None
+            else th.cat(
+                [
+                    state["control_filter"]["past_samples"].flatten(),
+                    state["control_filter"]["current_idx"].float().reshape(1),
+                    state["control_filter"]["fully_filled"].float().reshape(1),
+                ]
+            )
+        )
+        return th.cat([state_flat, filter_part])
+
+    def deserialize(self, state, controller_idx):
+        state_dict, idx = super().deserialize(state=state, controller_idx=controller_idx)
+        state_dict["control_filter"] = None
+        if self._control_filter is not None:
+            samples_len = self._control_filter.filter_width * self._control_filter.obs_dim
+            state_dict["control_filter"] = {
+                "past_samples": state[idx : idx + samples_len].reshape(
+                    self._control_filter.filter_width, self._control_filter.obs_dim
+                ),
+                "current_idx": state[idx + samples_len].long(),
+                "fully_filled": state[idx + samples_len + 1].bool(),
+            }
+            idx += samples_len + 2
+        return state_dict, idx
 
     def _generate_default_command_output_limits(self):
         # Use motor type instead of default control type, since, e.g, use_impedances is commanding joint positions
