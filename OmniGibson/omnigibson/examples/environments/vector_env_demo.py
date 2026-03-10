@@ -1,6 +1,7 @@
 import os
 import time
 
+import torch as th
 import yaml
 
 import omnigibson as og
@@ -21,22 +22,24 @@ def main(random_selection=False, headless=False, short_exec=False):
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     config["scene"]["load_object_categories"] = ["floors", "walls", "coffee_table"]
+    config["env"] = {"num_envs": 5}
 
     # Load the environment
-    vec_env = og.VectorEnvironment(5, config)
+    env = og.Environment(configs=config)
 
     max_iterations = 10 if not short_exec else 1
     for _ in range(max_iterations):
         start_time = time.time()
         for _ in range(NUM_STEPS):
-            actions = []
-            for e in vec_env.envs:
-                actions.append(e.action_space.sample())
-            vec_env.step(actions)
+            actions = th.stack([
+                th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
+                for i in range(env.num_envs)
+            ])
+            env.step(actions)
 
         step_time = time.time() - start_time
         fps = NUM_STEPS / step_time
-        effective_fps = NUM_STEPS * len(vec_env.envs) / step_time
+        effective_fps = NUM_STEPS * env.num_envs / step_time
         print("fps", fps)
         print("effective fps", effective_fps)
 
