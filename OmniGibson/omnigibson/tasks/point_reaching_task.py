@@ -107,9 +107,11 @@ class PointReachingTask(PointNavigationTask):
 
         return terminations
 
-    def _sample_initial_pose_and_goal_pos(self, env, max_trials=100):
+    def _sample_initial_pose_and_goal_pos(self, env, env_idx, max_trials=100):
         # Run super first
-        initial_pos, initial_ori, goal_pos = super()._sample_initial_pose_and_goal_pos(env=env, max_trials=max_trials)
+        initial_pos, initial_ori, goal_pos = super()._sample_initial_pose_and_goal_pos(
+            env=env, env_idx=env_idx, max_trials=max_trials
+        )
 
         # Sample goal position to be within requested height range if specified
         if self._height_range is not None:
@@ -117,25 +119,28 @@ class PointReachingTask(PointNavigationTask):
 
         return initial_pos, initial_ori, goal_pos
 
-    def _get_l2_potential(self, env):
+    def _get_l2_potential(self, env, env_idx):
         # Distance calculated from robot EEF, not base!
-        return T.l2_distance(env.robots[self._robot_idn].get_eef_position(), self._goal_pos)
+        robot = env.scenes[env_idx].robots[self._robot_idn]
+        return T.l2_distance(robot.get_eef_position(), self._goal_pos[env_idx])
 
-    def _get_obs(self, env):
+    def _get_obs(self, env, env_idx):
         # Get obs from super
-        low_dim_obs, obs = super()._get_obs(env=env)
+        low_dim_obs, obs = super()._get_obs(env=env, env_idx=env_idx)
 
         # Remove xy-pos and replace with full xyz relative distance between current and goal pos
         low_dim_obs.pop("xy_pos_to_goal")
-        low_dim_obs["eef_to_goal"] = self._global_pos_to_robot_frame(env=env, pos=self._goal_pos)
+        low_dim_obs["eef_to_goal"] = self._global_pos_to_robot_frame(env=env, env_idx=env_idx, pos=self._goal_pos[env_idx])
 
         # Add local eef position as well
+        robot = env.scenes[env_idx].robots[self._robot_idn]
         low_dim_obs["eef_local_pos"] = self._global_pos_to_robot_frame(
-            env=env, pos=env.robots[self._robot_idn].get_eef_position()
+            env=env, env_idx=env_idx, pos=robot.get_eef_position()
         )
 
         return low_dim_obs, obs
 
-    def get_current_pos(self, env):
+    def get_current_pos(self, env, env_idx):
         # Current position is the robot's EEF, not base!
-        return env.robots[self._robot_idn].get_eef_position()
+        robot = env.scenes[env_idx].robots[self._robot_idn]
+        return robot.get_eef_position()

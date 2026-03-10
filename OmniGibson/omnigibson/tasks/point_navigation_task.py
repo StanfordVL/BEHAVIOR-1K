@@ -88,9 +88,9 @@ class PointNavigationTask(BaseTask):
         # Store inputs
         self._robot_idn = robot_idn
         self._floor = floor
-        self._initial_pos = initial_pos if initial_pos is None else th.tensor(initial_pos)
-        self._initial_quat = initial_quat if initial_quat is None else th.tensor(initial_quat)
-        self._goal_pos = goal_pos if goal_pos is None else th.tensor(goal_pos)
+        self._initial_pos_cfg = initial_pos if initial_pos is None else th.tensor(initial_pos)
+        self._initial_quat_cfg = initial_quat if initial_quat is None else th.tensor(initial_quat)
+        self._goal_pos_cfg = goal_pos if goal_pos is None else th.tensor(goal_pos)
         self._goal_tolerance = goal_tolerance
         self._goal_in_polar = goal_in_polar
         self._path_range = path_range
@@ -106,13 +106,18 @@ class PointNavigationTask(BaseTask):
         assert_valid_key(key=reward_type, valid_keys=POINT_NAVIGATION_REWARD_TYPES, name="reward type")
         self._reward_type = reward_type
 
-        # Create other attributes that will be filled in at runtime
+        # Per-env state (populated during reset)
+        self._initial_pos = None       # list of (3,) tensors per env
+        self._initial_quat = None      # list of (4,) tensors per env
+        self._goal_pos = None          # list of (3,) tensors per env
+        self._path_length = None       # th.Tensor (num_envs,)
+        self._current_robot_pos = None # list of (3,) tensors per env
+        self._geodesic_dist = None     # th.Tensor (num_envs,)
+
+        # Visualization markers (only for first scene)
         self._initial_pos_marker = None
         self._goal_pos_marker = None
         self._waypoint_markers = None
-        self._path_length = None
-        self._current_robot_pos = None
-        self._geodesic_dist = None
 
         # Run super
         super().__init__(termination_config=termination_config, reward_config=reward_config, include_obs=include_obs)
@@ -150,13 +155,22 @@ class PointNavigationTask(BaseTask):
         return rewards
 
     def _load(self, env):
-        # Load visualization
+        # Initialize per-env state lists
+        self._initial_pos = [None] * env.num_envs
+        self._initial_quat = [None] * env.num_envs
+        self._goal_pos = [None] * env.num_envs
+        self._path_length = th.zeros(env.num_envs, dtype=th.float32)
+        self._current_robot_pos = [None] * env.num_envs
+        self._geodesic_dist = th.zeros(env.num_envs, dtype=th.float32)
+
+        # Load visualization (only for first scene)
         self._load_visualization_markers(env=env)
 
         # Auto-initialize all markers
         og.sim.play()
-        self._reset_agent(env=env)
-        env.scene.update_initial_file()
+        self._reset_agent(env=env, env_indices=th.arange(env.num_envs))
+        for scene in env.scenes:
+            scene.update_initial_file()
         og.sim.stop()
 
     def _load_visualization_markers(self, env):
@@ -186,9 +200,9 @@ class PointNavigationTask(BaseTask):
                 rgba=th.tensor([0, 0, 1, 0.3]),
             )
 
-            # Load the objects into the simulator
-            env.scene.add_object(self._initial_pos_marker)
-            env.scene.add_object(self._goal_pos_marker)
+            # Load the objects into the first scene
+            env.scenes[0].add_object(self._initial_pos_marker)
+            env.scenes[0].add_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if self._visualize_path:
@@ -203,13 +217,13 @@ class PointNavigationTask(BaseTask):
                     visual_only=True,
                     rgba=th.tensor([0, 1, 0, 0.3]),
                 )
-                env.scene.add_object(waypoint)
+                env.scenes[0].add_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints
             self._waypoint_markers = waypoints
 
-    def _sample_initial_pose_and_goal_pos(self, env, max_trials=100):
+    def _sample_initial_pose_and_goal_pos(self, env, env_idx, max_trials=100):
         """
         Potentially sample the robot initial pos / ori and target pos, based on whether we're using randomized
         initial and goal states. If not randomzied, then this value will return the corresponding values inputted
@@ -217,6 +231,7 @@ class PointNavigationTask(BaseTask):
 
         Args:
             env (Environment): Environment instance
+            env_idx (int): Index of the environment
             max_trials (int): Number of trials to attempt to sample valid poses and positions
 
         Returns:
@@ -225,29 +240,32 @@ class PointNavigationTask(BaseTask):
                 - 4-array: (x,y,z,w) global sampled initial orientation in quaternion form
                 - 3-array: (x,y,z) global sampled goal position
         """
+        scene = env.scenes[env_idx]
+        robot = scene.robots[self._robot_idn]
+
         # Possibly sample initial pos
         if self._randomize_initial_pos:
-            _, initial_pos = env.scene.get_random_point(floor=self._floor, robot=env.robots[self._robot_idn])
+            _, initial_pos = scene.get_random_point(floor=self._floor, robot=robot)
         else:
-            initial_pos = self._initial_pos
+            initial_pos = self._initial_pos_cfg.clone()
 
         # Possibly sample initial ori
         quat_lo, quat_hi = 0, math.pi * 2
         initial_quat = (
             T.euler2quat(th.tensor([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]))
             if self._randomize_initial_quat
-            else self._initial_quat
+            else self._initial_quat_cfg.clone()
         )
 
         # Possibly sample goal pos
         if self._randomize_goal_pos:
             dist, in_range_dist = 0.0, False
             for _ in range(max_trials):
-                _, goal_pos = env.scene.get_random_point(
-                    floor=self._floor, reference_point=initial_pos, robot=env.robots[self._robot_idn]
+                _, goal_pos = scene.get_random_point(
+                    floor=self._floor, reference_point=initial_pos, robot=robot
                 )
-                _, dist = env.scene.get_shortest_path(
-                    self._floor, initial_pos[:2], goal_pos[:2], entire_path=False, robot=env.robots[self._robot_idn]
+                _, dist = scene.get_shortest_path(
+                    self._floor, initial_pos[:2], goal_pos[:2], entire_path=False, robot=robot
                 )
                 # If a path range is specified, make sure distance is valid
                 if dist is not None and (self._path_range is None or self._path_range[0] < dist < self._path_range[1]):
@@ -257,129 +275,144 @@ class PointNavigationTask(BaseTask):
             if not in_range_dist:
                 log.warning("Failed to sample initial and target positions within requested path range")
         else:
-            goal_pos = self._goal_pos
+            goal_pos = self._goal_pos_cfg.clone()
 
         # Add additional logging info
         log.info("Sampled initial pose: {}, {}".format(initial_pos, initial_quat))
         log.info("Sampled goal position: {}".format(goal_pos))
         return initial_pos, initial_quat, goal_pos
 
-    def _get_geodesic_potential(self, env):
+    def _get_geodesic_potential(self, env, env_idx):
         """
         Get potential based on geodesic distance
 
         Args:
-            env: environment instance
+            env (Environment): Environment instance
+            env_idx (int): Index of the environment
 
         Returns:
             float: geodesic distance to the target position
         """
-        _, geodesic_dist = self.get_shortest_path_to_goal(env=env)
+        _, geodesic_dist = self.get_shortest_path_to_goal(env=env, env_idx=env_idx)
         return geodesic_dist
 
-    def _get_l2_potential(self, env):
+    def _get_l2_potential(self, env, env_idx):
         """
         Get potential based on L2 distance
 
         Args:
-            env: environment instance
+            env (Environment): Environment instance
+            env_idx (int): Index of the environment
 
         Returns:
             float: L2 distance to the target position
         """
-        return T.l2_distance(env.robots[self._robot_idn].states[Pose].get_value()[0][:2], self._goal_pos[:2])
+        robot = env.scenes[env_idx].robots[self._robot_idn]
+        return T.l2_distance(robot.states[Pose].get_value()[0][:2], self._goal_pos[env_idx][:2])
 
-    def get_potential(self, env):
+    def get_potential(self, env, env_idx):
         """
         Compute task-specific potential: distance to the goal
 
         Args:
             env (Environment): Environment instance
+            env_idx (int): Index of the environment
 
         Returns:
             float: Computed potential
         """
         if self._reward_type == "l2":
-            potential = self._get_l2_potential(env)
+            potential = self._get_l2_potential(env, env_idx)
         elif self._reward_type == "geodesic":
-            potential = self._get_geodesic_potential(env)
+            potential = self._get_geodesic_potential(env, env_idx)
             # If no path is found, fall back to L2 potential
             if potential is None:
-                potential = self._get_l2_potential(env)
+                potential = self._get_l2_potential(env, env_idx)
         else:
             raise ValueError(f"Invalid reward type! {self._reward_type}")
 
         return potential
 
-    def _reset_agent(self, env):
-        # Reset agent
-        env.robots[self._robot_idn].reset()
+    def _reset_agent(self, env, env_indices):
+        for env_idx in env_indices:
+            scene = env.scenes[env_idx]
+            robot = scene.robots[self._robot_idn]
+            # Reset agent
+            robot.reset()
 
-        # We attempt to sample valid initial poses and goal positions
-        # TODO: There used to be a test for collision-free, but it was removed because it involved
-        # stepping the simulator and checking for collisions. We should consider alternatives.
-        initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env)
+            # We attempt to sample valid initial poses and goal positions
+            # TODO: There used to be a test for collision-free, but it was removed because it involved
+            # stepping the simulator and checking for collisions. We should consider alternatives.
+            initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env, env_idx)
 
-        # Land the robot
-        env.robots[self._robot_idn].set_position_orientation(position=initial_pos, orientation=initial_quat)
+            # Land the robot
+            robot.set_position_orientation(position=initial_pos, orientation=initial_quat)
 
-        # Store the sampled values internally
-        self._initial_pos = initial_pos
-        self._initial_quat = initial_quat
-        self._goal_pos = goal_pos
+            # Store the sampled values internally
+            self._initial_pos[env_idx] = initial_pos
+            self._initial_quat[env_idx] = initial_quat
+            self._goal_pos[env_idx] = goal_pos
 
-        # Update visuals if requested
-        if self._visualize_goal:
-            self._initial_pos_marker.set_position_orientation(position=self._initial_pos)
-            self._goal_pos_marker.set_position_orientation(position=self._goal_pos)
+            # Update visuals if requested (only for first env)
+            if env_idx == 0 and self._visualize_goal:
+                self._initial_pos_marker.set_position_orientation(position=self._initial_pos[0])
+                self._goal_pos_marker.set_position_orientation(position=self._goal_pos[0])
 
-    def _reset_variables(self, env):
+    def _reset_variables(self, env, env_indices):
         # Run super first
-        super()._reset_variables(env=env)
+        super()._reset_variables(env=env, env_indices=env_indices)
 
         # Reset internal variables
-        self._path_length = 0.0
-        self._current_robot_pos = self._initial_pos
-        self._geodesic_dist = self._get_geodesic_potential(env)
+        for env_idx in env_indices:
+            self._path_length[env_idx] = 0.0
+            self._current_robot_pos[env_idx] = self._initial_pos[env_idx]
+            geodesic = self._get_geodesic_potential(env, env_idx)
+            self._geodesic_dist[env_idx] = geodesic if geodesic is not None else 0.0
 
-    def _step_termination(self, env, action, info=None):
+    def _step_termination(self, env, action, infos=None):
         # Run super first
-        done, info = super()._step_termination(env=env, action=action, info=info)
+        dones, infos = super()._step_termination(env=env, action=action, infos=infos)
 
-        # Add additional info
-        info["path_length"] = self._path_length
-        info["spl"] = (
-            float(info["success"]) * min(1.0, self._geodesic_dist / self._path_length)
-            if done and self._path_length != 0.0
-            else 0.0
-        )
+        # Add additional info per env
+        for env_idx in range(self._num_envs):
+            infos[env_idx]["path_length"] = self._path_length[env_idx].item()
+            path_len = self._path_length[env_idx].item()
+            geo_dist = self._geodesic_dist[env_idx].item()
+            infos[env_idx]["spl"] = (
+                float(infos[env_idx]["success"]) * min(1.0, geo_dist / path_len)
+                if dones[env_idx].item() and path_len != 0.0
+                else 0.0
+            )
 
-        return done, info
+        return dones, infos
 
-    def _global_pos_to_robot_frame(self, env, pos):
+    def _global_pos_to_robot_frame(self, env, env_idx, pos):
         """
         Convert a 3D point in global frame to agent's local frame
 
         Args:
             env (TraversableEnv): Environment instance
+            env_idx (int): Index of the environment
             pos (th.Tensor): global (x,y,z) position
 
         Returns:
             th.Tensor: (x,y,z) position in self._robot_idn agent's local frame
         """
-        delta_pos_global = pos - env.robots[self._robot_idn].states[Pose].get_value()[0]
-        return T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T @ delta_pos_global
+        robot = env.scenes[env_idx].robots[self._robot_idn]
+        delta_pos_global = pos - robot.states[Pose].get_value()[0]
+        return T.quat2mat(robot.states[Pose].get_value()[1]).T @ delta_pos_global
 
-    def _get_obs(self, env):
+    def _get_obs(self, env, env_idx):
         # Get relative position of goal with respect to the current agent position
-        xy_pos_to_goal = self._global_pos_to_robot_frame(env, self._goal_pos)[:2]
+        xy_pos_to_goal = self._global_pos_to_robot_frame(env, env_idx, self._goal_pos[env_idx])[:2]
         if self._goal_in_polar:
             xy_pos_to_goal = th.tensor(T.cartesian_to_polar(*xy_pos_to_goal))
 
         # linear velocity and angular velocity
-        ori_t = T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T
-        lin_vel = ori_t @ env.robots[self._robot_idn].get_linear_velocity()
-        ang_vel = ori_t @ env.robots[self._robot_idn].get_angular_velocity()
+        robot = env.scenes[env_idx].robots[self._robot_idn]
+        ori_t = T.quat2mat(robot.states[Pose].get_value()[1]).T
+        lin_vel = ori_t @ robot.get_linear_velocity()
+        ang_vel = ori_t @ robot.get_angular_velocity()
 
         # Compose observation dict
         low_dim_obs = dict(
@@ -395,26 +428,27 @@ class PointNavigationTask(BaseTask):
         # No non-low dim observations so we return an empty dict
         return dict()
 
-    def get_goal_pos(self):
+    def get_goal_pos(self, env_idx):
         """
         Returns:
-            3-array: (x,y,z) global current goal position
+            3-array: (x,y,z) global current goal position for the specified env
         """
-        return self._goal_pos
+        return self._goal_pos[env_idx]
 
-    def get_current_pos(self, env):
+    def get_current_pos(self, env, env_idx):
         """
         Returns:
             3-array: (x,y,z) global current position representing the robot
         """
-        return env.robots[self._robot_idn].states[Pose].get_value()[0]
+        return env.scenes[env_idx].robots[self._robot_idn].states[Pose].get_value()[0]
 
-    def get_shortest_path_to_goal(self, env, start_xy_pos=None, entire_path=False):
+    def get_shortest_path_to_goal(self, env, env_idx, start_xy_pos=None, entire_path=False):
         """
         Get the shortest path and geodesic distance from @start_pos to the target position
 
         Args:
             env (TraversableEnv): Environment instance
+            env_idx (int): Index of the environment
             start_xy_pos (None or 2-array): If specified, should be the global (x,y) start position from which
                 to calculate the shortest path to the goal position. If None (default), the robot's current xy position
                 will be used
@@ -425,11 +459,13 @@ class PointNavigationTask(BaseTask):
                 - list of 2-array: List of (x,y) waypoints representing the path # TODO: is this true?
                 - float: geodesic distance of the path to the goal position
         """
+        scene = env.scenes[env_idx]
+        robot = scene.robots[self._robot_idn]
         start_xy_pos = (
-            env.robots[self._robot_idn].states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
+            robot.states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
         )
-        return env.scene.get_shortest_path(
-            self._floor, start_xy_pos, self._goal_pos[:2], entire_path=entire_path, robot=env.robots[self._robot_idn]
+        return scene.get_shortest_path(
+            self._floor, start_xy_pos, self._goal_pos[env_idx][:2], entire_path=entire_path, robot=robot
         )
 
     def _step_visualization(self, env):
@@ -440,8 +476,8 @@ class PointNavigationTask(BaseTask):
             env (Environment): Environment instance
         """
         if self._visualize_path:
-            shortest_path, _ = self.get_shortest_path_to_goal(env=env, entire_path=True)
-            floor_height = env.scene.get_floor_height(self._floor)
+            shortest_path, _ = self.get_shortest_path_to_goal(env=env, env_idx=0, entire_path=True)
+            floor_height = env.scenes[0].get_floor_height(self._floor)
             num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
             for i in range(num_nodes):
                 self._waypoint_markers[i].set_position_orientation(
@@ -458,9 +494,14 @@ class PointNavigationTask(BaseTask):
         self._step_visualization(env=env)
 
         # Update other internal variables
-        new_robot_pos = env.robots[self._robot_idn].states[Pose].get_value()[0]
-        self._path_length += T.l2_distance(self._current_robot_pos[:2], new_robot_pos[:2])
-        self._current_robot_pos = new_robot_pos
+        for env_idx in range(self._num_envs):
+            robot = env.scenes[env_idx].robots[self._robot_idn]
+            new_robot_pos = robot.states[Pose].get_value()[0]
+            if self._current_robot_pos[env_idx] is not None:
+                self._path_length[env_idx] += T.l2_distance(
+                    self._current_robot_pos[env_idx][:2], new_robot_pos[:2]
+                )
+            self._current_robot_pos[env_idx] = new_robot_pos
 
         return reward, done, info
 
