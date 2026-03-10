@@ -2,6 +2,7 @@ from abc import ABCMeta
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cached_property
+import itertools
 from typing import Literal
 
 import torch as th
@@ -60,21 +61,8 @@ m.FIRE_EMITTER_HEIGHT_RATIO = 0.4  # z-height of generated fire relative to its 
 OBJECT_TAXONOMY = ObjectTaxonomy()
 
 
-class FlowEmitterLayerRegistry:
-    """
-    Registry for flow emitter layers. This is used to ensure that all flow emitters are placed on unique layers, so that
-    they do not interfere with each other.
-    """
-
-    def __init__(self):
-        self._layer = 0
-
-    def __call__(self):
-        self._layer += 1
-        return self._layer
-
-
-LAYER_REGISTRY = FlowEmitterLayerRegistry()
+# Counter that assigns each flow emitter a unique layer number so emitters don't interfere.
+_EMITTER_LAYER_COUNTER = itertools.count(1)
 
 
 class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
@@ -540,7 +528,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             "canonical_pose": mesh.get_position_orientation(),
         }
 
-        layer_number = LAYER_REGISTRY()
+        layer_number = next(_EMITTER_LAYER_COUNTER)
 
         # Update emitter general settings.
         emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
