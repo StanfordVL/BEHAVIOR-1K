@@ -91,8 +91,6 @@ jobs:
           - {test_file: test_examples, example: "scenes.scene_tour_demo"}
           - {test_file: test_examples, example: "scenes.traversability_map_example"}
           - {test_file: test_examples, example: "simulator.sim_save_load_example"}
-          - {test_file: test_examples, example: "teleoperation.vr_robot_control_demo"}
-          - {test_file: test_examples, example: "teleoperation.vr_scene_tour_demo"}
         # --- END AUTO-GENERATED EXAMPLE INCLUDES ---
 
     defaults:

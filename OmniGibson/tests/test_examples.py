@@ -41,8 +41,6 @@ EXAMPLES = [
     "scenes.scene_tour_demo",
     "scenes.traversability_map_example",
     "simulator.sim_save_load_example",
-    "teleoperation.vr_robot_control_demo",
-    "teleoperation.vr_scene_tour_demo",
     # --- END AUTO-GENERATED EXAMPLES ---
 ]
 
@@ -54,6 +52,8 @@ EXAMPLES_TO_SKIP = [
     "environments.behavior_env_demo",  # requires pre-sampled cached BEHAVIOR activity scene
     "learning.navigation_policy_demo",
     "teleoperation.robot_teleoperate_demo",
+    "teleoperation.vr_robot_control_demo",  # does not support headless mode
+    "teleoperation.vr_scene_tour_demo",  # does not support headless mode
 ]
 
 
