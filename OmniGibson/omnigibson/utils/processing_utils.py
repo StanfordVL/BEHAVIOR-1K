@@ -82,14 +82,40 @@ class MovingAverageFilter(Filter):
 
         super().__init__()
 
-    def add_member(self):
-        """Grow the filter by one row for a newly registered controller member."""
+    def add_member(self, slot):
+        """Register a member at the given slot index.
+
+        If slot < n_members the slot is being reused (tombstone reuse): its buffer is cleared
+        in-place and n_members is unchanged. If slot == n_members a new row is appended.
+
+        Args:
+            slot (int): Slot index as determined by the controller's add_member (either a
+                previously tombstoned index or the next new index == current n_members).
+        """
+        if slot < self.n_members:
+            # Reuse: clear the slot so it starts fresh
+            self.past_samples[slot].zero_()
+            self.current_idx[slot] = 0
+            self.fully_filled[slot] = False
+            # n_members and _member_arange stay the same — slot count is unchanged
+            return
+        # New slot: append a fresh row
         self.past_samples = th.cat([self.past_samples, th.zeros(1, self.filter_width, self.obs_dim)], dim=0)
         self.current_idx = th.cat([self.current_idx, th.zeros(1, dtype=th.long)])
         self.fully_filled = th.cat([self.fully_filled, th.zeros(1, dtype=th.bool)])
         # rebuild arange to include the new member
         self._member_arange = th.arange(self.n_members + 1)
         self.n_members += 1
+
+    def unregister_member(self, member_idx):
+        """Zero a member's buffer when it is unregistered (tombstoned at the controller level).
+
+        Args:
+            member_idx (int): Index of the member to unregister.
+        """
+        self.past_samples[member_idx].zero_()
+        self.current_idx[member_idx] = 0
+        self.fully_filled[member_idx] = False
 
     def estimate(self, member_idx, observation):
         """

@@ -606,16 +606,10 @@ class Robot(USDObject, GymObservable):
             if self.is_manipulation:
                 for arm in self.arm_names:
                     if name == f"arm_{arm}":
-                        try:
-                            link_name = self.eef_link_names[arm]
-                        except (ValueError, AttributeError, KeyError):
-                            pass
+                        link_name = self.eef_link_names[arm]
             if self.is_articulated_trunk:
                 if name == "trunk":
-                    try:
-                        link_name = self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
-                    except (ValueError, AttributeError, KeyError):
-                        pass
+                    link_name = self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
 
             # Register with ControllerView — creates the shared controller if it doesn't exist yet,
             # then adds this robot as a member and returns its per-member index.

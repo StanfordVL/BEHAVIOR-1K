@@ -391,15 +391,16 @@ def test_arm_control():
     og.clear()
 
 
-def test_two_fetch_reload_noncontiguous_slots():
+def test_two_fetch_reload_reuses_slots():
     """
-    Verify unregister/reload keeps controller_idx stable.
+    Verify unregister/reload reuses tombstoned slots in shared groups.
 
-    This test reloads both Fetch robots twice so old slots become tombstones and active slots are
-    non-contiguous. It checks that:
+    This test reloads both Fetch robots twice and checks that slot reuse keeps the shared group
+    compact instead of growing with stale tombstones. It checks that:
     - shared arm controllers still point to the same group
-    - active controller indices remain valid despite tombstones
-    - stepping the scene does not crash with non-contiguous active slots
+    - active indices correspond exactly to the two live members
+    - stale tombstones are not accumulating after reload
+    - stepping the scene does not crash after repeated reloads
     """
     env = _make_two_fetch_env()
     _stabilize_and_reset(env.robots)
@@ -410,7 +411,7 @@ def test_two_fetch_reload_noncontiguous_slots():
         }
         robot.reload_controllers(controller_config)
 
-    # Reload each robot once more to force tombstones in shared groups.
+    # Reload each robot once more; reused slots should prevent group growth.
     for robot in env.robots:
         controller_config = {
             f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names
@@ -426,11 +427,12 @@ def test_two_fetch_reload_noncontiguous_slots():
     unregistered = list(controller._unregistered_controllers)
     active_slots = [i for i, u in enumerate(unregistered) if u == 0]
 
-    # We expect tombstones from the first membership pair and active non-contiguous slots.
-    assert controller.n_members >= 4
+    # With slot reuse, shared group should stay compact for exactly two live members.
+    assert controller.n_members == 2
     assert len(active_slots) == 2
     assert idx_a in active_slots and idx_b in active_slots
-    assert idx_a >= 2 and idx_b >= 2
+    assert set(active_slots) == {idx_a, idx_b}
+    assert sum(unregistered) == 0
 
     actions = {r.name: th.zeros(r.action_dim) for r in env.robots}
     for _ in range(5):

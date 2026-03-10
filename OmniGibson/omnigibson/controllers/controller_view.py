@@ -60,12 +60,18 @@ class ControllerView:
         if group_key not in cls._controller_groups:
             from omnigibson.controllers import create_controller
 
-            cls._controller_groups[group_key] = create_controller(**controller_cfg)
+            controller_name = controller_cfg.get("name")
+            if link_name is not None and controller_name in {
+                "InverseKinematicsController",
+                "OperationalSpaceController",
+            }:
+                cls._controller_groups[group_key] = create_controller(**controller_cfg, link_name=link_name)
+            else:
+                cls._controller_groups[group_key] = create_controller(**controller_cfg)
 
         controller = cls._controller_groups[group_key]
         controller_idx = controller.add_member(
             articulation_root_path,
-            link_name,
             control_enabled=control_enabled,
         )
 

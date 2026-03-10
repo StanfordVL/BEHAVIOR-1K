@@ -59,6 +59,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
         condition_on_current_position=True,
+        link_name=None,
     ):
         """
         Args:
@@ -122,6 +123,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                 values, and the returned tuple is the processed (pos, quat) command.
             condition_on_current_position (bool): if True, will use the current joint position as the initial guess for the IK algorithm.
                 Otherwise, will use the reset_joint_pos as the initial guess.
+            link_name (str or None): name of the EEF or trunk link.
         """
         # Store arguments
         assert mode in IK_MODES, f"Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
@@ -136,7 +138,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         self.reset_joint_pos = reset_joint_pos[dof_idx]
         self.condition_on_current_position = condition_on_current_position
 
-        self._link_name = None  # eef/trunk link name (same for all members in the group)
+        self._link_name = link_name  # eef/trunk link name (same for all members in the group)
         self._fixed_quat_targets = []  # per-member fixed quat target for position_fixed_ori mode
 
         # If the mode is set as absolute orientation and using default config,
@@ -185,21 +187,24 @@ class InverseKinematicsController(JointController, ManipulationController):
             smoothing_filter_size=smoothing_filter_size,
         )
 
-    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
+    def add_member(self, articulation_root_path, control_enabled=True):
         """
         Register a member and store its EEF link name.
 
+        Reuses a tombstoned slot when available (tombstone reuse is handled by the base class).
+
         Args:
             articulation_root_path (str): articulation root prim path of the new group member
-            link_name (str or None): name of the EEF or trunk link for this member
 
         Returns:
             int: controller_idx
         """
         idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
-        if self._link_name is None:
-            self._link_name = link_name
-        self._fixed_quat_targets.append(None)
+        if idx < len(self._fixed_quat_targets):
+            # Reusing a tombstoned slot — reset the fixed orientation target
+            self._fixed_quat_targets[idx] = None
+        else:
+            self._fixed_quat_targets.append(None)
         return idx
 
     def reset(self, controller_idx):

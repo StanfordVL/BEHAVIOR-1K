@@ -129,15 +129,32 @@ class MultiFingerGripperController(GripperController):
             isaac_kd=isaac_kd,
         )
 
-    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
+    def add_member(self, articulation_root_path, control_enabled=True):
         idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
-        self._is_grasping.append(IsGraspingState.FALSE)
+        if idx < len(self._is_grasping):
+            # Reusing a tombstoned slot — reset per-member grasping state
+            self._is_grasping[idx] = IsGraspingState.FALSE
+        else:
+            # New slot — append state
+            self._is_grasping.append(IsGraspingState.FALSE)
         if self._vel_filter is None:
+            # First-ever member: create the batched filter (idx is always 0 here)
             self._vel_filter = MovingAverageFilter(obs_dim=len(self.dof_idx), filter_width=5, n_members=1)
         else:
-            self._vel_filter.add_member()
-        self._controls.append(None)
+            # Pass idx so the filter reuses the slot in-place or appends as appropriate
+            self._vel_filter.add_member(idx)
+        # Note: _controls is managed by BaseController.add_member; do not append here
         return idx
+
+    def unregister_member(self, controller_idx):
+        """Mark member at controller_idx as a tombstone in both controller and velocity filter.
+
+        Args:
+            controller_idx (int): index of the member to unregister
+        """
+        super().unregister_member(controller_idx)
+        if self._vel_filter is not None:
+            self._vel_filter.unregister_member(controller_idx)
 
     def _generate_default_command_output_limits(self):
         # By default (independent mode), this is simply the super call

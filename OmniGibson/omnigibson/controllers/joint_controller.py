@@ -159,18 +159,30 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             isaac_kd=isaac_kd,
         )
 
-    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
-        idx = super().add_member(articulation_root_path, link_name=link_name, control_enabled=control_enabled)
+    def add_member(self, articulation_root_path, control_enabled=True):
+        idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
         if self._smoothing_filter_size not in {None, 0}:
             if self._control_filter is None:
+                # First-ever member: create the batched filter (idx is always 0 here)
                 self._control_filter = MovingAverageFilter(
                     obs_dim=self._filter_obs_dim,
                     filter_width=self._smoothing_filter_size,
                     n_members=1,
                 )
             else:
-                self._control_filter.add_member()
+                # Pass idx so the filter reuses the slot in-place or appends as appropriate
+                self._control_filter.add_member(idx)
         return idx
+
+    def unregister_member(self, controller_idx):
+        """Mark member at controller_idx as a tombstone in both controller and smoothing filter.
+
+        Args:
+            controller_idx (int): index of the member to unregister
+        """
+        super().unregister_member(controller_idx)
+        if self._control_filter is not None:
+            self._control_filter.unregister_member(controller_idx)
 
     def reset(self, controller_idx):
         super().reset(controller_idx)

@@ -77,6 +77,7 @@ class OperationalSpaceController(ManipulationController):
         workspace_pose_limiter=None,
         use_gravity_compensation=False,
         use_cc_compensation=True,
+        link_name=None,
     ):
         """
         Args:
@@ -139,6 +140,7 @@ class OperationalSpaceController(ManipulationController):
             use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
                 an experimental feature that only works on fixed base robots. We do not recommend enabling this.
             use_cc_compensation (bool): If True, will add Coriolis / centrifugal compensation to the computed efforts.
+            link_name (str or None): name of eef or trunk link
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -246,7 +248,7 @@ class OperationalSpaceController(ManipulationController):
         self.reset_joint_pos = reset_joint_pos[dof_idx]
 
         # member state that will be filled in at runtime
-        self._link_name = None  # eef/trunk link name (same for all members in the group)
+        self._link_name = link_name  # eef/trunk link name (same for all members in the group)
         self._fixed_quat_targets = []  # per-member fixed quat target for position_fixed_ori mode
 
         # Run super init
@@ -260,21 +262,24 @@ class OperationalSpaceController(ManipulationController):
             isaac_kd=isaac_kd,
         )
 
-    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
+    def add_member(self, articulation_root_path, control_enabled=True):
         """
         Register a member and store its EEF link name.
 
+        Reuses a tombstoned slot when available (tombstone reuse is handled by the base class).
+
         Args:
             articulation_root_path (str): articulation root prim path of the new group member
-            link_name (str or None): name of the EEF link for this member
 
         Returns:
             int: controller_idx
         """
         idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
-        if self._link_name is None:
-            self._link_name = link_name
-        self._fixed_quat_targets.append(None)
+        if idx < len(self._fixed_quat_targets):
+            # Reusing a tombstoned slot — reset the fixed orientation target
+            self._fixed_quat_targets[idx] = None
+        else:
+            self._fixed_quat_targets.append(None)
         return idx
 
     def reset(self, controller_idx):

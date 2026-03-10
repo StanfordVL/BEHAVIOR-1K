@@ -153,7 +153,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Per-member last deployed control tensor (set in _write_control)
         self._controls = []
         # Per-member tombstone mask: 0 = active, 1 = unregistered (permanently ignored)
-        self._unregistered_controllers = []
+        self._unregistered_controllers = th.zeros(0, dtype=th.long)
         # Lazy-init: row indices of each member in the shared view (None until first _write_control call)
         self._view_row_indices = None
 
@@ -217,33 +217,48 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._isaac_kp = None if isaac_kp is None else self.nums2array(isaac_kp, self.control_dim)
         self._isaac_kd = None if isaac_kd is None else self.nums2array(isaac_kd, self.control_dim)
 
-    def add_member(self, articulation_root_path, link_name=None, control_enabled=True):
+    def add_member(self, articulation_root_path, control_enabled=True):
         """
         Register a controller as a member of this controller group.
 
+        Reuses the first tombstoned (unregistered) slot if one exists, otherwise appends a new slot.
+
         Args:
             articulation_root_path (str): articulation root prim path of the new group member
-            link_name (None or str): EEF link name — ignored by default; overridden by IK/OSC.
 
         Returns:
             int: controller_idx — index into this group's member arrays for the added controller,
                 used to access goal, control, and articulation_root_path
         """
-        controller_idx = len(self._articulation_root_paths)
-        self._articulation_root_paths.append(articulation_root_path)
-        self._view_row_indices = None  # force lazy re-init on next _write_control
-        self._goal_set.append(False)
-        self._control_enabled.append(1 if control_enabled else 0)
-        self._controls.append(None)
-        self._unregistered_controllers.append(0)
+        # Reuse the first tombstoned slot if available
+        tombstone_indices = (self._unregistered_controllers == 1).nonzero(as_tuple=True)[0]
+        if len(tombstone_indices) > 0:
+            controller_idx = tombstone_indices[0].item()
+            # Reset the reused slot in-place
+            self._articulation_root_paths[controller_idx] = articulation_root_path
+            self._goal_set[controller_idx] = False
+            self._control_enabled[controller_idx] = 1 if control_enabled else 0
+            self._controls[controller_idx] = None
+            self._unregistered_controllers[controller_idx] = 0
+            for key, shape in self._goal_shapes.items():
+                self._goals[key][controller_idx] = cb.zeros(shape)
+        else:
+            # No tombstone available — append a new slot
+            controller_idx = len(self._articulation_root_paths)
+            self._articulation_root_paths.append(articulation_root_path)
+            self._goal_set.append(False)
+            self._control_enabled.append(1 if control_enabled else 0)
+            self._controls.append(None)
+            self._unregistered_controllers = th.cat([self._unregistered_controllers, th.zeros(1, dtype=th.long)])
+            for key, shape in self._goal_shapes.items():
+                new_row = cb.zeros((1, *shape))
+                if key in self._goals:
+                    self._goals[key] = cb.cat([self._goals[key], new_row], 0)
+                else:
+                    self._goals[key] = new_row
 
-        for key, shape in self._goal_shapes.items():
-            new_row = cb.zeros((1, *shape))
-            if key in self._goals:
-                self._goals[key] = cb.cat([self._goals[key], new_row], 0)
-            else:
-                self._goals[key] = new_row
-
+        # Always invalidate cached view indices so the next _write_control re-resolves them
+        self._view_row_indices = None
         return controller_idx
 
     @property
@@ -514,8 +529,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     def has_no_active_members(self):
         """Return True if all members have been unregistered."""
-        no_active = all(u == 1 for u in self._unregistered_controllers)
-        return no_active
+        return bool(th.all(self._unregistered_controllers == 1).item())
 
     def set_control_enabled(self, controller_idx, enabled):
         self._control_enabled[controller_idx] = 1 if enabled else 0
