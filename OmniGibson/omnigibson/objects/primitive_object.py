@@ -2,7 +2,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.python_utils import assert_valid_key
@@ -20,7 +20,7 @@ VALID_HEIGHT_OBJECTS = {"Cone", "Cylinder"}
 VALID_SIZE_OBJECTS = {"Cube", "Torus"}
 
 
-class PrimitiveObject(StatefulObject):
+class PrimitiveObject(BaseObject):
     """
     PrimitiveObjects are objects defined by a single geom, e.g: sphere, mesh, cube, etc.
     """
