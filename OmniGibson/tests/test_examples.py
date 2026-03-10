@@ -1,5 +1,6 @@
 import importlib
 import os
+from unittest.mock import patch
 
 import pytest
 
@@ -60,4 +61,5 @@ EXAMPLES_TO_SKIP = [
 @pytest.mark.parametrize("example_name", EXAMPLES)
 def test_example(example_name):
     module = importlib.import_module(f"omnigibson.examples.{example_name}")
-    module.main(random_selection=True, headless=True, short_exec=True)
+    with patch("omnigibson.shutdown"):
+        module.main(random_selection=True, headless=True, short_exec=True)
