@@ -50,12 +50,6 @@ All objects are tracked and organized by the underlying scene, and can quickly b
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`StatefulObject`**](../reference/objects/stateful_object.md)<br><br>
-            Encapsulates an object that owns a set of [object states](./object_states.md). In general, this is intended to be a parent class, and not meant to be instantiated directly.<br><br>
-        </td>
-    </tr>
-    <tr>
-        <td valign="top">
             [**`USDObject`**](../reference/objects/usd_object.md)<br><br>
             Encapsulates an object imported from a usd file. Useful when loading custom USD assets into **`OmniGibson`**. Users should specify the absolute `usd_path` to the desired file to import.<br><br>
         </td>
