@@ -30,11 +30,10 @@ from omnigibson.object_states.on_fire import OnFire
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.utils.constants import EmitterType, PrimType, OBJECT_CATEGORIES
+from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, extract_class_init_kwargs_from_dict, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, create_joint
-from omnigibson.utils.vision_utils import add_semantic_label
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -175,9 +174,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config["self_collisions"] = self_collisions
         load_config["prim_type"] = prim_type
 
-        # Store this category
-        OBJECT_CATEGORIES.add(self.category)
-
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -312,8 +308,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 self._link_physics_materials[link_name] = physics_mat
 
         # Add semantics
-        add_semantic_label(prim=self._prim, label=self.category)
-
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
+            prim=self._prim,
+            semantic_label=self.category,
+            type_label="class",
+        )
         # Prepare the object states
         self._states = {}
         self.prepare_object_states()
