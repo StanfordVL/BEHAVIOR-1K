@@ -40,11 +40,11 @@ class GraspReward(BaseRewardFunction):
         regularization_coef,
     ):
         # Store internal vars
-        self.prev_grasping = False
+        self.prev_grasping = None
         self.prev_eef_pos = None
-        self.prev_eef_rot = None
+        self.prev_eef_quat = None
         self.obj_name = obj_name
-        self.obj = None
+        self._objs = None  # list of objects per scene, populated lazily
         self.dist_coeff = dist_coeff
         self.grasp_reward = grasp_reward
         self.collision_penalty = collision_penalty
@@ -56,103 +56,123 @@ class GraspReward(BaseRewardFunction):
         super().__init__()
 
     def _step(self, task, env, action):
-        self.obj = env.scene.object_registry("name", self.obj_name) if self.obj is None else self.obj
+        # Lazily populate per-scene object references
+        if self._objs is None:
+            self._objs = [env.scenes[i].object_registry("name", self.obj_name) for i in range(env.num_envs)]
 
-        robot = env.robots[0]
-        obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
-        current_grasping = obj_in_hand == self.obj
+        rewards = th.zeros(env.num_envs, dtype=th.float32)
+        infos = [dict() for _ in range(env.num_envs)]
 
-        info = {"grasp_success": current_grasping}
+        for env_idx in range(env.num_envs):
+            obj = self._objs[env_idx]
+            robot = env.scenes[env_idx].robots[0]
+            obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
+            current_grasping = obj_in_hand == obj
 
-        # Reward varying based on combination of whether the robot was previously grasping the desired object
-        # and is currently grasping the desired object
-        reward = 0.0
+            info = {"grasp_success": current_grasping}
 
-        # Penalize large actions
-        action_mag = th.sum(th.abs(action))
-        regularization_penalty = -(action_mag * self.regularization_coef)
-        reward += regularization_penalty
-        info["regularization_penalty_factor"] = action_mag
-        info["regularization_penalty"] = regularization_penalty
+            # Reward varying based on combination of whether the robot was previously grasping the desired object
+            # and is currently grasping the desired object
+            reward = 0.0
 
-        # Penalize based on the magnitude of the action
-        eef_pos = robot.get_eef_position(robot.default_arm)
-        info["position_penalty_factor"] = 0.0
-        info["position_penalty"] = 0.0
-        if self.prev_eef_pos is not None:
-            eef_pos_delta = T.l2_distance(self.prev_eef_pos, eef_pos)
-            position_penalty = -eef_pos_delta * self.eef_position_penalty_coef
-            reward += position_penalty
-            info["position_penalty_factor"] = eef_pos_delta
-            info["position_penalty"] = position_penalty
-        self.prev_eef_pos = eef_pos
+            # Penalize large actions
+            action_mag = th.sum(th.abs(action))
+            regularization_penalty = -(action_mag * self.regularization_coef)
+            reward += regularization_penalty
+            info["regularization_penalty_factor"] = action_mag
+            info["regularization_penalty"] = regularization_penalty
 
-        eef_quat = robot.get_eef_orientation(robot.default_arm)
-        info["rotation_penalty_factor"] = 0.0
-        info["rotation_penalty"] = 0.0
-        if self.prev_eef_quat is not None:
-            delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_quat, eef_quat)
-            rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
-            reward += rotation_penalty
-            info["rotation_penalty_factor"] = delta_rot.item()
-            info["rotation_penalty"] = rotation_penalty.item()
-        self.prev_eef_quat = eef_quat
+            # Penalize based on the magnitude of the action
+            eef_pos = robot.get_eef_position(robot.default_arm)
+            info["position_penalty_factor"] = 0.0
+            info["position_penalty"] = 0.0
+            if self.prev_eef_pos is not None and self.prev_eef_pos[env_idx] is not None:
+                eef_pos_delta = T.l2_distance(self.prev_eef_pos[env_idx], eef_pos)
+                position_penalty = -eef_pos_delta * self.eef_position_penalty_coef
+                reward += position_penalty
+                info["position_penalty_factor"] = eef_pos_delta
+                info["position_penalty"] = position_penalty
 
-        # Penalize robot for colliding with an object
-        info["collision_penalty_factor"] = 0.0
-        info["collision_penalty"] = 0.0
-        if detect_robot_collision_in_sim(robot, filter_objs=[self.obj]):
-            reward += -self.collision_penalty
-            info["collision_penalty_factor"] = 1.0
-            info["collision_penalty"] = -self.collision_penalty
+            eef_quat = robot.get_eef_orientation(robot.default_arm)
+            info["rotation_penalty_factor"] = 0.0
+            info["rotation_penalty"] = 0.0
+            if self.prev_eef_quat is not None and self.prev_eef_quat[env_idx] is not None:
+                delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_quat[env_idx], eef_quat)
+                rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
+                reward += rotation_penalty
+                info["rotation_penalty_factor"] = delta_rot.item()
+                info["rotation_penalty"] = rotation_penalty.item()
 
-        # If we're not currently grasping
-        info["grasp_reward_factor"] = 0.0
-        info["grasp_reward"] = 0.0
-        info["pregrasp_dist"] = 0.0
-        info["pregrasp_dist_reward_factor"] = 0.0
-        info["pregrasp_dist_reward"] = 0.0
-        info["postgrasp_dist"] = 0.0
-        info["postgrasp_dist_reward_factor"] = 0.0
-        info["postgrasp_dist_reward"] = 0.0
-        if not current_grasping:
-            # TODO: If we dropped the object recently, penalize for that
-            obj_center = self.obj.get_position_orientation()[0]
-            dist = T.l2_distance(eef_pos, obj_center)
-            dist_reward = math.exp(-dist) * self.dist_coeff
-            reward += dist_reward
-            info["pregrasp_dist"] = dist
-            info["pregrasp_dist_reward_factor"] = math.exp(-dist)
-            info["pregrasp_dist_reward"] = dist_reward
-        else:
-            # We are currently grasping - first apply a grasp reward
-            reward += self.grasp_reward
-            info["grasp_reward_factor"] = 1.0
-            info["grasp_reward"] = self.grasp_reward
+            # Penalize robot for colliding with an object
+            info["collision_penalty_factor"] = 0.0
+            info["collision_penalty"] = 0.0
+            if detect_robot_collision_in_sim(robot, filter_objs=[obj]):
+                reward += -self.collision_penalty
+                info["collision_penalty_factor"] = 1.0
+                info["collision_penalty"] = -self.collision_penalty
 
-            # Then apply a distance reward to take us to a tucked position
-            robot_center = robot.links["torso_lift_link"].get_position_orientation()[0]
-            obj_center = self.obj.get_position_orientation()[0]
-            dist = T.l2_distance(robot_center, obj_center)
-            dist_reward = math.exp(-dist) * self.dist_coeff
-            reward += dist_reward
-            info["postgrasp_dist"] = dist
-            info["postgrasp_dist_reward_factor"] = math.exp(-dist)
-            info["postgrasp_dist_reward"] = dist_reward
+            # If we're not currently grasping
+            info["grasp_reward_factor"] = 0.0
+            info["grasp_reward"] = 0.0
+            info["pregrasp_dist"] = 0.0
+            info["pregrasp_dist_reward_factor"] = 0.0
+            info["pregrasp_dist_reward"] = 0.0
+            info["postgrasp_dist"] = 0.0
+            info["postgrasp_dist_reward_factor"] = 0.0
+            info["postgrasp_dist_reward"] = 0.0
+            if not current_grasping:
+                # TODO: If we dropped the object recently, penalize for that
+                obj_center = obj.get_position_orientation()[0]
+                dist = T.l2_distance(eef_pos, obj_center)
+                dist_reward = math.exp(-dist) * self.dist_coeff
+                reward += dist_reward
+                info["pregrasp_dist"] = dist
+                info["pregrasp_dist_reward_factor"] = math.exp(-dist)
+                info["pregrasp_dist_reward"] = dist_reward
+            else:
+                # We are currently grasping - first apply a grasp reward
+                reward += self.grasp_reward
+                info["grasp_reward_factor"] = 1.0
+                info["grasp_reward"] = self.grasp_reward
 
-        self.prev_grasping = current_grasping
+                # Then apply a distance reward to take us to a tucked position
+                robot_center = robot.links["torso_lift_link"].get_position_orientation()[0]
+                obj_center = obj.get_position_orientation()[0]
+                dist = T.l2_distance(robot_center, obj_center)
+                dist_reward = math.exp(-dist) * self.dist_coeff
+                reward += dist_reward
+                info["postgrasp_dist"] = dist
+                info["postgrasp_dist_reward_factor"] = math.exp(-dist)
+                info["postgrasp_dist_reward"] = dist_reward
 
-        return reward, info
+            rewards[env_idx] = reward
+            infos[env_idx] = info
 
-    def reset(self, task, env):
+            # Update per-env tracking
+            if self.prev_eef_pos is not None:
+                self.prev_eef_pos[env_idx] = eef_pos
+            if self.prev_eef_quat is not None:
+                self.prev_eef_quat[env_idx] = eef_quat
+            if self.prev_grasping is not None:
+                self.prev_grasping[env_idx] = current_grasping
+
+        return rewards, infos
+
+    def reset(self, task, env, env_indices):
         """
         Reward function-specific reset
 
         Args:
             task (BaseTask): Task instance
             env (Environment): Environment instance
+            env_indices (list): List of environment indices to reset
         """
-        super().reset(task, env)
-        self.prev_grasping = False
-        self.prev_eef_pos = None
-        self.prev_eef_rot = None
+        super().reset(task, env, env_indices)
+        if self.prev_grasping is None:
+            self.prev_grasping = [False] * env.num_envs
+            self.prev_eef_pos = [None] * env.num_envs
+            self.prev_eef_quat = [None] * env.num_envs
+        for idx in env_indices:
+            self.prev_grasping[idx] = False
+            self.prev_eef_pos[idx] = None
+            self.prev_eef_quat[idx] = None

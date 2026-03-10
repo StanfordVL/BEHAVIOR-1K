@@ -1,3 +1,5 @@
+import torch as th
+
 from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
 
@@ -19,4 +21,5 @@ class Timeout(FailureCondition):
 
     def _step(self, task, env, action):
         # Terminate if number of steps passed exceeds threshold
+        # env.episode_steps is (num_envs,) tensor
         return env.episode_steps >= self._max_steps

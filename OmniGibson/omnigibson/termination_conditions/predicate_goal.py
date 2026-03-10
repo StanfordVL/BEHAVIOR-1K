@@ -1,3 +1,5 @@
+import torch as th
+
 from bddl.activity import evaluate_goal_conditions
 
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
@@ -11,9 +13,9 @@ class PredicateGoal(SuccessCondition):
     Args:
         goal_fcn (method): function for calculating goal(s). Function signature should be:
 
-            goals = goal_fcn()
+            goals = goal_fcn(env_idx)
 
-            where @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
+            where @env_idx is the environment index and @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
     """
 
     def __init__(self, goal_fcn):
@@ -24,23 +26,29 @@ class PredicateGoal(SuccessCondition):
         # Run super
         super().__init__()
 
-    def reset(self, task, env):
+    def reset(self, task, env, env_indices):
         # Run super first
-        super().reset(task, env)
+        super().reset(task, env, env_indices)
 
         # Reset status
-        self._goal_status = {"satisfied": [], "unsatisfied": []}
+        if self._goal_status is None:
+            self._goal_status = [{"satisfied": [], "unsatisfied": []} for _ in range(env.num_envs)]
+        for idx in env_indices:
+            self._goal_status[idx] = {"satisfied": [], "unsatisfied": []}
 
     def _step(self, task, env, action):
         # Terminate if all goal conditions are met in the task
-        done, self._goal_status = evaluate_goal_conditions(self._goal_fcn())
-        return done
+        results = th.zeros(env.num_envs, dtype=th.bool)
+        for env_idx in range(env.num_envs):
+            done, self._goal_status[env_idx] = evaluate_goal_conditions(self._goal_fcn(env_idx))
+            results[env_idx] = done
+        return results
 
     @property
     def goal_status(self):
         """
         Returns:
-            dict: Current goal status for the active predicate(s), mapping "satisfied" and "unsatisfied" to a list
-                of the predicates matching either of those conditions
+            list[dict]: Current goal status for the active predicate(s), mapping "satisfied" and "unsatisfied" to a list
+                of the predicates matching either of those conditions for each env
         """
         return self._goal_status

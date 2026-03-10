@@ -1,5 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
+import torch as th
+
 from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_TERMINATION_CONDITIONS = dict()
@@ -25,6 +27,7 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
 
     def __init__(self):
         # Initialize internal vars that will be filled in at runtime
+        self._num_envs = None
         self._done = None
 
     @abstractmethod
@@ -38,7 +41,7 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
             action (n-array): 1D flattened array of actions executed by all agents in the environment
 
         Returns:
-            bool: whether environment should terminate or not
+            th.Tensor: (num_envs,) bool tensor indicating whether each env should terminate
         """
         raise NotImplementedError()
 
@@ -53,33 +56,36 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
 
         Returns:
             2-tuple:
-                - bool: whether environment should terminate or not
-                - bool: whether a success was reached under this termination condition
+                - th.Tensor: (num_envs,) bool tensor indicating whether each env should terminate or not
+                - th.Tensor: (num_envs,) bool tensor indicating whether a success was reached under this termination condition
         """
         # Step internally and store the done state internally as well
         self._done = self._step(task=task, env=env, action=action)
 
         # We are successful if done is True AND this is a success condition
-        success = self._done and self._terminate_is_success
+        success = self._done & self._terminate_is_success
 
         return self._done, success
 
-    def reset(self, task, env):
+    def reset(self, task, env, env_indices):
         """
         Termination condition-specific reset
 
         Args:
             task (BaseTask): Task instance
             env (Environment): Environment instance
+            env_indices (th.Tensor): Indices of environments to reset
         """
-        # Reset internal vars
-        self._done = None
+        if self._num_envs is None:
+            self._num_envs = env.num_envs
+            self._done = th.zeros(self._num_envs, dtype=th.bool)
+        self._done[env_indices] = False
 
     @property
     def done(self):
         """
         Returns:
-            bool: Whether this termination condition has triggered or not
+            th.Tensor: (num_envs,) bool tensor indicating whether this termination condition has triggered
         """
         assert self._done is not None, "At least one step() must occur before done can be calculated!"
         return self._done
@@ -88,10 +94,10 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
     def success(self):
         """
         Returns:
-            bool: Whether this termination condition has been evaluated as a success or not
+            th.Tensor: (num_envs,) bool tensor indicating whether this termination condition is a success
         """
         assert self._done is not None, "At least one step() must occur before success can be calculated!"
-        return self._done and self._terminate_is_success
+        return self._done & self._terminate_is_success
 
     @classproperty
     def _terminate_is_success(cls):
