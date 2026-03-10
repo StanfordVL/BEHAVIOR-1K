@@ -45,7 +45,7 @@ def main():
     # Load the environment
     env = og.Environment(configs=config)
     scene = env.scene
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
 
     # Open the gripper(s) to match cuRobo's default state
     for arm_name in robot.gripper_control_idx.keys():

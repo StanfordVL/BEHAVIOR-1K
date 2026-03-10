@@ -101,7 +101,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     env = og.Environment(configs=cfg)
 
     # Choose robot controller to use
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     controller_choices = {
         "base": "DifferentialDriveController",
         "arm_0": "InverseKinematicsController",

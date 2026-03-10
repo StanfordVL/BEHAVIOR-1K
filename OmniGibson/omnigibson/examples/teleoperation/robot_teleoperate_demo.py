@@ -120,7 +120,7 @@ def main():
     # update viewer camera pose
     og.sim.viewer_camera.set_position_orientation(position=[-0.22, 0.99, 1.09], orientation=[-0.14, 0.47, 0.84, -0.23])
     # Start teleoperation system
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
 
     # Initialize teleoperation system
     teleop_sys = TeleopSystem(config=teleop_config, robot=robot, show_control_marker=True)

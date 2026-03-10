@@ -16,7 +16,7 @@ class RichObservationWrapper(EnvironmentWrapper):
     def __init__(self, env: Environment):
         super().__init__(env=env)
         # Note that from eval.py we already set the robot to include rgb + depth + seg_instance_id modalities
-        robot = env.robots[0]
+        robot = env.scene.robots[0]
         # Here, we change the camera resolution and head camera aperture to match the one we used in data collection
         for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
             sensor_name = camera_name.split("::")[1]

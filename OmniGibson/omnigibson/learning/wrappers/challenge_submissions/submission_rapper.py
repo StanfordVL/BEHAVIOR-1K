@@ -347,7 +347,7 @@ class RAPPERWrapper(EnvironmentWrapper):
         if getattr(self, "_defer_ticks_after_reset", 0) > 0:
             self._defer_ticks_after_reset -= 1
             return
-        robot = self.env.robots[0]
+        robot = self.env.scene.robots[0]
         robot_pos, robot_orn = robot.get_position_orientation()
         if not isinstance(robot_pos, th.Tensor):
             robot_pos = th.tensor(robot_pos, dtype=th.float32)
@@ -440,7 +440,7 @@ class RAPPERWrapper(EnvironmentWrapper):
         Dynamic map을 사용하여 movable objects를 고려함
         """
         robot_pos = obs.get("aux::robot_pos")
-        robot: BaseRobot = self.env.robots[0]
+        robot: BaseRobot = self.env.scene.robots[0]
         current_map: BaseMap = self.env.scene.trav_map
 
         if self._planned_path is None:

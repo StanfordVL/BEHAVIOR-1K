@@ -44,7 +44,7 @@ def main():
 
     # Load the environment
     env = og.Environment(configs=config)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()

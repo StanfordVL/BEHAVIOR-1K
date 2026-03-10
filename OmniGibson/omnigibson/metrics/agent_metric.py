@@ -21,7 +21,7 @@ class AgentMetric(MetricBase):
         self.initialized = False
 
     def step_callback(self, env):
-        robot = env.robots[0]
+        robot = env.scene.robots[0]
         self.next_state_cache = {
             "base": {"position": robot.get_position_orientation()[0]},
             **{arm: {"position": robot.get_eef_position(arm)} for arm in robot.arm_names},

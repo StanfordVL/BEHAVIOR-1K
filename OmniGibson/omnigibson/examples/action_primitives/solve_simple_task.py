@@ -54,7 +54,7 @@ def main():
     # Load the environment
     env = og.Environment(configs=config)
     scene = env.scene
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
 
     # Let the objects settle
     for _ in range(30):

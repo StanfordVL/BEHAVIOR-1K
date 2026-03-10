@@ -76,7 +76,7 @@ def main():
     env.reset()
     # start vrsys
     vrsys = OVXRSystem(
-        robot=env.robots[0],
+        robot=env.scene.robots[0],
         show_control_marker=CONTROLLER_VISIBLE,
         system="SteamVR",
         eef_tracking_mode="controller",

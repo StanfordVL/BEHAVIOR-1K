@@ -36,8 +36,8 @@ class TheNorthStarWrapper(EnvironmentWrapper):
             # We exhausted the action buffer, need to get new action from policy
             # activate for nav module, inactivate for efficiency
             obs["past_obs"] = self.obs_buffer
-            obs["robot_rel_lin_vel"] = self.env.robots[0].get_relative_linear_velocity()
-            obs["robot_rel_ang_vel"] = self.env.robots[0].get_relative_angular_velocity()
+            obs["robot_rel_lin_vel"] = self.env.scene.robots[0].get_relative_linear_velocity()
+            obs["robot_rel_ang_vel"] = self.env.scene.robots[0].get_relative_angular_velocity()
             obs["seg_id_map"] = pickle.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
             obs["need_new_action"] = True
         else:
@@ -81,7 +81,7 @@ class TheNorthStarWrapper(EnvironmentWrapper):
             dict: The preprocessed observation dictionary.
         """
         obs = flatten_obs_dict(obs)
-        base_pose = self.env.robots[0].get_position_orientation()
+        base_pose = self.env.scene.robots[0].get_position_orientation()
         cam_rel_poses = []
         # The first time we query for camera parameters, it will return all zeros
         # For this case, we use camera.get_position_orientation() instead.
@@ -90,7 +90,7 @@ class TheNorthStarWrapper(EnvironmentWrapper):
         # Since we are using n_render_iterations=1 for speed concern, we need the correct corresponding camera poses instead of the most update-to-date one.
         # Thus, we use camera parameters which are guaranteed to be in sync with the visual observations.
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
-            camera = self.env.robots[0].sensors[camera_name.split("::")[1]]
+            camera = self.env.scene.robots[0].sensors[camera_name.split("::")[1]]
             direct_cam_pose = camera.camera_parameters["cameraViewTransform"]
             if np.allclose(direct_cam_pose, np.zeros(16)):
                 cam_rel_poses.append(
@@ -101,8 +101,8 @@ class TheNorthStarWrapper(EnvironmentWrapper):
                 cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         obs["seg_id_map"] = pickle.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
-        obs["robot_rel_lin_vel"] = self.env.robots[0].get_relative_linear_velocity()
-        obs["robot_rel_ang_vel"] = self.env.robots[0].get_relative_angular_velocity()
+        obs["robot_rel_lin_vel"] = self.env.scene.robots[0].get_relative_linear_velocity()
+        obs["robot_rel_ang_vel"] = self.env.scene.robots[0].get_relative_angular_velocity()
         return obs
 
     def __init__(self, env: Environment):
@@ -110,7 +110,7 @@ class TheNorthStarWrapper(EnvironmentWrapper):
         self.cfg = env.config
         # Note that from eval.py we only set rgb modality, here we include more (depth + seg_instance_id)
         # Here, we change the camera resolution and head camera aperture to match the one we used in data collection
-        robot = env.robots[0]
+        robot = env.scene.robots[0]
         # Update robot sensors:
         for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
             sensor_name = camera_name.split("::")[1]
