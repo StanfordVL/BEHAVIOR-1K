@@ -41,6 +41,8 @@ EXAMPLES = [
     "scenes.scene_tour_demo",
     "scenes.traversability_map_example",
     "simulator.sim_save_load_example",
+    "teleoperation.vr_robot_control_demo",
+    "teleoperation.vr_scene_tour_demo",
     # --- END AUTO-GENERATED EXAMPLES ---
 ]
 
