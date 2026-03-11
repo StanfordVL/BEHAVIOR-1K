@@ -136,7 +136,10 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         impulses = RigidContactAPI.get_all_impulses(scene.idx)
 
         # Batch check each slicer against all sliceables
-        return th.any(impulses[all_slicer_idxs][:, sliceable_idxs] > 0, dim=-1)
+        pair_has_contact = th.any(impulses, dim=-1)
+        has_contact = th.any(pair_has_contact[all_slicer_idxs][:, sliceable_idxs], dim=-1)
+
+        return has_contact
 
     @classproperty
     def value_name(cls):

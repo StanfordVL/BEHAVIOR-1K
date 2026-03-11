@@ -396,6 +396,8 @@ def _launch_simulator(*args, **kwargs):
             self._camera_mover = None
             self._render_on_step = True
             self.currently_stepping = False
+            self.pre_step_exception = None
+            self.post_step_exception = None
 
             self._floor_plane = None
             self._skybox = None
@@ -1198,9 +1200,11 @@ def _launch_simulator(*args, **kwargs):
             for _ in range(self._n_steps_per_loop):
                 if render:
                     super().step(render=True)
+                    self._report_step_exceptions()
                 else:
                     for i in range(self.n_physics_timesteps_per_render):
                         super().step(render=False)
+                        self._report_step_exceptions()
 
             # Additionally run non physics things
             self._non_physics_step()
@@ -1214,35 +1218,54 @@ def _launch_simulator(*args, **kwargs):
             Step the physics a single step.
             """
             self._physics_context._step(current_time=self.current_time)
+            self._report_step_exceptions()
 
         def _on_pre_physics_step(self):
-            # Make it possible to identify that we are currently within a step
-            self.currently_stepping = True
+            try:
+                # Make it possible to identify that we are currently within a step
+                self.currently_stepping = True
 
-            # Invalidate various APIs so that any reads from them will be updated
-            PoseAPI.invalidate()
+                # Invalidate various APIs so that any reads from them will be updated
+                PoseAPI.invalidate()
 
-            # Only do this if we're not in the warmup phase
-            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                # Run the controller step on every controllable object
-                for scene in self.scenes:
-                    for robot in scene.robots:
-                        robot.step()
+                # Only do this if we're not in the warmup phase
+                if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                    # Run the controller step on every controllable object
+                    for scene in self.scenes:
+                        for robot in scene.robots:
+                            robot.step()
 
-                # Flush the controls from the ControllableObjectViewAPI
-                ControllableObjectViewAPI.flush_control()
+                    # Flush the controls from the ControllableObjectViewAPI
+                    ControllableObjectViewAPI.flush_control()
+            except Exception as e:
+                self.pre_step_exception = e
+                raise e
 
         def _on_post_physics_step(self):
-            # Only do this if we're not in the warmup phase
-            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                # Run the post physics update for backend view
-                ControllableObjectViewAPI.post_physics_step()
+            try:
+                # Only do this if we're not in the warmup phase
+                if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                    # Run the post physics update for backend view
+                    ControllableObjectViewAPI.post_physics_step()
 
-            # Update persistent rigid contact caches from the latest physics step
-            RigidContactAPI.update_contact_cache()
+                # Update persistent rigid contact caches from the latest physics step
+                RigidContactAPI.update_contact_cache()
 
-            # Record that we are done with the step context.
-            self.currently_stepping = False
+                # Record that we are done with the step context.
+                self.currently_stepping = False
+            except Exception as e:
+                self.post_step_exception = e
+                raise e
+
+        def _report_step_exceptions(self):
+            if self.pre_step_exception is not None:
+                pre_step_exception = self.pre_step_exception
+                self.pre_step_exception = None
+                raise RuntimeError("Exception occurred during pre-physics step") from pre_step_exception
+            if self.post_step_exception is not None:
+                post_step_exception = self.post_step_exception
+                self.post_step_exception = None
+                raise RuntimeError("Exception occurred during post-physics step") from post_step_exception
 
         def get_obj_at_prim_path(self, prim_path):
             for scene in self.scenes:
