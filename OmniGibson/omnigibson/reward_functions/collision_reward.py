@@ -1,4 +1,4 @@
-from omnigibson.utils.sim_utils import get_rigid_contact_bodies
+from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
 
@@ -31,6 +31,6 @@ class CollisionReward(BaseRewardFunction):
         # Ignore floors and potentially robot's own prims as well
         floors = list(env.scene.object_registry("category", "floors", []))
         ignore_objs = floors if self._ignore_self_collisions is None else floors + [robot]
-        in_contact = len(get_rigid_contact_bodies(env.robots[self._robot_idn], ignore_objs=tuple(ignore_objs))) > 0
+        in_contact = RigidContactAPI.is_in_contact(scene_idx=robot.scene.idx, query_set=[robot], ignore_set=ignore_objs)
         reward = float(in_contact) * -self._r_collision
         return reward, {}

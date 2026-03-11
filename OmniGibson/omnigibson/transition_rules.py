@@ -407,17 +407,7 @@ class TouchingAnyCondition(RuleCondition):
 
         # Batch check for each object
         for obj in object_candidates[self._filter_1_name]:
-            # Get all impulses between @obj and any object in @filter_2_name that are in the same scene
-            idxs_to_check = th.cat(
-                [
-                    self._filter_2_idxs[obj2]
-                    for obj2 in object_candidates[self._filter_2_name]
-                    if obj2.scene == obj.scene
-                ]
-            )
-            if th.any(
-                RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check.tolist()]
-            ):
+            if RigidContactAPI.is_in_contact(query_set=[obj], with_set=object_candidates[self._filter_2_name]):
                 objs.append(obj)
 
         # Update candidates

@@ -38,12 +38,12 @@ class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothState
         if not (self.obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.RIGID):
             raise ValueError("Draped state requires obj1 is cloth and obj2 is rigid.")
 
-        # Cloth contact is only available through cloth contact_list.
+        # Cloth contact is only available through cloth's get_contacts() method.
         contact_link_prim_paths = set(other.link_prim_paths)
         contact_positions = []
-        for contact in self.obj.root_link.contact_list():
-            if len({contact.body0, contact.body1} & contact_link_prim_paths) > 0:
-                contact_positions.append(contact.position)
+        for contact_prim_path, contact_position in self.obj.root_link.get_contacts():
+            if contact_prim_path in contact_link_prim_paths:
+                contact_positions.append(contact_position)
 
         if len(contact_positions) == 0:
             return False

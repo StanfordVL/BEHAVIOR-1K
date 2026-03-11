@@ -13,7 +13,6 @@ from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES
-from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,

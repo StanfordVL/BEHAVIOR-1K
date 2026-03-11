@@ -5,7 +5,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.utils.sim_utils import get_rigid_contact_bodies
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
@@ -182,7 +181,7 @@ class AttachedTo(
                     else:
                         og.sim.step_physics()
                         # self.obj should not collide with other objects except the parent
-                        success = len(get_rigid_contact_bodies(self.obj, ignore_objs=(other,))) == 0
+                        success = RigidContactAPI.is_in_contact(scene_idx=self.obj.scene.idx, query_set=[self.obj], ignore_set=[other])
                         if success:
                             return True
                         else:

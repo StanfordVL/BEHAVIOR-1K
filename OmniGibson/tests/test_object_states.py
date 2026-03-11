@@ -232,7 +232,7 @@ def test_touching(env):
 
 @og_test
 def test_rigid_contact_bodies(env):
-    from omnigibson.utils.sim_utils import get_rigid_contact_bodies
+    from omnigibson.utils.usd_utils import RigidContactAPI
 
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     bowl = env.scene.object_registry("name", "bowl")
@@ -243,24 +243,20 @@ def test_rigid_contact_bodies(env):
         og.sim.step()
 
     # Bowl should be in contact with the table
-    table_contacts = get_rigid_contact_bodies(breakfast_table)
-    assert bowl.root_link in table_contacts
+    assert RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table])
 
     # Let bodies settle/sleep and verify contacts persist
     for _ in range(100):
         og.sim.step()
     assert breakfast_table.is_asleep, "Table should be asleep"
     assert bowl.root_link.is_asleep, "Bowl should be asleep"
-    table_contacts_after_sleep = get_rigid_contact_bodies(breakfast_table)
-    assert bowl.root_link in table_contacts_after_sleep
+    assert RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table])
 
     # Move the bowl far away and verify contacts clear
     bowl.set_position_orientation(position=th.tensor([10.0, 10.0, 10.0]))
     og.sim.step()
-    table_contacts_after_separation = get_rigid_contact_bodies(breakfast_table)
-    assert bowl.root_link not in table_contacts_after_separation
-    bowl_contacts_after_separation = get_rigid_contact_bodies(bowl)
-    assert breakfast_table.root_link not in bowl_contacts_after_separation
+    assert not RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table])
+    assert not RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl])
 
 
 @og_test

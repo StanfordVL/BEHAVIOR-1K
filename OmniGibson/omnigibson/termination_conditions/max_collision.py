@@ -1,4 +1,4 @@
-from omnigibson.utils.sim_utils import get_rigid_contact_bodies
+from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
 
@@ -37,6 +37,6 @@ class MaxCollision(FailureCondition):
         robot = env.robots[self._robot_idn]
         floors = list(env.scene.object_registry("category", "floors", []))
         ignore_objs = floors if self._ignore_self_collisions is None else floors + [robot]
-        in_contact = len(get_rigid_contact_bodies(env.robots[self._robot_idn], ignore_objs=tuple(ignore_objs))) > 0
+        in_contact = RigidContactAPI.is_in_contact(scene_idx=robot.scene.idx, query_set=[robot], ignore_set=ignore_objs)
         self._n_collisions += int(in_contact)
         return self._n_collisions > self._max_collisions

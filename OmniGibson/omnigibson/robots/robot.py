@@ -50,7 +50,6 @@ from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
-from omnigibson.utils.sim_utils import get_rigid_contact_bodies
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
     RigidContactAPI,
@@ -2077,7 +2076,7 @@ class Robot(USDObject, GymObservable):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                if len(get_rigid_contact_bodies(candidate_obj).intersection(finger_links)) == 0:
+                if not RigidContactAPI.is_in_contact(scene_idx=self.scene.idx, query_set=finger_links, with_set=[candidate_obj]):
                     is_grasping = IsGraspingState.FALSE
         return is_grasping
 
@@ -2108,7 +2107,7 @@ class Robot(USDObject, GymObservable):
         raw_contact_data = {
             (link_contact, other_contact)
             for link_contact, other_contact in RigidContactAPI.get_contact_pairs(
-                self.scene.idx, sensor_prim_paths=finger_paths
+                scene_idx=self.scene.idx, sensor_prim_paths=finger_paths
             )
             if other_contact not in link_paths
         }

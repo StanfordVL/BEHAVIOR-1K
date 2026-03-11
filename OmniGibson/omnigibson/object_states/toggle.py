@@ -25,9 +25,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     # List of set of prim paths defining robot finger links belonging to any manipulation robots per scene
     _robot_finger_paths = None
 
-    # Set of objects that are contacting any manipulation robots
-    _finger_contact_objs = None
-
     def __init__(self, obj, scale=None, requires_closed=False):
         self.scale = scale
         self.value = False
@@ -77,9 +74,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
     @classmethod
     def global_update(cls):
-        # Clear finger contact objects since it will be refreshed now
-        cls._finger_contact_objs = set()
-
         # detect marker and hand interaction
         cls._robot_finger_paths = [
             {
@@ -95,21 +89,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         # If there aren't any valid robot link paths, immediately return
         if not any(len(robot_finger_paths) > 0 for robot_finger_paths in cls._robot_finger_paths):
             return
-
-        for scene_idx, (scene, scene_robot_finger_paths) in enumerate(zip(og.sim.scenes, cls._robot_finger_paths)):
-            if len(scene_robot_finger_paths) == 0:
-                continue
-            finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in scene_robot_finger_paths]
-            finger_impulses = RigidContactAPI.get_all_impulses(scene_idx)[:, finger_idxs, :]
-            n_bodies = len(finger_impulses)
-            touching_bodies = th.any(finger_impulses.reshape(n_bodies, -1), dim=-1)
-            touching_bodies_idxs = th.where(touching_bodies)[0]
-            if len(touching_bodies_idxs) > 0:
-                for idx in touching_bodies_idxs:
-                    body_prim_path = RigidContactAPI.get_row_idx_prim_path(scene_idx, idx=idx)
-                    obj = scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
-                    if obj is not None:
-                        cls._finger_contact_objs.add(obj)
 
     @classproperty
     def meta_link_types(cls):
@@ -212,12 +191,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             return
 
         # If we're not nearby any fingers, we automatically can't toggle
-        if self.obj not in self._finger_contact_objs:
-            robot_can_toggle = False
-        else:
-            # Check to make sure fingers are actually overlapping the toggle button mesh
-            robot_can_toggle = self._check_overlap()
-
+        robot_can_toggle = RigidContactAPI.is_in_contact(query_set=self._robot_finger_paths, with_set=[self.obj]) and self._check_overlap()
         previous_step = self.robot_can_toggle_steps
         if robot_can_toggle:
             self.robot_can_toggle_steps += 1
