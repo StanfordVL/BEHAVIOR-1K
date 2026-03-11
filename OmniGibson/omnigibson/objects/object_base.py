@@ -2,7 +2,6 @@ from abc import ABCMeta
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cached_property
-import itertools
 from typing import Literal
 
 import torch as th
@@ -62,7 +61,7 @@ OBJECT_TAXONOMY = ObjectTaxonomy()
 
 
 # Counter that assigns each flow emitter a unique layer number so emitters don't interfere.
-_EMITTER_LAYER_COUNTER = itertools.count(1)
+_EMITTER_LAYER_COUNTER = 1
 
 
 class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
@@ -528,7 +527,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             "canonical_pose": mesh.get_position_orientation(),
         }
 
-        layer_number = next(_EMITTER_LAYER_COUNTER)
+        global _EMITTER_LAYER_COUNTER
+        layer_number = _EMITTER_LAYER_COUNTER
+        _EMITTER_LAYER_COUNTER += 1
 
         # Update emitter general settings.
         emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
