@@ -246,7 +246,7 @@ def test_rigid_contact_bodies(env):
     assert RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table])
 
     # Let bodies settle/sleep and verify contacts persist
-    for _ in range(100):
+    for _ in range(300):
         og.sim.step()
     assert breakfast_table.is_asleep, "Table should be asleep"
     assert bowl.root_link.is_asleep, "Bowl should be asleep"

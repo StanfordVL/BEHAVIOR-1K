@@ -114,34 +114,29 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def _currently_touching_sliceables(cls):
         # Grab all sliceable objects
-        # TODO: This assertion is added because the code already assumed this to be true. We'll remove this once we support multiple scenes.
-        assert (
-            len(og.sim.scenes) == 1
-        ), "Tensorized sliceable state only supports one scene for now. This will be supported in the future."
-        scene = og.sim.scenes[0]
-        sliceable_objs = scene.object_registry("abilities", "sliceable", [])
+        currently_touching = th.zeros_like(cls.PREVIOUSLY_TOUCHING)
+        for scene in og.sim.scenes:
+            sliceable_objs = scene.object_registry("abilities", "sliceable", [])
 
-        # If there's no sliceables, then obviously no slicer is touching any sliceable so immediately return all Falses
-        if len(sliceable_objs) == 0:
-            return th.zeros_like(cls.PREVIOUSLY_TOUCHING)
+            # If there's no sliceables in the scene, continue to the next scene.
+            if len(sliceable_objs) == 0:
+                continue
 
-        # Aggregate all link prim path indices
-        all_slicer_idxs = [
-            [list(RigidContactAPI.get_body_row_idx(prim_path))[1] for prim_path in link_paths]
-            for link_paths in cls.SLICER_LINK_PATHS
-        ]
-        sliceable_idxs = [
-            list(RigidContactAPI.get_body_col_idx(link.prim_path))[1]
-            for obj in sliceable_objs
-            for link in obj.links.values()
-        ]
-        impulses = RigidContactAPI.get_all_impulses(scene.idx)
+            # Get the prim paths of all the sliceables in this scene
+            sliceable_prim_paths = [
+                link_prim_path
+                for obj in sliceable_objs
+                for link_prim_path in obj.link_prim_paths
+            ]
 
-        # Batch check each slicer against all sliceables
-        pair_has_contact = th.any(impulses, dim=-1)
-        has_contact = th.any(pair_has_contact[all_slicer_idxs][:, sliceable_idxs], dim=-1)
+            # Aggregate all link prim path indices for the slicers in this scene
+            for i, (obj, link_paths) in enumerate(zip(cls.IDX_OBJS, cls.SLICER_LINK_PATHS)):
+                if obj.scene != scene:
+                    continue
+                if RigidContactAPI.is_in_contact(scene.idx, link_paths, sliceable_prim_paths):
+                    currently_touching[i] = True
 
-        return has_contact
+        return currently_touching
 
     @classproperty
     def value_name(cls):
