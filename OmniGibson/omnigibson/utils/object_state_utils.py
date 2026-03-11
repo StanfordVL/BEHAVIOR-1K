@@ -160,6 +160,12 @@ def sample_kinematics(
         )
 
     # Attempt sampling
+    def _is_in_contact():
+        if objA.prim_type == PrimType.RIGID:
+            return RigidContactAPI.is_in_contact(scene_idx=objA.scene.idx, query_set=[objA])
+        else:
+            return len(objA.root_link.get_contacts()) > 0
+
     for i in range(max_trials):
         pos = None
         if hasattr(objA, "orientations") and objA.orientations is not None:
@@ -245,7 +251,7 @@ def sample_kinematics(
 
             og.sim.step_physics()
             objA.keep_still()
-            success = not RigidContactAPI.is_in_contact(scene_idx=objA.scene.idx, query_set=[objA])
+            success = not _is_in_contact()
 
         if macros.utils.sampling_utils.DEBUG_SAMPLING:
             debug_breakpoint(f"sample_kinematics: {success}")
@@ -281,12 +287,6 @@ def sample_kinematics(
         # step until (a) max steps is reached (restarted from 0) or (b) velocity is below some threshold
         n_steps_max = int(0.5 / og.sim.get_physics_dt())
         i = 0
-
-        def _is_in_contact():
-            if objA.prim_type == PrimType.RIGID:
-                return RigidContactAPI.is_in_contact(scene_idx=objA.scene.idx, query_set=[objA])
-            else:
-                return len(objA.root_link.get_contacts()) > 0
 
         while not _is_in_contact() and i < n_steps_max:
             og.sim.step_physics()
