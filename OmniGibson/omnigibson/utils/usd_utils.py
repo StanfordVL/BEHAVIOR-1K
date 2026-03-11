@@ -314,15 +314,13 @@ class RigidContactAPIImpl:
                 self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_body_view(
                     pattern=f"/World/scene_{scene_idx}/*/*"
                 )
-                path_to_view_idx = {
-                    path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))
-                }
-                self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor([
-                    path_to_view_idx[path] for path in row_paths
-                ], dtype=th.long)
-                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor([
-                    path_to_view_idx[path] for path in col_paths
-                ], dtype=th.long)
+                path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
+                self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
+                    [path_to_view_idx[path] for path in row_paths], dtype=th.long
+                )
+                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
+                    [path_to_view_idx[path] for path in col_paths], dtype=th.long
+                )
                 self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths), 3), dtype=th.float32)
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
 
