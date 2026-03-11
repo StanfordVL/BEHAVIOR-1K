@@ -183,7 +183,6 @@ class MultiFingerGripperController(GripperController):
         # Reset the filter and grasping state
         self._vel_filter.reset(controller_idx)
         self._is_grasping[controller_idx] = IsGraspingState.FALSE
-        self._controls[controller_idx] = None
 
     def _preprocess_command(self, command):
         # We extend this method to make sure command is always n-dimensional
@@ -218,122 +217,122 @@ class MultiFingerGripperController(GripperController):
         Returns:
             Tensor: (N, control_dim) outputted (non-clipped!) control signal to deploy
         """
-        N = self.n_members
         target_batch = goals["target"]  # (N, command_dim)
 
         rows = self.view_row_indices
-        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][
-            :, self.dof_idx
-        ]  # (N, ctrl_dim)
+        all_joint_pos = cb.to_torch(
+            ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]
+        )  # (N, ctrl_dim)
 
-        u_list = []
-        for i in range(N):
-            if self._unregistered_controllers[i] == 1:
-                u_list.append(cb.zeros(self.control_dim))
-                continue
+        unregistered_mask = self._unregistered_controllers == 1  # (N,)
 
-            target = target_batch[i]
-            joint_pos = all_joint_pos[i]
+        # Choose what to do based on control mode
+        if self._mode == "binary":
+            should_open = target_batch[:, 0] >= 0.0 if not self._inverted else target_batch[:, 0] > 0.0  # (N,)
+            open_limit = cb.to_torch(
+                self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
+                if self._open_qpos is None
+                else self._open_qpos
+            )  # (ctrl_dim,)
+            closed_limit = cb.to_torch(
+                self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
+                if self._closed_qpos is None
+                else self._closed_qpos
+            )  # (ctrl_dim,)
+            u = th.where(should_open.unsqueeze(1), open_limit, closed_limit)  # (N, ctrl_dim)
+        else:
+            u = (
+                target_batch.expand(-1, self.control_dim) if target_batch.shape[1] == 1 else target_batch
+            )  # (N, ctrl_dim)
 
-            # Choose what to do based on control mode
-            if self._mode == "binary":
-                should_open = target[0] >= 0.0 if not self._inverted else target[0] > 0.0
-                if should_open:
-                    u = (
-                        self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-                        if self._open_qpos is None
-                        else self._open_qpos
-                    )
-                else:
-                    u = (
-                        self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
-                        if self._closed_qpos is None
-                        else self._closed_qpos
-                    )
-            else:
-                u = cb.full((self.control_dim,), target[0]) if len(target) == 1 else target
+        # If we're near the joint limits and we're using velocity / torque control, we zero out the action
+        if self._motor_type in {"velocity", "torque"}:
+            pos_hi = cb.to_torch(self._control_limits[ControlType.POSITION][1][self.dof_idx])  # (ctrl_dim,)
+            pos_lo = cb.to_torch(self._control_limits[ControlType.POSITION][0][self.dof_idx])  # (ctrl_dim,)
+            violate_upper_limit = all_joint_pos > pos_hi - self._limit_tolerance  # (N, ctrl_dim)
+            violate_lower_limit = all_joint_pos < pos_lo + self._limit_tolerance  # (N, ctrl_dim)
+            violation = (violate_upper_limit & (u > 0)) | (violate_lower_limit & (u < 0))
+            u = u * ~violation
 
-            # If we're near the joint limits and we're using velocity / torque control, we zero out the action
-            if self._motor_type in {"velocity", "torque"}:
-                violate_upper_limit = (
-                    joint_pos > self._control_limits[ControlType.POSITION][1][self.dof_idx] - self._limit_tolerance
-                )
-                violate_lower_limit = (
-                    joint_pos < self._control_limits[ControlType.POSITION][0][self.dof_idx] + self._limit_tolerance
-                )
-                violation = cb.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
-                u = u * ~violation
+        # Update grasping state for all members
+        self._update_grasping_state(all_joint_pos, u)
 
-            # Update grasping state for this member
-            self._update_grasping_state(i, joint_pos, u)
-            self._controls[i] = u
+        # Zero out unregistered members
+        u[unregistered_mask] = 0.0
 
-            u_list.append(u)
+        return u  # tensor with shape (N, control_dim)
 
-        return cb.stack(u_list, dim=0)  # (N, control_dim)
-
-    def _update_grasping_state(self, controller_idx, joint_pos, control):
+    def _update_grasping_state(self, joint_pos, control):
         """
         Updates internal inferred grasping state for the controller at @controller_idx.
 
         Args:
-            controller_idx (int): index of the controller in this group
-            joint_pos (Tensor): current joint positions for this member's controlled DOFs
-            control (Tensor): the control signal being applied
+            joint_pos (Tensor): joint positions for this group's members' controlled DOFs, shape (N, ctrl_dim)
+            control (Tensor): the control signal being applied, shape (N, ctrl_dim)
         """
-        prim_path = self._articulation_root_paths[controller_idx]
-        joint_vel = ControllableObjectViewAPI.get_joint_velocities(prim_path, estimate=True)[self.dof_idx]
+        rows = self.view_row_indices
+        all_joint_vel = cb.to_torch(
+            ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
+                :, self.dof_idx
+            ]
+        )  # (N, ctrl_dim)
 
-        # Update velocity history
-        finger_vel = self._vel_filter.estimate(controller_idx, cb.to_torch(joint_vel))
-        last_ctrl = self._controls[controller_idx]
+        # Update velocity history for all members
+        finger_vels = self._vel_filter.estimate_batch(all_joint_vel)  # (N, ctrl_dim)
 
         # Calculate grasping state based on mode of this controller
         if self._mode == "independent":
-            is_grasping = IsGraspingState.UNKNOWN
-
-        # No control has been issued before -- we assume not grasping
-        elif last_ctrl is None:
-            is_grasping = IsGraspingState.FALSE
-        #  Different values in the command for non-independent mode - cannot use heuristics
-        elif not cb.all(last_ctrl == last_ctrl[0]):
-            is_grasping = IsGraspingState.UNKNOWN
-
-        # Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the gripper
-        # controller's tolerance of zero-ing out velocities, which makes the heuristics invalid.
-        elif not m.POS_TOLERANCE > self._limit_tolerance:
-            is_grasping = IsGraspingState.UNKNOWN
+            is_grasping_result = [IsGraspingState.UNKNOWN] * self.n_members
 
         else:
-            # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
-            if self._motor_type == "position" and cb.abs(joint_pos - last_ctrl).mean() < m.POS_TOLERANCE:
-                is_grasping = IsGraspingState.UNKNOWN
-            # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
-            elif self._motor_type in {"velocity", "torque"} and cb.abs(last_ctrl).mean() < m.VEL_TOLERANCE:
-                is_grasping = IsGraspingState.UNKNOWN
-            # Otherwise, the last control signal intends to "move" the gripper
+            #  Different values in the command for non-independent mode - cannot use heuristics
+            non_uniform_mask = ~th.all(control == control[:, :1], dim=1)  # (N,)
+
+            # Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the gripper
+            # controller's tolerance of zero-ing out velocities, which makes the heuristics invalid.
+            if not m.POS_TOLERANCE > self._limit_tolerance:
+                is_grasping_result = [IsGraspingState.UNKNOWN] * self.n_members
+
             else:
-                min_pos = self._control_limits[ControlType.POSITION][0][self.dof_idx]
-                max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
+                # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
+                if self._motor_type == "position":
+                    no_move_mask = (control - joint_pos).abs().mean(dim=1) < m.POS_TOLERANCE  # (N,)
+                # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
+                elif self._motor_type in {"velocity", "torque"}:
+                    no_move_mask = control.abs().mean(dim=1) < m.VEL_TOLERANCE  # (N,)
+                else:
+                    no_move_mask = th.zeros(self.n_members, dtype=th.bool)
+
+                # Otherwise, the last control signal intends to "move" the gripper
+                min_pos = cb.to_torch(self._control_limits[ControlType.POSITION][0][self.dof_idx])  # (ctrl_dim,)
+                max_pos = cb.to_torch(self._control_limits[ControlType.POSITION][1][self.dof_idx])  # (ctrl_dim,)
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
-                finger_pos = joint_pos.clip(min_pos, max_pos)
+                finger_pos = joint_pos.clip(min_pos, max_pos)  # (N, ctrl_dim)
                 # Check distance from both ends of the joint limits
-                dist_from_lower_limit = finger_pos - min_pos
-                dist_from_upper_limit = max_pos - finger_pos
+                dist_from_lower_limit = finger_pos - min_pos  # (N, ctrl_dim)
+                dist_from_upper_limit = max_pos - finger_pos  # (N, ctrl_dim)
 
                 # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
-                valid_grasp_pos = (
-                    dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
-                )
+                valid_grasp_pos = (dist_from_lower_limit.mean(dim=1) > m.POS_TOLERANCE) | (
+                    dist_from_upper_limit.mean(dim=1) > m.POS_TOLERANCE
+                )  # (N,)
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
-                valid_grasp_vel = cb.all(cb.abs(finger_vel) < m.VEL_TOLERANCE)
+                valid_grasp_vel = th.all(finger_vels.abs() < m.VEL_TOLERANCE, dim=1)  # (N,)
 
                 # Then the gripper is grasping something, which stops the gripper from reaching its desired state
-                is_grasping = IsGraspingState.TRUE if valid_grasp_pos and valid_grasp_vel else IsGraspingState.FALSE
+                is_grasping_true = valid_grasp_pos & valid_grasp_vel  # (N,)
+
+                # Build per-member result: UNKNOWN overrides where non_uniform or no_move
+                is_grasping_result = [
+                    IsGraspingState.UNKNOWN
+                    if (non_uniform_mask[i] or no_move_mask[i])
+                    else (IsGraspingState.TRUE if is_grasping_true[i] else IsGraspingState.FALSE)
+                    for i in range(self.n_members)
+                ]
 
         # Store calculated state
-        self._is_grasping[controller_idx] = is_grasping
+        self._is_grasping = is_grasping_result
 
     def compute_no_op_goal(self, controller_idx):
         prim_path = self._articulation_root_paths[controller_idx]

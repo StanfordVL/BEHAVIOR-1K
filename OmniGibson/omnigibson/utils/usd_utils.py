@@ -1034,7 +1034,7 @@ class BatchControlViewAPIImpl:
             self._read_cache["dof_position_targets"] = cb.from_torch(self._view.get_dof_position_targets())
         targets = self._read_cache["dof_position_targets"]
         row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
-        targets[row_idx, dof_idx] = controls
+        targets[row_idx, dof_idx] = cb.from_torch(controls) if isinstance(controls, th.Tensor) else controls
         self._write_idx_cache["dof_position_targets"].update(enabled_rows)
 
     def set_all_joint_velocity_targets(self, enabled_rows, velocities, dof_idx):
@@ -1042,7 +1042,7 @@ class BatchControlViewAPIImpl:
             self._read_cache["dof_velocity_targets"] = cb.from_torch(self._view.get_dof_velocity_targets())
         targets = self._read_cache["dof_velocity_targets"]
         row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
-        targets[row_idx, dof_idx] = velocities
+        targets[row_idx, dof_idx] = cb.from_torch(velocities) if isinstance(velocities, th.Tensor) else velocities
         self._write_idx_cache["dof_velocity_targets"].update(enabled_rows)
 
     def set_all_joint_efforts(self, enabled_rows, efforts, dof_idx):
@@ -1050,7 +1050,7 @@ class BatchControlViewAPIImpl:
             self._read_cache["dof_actuation_forces"] = cb.from_torch(self._view.get_dof_actuation_forces())
         targets = self._read_cache["dof_actuation_forces"]
         row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
-        targets[row_idx, dof_idx] = efforts
+        targets[row_idx, dof_idx] = cb.from_torch(efforts) if isinstance(efforts, th.Tensor) else efforts
         self._write_idx_cache["dof_actuation_forces"].update(enabled_rows)
 
     def get_all_root_transform(self):

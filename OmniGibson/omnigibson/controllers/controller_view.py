@@ -129,7 +129,7 @@ class ControllerView:
     @classmethod
     def clear(cls):
         """
-        Remove all registered controller groups. Call this when the scene is reset.
+        Remove all registered controller groups. Call this inside simulator._partial_clear().
         """
         cls._controller_groups.clear()
 

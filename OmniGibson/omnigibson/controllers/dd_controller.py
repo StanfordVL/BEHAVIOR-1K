@@ -1,5 +1,6 @@
+import torch as th
+
 from omnigibson.controllers import ControlType, LocomotionController
-from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
 class DifferentialDriveController(LocomotionController):
@@ -60,6 +61,13 @@ class DifferentialDriveController(LocomotionController):
         self._wheel_radius = wheel_radius
         self._wheel_axle_halflength = wheel_axle_length / 2.0
 
+        # Precompute (2, 2) transform: vel_batch (N, 2) @ _wheel_vel_transform -> (N, 2) [left, right] wheel vels
+        # left  = lin_vel / r - ang_vel * half / r
+        # right = lin_vel / r + ang_vel * half / r
+        inv_r = 1.0 / wheel_radius
+        half_inv_r = self._wheel_axle_halflength / wheel_radius
+        self._wheel_vel_transform = th.tensor([[inv_r, inv_r], [-half_inv_r, half_inv_r]], dtype=th.float32)  # (2, 2)
+
         # If we're using default command output limits, map this to maximum linear / angular velocities
         if type(command_output_limits) is str and command_output_limits == "default":
             min_vels = control_limits["velocity"][0][dof_idx]
@@ -105,24 +113,15 @@ class DifferentialDriveController(LocomotionController):
         Returns:
             Tensor: (N, 2) outputted (non-clipped!) velocity control signal to deploy to the [left, right] wheel joints
         """
-        vel_batch = goals["vel"]  # (N, 2)
-        lin_vel = vel_batch[:, 0:1]
-        ang_vel = vel_batch[:, 1:2]
-
-        left_wheel_joint_vel = (lin_vel - ang_vel * self._wheel_axle_halflength) / self._wheel_radius
-        right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
-
-        # Backend-safe concat: numpy backend does not accept torch-style `dim` kwarg in concatenate.
-        left_wheel_joint_vel = cb.squeeze(left_wheel_joint_vel, dim=-1)  # (N,)
-        right_wheel_joint_vel = cb.squeeze(right_wheel_joint_vel, dim=-1)  # (N,)
-        return cb.stack([left_wheel_joint_vel, right_wheel_joint_vel], dim=-1)  # (N, 2)
+        # (N, 2) @ (2, 2) -> (N, 2) [left, right] wheel joint velocities
+        return goals["vel"] @ self._wheel_vel_transform
 
     def compute_no_op_goal(self, controller_idx):
         # This is zero-vector, since we want zero linear / angular velocity
-        return dict(vel=cb.zeros(2))
+        return dict(vel=th.zeros(2))
 
     def _compute_no_op_command(self, controller_idx):
-        return cb.zeros(2)
+        return th.zeros(2)
 
     def _get_goal_shapes(self):
         # Add (2, )-array representing linear, angular velocity

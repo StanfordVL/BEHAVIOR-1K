@@ -4,7 +4,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControllerView
-from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
 # -------------------- Helper Functions --------------------
@@ -372,8 +371,8 @@ def test_arm_control():
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
                         arm_group_key, arm_ci = robot.controllers[f"arm_{arm}"]
                         arm_goal = ControllerView.get_goal(arm_group_key, arm_ci)
-                        target_pos = cb.to_torch(arm_goal["target_pos"])
-                        target_quat = T.mat2quat(cb.to_torch(arm_goal["target_ori_mat"]))
+                        target_pos = arm_goal["target_pos"]
+                        target_quat = T.mat2quat(arm_goal["target_ori_mat"])
                         pos_check = err_checks[controller_mode][action_name]["pos"]
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)

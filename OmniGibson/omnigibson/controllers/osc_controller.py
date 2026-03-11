@@ -17,6 +17,23 @@ from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+
+@th.jit.script
+def _quat_multiply_batch(q1: th.Tensor, q0: th.Tensor) -> th.Tensor:
+    """Batched quaternion multiplication q1 * q0. Inputs are (N, 4) in (x,y,z,w) convention."""
+    x0, y0, z0, w0 = q0[..., 0], q0[..., 1], q0[..., 2], q0[..., 3]
+    x1, y1, z1, w1 = q1[..., 0], q1[..., 1], q1[..., 2], q1[..., 3]
+    return th.stack(
+        [
+            x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+            -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+            x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
+            -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
+        ],
+        dim=-1,
+    )
+
+
 # Different modes
 OSC_MODE_COMMAND_DIMS = {
     "absolute_pose": 6,  # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
@@ -154,14 +171,18 @@ class OperationalSpaceController(ManipulationController):
                 "fixed base robots. We do not recommend enabling this."
             )
 
-        # Store gains
-        self.kp = self.nums2array(nums=kp, dim=6) if kp is not None else None
+        # Store gains as torch tensors for direct use in the torch solver
+        self.kp = th.as_tensor(self.nums2array(nums=kp, dim=6), dtype=th.float32) if kp is not None else None
         self.damping_ratio = damping_ratio
-        self.kp_null = self.nums2array(nums=kp_null, dim=control_dim) if kp_null is not None else None
-        self.kd_null = 2 * cb.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
-        self.kp_limits = cb.array(kp_limits)
-        self.damping_ratio_limits = cb.array(damping_ratio_limits)
-        self.kp_null_limits = cb.array(kp_null_limits)
+        self.kp_null = (
+            th.as_tensor(self.nums2array(nums=kp_null, dim=control_dim), dtype=th.float32)
+            if kp_null is not None
+            else None
+        )
+        self.kd_null = 2 * th.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
+        self.kp_limits = th.tensor(list(kp_limits), dtype=th.float32)
+        self.damping_ratio_limits = th.tensor(list(damping_ratio_limits), dtype=th.float32)
+        self.kp_null_limits = th.tensor(list(kp_null_limits), dtype=th.float32)
 
         # Store settings for whether we're learning gains or not
         self.variable_kp = self.kp is None
@@ -231,12 +252,12 @@ class OperationalSpaceController(ManipulationController):
                 # Add this to input / output limits
                 if is_input_limits_numeric:
                     command_input_limits = [
-                        cb.cat([lim, self.nums2array(nums=val, dim=dim)])
+                        th.cat([lim, th.as_tensor(self.nums2array(nums=val, dim=dim), dtype=th.float32)])
                         for lim, val in zip(command_input_limits, (-1, 1))
                     ]
                 if is_output_limits_numeric:
                     command_output_limits = [
-                        cb.cat([lim, self.nums2array(nums=val, dim=dim)])
+                        th.cat([lim, th.as_tensor(self.nums2array(nums=val, dim=dim), dtype=th.float32)])
                         for lim, val in zip(command_output_limits, gain_limits)
                     ]
                 # Update command dim
@@ -245,7 +266,7 @@ class OperationalSpaceController(ManipulationController):
         # Other values
         self.decouple_pos_ori = decouple_pos_ori
         self.workspace_pose_limiter = workspace_pose_limiter
-        self.reset_joint_pos = reset_joint_pos[dof_idx]
+        self.reset_joint_pos = th.as_tensor(reset_joint_pos[dof_idx], dtype=th.float32)
 
         # member state that will be filled in at runtime
         self._link_name = link_name  # eef/trunk link name (same for all members in the group)
@@ -297,7 +318,7 @@ class OperationalSpaceController(ManipulationController):
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
             if self._goal_set[controller_idx]:
-                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(self._goals["target_ori_mat"][controller_idx])
+                self._fixed_quat_targets[controller_idx] = TT.mat2quat(self._goals["target_ori_mat"][controller_idx])
 
     def _clear_variable_gains(self):
         """
@@ -327,7 +348,7 @@ class OperationalSpaceController(ManipulationController):
             idx += 6
         if self.variable_kp_null:
             self.kp_null = gains[:, idx : idx + self.control_dim]
-            self.kd_null = 2 * cb.sqrt(self.kp_null)  # critically damped
+            self.kd_null = 2 * th.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
     def _update_goal(self, controller_idx, command):
@@ -345,24 +366,26 @@ class OperationalSpaceController(ManipulationController):
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
             prim_path, link_name
         )
-        pos_relative = cb.copy(pos_relative)
-        quat_relative = cb.copy(quat_relative)
+        # Ensure all values are torch tensors for consistent downstream processing
+        command = cb.to_torch(command).float()
+        pos_relative = cb.to_torch(pos_relative).float()
+        quat_relative = cb.to_torch(quat_relative).float()
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
             target_pos = command[:3]
         else:
             dpos = command[:3]
-            target_pos = pos_relative + dpos
+            target_pos = pos_relative + dpos  # arithmetic produces a new tensor; no clone needed
 
         # Compute orientation
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_targets[controller_idx] is None:
                 self._fixed_quat_targets[controller_idx] = (
-                    quat_relative
+                    quat_relative.clone()  # clone: stored persistently; view cache buffer is reused each step
                     if not self._goal_set[controller_idx]
-                    else cb.T.mat2quat(self._goals["target_ori_mat"][controller_idx])
+                    else TT.mat2quat(self._goals["target_ori_mat"][controller_idx])
                 )
             target_quat = self._fixed_quat_targets[controller_idx]
         elif self.mode == "position_compliant_ori":
@@ -370,11 +393,11 @@ class OperationalSpaceController(ManipulationController):
             target_quat = quat_relative
         elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
             # Received "delta" ori is in fact the desired absolute orientation
-            target_quat = cb.T.axisangle2quat(command[3:6])
+            target_quat = TT.axisangle2quat(command[3:6])
         else:  # pose_delta_ori control
             # Grab dori and compute target ori
-            dori = cb.T.quat2mat(cb.T.axisangle2quat(command[3:6]))
-            target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
+            dori = TT.quat2mat(TT.axisangle2quat(command[3:6]))
+            target_quat = TT.mat2quat(dori @ TT.quat2mat(quat_relative))
 
         # Possibly limit to workspace if specified
         if self.workspace_pose_limiter is not None:
@@ -386,8 +409,8 @@ class OperationalSpaceController(ManipulationController):
 
         # Set goals and return
         return dict(
-            target_pos=cb.as_float32(target_pos),
-            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
+            target_pos=target_pos.float(),
+            target_ori_mat=TT.quat2mat(target_quat),
         )
 
     def compute_control(self, goals):
@@ -405,20 +428,21 @@ class OperationalSpaceController(ManipulationController):
         """
         # TODO: Update to possibly grab parameters from dict
         # For now, always use internal values
-        N = self.n_members
         link_name = self._link_name
         rows = self.view_row_indices
 
-        kp = self.kp
-        kd = 2 * cb.sqrt(kp) * self.damping_ratio
+        kp = self.kp  # (6,) torch tensor
+        kd = 2 * th.sqrt(kp) * self.damping_ratio  # (6,) torch tensor
 
         # Batched joint state reads
         # Keep all_q as full (N_view, n_dof) to preserve shape for downstream offset computation.
         all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)
-        q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
-        qd_all = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
-            :, self.dof_idx
-        ]  # (N, ctrl_dim)
+        q_all = cb.to_torch(all_q[rows, :][:, self.dof_idx]).float()  # (N, ctrl_dim)
+        qd_all = cb.to_torch(
+            ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
+                :, self.dof_idx
+            ]
+        ).float()  # (N, ctrl_dim)
 
         # Batched mass matrix: slice to (N, ctrl_dim, ctrl_dim)
         all_mm_full = ControllableObjectViewAPI.get_all_generalized_mass_matrices(
@@ -429,8 +453,11 @@ class OperationalSpaceController(ManipulationController):
         # Compute offsets from full tensor shapes before row-slicing.
         mm_col_offset = all_mm_full.shape[-1] - all_q.shape[-1]
         mm_dof_idx = self.dof_idx + mm_col_offset
-        dof_idxs_mat = tuple(cb.meshgrid(mm_dof_idx, mm_dof_idx))
-        mm_all = all_mm_full[rows, :, :][:, dof_idxs_mat[0], dof_idxs_mat[1]]  # (N, ctrl_dim, ctrl_dim)
+        mm_dof_idx_t = th.as_tensor(mm_dof_idx, dtype=th.long)
+        dof_idxs_mat = th.meshgrid(mm_dof_idx_t, mm_dof_idx_t, indexing="ij")
+        mm_all = cb.to_torch(all_mm_full[rows, :, :]).float()[
+            :, dof_idxs_mat[0], dof_idxs_mat[1]
+        ]  # (N, ctrl_dim, ctrl_dim)
 
         # Batched jacobians
         jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(
@@ -442,53 +469,53 @@ class OperationalSpaceController(ManipulationController):
         # dof_idx indexes the joint block, so we need an offset for the Jacobian columns.
         jac_col_offset = jac_all.shape[-1] - all_q.shape[-1]
         jac_dof_idx = self.dof_idx + jac_col_offset
-        j_eef_all = jac_all[rows][:, jac_row, :, :][:, :, jac_dof_idx]  # (N, 6, ctrl_dim)
+        j_eef_all = cb.to_torch(jac_all[rows][:, jac_row, :, :][:, :, jac_dof_idx]).float()  # (N, 6, ctrl_dim)
 
-        # Batched EEF pose and velocities
+        # Batched EEF pose and velocities — convert to torch
         ee_pos_all, ee_quat_all = ControllableObjectViewAPI.get_all_link_relative_position_orientation(
             self.routing_path, link_name
         )  # (N_view, 3), (N_view, 4)
-        ee_pos_all = ee_pos_all[rows]
-        ee_quat_all = ee_quat_all[rows]
-        ee_mat_all = cb.as_float32(cb.T.quat2mat(ee_quat_all))  # (N, 3, 3)
-        ee_lin_vel_all = cb.as_float32(
+        ee_pos_all = cb.to_torch(ee_pos_all[rows]).float()
+        ee_quat_all = cb.to_torch(ee_quat_all[rows]).float()
+        ee_mat_all = TT.quat2mat(ee_quat_all)  # (N, 3, 3)
+        ee_lin_vel_all = cb.to_torch(
             ControllableObjectViewAPI.get_all_link_relative_linear_velocity(
                 self.routing_path, link_name, estimate=True
             )[rows]
-        )  # (N, 3)
-        ee_ang_vel_all = ControllableObjectViewAPI.get_all_link_relative_angular_velocity(
-            self.routing_path, link_name, estimate=True
-        )[rows]  # (N, 3)
-        base_lin_vel_all = cb.as_float32(
+        ).float()  # (N, 3)
+        ee_ang_vel_all = cb.to_torch(
+            ControllableObjectViewAPI.get_all_link_relative_angular_velocity(
+                self.routing_path, link_name, estimate=True
+            )[rows]
+        ).float()  # (N, 3)
+        base_lin_vel_all = cb.to_torch(
             ControllableObjectViewAPI.get_all_relative_linear_velocity(self.routing_path, estimate=True)[rows]
-        )  # (N, 3)
-        base_ang_vel_all = ControllableObjectViewAPI.get_all_relative_angular_velocity(
-            self.routing_path, estimate=True
-        )[rows]  # (N, 3)
+        ).float()  # (N, 3)
+        base_ang_vel_all = cb.to_torch(
+            ControllableObjectViewAPI.get_all_relative_angular_velocity(self.routing_path, estimate=True)[rows]
+        ).float()  # (N, 3)
 
         # Batched angular velocity error: quat_multiply(axisangle2quat(-ee_ang_vel), axisangle2quat(base_ang_vel))
-        ee_ang_vel_err_all = cb.as_float32(
-            cb.T.quat2axisangle(
-                cb.T.quat_multiply(
-                    cb.T.axisangle2quat(-ee_ang_vel_all),
-                    cb.T.axisangle2quat(base_ang_vel_all),
-                )
+        ee_ang_vel_err_all = TT.quat2axisangle(
+            _quat_multiply_batch(
+                TT.axisangle2quat(-ee_ang_vel_all),
+                TT.axisangle2quat(base_ang_vel_all),
             )
         )  # (N, 3)
 
-        # Broadcast scalar gains to (N, *) for the batch JIT
-        kp_batch = cb.stack([kp] * N, dim=0)  # (N, 6)
-        kd_batch = cb.stack([kd] * N, dim=0)  # (N, 6)
-        kp_null_batch = cb.stack([self.kp_null] * N, dim=0)  # (N, ctrl_dim)
-        kd_null_batch = cb.stack([self.kd_null] * N, dim=0)  # (N, ctrl_dim)
-        rest_qpos_batch = cb.stack([self.reset_joint_pos] * N, dim=0)  # (N, ctrl_dim)
+        # unsqueeze to (1, *) — broadcasts over N in the batch solver
+        kp_batch = kp.unsqueeze(0)
+        kd_batch = kd.unsqueeze(0)
+        kp_null_batch = self.kp_null.unsqueeze(0)
+        kd_null_batch = self.kd_null.unsqueeze(0)
+        rest_qpos_batch = self.reset_joint_pos.unsqueeze(0)
 
-        u = cb.get_custom_method("compute_osc_torques_batch")(
+        u = _compute_osc_torques_batch_torch(
             q=q_all,
             qd=qd_all,
             mm=mm_all,
             j_eef=j_eef_all,
-            ee_pos=cb.as_float32(ee_pos_all),
+            ee_pos=ee_pos_all,
             ee_mat=ee_mat_all,
             ee_lin_vel=ee_lin_vel_all,
             ee_ang_vel_err=ee_ang_vel_err_all,
@@ -502,20 +529,20 @@ class OperationalSpaceController(ManipulationController):
             control_dim=self.control_dim,
             decouple_pos_ori=self.decouple_pos_ori,
             base_lin_vel=base_lin_vel_all,
-            base_ang_vel=cb.as_float32(base_ang_vel_all),
+            base_ang_vel=base_ang_vel_all,
         )  # (N, ctrl_dim)
 
         if self._use_gravity_compensation:
             all_gravity = ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)
             gravity_col_offset = all_gravity.shape[-1] - all_q.shape[-1]
             gravity_dof_idx = self.dof_idx + gravity_col_offset
-            u = u + all_gravity[rows][:, gravity_dof_idx]
+            u = u + cb.to_torch(all_gravity[rows][:, gravity_dof_idx]).float()
 
         if self._use_cc_compensation:
             all_cc = ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)
             cc_col_offset = all_cc.shape[-1] - all_q.shape[-1]
             cc_dof_idx = self.dof_idx + cc_col_offset
-            u = u + all_cc[rows][:, cc_dof_idx]
+            u = u + cb.to_torch(all_cc[rows][:, cc_dof_idx]).float()
 
         return u
 
@@ -525,13 +552,13 @@ class OperationalSpaceController(ManipulationController):
         link_name = self._link_name
 
         target_pos, target_quat = ControllableObjectViewAPI.get_link_relative_position_orientation(prim_path, link_name)
-        target_pos = cb.copy(target_pos)
-        target_quat = cb.copy(target_quat)
+        target_pos = cb.to_torch(target_pos).float().clone()  # clone: stored directly as goal
+        target_quat = cb.to_torch(target_quat).float()  # no clone: quat2mat produces a new tensor
 
         # Convert quat into eef ori mat
         return dict(
-            target_pos=cb.as_float32(target_pos),
-            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
+            target_pos=target_pos,
+            target_ori_mat=TT.quat2mat(target_quat),
         )
 
     def _compute_no_op_command(self, controller_idx):
@@ -541,8 +568,10 @@ class OperationalSpaceController(ManipulationController):
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
             prim_path, link_name
         )
+        pos_relative = cb.to_torch(pos_relative).float()
+        quat_relative = cb.to_torch(quat_relative).float()
 
-        command = cb.zeros(6)
+        command = th.zeros(6)
 
         # Handle position
         if self.mode == "absolute_pose":
@@ -553,7 +582,7 @@ class OperationalSpaceController(ManipulationController):
 
         # Handle orientation
         if self.mode in ("pose_absolute_ori", "absolute_pose"):
-            command[3:] = cb.T.quat2axisangle(quat_relative)
+            command[3:] = TT.quat2axisangle(quat_relative)
         else:
             # For these modes, we don't need to add orientation to the command
             pass

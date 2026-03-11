@@ -147,13 +147,17 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Batched goals: key -> (N, *shape) tensor, built lazily as members are added
         self._goals = {}
         # Per-member flag indicating whether goal has been set this step
-        self._goal_set = []
+        self._goal_set = th.zeros(0, dtype=th.bool)
         # Per-member control enabled mask (1 enabled, 0 disabled)
-        self._control_enabled = []
-        # Per-member last deployed control tensor (set in _write_control)
-        self._controls = []
+        self._control_enabled = th.zeros(0, dtype=th.long)
+        # Per-member last deployed control tensor (N, control_dim)
+        self._controls = th.zeros((0, self.control_dim))
         # Per-member tombstone mask: 0 = active, 1 = unregistered (permanently ignored)
         self._unregistered_controllers = th.zeros(0, dtype=th.long)
+
+        # Cached control limits for this controller's dof_idx — used by clip_control every step
+        self._clip_lo = th.as_tensor(self._control_limits[self.control_type][0][self.dof_idx], dtype=th.float32)
+        self._clip_hi = th.as_tensor(self._control_limits[self.control_type][1][self.dof_idx], dtype=th.float32)
 
         # Initialize command scaling variables
         self._command_scale_factor = None
@@ -236,22 +240,23 @@ class BaseController(Serializable, Registerable, Recreatable):
             self._articulation_root_paths[controller_idx] = articulation_root_path
             self._goal_set[controller_idx] = False
             self._control_enabled[controller_idx] = 1 if control_enabled else 0
-            self._controls[controller_idx] = None
             self._unregistered_controllers[controller_idx] = 0
             for key, shape in self._goal_shapes.items():
-                self._goals[key][controller_idx] = cb.zeros(shape)
+                self._goals[key][controller_idx] = th.zeros(shape)
         else:
             # No tombstone available — append a new slot
             controller_idx = len(self._articulation_root_paths)
             self._articulation_root_paths.append(articulation_root_path)
-            self._goal_set.append(False)
-            self._control_enabled.append(1 if control_enabled else 0)
-            self._controls.append(None)
+            self._goal_set = th.cat([self._goal_set, th.zeros(1, dtype=th.bool)])
+            self._control_enabled = th.cat(
+                [self._control_enabled, th.tensor([1 if control_enabled else 0], dtype=th.long)]
+            )
+            self._controls = th.cat([self._controls, th.zeros(1, self.control_dim)])
             self._unregistered_controllers = th.cat([self._unregistered_controllers, th.zeros(1, dtype=th.long)])
             for key, shape in self._goal_shapes.items():
-                new_row = cb.zeros((1, *shape))
+                new_row = th.zeros(1, *shape)
                 if key in self._goals:
-                    self._goals[key] = cb.cat([self._goals[key], new_row], 0)
+                    self._goals[key] = th.cat([self._goals[key], new_row], 0)
                 else:
                     self._goals[key] = new_row
 
@@ -373,7 +378,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         preprocessed = self._preprocess_command(command)
         goal_dict = self._update_goal(controller_idx, preprocessed)
         for k, v in goal_dict.items():
-            self._goals[k][controller_idx] = v
+            self._goals[k][controller_idx] = v if isinstance(v, th.Tensor) else th.as_tensor(v, dtype=th.float32)
 
         self._goal_set[controller_idx] = True
 
@@ -416,40 +421,35 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Tensor: Clipped (N, control_dim) control signal
         """
-        lo = self._control_limits[self.control_type][0][self.dof_idx]
-        hi = self._control_limits[self.control_type][1][self.dof_idx]
-        # Broadcast limits: (control_dim,) -> (1, control_dim) for N-dim clipping
-        clipped_control = control.clip(lo, hi)
-        idx = (
-            self._dof_has_limits[self.dof_idx]
-            if self.control_type == ControlType.POSITION
-            else (cb.ones(self.control_dim) > 0)
-        )
-        control[:, idx] = clipped_control[:, idx]
-        return control
+        clipped_control = control.clip(self._clip_lo, self._clip_hi)
+        # Undo the clipping of unlimited position joints
+        if self.control_type == ControlType.POSITION:
+            idx = cb.to_torch(self._dof_has_limits[self.dof_idx]).bool()
+            clipped_control[:, ~idx] = control[:, ~idx]
+        return clipped_control
 
     def step(self):
         """
         Take a batched controller step across all member controller.
 
-        For any controller that has not received a goal this step, a no-op goal is computed.
+        For any controller that has not received a goal yet, a no-op goal is computed.
         The control is then computed for all controllers, clipped, written to Isaac, and the
         goal_set flags are reset.
         """
         N = self.n_members
-        # If all active (non-unregistered) members are disabled, early return
-        if all(self._control_enabled[i] == 0 or self._unregistered_controllers[i] == 1 for i in range(N)):
+        # active_mask: True for members that are enabled and registered
+        active_mask = (self._control_enabled != 0) & (self._unregistered_controllers == 0)
+
+        # If no active members, early return
+        if not active_mask.any():
             return
 
-        # Fill in no-op goals for any controllers that haven't received a goal.
-        for i in range(N):
-            # Skip control_disabled or unregistered members
-            if self._control_enabled[i] == 0 or self._unregistered_controllers[i] == 1:
-                continue
+        # Fill in no-op goals for any active controllers that haven't received a goal.
+        for i in active_mask.nonzero(as_tuple=True)[0].tolist():
             if not self._goal_set[i]:
                 no_op = self.compute_no_op_goal(i)
                 for k, v in no_op.items():
-                    self._goals[k][i] = v
+                    self._goals[k][i] = v if isinstance(v, th.Tensor) else th.as_tensor(v, dtype=th.float32)
                 self._goal_set[i] = True
 
         # Compute batched control: (N, control_dim)
@@ -461,28 +461,15 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Clip, store per-member controls, then write batched
         control_output = self.clip_control(control_output)
-        for i in range(N):
-            if self._control_enabled[i] != 0 and self._unregistered_controllers[i] == 0:
-                ctrl = control_output[i]
-                self._controls[i] = (
-                    cb.from_torch(ctrl)
-                    if isinstance(ctrl, th.Tensor)
-                    else (ctrl if isinstance(ctrl, cb.arr_type) else cb.array(ctrl))
-                )
+        self._controls[active_mask] = control_output[active_mask]
 
         # Write batched control signals to Isaac via a single tensor op per control type.
-
-        # Filter to enabled and non-unregistered members
-        enabled_indices = [
-            i
-            for i, (e, u) in enumerate(zip(self._control_enabled, self._unregistered_controllers))
-            if e != 0 and u == 0
-        ]
-        if not enabled_indices:
+        if not active_mask.any():
             return
 
-        enabled_rows = [self.view_row_indices[i] for i in enabled_indices]
-        enabled_controls = cb.stack([self._controls[i] for i in enabled_indices])  # (N_en, K)
+        all_view_rows = th.tensor(self.view_row_indices, dtype=th.long)
+        enabled_rows = all_view_rows[active_mask]
+        enabled_controls = self._controls[active_mask]  # (N_en, control_dim)
         routing_path = self.routing_path
 
         if self.control_type == ControlType.POSITION:
@@ -490,7 +477,7 @@ class BaseController(Serializable, Registerable, Recreatable):
                 routing_path, enabled_rows, enabled_controls, self.dof_idx
             )
             ControllableObjectViewAPI.set_all_joint_velocity_targets(
-                routing_path, enabled_rows, cb.zeros(enabled_controls.shape), self.dof_idx
+                routing_path, enabled_rows, th.zeros_like(enabled_controls), self.dof_idx
             )
         elif self.control_type == ControlType.VELOCITY:
             ControllableObjectViewAPI.set_all_joint_velocity_targets(
@@ -509,9 +496,9 @@ class BaseController(Serializable, Registerable, Recreatable):
         if self._unregistered_controllers[controller_idx] == 1:
             return
         self._goal_set[controller_idx] = False
-        self._controls[controller_idx] = None
+        self._controls[controller_idx] = th.zeros(self.control_dim)
         for k in self._goals:
-            self._goals[k][controller_idx] = cb.zeros(self._goal_shapes[k])
+            self._goals[k][controller_idx] = th.zeros(self._goal_shapes[k])
 
     def unregister_member(self, controller_idx):
         """Mark member at controller_idx as a tombstone (permanently ignored)."""
@@ -568,7 +555,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     def _dump_state(self, controller_idx: int) -> dict:
         """Dump state for one controller member."""
-        goals = {k: cb.to_torch(v[controller_idx]).clone() for k, v in self._goals.items()}
+        goals = {k: v[controller_idx].clone() for k, v in self._goals.items()}
         return {
             "goal_set": bool(self._goal_set[controller_idx]),
             "goals": goals,
@@ -593,18 +580,14 @@ class BaseController(Serializable, Registerable, Recreatable):
         goal_set = state["goal_set"]
         if isinstance(goal_set, th.Tensor):
             goal_set = bool(goal_set.item())
-        # Loaded goals can be stale after scene reset / controller reload.
-        # Force a fresh no-op goal on next step for this member.
-        self._goal_set[controller_idx] = False
-        self._controls[controller_idx] = None
+        self._goal_set[controller_idx] = goal_set
+        self._controls[controller_idx] = th.zeros(self.control_dim)
         self._unregistered_controllers[controller_idx] = 0  # we won't load a unregistered controller
         for name, val in state["goals"].items():
             if name in self._goals:
-                if isinstance(val, th.Tensor):
-                    val = cb.from_torch(val)
-                elif not isinstance(val, cb.arr_type):
-                    val = cb.array(val)
-                self._goals[name][controller_idx] = val
+                self._goals[name][controller_idx] = (
+                    val if isinstance(val, th.Tensor) else th.as_tensor(val, dtype=th.float32)
+                )
 
     def load_state(self, controller_idx: int, state, serialized: bool = False):
         """
