@@ -281,7 +281,14 @@ def sample_kinematics(
         # step until (a) max steps is reached (restarted from 0) or (b) velocity is below some threshold
         n_steps_max = int(0.5 / og.sim.get_physics_dt())
         i = 0
-        while not RigidContactAPI.is_in_contact(scene_idx=objA.scene.idx, query_set=[objA]) and i < n_steps_max:
+
+        def _is_in_contact():
+            if objA.prim_type == PrimType.RIGID:
+                return RigidContactAPI.is_in_contact(scene_idx=objA.scene.idx, query_set=[objA])
+            else:
+                return len(objA.root_link.get_contacts()) > 0
+
+        while not _is_in_contact() and i < n_steps_max:
             og.sim.step_physics()
             i += 1
         objA.keep_still()
