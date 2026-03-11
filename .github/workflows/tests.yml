@@ -154,11 +154,19 @@ jobs:
       - name: Convert JUnit XML to CTRF
         run: npx --yes junit-to-ctrf "test-results/test_*.xml" -o ctrf-report.json
 
-      - name: Publish test report
+      - name: Publish summary report
         uses: ctrf-io/github-test-reporter@v1
         with:
           report-path: ctrf-report.json
           summary-report: true
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish failed report
+        uses: ctrf-io/github-test-reporter@v1
+        with:
+          report-path: ctrf-report.json
           failed-report: true
         if: always()
         env:
