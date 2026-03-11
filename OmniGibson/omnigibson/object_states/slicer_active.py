@@ -115,7 +115,9 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     def _currently_touching_sliceables(cls):
         # Grab all sliceable objects
         # TODO: This assertion is added because the code already assumed this to be true. We'll remove this once we support multiple scenes.
-        assert len(og.sim.scenes) == 1, "Tensorized sliceable state only supports one scene for now. This will be supported in the future."
+        assert (
+            len(og.sim.scenes) == 1
+        ), "Tensorized sliceable state only supports one scene for now. This will be supported in the future."
         scene = og.sim.scenes[0]
         sliceable_objs = scene.object_registry("abilities", "sliceable", [])
 

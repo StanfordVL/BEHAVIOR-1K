@@ -446,7 +446,9 @@ class RigidContactAPIImpl:
         # Get the row indices corresponding to the sensor prim paths
         sensor_prim_paths = list(sensor_prim_paths)
         missing_row_prim_paths = [x for x in sensor_prim_paths if x not in self._PATH_TO_ROW_IDX[scene_idx].keys()]
-        assert len(missing_row_prim_paths) == 0, f"Sensor prim paths {missing_row_prim_paths} are not in the contact matrix. This is likely because those rigid prims are kinematic-only."
+        assert (
+            len(missing_row_prim_paths) == 0
+        ), f"Sensor prim paths {missing_row_prim_paths} are not in the contact matrix. This is likely because those rigid prims are kinematic-only."
         row_idxs = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in sensor_prim_paths]
 
         # Filter the impulses to only include the rows corresponding to the sensor prim paths
@@ -476,7 +478,9 @@ class RigidContactAPIImpl:
             bool: True if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set, else False.
         """
         # Assert that at most one of the with-set, or the ignore-set is specified, but not both.
-        assert with_set is None or ignore_set is None, "Either the with-set, or the ignore-set must be specified, but not both."
+        assert (
+            with_set is None or ignore_set is None
+        ), "Either the with-set, or the ignore-set must be specified, but not both."
 
         def _convert_to_prim_paths(inp_set: set) -> list[str]:
             # Avoid circular imports
@@ -505,7 +509,7 @@ class RigidContactAPIImpl:
             return False
 
         impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
-        
+
         rows = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in query_set]
         if with_set is not None:
             cols = [self._PATH_TO_COL_IDX[scene_idx][path] for path in with_set]
@@ -514,7 +518,7 @@ class RigidContactAPIImpl:
             ignore_cols = [self._PATH_TO_COL_IDX[scene_idx][path] for path in ignore_set]
             keep_cols = [col for col in range(impulses.shape[1]) if col not in ignore_cols]
             return th.any(impulses[rows, :][:, keep_cols] > 0).item()
-        
+
         # Base case, return any collisions with any other prim
         return th.any(impulses[rows] > 0).item()
 
