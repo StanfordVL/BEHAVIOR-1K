@@ -974,6 +974,7 @@ class BatchControlViewAPIImpl:
                 obj.base_footprint_link_name if obj.base_footprint_link_name != obj.root_link_name else None
             )
             for obj in controllable_objects
+            if obj.articulation_root_path in expected_prim_paths
         }
 
     def set_joint_position_targets(self, prim_path, positions, indices):
@@ -1052,13 +1053,27 @@ class BatchControlViewAPIImpl:
         targets[row_idx, dof_idx] = efforts
         self._write_idx_cache["dof_actuation_forces"].update(enabled_rows)
 
-    def get_root_transform(self, prim_path):
+    def get_all_root_transform(self):
         if "root_transforms" not in self._read_cache:
             self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
+        pose = self._read_cache["root_transforms"]
+        return pose[:, :3], pose[:, 3:]
 
+    def get_root_transform(self, prim_path):
         idx = self._idx[prim_path]
-        pose = self._read_cache["root_transforms"][idx]
-        return pose[:3], pose[3:]
+        pos, quat = self.get_all_root_transform()
+        return pos[idx], quat[idx]
+
+    def get_all_position_orientation(self):
+        # Here we want to return the position of the base footprint link.
+        # If the base footprint link is None, we return the position of the root link.
+
+        # we assume that in a view, all base link_name is the same
+        link_name = next(iter(self._base_footprint_link_names.values()))
+        if link_name is None:
+            return self.get_all_root_transform()
+        else:
+            return self.get_all_link_transform(link_name)
 
     def get_position_orientation(self, prim_path):
         # Here we want to return the position of the base footprint link. If the base footprint link is None,
@@ -1069,42 +1084,53 @@ class BatchControlViewAPIImpl:
         else:
             return self.get_root_transform(prim_path)
 
-    def _get_velocities(self, prim_path, estimate=False):
-        if self._base_footprint_link_names[prim_path] is not None:
-            link_name = self._base_footprint_link_names[prim_path]
-            return self._get_link_velocities(prim_path, link_name, estimate=estimate)
+    def _get_all_velocities(self, estimate=False):
+        link_name = next(iter(self._base_footprint_link_names.values()))
+        if link_name is not None:
+            return self._get_all_link_velocities(link_name, estimate=estimate)
         else:
-            return self._get_root_velocities(prim_path, estimate=estimate)
+            return self._get_all_root_velocities(estimate=estimate)
 
-    def _get_relative_velocities(self, prim_path, estimate=False):
+    def _get_all_relative_velocities(self, estimate=False):
+        """Returns (N, n_links+1, 6) relative velocities for all robots; final slot [-1] is the base."""
         vel_str = "velocities_estimate" if estimate else "velocities"
 
-        if f"relative_{vel_str}" not in self._read_cache:
-            self._read_cache[f"relative_{vel_str}"] = {}
+        if f"all_relative_{vel_str}" not in self._read_cache:
+            # Warm the (N, L, 6) link velocity cache and fetch it
+            any_link_name = next(iter(self._link_idx[0]))
+            self._get_all_link_velocities(any_link_name, estimate=estimate)
+            link_vels = cb.to_torch(self._read_cache[f"link_{vel_str}"])  # (N, L, 6)
 
-        if prim_path not in self._read_cache[f"relative_{vel_str}"]:
-            # Compute all tfs at once, including base as well as all links
-            idx = self._idx[prim_path]
-            if f"link_{vel_str}" not in self._read_cache:
-                # Force the internal cache to update
-                self._get_link_velocities(
-                    prim_path=prim_path, link_name=next(iter(self._link_idx[idx].keys())), estimate=estimate
-                )
+            # Get base velocities (N, 6): reuse link cache if a base footprint link is configured
+            # (all robots in a view share the same base footprint link name)
+            base_footprint_link_name = next(iter(self._base_footprint_link_names.values()))
+            if base_footprint_link_name is not None:
+                base_link_idx = self._link_idx[0][base_footprint_link_name]
+                base_vels = link_vels[:, base_link_idx, :]  # (N, 6) — already in cache, no extra fetch
+            else:
+                # Warm root velocities cache and get (N, 6)
+                self._get_all_root_velocities(estimate=estimate)
+                base_vels = cb.to_torch(self._read_cache[f"root_{vel_str}"])  # (N, 6)
 
-            vels = cb.zeros((len(self._link_idx[idx]) + 1, 6, 1))
-            # base vel is the final -1 index
-            vels[:-1, :, 0] = self._read_cache[f"link_{vel_str}"][idx, :]
-            vels[-1, :, 0] = self._get_velocities(prim_path=prim_path, estimate=estimate)
+            # Build (N, L+1, 6): link vels followed by base vel (base at final index, matching _get_relative_velocities)
+            all_vels = th.cat([link_vels, base_vels.unsqueeze(1)], dim=1)  # (N, L+1, 6)
 
-            tf = cb.zeros((1, 6, 6))
-            orn_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
-            tf[0, :3, :3] = orn_t
-            tf[0, 3:, 3:] = orn_t
-            # x.T --> transpose (inverse) orientation
-            # (1, 6, 6) @ (n_links, 6, 1) -> (n_links, 6, 1) -> (n_links, 6)
-            self._read_cache[f"relative_{vel_str}"][prim_path] = cb.squeeze(tf @ vels, dim=-1)
+            # Build block-diagonal rotation transform per robot: (N, 6, 6)
+            all_quats = cb.to_torch(self.get_all_position_orientation()[1])  # (N, 4)
+            ori_t_batch = TT.quat2mat(all_quats).transpose(-2, -1)  # (N, 3, 3)
+            tf = th.zeros(all_vels.shape[0], 6, 6, dtype=all_vels.dtype)
+            tf[:, :3, :3] = ori_t_batch
+            tf[:, 3:, 3:] = ori_t_batch
 
-        return self._read_cache[f"relative_{vel_str}"][prim_path]
+            # Batched matmul: (N, 1, 6, 6) @ (N, L+1, 6, 1) → (N, L+1, 6)
+            rel_vels = (tf.unsqueeze(1) @ all_vels.unsqueeze(-1)).squeeze(-1)
+            self._read_cache[f"all_relative_{vel_str}"] = cb.from_torch(rel_vels)
+
+        return self._read_cache[f"all_relative_{vel_str}"]
+
+    def _get_relative_velocities(self, prim_path, estimate=False):
+        idx = self._idx[prim_path]
+        return self._get_all_relative_velocities(estimate=estimate)[idx]
 
     def get_linear_velocity(self, prim_path, estimate=False):
         return self._get_velocities(prim_path, estimate=estimate)[:3]
@@ -1112,7 +1138,7 @@ class BatchControlViewAPIImpl:
     def get_angular_velocity(self, prim_path, estimate=False):
         return self._get_velocities(prim_path, estimate=estimate)[3:]
 
-    def _get_root_velocities(self, prim_path, estimate=False):
+    def _get_all_root_velocities(self, estimate=False):
         vel_str = "velocities_estimate" if estimate else "velocities"
 
         # Use estimated calculation if requested and we have prior history info
@@ -1134,8 +1160,7 @@ class BatchControlViewAPIImpl:
             else:
                 self._read_cache[f"root_{vel_str}"] = cb.from_torch(self._view.get_root_velocities())
 
-        idx = self._idx[prim_path]
-        return self._read_cache[f"root_{vel_str}"][idx]
+        return self._read_cache[f"root_{vel_str}"]
 
     def get_relative_linear_velocity(self, prim_path, estimate=False):
         # base corresponds to final index
@@ -1149,22 +1174,13 @@ class BatchControlViewAPIImpl:
         """Returns the integer body index for the named link in the articulation view's link_paths."""
         return self._link_idx[0][link_name]
 
-    def get_all_relative_jacobians(self):
-        """Returns (N, n_links, 6, n_dof_total) relative jacobians for all robots in this view."""
-        if "all_relative_jacobians" not in self._read_cache:
-            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
-            self._read_cache["all_relative_jacobians"] = cb.stack(
-                [self.get_relative_jacobian(p) for p in prim_paths_sorted], dim=0
-            )
-        return self._read_cache["all_relative_jacobians"]
-
     def get_all_link_relative_position_orientation(self, link_name):
         """Returns (N, 3) positions and (N, 4) quaternions for the given link across all robots."""
         cache_key = f"all_link_rel_pose_{link_name}"
         if cache_key not in self._read_cache:
             link_idx = self._link_idx[0][link_name]
-            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
-            poses = cb.stack([self._get_relative_poses(p)[link_idx] for p in prim_paths_sorted], dim=0)
+            # _get_all_relative_poses returns (N, n_links, 7); slice the desired link: (N, 7)
+            poses = self._get_all_relative_poses()[:, link_idx, :]
             self._read_cache[cache_key] = poses
         poses = self._read_cache[cache_key]
         return poses[:, :3], poses[:, 3:]
@@ -1174,10 +1190,7 @@ class BatchControlViewAPIImpl:
         cache_key = f"all_link_rel_lin_vel{'_est' if estimate else ''}_{link_name}"
         if cache_key not in self._read_cache:
             link_idx = self._link_idx[0][link_name]
-            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
-            self._read_cache[cache_key] = cb.stack(
-                [self._get_relative_velocities(p, estimate=estimate)[link_idx, :3] for p in prim_paths_sorted], dim=0
-            )
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, link_idx, :3]
         return self._read_cache[cache_key]
 
     def get_all_link_relative_angular_velocity(self, link_name, estimate=False):
@@ -1185,30 +1198,23 @@ class BatchControlViewAPIImpl:
         cache_key = f"all_link_rel_ang_vel{'_est' if estimate else ''}_{link_name}"
         if cache_key not in self._read_cache:
             link_idx = self._link_idx[0][link_name]
-            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
-            self._read_cache[cache_key] = cb.stack(
-                [self._get_relative_velocities(p, estimate=estimate)[link_idx, 3:] for p in prim_paths_sorted], dim=0
-            )
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, link_idx, 3:]
         return self._read_cache[cache_key]
 
     def get_all_relative_linear_velocity(self, estimate=False):
         """Returns (N, 3) base linear velocities for all robots in this view."""
         cache_key = f"all_relative_lin_vel{'_est' if estimate else ''}"
         if cache_key not in self._read_cache:
-            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
-            self._read_cache[cache_key] = cb.stack(
-                [self._get_relative_velocities(p, estimate=estimate)[-1, :3] for p in prim_paths_sorted], dim=0
-            )
+            # Base is appended at the final index in _get_all_relative_velocities
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, -1, :3]
         return self._read_cache[cache_key]
 
     def get_all_relative_angular_velocity(self, estimate=False):
         """Returns (N, 3) base angular velocities for all robots in this view."""
         cache_key = f"all_relative_ang_vel{'_est' if estimate else ''}"
         if cache_key not in self._read_cache:
-            prim_paths_sorted = sorted(self._idx.keys(), key=lambda p: self._idx[p])
-            self._read_cache[cache_key] = cb.stack(
-                [self._get_relative_velocities(p, estimate=estimate)[-1, 3:] for p in prim_paths_sorted], dim=0
-            )
+            # Base is appended at the final index in _get_all_relative_velocities
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, -1, 3:]
         return self._read_cache[cache_key]
 
     def get_all_joint_positions(self):
@@ -1276,43 +1282,33 @@ class BatchControlViewAPIImpl:
         return self.get_all_coriolis_and_centrifugal_compensation_forces()[self._idx[prim_path]]
 
     def get_link_transform(self, prim_path, link_name):
+        idx = self._idx[prim_path]
+        pos, quat = self.get_all_link_transform(link_name)
+        return pos[idx], quat[idx]
+
+    def get_all_link_transform(self, link_name):
         if "link_transforms" not in self._read_cache:
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
 
-        idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        pose = self._read_cache["link_transforms"][idx, link_idx]
-        return pose[:3], pose[3:]
+        # We assume that in a view, link_idx for the same link_name is the same across all members
+        link_idx = self._link_idx[0][link_name]
+        pose = self._read_cache["link_transforms"][:, link_idx]
+        return pose[:, :3], pose[:, 3:]
 
     def _get_relative_poses(self, prim_path):
-        if "relative_poses" not in self._read_cache:
-            self._read_cache["relative_poses"] = {}
-
-        if prim_path not in self._read_cache["relative_poses"]:
-            # Compute all tfs at once, including base as well as all links
-            if "link_transforms" not in self._read_cache:
-                self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
-
-            idx = self._idx[prim_path]
-            self._read_cache["relative_poses"][prim_path] = cb.get_custom_method("compute_relative_poses")(
-                idx,
-                len(self._link_idx[idx]),
-                self._read_cache["link_transforms"],
-                self.get_position_orientation(prim_path=prim_path),
-            )
-
-        return self._read_cache["relative_poses"][prim_path]
+        idx = self._idx[prim_path]
+        return self._get_all_relative_poses()[idx]
 
     def get_link_relative_position_orientation(self, prim_path, link_name):
         idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        rel_pose = self._get_relative_poses(prim_path)[link_idx]
-        return rel_pose[:3], rel_pose[3:]
+        pos, quat = self.get_all_link_relative_position_orientation(link_name)
+        return pos[idx], quat[idx]
 
-    def _get_link_velocities(self, prim_path, link_name, estimate=False):
+    def _get_all_link_velocities(self, link_name, estimate=False):
+        """Returns (N, 6) velocities (linear + angular) for the given link across all robots."""
         vel_str = "velocities_estimate" if estimate else "velocities"
 
-        # Use estimated calculation if requested and we have prior history info
+        # Build and cache the full (N, L, 6) tensor for all robots and all links
         if f"link_{vel_str}" not in self._read_cache:
             if estimate and self._last_state is not None:
                 # Compute link velocities estimate as delta between prior timestep and current timestep
@@ -1340,51 +1336,107 @@ class BatchControlViewAPIImpl:
             else:
                 self._read_cache[f"link_{vel_str}"] = cb.from_torch(self._view.get_link_velocities())
 
-        idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        vel = self._read_cache[f"link_{vel_str}"][idx, link_idx]
+        link_idx = self._link_idx[0][link_name]
+        return self._read_cache[f"link_{vel_str}"][:, link_idx, :]  # (N, 6)
 
-        return vel
+    def _get_link_velocities(self, prim_path, link_name, estimate=False):
+        idx = self._idx[prim_path]
+        return self._get_all_link_velocities(link_name, estimate=estimate)[idx]
 
     def get_link_linear_velocity(self, prim_path, link_name, estimate=False):
         return self._get_link_velocities(prim_path, link_name, estimate=estimate)[:3]
+
+    def get_all_link_linear_velocity(self, link_name, estimate=False):
+        return self._get_all_link_velocities(link_name, estimate=estimate)[:, :3]
 
     def get_link_relative_linear_velocity(self, prim_path, link_name, estimate=False):
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, :3]
 
-    def get_link_angular_velocity(self, prim_path, link_name, estimate=False):
-        return self._get_link_velocities(prim_path, link_name, estimate=estimate)[3:]
+    def get_all_link_angular_velocity(self, link_name, estimate=False):
+        return self._get_all_link_velocities(link_name, estimate=estimate)[:, 3:]
 
     def get_link_relative_angular_velocity(self, prim_path, link_name, estimate=False):
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, 3:]
 
-    def get_jacobian(self, prim_path):
+    def get_all_jacobian(self):
         if "jacobians" not in self._read_cache:
             self._read_cache["jacobians"] = cb.from_torch(self._view.get_jacobians())
+        return self._read_cache["jacobians"]
 
+    def get_jacobian(self, prim_path):
         idx = self._idx[prim_path]
-        return self._read_cache["jacobians"][idx]
+        return self.get_all_jacobian()[idx]
+
+    def _get_all_relative_poses(self):
+        """Returns (N, n_links, 7) relative poses (pos + quat) for all robots in this view, batched."""
+        if "relative_poses" not in self._read_cache:
+            # All link world transforms: (N, n_links, 7)
+            if "link_transforms" not in self._read_cache:
+                self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
+            all_link_tfs = cb.to_torch(self._read_cache["link_transforms"])  # (N, n_links, 7)
+
+            # All base poses
+            all_pos, all_quat = self.get_all_position_orientation()  # (N, 3), (N, 4)
+            all_pos = cb.to_torch(all_pos)
+            all_quat = cb.to_torch(all_quat)
+
+            N, n_links = all_link_tfs.shape[:2]
+
+            # Build link homogeneous transform matrices: (N, n_links, 4, 4)
+            tfs = th.zeros(N, n_links, 4, 4, dtype=th.float32)
+            tfs[:, :, 3, 3] = 1.0
+            tfs[:, :, :3, 3] = all_link_tfs[:, :, :3]
+            # quat2mat doesn't handle rank-3 input; flatten the N*n_links batch dimension
+            tfs[:, :, :3, :3] = TT.quat2mat(all_link_tfs[:, :, 3:].reshape(-1, 4)).reshape(N, n_links, 3, 3)
+
+            # Build batched base pose inverses: (N, 4, 4)
+            # For a rigid transform [R, t; 0, 1], the inverse is [R^T, -R^T t; 0, 1]
+            base_rot_T = TT.quat2mat(all_quat).transpose(-2, -1)  # (N, 3, 3)
+            base_tf_inv = th.zeros(N, 4, 4, dtype=th.float32)
+            base_tf_inv[:, 3, 3] = 1.0
+            base_tf_inv[:, :3, :3] = base_rot_T
+            base_tf_inv[:, :3, 3] = -(base_rot_T @ all_pos.unsqueeze(-1)).squeeze(-1)
+
+            # Batched matmul: (N, 1, 4, 4) @ (N, n_links, 4, 4) → (N, n_links, 4, 4)
+            rel_tfs = base_tf_inv.unsqueeze(1) @ tfs
+
+            # Convert back to (N, n_links, 7) pos + quat
+            rel_poses = th.zeros(N, n_links, 7, dtype=th.float32)
+            rel_poses[:, :, :3] = rel_tfs[:, :, :3, 3]
+            rel_poses[:, :, 3:] = TT.mat2quat(rel_tfs[:, :, :3, :3].reshape(-1, 3, 3)).reshape(N, n_links, 4)
+
+            self._read_cache["relative_poses"] = cb.from_torch(rel_poses)
+        return self._read_cache["relative_poses"]
+
+    def get_all_relative_jacobians(self):
+        """Returns (N, n_links, 6, n_dof_total) relative jacobians for all robots in this view."""
+        if "relative_jacobians" not in self._read_cache:
+            # All raw jacobians: (N, n_links, 6, n_dof_total)
+            all_jacobians = cb.to_torch(self.get_all_jacobian())
+            # Base orientation quaternions for all robots: (N, 4)
+            all_quats = cb.to_torch(self.get_all_position_orientation()[1])
+            N = all_quats.shape[0]
+
+            # Rotation matrices transposed per robot: (N, 3, 3)
+            ori_t_batch = TT.quat2mat(all_quats).transpose(-2, -1)
+
+            # Build block-diagonal transform tf = [[ori_t, 0], [0, ori_t]]: (N, 6, 6)
+            tf = th.zeros(N, 6, 6, dtype=all_jacobians.dtype)
+            tf[:, :3, :3] = ori_t_batch
+            tf[:, 3:, 3:] = ori_t_batch
+
+            # Batched matmul: (N, 1, 6, 6) @ (N, n_links, 6, n_dof_total) → (N, n_links, 6, n_dof_total)
+            # Run in pytorch since it's order of magnitude faster than numpy!
+            self._read_cache["relative_jacobians"] = cb.from_torch(tf.unsqueeze(1) @ all_jacobians)
+        return self._read_cache["relative_jacobians"]
 
     def get_relative_jacobian(self, prim_path):
-        if "relative_jacobians" not in self._read_cache:
-            self._read_cache["relative_jacobians"] = {}
-
-        if prim_path not in self._read_cache["relative_jacobians"]:
-            jacobian = self.get_jacobian(prim_path)
-            ori_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
-            tf = cb.zeros((1, 6, 6))
-            tf[:, :3, :3] = ori_t
-            tf[:, 3:, 3:] = ori_t
-            # Run this explicitly in pytorch since it's order of magnitude faster than numpy!
-            # e.g.: 2e-4 vs. 3e-5 on R1
-            rel_jac = cb.from_torch(cb.to_torch(tf) @ cb.to_torch(jacobian))
-            self._read_cache["relative_jacobians"][prim_path] = rel_jac
-
-        return self._read_cache["relative_jacobians"][prim_path]
+        idx = self._idx[prim_path]
+        return self.get_all_relative_jacobians()[idx]
 
 
 def get_robot_kinematic_tree_pattern(articulation_root_path: str) -> str:
