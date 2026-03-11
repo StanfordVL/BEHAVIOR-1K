@@ -2076,7 +2076,9 @@ class Robot(USDObject, GymObservable):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                if not RigidContactAPI.is_in_contact(scene_idx=self.scene.idx, query_set=finger_links, with_set=[candidate_obj]):
+                if not RigidContactAPI.is_in_contact(
+                    scene_idx=self.scene.idx, query_set=finger_links, with_set=[candidate_obj]
+                ):
                     is_grasping = IsGraspingState.FALSE
         return is_grasping
 

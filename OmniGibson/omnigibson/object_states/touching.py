@@ -13,7 +13,9 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         # Find a kinematic object and check for contact with the other object.
         kinematic_obj = obj_a if obj_a.kinematic_only else obj_b
         non_kinematic_obj = obj_b if obj_a.kinematic_only else obj_a
-        return RigidContactAPI.is_in_contact(scene_idx=kinematic_obj.scene.idx, query_set=[non_kinematic_obj], with_set=[kinematic_obj])
+        return RigidContactAPI.is_in_contact(
+            scene_idx=kinematic_obj.scene.idx, query_set=[non_kinematic_obj], with_set=[kinematic_obj]
+        )
 
     @staticmethod
     def _check_cloth_contact(cloth_obj, other_obj):

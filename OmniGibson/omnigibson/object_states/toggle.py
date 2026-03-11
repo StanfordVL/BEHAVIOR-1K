@@ -192,7 +192,10 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         # If we're not nearby any fingers, we automatically can't toggle
         all_finger_paths = {path for path_set in self._robot_finger_paths for path in path_set}
-        robot_can_toggle = RigidContactAPI.is_in_contact(scene_idx=self.obj.scene.idx, query_set=all_finger_paths, with_set=[self.obj]) and self._check_overlap()
+        robot_can_toggle = (
+            RigidContactAPI.is_in_contact(scene_idx=self.obj.scene.idx, query_set=all_finger_paths, with_set=[self.obj])
+            and self._check_overlap()
+        )
         previous_step = self.robot_can_toggle_steps
         if robot_can_toggle:
             self.robot_can_toggle_steps += 1

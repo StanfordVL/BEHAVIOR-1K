@@ -407,7 +407,9 @@ class TouchingAnyCondition(RuleCondition):
 
         # Batch check for each object
         for obj in object_candidates[self._filter_1_name]:
-            if RigidContactAPI.is_in_contact(scene_idx=obj.scene.idx, query_set=[obj], with_set=object_candidates[self._filter_2_name]):
+            if RigidContactAPI.is_in_contact(
+                scene_idx=obj.scene.idx, query_set=[obj], with_set=object_candidates[self._filter_2_name]
+            ):
                 objs.append(obj)
 
         # Update candidates

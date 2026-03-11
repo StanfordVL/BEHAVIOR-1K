@@ -765,9 +765,11 @@ class ClothPrim(GeomPrim):
 
         positions = self.keypoint_particle_positions if keypoints_only else self.compute_particle_positions()
         for pos in positions:
+
             def report_hit(hit):
                 contacts.append((hit.rigid_body, pos))
                 return True
+
             og.sim.psqi.overlap_sphere(self.cloth_system.particle_contact_offset, pos.tolist(), report_hit, False)
 
         return contacts
