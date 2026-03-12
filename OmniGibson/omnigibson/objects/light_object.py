@@ -37,7 +37,6 @@ class LightObject(USDObject):
         relative_prim_path=None,
         category="light",
         scale=None,
-        fixed_base=False,
         link_physics_materials=None,
         load_config=None,
         abilities=None,
@@ -55,7 +54,6 @@ class LightObject(USDObject):
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
-            fixed_base (bool): whether to fix the base of this object or not
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
                 a specific physical material for that link's collision meshes, where the kwargs are arguments directly
                 passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
@@ -95,8 +93,9 @@ class LightObject(USDObject):
             category=category,
             scale=scale,
             visible=True,
-            fixed_base=fixed_base,
+            fixed_base=True,
             visual_only=True,
+            kinematic_only=True,
             self_collisions=False,
             prim_type=PrimType.RIGID,
             include_default_states=include_default_states,
