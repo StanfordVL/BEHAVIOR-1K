@@ -147,25 +147,32 @@ jobs:
     needs: [run_test]
     if: always()
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v2
-        with:
-          submodules: true
-          path: behavior1k-src
       - name: Pull reports
         uses: actions/download-artifact@v4
         with:
-          path: behavior1k-src/OmniGibson
+          path: test-results
           merge-multiple: true
-      - name: Test Report
-        uses: dorny/test-reporter@v1
+      - name: Convert JUnit XML to CTRF
+        run: npx --yes junit-to-ctrf "test-results/test_*.xml" -o ctrf-report.json
+
+      - name: Publish report
+        uses: ctrf-io/github-test-reporter@v1
         with:
-          name: Test Results
-          working-directory: behavior1k-src/OmniGibson
-          path: test_*.xml
-          reporter: java-junit
-          fail-on-error: 'false'
-          fail-on-empty: 'false'
+          report-path: ctrf-report.json
+          summary-report: true
+          failed-report: true
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Test Report with Pull Request Comment
+        uses: ctrf-io/github-test-reporter@v1
+        with:
+          report-path: './ctrf-report.json'
+          pull-request-report: true
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0
