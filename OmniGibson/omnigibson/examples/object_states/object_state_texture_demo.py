@@ -15,7 +15,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- empty scene plus a steak
     cfg = {
         "env": {
-            **({"rendering_frequency": 60} if not headless else {}),  # for HQ rendering
+            "action_frequency": 60,
+            "rendering_frequency": 60,  # for HQ rendering
         },
         "scene": {
             "type": "Scene",
