@@ -58,7 +58,7 @@ OmniGibson is a Python package, and it requires Isaac Sim to be available locall
 
 ### OmniGibson Assets
 
-The OmniGibson assets are a collection of robots and other simple graphical assets that are downloaded into the omnigibson/data directory. These assets are necessary to be able to OmniGibson (e.g. no robot simulation without robots!) for any purpose, and as such are shipped separately from the BEHAVIOR dataset which contains the items needed to simulate BEHAVIOR tasks. These assets are not encrypted.
+The OmniGibson assets are a collection of robots and other simple graphical assets that are downloaded into the omnigibson/data directory. These assets are necessary to be able to use OmniGibson (e.g. no robot simulation without robots!) for any purpose, and as such are shipped separately from the BEHAVIOR dataset which contains the items needed to simulate BEHAVIOR tasks. These assets are not encrypted.
 
 ### The BEHAVIOR dataset
 

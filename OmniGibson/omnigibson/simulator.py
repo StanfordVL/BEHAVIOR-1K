@@ -22,7 +22,6 @@ from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBre
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
@@ -1091,7 +1090,7 @@ def _launch_simulator(*args, **kwargs):
                     for scene in self.scenes:
                         for obj in scene.objects:
                             # Only update visuals for objects that have been initialized so far
-                            if isinstance(obj, StatefulObject) and obj.initialized:
+                            if obj.initialized:
                                 obj.update_visuals()
 
                 # Possibly run transition rule step
@@ -1296,7 +1295,7 @@ def _launch_simulator(*args, **kwargs):
                         if obj is not None:
                             break
 
-                    if obj is None or not obj.initialized or not isinstance(obj, StatefulObject):
+                    if obj is None or not obj.initialized:
                         return
                     if len(obj.states.keys() & self.object_state_types_on_joint_break) == 0:
                         return

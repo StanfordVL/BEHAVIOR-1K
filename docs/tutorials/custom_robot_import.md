@@ -1,6 +1,6 @@
 # :material-robot-industrial: **Importing a Custom Robot**
 
-While OmniGibson assets includes a set of commonly-used robots, users might still want to import robot model of there own. This tutorial introduces users 
+While OmniGibson assets includes a set of commonly-used robots, users might still want to import robot model of their own. This tutorial introduces users
 
 ## Preparation
 
@@ -343,7 +343,7 @@ Some notes about the importing script:
 
 
 ### Option 2: Using IsaacSim's Native URDF-to-USD Converter
-In this section, we will be using the URDF Importer in native Isaac Sim to convert our robot URDF model into USD format. Before we get started, it is strongly recommended that you read through the official [URDF Importer Tutorial](https://docs.omniverse.nvidia.com/isaacsim/latest/features/environment_setup/ext_omni_isaac_urdf.html). 
+In this section, we will be using the URDF Importer in native Isaac Sim to convert our robot URDF model into USD format. Before we get started, it is strongly recommended that you read through the official [URDF Importer Tutorial](https://docs.omniverse.nvidia.com/isaacsim/latest/features/environment_setup/ext_omni_isaac_urdf.html).
 
 1. Create a directory with the name of the new robot under `<PATH_TO_OG_ASSET_DIR>/models`. This is where all of our robot models live. In our case, we created a directory named `stretch`.
 
@@ -368,7 +368,7 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
 2. Make sure the default prim or root link of the robot has `Articulation Root` property
 
     Select the default prim in `Stage` panel on the top right, go to the `Property` section at the bottom right, scroll down to the `Physics` section, you should see the `Articulation Root` section. Make sure the `Articulation Enabled` is checked. If you don't see the section, scroll to top of the `Property` section, and `Add` -> `Physics` -> `Articulation Root`
-   
+
     ![Stretch Robot Import 2](../assets/tutorials/stretch-import-2.png)
 
 3. Make sure every link has visual mesh and collision mesh in the correct shape. You can visually inspect this by clicking on every link in the `Stage` panel and view the highlighted visual mesh in orange. To visualize all collision meshes, click on the Eye Icon at the top and select `Show By Type` -> `Physics` -> `Colliders` -> `All`. This will outline all the collision meshes in green. If any collision meshes do not look as expected, please inspect the original collision mesh referenced in the URDF. Note that IsaacSim cannot import a pre-convex-decomposed collision mesh, and so such a collision mesh must be manually split and explicitly defined as individual sub-meshes in the URDF before importing. In our case, the Stretch robot model already comes with rough cubic approximations of its meshes.
@@ -378,16 +378,16 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
 4. Make sure the physics is stable:
 
     - Create a fixed joint in the base: select the base link of the robot, then right click -> `Create` -> `Physics` -> `Joint` -> `Fixed Joint`
-    
+
     - Click on the play button on the left toolbar, you should see the robot either standing still or falling down due to gravity, but there should be no abrupt movements.
 
     - If you observe the robot moving strangely, this suggests that there is something wrong with the robot physics. Some common issues we've observed are:
-    
+
         - Self-collision is enabled, but the collision meshes are badly modeled and there are collision between robot links.
 
         - Some joints have bad damping/stiffness, max effort, friction, etc.
 
-        - One or more of the robot links have off-the-scale mass values. 
+        - One or more of the robot links have off-the-scale mass values.
 
     At this point, there is unfortunately no better way then to manually go through each of the individual links and joints in the Stage and examine / tune the parameters to determine which aspect of the model is causing physics problems. If you experience significant difficulties, please post on our [Discord channel](https://discord.gg/bccR5vGFEx).
 
@@ -398,7 +398,7 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
 
     You can rename the generated sensors as needed. Note that it may be necessary to rotate / offset the sensors so that the pose is unobstructed and the orientation is correct. This can be achieved by modifying the `Translate` and `Rotate` properties in the `Lidar` sensor, or the `Translate` and `Orient` properties in the `Camera` sensor. Note that the local camera convention is z-backwards, y-up. Additional default values can be specified in each sensor's respective properties, such as `Clipping Range` and `Focal Length` in the `Camera` sensor.
 
-    In our case, we created a LIDAR at the `laser` link (offset by 0.01m in the z direction), and cameras at the `camera_link` link (offset by 0.005m in the x direction and -90 degrees about the y-axis) and `gripper_camera_link` link (offset by 0.01m in the x direction and 90 / -90 degrees about the x-axis / y-axis). 
+    In our case, we created a LIDAR at the `laser` link (offset by 0.01m in the z direction), and cameras at the `camera_link` link (offset by 0.005m in the x direction and -90 degrees about the y-axis) and `gripper_camera_link` link (offset by 0.01m in the x direction and 90 / -90 degrees about the x-axis / y-axis).
 
     ![Stretch Robot Import 5a](../assets/tutorials/stretch-import-5a.png)
     ![Stretch Robot Import 5b](../assets/tutorials/stretch-import-5b.png)
@@ -416,16 +416,16 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 3. You must implement all required abstract properties defined by each respective inherited robot interface. In the most simple case, this is usually simply defining relevant metadata from the original robot source files, such as relevant joint / link names and absolute paths to the corresponding robot URDF and USD files. Please see our annotated `stretch.py` module below which serves as a good starting point that you can modify. Note that **OmniGibson** automatically looks for your robot file at `<gm.DATA_PATH>/omnigibson-robot-assets/models/<name>/usd/<name>.usda`, so if it exists elsewhere please specify the path via the `usd_path` property in the robot class.
 
     ??? note "Optional properties"
-     
+
         We offer a more in-depth description of a couple of more advanced properties for ManipulationRobots below:
 
         - `assisted_grasp_start_points`, `assisted_grasp_end_points`: you need to implement this if you want to use sticky grasp/assisted grasp on the new robot.
-    
-            These points are `omnigibson.robots.manipulation_robot.GraspingPoint` that is defined by the end effector link name and the relative position of the point w.r.t. to the pose of the link. Basically when the gripper receives a close command and OmniGibson tries to perform assisted grasping, it will cast rays from every start point to every end point, and if there is one object that is hit by any rays, then we consider the object is grasped by the robot. 
-            
+
+            These points are `omnigibson.robots.manipulation_robot.GraspingPoint` that is defined by the end effector link name and the relative position of the point w.r.t. to the pose of the link. Basically when the gripper receives a close command and OmniGibson tries to perform assisted grasping, it will cast rays from every start point to every end point, and if there is one object that is hit by any rays, then we consider the object is grasped by the robot.
+
             In practice, for parallel grippers, naturally the start and end points should be uniformally sampled on the inner surface of the two fingers. You can refer to the Fetch class for an example of this case. For more complicated end effectors like dexterous hands, it's usually best practice to have start points at palm center and lower center, and thumb tip, and end points at each every other finger tips. You can refer to the Franka class for examples of this case.
-    
-            Best practise of setting these points is to load the robot into Isaac Sim, and create a small sphere under the target link of the end effector. Then drag the sphere to the desired location (which should be just right outside the mesh of the link) or by setting the position in the `Property` tab. After you get a desired relative pose to the link, write down the link name and position in the robot class. 
+
+            Best practise of setting these points is to load the robot into Isaac Sim, and create a small sphere under the target link of the end effector. Then drag the sphere to the desired location (which should be just right outside the mesh of the link) or by setting the position in the `Property` tab. After you get a desired relative pose to the link, write down the link name and position in the robot class.
 
 4. If your robot is a manipulation robot, you must additionally define a description .yaml file in order to use our CuRobo solver for end-effector motion planning. Our example description file is shown below for our R1 robot, which you can modify as needed. (Note that if you import your robot URDF using our import script, these files are automatically generated for you!). Place the curobo file under `<PATH_TO_OG_ASSET_DIR>/models/<YOUR_MODEL>/curobo`.
 
@@ -441,51 +441,51 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
     from omnigibson.robots.active_camera_robot import ActiveCameraRobot
     from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
     from omnigibson.robots.two_wheel_robot import TwoWheelRobot
-    
-    
+
+
     class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         """
         Strech Robot from Hello Robotics
         Reference: https://hello-robot.com/stretch-3-product
         """
-    
+
         @property
         def discrete_action_list(self):
             raise NotImplementedError()
-    
+
         def _create_discrete_action_space(self):
             raise ValueError("Stretch does not support discrete actions!")
-    
+
         @property
         def _raw_controller_order(self):
             # Ordered by general robot kinematics chain
             return ["base", "camera", f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
-    
+
         @property
         def _default_controllers(self):
             # Always call super first
             controllers = super()._default_controllers
-    
+
             # We use multi finger gripper, differential drive, and IK controllers as default
             controllers["base"] = "DifferentialDriveController"
             controllers["camera"] = "JointController"
             controllers[f"arm_{self.default_arm}"] = "JointController"
             controllers[f"gripper_{self.default_arm}"] = "MultiFingerGripperController"
-    
+
             return controllers
-    
+
         @property
         def _default_joint_pos(self):
             return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8])
-    
+
         @property
         def wheel_radius(self):
             return 0.050
-    
+
         @property
         def wheel_axle_length(self):
             return 0.330
-    
+
         @property
         def disabled_collision_pairs(self):
             return [
@@ -498,15 +498,15 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
                 ["link_arm_l0", "link_arm_l2"],
                 ["link_arm_l0", "link_arm_l3"],
             ]
-    
+
         @property
         def base_joint_names(self):
             return ["joint_left_wheel", "joint_right_wheel"]
-    
+
         @property
         def camera_joint_names(self):
             return ["joint_head_pan", "joint_head_tilt"]
-    
+
         @property
         def arm_link_names(self):
             return {
@@ -521,7 +521,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
                     "link_wrist_roll",
                 ]
             }
-    
+
         @property
         def arm_joint_names(self):
             return {
@@ -536,11 +536,11 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
                     "joint_wrist_roll",
                 ]
             }
-    
+
         @property
         def eef_link_names(self):
             return {self.default_arm: "eef_link"}
-    
+
         @property
         def finger_link_names(self):
             return {
@@ -549,7 +549,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
                     "link_gripper_finger_right",
                 ]
             }
-    
+
         @property
         def finger_joint_names(self):
             return {self.default_arm: ["joint_gripper_finger_right", "joint_gripper_finger_left"]}
@@ -1203,5 +1203,3 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 You can now try testing your custom robot! Import and control the robot by launching `python omnigibson/examples/robot/robot_control_examples.py`! Try different controller options and teleop the robot with your keyboard, If you observe poor joint behavior, you can inspect and tune relevant joint parameters as needed. This test also exposes other bugs that may have occurred along the way, such as missing / bad joint limits, collisions, etc. Please refer to the Franka or Fetch robots as a baseline for a common set of joint parameters that work well. This is what our newly imported Stretch robot looks like in action:
 
  ![Stretch Import Test](../assets/tutorials/stretch-import-test.png)
-
-

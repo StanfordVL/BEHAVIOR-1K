@@ -1,9 +1,9 @@
 name: Tests
 
-on: 
-  pull_request: 
-  push: 
-    branches: 
+on:
+  pull_request:
+  push:
+    branches:
       - main
 
 concurrency:
@@ -11,6 +11,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_example_list:
+    name: Check Example List Up To Date
+    runs-on: [self-hosted, linux, gpu]
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/OmniGibson
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install BDDL
+        run: pip install -e .
+        working-directory: ${{ github.workspace }}/bddl3
+
+      - name: Install OmniGibson
+        run: pip install -e .[dev,primitives,eval] --no-build-isolation
+      - name: Check example lists are up to date
+        run: python tests/update_example_tests.py --check
+
   run_test:
     name: Run Tests
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
@@ -37,6 +59,39 @@ jobs:
           - test_systems
           - test_transform_utils
           - test_transition_rules
+        include:
+        # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
+          - {test_file: test_examples, example: "environments.navigation_env_demo"}
+          - {test_file: test_examples, example: "environments.vector_env_demo"}
+          - {test_file: test_examples, example: "object_states.attachment_demo"}
+          - {test_file: test_examples, example: "object_states.dicing_demo"}
+          - {test_file: test_examples, example: "object_states.folded_unfolded_state_demo"}
+          - {test_file: test_examples, example: "object_states.heat_source_or_sink_demo"}
+          - {test_file: test_examples, example: "object_states.heated_state_demo"}
+          - {test_file: test_examples, example: "object_states.object_state_texture_demo"}
+          - {test_file: test_examples, example: "object_states.onfire_demo"}
+          - {test_file: test_examples, example: "object_states.overlaid_demo"}
+          - {test_file: test_examples, example: "object_states.particle_applier_remover_demo"}
+          - {test_file: test_examples, example: "object_states.particle_source_sink_demo"}
+          - {test_file: test_examples, example: "object_states.sample_kinematics_demo"}
+          - {test_file: test_examples, example: "object_states.slicing_demo"}
+          - {test_file: test_examples, example: "object_states.temperature_demo"}
+          - {test_file: test_examples, example: "objects.draw_bounding_box"}
+          - {test_file: test_examples, example: "objects.highlight_objects"}
+          - {test_file: test_examples, example: "objects.import_custom_object"}
+          - {test_file: test_examples, example: "objects.load_object_selector"}
+          - {test_file: test_examples, example: "objects.view_cloth_configurations"}
+          - {test_file: test_examples, example: "objects.visualize_object"}
+          - {test_file: test_examples, example: "robots.all_robots_visualizer"}
+          - {test_file: test_examples, example: "robots.curobo_example"}
+          - {test_file: test_examples, example: "robots.grasping_mode_example"}
+          - {test_file: test_examples, example: "robots.import_custom_robot"}
+          - {test_file: test_examples, example: "robots.robot_control_example"}
+          - {test_file: test_examples, example: "scenes.scene_selector"}
+          - {test_file: test_examples, example: "scenes.scene_tour_demo"}
+          - {test_file: test_examples, example: "scenes.traversability_map_example"}
+          - {test_file: test_examples, example: "simulator.sim_save_load_example"}
+        # --- END AUTO-GENERATED EXAMPLE INCLUDES ---
 
     defaults:
       run:
@@ -59,21 +114,25 @@ jobs:
         run: printenv
 
       - name: Run tests
-        run: pytest -s tests/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml
+        run: >
+          pytest -s tests/${{ matrix.test_file }}.py
+          ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
+          --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
         continue-on-error: true
 
       - name: Deploy artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.run_id }}-tests-${{ matrix.test_file }}
-          path: OmniGibson/${{ matrix.test_file }}.xml
+          name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}
+          path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
 
       - name: Check for failures, errors, or missing XML
         run: |
-          if [ ! -f ${{ matrix.test_file }}.xml ]; then
+          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          if [ ! -f "$xml" ]; then
             echo "Error: XML file not found, probably due to segfault"
             exit 1
-          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' ${{ matrix.test_file }}.xml; then
+          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$xml"; then
             echo "Error: Test failures or errors found"
             exit 1
           else
@@ -97,7 +156,7 @@ jobs:
         with:
           path: behavior1k-src/OmniGibson
           merge-multiple: true
-      - name: Test Report0
+      - name: Test Report
         uses: dorny/test-reporter@v1
         with:
           name: Test Results
