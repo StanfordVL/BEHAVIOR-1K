@@ -1,12 +1,10 @@
-import glob
 import hashlib
 import os
 import tempfile
-import zipfile
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import create_module_logger
@@ -17,7 +15,7 @@ from omnigibson.utils.usd_utils import add_asset_to_stage
 log = create_module_logger(module_name=__name__)
 
 
-class USDObject(StatefulObject):
+class USDObject(BaseObject):
     """
     USDObjects are instantiated from a USD file. They can be composed of one
     or more links and joints. They may or may not be passive.
