@@ -29,14 +29,12 @@ EXAMPLES = [
     "object_states.temperature_demo",
     "objects.draw_bounding_box",
     "objects.highlight_objects",
-    "objects.import_custom_object",
     "objects.load_object_selector",
     "objects.view_cloth_configurations",
     "objects.visualize_object",
     "robots.all_robots_visualizer",
     "robots.curobo_example",
     "robots.grasping_mode_example",
-    "robots.import_custom_robot",
     "robots.robot_control_example",
     "scenes.scene_selector",
     "scenes.scene_tour_demo",
@@ -55,6 +53,8 @@ EXAMPLES_TO_SKIP = [
     "teleoperation.robot_teleoperate_demo",
     "teleoperation.vr_robot_control_demo",  # does not support headless mode
     "teleoperation.vr_scene_tour_demo",  # does not support headless mode
+    "robots.import_custom_robot",  # CLI conversion tool, requires demo / test asset file
+    "objects.import_custom_object",  # CLI conversion tool, requires demo / test asset files
 ]
 
 
