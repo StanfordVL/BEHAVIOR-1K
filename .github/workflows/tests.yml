@@ -119,6 +119,7 @@ jobs:
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
           --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
         continue-on-error: true
+        timeout-minutes: 30
 
       - name: Deploy artifact
         uses: actions/upload-artifact@v4
