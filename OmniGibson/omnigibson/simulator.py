@@ -27,8 +27,11 @@ def with_profiler(name):
             finally:
                 if profiler is not None:
                     profiler.disable()
+
         return wrapper
+
     return decorator
+
 
 import torch as th
 
