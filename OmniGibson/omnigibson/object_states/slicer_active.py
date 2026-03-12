@@ -123,11 +123,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 continue
 
             # Get the prim paths of all the sliceables in this scene
-            sliceable_prim_paths = [
-                link_prim_path
-                for obj in sliceable_objs
-                for link_prim_path in obj.link_prim_paths
-            ]
+            sliceable_prim_paths = [link_prim_path for obj in sliceable_objs for link_prim_path in obj.link_prim_paths]
 
             # Aggregate all link prim path indices for the slicers in this scene
             for i, (obj, link_paths) in enumerate(zip(cls.IDX_OBJS, cls.SLICER_LINK_PATHS)):
