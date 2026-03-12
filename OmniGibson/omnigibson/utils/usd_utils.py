@@ -213,15 +213,20 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
 
+        # The CPU/GPU counters
+        self._CONTACT_MATRIX_GPU_STEP = dict()
+        self._CONTACT_MATRIX_CPU_STEP = dict()
+
         # Current contacts over all tracked rigid bodies at the current timestep. Shape: (R, C, 3)
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_CPU = dict()
 
         # Cached body transforms used for change detection. Shape: (N, 7) [pos(3), quat(4)]
         self._BODY_TRANSFORMS = dict()
 
         # Position / orientation tolerances for deciding whether a pair should be updated
-        self._POS_EPS = 1e-6
-        self._ORI_EPS = 1e-5
+        self._POS_EPS = 1e-4
+        self._ORI_EPS = 1e-4
 
     @classmethod
     def get_body_filters(cls):
@@ -329,6 +334,8 @@ class RigidContactAPIImpl:
                 )
                 self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths), 3), dtype=th.float32, device="cuda")
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().to(device="cuda")
+                self._CONTACT_MATRIX_GPU_STEP[scene_idx] = -1
+                self._CONTACT_MATRIX_CPU_STEP[scene_idx] = -1
 
     def update_contact_cache(self):
         """
@@ -368,14 +375,17 @@ class RigidContactAPIImpl:
             changed_pairs = did_row_change[:, None] | did_col_change[None, :]
             self._CONTACT_MATRIX[scene_idx][changed_pairs] = current_impulses[changed_pairs]
 
-            # Finally, update the body transforms
-            self._BODY_TRANSFORMS[scene_idx] = transforms
+            # Finally, update the body transforms. Note that we're only updating the transforms for the rows that have changed.
+            # This way we prevent error from accumulating over time for very slow-moving objects.
+            self._BODY_TRANSFORMS[scene_idx][changed] = transforms[changed]
+
+            self._CONTACT_MATRIX_GPU_STEP[scene_idx] += 1
 
     def get_contact_pairs(self, scene_idx, sensor_prim_paths):
         """Get pairs of prim paths that are in contact."""
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return set()
-        impulses = th.norm(self._CONTACT_MATRIX[scene_idx], dim=-1)
+        impulses = th.norm(self._get_all_impulses(scene_idx), dim=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
 
         # Get the row indices corresponding to the sensor prim paths
@@ -443,7 +453,7 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return False
 
-        impulses = th.norm(self._CONTACT_MATRIX[scene_idx], dim=-1)
+        impulses = th.norm(self._get_all_impulses(scene_idx), dim=-1)
 
         rows = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in query_set]
         if with_set is not None:
@@ -456,6 +466,16 @@ class RigidContactAPIImpl:
 
         # Base case, return any collisions with any other prim
         return th.any(impulses[rows] > 0).item()
+
+    def _get_all_impulses(self, scene_idx):
+        """
+        Get all impulses for all pairs of rigid bodies in the scene.
+        """
+        # Copy the matrix to CPU if it isn't there already
+        if self._CONTACT_MATRIX_CPU.get(scene_idx) is None or self._CONTACT_MATRIX_CPU_STEP[scene_idx] != self._CONTACT_MATRIX_GPU_STEP[scene_idx]:
+            self._CONTACT_MATRIX_CPU[scene_idx] = self._CONTACT_MATRIX[scene_idx].cpu()
+            self._CONTACT_MATRIX_CPU_STEP[scene_idx] = self._CONTACT_MATRIX_GPU_STEP[scene_idx]
+        return self._CONTACT_MATRIX_CPU[scene_idx]
 
     def clear(self):
         """
@@ -470,6 +490,9 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_CPU = dict()
+        self._CONTACT_MATRIX_CPU_STEP = dict()
+        self._CONTACT_MATRIX_GPU_STEP = dict()
         self._BODY_TRANSFORMS = dict()
 
 
