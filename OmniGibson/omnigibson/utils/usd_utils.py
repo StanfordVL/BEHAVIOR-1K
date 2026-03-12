@@ -211,6 +211,7 @@ class RigidContactAPIImpl:
         # Precomputed tensors mapping row/col indices to rigid body view indices
         self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
+        self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
 
         # Current contacts over all tracked rigid bodies at the current timestep. Shape: (R, C, 3)
         self._CONTACT_MATRIX = dict()
@@ -320,9 +321,14 @@ class RigidContactAPIImpl:
                 self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor([
                     path_to_view_idx[path] for path in row_paths
                 ], dtype=th.long)
-                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor([
-                    path_to_view_idx[path] for path in col_paths
-                ], dtype=th.long)
+
+                # Some contact-matrix columns can correspond to kinematic-only links that do not appear
+                # in the rigid-body view. We encode those as -1 and track a validity mask.
+                col_to_rigid_rows = [path_to_view_idx.get(path, -1) for path in col_paths]
+                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(col_to_rigid_rows, dtype=th.long)
+                self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx] = (
+                    self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] >= 0
+                )
                 self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths), 3), dtype=th.float32)
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
 
@@ -364,7 +370,15 @@ class RigidContactAPIImpl:
 
             # Now, for each row index and column index in the contact matrix, check if the rigid body has moved
             did_row_change = changed[self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]]
-            did_col_change = changed[self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]]
+            did_col_change = th.zeros(
+                len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]), dtype=th.bool
+            )
+            # Here we ignore kinematic-only columns, which do not appear in the rigid-body view.
+            # They are fixed-position, so treating them as "unchanged"
+            # preserves persistence correctness while avoiding invalid indexing.
+            valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
+            valid_col_rows = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx][valid_col_mask]
+            did_col_change[valid_col_mask] = changed[valid_col_rows]
 
             # Then, update the contact matrix for every pair where at least one body has changed
             changed_pairs = did_row_change[:, None] | did_col_change[None, :]
@@ -470,6 +484,7 @@ class RigidContactAPIImpl:
         self._RIGID_BODY_VIEW = dict()
         self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
+        self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
 
