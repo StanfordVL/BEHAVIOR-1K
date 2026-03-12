@@ -315,12 +315,10 @@ class RigidContactAPIImpl:
                 self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_body_view(
                     pattern=f"/World/scene_{scene_idx}/*/*"
                 )
-                path_to_view_idx = {
-                    path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))
-                }
-                self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor([
-                    path_to_view_idx[path] for path in row_paths
-                ], dtype=th.long)
+                path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
+                self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
+                    [path_to_view_idx[path] for path in row_paths], dtype=th.long
+                )
 
                 # Some contact-matrix columns can correspond to kinematic-only links that do not appear
                 # in the rigid-body view. We encode those as -1 and track a validity mask.
@@ -370,9 +368,7 @@ class RigidContactAPIImpl:
 
             # Now, for each row index and column index in the contact matrix, check if the rigid body has moved
             did_row_change = changed[self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]]
-            did_col_change = th.zeros(
-                len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]), dtype=th.bool
-            )
+            did_col_change = th.zeros(len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]), dtype=th.bool)
             # Here we ignore kinematic-only columns, which do not appear in the rigid-body view.
             # They are fixed-position, so treating them as "unchanged"
             # preserves persistence correctness while avoiding invalid indexing.
