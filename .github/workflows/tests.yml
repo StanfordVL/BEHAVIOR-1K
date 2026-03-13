@@ -168,7 +168,8 @@ jobs:
         uses: ctrf-io/github-test-reporter@v1
         with:
           report-path: './ctrf-report.json'
-          github-report: true
+          pull-request-report: true
+          overwite-comment: true
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
