@@ -22,6 +22,7 @@ parser.add_argument("-w", "--fluids", action="store_true")
 parser.add_argument("-g", "--gpu_dynamics", action="store_true")
 parser.add_argument("-p", "--macro_particle_system", action="store_true")
 parser.add_argument("-f", "--flatcache", action="store_true")
+parser.add_argument("-d", "--deep-profiling", action="store_true")
 
 PROFILING_FIELDS = ["FPS", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
 NUM_CLOTH = 5
@@ -45,6 +46,7 @@ def main():
     gm.ENABLE_TRANSITION_RULES = True
     gm.ENABLE_FLATCACHE = args.flatcache
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
+    gm.ENABLE_PROFILING = args.deep_profiling
 
     cfg = {
         "env": {
@@ -200,6 +202,13 @@ def main():
     ret.extend(output)
     with open("output.json", "w") as f:
         json.dump(ret, f, indent=4)
+
+    # Save the simulation profilers
+    if args.deep_profiling:
+        og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
+        og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
+        og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
+
     og.shutdown()
 
 
