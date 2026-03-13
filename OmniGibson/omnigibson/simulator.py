@@ -174,6 +174,10 @@ def _launch_app():
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
 
+    # Clear the argv - Isaac Sim unfortunately reads from it directly, so we need to clear it to avoid issues.
+    # Otherwise it will inherit the arguments of the entrypoint script.
+    sys.argv = []
+
     # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
     if not gm.DEBUG:
         import warnings
@@ -231,10 +235,6 @@ def _launch_app():
     os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
 
     launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
-
-    # Clear the argv - Isaac Sim unfortunately reads from it directly, so we need to clear it to avoid issues.
-    # Otherwise it will inherit the arguments of the entrypoint script.
-    sys.argv = []
 
     # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
     local_appdata = Path(gm.APPDATA_PATH) / "local"
@@ -1251,6 +1251,11 @@ def _launch_simulator(*args, **kwargs):
             """
             self._physics_context._step(current_time=self.current_time)
             self._report_step_exceptions()
+
+            # Update persistent rigid contact caches from the latest step. We normally do this on the non-physics step,
+            # but this step_physics function is usually used to let contacts propagate during sampling etc, which 
+            # means that we need to update the contact cache here too.
+            RigidContactAPI.update_contact_cache()
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):

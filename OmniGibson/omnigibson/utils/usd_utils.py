@@ -524,6 +524,88 @@ class RigidContactAPIImpl:
         # Base case, return any collisions with any other prim
         return th.any(contact_matrix[rows]).item()
 
+    def get_contact_row_mask(self, scene_idx, objects_links_or_prim_paths):
+        """
+        Gets a boolean mask over contact matrix rows for a given set of objects, links, or prim paths.
+        Useful for building batch query masks for :meth:`is_in_contact_batch`.
+
+        Args:
+            scene_idx (int): Scene index.
+            objects_links_or_prim_paths: Objects, links, or prim paths (or a pre-cached index tensor).
+
+        Returns:
+            th.Tensor: (R,) boolean tensor where R is the number of contact matrix rows.
+        """
+        R = self._CONTACT_MATRIX[scene_idx].shape[0]
+        idxs = self.get_contact_row_indices(scene_idx, objects_links_or_prim_paths)
+        mask = th.zeros(R, dtype=th.bool)
+        mask[idxs] = True
+        return mask
+
+    def get_contact_col_mask(self, scene_idx, objects_links_or_prim_paths):
+        """
+        Gets a boolean mask over contact matrix columns for a given set of objects, links, or prim paths.
+        Useful for building batch with/ignore masks for :meth:`is_in_contact_batch`.
+
+        Args:
+            scene_idx (int): Scene index.
+            objects_links_or_prim_paths: Objects, links, or prim paths (or a pre-cached index tensor).
+
+        Returns:
+            th.Tensor: (C,) boolean tensor where C is the number of contact matrix columns.
+        """
+        C = self._CONTACT_MATRIX[scene_idx].shape[1]
+        idxs = self.get_contact_col_indices(scene_idx, objects_links_or_prim_paths)
+        mask = th.zeros(C, dtype=th.bool)
+        mask[idxs] = True
+        return mask
+
+    def is_in_contact_batch(self, scene_idx, query_masks, with_masks=None, ignore_masks=None):
+        """
+        Batch contact check for N queries, fully tensorized.
+
+        Each row ``i`` of the input masks defines one independent contact query. The method
+        returns an ``(N,)`` boolean tensor where entry ``i`` is ``True`` iff any row selected
+        by ``query_masks[i]`` is in contact with any column selected by ``with_masks[i]``
+        (or any column *not* in ``ignore_masks[i]``).
+
+        Provide either ``with_masks`` for all N queries or ``ignore_masks`` for all N queries,
+        but not both (and not a per-query mix).
+
+        Use :meth:`get_contact_row_mask` / :meth:`get_contact_col_mask` to build individual
+        masks, then ``torch.stack`` them into the ``(N, R)`` / ``(N, C)`` tensors expected here.
+
+        Args:
+            scene_idx (int): Scene index to check for contact.
+            query_masks (th.Tensor): ``(N, R)`` boolean tensor. ``query_masks[i, j]`` is True
+                if contact-matrix row ``j`` belongs to query set ``i``.
+            with_masks (th.Tensor or None): ``(N, C)`` boolean tensor. ``with_masks[i, j]`` is
+                True if contact-matrix column ``j`` belongs to the with-set for query ``i``.
+            ignore_masks (th.Tensor or None): ``(N, C)`` boolean tensor. ``ignore_masks[i, j]``
+                is True if contact-matrix column ``j`` should be *ignored* for query ``i``.
+
+        Returns:
+            th.Tensor: ``(N,)`` boolean tensor of contact results.
+        """
+        assert with_masks is None or ignore_masks is None, \
+            "Provide either with_masks or ignore_masks, not both."
+
+        if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
+            return th.zeros(query_masks.shape[0], dtype=th.bool)
+
+        contact_matrix = self._CONTACT_MATRIX[scene_idx]
+
+        # query_contacts[i, c] = True iff any row in query set i is in contact with column c.
+        # We use float matmul for speed: (N, R) @ (R, C) -> (N, C), then threshold.
+        query_contacts = (query_masks.float() @ contact_matrix.float()) > 0
+
+        if with_masks is not None:
+            return (query_contacts & with_masks).any(dim=1)
+        elif ignore_masks is not None:
+            return (query_contacts & ~ignore_masks).any(dim=1)
+
+        return query_contacts.any(dim=1)
+
     def clear(self):
         """
         Clears internal contact views, mappings, and caches.
