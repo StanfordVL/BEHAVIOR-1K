@@ -291,10 +291,10 @@ class USDObject(BaseObject):
                 # Non-fixed articulated object: ArticulationRootAPI goes on the root link.
                 lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
                 lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
-            else:
-                # Fixed articulated object: ArticulationRootAPI goes on the object root prim.
-                lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(default_prim)
-                lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(default_prim)
+        else:
+            # Fixed articulated object: ArticulationRootAPI goes on the object root prim.
+            lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(default_prim)
+            lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(default_prim)
 
         # Write to a temp file so the original USD on disk is never modified.
         return _export_stage_to_temp(stage, usd_path)
