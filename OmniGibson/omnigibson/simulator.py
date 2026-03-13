@@ -1,5 +1,4 @@
 import contextlib
-import functools
 import json
 import logging
 import math
@@ -12,25 +11,6 @@ import tempfile
 import traceback
 from contextlib import nullcontext
 from pathlib import Path
-from cProfile import Profile
-
-
-def with_profiler(name):
-    def decorator(fn):
-        @functools.wraps(fn)
-        def wrapper(self, *args, **kwargs):
-            profiler = getattr(self, name)
-            if profiler is not None:
-                profiler.enable()
-            try:
-                return fn(self, *args, **kwargs)
-            finally:
-                if profiler is not None:
-                    profiler.disable()
-
-        return wrapper
-
-    return decorator
 
 
 import torch as th
@@ -418,10 +398,6 @@ def _launch_simulator(*args, **kwargs):
             self.currently_stepping = False
             self.pre_step_exception = None
             self.post_step_exception = None
-
-            self._pre_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
-            self._post_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
-            self._non_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
 
             self._floor_plane = None
             self._skybox = None
@@ -1055,7 +1031,6 @@ def _launch_simulator(*args, **kwargs):
             RigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
 
-        @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
             """
             Complete any non-physics steps such as state updates.
@@ -1066,9 +1041,6 @@ def _launch_simulator(*args, **kwargs):
 
             # If we're playing we, also run additional logic
             if self.is_playing():
-                # Update persistent rigid contact caches from the latest step
-                RigidContactAPI.update_contact_cache()
-
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
                 if n_objects_to_initialize > 0 and self.is_playing():
@@ -1248,7 +1220,6 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context._step(current_time=self.current_time)
             self._report_step_exceptions()
 
-        @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
             try:
                 # Make it possible to identify that we are currently within a step
@@ -1270,13 +1241,15 @@ def _launch_simulator(*args, **kwargs):
                 self.pre_step_exception = e
                 raise e
 
-        @with_profiler(name="_post_physics_step_profiler")
         def _on_post_physics_step(self):
             try:
                 # Only do this if we're not in the warmup phase
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
+
+                # Update persistent rigid contact caches from the latest physics step
+                RigidContactAPI.update_contact_cache()
 
                 # Record that we are done with the step context.
                 self.currently_stepping = False
