@@ -1,8 +1,11 @@
+import os
+import tempfile
+
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.python_utils import assert_valid_key
@@ -20,7 +23,7 @@ VALID_HEIGHT_OBJECTS = {"Cone", "Cylinder"}
 VALID_SIZE_OBJECTS = {"Cube", "Torus"}
 
 
-class PrimitiveObject(BaseObject):
+class PrimitiveObject(USDObject):
     """
     PrimitiveObjects are objects defined by a single geom, e.g: sphere, mesh, cube, etc.
     """
@@ -102,7 +105,11 @@ class PrimitiveObject(BaseObject):
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
         self._primitive_type = primitive_type
 
+        # Build the USD for this primitive upfront and pass it to USDObject
+        usd_path = self._build_usd(name=name, primitive_type=primitive_type)
+
         super().__init__(
+            usd_path=usd_path,
             relative_prim_path=relative_prim_path,
             name=name,
             category=category,
@@ -120,33 +127,44 @@ class PrimitiveObject(BaseObject):
             **kwargs,
         )
 
-    def _load(self):
-        # Define an Xform at the specified path
-        prim = og.sim.stage.DefinePrim(self.prim_path, "Xform")
+    @staticmethod
+    def _build_usd(name, primitive_type):
+        """
+        Build a temporary USD containing the primitive mesh structure and return its path.
+        Material creation is deferred to _post_load().
+        """
+        tempdir_path = tempfile.mkdtemp(name, dir=og.tempdir)
+        usd_path = os.path.join(tempdir_path, f"{name}.usd")
+        side_stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+        root = side_stage.DefinePrim("/object", "Xform")
+        side_stage.SetDefaultPrim(root)
+        side_stage.DefinePrim("/object/base_link", "Xform")
 
-        # Define a nested mesh corresponding to the root link for this prim
-        og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
-        self._vis_geom = create_primitive_mesh(
-            prim_path=f"{self.prim_path}/base_link/visuals", primitive_type=self._primitive_type
+        create_primitive_mesh(prim_path="/object/base_link/visuals", primitive_type=primitive_type, stage=side_stage)
+        col_geom = create_primitive_mesh(
+            prim_path="/object/base_link/collisions", primitive_type=primitive_type, stage=side_stage
         )
-        self._col_geom = create_primitive_mesh(
-            prim_path=f"{self.prim_path}/base_link/collisions", primitive_type=self._primitive_type
-        )
+        lazy.pxr.UsdPhysics.CollisionAPI.Apply(col_geom.GetPrim())
+        lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(col_geom.GetPrim())
+        lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(col_geom.GetPrim())
 
-        # Add collision API to collision geom
-        lazy.pxr.UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
-        lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._col_geom.GetPrim())
-        lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
+        side_stage.Save()
+        del side_stage
+        return usd_path
 
-        # Create a material for this object for the base link
+    def _post_load(self):
+        self._vis_geom = lazy.pxr.UsdGeom.Mesh(og.sim.stage.GetPrimAtPath(f"{self.prim_path}/base_link/visuals"))
+        self._col_geom = lazy.pxr.UsdGeom.Mesh(og.sim.stage.GetPrimAtPath(f"{self.prim_path}/base_link/collisions"))
+
+        # Create a material and bind it to the visual geom.
+        # This is done here rather than in _prepare_to_load() because create_pbr_material
+        # and bind_material both go through omni.kit.commands, which operates on the
+        # active stage.
         og.sim.stage.DefinePrim(f"{self.prim_path}/Looks", "Scope")
         mat_path = f"{self.prim_path}/Looks/default"
         create_pbr_material(prim_path=mat_path)
         bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
 
-        return prim
-
-    def _post_load(self):
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
             log.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
