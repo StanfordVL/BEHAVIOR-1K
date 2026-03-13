@@ -60,10 +60,11 @@ EXAMPLES_TO_SKIP = [
 
 @pytest.mark.parametrize("example_name", EXAMPLES)
 def test_example(example_name, request):
-    module = importlib.import_module(f"omnigibson.examples.{example_name}")
     import click
 
+    module = importlib.import_module(f"omnigibson.examples.{example_name}")
     test_args = request.config.getoption("--test-args", default="")
+
     if isinstance(module.main, click.BaseCommand):
         from click.testing import CliRunner
 

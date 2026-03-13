@@ -833,14 +833,14 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
             yaml.dump({"robot_cfg": {"kinematics": arm_only_no_torso_cfg}}, f)
 
 
-@click.command(help=_DOCSTRING)
+@click.command(name="import-custom-robot", help=_DOCSTRING)
 @click.option(
     "--config",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
     help="Absolute path to robot config yaml file to import",
 )
-def import_custom_robot(config):
+def main(config):
     # Load config
     with open(config, "r") as f:
         cfg = Dict(yaml.load(f, yaml.Loader))
@@ -1032,4 +1032,4 @@ def import_custom_robot(config):
 
 
 if __name__ == "__main__":
-    import_custom_robot()
+    main()
