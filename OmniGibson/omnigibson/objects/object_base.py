@@ -250,29 +250,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
 
-        # First, remove any articulation root API that already exists at the object-level or root link level prim
-        if self._prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
-            self._prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
-            self._prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
-
-        if self.root_prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
-            self.root_prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
-            self.root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
-
-        if og.sim.is_playing():
-            log.warning(
-                "An object's articulation root API was changed while simulation is playing. This may cause issues."
-            )
-
-        # Potentially add articulation root APIs and also set self collisions
-        root_prim = (
-            None
-            if self.articulation_root_path is None
-            else lazy.isaacsim.core.utils.prims.get_prim_at_path(self.articulation_root_path)
-        )
-        if root_prim is not None:
-            lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
-            lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
+        if self.articulation_root_path is not None:
             self.self_collisions = self._load_config["self_collisions"]
 
         # Set position / velocity solver iterations if we're not cloth and not kinematic only
