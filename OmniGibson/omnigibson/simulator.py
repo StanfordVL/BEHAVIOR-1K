@@ -212,6 +212,10 @@ def _launch_app():
 
     launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
+    # Clear the argv - Isaac Sim unfortunately reads from it directly, so we need to clear it to avoid issues.
+    # Otherwise it will inherit the arguments of the entrypoint script.
+    sys.argv = []
+
     # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
     local_appdata = Path(gm.APPDATA_PATH) / "local"
     local_appdata.mkdir(parents=True, exist_ok=True)
