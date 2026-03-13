@@ -148,9 +148,9 @@ class ControllerView:
         - Preserve stable controller_idx assignments for remaining robots.
         - Avoid shifting arrays / remapping indices across robots in the same group.
 
-        Tombstoned slots are never reused.
+        Tombstoned slots are reused when a new robot registers into the same group.
         Controller logic must mask tombstoned slots during goal updates, batched
-        compute, and writeback.
+        compute, and writeback until they are reclaimed.
 
         Args:
             controllers (dict): The robot.controllers dict,
