@@ -17,12 +17,31 @@ from omnigibson.utils.usd_utils import add_asset_to_stage
 log = create_module_logger(module_name=__name__)
 
 
-def _count_joints(stage):
+def _export_stage_to_temp(stage, usd_path):
     """
-    Traverse @stage and count movable joints, fixed joints, and attachment points.
+    Export @stage to a temp file alongside the original @usd_path and return the new path.
 
     Args:
-        stage (Usd.Stage): The USD stage to inspect.
+        stage (Usd.Stage): The stage to export.
+        usd_path (str): Original USD path; its basename is reused in the temp directory.
+
+    Returns:
+        str: Path to the exported temp file.
+    """
+    basename = os.path.basename(usd_path)
+    tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
+    temp_usd_path = os.path.join(tempdir_path, basename)
+    stage.Export(temp_usd_path)
+    return temp_usd_path
+
+
+def _count_joints(root_prim):
+    """
+    BFS from @root_prim to count movable joints, fixed joints, and attachment points.
+    Mirrors the uninitialized-path logic in EntityPrim.n_joints / n_fixed_joints.
+
+    Args:
+        root_prim (Usd.Prim): Root prim of the object (the USD default prim).
 
     Returns:
         tuple: (n_joints, n_fixed_joints, has_attachment) where
@@ -33,14 +52,17 @@ def _count_joints(stage):
     n_joints = 0
     n_fixed_joints = 0
     has_attachment = False
-    for prim in stage.Traverse():
-        prim_type = prim.GetTypeName().lower()
+    children = list(root_prim.GetChildren())
+    while children:
+        child_prim = children.pop()
+        children.extend(child_prim.GetChildren())
+        prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
         if "joint" in prim_type:
             if "fixed" in prim_type:
                 n_fixed_joints += 1
             else:
                 n_joints += 1
-        if "attachment" in prim.GetName().lower():
+        if "attachment" in child_prim.GetName().lower():
             has_attachment = True
     return n_joints, n_fixed_joints, has_attachment
 
@@ -258,9 +280,18 @@ class USDObject(BaseObject):
                 p.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
                 p.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
 
-        # Traverse to collect joint counts and check for attachment points.
+        default_prim = stage.GetDefaultPrim()
+        if not default_prim.IsValid():
+            log.warning(
+                f"USD {usd_path} has no default prim; cannot pre-apply ArticulationRootAPI. "
+                "Loading may fail when simulation is playing."
+            )
+            # Still write to temp so original is never modified.
+            return _export_stage_to_temp(stage, usd_path)
+
+        # BFS from the default prim to collect joint counts and check for attachment points.
         # Mirrors EntityPrim.n_joints / n_fixed_joints / has_attachment_points.
-        n_joints, n_fixed_joints, has_attachment = _count_joints(stage)
+        n_joints, n_fixed_joints, has_attachment = _count_joints(default_prim)
 
         # Replicate the kinematic_only decision from BaseObject._post_load().
         kinematic_only = _determine_kinematic_only(
@@ -271,42 +302,30 @@ class USDObject(BaseObject):
         has_articulated = n_joints > 0
         has_fixed = n_fixed_joints > 0
         if not kinematic_only and (has_articulated or has_fixed):
-            default_prim = stage.GetDefaultPrim()
-            if not default_prim.IsValid():
-                log.warning(
-                    f"USD {usd_path} has no default prim; cannot pre-apply ArticulationRootAPI. "
-                    "Loading may fail when simulation is playing."
-                )
-            else:
-                if not self.fixed_base and has_articulated:
-                    # Non-fixed articulated object: ArticulationRootAPI goes on the root link.
-                    root_link_name = _find_root_link_name(default_prim)
-                    if root_link_name is None:
+            if not self.fixed_base and has_articulated:
+                # Non-fixed articulated object: ArticulationRootAPI goes on the root link.
+                root_link_name = _find_root_link_name(default_prim)
+                if root_link_name is None:
+                    log.warning(
+                        f"Could not determine root link name for {usd_path}; " "cannot pre-apply ArticulationRootAPI."
+                    )
+                else:
+                    target_prim = default_prim.GetPrimAtPath(root_link_name)
+                    if target_prim.IsValid():
+                        lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(target_prim)
+                        lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(target_prim)
+                    else:
                         log.warning(
-                            f"Could not determine root link name for {usd_path}; "
+                            f"Root link prim '{root_link_name}' not valid in {usd_path}; "
                             "cannot pre-apply ArticulationRootAPI."
                         )
-                    else:
-                        target_prim = default_prim.GetPrimAtPath(root_link_name)
-                        if target_prim.IsValid():
-                            lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(target_prim)
-                            lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(target_prim)
-                        else:
-                            log.warning(
-                                f"Root link prim '{root_link_name}' not valid in {usd_path}; "
-                                "cannot pre-apply ArticulationRootAPI."
-                            )
-                else:
-                    # Fixed articulated object: ArticulationRootAPI goes on the object root prim.
-                    lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(default_prim)
-                    lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(default_prim)
+            else:
+                # Fixed articulated object: ArticulationRootAPI goes on the object root prim.
+                lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(default_prim)
+                lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(default_prim)
 
         # Write to a temp file so the original USD on disk is never modified.
-        basename = os.path.basename(usd_path)
-        tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
-        temp_usd_path = os.path.join(tempdir_path, basename)
-        stage.Export(temp_usd_path)
-        return temp_usd_path
+        return _export_stage_to_temp(stage, usd_path)
 
     def prebuild(self, stage):
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
