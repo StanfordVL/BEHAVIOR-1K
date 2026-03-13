@@ -328,11 +328,15 @@ class RigidContactAPIImpl:
                 # Some contact-matrix columns can correspond to kinematic-only links that do not appear
                 # in the rigid-body view. We encode those as -1 and track a validity mask.
                 col_to_rigid_rows = [path_to_view_idx.get(path, -1) for path in col_paths]
-                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(col_to_rigid_rows, dtype=th.long, device="cuda")
+                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
+                    col_to_rigid_rows, dtype=th.long, device="cuda"
+                )
                 self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx] = (
                     self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] >= 0
                 )
-                self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths), 3), dtype=th.float32, device="cuda")
+                self._CONTACT_MATRIX[scene_idx] = th.zeros(
+                    (len(row_paths), len(col_paths), 3), dtype=th.float32, device="cuda"
+                )
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().to(device="cuda")
                 self._CONTACT_MATRIX_GPU_STEP[scene_idx] = -1
                 self._CONTACT_MATRIX_CPU_STEP[scene_idx] = -1
@@ -363,7 +367,9 @@ class RigidContactAPIImpl:
 
             # Now, for each row index and column index in the contact matrix, check if the rigid body has moved
             did_row_change = changed[self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]]
-            did_col_change = th.zeros(len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]), dtype=th.bool, device="cuda")
+            did_col_change = th.zeros(
+                len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]), dtype=th.bool, device="cuda"
+            )
             # Here we ignore kinematic-only columns, which do not appear in the rigid-body view.
             # They are fixed-position, so treating them as "unchanged"
             # preserves persistence correctness while avoiding invalid indexing.
@@ -472,7 +478,10 @@ class RigidContactAPIImpl:
         Get all impulses for all pairs of rigid bodies in the scene.
         """
         # Copy the matrix to CPU if it isn't there already
-        if self._CONTACT_MATRIX_CPU.get(scene_idx) is None or self._CONTACT_MATRIX_CPU_STEP[scene_idx] != self._CONTACT_MATRIX_GPU_STEP[scene_idx]:
+        if (
+            self._CONTACT_MATRIX_CPU.get(scene_idx) is None
+            or self._CONTACT_MATRIX_CPU_STEP[scene_idx] != self._CONTACT_MATRIX_GPU_STEP[scene_idx]
+        ):
             self._CONTACT_MATRIX_CPU[scene_idx] = self._CONTACT_MATRIX[scene_idx].cpu()
             self._CONTACT_MATRIX_CPU_STEP[scene_idx] = self._CONTACT_MATRIX_GPU_STEP[scene_idx]
         return self._CONTACT_MATRIX_CPU[scene_idx]
