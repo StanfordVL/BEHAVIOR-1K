@@ -199,7 +199,8 @@ class RigidContactAPIImpl:
         self._PATH_TO_ROW_IDX = dict()
         self._PATH_TO_COL_IDX = dict()
 
-        # Arrays of rigid body prim paths where each array index maps directly to the contact matrix col
+        # Arrays of rigid body prim paths where each array index maps directly to the contact matrix row / col
+        self._ROW_IDX_TO_PATH = dict()
         self._COL_IDX_TO_PATH = dict()
 
         # Contact view for generating contact matrices at each timestep
@@ -213,8 +214,12 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
 
-        # Current contacts over all tracked rigid bodies at the current timestep. Shape: (R, C, 3)
+        # Current contacts over all tracked rigid bodies at the current timestep. Shape: (R, C)
         self._CONTACT_MATRIX = dict()
+
+        # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
+        # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
+        self._INDEX_MATRIX = dict()
 
         # Cached body transforms used for change detection. Shape: (N, 7) [pos(3), quat(4)]
         self._BODY_TRANSFORMS = dict()
@@ -306,6 +311,7 @@ class RigidContactAPIImpl:
                     )
 
                 # Create the lookup tables
+                self._ROW_IDX_TO_PATH[scene_idx] = row_paths
                 self._COL_IDX_TO_PATH[scene_idx] = col_paths
                 self._PATH_TO_ROW_IDX[scene_idx] = {path: i for i, path in enumerate(row_paths)}
                 self._PATH_TO_COL_IDX[scene_idx] = {path: i for i, path in enumerate(col_paths)}
@@ -327,7 +333,9 @@ class RigidContactAPIImpl:
                 self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx] = (
                     self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] >= 0
                 )
-                self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths), 3), dtype=th.float32)
+                self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths)), dtype=th.bool)
+                ii, jj = th.meshgrid(th.arange(len(row_paths)), th.arange(len(col_paths)), indexing="ij")
+                self._INDEX_MATRIX[scene_idx] = th.stack([ii, jj], dim=-1)
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().clone()
 
     def update_contact_cache(self):
@@ -366,39 +374,121 @@ class RigidContactAPIImpl:
 
             # Then, update the contact matrix for every pair where at least one body has changed
             changed_pairs = did_row_change[:, None] | did_col_change[None, :]
-            self._CONTACT_MATRIX[scene_idx][changed_pairs] = current_impulses[changed_pairs]
+            self._CONTACT_MATRIX[scene_idx][changed_pairs] = th.any(current_impulses[changed_pairs] != 0, dim=-1)
 
             # Finally, update the body transforms. Note that we're only updating the transforms for the rows that have changed.
             # This way we prevent error from accumulating over time for very slow-moving objects.
             self._BODY_TRANSFORMS[scene_idx][changed] = transforms[changed]
 
-    def get_contact_pairs(self, scene_idx, sensor_prim_paths):
-        """Get pairs of prim paths that are in contact."""
+    def _get_prim_paths(self, objects_links_or_prim_paths):
+        """
+        Converts a set of objects, links, or prim paths to a list of prim paths for contact matrix lookups.
+
+        Args:
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to convert to prim paths.
+
+        Returns:
+            list[str]: List of prim paths.
+        """
+        # Avoid circular imports
+        from omnigibson.prims.entity_prim import EntityPrim
+        from omnigibson.prims.rigid_prim import RigidPrim
+
+        outputs = []
+        for inp in objects_links_or_prim_paths:
+            if isinstance(inp, EntityPrim):
+                outputs.extend([link.prim_path for link in inp.links.values()])
+            elif isinstance(inp, RigidPrim):
+                outputs.append(inp.prim_path)
+            elif isinstance(inp, str):
+                outputs.append(inp)
+            else:
+                raise ValueError(f"Input set must be a set of EntityPrim, RigidPrim, or str, found {type(inp)}")
+        return outputs
+
+    def get_contact_row_indices(self, scene_idx, objects_links_or_prim_paths):
+        """
+        Gets the row indices of the contact matrix for a given set of objects, links, or prim paths.
+        This is the index of the rigid body in the contact matrix. This can be used by external callers to
+        pre-cache the indices they care about for faster lookups later (e.g. avoiding a lookup on every call to is_in_contact).
+
+        Args:
+            scene_idx (int): Scene index to get the contact row indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact row indices for.
+
+        Returns:
+            th.Tensor: Tensor of row indices.
+        """
+        # If the input is already a tensor just return it
+        if isinstance(objects_links_or_prim_paths, th.Tensor):
+            return objects_links_or_prim_paths
+
+        # Otherwise, convert to prim paths
+        prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
+        return th.tensor([self._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths])
+
+    def get_contact_col_indices(self, scene_idx, objects_links_or_prim_paths):
+        """
+        Gets the column indices of the contact matrix for a given set of objects, links, or prim paths.
+        This is the index of the rigid body in the contact matrix. This can be used by external callers to
+        pre-cache the indices they care about for faster lookups later (e.g. avoiding a lookup on every call to is_in_contact).
+
+        Args:
+            scene_idx (int): Scene index to get the contact column indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact column indices for.
+
+        Returns:
+            th.Tensor: Tensor of column indices.
+        """
+        # If the input is already a tensor just return it
+        if isinstance(objects_links_or_prim_paths, th.Tensor):
+            return objects_links_or_prim_paths
+
+        # Otherwise, convert to prim paths
+        prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
+        return th.tensor([self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths])
+
+    def get_contact_pairs(self, scene_idx, query_set, with_set=None):
+        """
+        Get pairs of prim paths that are in contact.
+
+        Args:
+            scene_idx (int): Scene index to get the contact pairs for.
+            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check.
+            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact.
+
+        Returns:
+            set of tuples: Set of tuples of (query_prim_path, filter_prim_path) pairs that are in contact.
+        """
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return set()
         contact_matrix = self._CONTACT_MATRIX[scene_idx]
-        assert contact_matrix.ndim == 3, f"Contact matrix should be 3D, found shape {contact_matrix.shape}"
+        assert contact_matrix.ndim == 2, f"Contact matrix should be 2D, found shape {contact_matrix.shape}"
 
         # Get the row indices corresponding to the sensor prim paths
-        sensor_prim_paths = list(sensor_prim_paths)
-        missing_row_prim_paths = [x for x in sensor_prim_paths if x not in self._PATH_TO_ROW_IDX[scene_idx].keys()]
-        assert (
-            len(missing_row_prim_paths) == 0
-        ), f"Sensor prim paths {missing_row_prim_paths} are not in the contact matrix. This is likely because those rigid prims are kinematic-only."
-        row_idxs = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in sensor_prim_paths]
+        row_idxs = self.get_contact_row_indices(scene_idx, query_set)
 
-        # Slice first (few rows), then compute the boolean mask on the small subset
-        sliced = contact_matrix[row_idxs, :]
-        in_contact = th.any(sliced != 0, dim=-1)
+        # Slice the contact matrix and the index matrix with the same indexing so that
+        # nonzero positions in the submatrix can be mapped back to original row/col indices.
+        idx_matrix = self._INDEX_MATRIX[scene_idx]
+        if with_set is not None:
+            col_idxs = self.get_contact_col_indices(scene_idx, with_set)
+            in_contact = contact_matrix[row_idxs[:, None], col_idxs[None, :]]
+            idx_matrix = idx_matrix[row_idxs[:, None], col_idxs[None, :]]
+        else:
+            in_contact = contact_matrix[row_idxs, :]
+            idx_matrix = idx_matrix[row_idxs, :]
 
         # Early return if not in contact.
         if not th.any(in_contact).item():
             return set()
 
-        all_idx_pairs = zip(*(t.cpu() for t in th.nonzero(in_contact, as_tuple=True)))
+        original_indices = idx_matrix[in_contact].cpu().tolist()
 
-        # Convert the index pairs in to (sensor_prim_path, other_contact) pairs
-        return {(sensor_prim_paths[row], self._COL_IDX_TO_PATH[scene_idx][col]) for row, col in all_idx_pairs}
+        return {
+            (self._ROW_IDX_TO_PATH[scene_idx][row], self._COL_IDX_TO_PATH[scene_idx][col])
+            for row, col in original_indices
+        }
 
     def is_in_contact(self, scene_idx, query_set, with_set=None, ignore_set=None):
         """
@@ -418,44 +508,21 @@ class RigidContactAPIImpl:
             with_set is None or ignore_set is None
         ), "Either the with-set, or the ignore-set must be specified, but not both."
 
-        def _convert_to_prim_paths(inp_set: set) -> list[str]:
-            # Avoid circular imports
-            from omnigibson.prims.entity_prim import EntityPrim
-            from omnigibson.prims.rigid_prim import RigidPrim
-
-            outputs = []
-            for inp in inp_set:
-                if isinstance(inp, EntityPrim):
-                    outputs.extend([link.prim_path for link in inp.links.values()])
-                elif isinstance(inp, RigidPrim):
-                    outputs.append(inp.prim_path)
-                elif isinstance(inp, str):
-                    outputs.append(inp)
-                else:
-                    raise ValueError(f"Input set must be a set of EntityPrim, RigidPrim, or str, found {type(inp)}")
-            return outputs
-
-        query_set = _convert_to_prim_paths(query_set)
-        if with_set is not None:
-            with_set = _convert_to_prim_paths(with_set)
-        if ignore_set is not None:
-            ignore_set = _convert_to_prim_paths(ignore_set)
-
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return False
 
         contact_matrix = self._CONTACT_MATRIX[scene_idx]
-        rows = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in query_set]
+        rows = self.get_contact_row_indices(scene_idx, query_set)
         if with_set is not None:
-            cols = [self._PATH_TO_COL_IDX[scene_idx][path] for path in with_set]
-            return th.any(contact_matrix[rows, :][:, cols] != 0).item()
+            cols = self.get_contact_col_indices(scene_idx, with_set)
+            return th.any(contact_matrix[rows, :][:, cols]).item()
         elif ignore_set is not None:
-            ignore_cols = [self._PATH_TO_COL_IDX[scene_idx][path] for path in ignore_set]
-            keep_cols = [col for col in range(contact_matrix.shape[1]) if col not in ignore_cols]
-            return th.any(contact_matrix[rows, :][:, keep_cols] != 0).item()
+            ignore_mask = th.ones(contact_matrix.shape[1], dtype=th.bool)
+            ignore_mask[self.get_contact_col_indices(scene_idx, ignore_set)] = False
+            return th.any(contact_matrix[rows, :][:, ignore_mask]).item()
 
         # Base case, return any collisions with any other prim
-        return th.any(contact_matrix[rows] != 0).item()
+        return th.any(contact_matrix[rows]).item()
 
     def clear(self):
         """
@@ -463,6 +530,7 @@ class RigidContactAPIImpl:
         """
         self._PATH_TO_ROW_IDX = dict()
         self._PATH_TO_COL_IDX = dict()
+        self._ROW_IDX_TO_PATH = dict()
         self._COL_IDX_TO_PATH = dict()
         self._CONTACT_VIEW = dict()
         self._RIGID_BODY_VIEW = dict()
@@ -470,6 +538,7 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
+        self._INDEX_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
 
 

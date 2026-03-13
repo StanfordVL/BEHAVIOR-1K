@@ -124,7 +124,7 @@ class AttachedTo(
         contacting_paths = {
             other_contact
             for this_contact, other_contact in RigidContactAPI.get_contact_pairs(
-                scene_idx=scene_idx, sensor_prim_paths=my_link_paths
+                scene_idx=scene_idx, query_set=my_link_paths
             )
             if other_contact not in self.obj.link_prim_paths
         }

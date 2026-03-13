@@ -1,4 +1,5 @@
 import argparse
+import cProfile
 import json
 import math
 import os
@@ -134,6 +135,14 @@ def main():
     )
 
     load_start = time.time()
+
+    # Launch OG before setting up the profiler. If we don't do this then the carb profiler
+    # overtakes the profiler and we don't get any useful data.
+    og.launch()
+
+    if args.deep_profiling:
+        load_profiler = cProfile.Profile()
+        load_profiler.enable()
     env = ProfilingEnv(configs=cfg)
     table = env.scene.object_registry("name", "table")
     apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
@@ -160,6 +169,9 @@ def main():
         position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1]
     )
     # record total load time
+    if args.deep_profiling:
+        load_profiler.disable()
+        load_profiler.dump_stats("load.prof")
     total_load_time = time.time() - load_start
 
     for i in range(300):

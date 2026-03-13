@@ -25,6 +25,9 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     # List of set of prim paths defining robot finger links belonging to any manipulation robots per scene
     _robot_finger_paths = None
 
+    # Set of objects that are contacting any manipulation robots
+    _finger_contact_objs = None
+
     def __init__(self, obj, scale=None, requires_closed=False):
         self.scale = scale
         self.value = False
@@ -74,6 +77,9 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
     @classmethod
     def global_update(cls):
+        # Clear finger contact objects since it will be refreshed now
+        cls._finger_contact_objs = set()
+
         # detect marker and hand interaction
         cls._robot_finger_paths = [
             {
@@ -89,6 +95,17 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         # If there aren't any valid robot link paths, immediately return
         if not any(len(robot_finger_paths) > 0 for robot_finger_paths in cls._robot_finger_paths):
             return
+
+        for scene_idx, (scene, scene_robot_finger_paths) in enumerate(zip(og.sim.scenes, cls._robot_finger_paths)):
+            if len(scene_robot_finger_paths) == 0:
+                continue
+
+            # Get the robot finger prim paths' contacts
+            contact_pairs = RigidContactAPI.get_contact_pairs(scene_idx, scene_robot_finger_paths)
+            for contact_pair in contact_pairs:
+                obj = scene.object_registry("prim_path", "/".join(contact_pair[1].split("/")[:-1]))
+                if obj is not None:
+                    cls._finger_contact_objs.add(obj)
 
     @classproperty
     def meta_link_types(cls):
@@ -191,11 +208,12 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             return
 
         # If we're not nearby any fingers, we automatically can't toggle
-        all_finger_paths = {path for path_set in self._robot_finger_paths for path in path_set}
-        robot_can_toggle = (
-            RigidContactAPI.is_in_contact(scene_idx=self.obj.scene.idx, query_set=all_finger_paths, with_set=[self.obj])
-            and self._check_overlap()
-        )
+        if self.obj not in self._finger_contact_objs:
+            robot_can_toggle = False
+        else:
+            # Check to make sure fingers are actually overlapping the toggle button mesh
+            robot_can_toggle = self._check_overlap()
+
         previous_step = self.robot_can_toggle_steps
         if robot_can_toggle:
             self.robot_can_toggle_steps += 1

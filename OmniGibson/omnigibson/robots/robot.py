@@ -2109,7 +2109,7 @@ class Robot(USDObject, GymObservable):
         raw_contact_data = {
             (link_contact, other_contact)
             for link_contact, other_contact in RigidContactAPI.get_contact_pairs(
-                scene_idx=self.scene.idx, sensor_prim_paths=finger_paths
+                scene_idx=self.scene.idx, query_set=finger_paths
             )
             if other_contact not in link_paths
         }
