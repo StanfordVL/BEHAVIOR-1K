@@ -382,8 +382,8 @@ class RigidContactAPIImpl:
         """Get pairs of prim paths that are in contact."""
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return set()
-        impulses = th.norm(self._CONTACT_MATRIX[scene_idx], dim=-1)
-        assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
+        contact_matrix = self._CONTACT_MATRIX[scene_idx]
+        assert contact_matrix.ndim == 3, f"Contact matrix should be 3D, found shape {contact_matrix.shape}"
 
         # Get the row indices corresponding to the sensor prim paths
         sensor_prim_paths = list(sensor_prim_paths)
@@ -393,15 +393,15 @@ class RigidContactAPIImpl:
         ), f"Sensor prim paths {missing_row_prim_paths} are not in the contact matrix. This is likely because those rigid prims are kinematic-only."
         row_idxs = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in sensor_prim_paths]
 
-        # Filter the impulses to only include the rows corresponding to the sensor prim paths
-        impulses = impulses[row_idxs, :]
+        # Slice first (few rows), then compute the boolean mask on the small subset
+        sliced = contact_matrix[row_idxs, :]
+        in_contact = th.any(sliced != 0, dim=-1)
 
         # Early return if not in contact.
-        if not th.any(impulses > 0).item():
+        if not th.any(in_contact).item():
             return set()
 
-        # Get all of the (row, col) pairs where the impulse is greater than 0
-        all_idx_pairs = zip(*(t.cpu() for t in th.nonzero(impulses > 0, as_tuple=True)))
+        all_idx_pairs = zip(*(t.cpu() for t in th.nonzero(in_contact, as_tuple=True)))
 
         # Convert the index pairs in to (sensor_prim_path, other_contact) pairs
         return {(sensor_prim_paths[row], self._COL_IDX_TO_PATH[scene_idx][col]) for row, col in all_idx_pairs}
@@ -450,19 +450,18 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return False
 
-        impulses = th.norm(self._CONTACT_MATRIX[scene_idx], dim=-1)
-
+        contact_matrix = self._CONTACT_MATRIX[scene_idx]
         rows = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in query_set]
         if with_set is not None:
             cols = [self._PATH_TO_COL_IDX[scene_idx][path] for path in with_set]
-            return th.any(impulses[rows, :][:, cols] > 0).item()
+            return th.any(contact_matrix[rows, :][:, cols] != 0).item()
         elif ignore_set is not None:
             ignore_cols = [self._PATH_TO_COL_IDX[scene_idx][path] for path in ignore_set]
-            keep_cols = [col for col in range(impulses.shape[1]) if col not in ignore_cols]
-            return th.any(impulses[rows, :][:, keep_cols] > 0).item()
+            keep_cols = [col for col in range(contact_matrix.shape[1]) if col not in ignore_cols]
+            return th.any(contact_matrix[rows, :][:, keep_cols] != 0).item()
 
         # Base case, return any collisions with any other prim
-        return th.any(impulses[rows] > 0).item()
+        return th.any(contact_matrix[rows] != 0).item()
 
     def clear(self):
         """
