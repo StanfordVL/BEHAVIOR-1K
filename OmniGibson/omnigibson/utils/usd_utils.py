@@ -587,8 +587,7 @@ class RigidContactAPIImpl:
         Returns:
             th.Tensor: ``(N,)`` boolean tensor of contact results.
         """
-        assert with_masks is None or ignore_masks is None, \
-            "Provide either with_masks or ignore_masks, not both."
+        assert with_masks is None or ignore_masks is None, "Provide either with_masks or ignore_masks, not both."
 
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return th.zeros(query_masks.shape[0], dtype=th.bool)

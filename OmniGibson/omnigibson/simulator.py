@@ -1253,7 +1253,7 @@ def _launch_simulator(*args, **kwargs):
             self._report_step_exceptions()
 
             # Update persistent rigid contact caches from the latest step. We normally do this on the non-physics step,
-            # but this step_physics function is usually used to let contacts propagate during sampling etc, which 
+            # but this step_physics function is usually used to let contacts propagate during sampling etc, which
             # means that we need to update the contact cache here too.
             RigidContactAPI.update_contact_cache()
 
