@@ -139,8 +139,6 @@ def _find_root_link_name(default_prim):
         f"Exactly one root link should have been found for {default_prim.GetName()}, "
         f"but found none/multiple instead: {valid_roots}"
     )
-    if len(valid_roots) != 1:
-        return None
     return valid_roots[0]
 
 
@@ -257,43 +255,30 @@ class USDObject(BaseObject):
         else:
             self.check_hash(usd_path)
 
-        # Pre-apply ArticulationRootAPI so PhysX sees it at the right location when the USD is
-        # loaded.
         usd_path = self._preapply_articulation_root(usd_path)
 
         return usd_path
 
     def _preapply_articulation_root(self, usd_path):
         """
-        Opens @usd_path with the pxr library (bypassing PhysX), strips any existing
-        ArticulationRootAPI from every prim, determines the correct prim to carry it, applies it
-        there, and returns a path to the modified USD written to a temp file.  If no
-        ArticulationRootAPI is needed the modified USD (with any stale API removed) is still
-        written to a temp file so the original is never changed on disk.
+        Opens @usd_path with the pxr library, strips any existing ArticulationRootAPI, determines the correct prim to carry it, applies it
+        there, and returns a path to the modified USD written to a temp file.
         """
         stage = lazy.pxr.Usd.Stage.Open(usd_path)
-
-        # Strip all existing ArticulationRootAPI / PhysxArticulationAPI from the USD.
-        # This neutralises whatever placement was baked in at asset-creation time.
-        for p in stage.Traverse():
-            if p.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
-                p.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
-                p.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
-
         default_prim = stage.GetDefaultPrim()
-        if not default_prim.IsValid():
-            log.warning(
-                f"USD {usd_path} has no default prim; cannot pre-apply ArticulationRootAPI. "
-                "Loading may fail when simulation is playing."
-            )
-            # Still write to temp so original is never modified.
-            return _export_stage_to_temp(stage, usd_path)
+        root_link_name = _find_root_link_name(default_prim)
+        root_prim = default_prim.GetPrimAtPath(root_link_name)
 
-        # BFS from the default prim to collect joint counts and check for attachment points.
-        # Mirrors EntityPrim.n_joints / n_fixed_joints / has_attachment_points.
+        # Strip existing ArticulationRootAPI / PhysxArticulationAPI from the USD.
+        if default_prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
+            default_prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
+            default_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
+        if root_prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
+            root_prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
+            root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
+
         n_joints, n_fixed_joints, has_attachment = _count_joints(default_prim)
 
-        # Replicate the kinematic_only decision from BaseObject._post_load().
         kinematic_only = _determine_kinematic_only(
             self.fixed_base, self._load_config, n_joints, n_fixed_joints, has_attachment
         )
@@ -304,21 +289,8 @@ class USDObject(BaseObject):
         if not kinematic_only and (has_articulated or has_fixed):
             if not self.fixed_base and has_articulated:
                 # Non-fixed articulated object: ArticulationRootAPI goes on the root link.
-                root_link_name = _find_root_link_name(default_prim)
-                if root_link_name is None:
-                    log.warning(
-                        f"Could not determine root link name for {usd_path}; " "cannot pre-apply ArticulationRootAPI."
-                    )
-                else:
-                    target_prim = default_prim.GetPrimAtPath(root_link_name)
-                    if target_prim.IsValid():
-                        lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(target_prim)
-                        lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(target_prim)
-                    else:
-                        log.warning(
-                            f"Root link prim '{root_link_name}' not valid in {usd_path}; "
-                            "cannot pre-apply ArticulationRootAPI."
-                        )
+                lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
+                lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             else:
                 # Fixed articulated object: ArticulationRootAPI goes on the object root prim.
                 lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(default_prim)
