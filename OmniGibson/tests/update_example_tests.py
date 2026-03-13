@@ -57,7 +57,7 @@ def generate_examples_list(examples, skip_list):
 # Per-example extra args passed via --test-args when running in CI.
 # Add entries here for examples that require CLI arguments (e.g. click-based tools).
 EXAMPLE_ARGS = {
-    "robots.import_custom_robot": "tests/data/r1_pro_source_config.yaml",
+    "robots.import_custom_robot": "--config tests/data/r1_pro_source_config.yaml",
 }
 
 

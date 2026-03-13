@@ -83,7 +83,7 @@ jobs:
           - {test_file: test_examples, example: "objects.visualize_object"}
           - {test_file: test_examples, example: "robots.all_robots_visualizer"}
           - {test_file: test_examples, example: "robots.grasping_mode_example"}
-          - {test_file: test_examples, example: "robots.import_custom_robot", args: "tests/data/r1_pro_source_config.yaml"}
+          - {test_file: test_examples, example: "robots.import_custom_robot", args: "--config tests/data/r1_pro_source_config.yaml"}
           - {test_file: test_examples, example: "robots.robot_control_example"}
           - {test_file: test_examples, example: "scenes.scene_selector"}
           - {test_file: test_examples, example: "scenes.scene_tour_demo"}
