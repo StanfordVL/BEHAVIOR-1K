@@ -730,7 +730,6 @@ def _launch_simulator(*args, **kwargs):
                 category="background",
                 light_type="Dome",
                 intensity=2500,
-                fixed_base=True,
             )
             self._skybox.load(None)
             self._skybox.color = (1.07, 0.85, 0.61)
