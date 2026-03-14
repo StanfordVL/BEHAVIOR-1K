@@ -125,6 +125,7 @@ def camera_pose_test(flatcache):
 def test_camera_pose_flatcache_on():
     camera_pose_test(True)
 
+
 @pytest.mark.parametrize("robot_name", REGISTERED_ROBOTS)
 def test_robot_load_drive(robot_name):
     if og.sim is None:
