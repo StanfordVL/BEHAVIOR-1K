@@ -42,7 +42,7 @@ from omnigibson.utils.python_utils import (
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import CollisionAPI, add_asset_to_stage
+from omnigibson.utils.usd_utils import CollisionAPI, add_asset_to_stage, create_usd_stage
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -288,7 +288,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Create a new stage inside the tempdir, named after this scene's file.
             decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(scene_file_path) + ".usd", dir=og.tempdir)
             os.close(decrypted_fd)
-            stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+            stage = create_usd_stage(usd_path)
 
             # Create the world prim and make it the default
             world_prim = stage.DefinePrim("/World", "Xform")

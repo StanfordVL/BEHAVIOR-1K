@@ -11,7 +11,7 @@ from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.utils.usd_utils import create_primitive_mesh, create_usd_stage
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -135,7 +135,7 @@ class PrimitiveObject(USDObject):
         """
         tempdir_path = tempfile.mkdtemp(name, dir=og.tempdir)
         usd_path = os.path.join(tempdir_path, f"{name}.usd")
-        side_stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+        side_stage = create_usd_stage(usd_path)
         root = side_stage.DefinePrim("/object", "Xform")
         side_stage.SetDefaultPrim(root)
         side_stage.DefinePrim("/object/base_link", "Xform")
