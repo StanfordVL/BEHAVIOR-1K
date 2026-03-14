@@ -1,8 +1,11 @@
+import os
+import tempfile
+
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import assert_valid_key
@@ -12,7 +15,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 log = create_module_logger(module_name=__name__)
 
 
-class LightObject(BaseObject):
+class LightObject(USDObject):
     """
     LightObjects are objects that generate light in the simulation
     """
@@ -34,7 +37,6 @@ class LightObject(BaseObject):
         relative_prim_path=None,
         category="light",
         scale=None,
-        fixed_base=False,
         link_physics_materials=None,
         load_config=None,
         abilities=None,
@@ -52,7 +54,6 @@ class LightObject(BaseObject):
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
-            fixed_base (bool): whether to fix the base of this object or not
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
                 a specific physical material for that link's collision meshes, where the kwargs are arguments directly
                 passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
@@ -81,15 +82,20 @@ class LightObject(BaseObject):
         # Other attributes to be filled in at runtime
         self._light_link = None
 
+        # Build the USD for this light upfront and pass it to USDObject
+        usd_path = self._build_usd(name=name, light_type=light_type)
+
         # Run super method
         super().__init__(
+            usd_path=usd_path,
             relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             scale=scale,
             visible=True,
-            fixed_base=fixed_base,
+            fixed_base=True,
             visual_only=True,
+            kinematic_only=True,
             self_collisions=False,
             prim_type=PrimType.RIGID,
             include_default_states=include_default_states,
@@ -99,19 +105,19 @@ class LightObject(BaseObject):
             **kwargs,
         )
 
-    def _load(self):
-        # Define XForm and base link for this light
-        prim = og.sim.stage.DefinePrim(self.prim_path, "Xform")
-        og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
-
-        # Define the actual light link
-        (
-            getattr(lazy.pxr.UsdLux, f"{self.light_type}Light")
-            .Define(og.sim.stage, f"{self.prim_path}/base_link/light")
-            .GetPrim()
-        )
-
-        return prim
+    @staticmethod
+    def _build_usd(name, light_type):
+        """Build a temporary USD containing the light prim structure and return its path."""
+        tempdir_path = tempfile.mkdtemp(name, dir=og.tempdir)
+        usd_path = os.path.join(tempdir_path, f"{name}.usd")
+        side_stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+        root = side_stage.DefinePrim("/object", "Xform")
+        side_stage.SetDefaultPrim(root)
+        side_stage.DefinePrim("/object/base_link", "Xform")
+        getattr(lazy.pxr.UsdLux, f"{light_type}Light").Define(side_stage, "/object/base_link/light")
+        side_stage.Save()
+        del side_stage
+        return usd_path
 
     def _post_load(self):
         # run super first
