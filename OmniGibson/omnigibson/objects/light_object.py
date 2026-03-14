@@ -6,6 +6,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects.usd_object import USDObject
+from omnigibson.utils.usd_utils import create_usd_stage
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import assert_valid_key
@@ -110,7 +111,7 @@ class LightObject(USDObject):
         """Build a temporary USD containing the light prim structure and return its path."""
         tempdir_path = tempfile.mkdtemp(name, dir=og.tempdir)
         usd_path = os.path.join(tempdir_path, f"{name}.usd")
-        side_stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+        side_stage = create_usd_stage(usd_path)
         root = side_stage.DefinePrim("/object", "Xform")
         side_stage.SetDefaultPrim(root)
         side_stage.DefinePrim("/object/base_link", "Xform")

@@ -78,14 +78,12 @@ jobs:
           - {test_file: test_examples, example: "object_states.temperature_demo"}
           - {test_file: test_examples, example: "objects.draw_bounding_box"}
           - {test_file: test_examples, example: "objects.highlight_objects"}
-          - {test_file: test_examples, example: "objects.import_custom_object"}
           - {test_file: test_examples, example: "objects.load_object_selector"}
           - {test_file: test_examples, example: "objects.view_cloth_configurations"}
           - {test_file: test_examples, example: "objects.visualize_object"}
           - {test_file: test_examples, example: "robots.all_robots_visualizer"}
-          - {test_file: test_examples, example: "robots.curobo_example"}
           - {test_file: test_examples, example: "robots.grasping_mode_example"}
-          - {test_file: test_examples, example: "robots.import_custom_robot"}
+          - {test_file: test_examples, example: "robots.import_custom_robot", args: "--config tests/data/r1_pro_source_config.yaml"}
           - {test_file: test_examples, example: "robots.robot_control_example"}
           - {test_file: test_examples, example: "scenes.scene_selector"}
           - {test_file: test_examples, example: "scenes.scene_tour_demo"}
@@ -117,6 +115,7 @@ jobs:
         run: >
           pytest -s tests/${{ matrix.test_file }}.py
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
+          ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
           --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
         continue-on-error: true
         timeout-minutes: 30

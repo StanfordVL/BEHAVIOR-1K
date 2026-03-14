@@ -3604,12 +3604,12 @@ class Robot(USDObject, GymObservable):
             raw_data = og.sim.contact_sensor.get_rigid_body_raw_data(finger_path)
             for c in raw_data:
                 # Convert body handles to prim paths for robust matching
-                body0 = og.sim.contact_sensor.decode_body_name(c.body0)
-                body1 = og.sim.contact_sensor.decode_body_name(c.body1)
+                body0 = og.sim.contact_sensor.decode_body_name(c[2])
+                body1 = og.sim.contact_sensor.decode_body_name(c[3])
                 if (body0 == finger_path and body1 == target_link_prim_path) or (
                     body0 == target_link_prim_path and body1 == finger_path
                 ):
-                    contact_pos_world = th.as_tensor(c.position, dtype=th.float32)
+                    contact_pos_world = th.as_tensor(c[4], dtype=th.float32)
                     break
             if contact_pos_world is not None:
                 break

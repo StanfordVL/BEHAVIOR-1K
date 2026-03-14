@@ -29,12 +29,10 @@ EXAMPLES = [
     "object_states.temperature_demo",
     "objects.draw_bounding_box",
     "objects.highlight_objects",
-    "objects.import_custom_object",
     "objects.load_object_selector",
     "objects.view_cloth_configurations",
     "objects.visualize_object",
     "robots.all_robots_visualizer",
-    "robots.curobo_example",
     "robots.grasping_mode_example",
     "robots.import_custom_robot",
     "robots.robot_control_example",
@@ -55,11 +53,25 @@ EXAMPLES_TO_SKIP = [
     "teleoperation.robot_teleoperate_demo",
     "teleoperation.vr_robot_control_demo",  # does not support headless mode
     "teleoperation.vr_scene_tour_demo",  # does not support headless mode
+    "robots.curobo_example",  # requires CuRobo and CUDA support
+    "objects.import_custom_object",  # CLI conversion tool, requires demo / test asset files
 ]
 
 
 @pytest.mark.parametrize("example_name", EXAMPLES)
-def test_example(example_name):
+def test_example(example_name, request):
+    import click
+
     module = importlib.import_module(f"omnigibson.examples.{example_name}")
-    with patch("omnigibson.shutdown"):
-        module.main(random_selection=True, headless=True, short_exec=True)
+    test_args = request.config.getoption("--test-args", default="")
+
+    if isinstance(module.main, click.BaseCommand):
+        from click.testing import CliRunner
+
+        args = test_args.split() if test_args else []
+        runner = CliRunner()
+        result = runner.invoke(module.main, args, catch_exceptions=False)
+        assert result.exit_code == 0, result.output
+    else:
+        with patch("omnigibson.shutdown"):
+            module.main(random_selection=True, headless=True, short_exec=True)

@@ -80,10 +80,10 @@ def control_gripper(env, robot, attached_obj):
         env.step(action)
 
 
-def test_curobo():
+def main(random_selection=False, headless=False, short_exec=False):
     # Ask the user whether they want online object sampling or not
     robot_options = ["R1", "Tiago"]
-    robot_type = choose_from_options(options=robot_options, name="robot options", random_selection=False)
+    robot_type = choose_from_options(options=robot_options, name="robot options", random_selection=random_selection)
 
     robot_cfg = {
         "type": robot_type,
@@ -367,4 +367,4 @@ def test_curobo():
 
 
 if __name__ == "__main__":
-    test_curobo()
+    main()

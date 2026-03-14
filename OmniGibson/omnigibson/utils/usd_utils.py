@@ -1806,6 +1806,13 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     return triangularize_mesh(mesh)
 
 
+def create_usd_stage(usd_path):
+    stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+    lazy.pxr.UsdGeom.SetStageMetersPerUnit(stage, 1.0)
+    lazy.pxr.UsdGeom.SetStageUpAxis(stage, "Z")
+    return stage
+
+
 def triangularize_mesh(mesh):
     """
     Triangulates the mesh @mesh, modification in-place
