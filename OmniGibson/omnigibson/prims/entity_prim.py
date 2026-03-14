@@ -626,7 +626,7 @@ class EntityPrim(XFormPrim):
     @visual_only.setter
     def visual_only(self, val):
         """
-        Sets the visaul only state of this link
+        Sets the visual only state of this link
 
         Args:
             val (bool): Whether this link should be a visual-only link (i.e.: no gravity or collisions applied)

@@ -339,7 +339,7 @@ Some notes about the importing script:
         - 0.03
         - 0.03
 
-        ```
+    ```
 
 
 ### Option 2: Using IsaacSim's Native URDF-to-USD Converter
