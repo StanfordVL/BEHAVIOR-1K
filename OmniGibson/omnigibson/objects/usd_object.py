@@ -10,191 +10,11 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.utils.usd_utils import add_asset_to_stage, compute_kinematic_only, count_joints
 
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
-
-
-def _export_stage_to_temp(stage, usd_path):
-    """
-    Export @stage to a temp file alongside the original @usd_path and return the new path.
-
-    Args:
-        stage (Usd.Stage): The stage to export.
-        usd_path (str): Original USD path; its basename is reused in the temp directory.
-
-    Returns:
-        str: Path to the exported temp file.
-    """
-    basename = os.path.basename(usd_path)
-    tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
-    temp_usd_path = os.path.join(tempdir_path, basename)
-    stage.Export(temp_usd_path)
-    return temp_usd_path
-
-
-def _count_joints(root_prim):
-    """
-    BFS from @root_prim to count movable joints, fixed joints, and attachment points.
-    Mirrors the uninitialized-path logic in EntityPrim.n_joints / n_fixed_joints.
-
-    Args:
-        root_prim (Usd.Prim): Root prim of the object (the USD default prim).
-
-    Returns:
-        tuple: (n_joints, n_fixed_joints, has_attachment) where
-            n_joints (int): number of non-fixed physics joints,
-            n_fixed_joints (int): number of fixed physics joints,
-            has_attachment (bool): whether any prim name contains "attachment".
-    """
-    n_joints = 0
-    n_fixed_joints = 0
-    has_attachment = False
-    children = list(root_prim.GetChildren())
-    while children:
-        child_prim = children.pop()
-        children.extend(child_prim.GetChildren())
-        prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
-        if "joint" in prim_type:
-            if "fixed" in prim_type:
-                n_fixed_joints += 1
-            else:
-                n_joints += 1
-        if "attachment" in child_prim.GetName().lower():
-            has_attachment = True
-    return n_joints, n_fixed_joints, has_attachment
-
-
-def _resolve_scale(load_config, default_prim):
-    """
-    Resolve the effective scale from @load_config, falling back to reading ig:nativeBB from
-    @default_prim when only a bounding_box is specified (as in DatasetObject).
-
-    Args:
-        load_config (dict): The object's load config.
-        default_prim (Usd.Prim): The default prim of the USD stage.
-
-    Returns:
-        th.Tensor: 3-element scale tensor.
-    """
-    raw_scale = load_config.get("scale", None)
-    if raw_scale is not None:
-        scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
-        if scale.dim() == 0:
-            scale = scale.expand(3)
-        return scale.float()
-
-    bounding_box = load_config.get("bounding_box", None)
-    if bounding_box is not None:
-        native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
-        if native_bb_attr.IsValid():
-            native_bb = th.tensor(list(native_bb_attr.Get()), dtype=th.float32)
-            bb = th.tensor(bounding_box, dtype=th.float32)
-            scale = th.ones(3)
-            valid = native_bb > 1e-4
-            scale[valid] = bb[valid] / native_bb[valid]
-            return scale
-
-    return th.ones(3)
-
-
-def _determine_kinematic_only(fixed_base, load_config, default_prim, n_joints, n_fixed_joints, has_attachment):
-    """
-    Replicate the kinematic_only decision from BaseObject._post_load().
-
-    Args:
-        fixed_base (bool): Whether the object has a fixed base.
-        load_config (dict): The object's load config.
-        default_prim (Usd.Prim): The default prim of the USD stage (used to resolve scale from bounding_box).
-        n_joints (int): Number of non-fixed joints.
-        n_fixed_joints (int): Number of fixed joints.
-        has_attachment (bool): Whether the object has attachment points.
-
-    Returns:
-        bool: True if the object should be kinematic only.
-    """
-    if not fixed_base:
-        return False
-    if load_config.get("kinematic_only", None) is False:
-        return False
-    scale = _resolve_scale(load_config, default_prim)
-    return (
-        n_joints == 0
-        and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or n_fixed_joints == 0)
-        and not has_attachment
-    )
-
-
-def _find_root_link_name(default_prim):
-    """
-    Given the default prim of a USD stage, return the name of the root link by replicating
-    the logic in EntityPrim.update_links(): the root link is the Xform child that is not the
-    body1 target of any joint belonging to another link.
-
-    Args:
-        default_prim (Usd.Prim): The default prim of the USD stage (maps to self.prim_path in Isaac).
-
-    Returns:
-        str or None: Name of the root link, or None if it cannot be determined.
-    """
-    joint_children = set()
-    link_names = []
-    for prim in default_prim.GetChildren():
-        if prim.GetTypeName() != "Xform":
-            continue
-        link_names.append(prim.GetName())
-        for child in prim.GetChildren():
-            if "joint" not in child.GetTypeName().lower():
-                continue
-            rels = {r.GetName(): r for r in child.GetRelationships()}
-            # Only count joints that have body0 (world-fixed joints have no body0)
-            body0_rel = rels.get("physics:body0")
-            body1_rel = rels.get("physics:body1")
-            if body0_rel is None or body1_rel is None:
-                continue
-            if len(body0_rel.GetTargets()) > 0:
-                joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
-
-    valid_roots = list(set(link_names) - joint_children)
-    assert len(valid_roots) == 1, (
-        f"Exactly one root link should have been found for {default_prim.GetName()}, "
-        f"but found none/multiple instead: {valid_roots}"
-    )
-    return valid_roots[0]
-
-
-def _determine_articulation_root_prim(default_prim, fixed_base, load_config, n_joints, n_fixed_joints, has_attachment):
-    """
-    Determine which prim should carry ArticulationRootAPI, mirroring BaseObject.articulation_root_path.
-
-    Args:
-        default_prim (Usd.Prim): The default prim of the USD stage.
-        fixed_base (bool): Whether the object has a fixed base.
-        load_config (dict): The object's load config.
-        n_joints (int): Number of non-fixed joints.
-        n_fixed_joints (int): Number of fixed joints.
-        has_attachment (bool): Whether the object has attachment points.
-
-    Returns:
-        Usd.Prim or None: The prim to apply ArticulationRootAPI to, or None if not applicable.
-    """
-    kinematic_only = _determine_kinematic_only(
-        fixed_base, load_config, default_prim, n_joints, n_fixed_joints, has_attachment
-    )
-    has_articulated = n_joints > 0
-    has_fixed = n_fixed_joints > 0
-
-    if kinematic_only or (not has_articulated and not has_fixed):
-        return None
-
-    if not fixed_base and has_articulated:
-        root_link_name = _find_root_link_name(default_prim)
-        target = default_prim.GetPrimAtPath(root_link_name)
-        return target
-
-    return default_prim
 
 
 class USDObject(BaseObject):
@@ -327,16 +147,66 @@ class USDObject(BaseObject):
             p.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
             p.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
 
-        n_joints, n_fixed_joints, has_attachment = _count_joints(default_prim)
-        articulation_root_prim = _determine_articulation_root_prim(
-            default_prim, self.fixed_base, self._load_config, n_joints, n_fixed_joints, has_attachment
+        n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
+
+        raw_scale = self._load_config.get("scale", None)
+        if raw_scale is not None:
+            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
+            if scale.dim() == 0:
+                scale = scale.expand(3)
+            scale = scale.float()
+        else:
+            scale = th.ones(3)
+
+        kinematic_only = compute_kinematic_only(
+            self.fixed_base,
+            scale,
+            n_joints,
+            n_fixed_joints,
+            self._load_config.get("kinematic_only", None),
+            has_attachment,
         )
+
+        # Determine which prim should carry ArticulationRootAPI
+        articulation_root_prim = None
+        if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
+            if not self.fixed_base and n_joints > 0:
+                # Root link = the Xform child that is not body1 of any joint with a body0
+                joint_children = set()
+                link_names = []
+                for prim in default_prim.GetChildren():
+                    if prim.GetTypeName() != "Xform":
+                        continue
+                    link_names.append(prim.GetName())
+                    for child in prim.GetChildren():
+                        if "joint" not in child.GetTypeName().lower():
+                            continue
+                        rels = {r.GetName(): r for r in child.GetRelationships()}
+                        body0_rel = rels.get("physics:body0")
+                        body1_rel = rels.get("physics:body1")
+                        if body0_rel is None or body1_rel is None:
+                            continue
+                        if len(body0_rel.GetTargets()) > 0:
+                            joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
+                valid_roots = list(set(link_names) - joint_children)
+                assert len(valid_roots) == 1, (
+                    f"Exactly one root link should have been found for {default_prim.GetName()}, "
+                    f"but found none/multiple instead: {valid_roots}"
+                )
+                articulation_root_prim = default_prim.GetPrimAtPath(valid_roots[0])
+            else:
+                articulation_root_prim = default_prim
 
         if articulation_root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(articulation_root_prim)
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(articulation_root_prim)
 
-        return _export_stage_to_temp(stage, usd_path)
+        # Export to a temp file
+        basename = os.path.basename(usd_path)
+        tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
+        temp_usd_path = os.path.join(tempdir_path, basename)
+        stage.Export(temp_usd_path)
+        return temp_usd_path
 
     def prebuild(self, stage):
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.

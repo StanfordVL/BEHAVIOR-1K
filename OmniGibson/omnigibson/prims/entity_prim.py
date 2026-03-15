@@ -16,7 +16,7 @@ from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.render_utils import force_pbr_material_for_link
-from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
+from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative, count_joints
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -460,15 +460,7 @@ class EntityPrim(XFormPrim):
         if self.initialized:
             num = len(self._joints)
         else:
-            # Manually iterate over all links and check for any joints that are not fixed joints!
-            num = 0
-            children = list(self.prim.GetChildren())
-            while children:
-                child_prim = children.pop()
-                children.extend(child_prim.GetChildren())
-                prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
-                if "joint" in prim_type and "fixed" not in prim_type:
-                    num += 1
+            num, _, _ = count_joints(self.prim)
         return num
 
     @cached_property
@@ -481,16 +473,7 @@ class EntityPrim(XFormPrim):
         if self._articulation_view and self._articulation_view._metadata:
             return sum(1 for joint_dof in self._articulation_view._metadata.joint_dof_counts if joint_dof == 0)
 
-        # Manually iterate over all links and check for any joints that are not fixed joints!
-        num = 0
-        children = list(self.prim.GetChildren())
-        while children:
-            child_prim = children.pop()
-            children.extend(child_prim.GetChildren())
-            prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
-            if "joint" in prim_type and "fixed" in prim_type:
-                num += 1
-
+        _, num, _ = count_joints(self.prim)
         return num
 
     @property
@@ -527,13 +510,8 @@ class EntityPrim(XFormPrim):
         Returns:
             bool: Whether this object has any attachment points
         """
-        children = list(self.prim.GetChildren())
-        while children:
-            child_prim = children.pop()
-            children.extend(child_prim.GetChildren())
-            if "attachment" in child_prim.GetName():
-                return True
-        return False
+        _, _, has_attachment = count_joints(self.prim)
+        return has_attachment
 
     def _compute_articulation_tree(self):
         """

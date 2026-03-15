@@ -33,7 +33,7 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, extract_class_init_kwargs_from_dict, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, create_joint
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, compute_kinematic_only, create_joint
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -198,24 +198,20 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
     def _post_load(self):
         # Add fixed joint or make object kinematic only if we're fixing the base
-        kinematic_only = False
-        if self.fixed_base:
-            # For optimization purposes, if we only have a single rigid body that has either
-            # (no custom scaling OR no fixed joints), we assume this is not an articulated object so we
-            # merely set this to be a static collider, i.e.: kinematic-only
-            # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
-            # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
-            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
-            if (
-                # no articulated joints
-                self.n_joints == 0
-                # no fixed joints or scaling is [1, 1, 1] (TODO verify [1, 1, 1] is still needed)
-                and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
-                # users force the object to not have kinematic_only
-                and self._load_config["kinematic_only"] is not False  # if can be True or None
-                and not self.has_attachment_points
-            ):
-                kinematic_only = True
+        # For optimization purposes, if we only have a single rigid body that has either
+        # (no custom scaling OR no fixed joints), we assume this is not an articulated object so we
+        # merely set this to be a static collider, i.e.: kinematic-only
+        # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
+        # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
+        scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
+        kinematic_only = compute_kinematic_only(
+            self.fixed_base,
+            scale,
+            self.n_joints,
+            self.n_fixed_joints,
+            self._load_config["kinematic_only"],
+            self.has_attachment_points,
+        )
 
         # Validate that we didn't make a kinematic-only decision that does not match
         assert (
