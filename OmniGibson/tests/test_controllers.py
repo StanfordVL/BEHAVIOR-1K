@@ -238,7 +238,7 @@ def test_arm_control():
     }
 
     # Position the robots, reset them, and keep them still
-    for i, robot in enumerate(env.robots):
+    for i, robot in enumerate(env.robots[0]):
         robot.set_position_orientation(
             position=th.tensor([0.0, i * 5.0, 0.0]), orientation=T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
         )
@@ -249,7 +249,7 @@ def test_arm_control():
         og.sim.step()
 
     # Keep all robots still
-    for robot in env.robots:
+    for robot in env.robots[0]:
         robot.keep_still()
 
         # We need to explicitly reset the controllers to unify the initial state that will be seen
@@ -266,7 +266,7 @@ def test_arm_control():
 
     # Record initial eef pose of all robots
     initial_eef_pose = dict()
-    for i, robot in enumerate(env.robots):
+    for i, robot in enumerate(env.robots[0]):
         initial_eef_pose[robot.name] = {arm: robot.get_relative_eef_pose(arm=arm) for arm in robot.arm_names}
 
     for controller in ["InverseKinematicsController", "OperationalSpaceController"]:
@@ -289,7 +289,7 @@ def test_arm_control():
             # Load the initial state without stepping physics
             env.scene.load_state(env.scene._initial_file["state"])
 
-            for i, robot in enumerate(env.robots):
+            for i, robot in enumerate(env.robots[0]):
                 controller_config = {f"arm_{arm}": {"name": controller, **controller_kwargs} for arm in robot.arm_names}
                 robot.reload_controllers(controller_config)
 
@@ -358,7 +358,7 @@ def test_arm_control():
                 for _ in range(n_steps[controller_mode][action_name]):
                     env.step(action)
 
-                for i, robot in enumerate(env.robots):
+                for i, robot in enumerate(env.robots[0]):
                     for arm in robot.arm_names:
                         # Make sure no arm joints are at their limit
                         normalized_qpos = robot.get_joint_positions(normalized=True)[robot.arm_control_idx[arm]]
