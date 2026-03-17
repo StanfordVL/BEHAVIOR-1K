@@ -383,10 +383,16 @@ class TouchingAnyCondition(RuleCondition):
         # Keep any object that has non-zero impulses between itself and any of the @filter_2_name's objects
         objs = []
 
+        with_set_by_scene = defaultdict(list)
+        for obj in object_candidates[self._filter_2_name]:
+            with_set_by_scene[obj.scene].append(obj)
+
         # Batch check for each object
         for obj in object_candidates[self._filter_1_name]:
+            if obj.scene not in with_set_by_scene:
+                continue
             if RigidContactAPI.is_in_contact(
-                scene_idx=obj.scene.idx, query_set=[obj], with_set=object_candidates[self._filter_2_name]
+                scene_idx=obj.scene.idx, query_set=[obj], with_set=with_set_by_scene[obj.scene]
             ):
                 objs.append(obj)
 

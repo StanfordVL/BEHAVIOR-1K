@@ -799,7 +799,7 @@ def check_robot_self_collision(env):
     # TODO: What about gripper finger self collision?
     for robot in env.robots:
         link_paths = list(robot.link_prim_paths)
-        if RigidContactAPI.is_in_contact(env.scene.idx, link_paths, with_set=link_paths)
+        if RigidContactAPI.is_in_contact(env.scene.idx, link_paths, with_set=link_paths):
             return True
     return False
 

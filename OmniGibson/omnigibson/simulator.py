@@ -488,9 +488,6 @@ def _launch_simulator(*args, **kwargs):
             # Set the lighting mode to be stage by default
             self.set_lighting_mode(mode=LightingMode.STAGE)
 
-            # Mapping from link IDs assigned from omni to the object that they reference
-            self._link_id_to_objects = dict()
-
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = [
@@ -898,10 +895,6 @@ def _launch_simulator(*args, **kwargs):
             for callback in self._callbacks_on_add_obj.values():
                 callback(obj)
 
-            # Cache the mapping from link IDs to object
-            for link in obj.links.values():
-                self._link_id_to_objects[lazy.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
-
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self._objects_to_initialize.append(obj)
 
@@ -981,10 +974,6 @@ def _launch_simulator(*args, **kwargs):
             # Run any callbacks
             for callback in self._callbacks_on_remove_obj.values():
                 callback(obj)
-
-            # pop all link ids
-            for link in obj.links.values():
-                self._link_id_to_objects.pop(lazy.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path))
 
             # If it was queued up to be initialized, remove it from the queue as well
             for i, initialize_obj in enumerate(self._objects_to_initialize):
