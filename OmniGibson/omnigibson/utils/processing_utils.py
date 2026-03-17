@@ -61,12 +61,12 @@ class MovingAverageFilter(Filter):
     using matrix operations and broadcasting with no intermediate large allocations.
     """
 
-    def __init__(self, obs_dim, filter_width, n_members):
+    def __init__(self, obs_dim, filter_width, n_members=1):
         """
         Args:
             obs_dim (int): The dimension of the points to filter.
             filter_width (int): The number of past samples to take the moving average over.
-            n_members (int): Number of independent filter rows (one per controller member).
+            n_members (int): Number of independent filter rows (one per controller member). Defaults to 1.
         """
         self.obs_dim = obs_dim
         assert filter_width > 0, f"MovingAverageFilter must have a non-zero size! Got: {filter_width}"
