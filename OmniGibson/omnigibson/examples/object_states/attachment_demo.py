@@ -76,17 +76,19 @@ def main(random_selection=False, headless=False, short_exec=False):
     for _ in range(10):
         env.step([])
 
-    input(
-        "\n\nbookcase parts fall to their correct poses and get automatically attached to the back panel.\n"
-        "You can try to drag (Shift + Left-CLICK + Drag) parts of the bookcase to break it apart (you may need to zoom out and drag with a larger force).\n"
-        "Press [ENTER] to continue.\n"
-    )
+    if not headless:
+        input(
+            "\n\nbookcase parts fall to their correct poses and get automatically attached to the back panel.\n"
+            "You can try to drag (Shift + Left-CLICK + Drag) parts of the bookcase to break it apart (you may need to zoom out and drag with a larger force).\n"
+            "Press [ENTER] to continue.\n"
+        )
 
     steps = 0
     max_steps = -1 if not short_exec else 1000
 
     while steps != max_steps:
         env.step([])
+        steps += 1
 
     og.shutdown()
 

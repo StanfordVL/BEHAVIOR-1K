@@ -54,12 +54,24 @@ def generate_examples_list(examples, skip_list):
     return "\n".join(lines)
 
 
+# Per-example extra args passed via --test-args when running in CI.
+# Add entries here for examples that require CLI arguments (e.g. click-based tools).
+EXAMPLE_ARGS = {
+    "robots.import_custom_robot": "--config tests/data/r1_pro_source_config.yaml",
+}
+
+
 def generate_yml_includes(examples, skip_list):
     """Generate the matrix include entries for test_examples."""
     lines = [f"        {INCLUDE_START}"]
     for name in examples:
         if name not in skip_list:
-            lines.append(f'          - {{test_file: test_examples, example: "{name}"}}')
+            if name in EXAMPLE_ARGS:
+                lines.append(
+                    f'          - {{test_file: test_examples, example: "{name}", args: "{EXAMPLE_ARGS[name]}"}}'
+                )
+            else:
+                lines.append(f'          - {{test_file: test_examples, example: "{name}"}}')
     lines.append(f"        {INCLUDE_END}")
     return "\n".join(lines)
 

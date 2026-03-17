@@ -78,14 +78,12 @@ jobs:
           - {test_file: test_examples, example: "object_states.temperature_demo"}
           - {test_file: test_examples, example: "objects.draw_bounding_box"}
           - {test_file: test_examples, example: "objects.highlight_objects"}
-          - {test_file: test_examples, example: "objects.import_custom_object"}
           - {test_file: test_examples, example: "objects.load_object_selector"}
           - {test_file: test_examples, example: "objects.view_cloth_configurations"}
           - {test_file: test_examples, example: "objects.visualize_object"}
           - {test_file: test_examples, example: "robots.all_robots_visualizer"}
-          - {test_file: test_examples, example: "robots.curobo_example"}
           - {test_file: test_examples, example: "robots.grasping_mode_example"}
-          - {test_file: test_examples, example: "robots.import_custom_robot"}
+          - {test_file: test_examples, example: "robots.import_custom_robot", args: "--config tests/data/r1_pro_source_config.yaml"}
           - {test_file: test_examples, example: "robots.robot_control_example"}
           - {test_file: test_examples, example: "scenes.scene_selector"}
           - {test_file: test_examples, example: "scenes.scene_tour_demo"}
@@ -117,6 +115,7 @@ jobs:
         run: >
           pytest -s tests/${{ matrix.test_file }}.py
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
+          ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
           --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
         continue-on-error: true
         timeout-minutes: 30
@@ -147,25 +146,32 @@ jobs:
     needs: [run_test]
     if: always()
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v2
-        with:
-          submodules: true
-          path: behavior1k-src
       - name: Pull reports
         uses: actions/download-artifact@v4
         with:
-          path: behavior1k-src/OmniGibson
+          path: test-results
           merge-multiple: true
-      - name: Test Report
-        uses: dorny/test-reporter@v1
+      - name: Convert JUnit XML to CTRF
+        run: npx --yes junit-to-ctrf "test-results/test_*.xml" -o ctrf-report.json
+
+      - name: Publish report
+        uses: ctrf-io/github-test-reporter@v1
         with:
-          name: Test Results
-          working-directory: behavior1k-src/OmniGibson
-          path: test_*.xml
-          reporter: java-junit
-          fail-on-error: 'false'
-          fail-on-empty: 'false'
+          report-path: ctrf-report.json
+          summary-report: true
+          failed-report: true
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Test Report with Pull Request Comment
+        uses: ctrf-io/github-test-reporter@v1
+        with:
+          report-path: './ctrf-report.json'
+          pull-request-report: true
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0

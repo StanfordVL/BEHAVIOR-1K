@@ -1,5 +1,5 @@
 import torch as th
-
+import pytest
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
@@ -127,35 +127,33 @@ def test_camera_pose_flatcache_on():
     camera_pose_test(True)
 
 
-def test_robot_load_drive():
-    if og.sim is None:
-        # Set global flags
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_TRANSITION_RULES = False
-    else:
-        # Make sure sim is stopped
+@pytest.mark.parametrize("robot_name", REGISTERED_ROBOTS)
+def test_robot_load_drive(robot_name):
+    if robot_name == "stretch":
+        pytest.skip("Skipping stretch for now")
+
+    if robot_name == "husky":
+        pytest.skip("Husky base motion is a little messed up because of the 4-wheel drive; skipping for now")
+
+    try:
+        if og.sim is None:
+            # Set global flags
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = True
+            gm.ENABLE_TRANSITION_RULES = False
+        else:
+            # Make sure sim is stopped
+            og.sim.stop()
+
+        config = {
+            "scene": {
+                "type": "Scene",
+            },
+        }
+
+        env = og.Environment(configs=config)
         og.sim.stop()
-
-    config = {
-        "scene": {
-            "type": "Scene",
-        },
-    }
-
-    env = og.Environment(configs=config)
-    og.sim.stop()
-
-    # Iterate over all robots and test their motion
-    for robot_name in REGISTERED_ROBOTS:
-        if robot_name in ["stretch"]:
-            # TODO: skipping stretch for now
-            continue
-
-        if robot_name in ["husky"]:
-            # Husky base motion is a little messed up because of the 4-wheel drive; skipping for now
-            # BehaviorRobot does not work with the primitive actions at the moment
-            continue
 
         robot = Robot(
             name=robot_name,
@@ -208,13 +206,16 @@ def test_robot_load_drive():
             for action in action_primitives._navigate_to_pose_direct(goal_location):
                 env.step(action)
             assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
-            assert robot.get_rpy()[2] - goal_location[2] < 0.1
+            yaw_diff = robot.get_rpy()[2] - goal_location[2]
+            wrapped_yaw_diff = th.atan2(th.sin(yaw_diff), th.cos(yaw_diff))
+            assert th.abs(wrapped_yaw_diff) < 0.1
 
         # Stop the simulator and remove the robot
         og.sim.stop()
         env.scene.remove_object(obj=robot)
-
-    og.clear()
+    finally:
+        if og.sim is not None:
+            og.clear()
 
 
 def test_grasping_mode():
