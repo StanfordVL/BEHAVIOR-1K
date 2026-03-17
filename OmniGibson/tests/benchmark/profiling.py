@@ -1,4 +1,5 @@
 import argparse
+import cProfile
 import json
 import math
 import os
@@ -22,6 +23,8 @@ parser.add_argument("-w", "--fluids", action="store_true")
 parser.add_argument("-g", "--gpu_dynamics", action="store_true")
 parser.add_argument("-p", "--macro_particle_system", action="store_true")
 parser.add_argument("-f", "--flatcache", action="store_true")
+parser.add_argument("--deep-profile", action="store_true")
+parser.add_argument("--deep-profile-output", default="deep-profile.prof")
 
 PROFILING_FIELDS = ["FPS", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
 NUM_CLOTH = 5
@@ -131,46 +134,59 @@ def main():
         ]
     )
 
-    load_start = time.time()
-    env = ProfilingEnv(configs=cfg)
-    table = env.scene.object_registry("name", "table")
-    apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
-    knifes = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
-    if args.cloth:
-        clothes = [env.scene.object_registry("name", f"cloth_{n}") for n in range(NUM_CLOTH)]
-        for cloth in clothes:
-            cloth.root_link.mass = 1.0
-    env.reset()
-
-    for n, knife in enumerate(knifes):
-        knife.set_position_orientation(
-            position=apples[n].get_position_orientation()[0] + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
-            orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32)),
-        )
-        knife.keep_still()
-    if args.fluids:
-        table.states[Covered].set_value(env.scene.get_system("water"), True)
-
     output, results = [], []
 
-    # Update the simulator's viewer camera's pose so it points towards the robot
-    og.sim.viewer_camera.set_position_orientation(
-        position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1]
-    )
-    # record total load time
-    total_load_time = time.time() - load_start
+    def _run_profiled_simulation():
+        load_start = time.time()
+        env = ProfilingEnv(configs=cfg)
+        table = env.scene.object_registry("name", "table")
+        apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
+        knifes = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
+        if args.cloth:
+            clothes = [env.scene.object_registry("name", f"cloth_{n}") for n in range(NUM_CLOTH)]
+            for cloth in clothes:
+                cloth.root_link.mass = 1.0
+        env.reset()
 
-    for i in range(300):
-        if args.robot:
-            action_lo, action_hi = -0.3, 0.3
-            result = env.step(
-                th.stack(
-                    [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
-                ).flatten()
-            )[4]
-        else:
-            result = env.step(None)[4]
-        results.append(result)
+        for n, knife in enumerate(knifes):
+            knife.set_position_orientation(
+                position=apples[n].get_position_orientation()[0] + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
+                orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32)),
+            )
+            knife.keep_still()
+        if args.fluids:
+            table.states[Covered].set_value(env.scene.get_system("water"), True)
+
+        # Update the simulator's viewer camera's pose so it points towards the robot
+        og.sim.viewer_camera.set_position_orientation(
+            position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1]
+        )
+
+        total_load_time = time.time() - load_start
+        for i in range(300):
+            if args.robot:
+                action_lo, action_hi = -0.3, 0.3
+                result = env.step(
+                    th.stack(
+                        [
+                            th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo
+                            for i in range(args.robot)
+                        ]
+                    ).flatten()
+                )[4]
+            else:
+                result = env.step(None)[4]
+            results.append(result)
+
+        og.shutdown()
+        return total_load_time
+
+    if args.deep_profile:
+        profiler = cProfile.Profile()
+        total_load_time = profiler.runcall(_run_profiled_simulation)
+        profiler.dump_stats(args.deep_profile_output)
+    else:
+        total_load_time = _run_profiled_simulation()
 
     field = f"{args.scene}" if args.scene else "Empty scene"
     if args.robot:
@@ -200,7 +216,6 @@ def main():
     ret.extend(output)
     with open("output.json", "w") as f:
         json.dump(ret, f, indent=4)
-    og.shutdown()
 
 
 if __name__ == "__main__":
