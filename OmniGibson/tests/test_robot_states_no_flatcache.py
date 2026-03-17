@@ -14,7 +14,7 @@ def test_camera_pose_flatcache_off():
 
 def test_camera_semantic_segmentation():
     env = setup_environment(False)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
@@ -32,7 +32,7 @@ def test_camera_semantic_segmentation():
 
 def test_object_in_FOV_of_robot():
     env = setup_environment(False)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     objs_in_fov = robot.states[ObjectsInFOVOfRobot].get_value()
     assert len(objs_in_fov) == 1 and next(iter(objs_in_fov)) == robot
@@ -77,7 +77,7 @@ def test_holonomic_robot_tuck_untuck_base_joint_invariance():
     }
 
     env = og.Environment(configs=config)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     og.sim.step()
 

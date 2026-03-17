@@ -258,7 +258,7 @@ def test_curobo():
         cfg["robots"] = [robot_cfg]
 
         env = og.Environment(configs=cfg)
-        robot = env.robots[0]
+        robot = env.scene.robots[0]
         obj = env.scene.object_registry("name", "obj0")
         eef_markers = [env.scene.object_registry("name", f"eef_marker_{i}") for i in range(2)]
 

@@ -46,7 +46,7 @@ def setup_environment(flatcache):
 
 def camera_pose_test(flatcache):
     env = setup_environment(flatcache)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     og.sim.step()
 

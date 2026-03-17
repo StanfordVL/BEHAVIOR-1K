@@ -36,7 +36,7 @@ def test_teleop():
 
     # Create the environment
     env = og.Environment(configs=cfg)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     teleop_action = TeleopAction()
     start_base_pose = robot.get_position_orientation()
