@@ -43,7 +43,7 @@ jobs:
         test_file:
           - test_controllers
           # - test_curobo
-          # - test_data_collection
+          # - test_data_collection  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2016
           - test_dump_load_states
           - test_envs
           - test_multiple_envs
@@ -58,7 +58,7 @@ jobs:
           - test_symbolic_primitives
           - test_systems
           - test_transform_utils
-          # - test_transition_rules
+          # - test_transition_rules  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2017
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
@@ -169,7 +169,7 @@ jobs:
         with:
           report-path: './ctrf-report.json'
           pull-request-report: true
-          fail-on-error: true
+          exit-on-fail: true
           update-comment: true
         if: always()
         env:
