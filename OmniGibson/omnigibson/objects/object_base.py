@@ -193,7 +193,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         usd_path = self._usd_path
 
         if self._encrypted:
-            # Create a temporary file to store the decrytped asset, load it, and then delete it
+            # Create a temporary file to store the decrypted asset, load it, and then delete it
             encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
             self.check_hash(encrypted_filename)
             basename = os.path.basename(self._usd_path)
