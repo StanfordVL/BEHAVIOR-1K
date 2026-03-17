@@ -177,84 +177,85 @@ def _launch_app():
     # Clear the argv - Isaac Sim unfortunately reads from it directly, so we need to clear it to avoid issues.
     # Otherwise it will inherit the arguments of the entrypoint script.
     _saved_argv = sys.argv[:]
-    sys.argv = []
+    try:
+        sys.argv = []
 
-    # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
-    if not gm.DEBUG:
-        import warnings
+        # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
+        if not gm.DEBUG:
+            import warnings
 
+            try:
+                from numba.core.errors import NumbaPerformanceWarning
+
+                warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+            except ImportError:
+                pass
+
+            # Find a more elegant way to prune omni logging
+            if gm.NO_OMNI_LOGS:
+                sys.argv.append("--/log/level=error")
+                sys.argv.append("--/log/fileLogLevel=error")
+                sys.argv.append("--/log/outputStreamLevel=error")
+
+        # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
+        # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
+        # On the regular omniverse launcher version this should not have any impact.
         try:
-            from numba.core.errors import NumbaPerformanceWarning
-
-            warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+            os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
+            import isaacsim  # noqa: F401
         except ImportError:
             pass
 
-        # Find a more elegant way to prune omni logging
-        if gm.NO_OMNI_LOGS:
-            sys.argv.append("--/log/level=error")
-            sys.argv.append("--/log/fileLogLevel=error")
-            sys.argv.append("--/log/outputStreamLevel=error")
+        # First obtain the Isaac Sim version
+        isaac_path = os.environ["ISAAC_PATH"]
+        version_file_path = os.path.join(isaac_path, "VERSION")
+        assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
+        with open(version_file_path, "r") as file:
+            version_content = file.read().strip()
+            isaac_version_str = version_content.split("-")[0]
+            isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
+            assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
+            kit_file_name = m.KIT_FILES[isaac_version_tuple]
 
-    # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
-    # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
-    # On the regular omniverse launcher version this should not have any impact.
-    try:
-        os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
-        import isaacsim  # noqa: F401
-    except ImportError:
-        pass
+        # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+        # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+        # ensure that the kit file is always up to date.
+        assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+        exp_path = os.environ["EXP_PATH"]
+        kit_file = Path(__file__).parent / kit_file_name
+        kit_file_target = Path(exp_path) / kit_file_name
+        icon_file = Path(__file__).parents[2] / "docs" / "assets" / "OmniGibson_logo.png"
+        icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
 
-    # First obtain the Isaac Sim version
-    isaac_path = os.environ["ISAAC_PATH"]
-    version_file_path = os.path.join(isaac_path, "VERSION")
-    assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
-    with open(version_file_path, "r") as file:
-        version_content = file.read().strip()
-        isaac_version_str = version_content.split("-")[0]
-        isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
-        assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
-        kit_file_name = m.KIT_FILES[isaac_version_tuple]
+        try:
+            shutil.copyfile(kit_file, kit_file_target)
+            shutil.copyfile(icon_file, icon_file_target)
+        except Exception as e:
+            raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
-    # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
-    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
-    # ensure that the kit file is always up to date.
-    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
-    exp_path = os.environ["EXP_PATH"]
-    kit_file = Path(__file__).parent / kit_file_name
-    kit_file_target = Path(exp_path) / kit_file_name
-    icon_file = Path(__file__).parents[2] / "docs" / "assets" / "OmniGibson_logo.png"
-    icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
+        # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
+        os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
 
-    try:
-        shutil.copyfile(kit_file, kit_file_target)
-        shutil.copyfile(icon_file, icon_file_target)
-    except Exception as e:
-        raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
+        launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
-    # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
-    os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
+        # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
+        local_appdata = Path(gm.APPDATA_PATH) / "local"
+        local_appdata.mkdir(parents=True, exist_ok=True)
+        sys.argv.extend(["--portable-root", str(local_appdata)])
 
-    launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
+        global_cache_dir = Path(gm.APPDATA_PATH) / "global" / "cache"
+        global_cache_dir.mkdir(parents=True, exist_ok=True)
+        sys.argv.append(f"--/app/tokens/omni_global_cache={global_cache_dir}")
 
-    # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
-    local_appdata = Path(gm.APPDATA_PATH) / "local"
-    local_appdata.mkdir(parents=True, exist_ok=True)
-    sys.argv.extend(["--portable-root", str(local_appdata)])
+        global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
+        global_data_dir.mkdir(parents=True, exist_ok=True)
+        sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
 
-    global_cache_dir = Path(gm.APPDATA_PATH) / "global" / "cache"
-    global_cache_dir.mkdir(parents=True, exist_ok=True)
-    sys.argv.append(f"--/app/tokens/omni_global_cache={global_cache_dir}")
-
-    global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
-    global_data_dir.mkdir(parents=True, exist_ok=True)
-    sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
-
-    with launch_context(None):
-        app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
-
-    # Restore the original argv now that Isaac Sim has been initialized
-    sys.argv = _saved_argv
+        with launch_context(None):
+            app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+    finally:
+        # Always restore the caller's argv, even if Isaac Sim startup raises.
+        sys.argv = _saved_argv
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.isaacsim.core.utils.stage.close_stage()

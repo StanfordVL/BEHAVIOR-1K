@@ -534,10 +534,8 @@ class RigidContactAPIImpl:
         Returns:
             bool: True if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set, else False.
         """
-        # Assert that at most one of the with-set, or the ignore-set is specified, but not both.
-        assert (
-            with_set is None or ignore_set is None
-        ), "Either the with-set, or the ignore-set must be specified, but not both."
+        if with_set is not None and ignore_set is not None:
+            raise ValueError("At most one of with_set or ignore_set may be specified.")
 
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return False

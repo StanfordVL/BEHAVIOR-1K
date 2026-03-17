@@ -795,16 +795,12 @@ class HeadCameraUprightMetric(EnvMetric):
         return results
 
 
-def check_robot_self_collision(env, min_threshold=None):
+def check_robot_self_collision(env):
     # TODO: What about gripper finger self collision?
     for robot in env.robots:
-        link_paths = robot.link_prim_paths
-        if min_threshold is None:
-            if RigidContactAPI.in_contact(link_paths, link_paths):
-                return True
-        else:
-            if th.any(th.norm(RigidContactAPI.get_impulses(link_paths, link_paths), dim=-1) > min_threshold).item():
-                return True
+        link_paths = list(robot.link_prim_paths)
+        if RigidContactAPI.is_in_contact(env.scene.idx, link_paths, with_set=link_paths)
+            return True
     return False
 
 
@@ -823,10 +819,10 @@ def check_robot_base_nonarm_nonkinematic_collision(env):
             robot_link_paths -= set(link.prim_path for link in robot.arm_links[arm])
             robot_link_paths -= set(link.prim_path for link in robot.gripper_links[arm])
             robot_link_paths -= set(link.prim_path for link in robot.finger_links[arm])
-    robot_link_idxs = [RigidContactAPI.get_body_col_idx(link_path)[1] for link_path in robot_link_paths]
-    robot_contacts = RigidContactAPI.get_all_impulses(env.scene.idx)[robot_link_idxs]
+        if RigidContactAPI.is_in_contact(env.scene.idx, robot_link_paths, ignore_set={robot}):
+            return True
 
-    return th.any(robot_contacts).item()
+    return False
 
 
 def check_robot_nonarm_nonground_collision(env):
