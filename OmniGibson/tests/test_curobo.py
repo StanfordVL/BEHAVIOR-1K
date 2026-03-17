@@ -457,15 +457,10 @@ def test_curobo():
                         og.sim.step()
                         for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
                             assert body0 in robot.link_prim_paths
-                            if (
-                                body1 in floor_plane_prim_paths
-                                and body0 in floor_touching_base_link_prim_paths
-                            ):
+                            if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
                             print(f"Unexpected contact pair during traj rollout: {body0}, {body1}")
-                            assert (
-                                False
-                            ), f"Unexpected contact pair during traj rollout: {body0}, {body1}"
+                            assert False, f"Unexpected contact pair during traj rollout: {body0}, {body1}"
                     else:
                         # Convert target joint positions to action
                         action = robot.q_to_action(q)
@@ -475,10 +470,7 @@ def test_curobo():
 
                         for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
                             assert body0 in robot.link_prim_paths
-                            if (
-                                body1 in floor_plane_prim_paths
-                                and body0 in floor_touching_base_link_prim_paths
-                            ):
+                            if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
                             print(f"Unexpected contact pair during traj rollout: {body0}, {body1}")
                             # Controller is not perfect, so collisions might happen

@@ -3236,7 +3236,11 @@ class Robot(USDObject, GymObservable):
             # Calculate position of the object link. Only allow this for objects currently.
             obj_prim_path, link_name = prim_path.rsplit("/", 1)
             candidate_obj = self.scene.object_registry("prim_path", obj_prim_path, None)
-            if candidate_obj is None or link_name not in candidate_obj.links or not isinstance(candidate_obj.links[link_name], RigidDynamicPrim):
+            if (
+                candidate_obj is None
+                or link_name not in candidate_obj.links
+                or not isinstance(candidate_obj.links[link_name], RigidDynamicPrim)
+            ):
                 continue
             candidate_link = candidate_obj.links[link_name]
             dist = th.norm(candidate_link.get_position_orientation()[0] - gripper_center_pos)
