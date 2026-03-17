@@ -391,18 +391,7 @@ class MultiFingerGripperController(GripperController):
     def _dump_state(self, controller_idx):
         # Run super first
         state = super()._dump_state(controller_idx=controller_idx)
-
-        # Add filter state
-        if self._vel_filter is None:
-            state["vel_filter"] = None
-        else:
-            vel_filter_state = self._vel_filter.dump_state(serialized=False)
-            state["vel_filter"] = {
-                "past_samples": vel_filter_state["past_samples"][controller_idx].clone(),
-                "current_idx": vel_filter_state["current_idx"][controller_idx].clone(),
-                "fully_filled": vel_filter_state["fully_filled"][controller_idx].clone(),
-            }
-
+        state["vel_filter"] = None if self._vel_filter is None else self._vel_filter.dump_state(controller_idx)
         return state
 
     def _load_state(self, controller_idx, state):
@@ -411,12 +400,7 @@ class MultiFingerGripperController(GripperController):
 
         # Also load velocity filter state for this single member.
         if self._vel_filter is not None and state.get("vel_filter") is not None:
-            vel_filter_state = self._vel_filter.dump_state(serialized=False)
-            loaded_filter_state = state["vel_filter"]
-            vel_filter_state["past_samples"][controller_idx] = loaded_filter_state["past_samples"]
-            vel_filter_state["current_idx"][controller_idx] = loaded_filter_state["current_idx"]
-            vel_filter_state["fully_filled"][controller_idx] = loaded_filter_state["fully_filled"]
-            self._vel_filter.load_state(vel_filter_state, serialized=False)
+            self._vel_filter.load_state(controller_idx, state["vel_filter"])
         elif self._vel_filter is not None and not state["goal_set"]:
             self._vel_filter.reset(controller_idx)
 
@@ -424,13 +408,7 @@ class MultiFingerGripperController(GripperController):
         # Run super first
         state_flat = super().serialize(state=state, controller_idx=controller_idx)
         filter_flat = (
-            th.cat(
-                [
-                    state["vel_filter"]["past_samples"].flatten(),
-                    state["vel_filter"]["current_idx"].float().reshape(1),
-                    state["vel_filter"]["fully_filled"].float().reshape(1),
-                ]
-            )
+            self._vel_filter.serialize(state["vel_filter"], controller_idx)
             if self._vel_filter is not None and state.get("vel_filter") is not None
             else th.tensor([])
         )
@@ -440,15 +418,8 @@ class MultiFingerGripperController(GripperController):
         state_dict, idx = super().deserialize(state=state, controller_idx=controller_idx)
         state_dict["vel_filter"] = None
         if self._vel_filter is not None:
-            samples_len = self._vel_filter.filter_width * self._vel_filter.obs_dim
-            state_dict["vel_filter"] = {
-                "past_samples": state[idx : idx + samples_len].reshape(
-                    self._vel_filter.filter_width, self._vel_filter.obs_dim
-                ),
-                "current_idx": state[idx + samples_len].long(),
-                "fully_filled": state[idx + samples_len + 1].bool(),
-            }
-            idx += samples_len + 2
+            state_dict["vel_filter"], samples_len = self._vel_filter.deserialize(state[idx:], controller_idx)
+            idx += samples_len
         return state_dict, idx
 
     @property

@@ -823,21 +823,20 @@ class Robot(USDObject, GymObservable):
             # stays the same across different controllers and control modes (absolute / delta). This way,
             # a zero action will actually keep the AG setting where it already is.
             group_key, controller_idx = self._controllers[f"gripper_{arm}"]
-            controller = ControllerView.get_controller(group_key)
-            controlled_joints = controller.dof_idx
-            control = controller.control(controller_idx)
+            controlled_joints = ControllerView.get_dof_idx(group_key)
+            control = ControllerView.get_control(group_key, controller_idx)
             if control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
                 applying_grasp = (
                     th.any(control < self.joint_upper_limits[controlled_joints])
-                    if controller.control_type == ControlType.POSITION
+                    if ControllerView.get_control_type(group_key) == ControlType.POSITION
                     else th.any(control < 0)
                 )
             else:
                 applying_grasp = (
                     th.any(control > self.joint_lower_limits[controlled_joints])
-                    if controller.control_type == ControlType.POSITION
+                    if ControllerView.get_control_type(group_key) == ControlType.POSITION
                     else th.any(control > 0)
                 )
             # Execute gradual release of object
@@ -980,10 +979,6 @@ class Robot(USDObject, GymObservable):
         # Dump controllers
         controller_states = {}
         for controller_name, (group_key, controller_idx) in self._controllers.items():
-            print(
-                f"[Robot._dump_state] robot={self.name} "
-                f"controller={controller_name} group_key={group_key} idx={controller_idx}"
-            )
             controller_states[controller_name] = ControllerView.dump_state(group_key, controller_idx)
         state["controller_groups"] = controller_states
 
@@ -1011,11 +1006,6 @@ class Robot(USDObject, GymObservable):
         for controller_name, (group_key, controller_idx) in self._controllers.items():
             controller_state = state["controller_groups"].get(controller_name)
             if controller_state is not None:
-                print(
-                    f"[Robot._load_state] robot={self.name} "
-                    f"controller={controller_name} group_key={group_key} idx={controller_idx} "
-                    f"incoming_goal_set={controller_state.get('goal_set', None)}"
-                )
                 ControllerView.load_state(group_key, controller_idx, controller_state)
 
         if self.is_manipulation:
@@ -1330,21 +1320,21 @@ class Robot(USDObject, GymObservable):
             for arm in self.arm_names:
                 # If we have an arm controller, make sure it is a manipulation controller
                 if f"arm_{arm}" in self._controllers:
-                    assert isinstance(
-                        ControllerView.get_controller(self._controllers[f"arm_{arm}"][0]), ManipulationController
+                    assert ControllerView.is_controller_type(
+                        self._controllers[f"arm_{arm}"][0], ManipulationController
                     ), "Arm {} controller must be a member of ManipulationController!".format(arm)
 
                 # If we have a gripper controller, make sure it is a manipulation controller
                 if f"gripper_{arm}" in self._controllers:
-                    assert isinstance(
-                        ControllerView.get_controller(self._controllers[f"gripper_{arm}"][0]), GripperController
+                    assert ControllerView.is_controller_type(
+                        self._controllers[f"gripper_{arm}"][0], GripperController
                     ), "Gripper {} controller must be a member of GripperController!".format(arm)
 
         if self.is_locomotion:
             # If we have a base controller, make sure it is a locomotion controller
             if "base" in self._controllers:
-                assert isinstance(
-                    ControllerView.get_controller(self._controllers["base"][0]), LocomotionController
+                assert ControllerView.is_controller_type(
+                    self._controllers["base"][0], LocomotionController
                 ), "Base controller must be a member of LocomotionController!"
         if self.is_two_wheel:
             assert (
@@ -1947,8 +1937,8 @@ class Robot(USDObject, GymObservable):
         """
         if self.is_two_wheel:
             action = th.zeros(self.action_dim)
-            assert isinstance(
-                ControllerView.get_controller(self._controllers["base"][0]), DifferentialDriveController
+            assert ControllerView.is_controller_type(
+                self._controllers["base"][0], DifferentialDriveController
             ), "Only DifferentialDriveController is supported!"
             action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
             return action
@@ -3796,12 +3786,13 @@ class Robot(USDObject, GymObservable):
         if not self.is_holonomic_base:
             action = []
             for name, (group_key, _) in self.controllers.items():
-                ctrl = ControllerView.get_controller(group_key)
-                assert (
-                    ControllerView.is_controller_type(group_key, JointController) and not ctrl.use_delta_commands
+                assert ControllerView.is_controller_type(
+                    group_key, JointController
+                ) and not ControllerView.get_use_delta_commands(
+                    group_key
                 ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
                 command = q[ControllerView.get_dof_idx(group_key)]
-                action.append(ctrl._reverse_preprocess_command(command))
+                action.append(ControllerView.reverse_preprocess_command(group_key, command))
             action = th.cat(action, dim=0)
             assert (
                 action.shape[0] == self.action_dim
@@ -3810,9 +3801,9 @@ class Robot(USDObject, GymObservable):
 
         action = []
         for name, (group_key, _) in self.controllers.items():
-            ctrl = ControllerView.get_controller(group_key)
             assert (
-                ControllerView.is_controller_type(group_key, JointController) and not ctrl.use_delta_commands
+                ControllerView.is_controller_type(group_key, JointController)
+                and not ControllerView.get_use_delta_commands(group_key)
             ), f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
             command = q[ControllerView.get_dof_idx(group_key)]
             if ControllerView.is_controller_type(group_key, HolonomicBaseJointController):
@@ -3830,7 +3821,7 @@ class Robot(USDObject, GymObservable):
                     canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), body_pos, body_quat
                 )[0]
                 command = th.tensor([local_pos[0], local_pos[1], delta_q])
-            action.append(ctrl._reverse_preprocess_command(command))
+            action.append(ControllerView.reverse_preprocess_command(group_key, command))
         action = th.cat(action, dim=0)
         assert (
             action.shape[0] == self.action_dim

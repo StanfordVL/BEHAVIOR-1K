@@ -61,10 +61,11 @@ class ControllerView:
             from omnigibson.controllers import create_controller
 
             controller_name = controller_cfg.get("name")
-            if link_name is not None and controller_name in {
+            if controller_name in {
                 "InverseKinematicsController",
                 "OperationalSpaceController",
             }:
+                assert link_name is not None
                 cls._controller_groups[group_key] = create_controller(**controller_cfg, link_name=link_name)
             else:
                 cls._controller_groups[group_key] = create_controller(**controller_cfg)
@@ -144,13 +145,10 @@ class ControllerView:
         - Keep the group if any active members remain; delete it only when all members
         are tombstoned.
 
-        Why tombstones:
-        - Preserve stable controller_idx assignments for remaining robots.
-        - Avoid shifting arrays / remapping indices across robots in the same group.
-
-        Tombstoned slots are never reused.
         Controller logic must mask tombstoned slots during goal updates, batched
         compute, and writeback.
+
+        Tombstoned slots will be reused for new controller members.
 
         Args:
             controllers (dict): The robot.controllers dict,
@@ -194,6 +192,18 @@ class ControllerView:
     @classmethod
     def get_goal(cls, group_key: str, controller_idx: int) -> dict:
         return cls._controller_groups[group_key].get_goal(controller_idx)
+
+    @classmethod
+    def get_control(cls, group_key: str, controller_idx: int):
+        return cls._controller_groups[group_key].get_control(controller_idx)
+
+    @classmethod
+    def reverse_preprocess_command(cls, group_key: str, command):
+        return cls._controller_groups[group_key]._reverse_preprocess_command(command)
+
+    @classmethod
+    def get_use_delta_commands(cls, group_key: str) -> bool:
+        return cls._controller_groups[group_key].use_delta_commands
 
     @classmethod
     def get_controller(cls, group_key: str):

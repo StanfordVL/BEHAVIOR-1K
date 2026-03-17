@@ -197,39 +197,22 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
     def _dump_state(self, controller_idx):
         state = super()._dump_state(controller_idx=controller_idx)
-        if self._control_filter is None:
-            state["control_filter"] = None
-        else:
-            filter_state = self._control_filter.dump_state(serialized=False)
-            state["control_filter"] = {
-                "past_samples": filter_state["past_samples"][controller_idx].clone(),
-                "current_idx": filter_state["current_idx"][controller_idx].clone(),
-                "fully_filled": filter_state["fully_filled"][controller_idx].clone(),
-            }
+        state["control_filter"] = (
+            None if self._control_filter is None else self._control_filter.dump_state(controller_idx)
+        )
         return state
 
     def _load_state(self, controller_idx, state):
         super()._load_state(controller_idx=controller_idx, state=state)
         if self._control_filter is not None and state.get("control_filter") is not None:
-            filter_state = self._control_filter.dump_state(serialized=False)
-            loaded_filter_state = state["control_filter"]
-            filter_state["past_samples"][controller_idx] = loaded_filter_state["past_samples"]
-            filter_state["current_idx"][controller_idx] = loaded_filter_state["current_idx"]
-            filter_state["fully_filled"][controller_idx] = loaded_filter_state["fully_filled"]
-            self._control_filter.load_state(filter_state, serialized=False)
+            self._control_filter.load_state(controller_idx, state["control_filter"])
 
     def serialize(self, state, controller_idx):
         state_flat = super().serialize(state=state, controller_idx=controller_idx)
         filter_part = (
             th.tensor([])
             if self._control_filter is None or state.get("control_filter") is None
-            else th.cat(
-                [
-                    state["control_filter"]["past_samples"].flatten(),
-                    state["control_filter"]["current_idx"].float().reshape(1),
-                    state["control_filter"]["fully_filled"].float().reshape(1),
-                ]
-            )
+            else self._control_filter.serialize(state["control_filter"], controller_idx)
         )
         return th.cat([state_flat, filter_part])
 
@@ -237,15 +220,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         state_dict, idx = super().deserialize(state=state, controller_idx=controller_idx)
         state_dict["control_filter"] = None
         if self._control_filter is not None:
-            samples_len = self._control_filter.filter_width * self._control_filter.obs_dim
-            state_dict["control_filter"] = {
-                "past_samples": state[idx : idx + samples_len].reshape(
-                    self._control_filter.filter_width, self._control_filter.obs_dim
-                ),
-                "current_idx": state[idx + samples_len].long(),
-                "fully_filled": state[idx + samples_len + 1].bool(),
-            }
-            idx += samples_len + 2
+            state_dict["control_filter"], samples_len = self._control_filter.deserialize(state[idx:], controller_idx)
+            idx += samples_len
         return state_dict, idx
 
     def _generate_default_command_output_limits(self):

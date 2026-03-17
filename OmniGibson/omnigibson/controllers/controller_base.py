@@ -152,7 +152,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._control_enabled = th.zeros(0, dtype=th.long)
         # Per-member last deployed control tensor (N, control_dim)
         self._controls = th.zeros((0, self.control_dim))
-        # Per-member tombstone mask: 0 = active, 1 = unregistered (permanently ignored)
+        # Per-member tombstone mask: 0 = active, 1 = unregistered
         self._unregistered_controllers = th.zeros(0, dtype=th.long)
 
         # Cached control limits for this controller's dof_idx — used by clip_control every step
@@ -501,7 +501,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             self._goals[k][controller_idx] = th.zeros(self._goal_shapes[k])
 
     def unregister_member(self, controller_idx):
-        """Mark member at controller_idx as a tombstone (permanently ignored)."""
+        """Mark member at controller_idx as a tombstone (can be reused by new member)."""
         self._unregistered_controllers[controller_idx] = 1
 
     def has_no_active_members(self):

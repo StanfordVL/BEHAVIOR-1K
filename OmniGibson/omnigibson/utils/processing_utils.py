@@ -196,58 +196,51 @@ class MovingAverageFilter(Filter):
 
     @property
     def state_size(self):
-        # This is the size of the internal buffer plus the current index and fully filled values
-        return self.n_members * self.filter_width * self.obs_dim + 2 * self.n_members
+        return self.filter_width * self.obs_dim + 2
 
-    def _dump_state(self):
-        # Run super init first
-        state = super()._dump_state()
+    def dump_state(self, controller_idx, serialized=False):
+        state = self._dump_state(controller_idx)
+        return self.serialize(state, controller_idx) if serialized else state
 
-        # Add info from this filter
-        state["past_samples"] = self.past_samples.clone()
-        state["current_idx"] = self.current_idx.clone()
-        state["fully_filled"] = self.fully_filled.clone()
+    def _dump_state(self, controller_idx):
+        return {
+            "past_samples": self.past_samples[controller_idx].clone(),
+            "current_idx": self.current_idx[controller_idx].clone(),
+            "fully_filled": self.fully_filled[controller_idx].clone(),
+        }
 
-        return state
+    def load_state(self, controller_idx, state, serialized=False):
+        if serialized:
+            orig_state_len = len(state)
+            state, deserialized_items = self.deserialize(state, controller_idx)
+            assert deserialized_items == orig_state_len, (
+                f"Invalid state deserialization occurred! Expected {orig_state_len} total "
+                f"values to be deserialized, only {deserialized_items} were."
+            )
+        self._load_state(controller_idx, state)
 
-    def _load_state(self, state):
-        # Run super first
-        super()._load_state(state=state)
+    def _load_state(self, controller_idx, state):
+        self.past_samples[controller_idx] = state["past_samples"]
+        self.current_idx[controller_idx] = state["current_idx"]
+        self.fully_filled[controller_idx] = state["fully_filled"]
 
-        # Load relevant info for this filter
-        self.past_samples = state["past_samples"].clone()
-        self.current_idx = state["current_idx"].clone()
-        self.fully_filled = state["fully_filled"].clone()
-
-    def serialize(self, state):
-        # Run super first
-        state_flat = super().serialize(state=state)
-
-        # Serialize state for this filter
+    def serialize(self, state, controller_idx):
         return th.cat(
             [
-                state_flat,
                 state["past_samples"].flatten(),
-                state["current_idx"].float(),
-                state["fully_filled"].float(),
+                state["current_idx"].float().reshape(1),
+                state["fully_filled"].float().reshape(1),
             ]
         )
 
-    def deserialize(self, state):
-        # Run super first
-        state_dict, idx = super().deserialize(state=state)
-
-        # Deserialize state for this filter
-        samples_len = self.n_members * self.filter_width * self.obs_dim
-        state_dict["past_samples"] = state[idx : idx + samples_len].reshape(
-            self.n_members, self.filter_width, self.obs_dim
-        )
-        idx += samples_len
-        state_dict["current_idx"] = state[idx : idx + self.n_members].long()
-        idx += self.n_members
-        state_dict["fully_filled"] = state[idx : idx + self.n_members].bool()
-        idx += self.n_members
-        return state_dict, idx
+    def deserialize(self, state, controller_idx):
+        samples_len = self.filter_width * self.obs_dim
+        state_dict = {
+            "past_samples": state[:samples_len].reshape(self.filter_width, self.obs_dim),
+            "current_idx": state[samples_len].long(),
+            "fully_filled": state[samples_len + 1].bool(),
+        }
+        return state_dict, samples_len + 2
 
 
 class ExponentialAverageFilter(Filter):
