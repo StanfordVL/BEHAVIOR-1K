@@ -1129,9 +1129,7 @@ class BDDLSampler:
                     }
 
                 room_insts = (
-                    [None]
-                    if self._scene_model is None
-                    else self._scene.seg_map.room_sem_name_to_ins_name[room_type]
+                    [None] if self._scene_model is None else self._scene.seg_map.room_sem_name_to_ins_name[room_type]
                 )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
@@ -1414,9 +1412,7 @@ class BDDLSampler:
                 system_name = OBJECT_TAXONOMY.get_subtree_substances(obj_synset)[0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
-                    entity=(
-                        None if obj_inst in self._future_obj_instances else self._scene.get_system(system_name)
-                    ),
+                    entity=(None if obj_inst in self._future_obj_instances else self._scene.get_system(system_name)),
                 )
             else:
                 valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))

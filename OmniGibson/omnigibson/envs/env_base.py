@@ -276,14 +276,20 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         )
                         robot_config["model"] = robot_config["type"].lower()
                         del robot_config["type"]
-                    assert robot_config["model"] in REGISTERED_ROBOTS, f"{robot_config['model']} is not a registered robot."
+                    assert (
+                        robot_config["model"] in REGISTERED_ROBOTS
+                    ), f"{robot_config['model']} is not a registered robot."
                     position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                     pose_frame = robot_config.pop("pose_frame", "scene")
                     if position is not None:
-                        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+                        position = (
+                            position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+                        )
                     if orientation is not None:
                         orientation = (
-                            orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+                            orientation
+                            if isinstance(orientation, th.Tensor)
+                            else th.tensor(orientation, dtype=th.float32)
                         )
 
                     robot = Robot(**robot_config)

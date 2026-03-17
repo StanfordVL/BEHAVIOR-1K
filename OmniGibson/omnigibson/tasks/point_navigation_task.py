@@ -107,12 +107,12 @@ class PointNavigationTask(BaseTask):
         self._reward_type = reward_type
 
         # Per-env state (populated during reset)
-        self._initial_pos = None       # list of (3,) tensors per env
-        self._initial_quat = None      # list of (4,) tensors per env
-        self._goal_pos = None          # list of (3,) tensors per env
-        self._path_length = None       # th.Tensor (num_envs,)
-        self._current_robot_pos = None # list of (3,) tensors per env
-        self._geodesic_dist = None     # th.Tensor (num_envs,)
+        self._initial_pos = None  # list of (3,) tensors per env
+        self._initial_quat = None  # list of (4,) tensors per env
+        self._goal_pos = None  # list of (3,) tensors per env
+        self._path_length = None  # th.Tensor (num_envs,)
+        self._current_robot_pos = None  # list of (3,) tensors per env
+        self._geodesic_dist = None  # th.Tensor (num_envs,)
 
         # Visualization markers (only for first scene)
         self._initial_pos_marker = None
@@ -261,9 +261,7 @@ class PointNavigationTask(BaseTask):
         if self._randomize_goal_pos:
             dist, in_range_dist = 0.0, False
             for _ in range(max_trials):
-                _, goal_pos = scene.get_random_point(
-                    floor=self._floor, reference_point=initial_pos, robot=robot
-                )
+                _, goal_pos = scene.get_random_point(floor=self._floor, reference_point=initial_pos, robot=robot)
                 _, dist = scene.get_shortest_path(
                     self._floor, initial_pos[:2], goal_pos[:2], entire_path=False, robot=robot
                 )
@@ -461,9 +459,7 @@ class PointNavigationTask(BaseTask):
         """
         scene = env.scenes[env_idx]
         robot = scene.robots[self._robot_idn]
-        start_xy_pos = (
-            robot.states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
-        )
+        start_xy_pos = robot.states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
         return scene.get_shortest_path(
             self._floor, start_xy_pos, self._goal_pos[env_idx][:2], entire_path=entire_path, robot=robot
         )
@@ -498,9 +494,7 @@ class PointNavigationTask(BaseTask):
             robot = env.scenes[env_idx].robots[self._robot_idn]
             new_robot_pos = robot.states[Pose].get_value()[0]
             if self._current_robot_pos[env_idx] is not None:
-                self._path_length[env_idx] += T.l2_distance(
-                    self._current_robot_pos[env_idx][:2], new_robot_pos[:2]
-                )
+                self._path_length[env_idx] += T.l2_distance(self._current_robot_pos[env_idx][:2], new_robot_pos[:2])
             self._current_robot_pos[env_idx] = new_robot_pos
 
         return reward, done, info

@@ -31,10 +31,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     for _ in range(max_iterations):
         start_time = time.time()
         for _ in range(NUM_STEPS):
-            actions = th.stack([
-                th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-                for i in range(env.num_envs)
-            ])
+            actions = th.stack(
+                [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(env.num_envs)]
+            )
             env.step(actions)
 
         step_time = time.time() - start_time

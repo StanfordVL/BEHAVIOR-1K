@@ -386,10 +386,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         self._reward = rewards
         self._done = dones
         self._success = th.tensor([di["success"] for di in done_infos], dtype=th.bool)
-        self._info = [
-            {"reward": reward_infos[i], "done": done_infos[i]}
-            for i in range(self._num_envs)
-        ]
+        self._info = [{"reward": reward_infos[i], "done": done_infos[i]} for i in range(self._num_envs)]
 
         return self._reward, self._done, deepcopy(self._info)
 

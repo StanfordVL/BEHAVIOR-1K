@@ -423,7 +423,9 @@ class BehaviorTask(BaseTask):
                 self.activity_conditions, self.backend, self.object_scope[env_idx]
             )
             self.ground_goal_state_options[env_idx] = get_ground_goal_state_options(
-                self.activity_conditions, self.backend, self.object_scope[env_idx],
+                self.activity_conditions,
+                self.backend,
+                self.object_scope[env_idx],
                 self.activity_goal_conditions[env_idx],
             )
 

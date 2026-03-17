@@ -130,7 +130,9 @@ class PointReachingTask(PointNavigationTask):
 
         # Remove xy-pos and replace with full xyz relative distance between current and goal pos
         low_dim_obs.pop("xy_pos_to_goal")
-        low_dim_obs["eef_to_goal"] = self._global_pos_to_robot_frame(env=env, env_idx=env_idx, pos=self._goal_pos[env_idx])
+        low_dim_obs["eef_to_goal"] = self._global_pos_to_robot_frame(
+            env=env, env_idx=env_idx, pos=self._goal_pos[env_idx]
+        )
 
         # Add local eef position as well
         robot = env.scenes[env_idx].robots[self._robot_idn]

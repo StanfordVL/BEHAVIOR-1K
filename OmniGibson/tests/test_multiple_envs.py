@@ -43,6 +43,7 @@ def _grasp_reset_pose_path(robot):
     f.close()
     return f.name
 
+
 # Test counter for progress tracking
 _test_counter = {"current": 0, "total": 84}
 
@@ -117,6 +118,7 @@ def setup_multi_environment(num_of_envs, robot="fetch", task_type="DummyTask", a
 #  Section 1 – Environment-level API tests
 # ===================================================================
 
+
 class TestEnvConstruction:
     """Basic environment construction & property tests."""
 
@@ -174,10 +176,9 @@ class TestStepAndReset:
         env = setup_multi_environment(num_of_envs=num_envs)
         env.reset()
 
-        actions = th.stack([
-            th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-            for i in range(num_envs)
-        ])
+        actions = th.stack(
+            [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(num_envs)]
+        )
 
         obs_list, rewards, terminateds, truncateds, infos = env.step(actions)
 
@@ -207,8 +208,9 @@ class TestStepAndReset:
 
         pos_after = env.scenes[0].robots[0].get_position_orientation(frame="scene")[0]
         print(f"  pos_before={pos_before}, pos_after={pos_after}")
-        assert th.allclose(pos_before, pos_after, atol=0.05), \
-            f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
+        assert th.allclose(
+            pos_before, pos_after, atol=0.05
+        ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
         og.clear()
         _passed("TestStepAndReset::test_selective_reset")
 
@@ -222,10 +224,9 @@ class TestStepAndReset:
         assert env.episode_steps.shape == (num_envs,)
         assert (env.episode_steps == 0).all()
 
-        actions = th.stack([
-            th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-            for i in range(num_envs)
-        ])
+        actions = th.stack(
+            [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(num_envs)]
+        )
         env.step(actions)
 
         print(f"  episode_steps after 1 step: {env.episode_steps}")
@@ -244,6 +245,7 @@ class TestStepAndReset:
 #              Parametrized over robots & task types
 # ===================================================================
 
+
 @pytest.mark.parametrize("robot", ROBOTS)
 @pytest.mark.parametrize("task_type", TASK_TYPES)
 class TestTaskTensors:
@@ -258,10 +260,9 @@ class TestTaskTensors:
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=task_type)
         env.reset()
 
-        actions = th.stack([
-            th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-            for i in range(num_envs)
-        ])
+        actions = th.stack(
+            [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(num_envs)]
+        )
         env.step(actions)
 
         print(f"  reward={env.task.reward}, done={env.task.done}, success={env.task.success}")
@@ -279,16 +280,16 @@ class TestTaskTensors:
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=task_type)
         env.reset()
 
-        actions = th.stack([
-            th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-            for i in range(num_envs)
-        ])
+        actions = th.stack(
+            [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(num_envs)]
+        )
         env.step(actions)
 
         for rf_name, rf in env.task._reward_functions.items():
             print(f"  reward fn '{rf_name}': shape={rf._reward.shape}, values={rf._reward}")
-            assert rf._reward.shape == (num_envs,), \
-                f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
+            assert rf._reward.shape == (
+                num_envs,
+            ), f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
         og.clear()
         _passed(test_id)
 
@@ -300,16 +301,16 @@ class TestTaskTensors:
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=task_type)
         env.reset()
 
-        actions = th.stack([
-            th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-            for i in range(num_envs)
-        ])
+        actions = th.stack(
+            [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(num_envs)]
+        )
         env.step(actions)
 
         for tc_name, tc in env.task._termination_conditions.items():
             print(f"  termination '{tc_name}': shape={tc._done.shape}, dtype={tc._done.dtype}, values={tc._done}")
-            assert tc._done.shape == (num_envs,), \
-                f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
+            assert tc._done.shape == (
+                num_envs,
+            ), f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
             assert tc._done.dtype == th.bool
         og.clear()
         _passed(test_id)
@@ -318,6 +319,7 @@ class TestTaskTensors:
 # ===================================================================
 #  Section 3 – Navigation-specific tests (PointNavigation & PointReaching)
 # ===================================================================
+
 
 @pytest.mark.parametrize("robot", ROBOTS)
 @pytest.mark.parametrize("task_type", ["PointNavigationTask", "PointReachingTask"])
@@ -333,10 +335,9 @@ class TestNavigationTasks:
         env.reset()
 
         for step_i in range(3):
-            actions = th.stack([
-                th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-                for i in range(num_envs)
-            ])
+            actions = th.stack(
+                [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(num_envs)]
+            )
             obs_list, rewards, terminateds, truncateds, infos = env.step(actions)
             print(f"  step {step_i+1}/3: rewards={rewards}")
 
@@ -354,6 +355,7 @@ class TestNavigationTasks:
 # ===================================================================
 #  Section 4 – Grasp task specific test
 # ===================================================================
+
 
 @pytest.mark.parametrize("robot", ROBOTS)
 class TestGraspTask:
@@ -423,6 +425,7 @@ class TestGraspTask:
 # ===================================================================
 #  Section 5 – Scene coordinate system & state tests
 # ===================================================================
+
 
 class TestSceneCoordinates:
     """Multi-scene position/orientation and state dump/load tests."""
@@ -528,15 +531,18 @@ class TestSceneCoordinates:
         print(f"  updated_global={updated_global_pos}, expected={new_global_pos}")
         print(f"  updated_local={updated_local_pos}, expected_local={expected_local_pos}")
 
-        assert th.allclose(updated_global_pos, new_global_pos, atol=1e-3), \
-            f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
-        assert th.allclose(updated_local_pos, expected_local_pos, atol=1e-3), \
-            f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
+        assert th.allclose(
+            updated_global_pos, new_global_pos, atol=1e-3
+        ), f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
+        assert th.allclose(
+            updated_local_pos, expected_local_pos, atol=1e-3
+        ), f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
 
         global_pos_change = updated_global_pos - initial_global_pos
         expected_change = th.tensor([1.0, 0.5, 0.0], dtype=th.float32)
-        assert th.allclose(global_pos_change, expected_change, atol=1e-3), \
-            f"Global position change {global_pos_change} does not match expected change {expected_change}"
+        assert th.allclose(
+            global_pos_change, expected_change, atol=1e-3
+        ), f"Global position change {global_pos_change} does not match expected change {expected_change}"
 
         og.clear()
         _passed("TestSceneCoordinates::test_multi_scene_set_local_position")
@@ -570,22 +576,26 @@ class TestSceneCoordinates:
         updated_relative_pos, updated_relative_ori = robot.get_position_orientation(frame="scene")
 
         print(f"  set relative pos={new_relative_pos}, got={updated_relative_pos}")
-        assert th.allclose(updated_relative_pos, new_relative_pos, atol=1e-3), \
-            f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
-        assert th.allclose(updated_relative_ori, new_relative_ori, atol=1e-3), \
-            f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
+        assert th.allclose(
+            updated_relative_pos, new_relative_pos, atol=1e-3
+        ), f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
+        assert th.allclose(
+            updated_relative_ori, new_relative_ori, atol=1e-3
+        ), f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
 
         scene_pos, scene_ori = env.scenes[1].get_position_orientation()
         global_pos, global_ori = robot.get_position_orientation()
 
         expected_global_pos = scene_pos + updated_relative_pos
         print(f"  global_pos={global_pos}, expected={expected_global_pos}")
-        assert th.allclose(global_pos, expected_global_pos, atol=1e-3), \
-            f"Global position {global_pos} does not match expected {expected_global_pos}"
+        assert th.allclose(
+            global_pos, expected_global_pos, atol=1e-3
+        ), f"Global position {global_pos} does not match expected {expected_global_pos}"
 
         expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
-        assert th.allclose(global_ori, expected_global_ori, atol=1e-3), \
-            f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+        assert th.allclose(
+            global_ori, expected_global_ori, atol=1e-3
+        ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
 
         og.clear()
         _passed("TestSceneCoordinates::test_multi_scene_position_orientation_relative_to_scene")
@@ -594,6 +604,7 @@ class TestSceneCoordinates:
 # ===================================================================
 #  Section 6 – Robot-specific getter/setter tests (parametrized)
 # ===================================================================
+
 
 @pytest.mark.parametrize("robot", ROBOTS)
 class TestRobotGetterSetter:
@@ -716,6 +727,7 @@ class TestRobotGetterSetter:
 # ===================================================================
 #  Section 7 – Particle system test
 # ===================================================================
+
 
 class TestParticles:
     def test_multi_scene_particle_source(self):
