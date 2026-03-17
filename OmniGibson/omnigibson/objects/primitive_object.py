@@ -360,22 +360,6 @@ class PrimitiveObject(BaseObject):
                     )
                 )
 
-    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
-        # Add additional kwargs (bounding_box is already captured in load_config)
-        return self.__class__(
-            relative_prim_path=relative_prim_path,
-            primitive_type=self._primitive_type,
-            name=name,
-            category=self.category,
-            scale=self.scale,
-            visible=self.visible,
-            fixed_base=self.fixed_base,
-            prim_type=self._prim_type,
-            load_config=load_config,
-            abilities=self._abilities,
-            visual_only=self._visual_only,
-        )
-
     def _dump_state(self):
         state = super()._dump_state()
         # state["extents"] = self._extents
