@@ -139,6 +139,7 @@ def test_robot_load_drive(robot_name):
             # Set global flags
             gm.ENABLE_OBJECT_STATES = True
             gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = True
             gm.ENABLE_TRANSITION_RULES = False
         else:
             # Make sure sim is stopped
@@ -204,7 +205,9 @@ def test_robot_load_drive(robot_name):
             for action in action_primitives._navigate_to_pose_direct(goal_location):
                 env.step(action)
             assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
-            assert robot.get_rpy()[2] - goal_location[2] < 0.1
+            yaw_diff = robot.get_rpy()[2] - goal_location[2]
+            wrapped_yaw_diff = th.atan2(th.sin(yaw_diff), th.cos(yaw_diff))
+            assert th.abs(wrapped_yaw_diff) < 0.1
 
         # Stop the simulator and remove the robot
         og.sim.stop()
