@@ -60,7 +60,7 @@ def test_data_collect_and_playback():
     for i in range(3):
         env.reset()
         for _ in range(2):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
         # Manually add a random object, e.g.: a banana, and place on the floor
         obj = DatasetObject(name="banana", category="banana")
         env.scene.add_object(obj)
@@ -68,23 +68,23 @@ def test_data_collect_and_playback():
 
         # Take a few more steps
         for _ in range(2):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
         # Manually remove the added object
         env.scene.remove_object(obj)
 
         # Take a few more steps
         for _ in range(2):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
         # Checkpoint state here for our first episode
         if i == 0:
             env.update_checkpoint()
-            robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
+            robot_eef_state = {arm: env.scene.robots[0].get_eef_position(arm=arm) for arm in env.scene.robots[0].arm_names}
 
             # Take one step to avoid creating the system immediately after the checkpoint is updated, which
             # will cause downstream errors during playback
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
         # Add water particles
         water = env.scene.get_system("water")
@@ -93,7 +93,7 @@ def test_data_collect_and_playback():
 
         # Take a few more steps
         for _ in range(2):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
         if i == 0:
             # Rollback state here for our first episode
@@ -104,23 +104,23 @@ def test_data_collect_and_playback():
 
             # Make sure robot state is roughly the same
             for arm, pos in robot_eef_state.items():
-                assert th.all(th.isclose(pos, env.robots[0].get_eef_position(arm=arm))).item()
+                assert th.all(th.isclose(pos, env.scene.robots[0].get_eef_position(arm=arm))).item()
 
         elif i == 1:
             # Checkpoint state here for our second episode
             env.update_checkpoint()
-            robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
+            robot_eef_state = {arm: env.scene.robots[0].get_eef_position(arm=arm) for arm in env.scene.robots[0].arm_names}
 
             # Take one step to avoid clearing the system immediately after the checkpoint is updated, which
             # will cause downstream errors during playback
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
         # Clear the system
         env.scene.clear_system("water")
 
         # Take a few more steps
         for _ in range(2):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
         if i == 1:
             # Rollback state here for our first episode
@@ -131,11 +131,11 @@ def test_data_collect_and_playback():
 
             # Make sure robot state is roughly the same
             for arm, pos in robot_eef_state.items():
-                assert th.all(th.isclose(pos, env.robots[0].get_eef_position(arm=arm))).item()
+                assert th.all(th.isclose(pos, env.scene.robots[0].get_eef_position(arm=arm))).item()
 
         # Take a few more steps
         for _ in range(2):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
         if i == 1:
             # Clear the water system since it was re-added
