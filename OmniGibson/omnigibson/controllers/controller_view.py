@@ -1,5 +1,6 @@
 import torch as th
 from typing import Dict, Optional, Tuple
+import hashlib
 
 
 class ControllerView:
@@ -280,5 +281,7 @@ class ControllerView:
         from omnigibson.utils.usd_utils import get_robot_kinematic_tree_pattern
 
         pattern = get_robot_kinematic_tree_pattern(articulation_root_path)
-        cfg_hash = hash(cls._freeze_for_hash(controller_cfg))
+        frozen_cfg = cls._freeze_for_hash(controller_cfg)
+        cfg_bytes = repr(frozen_cfg).encode("utf-8")
+        cfg_hash = hashlib.sha256(cfg_bytes).hexdigest()
         return f"{pattern}__{body_part}__{cfg_hash}"
