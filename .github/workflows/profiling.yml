@@ -37,6 +37,10 @@ jobs:
           - name: baseline-rs-int-1robot
             args: "-g -f -s Rs_int -r 1"
             label: "Rs_int + 1 Robot"
+          - name: deep-rs-int-1robot
+            args: "-g -f -s Rs_int -r 1 --deep-profile --deep-profile-output deep-profile-rs-int-with-robot.prof"
+            label: "Rs_int + 1 Robot (deep profile)"
+            deep_profile: true
           # Scenes (flatcache vs non-flatcache)
           - name: scene-house
             args: "-f -r 1 -s house_single_floor"
@@ -72,10 +76,21 @@ jobs:
       - name: Install OmniGibson
         run: pip install -e .[dev,primitives,eval] --no-build-isolation
 
+      - name: Install deep profiling dependencies
+        if: matrix.deep_profile
+        run: pip install snakeviz
+
       - name: Run profiling
         run: |
           rm -f output.json
           python tests/benchmark/profiling.py ${{ matrix.args }}
+
+      - name: Convert deep profile to HTML
+        if: matrix.deep_profile
+        run: |
+          python ../.github/scripts/cprofile_to_html.py \
+            --profile deep-profile-rs-int-with-robot.prof \
+            --output deep-profile-rs-int-with-robot.html
 
       - name: Upload results
         uses: actions/upload-artifact@v4
@@ -83,6 +98,16 @@ jobs:
         with:
           name: profiling-${{ matrix.name }}
           path: OmniGibson/output.json
+          if-no-files-found: warn
+
+      - name: Upload deep profile outputs
+        uses: actions/upload-artifact@v4
+        if: always() && matrix.deep_profile
+        with:
+          name: profiling-deep-rs-int-1robot-html
+          path: |
+            OmniGibson/deep-profile-rs-int-with-robot.prof
+            OmniGibson/deep-profile-rs-int-with-robot.html
           if-no-files-found: warn
 
   report:
@@ -119,6 +144,7 @@ jobs:
               ("profiling-baseline-empty-1robot",     "Empty scene + 1 Robot",                "Baselines (GPU dynamics, flatcache)"),
               ("profiling-baseline-rs-int",           "Rs_int",                               "Baselines (GPU dynamics, flatcache)"),
               ("profiling-baseline-rs-int-1robot",    "Rs_int + 1 Robot",                     "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-deep-rs-int-1robot",        "Rs_int + 1 Robot (deep profile)",      "Baselines (GPU dynamics, flatcache)"),
               ("profiling-scene-house",               "house_single_floor + 1 Robot",         "Scenes"),
               ("profiling-scene-house-no-flatcache",  "house_single_floor + 1 Robot (no FC)", "Scenes"),
               ("profiling-feature-fluids",            "1 Robot + fluids",                     "Non-physics features (GPU dynamics, flatcache)"),
@@ -204,6 +230,12 @@ jobs:
                       cell += delta(m, pv, bv)
                   row += f" | {cell}"
               lines.append(row + " |")
+
+          lines.append("")
+          lines.append("### Deep profile artifacts")
+          lines.append(
+              f"- [Download deep profile HTML and raw .prof artifact](https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}#artifacts) (artifact: `profiling-deep-rs-int-1robot-html`)."
+          )
 
           lines.append("")
           lines.append("<details><summary>Legend</summary>\n")
