@@ -831,38 +831,20 @@ def check_robot_base_nonarm_nonkinematic_collision(env):
 
 
 def check_robot_nonarm_nonground_collision(env):
+    ground_objects = []
+    for cat in GROUND_CATEGORIES:
+        ground_objects.extend(env.scene.object_registry("category", cat))
+
     for robot in env.robots:
         robot_arm_paths = set()
-        robot_prim_path = robot.prim_path
         for arm in robot.arm_names:
             robot_arm_paths = robot_arm_paths.union(set(link.prim_path for link in robot.arm_links[arm]))
             robot_arm_paths = robot_arm_paths.union(set(link.prim_path for link in robot.gripper_links[arm]))
             robot_arm_paths = robot_arm_paths.union(set(link.prim_path for link in robot.finger_links[arm]))
-        for link in robot.links.values():
-            # Skip if link is an arm link
-            if link.prim_path in robot_arm_paths:
-                continue
-            for c in link.contact_list():
-                # Skip if it's a self-collision
-                if robot_prim_path in c.body0:
-                    if robot_prim_path in c.body1:
-                        continue
-                    else:
-                        c_prim_path = c.body1
-                else:
-                    c_prim_path = c.body0
-                # Ignore if zero-impulse
-                if np.linalg.norm(tuple(c.impulse)) == 0:
-                    continue
-                # Check which object this is
-                rigid_prims = prim_paths_to_rigid_prims([c_prim_path], robot.scene)
-                # Skip if obj is part of ground categories
-                assert len(rigid_prims) == 1
-                obj = next(iter(rigid_prims))[0]
-                if obj.category in GROUND_CATEGORIES:
-                    continue
-                # Otherwise this is a valid contact, so immediately return True
-                return True
+        non_arm_links = set(link for link in robot.links.values() if link.prim_path not in robot_arm_paths)
+
+        if RigidContactAPI.is_in_contact(env.scene.idx, non_arm_links, ignore_set=ground_objects + [robot]):
+            return True
 
     return False
 
