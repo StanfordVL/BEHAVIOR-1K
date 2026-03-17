@@ -1450,7 +1450,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                             T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn)
                         )
                         partial_action = th.cat((delta_pos, delta_orn))
-                    elif mode in "pose_absolute_ori":
+                    elif mode == "pose_absolute_ori":
                         partial_action = th.cat((delta_pos, target_orn_axisangle))
                     elif mode == "absolute_pose":
                         partial_action = th.cat((target_pos, target_orn_axisangle))
