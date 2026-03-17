@@ -104,7 +104,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always() && matrix.deep_profile
         with:
-          name: profiling-deep-rs-int-1robot
+          name: profiling-deep-rs-int-1robot-html
           path: |
             OmniGibson/deep-profile-rs-int-with-robot.prof
             OmniGibson/deep-profile-rs-int-with-robot.html
@@ -234,7 +234,7 @@ jobs:
           lines.append("")
           lines.append("### Deep profile artifacts")
           lines.append(
-              f"- [Download deep profile HTML and raw .prof artifact](https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}#artifacts) (artifact: `profiling-deep-rs-int-1robot`)."
+              f"- [Download deep profile HTML and raw .prof artifact](https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}#artifacts) (artifact: `profiling-deep-rs-int-1robot-html`)."
           )
 
           lines.append("")
