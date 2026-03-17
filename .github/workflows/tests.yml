@@ -144,7 +144,7 @@ jobs:
     name: Compile Report
     runs-on: ubuntu-latest
     needs: [run_test]
-    if: always()
+    if: ${{ !cancelled() }}
     steps:
       - name: Pull reports
         uses: actions/download-artifact@v4
@@ -160,7 +160,6 @@ jobs:
           report-path: ctrf-report.json
           summary-report: true
           failed-report: true
-        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -171,7 +170,8 @@ jobs:
           pull-request-report: true
           exit-on-fail: true
           update-comment: true
-        if: always()
+          status-check: true
+          status-check-name: "Test Report"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
