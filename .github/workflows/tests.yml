@@ -169,6 +169,8 @@ jobs:
         with:
           report-path: './ctrf-report.json'
           pull-request-report: true
+          fail-on-error: true
+          update-comment: true
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
