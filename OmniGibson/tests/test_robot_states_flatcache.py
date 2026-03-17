@@ -213,7 +213,8 @@ def test_robot_load_drive(robot_name):
         og.sim.stop()
         env.scene.remove_object(obj=robot)
     finally:
-        og.clear()
+        if og.sim is not None:
+            og.clear()
 
 
 def test_grasping_mode():
