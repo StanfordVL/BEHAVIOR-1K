@@ -452,7 +452,6 @@ def _compute_ik_qpos_numpy(
 add_compute_function(name="compute_ik_qpos", np_function=_compute_ik_qpos_numpy, th_function=_compute_ik_qpos_torch)
 
 
-@th.jit.script
 def _compute_ik_qpos_batch_torch(
     q: th.Tensor,
     j_eef: th.Tensor,
