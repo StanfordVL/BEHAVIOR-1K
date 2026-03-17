@@ -359,10 +359,15 @@ class RigidContactAPIImpl:
                     if surviving_row_paths and surviving_col_paths:
                         old_row_idxs = th.tensor([old_row_map[p] for p in surviving_row_paths], dtype=th.long)
                         old_col_idxs = th.tensor([old_col_map[p] for p in surviving_col_paths], dtype=th.long)
-                        new_row_idxs = th.tensor([self._PATH_TO_ROW_IDX[scene_idx][p] for p in surviving_row_paths], dtype=th.long)
-                        new_col_idxs = th.tensor([self._PATH_TO_COL_IDX[scene_idx][p] for p in surviving_col_paths], dtype=th.long)
-                        self._CONTACT_MATRIX[scene_idx][new_row_idxs[:, None], new_col_idxs[None, :]] = \
-                            old_matrix[old_row_idxs[:, None], old_col_idxs[None, :]]
+                        new_row_idxs = th.tensor(
+                            [self._PATH_TO_ROW_IDX[scene_idx][p] for p in surviving_row_paths], dtype=th.long
+                        )
+                        new_col_idxs = th.tensor(
+                            [self._PATH_TO_COL_IDX[scene_idx][p] for p in surviving_col_paths], dtype=th.long
+                        )
+                        self._CONTACT_MATRIX[scene_idx][new_row_idxs[:, None], new_col_idxs[None, :]] = old_matrix[
+                            old_row_idxs[:, None], old_col_idxs[None, :]
+                        ]
 
     def update_contact_cache(self):
         """
