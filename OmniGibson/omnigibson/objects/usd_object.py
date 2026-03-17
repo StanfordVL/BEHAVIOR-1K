@@ -68,9 +68,9 @@ OBJECT_TAXONOMY = ObjectTaxonomy()
 _EMITTER_LAYER_COUNTER = 1
 
 
-class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
+class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
     """
-    BaseObject is the interface that all OmniGibson objects must implement.
+    USDObject is the interface that all OmniGibson objects must implement.
     Objects are instantiated from a USD file and can be composed of one or more links and joints.
     """
 
@@ -110,7 +110,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             kinematic_only (None or bool): Whether this object should be kinematic only (and not get affected by any
                 collisions). If None, then this value will be set to True if @fixed_base is True and some other criteria
-                are satisfied (see object_base.py post_load function), else False.
+                are satisfied (see usd_object.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
@@ -125,7 +125,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             include_default_states (bool): whether to include the default object states from @get_default_states
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
                 Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
@@ -193,7 +193,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         usd_path = self._usd_path
 
         if self._encrypted:
-            # Create a temporary file to store the decrypted asset, load it, and then delete it
+            # Create a temporary file to store the decrytped asset, load it, and then delete it
             encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
             self.check_hash(encrypted_filename)
             basename = os.path.basename(self._usd_path)
@@ -854,7 +854,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     def scale(self, scale):
         # call super first
         # A bit esoteric -- see https://gist.github.com/Susensio/979259559e2bebcd0273f1a95d7c1e79
-        super(BaseObject, type(self)).scale.fset(self, scale)
+        super(USDObject, type(self)).scale.fset(self, scale)
 
         # Update init info for scale
         self._init_info["args"]["scale"] = scale

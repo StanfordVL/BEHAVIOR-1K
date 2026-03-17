@@ -69,7 +69,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     else:
         kwargs = {
-            "type": "BaseObject",
+            "type": "USDObject",
             "usd_path": usd_path,
         }
 

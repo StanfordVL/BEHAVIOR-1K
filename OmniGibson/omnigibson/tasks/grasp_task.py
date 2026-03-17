@@ -6,7 +6,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
-from omnigibson.objects.object_base import REGISTERED_OBJECTS
+from omnigibson.objects.usd_object import REGISTERED_OBJECTS
 from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask

@@ -865,7 +865,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         Checks whether object @obj is a cloth or not
 
         Args:
-            obj (BaseObject): Object to check
+            obj (USDObject): Object to check
 
         Returns:
             bool: True if the object is cloth type, otherwise False
@@ -911,7 +911,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         Synchronizes the particle groups based on desired identification numbers @group_idns
 
         Args:
-            group_objects (list of BaseObject): Desired unique group objects that should be active for
+            group_objects (list of USDObject): Desired unique group objects that should be active for
             this particle system.
             particle_idns (list of list of int): Per-group unique id numbers for the particles assigned to that group.
                 List should be same length as @group_idns with sub-entries corresponding to the desired number of

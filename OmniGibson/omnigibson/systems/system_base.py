@@ -497,7 +497,7 @@ class VisualParticleSystem(BaseSystem):
         Grabs the corresponding group name for object @obj
 
         Args:
-            obj (BaseObject): Object for which its procedurally generated particle attachment name should be grabbed
+            obj (USDObject): Object for which its procedurally generated particle attachment name should be grabbed
 
         Returns:
             str: Name of the attachment group to use when executing commands from this class on
@@ -511,7 +511,7 @@ class VisualParticleSystem(BaseSystem):
         for this object (should call generate_group_particles(...) ).
 
         Args:
-            obj (BaseObject): Object for which a new particle attachment group will be created for
+            obj (USDObject): Object for which a new particle attachment group will be created for
 
         Returns:
             str: Name of the attachment group to use when executing commands from this class on
@@ -907,7 +907,7 @@ class PhysicalParticleSystem(BaseSystem):
         Generates @n_particles new particle objects and samples their locations on the top surface of object @obj
 
         Args:
-            obj (BaseObject): Object on which to generate a particle instancer with sampled particles on the object's
+            obj (USDObject): Object on which to generate a particle instancer with sampled particles on the object's
                 top surface
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
@@ -1063,7 +1063,7 @@ def create_system_from_metadata(system_name):
         if has_asset:
 
             def generate_particle_template_fcn():
-                return lambda relative_prim_path, name: og.objects.BaseObject(
+                return lambda relative_prim_path, name: og.objects.USDObject(
                     relative_prim_path=relative_prim_path,
                     name=name,
                     usd_path=asset_path,

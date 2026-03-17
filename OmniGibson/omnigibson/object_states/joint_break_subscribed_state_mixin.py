@@ -1,10 +1,10 @@
 from abc import abstractmethod
 
-from omnigibson.object_states.object_state_base import BaseObjectState
+from omnigibson.object_states.object_state_base import USDObjectState
 from omnigibson.utils.python_utils import classproperty
 
 
-class JointBreakSubscribedStateMixin(BaseObjectState):
+class JointBreakSubscribedStateMixin(USDObjectState):
     """
     Handles JOINT_BREAK event.
     The subclass should implement its own on_joint_break method

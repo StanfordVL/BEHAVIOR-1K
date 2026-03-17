@@ -8,7 +8,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.asset_utils import (
     check_minimum_behavior_1k_assets_version,
     get_all_object_category_models,
@@ -33,7 +33,7 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 
-class DatasetObject(BaseObject):
+class DatasetObject(USDObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
     dataset. These objects should contain additional metadata, including aggregate statistics across the
@@ -85,7 +85,7 @@ class DatasetObject(BaseObject):
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             kinematic_only (None or bool): Whether this object should be kinematic only (and not get affected by any
                 collisions). If None, then this value will be set to True if @fixed_base is True and some other criteria
-                are satisfied (see object_base.py post_load function), else False.
+                are satisfied (see usd_object.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
@@ -105,7 +105,7 @@ class DatasetObject(BaseObject):
                 a list of room type(s) or a single room type
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
         # Store variables
         if isinstance(in_rooms, str):

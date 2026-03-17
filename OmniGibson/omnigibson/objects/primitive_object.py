@@ -5,7 +5,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.python_utils import assert_valid_key
@@ -23,7 +23,7 @@ VALID_HEIGHT_OBJECTS = {"Cone", "Cylinder"}
 VALID_SIZE_OBJECTS = {"Cube", "Torus"}
 
 
-class PrimitiveObject(BaseObject):
+class PrimitiveObject(USDObject):
     """
     PrimitiveObjects are objects defined by a single geom, e.g: sphere, mesh, cube, etc.
     """
@@ -66,7 +66,7 @@ class PrimitiveObject(BaseObject):
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             kinematic_only (None or bool): Whether this object should be kinematic only (and not get affected by any
                 collisions). If None, then this value will be set to True if @fixed_base is True and some other criteria
-                are satisfied (see object_base.py post_load function), else False.
+                are satisfied (see usd_object.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
@@ -86,7 +86,7 @@ class PrimitiveObject(BaseObject):
             size (None or float): If specified, sets the size for this object. This value is scaled by @scale
                 Note: Should only be specified if the @primitive_type is one of {"Cube", "Torus"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
@@ -105,7 +105,7 @@ class PrimitiveObject(BaseObject):
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
         self._primitive_type = primitive_type
 
-        # Build the USD for this primitive upfront and pass it to BaseObject
+        # Build the USD for this primitive upfront and pass it to USDObject
         usd_path = self._build_usd(name=name, primitive_type=primitive_type)
 
         super().__init__(

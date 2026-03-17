@@ -121,7 +121,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
         Args:
             name (str): Name of the callback to trigger
-            callback (function): Function to execute. Should have signature callback(obj: BaseObject) --> None
+            callback (function): Function to execute. Should have signature callback(obj: USDObject) --> None
         """
         cls.CALLBACKS_ON_REMOVE[name] = callback
 

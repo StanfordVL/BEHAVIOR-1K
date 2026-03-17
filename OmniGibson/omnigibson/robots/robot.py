@@ -15,7 +15,7 @@ import networkx as nx
 import gymnasium as gym
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.sensors import (
     ALL_SENSOR_MODALITIES,
     SENSOR_PRIMS_TO_SENSOR_CLS,
@@ -95,7 +95,7 @@ AG_MODES = {
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
 
-class Robot(BaseObject, GymObservable):
+class Robot(USDObject, GymObservable):
     def __init__(
         self,
         # Shared kwargs in hierarchy
@@ -109,7 +109,7 @@ class Robot(BaseObject, GymObservable):
         self_collisions=True,
         link_physics_materials=None,
         load_config=None,
-        # Unique to BaseObject hierarchy
+        # Unique to USDObject hierarchy
         abilities=None,
         # Unique to Robot
         control_freq=None,
@@ -204,7 +204,7 @@ class Robot(BaseObject, GymObservable):
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             end_effector (str): The end effector type to use.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
         self.model = model
         # Read and validate robot definition YAML file using OmegaConf
@@ -2656,7 +2656,7 @@ class Robot(BaseObject, GymObservable):
         Otherwise, return None.
 
         Args:
-            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_obj (USDObject): Object targeted for an assisted grasp
             target_link_name (str): Name of the link of the object to be grasped
 
         Returns:
@@ -3587,7 +3587,7 @@ class Robot(BaseObject, GymObservable):
         so we only perform some final checks.
 
         Args:
-            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_obj (USDObject): Object targeted for an assisted grasp
             target_link_name (str): Name of the link of the object to be grasped
             arm (str): Name of the arm to create the joint for
         """
@@ -3632,7 +3632,7 @@ class Robot(BaseObject, GymObservable):
         state of the world is such that it should establish a grasp.
 
         Args:
-            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_obj (USDObject): Object targeted for an assisted grasp
             target_link_name (str): Name of the link of the object to be grasped
             arm (str): Name of the arm to create the joint for
             contact_pos_world (th.tensor): Position of the contact point in world frame
@@ -3677,7 +3677,7 @@ class Robot(BaseObject, GymObservable):
         It does not take into account any world frame position or orientation. As a result, its inputs can be safely stored and restored from a saved state.
 
         The constraint params dictionary is expected to have the following keys:
-        - target_obj: BaseObject: Object targeted for an assisted grasp
+        - target_obj: USDObject: Object targeted for an assisted grasp
         - target_link_name: str: Name of the link of the object to be grasped
         - parent_frame_pos: th.tensor: Position of the parent frame
         - parent_frame_orn: th.tensor: Orientation of the parent frame

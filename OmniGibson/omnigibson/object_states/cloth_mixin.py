@@ -1,12 +1,12 @@
 from omnigibson.macros import gm
-from omnigibson.object_states.object_state_base import BaseObjectState
+from omnigibson.object_states.object_state_base import USDObjectState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
 
 
-class ClothStateMixin(BaseObjectState):
+class ClothStateMixin(USDObjectState):
     """
-    This class is a subclass of BaseObjectState that adds dependencies assuming the owned object is PrimType.CLOTH
+    This class is a subclass of USDObjectState that adds dependencies assuming the owned object is PrimType.CLOTH
     """
 
     @classmethod

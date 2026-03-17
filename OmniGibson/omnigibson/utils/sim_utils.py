@@ -85,7 +85,7 @@ def prims_to_rigid_prim_set(inp_prims):
 
 def prim_paths_to_rigid_prims(prim_paths, scene):
     """
-    Given a set of rigid body prim paths @body_prim_paths, return a list of (BaseObject, RigidPrim) tuples.
+    Given a set of rigid body prim paths @body_prim_paths, return a list of (USDObject, RigidPrim) tuples.
     """
     rigid_prims = set()
     for body in prim_paths:
@@ -267,7 +267,7 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
     Place the object so that its base (z-min) rests at the location of @pos
 
     Args:
-        obj (BaseObject): Object to place in the environment
+        obj (USDObject): Object to place in the environment
         pos (3-array): Global (x,y,z) location to place the base of the robot
         quat (None or 4-array): Optional (x,y,z,w) quaternion orientation when placing the object.
             If None, the object's current orientation will be used
@@ -289,7 +289,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     Test if the object can be placed with no collision.
 
     Args:
-        obj (BaseObject): Object to place in the environment
+        obj (USDObject): Object to place in the environment
         pos (3-array): Global (x,y,z) location to place the object
         quat (None or 4-array): Optional (x,y,z,w) quaternion orientation when placing the object.
             If None, the object's current orientation will be used
@@ -323,7 +323,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
     Land the object at the specified position @pos, given a valid position and orientation.
 
     Args:
-        obj (BaseObject): Object to place in the environment
+        obj (USDObject): Object to place in the environment
         pos (3-array): Global (x,y,z) location to place the object
         quat (None or 4-array): Optional (x,y,z,w) quaternion orientation when placing the object.
             If None, a random orientation about the z-axis will be sampled

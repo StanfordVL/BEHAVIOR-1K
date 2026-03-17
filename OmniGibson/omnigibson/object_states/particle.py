@@ -1,8 +1,8 @@
-from omnigibson.object_states.object_state_base import BaseObjectRequirement
+from omnigibson.object_states.object_state_base import USDObjectRequirement
 from omnigibson.macros import gm
 
 
-class ParticleRequirement(BaseObjectRequirement):
+class ParticleRequirement(USDObjectRequirement):
     """
     Class for sanity checking objects that requires particle systems
     """

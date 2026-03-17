@@ -10,7 +10,7 @@ import torch as th
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -440,7 +440,7 @@ class SerializableRegistry(Registry, Serializable):
             if self._load_filter(obj):
                 if obj.name not in state:
                     log.debug(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
-                    if m.STABILIZE_SKIPPED_OBJECTS and isinstance(obj, BaseObject) and not obj.kinematic_only:
+                    if m.STABILIZE_SKIPPED_OBJECTS and isinstance(obj, USDObject) and not obj.kinematic_only:
                         obj.keep_still()
                     continue
                 obj.load_state(state[obj.name], serialized=False)
