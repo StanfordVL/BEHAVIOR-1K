@@ -294,12 +294,11 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         if self._use_impedances:
             rows = self.view_row_indices
-            dof_idx_t = th.as_tensor(self.dof_idx, dtype=th.long)
+            # Joint indices are defined over actuated joints; generalized dynamics tensors may include extra base DoFs.
+            all_joint_positions = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :]
 
             if self._motor_type == "position":
-                base_value = cb.to_torch(
-                    ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]
-                ).float()
+                base_value = cb.to_torch(all_joint_positions[:, self.dof_idx]).float()
                 vel_base = cb.to_torch(
                     ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
                         :, self.dof_idx
@@ -323,12 +322,20 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             all_mm = cb.to_torch(
                 ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)[rows, :, :]
             ).float()  # (N, n_dof_total, n_dof_total)
+
+            # Compute offset between generalized DoFs and actuated joint DoFs (handles floating-base robots).
+            base_dof_offset = all_mm.shape[-1] - all_joint_positions.shape[-1]
+            if base_dof_offset < 0:
+                base_dof_offset = 0
+            effective_dof_idx = [idx + base_dof_offset for idx in self.dof_idx]
+            dof_idx_t = th.as_tensor(effective_dof_idx, dtype=th.long)
+
             u = _compute_joint_torques_batch_torch(u, all_mm, dof_idx_t)  # (N, control_dim)
 
             if self._use_gravity_compensation:
                 u += cb.to_torch(
                     ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)[rows, :][
-                        :, self.dof_idx
+                        :, effective_dof_idx
                     ]
                 ).float()
 
@@ -336,7 +343,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 u += cb.to_torch(
                     ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)[
                         rows, :
-                    ][:, self.dof_idx]
+                    ][:, effective_dof_idx]
                 ).float()
 
         else:
