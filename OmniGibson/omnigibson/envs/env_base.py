@@ -253,8 +253,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Load robots into the scene
         """
         # Only actually load robots if no robot has been imported from the scene loading directly yet
+        loaded_from_config = False
         for scene in self._scenes:
             if len(scene.robots) == 0:
+                loaded_from_config = True
                 assert og.sim.is_stopped(), "Simulator must be stopped before loading robots!"
 
                 # Iterate over all robots to generate in the robot config
@@ -288,6 +290,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     # Import the robot into the simulator
                     scene.add_object(robot)
                     robot.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
+
+        # Persist scene 0's robot names back to config for downstream use (e.g. data collection).
+        # Only needed when robots were created from config (ordering matches). When robots come
+        # from a scene file, names are already correct and ordering may not match config.
+        if loaded_from_config:
+            for robot_idx, robot in enumerate(self._scenes[0].robots):
+                if robot_idx < len(self.robots_config):
+                    self.robots_config[robot_idx]["name"] = robot.name
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 

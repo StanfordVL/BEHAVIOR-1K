@@ -80,7 +80,7 @@ class DataWrapper(EnvironmentWrapper):
             data_grp = self.hdf5_file["data"]
         if overwrite or "config" not in set(data_grp.attrs.keys()):
             if isinstance(env.task, BehaviorTask):
-                env.task.update_bddl_scope_metadata(env)
+                env.task.update_bddl_scope_metadata(env, env_idx=0)
             scene_file = env.scene.save()
             config = deepcopy(env.config)
             self.add_metadata(group=data_grp, name="config", data=config)
@@ -109,8 +109,14 @@ class DataWrapper(EnvironmentWrapper):
         if isinstance(action, dict):
             action = th.cat([act for act in action.values()])
 
-        next_obs, reward, terminated, truncated, info = self.env.step(action, n_render_iterations=n_render_iterations)
+        obs_list, rewards, terminateds, truncateds, infos = self.env.step(action, n_render_iterations=n_render_iterations)
         self.step_count += 1
+
+        next_obs = obs_list[0]
+        reward = rewards[0].item()
+        terminated = terminateds[0].item()
+        truncated = truncateds[0].item()
+        info = infos[0]
 
         self._record_step_trajectory(action, next_obs, reward, terminated, truncated, info)
 
@@ -164,7 +170,8 @@ class DataWrapper(EnvironmentWrapper):
         if len(self.current_traj_history) > 0:
             self.flush_current_traj()
 
-        self.current_obs, info = self.env.reset()
+        obs_list, info = self.env.reset()
+        self.current_obs = obs_list[0]
 
         return self.current_obs, info
 
@@ -446,11 +453,11 @@ class DataCollectionWrapper(DataWrapper):
                     pruned_transitions[step] = self.current_transitions.pop(step)
 
             # Update environment env step count
-            self.env._current_step = checkpoint_step_idx - 1
+            self.env._current_steps[0] = checkpoint_step_idx - 1
 
             # Save checkpoint rollback data if requested
             if self.checkpoint_rollback_trajs is not None:
-                step = self.env.episode_steps
+                step = self.env.episode_steps[0].item()
                 if step not in self.checkpoint_rollback_trajs:
                     self.checkpoint_rollback_trajs[step] = []
                 self.checkpoint_rollback_trajs[step].append(
@@ -646,13 +653,15 @@ class DataCollectionWrapper(DataWrapper):
         # if we rollback the state -- i.e.: the state will be rolled back to just BEFORE this transition was executed,
         # and will therefore not be tracked properly in subsequent states during playback. So we assert that the current
         # idx is NOT the current checkpoint idx
+        ep_step = self.env.episode_steps[0].item()
+
         if len(self.checkpoint_step_idxs) > 0:
             assert (
-                self.checkpoint_step_idxs[-1] - 1 != self.env.episode_steps
+                self.checkpoint_step_idxs[-1] - 1 != ep_step
             ), "A checkpoint was just updated. Any subsequent transitions at this immediate timestep will not be replayed properly!"
 
-        if self.env.episode_steps not in self.current_transitions:
-            self.current_transitions[self.env.episode_steps] = {
+        if ep_step not in self.current_transitions:
+            self.current_transitions[ep_step] = {
                 "systems": {"add": [], "remove": []},
                 "objects": {"add": [], "remove": []},
             }
@@ -661,7 +670,7 @@ class DataCollectionWrapper(DataWrapper):
         info = obj.get_init_info() if isinstance(obj, USDObject) and add else obj.name
         dic_key = "objects" if isinstance(obj, USDObject) else "systems"
         val_key = "add" if add else "remove"
-        self.current_transitions[self.env.episode_steps][dic_key][val_key].append(info)
+        self.current_transitions[ep_step][dic_key][val_key].append(info)
 
 
 class DataPlaybackWrapper(DataWrapper):
@@ -997,7 +1006,7 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If not controlling robots, disable for all robots
         if not self.include_robot_control:
-            for robot in self.robots:
+            for robot in self.scene.robots:
                 robot.control_enabled = False
                 # Set all controllers to effort mode with zero gain, this keeps the robot still
                 for controller in robot.controllers.values():
@@ -1016,9 +1025,11 @@ class DataPlaybackWrapper(DataWrapper):
         if record_data:
             # We need to step the environment to get the initial observations propagated
             first_time_load_n_iteration = 10
-            self.current_obs, _, _, _, init_info = self.env.step(
+            obs_list, _, _, _, infos = self.env.step(
                 action=action[0], n_render_iterations=self.n_render_iterations + first_time_load_n_iteration
             )
+            self.current_obs = obs_list[0]
+            init_info = infos[0]
             step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
@@ -1056,7 +1067,9 @@ class DataPlaybackWrapper(DataWrapper):
                         system.set_particles_velocities(
                             lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
                         )
-            self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+            obs_list, _, _, _, infos = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+            self.current_obs = obs_list[0]
+            info = infos[0]
 
             # If recording, record data
             if record_data:

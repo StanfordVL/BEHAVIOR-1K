@@ -968,7 +968,7 @@ class Robot(USDObject, GymObservable):
 
         # If we're not driving the joints, reset the controllers so that the goals are updated wrt to the new state
         # Also clear the controllable view's backend since state has changed
-        if not drive:
+        if not drive and self._controllers is not None:
             ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
             for group_key, controller_idx in self._controllers.values():
                 ControllerView.reset(group_key, controller_idx)
