@@ -539,6 +539,12 @@ class BaseController(Serializable, Registerable, Recreatable):
             for k, v in no_op_goal.items():
                 self._goals[k][controller_idx] = v
         command = self._compute_no_op_command(controller_idx)
+        # Ensure the no-op command matches the active controller backend before preprocessing.
+        # Some controllers return torch.Tensors even when the controller backend is NumPy,
+        # which would cause type mismatches inside _reverse_preprocess_command (e.g., when
+        # comparing or clamping against NumPy limits). Convert to a NumPy array in that case.
+        if isinstance(command, th.Tensor) and cb is not th:
+            command = command.detach().cpu().numpy()
         return cb.to_torch(self._reverse_preprocess_command(command))
 
     def _compute_no_op_command(self, controller_idx):
