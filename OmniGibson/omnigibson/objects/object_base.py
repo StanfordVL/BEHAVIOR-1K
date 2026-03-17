@@ -77,7 +77,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     def __init__(
         self,
         name,
-        usd_path=None,
+        usd_path,
         encrypted=False,
         relative_prim_path=None,
         category="object",
@@ -98,7 +98,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            usd_path (None or str): global path to the USD file to load
+            usd_path (str): global path to the USD file to load
             encrypted (bool): whether this file is encrypted (and should therefore be decrypted) or not
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
@@ -225,8 +225,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         Pre-build this object on an USD stage that is not loaded into Isaac Sim.
         This is useful for pre-compiling scene USDs, speeding up load times especially for parallel envs.
         """
-        if self._usd_path is None:
-            return
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
         prim_path = "/World" + self._relative_prim_path
         usd_path = self._prepare_to_load()
