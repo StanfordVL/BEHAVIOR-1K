@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniGibson Remote Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video, audio {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    audio { display: none; }
+    
+    #ui {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 12px 16px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    #status {
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #666;
+    }
+    #status-dot.connecting { background: #ff9500; animation: pulse 1.5s ease-in-out infinite; }
+    #status-dot.connected { background: #30d158; }
+    #status-dot.error { background: #ff3b30; }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    button {
+      padding: 8px 20px;
+      background: #007aff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: #0051d5; }
+    button:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+    
+    #error {
+      flex: 1 1 100%;
+      padding: 10px 12px;
+      background: rgba(255, 59, 48, 0.1);
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #ff3b30;
+      display: none;
+    }
+    #error.show { display: block; }
+    
+    #info {
+      display: none;
+      flex: 1;
+      gap: 20px;
+      font-size: 12px;
+      color: #999;
+      padding-left: 20px;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #info.show { display: flex; }
+    #info > div { white-space: nowrap; }
+    
+    .loading {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <video id="remote-video" autoplay playsinline></video>
+    <canvas id="remote-canvas" style="display: none;"></canvas>
+    
+    <div id="ui">
+      <div id="status">
+        <span id="status-dot"></span>
+        <span id="status-text">Disconnected</span>
+      </div>
+      <button id="connect-btn">Connect</button>
+      <div id="info">
+        <div>Resolution: <span id="resolution">-</span></div>
+        <div>Server: <span id="server">-</span></div>
+      </div>
+      <div id="error"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Try to import the NVIDIA WebRTC library (optional for websocket mode)
+    let AppStreamer, StreamType;
+    let webrtcAvailable = false;
+    try {
+      const lib = await import('./node_modules/@nvidia/omniverse-webrtc-streaming-library/dist/omniverse-webrtc-streaming-library.js');
+      AppStreamer = lib.AppStreamer;
+      StreamType = lib.StreamType;
+      webrtcAvailable = true;
+    } catch (e) {
+      console.warn('NVIDIA WebRTC library not available, will use WebSocket-only mode');
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const status = $('status-text');
+    const statusDot = $('status-dot');
+    const error = $('error');
+    const btn = $('connect-btn');
+    const info = $('info');
+    
+    let connected = false;
+    let streamingMode = null;  // Will be set from session response
+    let wsConnection = null;    // For websocket streaming
+
+    function setStatus(state, text) {
+      statusDot.className = state;
+      status.textContent = text;
+    }
+
+    function showError(msg) {
+      error.textContent = msg;
+      error.className = 'show';
+    }
+
+    function hideError() {
+      error.className = '';
+    }
+
+    // WebSocket streaming functions
+    async function connectWebSocket(session) {
+      const wsUrl = `ws://${session.streamSignalingHost}:${session.signalingPort}/streaming/client/`;
+      console.log('Connecting to WebSocket stream:', wsUrl);
+      
+      const ws = new WebSocket(wsUrl);
+      wsConnection = ws;
+      
+      // Use canvas for WebSocket streaming
+      const canvas = $('remote-canvas');
+      const video = $('remote-video');
+      const ctx = canvas.getContext('2d');
+      
+      // Hide video, show canvas
+      video.style.display = 'none';
+      canvas.style.display = 'block';
+      
+      let frameQueue = [];
+      let rendering = false;
+      
+      function renderFrame() {
+        if (frameQueue.length > 0) {
+          const img = frameQueue.shift();
+          
+          // Resize canvas if needed
+          if (canvas.width !== img.width || canvas.height !== img.height) {
+            canvas.width = img.width;
+            canvas.height = img.height;
+          }
+          
+          // Draw frame
+          ctx.drawImage(img, 0, 0);
+        }
+        
+        if (rendering) {
+          requestAnimationFrame(renderFrame);
+        }
+      }
+      
+      ws.onopen = () => {
+        connected = true;
+        rendering = true;
+        renderFrame();
+        
+        setStatus('connected', 'Connected (WebSocket/TCP)');
+        btn.textContent = 'Disconnect';
+        btn.disabled = false;
+        
+        $('resolution').textContent = 'Adaptive';
+        $('server').textContent = `${session.streamSignalingHost} (TCP-only)`;
+        info.classList.add('show');
+      };
+      
+      ws.onerror = (e) => {
+        console.error('WebSocket error:', e);
+        showError('WebSocket connection failed');
+        setStatus('error', 'Error');
+        btn.disabled = false;
+        rendering = false;
+      };
+      
+      ws.onclose = () => {
+        connected = false;
+        rendering = false;
+        setStatus('', 'Disconnected');
+        btn.textContent = 'Connect';
+        info.classList.remove('show');
+        wsConnection = null;
+        
+        // Show video, hide canvas
+        video.style.display = 'block';
+        canvas.style.display = 'none';
+      };
+      
+      ws.onmessage = async (event) => {
+        // Receive MJPEG frames
+        const blob = event.data;
+        const img = new Image();
+        img.src = URL.createObjectURL(blob);
+        img.onload = () => {
+          // Add to queue (limit queue size to prevent memory buildup)
+          if (frameQueue.length < 3) {
+            frameQueue.push(img);
+          }
+          URL.revokeObjectURL(img.src);
+        };
+      };
+    }
+
+    function disconnectWebSocket() {
+      if (wsConnection) {
+        wsConnection.close();
+        wsConnection = null;
+      }
+      connected = false;
+      btn.textContent = 'Connect';
+      info.classList.remove('show');
+      setStatus('', 'Disconnected');
+    }
+
+    // WebRTC streaming function
+    async function connectWebRTC(session) {
+      if (!webrtcAvailable) {
+        throw new Error('WebRTC library not available. Run: cd remote_viewer && ./setup.sh');
+      }
+      
+      await AppStreamer.connect({
+        streamSource: StreamType.DIRECT,
+        streamConfig: {
+          videoElementId: 'remote-video',
+          signalingServer: session.streamSignalingHost,
+          signalingPort: session.signalingPort,
+          mediaServer: session.streamSignalingHost,
+          mediaPort: session.mediaPort || session.signalingPort,
+          width: 1920,
+          height: 1080,
+          fps: 60,
+          onStart: () => {
+            connected = true;
+            setStatus('connected', 'Connected (WebRTC/UDP)');
+            btn.textContent = 'Disconnect';
+            btn.disabled = false;
+            
+            $('resolution').textContent = '1920x1080 @ 60fps';
+            $('server').textContent = session.streamSignalingHost;
+            info.classList.add('show');
+          },
+          onTerminate: () => {
+            connected = false;
+            setStatus('', 'Disconnected');
+            btn.textContent = 'Connect';
+            btn.disabled = false;
+            info.classList.remove('show');
+          },
+          onUpdate: (event) => {
+            console.log('Stream update:', event);
+          }
+        }
+      });
+    }
+
+    async function disconnectWebRTC() {
+      await AppStreamer.terminate();
+      connected = false;
+      btn.textContent = 'Connect';
+      info.classList.remove('show');
+      setStatus('', 'Disconnected');
+    }
+
+    // Main connect/disconnect handler
+    btn.onclick = async () => {
+      if (connected) {
+        try {
+          if (streamingMode === 'websocket') {
+            disconnectWebSocket();
+          } else {
+            await disconnectWebRTC();
+          }
+        } catch (e) {
+          showError('Disconnect failed: ' + e.message);
+        }
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        hideError();
+        setStatus('connecting', 'Connecting...');
+        
+        // Get session details from backend
+        const res = await fetch('/v1/streaming/session', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const session = await res.json();
+        console.log('Session response:', session);
+        
+        if (!session.streamSignalingHost || !session.signalingPort) {
+          throw new Error('Invalid session response: missing host or port');
+        }
+        
+        // Store streaming mode
+        streamingMode = session.streamingMode || 'webrtc';
+        console.log(`Using streaming mode: ${streamingMode}`);
+        
+        // Connect based on mode
+        if (streamingMode === 'websocket') {
+          await connectWebSocket(session);
+        } else {
+          await connectWebRTC(session);
+        }
+      } catch (e) {
+        console.error('Connection error:', e);
+        showError(e.message || 'Connection failed');
+        setStatus('error', 'Error');
+        btn.textContent = 'Retry';
+        btn.disabled = false;
+      }
+    };
+    
+    // Auto-hide UI after 3 seconds when connected
+    let hideTimer;
+    document.addEventListener('mousemove', () => {
+      $('ui').style.opacity = '1';
+      clearTimeout(hideTimer);
+      if (connected) {
+        hideTimer = setTimeout(() => {
+          $('ui').style.opacity = '0.3';
+        }, 3000);
+      }
+    });
+  </script>
+</body>
+</html>
+

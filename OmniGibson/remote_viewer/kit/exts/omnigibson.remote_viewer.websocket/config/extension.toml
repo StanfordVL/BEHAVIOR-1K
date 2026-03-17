@@ -1,0 +1,12 @@
+[package]
+title = "OmniGibson Remote Viewer WebSocket Streaming"
+version = "0.1.0"
+description = "TCP-only WebSocket video streaming for OmniGibson (no UDP required)"
+authors = ["OmniGibson"]
+
+[dependencies]
+"omni.kit.livestream.core" = {}
+
+[[python.module]]
+name = "omnigibson.remote_viewer.websocket"
+

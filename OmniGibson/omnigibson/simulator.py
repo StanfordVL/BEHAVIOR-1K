@@ -229,6 +229,9 @@ def _launch_app():
 
     with launch_context(None):
         app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        mgr = lazy.omni.kit.app.get_app().get_extension_manager()
+        mgr.add_path(str(gm.REMOTE_VIEWER_EXTENSION_PATH), lazy.omni.ext.ExtensionPathType.COLLECTION_USER)
+        mgr.process_and_apply_all_changes()
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.isaacsim.core.utils.stage.close_stage()
@@ -237,16 +240,15 @@ def _launch_app():
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
 
-    # Additional import for windows
+    # Ensure viewport window extension is available on Windows via the extension manager interface
     if os.name == "nt":
-        lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.window.viewport")
+        lazy.isaacsim.core.utils.extension.enable_extension("omni.kit.window.viewport")
 
     # Default Livestream settings
     if gm.REMOTE_STREAMING:
-        app.set_setting("/app/window/drawMouse", True)
-        app.set_setting("/app/livestream/proto", "ws")
-        app.set_setting("/app/livestream/websocket/framerate_limit", 120)
         app.set_setting("/ngx/enabled", False)
+        app.set_setting("/app/window/drawMouse", True)
+        app.set_setting("/app/livestream/proto", "websocket")
 
         # Find our IP address
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -258,18 +260,33 @@ def _launch_app():
         if gm.REMOTE_STREAMING == "native":
             # Enable Native Livestream extension
             # Default App: Streaming Client from the Omniverse Launcher
-            lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.livestream.native")
+            lazy.isaacsim.core.utils.extension.enable_extension("omni.kit.livestream.native")
             print(f"Now streaming on {ip} via Omniverse Streaming Client")
+
         elif gm.REMOTE_STREAMING == "webrtc":
-            # Enable WebRTC Livestream extension
-            app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
+            # Set WebRTC port
             app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
-            lazy.isaacsim.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
-            print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
-        else:
-            raise ValueError(
-                f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc."
-            )
+
+            # Enable custom OmniGibson remote viewer extensions
+            custom_exts = [
+                "omnigibson.remote_viewer.setup",
+                "omnigibson.remote_viewer.web",
+            ]
+            for ext_name in custom_exts:
+                mgr.set_extension_enabled_immediate(ext_name, True)
+
+        elif gm.REMOTE_STREAMING == "websocket":
+            # Set WebSocket streaming port (TCP-only, no UDP)
+            app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)  # Reuse same port
+
+            # Enable custom OmniGibson remote viewer extensions + websocket streaming
+            custom_exts = [
+                "omnigibson.remote_viewer.setup",
+                "omnigibson.remote_viewer.web",
+                "omnigibson.remote_viewer.websocket",  # TCP-only streaming
+            ]
+            for ext_name in custom_exts:
+                mgr.set_extension_enabled_immediate(ext_name, True)
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:

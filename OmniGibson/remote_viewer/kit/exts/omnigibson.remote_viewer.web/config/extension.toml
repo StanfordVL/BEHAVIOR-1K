@@ -1,0 +1,13 @@
+[package]
+title = "OmniGibson Remote Viewer Web UI"
+version = "0.1.0"
+description = "Serves the OmniGibson remote viewer web UI and session configuration API via Kit's HTTP server."
+authors = ["OmniGibson"]
+
+[dependencies]
+"omni.services.core" = {}
+"omni.services.transport.server.http" = {}
+
+[[python.module]]
+name = "omnigibson.remote_viewer.web"
+

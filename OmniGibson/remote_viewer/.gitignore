@@ -1,0 +1,6 @@
+# Python cache directories
+__pycache__/
+
+# npm artifacts (must be downloaded via setup.sh)
+node_modules/
+package-lock.json

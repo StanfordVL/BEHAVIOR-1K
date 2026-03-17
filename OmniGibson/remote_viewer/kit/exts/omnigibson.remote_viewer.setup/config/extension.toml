@@ -1,0 +1,22 @@
+[package]
+title = "OmniGibson Remote Viewer Setup"
+version = "0.1.0"
+description = "Bootstrap layout and lifecycle for the OmniGibson Remote Viewer application."
+category = "Setup"
+keywords = ["kit", "setup", "viewer"]
+
+[dependencies]
+"omni.kit.quicklayout" = {}
+"omni.kit.viewport.utility" = {}
+"omni.activity.ui" = {}
+"omnigibson.remote_viewer.web" = {}
+
+[settings.app]
+useFabricSceneDelegate = true
+
+[settings.exts."omnigibson.remote_viewer.setup"]
+menu_visible = false
+
+[[python.module]]
+name = "omnigibson.remote_viewer.setup"
+

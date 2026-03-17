@@ -10,6 +10,15 @@ keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in
 "isaacsim.exp.base" = {}
 "omni.flowusd" = {}
 "omni.kit.xr.profile.vr" = {}
+"omni.services.transport.server.http" = {}
+"omni.kit.livestream.core" = {}
+"omni.kit.livestream.webrtc" = {}
+"omni.kit.livestream.messaging" = {}
+"omni.services.livestream.nvcf" = {}
+
+[settings]
+exts."omni.services.transport.server.http".port = 8211
+exts."omni.services.transport.server.http".host = "0.0.0.0"
 
 [settings.app]
 name = "OmniGibson"
@@ -20,7 +29,7 @@ vulkan = true # Explicitly enable Vulkan (on by default on Linux, off by default
 window.iconPath = "${app}/OmniGibson_logo.png"
 
 [settings.app.livestream]
-proto = "ws"
+proto = "websocket"
 allowResize = true
 outDirectory = "${data}"
 

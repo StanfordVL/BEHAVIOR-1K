@@ -1,0 +1,38 @@
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "dock_id": 5,
+                    "dock_tab_bar_enabled": false,
+                    "dock_tab_bar_visible": false,
+                    "height": 500.0,
+                    "position_x": 0.0,
+                    "position_y": 26.0,
+                    "selected_in_dock": true,
+                    "title": "Viewport",
+                    "visible": true,
+                    "width": 727.0
+                  }
+                ],
+                "dock_id": 5,
+                "position": "LEFT"
+              }
+            ],
+            "dock_id": 3,
+            "position": "TOP"
+          }
+        ],
+        "dock_id": 1,
+        "position": "LEFT"
+      }
+    ],
+    "dock_id": 3358485147
+  }
+]
+
