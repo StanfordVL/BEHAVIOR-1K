@@ -5,7 +5,6 @@ from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.backend_utils import _compute_backend as cb
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 from omnigibson.robots import LocomotionRobot
 from gello.robots.sim_robot.og_teleop_utils import GHOST_APPEAR_THRESHOLD
 import torch as th
@@ -833,7 +832,7 @@ def check_robot_base_nonarm_nonkinematic_collision(env):
 def check_robot_nonarm_nonground_collision(env):
     ground_objects = []
     for cat in GROUND_CATEGORIES:
-        ground_objects.extend(env.scene.object_registry("category", cat))
+        ground_objects.extend(env.scene.object_registry("category", cat, []))
 
     for robot in env.robots:
         robot_arm_paths = set()

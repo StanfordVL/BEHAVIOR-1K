@@ -14,7 +14,7 @@ from omnigibson.systems.macro_particle_system import MacroVisualParticleSystem
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.object_states import Filled
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.usd_utils import RigidContactAPI, GripperRigidContactAPI, ControllableObjectViewAPI
+from omnigibson.utils.usd_utils import RigidContactAPI, ControllableObjectViewAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
@@ -423,7 +423,15 @@ class OGRobotServer:
         # Loop over all arms and grab relevant joint info
         joint_pos = self.robot.get_joint_positions()
         joint_vel = self.robot.get_joint_velocities()
-        finger_impulses = GripperRigidContactAPI.get_all_impulses(self.env.scene.idx) if INCLUDE_FINGER_CONTACT_OBS else None
+        finger_impulses = None
+        if INCLUDE_FINGER_CONTACT_OBS:
+            scene_idx = self.env.scene.idx
+            contact_view = RigidContactAPI._CONTACT_VIEW.get(scene_idx)
+            if contact_view is not None:
+                all_impulses = contact_view.get_contact_force_matrix(dt=1.0)
+                finger_paths = [link.prim_path for arm in self.robot.arm_names for link in self.robot.finger_links[arm]]
+                finger_row_idxs = RigidContactAPI.get_contact_row_indices(scene_idx, finger_paths)
+                finger_impulses = all_impulses[finger_row_idxs].permute(1, 0, 2)
 
         obs = dict()
         obs["active_arm"] = self.active_arm
@@ -444,7 +452,7 @@ class OGRobotServer:
             obs[f"arm_{arm}_ee_pos_quat"] = th.concatenate(self.robot.eef_links[arm].get_position_orientation())
             # When using VR, this expansive check makes the view glitch
             obs[f"arm_{arm}_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.arm_links[arm])) if VIEWING_MODE != ViewingMode.VR and INCLUDE_ARM_CONTACT_OBS else False
-            obs[f"arm_{arm}_finger_max_contact"] = th.max(th.sum(th.square(finger_impulses[:, 2*i:2*(i+1), :]), dim=-1)).item() if INCLUDE_FINGER_CONTACT_OBS else 0.0
+            obs[f"arm_{arm}_finger_max_contact"] = th.max(th.sum(th.square(finger_impulses[:, 2*i:2*(i+1), :]), dim=-1)).item() if finger_impulses is not None else 0.0
 
             obs[f"{arm}_gripper"] = self._joint_cmd[f"{arm}_gripper"].item()
 

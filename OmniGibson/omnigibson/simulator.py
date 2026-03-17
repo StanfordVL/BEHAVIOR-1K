@@ -176,6 +176,7 @@ def _launch_app():
 
     # Clear the argv - Isaac Sim unfortunately reads from it directly, so we need to clear it to avoid issues.
     # Otherwise it will inherit the arguments of the entrypoint script.
+    _saved_argv = sys.argv[:]
     sys.argv = []
 
     # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
@@ -251,6 +252,9 @@ def _launch_app():
 
     with launch_context(None):
         app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+
+    # Restore the original argv now that Isaac Sim has been initialized
+    sys.argv = _saved_argv
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.isaacsim.core.utils.stage.close_stage()
@@ -1275,8 +1279,9 @@ def _launch_simulator(*args, **kwargs):
                     # Flush the controls from the ControllableObjectViewAPI
                     ControllableObjectViewAPI.flush_control()
             except Exception as e:
+                self.currently_stepping = False
                 self.pre_step_exception = e
-                raise e
+                raise
 
         @with_profiler(name="_post_physics_step_profiler")
         def _on_post_physics_step(self):
@@ -1289,8 +1294,9 @@ def _launch_simulator(*args, **kwargs):
                 # Record that we are done with the step context.
                 self.currently_stepping = False
             except Exception as e:
+                self.currently_stepping = False
                 self.post_step_exception = e
-                raise e
+                raise
 
         def _report_step_exceptions(self):
             if self.pre_step_exception is not None:

@@ -254,7 +254,13 @@ class RigidContactAPIImpl:
         """
         assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
 
-        # Rebuild from scratch to avoid stale state from previous scene configurations.
+        # Snapshot the old contact matrices and path mappings so we can carry over
+        # cached contact state for pairs of bodies that already existed.
+        prev_contact_matrix = dict(self._CONTACT_MATRIX)
+        prev_path_to_row_idx = dict(self._PATH_TO_ROW_IDX)
+        prev_path_to_col_idx = dict(self._PATH_TO_COL_IDX)
+
+        # Rebuild views from scratch to pick up any new/removed bodies.
         self.clear()
 
         body_filters = self.get_body_filters()
@@ -333,10 +339,30 @@ class RigidContactAPIImpl:
                 self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx] = (
                     self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] >= 0
                 )
-                self._CONTACT_MATRIX[scene_idx] = th.zeros((len(row_paths), len(col_paths)), dtype=th.bool)
                 ii, jj = th.meshgrid(th.arange(len(row_paths)), th.arange(len(col_paths)), indexing="ij")
                 self._INDEX_MATRIX[scene_idx] = th.stack([ii, jj], dim=-1)
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().clone()
+
+                # Build the new contact matrix. Start from current impulses (captures contacts
+                # for newly added bodies), then overwrite with previously cached values for
+                # every pair of bodies that already existed before the rebuild.
+                initial_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
+                self._CONTACT_MATRIX[scene_idx] = th.any(initial_impulses != 0, dim=-1)
+
+                old_matrix = prev_contact_matrix.get(scene_idx)
+                old_row_map = prev_path_to_row_idx.get(scene_idx)
+                old_col_map = prev_path_to_col_idx.get(scene_idx)
+                if old_matrix is not None and old_row_map is not None and old_col_map is not None:
+                    # Find rows and columns that existed in both the old and new views
+                    surviving_row_paths = [p for p in row_paths if p in old_row_map]
+                    surviving_col_paths = [p for p in col_paths if p in old_col_map]
+                    if surviving_row_paths and surviving_col_paths:
+                        old_row_idxs = th.tensor([old_row_map[p] for p in surviving_row_paths], dtype=th.long)
+                        old_col_idxs = th.tensor([old_col_map[p] for p in surviving_col_paths], dtype=th.long)
+                        new_row_idxs = th.tensor([self._PATH_TO_ROW_IDX[scene_idx][p] for p in surviving_row_paths], dtype=th.long)
+                        new_col_idxs = th.tensor([self._PATH_TO_COL_IDX[scene_idx][p] for p in surviving_col_paths], dtype=th.long)
+                        self._CONTACT_MATRIX[scene_idx][new_row_idxs[:, None], new_col_idxs[None, :]] = \
+                            old_matrix[old_row_idxs[:, None], old_col_idxs[None, :]]
 
     def update_contact_cache(self):
         """
