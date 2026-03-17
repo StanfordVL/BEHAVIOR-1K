@@ -128,92 +128,93 @@ def test_camera_pose_flatcache_on():
 
 @pytest.mark.parametrize("robot_name", REGISTERED_ROBOTS)
 def test_robot_load_drive(robot_name):
-    if og.sim is None:
-        # Set global flags
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_TRANSITION_RULES = False
-    else:
-        # Make sure sim is stopped
-        og.sim.stop()
-
-    config = {
-        "scene": {
-            "type": "Scene",
-        },
-    }
-
-    env = og.Environment(configs=config)
-    og.sim.stop()
-
-    # Iterate over all robots and test their motion
     if robot_name == "stretch":
-        # TODO: skipping stretch for now
-        return
+        pytest.skip("Skipping stretch for now")
 
     if robot_name == "husky":
-        # Husky base motion is a little messed up because of the 4-wheel drive; skipping for now
-        # BehaviorRobot does not work with the primitive actions at the moment
-        return
+        pytest.skip("Husky base motion is a little messed up because of the 4-wheel drive; skipping for now")
 
-    robot = Robot(
-        name=robot_name,
-        model=robot_name.lower(),
-        obs_modalities=[],
-    )
-    env.scene.add_object(robot)
-
-    # At least one step is always needed while sim is playing for any imported object to be fully initialized
-    og.sim.play()
-
-    # Reset robot and make sure it's not moving
-    robot.reset()
-    robot.keep_still()
-
-    og.sim.step()
-
-    # Set viewer in front facing robot
-    og.sim.viewer_camera.set_position_orientation(
-        position=[2.69918369, -3.63686664, 4.57894564],
-        orientation=[0.39592411, 0.1348514, 0.29286304, 0.85982],
-    )
-
-    # If this is a manipulation robot, we want to test moving the arm
-    if robot.is_manipulation:
-        # load IK controller
-        controller_config = {
-            f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
-        }
-        robot.reload_controllers(controller_config=controller_config)
-        env.scene.update_initial_file()
-
-        action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
-
-        eef_pos = env.robots[0].get_eef_position()
-        eef_orn = env.robots[0].get_eef_orientation()
-        if robot.model == "stretch":  # Stretch arm faces the y-axis
-            target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
+    try:
+        if og.sim is None:
+            # Set global flags
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = True
+            gm.ENABLE_TRANSITION_RULES = False
         else:
-            target_eef_pos = th.tensor([eef_pos[0] + 0.1, eef_pos[1], eef_pos[2]], dtype=th.float32)
-        target_eef_orn = eef_orn
-        for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn)):
-            env.step(action)
-        assert th.norm(robot.get_eef_position() - target_eef_pos) < 0.05
+            # Make sure sim is stopped
+            og.sim.stop()
 
-    # If this is a locomotion robot, we want to test driving
-    if robot.is_locomotion:
-        action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
-        goal_location = th.tensor([0, 1, 0], dtype=th.float32)
-        for action in action_primitives._navigate_to_pose_direct(goal_location):
-            env.step(action)
-        assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
-        assert robot.get_rpy()[2] - goal_location[2] < 0.1
+        config = {
+            "scene": {
+                "type": "Scene",
+            },
+        }
 
-    # Stop the simulator and remove the robot
-    og.sim.stop()
-    env.scene.remove_object(obj=robot)
+        env = og.Environment(configs=config)
+        og.sim.stop()
 
-    og.clear()
+        robot = Robot(
+            name=robot_name,
+            model=robot_name.lower(),
+            obs_modalities=[],
+        )
+        env.scene.add_object(robot)
+
+        # At least one step is always needed while sim is playing for any imported object to be fully initialized
+        og.sim.play()
+
+        # Reset robot and make sure it's not moving
+        robot.reset()
+        robot.keep_still()
+
+        og.sim.step()
+
+        # Set viewer in front facing robot
+        og.sim.viewer_camera.set_position_orientation(
+            position=[2.69918369, -3.63686664, 4.57894564],
+            orientation=[0.39592411, 0.1348514, 0.29286304, 0.85982],
+        )
+
+        # If this is a manipulation robot, we want to test moving the arm
+        if robot.is_manipulation:
+            # load IK controller
+            controller_config = {
+                f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
+            }
+            robot.reload_controllers(controller_config=controller_config)
+            env.scene.update_initial_file()
+
+            action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
+
+            eef_pos = env.robots[0].get_eef_position()
+            eef_orn = env.robots[0].get_eef_orientation()
+            if robot.model == "stretch":  # Stretch arm faces the y-axis
+                target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
+            else:
+                target_eef_pos = th.tensor([eef_pos[0] + 0.1, eef_pos[1], eef_pos[2]], dtype=th.float32)
+            target_eef_orn = eef_orn
+            for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn)):
+                env.step(action)
+            assert th.norm(robot.get_eef_position() - target_eef_pos) < 0.05
+
+        # If this is a locomotion robot, we want to test driving
+        if robot.is_locomotion:
+            action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
+            goal_location = th.tensor([0, 1, 0], dtype=th.float32)
+            for action in action_primitives._navigate_to_pose_direct(goal_location):
+                env.step(action)
+            assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
+            yaw_diff = robot.get_rpy()[2] - goal_location[2]
+            wrapped_yaw_diff = th.atan2(th.sin(yaw_diff), th.cos(yaw_diff))
+            assert th.abs(wrapped_yaw_diff) < 0.1
+
+        # Stop the simulator and remove the robot
+        og.sim.stop()
+        env.scene.remove_object(obj=robot)
+    finally:
+        if og.sim is not None:
+            og.clear()
 
 
 def test_grasping_mode():
