@@ -220,7 +220,9 @@ def _launch_app():
         # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
         # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
         # ensure that the kit file is always up to date.
-        assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+        assert (
+            "EXP_PATH" in os.environ
+        ), "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
         exp_path = os.environ["EXP_PATH"]
         kit_file = Path(__file__).parent / kit_file_name
         kit_file_target = Path(exp_path) / kit_file_name
