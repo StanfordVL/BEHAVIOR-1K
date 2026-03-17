@@ -176,21 +176,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._tracking_object = None
 
         # Store the current position of the arm as the arm target
-        control_dict = self.robot.get_control_dict()
         self._arm_targets = {}
         self._reset_eef_pose = {}
         if self.robot.is_manipulation:
+            # Batched read of joint positions for all controllers
+            joint_positions = cb.to_torch(self.robot.get_joint_positions())
             for arm_name in self.robot.arm_names:
                 eef = f"eef_{arm_name}"
                 arm = f"arm_{arm_name}"
                 arm_group_key, _ = self.robot.controllers[arm]
                 if ControllerView.is_controller_type(arm_group_key, InverseKinematicsController):
-                    pos_relative = cb.to_torch(control_dict[f"{eef}_pos_relative"])
-                    quat_relative = cb.to_torch(control_dict[f"{eef}_quat_relative"])
+                    # Use the current relative end-effector pose as the IK target
+                    pos_relative_np, quat_relative_np = self.robot.get_relative_eef_pose(arm_name)
+                    pos_relative = cb.to_torch(pos_relative_np)
+                    quat_relative = cb.to_torch(quat_relative_np)
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
-                    arm_target = cb.to_torch(control_dict["joint_position"])[ControllerView.get_dof_idx(arm_group_key)]
+                    # Use the current joint positions for this arm as the target
+                    arm_target = joint_positions[ControllerView.get_dof_idx(arm_group_key)]
                     self._arm_targets[arm] = arm_target
 
                 self._reset_eef_pose[arm_name] = self.robot.get_relative_eef_pose(arm_name)
