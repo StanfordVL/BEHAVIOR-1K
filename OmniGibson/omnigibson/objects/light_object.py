@@ -5,7 +5,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.objects.usd_object import USDObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.usd_utils import create_usd_stage
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType
@@ -16,7 +16,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 log = create_module_logger(module_name=__name__)
 
 
-class LightObject(USDObject):
+class LightObject(BaseObject):
     """
     LightObjects are objects that generate light in the simulation
     """
@@ -68,7 +68,7 @@ class LightObject(USDObject):
             radius (float): Radius for this light.
             intensity (float): Intensity for this light.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
@@ -83,7 +83,7 @@ class LightObject(USDObject):
         # Other attributes to be filled in at runtime
         self._light_link = None
 
-        # Build the USD for this light upfront and pass it to USDObject
+        # Build the USD for this light upfront and pass it to BaseObject
         usd_path = self._build_usd(name=name, light_type=light_type)
 
         # Run super method

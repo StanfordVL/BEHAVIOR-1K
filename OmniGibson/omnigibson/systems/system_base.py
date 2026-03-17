@@ -1063,7 +1063,7 @@ def create_system_from_metadata(system_name):
         if has_asset:
 
             def generate_particle_template_fcn():
-                return lambda relative_prim_path, name: og.objects.USDObject(
+                return lambda relative_prim_path, name: og.objects.BaseObject(
                     relative_prim_path=relative_prim_path,
                     name=name,
                     usd_path=asset_path,

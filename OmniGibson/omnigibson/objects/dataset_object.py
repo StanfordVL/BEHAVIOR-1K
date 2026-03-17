@@ -1,7 +1,6 @@
 import math
 import os
 import random
-from enum import IntEnum
 
 import torch as th
 
@@ -9,7 +8,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.objects.usd_object import USDObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.asset_utils import (
     check_minimum_behavior_1k_assets_version,
     get_all_object_category_models,
@@ -34,7 +33,7 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 
-class DatasetObject(USDObject):
+class DatasetObject(BaseObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
     dataset. These objects should contain additional metadata, including aggregate statistics across the
@@ -106,7 +105,7 @@ class DatasetObject(USDObject):
                 a list of room type(s) or a single room type
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
         """
         # Store variables
         if isinstance(in_rooms, str):

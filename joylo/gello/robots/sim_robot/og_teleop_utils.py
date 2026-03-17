@@ -14,7 +14,7 @@ from omnigibson.utils.usd_utils import create_primitive_mesh, absolute_prim_path
 from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils import transform_utils as T
 from omnigibson.sensors import VisionSensor
-from omnigibson.objects.usd_object import USDObject
+from omnigibson.objects.object_base import BaseObject
 from bddl.activity import Conditions
 
 from gello.robots.sim_robot.og_teleop_cfg import *
@@ -943,7 +943,7 @@ def setup_ghost_robot(scene, task_cfg=None):
         object: Ghost robot object
     """    
     # NOTE: Add ghost robot, but don't register it
-    ghost = USDObject(
+    ghost = BaseObject(
         name="ghost", 
         usd_path=os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{ROBOT_TYPE.lower()}/usd/{ROBOT_TYPE.lower()}.usda"), 
         visual_only=True, 

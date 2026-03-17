@@ -1,3 +1,6 @@
+import hashlib
+import os
+import tempfile
 from abc import ABCMeta
 from collections import defaultdict
 from collections.abc import Iterable
@@ -30,10 +33,11 @@ from omnigibson.object_states.on_fire import OnFire
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, extract_class_init_kwargs_from_dict, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, create_joint
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, add_asset_to_stage, create_joint
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -65,11 +69,16 @@ _EMITTER_LAYER_COUNTER = 1
 
 
 class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
-    """This is the interface that all OmniGibson objects must implement."""
+    """
+    BaseObject is the interface that all OmniGibson objects must implement.
+    Objects are instantiated from a USD file and can be composed of one or more links and joints.
+    """
 
     def __init__(
         self,
         name,
+        usd_path=None,
+        encrypted=False,
         relative_prim_path=None,
         category="object",
         scale=None,
@@ -83,11 +92,14 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config=None,
         abilities=None,
         include_default_states=True,
+        expected_file_hash=None,
         **kwargs,
     ):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
+            usd_path (None or str): global path to the USD file to load
+            encrypted (bool): whether this file is encrypted (and should therefore be decrypted) or not
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -111,11 +123,15 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             include_default_states (bool): whether to include the default object states from @get_default_states
+            expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
                 Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
+        self._usd_path = usd_path
+        self._encrypted = encrypted
+        self._expected_file_hash = expected_file_hash
         # Generate default prim path if none is specified
         relative_prim_path = f"/{name}" if relative_prim_path is None else relative_prim_path
 
@@ -172,13 +188,72 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Update init info for this
         self._init_info["args"]["name"] = self.name
 
+    def _prepare_to_load(self):
+        """Prepare to load the USD by decrypting, correcting paths, and checking hashes."""
+        usd_path = self._usd_path
+
+        if self._encrypted:
+            # Create a temporary file to store the decrytped asset, load it, and then delete it
+            encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
+            self.check_hash(encrypted_filename)
+            basename = os.path.basename(self._usd_path)
+            tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
+            usd_path = os.path.join(tempdir_path, f"{basename}.usd")
+            decrypt_file(encrypted_filename, usd_path)
+
+            # Update the paths of all assets to be the absolute path. This is important because the
+            # relative paths are relative to the encrypted file and not the decrypted file in the
+            # tempdir.
+            side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
+
+            def _update_path(asset_path):
+                if ".mdl" in asset_path:
+                    # MDL paths are searched for in a different search space, so we don't modify them
+                    return asset_path
+                return os.path.join(os.path.dirname(encrypted_filename), asset_path)
+
+            lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
+            side_stage.Save()
+            del side_stage
+        else:
+            self.check_hash(usd_path)
+
+        return usd_path
+
     def prebuild(self, stage):
         """
-        Implement this function to provide pre-building functionality on an USD stage
-        that is not loaded into Isaac Sim. This is useful for pre-compiling scene USDs,
-        speeding up load times especially for parallel envs.
+        Pre-build this object on an USD stage that is not loaded into Isaac Sim.
+        This is useful for pre-compiling scene USDs, speeding up load times especially for parallel envs.
         """
-        pass
+        if self._usd_path is None:
+            return
+        # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
+        prim_path = "/World" + self._relative_prim_path
+        usd_path = self._prepare_to_load()
+        prim = stage.GetPrimAtPath(prim_path)
+        assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
+        prim = stage.DefinePrim(prim_path, "Xform")
+        assert prim.GetReferences().AddReference(usd_path)
+
+    def _load(self):
+        usd_path = self._prepare_to_load()
+        return add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
+
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
+        # Add additional kwargs
+        return self.__class__(
+            relative_prim_path=relative_prim_path,
+            usd_path=self._usd_path,
+            name=name,
+            category=self.category,
+            scale=self.scale,
+            visible=self.visible,
+            fixed_base=self.fixed_base,
+            visual_only=self._visual_only,
+            prim_type=self._prim_type,
+            load_config=load_config,
+            abilities=self._abilities,
+        )
 
     def load(self, scene):
         prim = super().load(scene)
@@ -354,6 +429,42 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             dict: Dictionary mapping ability name to ability arguments for this object
         """
         return self._abilities
+
+    @property
+    def usd_path(self):
+        """
+        Returns:
+            str: absolute path to this model's USD file
+        """
+        return self._usd_path
+
+    def check_hash(self, usd_path):
+        """
+        Check if the hash of the file matches the expected hash.
+
+        Args:
+            usd_path (str): The path to the USD file.
+        """
+        # Hash the file to record the loaded asset's version
+        hash_md5 = hashlib.md5()
+        with open(usd_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                hash_md5.update(chunk)
+        file_hash = hash_md5.hexdigest()
+
+        # If there is a file hash already in the init info, compare against it to see if the file has changed
+        if self._expected_file_hash is not None:
+            if file_hash != self._expected_file_hash:
+                log.warn(
+                    f"Object {self.name} was expected to have USD file hash {self._expected_file_hash} but loaded with {file_hash}. The saved state might be incompatible."
+                )
+        else:
+            # If there is no expected file hash, set the expected file hash to the loaded one
+            self._expected_file_hash = file_hash
+
+            # Update the init info too so that the information gets saved with the scene.
+            # TODO: Super hacky, think of a better way to preserve this info
+            self._init_info["args"]["expected_file_hash"] = file_hash
 
     @property
     def is_active(self):
@@ -1008,9 +1119,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
     @classproperty
     def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
-        classes.add("BaseObject")
         return classes
 
     @classproperty

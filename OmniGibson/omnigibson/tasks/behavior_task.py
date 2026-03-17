@@ -485,7 +485,7 @@ class BehaviorTask(BaseTask):
         for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
             objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin
         ):
-            # TODO: May need to update checking here to USDObject? Or even baseobject?
+            # TODO: May need to update checking here to BaseObject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:
                 low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])

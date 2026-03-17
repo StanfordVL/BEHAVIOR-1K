@@ -15,7 +15,7 @@ import networkx as nx
 import gymnasium as gym
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.objects.usd_object import USDObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors import (
     ALL_SENSOR_MODALITIES,
     SENSOR_PRIMS_TO_SENSOR_CLS,
@@ -95,7 +95,7 @@ AG_MODES = {
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
 
-class Robot(USDObject, GymObservable):
+class Robot(BaseObject, GymObservable):
     def __init__(
         self,
         # Shared kwargs in hierarchy
@@ -109,7 +109,7 @@ class Robot(USDObject, GymObservable):
         self_collisions=True,
         link_physics_materials=None,
         load_config=None,
-        # Unique to USDObject hierarchy
+        # Unique to BaseObject hierarchy
         abilities=None,
         # Unique to Robot
         control_freq=None,
@@ -204,7 +204,7 @@ class Robot(USDObject, GymObservable):
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             end_effector (str): The end effector type to use.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is BaseObject).
         """
         self.model = model
         # Read and validate robot definition YAML file using OmegaConf
