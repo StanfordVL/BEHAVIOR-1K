@@ -43,7 +43,7 @@ class ProfilingEnv(og.Environment):
             if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
                 action_dict = dict()
                 idx = 0
-                for robot in self.robots:
+                for robot in self.scene.robots:
                     action_dim = robot.action_dim
                     action_dict[robot.name] = action[idx : idx + action_dim]
                     idx += action_dim
@@ -52,7 +52,7 @@ class ProfilingEnv(og.Environment):
                 action_dict = action
 
             # Iterate over all robots and apply actions
-            for robot in self.robots:
+            for robot in self.scene.robots:
                 robot.apply_action(action_dict[robot.name])
 
             # Run simulation step
@@ -76,14 +76,14 @@ class ProfilingEnv(og.Environment):
             reward, done, info = self.task.step(self, action)
             self._populate_info(info)
 
-            if done and self._automatic_reset:
+            if done.any() and self._automatic_reset:
                 # Add lost observation to our information dict, and reset
-                info["last_observation"] = obs
-                info["last_observation_info"] = obs_info
+                info[0]["last_observation"] = obs
+                info[0]["last_observation_info"] = obs_info
                 obs, obs_info = self.reset()
 
             # Increment step
-            self._current_step += 1
+            self._current_steps += 1
 
             # collect profiling data
             total_frame_time = (time() - start) * 1e3
@@ -105,7 +105,7 @@ class ProfilingEnv(og.Environment):
             pynvml.nvmlShutdown()
 
             ret = [total_frame_time, omni_time, og_time, memory_usage, vram_usage]
-            if self._current_step % 100 == 0:
+            if self._current_steps[0] % 100 == 0:
                 print(
                     "total time: {:.3f} ms, Isaac time: {:.3f} ms, Non-Isaac time: {:.3f} ms, memory: {:.3f} GB, vram: {:.3f} GB.".format(
                         *ret
@@ -115,5 +115,5 @@ class ProfilingEnv(og.Environment):
             return obs, reward, done, info, ret
         except:
             raise ValueError(
-                f"Failed to execute environment step {self._current_step} in episode {self._current_episode}"
+                f"Failed to execute environment step {self._current_steps[0]} in episode {self._current_episodes[0]}"
             )
