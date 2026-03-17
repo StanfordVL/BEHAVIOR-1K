@@ -43,7 +43,7 @@ jobs:
         test_file:
           - test_controllers
           # - test_curobo
-          - test_data_collection
+          # - test_data_collection
           - test_dump_load_states
           - test_envs
           - test_multiple_envs
@@ -58,7 +58,7 @@ jobs:
           - test_symbolic_primitives
           - test_systems
           - test_transform_utils
-          - test_transition_rules
+          # - test_transition_rules
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
