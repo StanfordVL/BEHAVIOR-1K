@@ -761,7 +761,6 @@ add_compute_function(
 )
 
 
-@th.jit.script
 def _compute_osc_torques_batch_torch(
     q: th.Tensor,
     qd: th.Tensor,
