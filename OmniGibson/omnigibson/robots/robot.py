@@ -16,6 +16,7 @@ import gymnasium as gym
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.objects.usd_object import USDObject
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.sensors import (
     ALL_SENSOR_MODALITIES,
     SENSOR_PRIMS_TO_SENSOR_CLS,
@@ -3235,7 +3236,7 @@ class Robot(USDObject, GymObservable):
             # Calculate position of the object link. Only allow this for objects currently.
             obj_prim_path, link_name = prim_path.rsplit("/", 1)
             candidate_obj = self.scene.object_registry("prim_path", obj_prim_path, None)
-            if candidate_obj is None or link_name not in candidate_obj.links:
+            if candidate_obj is None or link_name not in candidate_obj.links or not isinstance(candidate_obj.links[link_name], RigidDynamicPrim):
                 continue
             candidate_link = candidate_obj.links[link_name]
             dist = th.norm(candidate_link.get_position_orientation()[0] - gripper_center_pos)
@@ -3585,6 +3586,8 @@ class Robot(USDObject, GymObservable):
             return
 
         # Compute the contact position in world frame
+        # Note that this relies on the legacy contact sensor API and not the RigidContactAPI,
+        # because the position information is not reliably available through the RigidContactAPI.
         target_link_prim_path = target_obj.links[target_link_name].prim_path
         finger_paths = {link.prim_path for link in self.finger_links[arm]}
         contact_pos_world = None
