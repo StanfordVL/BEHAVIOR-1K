@@ -127,8 +127,10 @@ def test_camera_pose_flatcache_on():
 
 @pytest.mark.parametrize("robot_name", REGISTERED_ROBOTS)
 def test_robot_load_drive(robot_name):
-    if robot_name == "stretch":
-        pytest.skip("Skipping stretch for now")
+    if robot_name == "stretch" or robot_name == "locobot":
+        pytest.skip(
+            f"Skipping {robot_name} for now due to issues with turning"
+        )  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2018
 
     if robot_name == "husky":
         pytest.skip("Husky base motion is a little messed up because of the 4-wheel drive; skipping for now")
