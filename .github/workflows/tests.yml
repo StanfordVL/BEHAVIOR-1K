@@ -144,6 +144,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [run_test]
     if: ${{ !cancelled() }}
+    permissions:
+      checks: write
+      pull-requests: write
     steps:
       - name: Pull reports
         uses: actions/download-artifact@v4
@@ -165,7 +168,7 @@ jobs:
       - name: Publish Test Report with Pull Request Comment
         uses: ctrf-io/github-test-reporter@v1
         with:
-          report-path: './ctrf-report.json'
+          report-path: ctrf-report.json
           pull-request-report: true
           exit-on-fail: true
           update-comment: true
