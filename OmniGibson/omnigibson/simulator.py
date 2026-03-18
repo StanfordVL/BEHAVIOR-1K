@@ -14,25 +14,6 @@ from contextlib import nullcontext
 from pathlib import Path
 from cProfile import Profile
 
-
-def with_profiler(name):
-    def decorator(fn):
-        @functools.wraps(fn)
-        def wrapper(self, *args, **kwargs):
-            profiler = getattr(self, name)
-            if profiler is not None:
-                profiler.enable()
-            try:
-                return fn(self, *args, **kwargs)
-            finally:
-                if profiler is not None:
-                    profiler.disable()
-
-        return wrapper
-
-    return decorator
-
-
 import torch as th
 
 import omnigibson as og
@@ -40,7 +21,8 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
+from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims import XFormPrim
@@ -67,9 +49,28 @@ from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
     PoseAPI,
     RigidContactAPI,
+    clear as clear_usd_utils,
+    triangularize_mesh,
 )
-from omnigibson.utils.usd_utils import clear as clear_usd_utils
-from omnigibson.utils.usd_utils import triangularize_mesh
+
+
+def with_profiler(name):
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            profiler = getattr(self, name)
+            if profiler is not None:
+                profiler.enable()
+            try:
+                return fn(self, *args, **kwargs)
+            finally:
+                if profiler is not None:
+                    profiler.disable()
+
+        return wrapper
+
+    return decorator
+
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -495,7 +496,7 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_requiring_update = [
                 state
                 for state in self.object_state_types
-                if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedValueState))
             ]
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
@@ -509,7 +510,7 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
 
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
+                if issubclass(state, TensorizedValueState):
                     state.global_initialize()
 
             # Now start rebuilding everything
@@ -1105,7 +1106,7 @@ def _launch_simulator(*args, **kwargs):
                 if gm.ENABLE_OBJECT_STATES:
                     # Step the object states in global topological order (if the scene exists)
                     for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, GlobalUpdateStateMixin):
+                        if issubclass(state_type, TensorizedValueState):
                             state_type.global_update()
                         if issubclass(state_type, UpdateStateMixin):
                             for scene in self.scenes:
@@ -1742,7 +1743,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
+                if issubclass(state, TensorizedValueState):
                     state.global_initialize()
 
             # Clear all materials

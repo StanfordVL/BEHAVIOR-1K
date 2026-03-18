@@ -3,11 +3,10 @@ import math
 import torch as th
 
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
 from omnigibson.utils.python_utils import classproperty, torch_delete
 
 
-class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
+class TensorizedValueState(AbsoluteObjectState):
     """
     A state-mixin that implements optimized global value updates across all object state instances
     of this type, i.e.: all values across all object state instances are updated at once, rather than per
@@ -30,9 +29,6 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     @classmethod
     def global_initialize(cls):
-        # Call super first
-        super().global_initialize()
-
         # Initialize the global variables
         cls.VALUES = th.empty(0, dtype=cls.value_type).reshape(0, *cls.value_shape)
         cls.OBJ_IDXS = dict()
@@ -45,9 +41,6 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     @classmethod
     def global_update(cls):
-        # Call super first
-        super().global_update()
-
         # This should be globally update all values. If there are no values, we skip by default since there is nothing
         # being tracked currently
         n_values = len(cls.VALUES)
