@@ -448,7 +448,7 @@ class StateCondition(RuleCondition):
         Args:
             filter_name (str): Name of the filter whose object candidates will be pruned based on whether or not
                 the state @state's value is equal to @val
-            state (USDObjectState): Object state whose value should be queried as a rule condition
+            state (BaseObjectState): Object state whose value should be queried as a rule condition
             val (any): The value @state should be in order for this condition to be satisfied
             op (function): Binary operator to apply between @state's getter and @val. Default is operator.eq,
                 which does state.get_value() == val.

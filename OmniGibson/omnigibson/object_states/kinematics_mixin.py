@@ -1,14 +1,14 @@
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.joint_state import Joint
-from omnigibson.object_states.object_state_base import USDObjectState
+from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.object_states.pose import Pose
 from omnigibson.utils.python_utils import classproperty
 
 
-class KinematicsMixin(USDObjectState):
+class KinematicsMixin(BaseObjectState):
     """
-    This class is a subclass of USDObjectState that adds dependencies
+    This class is a subclass of BaseObjectState that adds dependencies
     on the default kinematics states.
     """
 

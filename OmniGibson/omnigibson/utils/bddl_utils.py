@@ -687,7 +687,7 @@ class BDDLEntity(Wrapper):
         Helper function to grab wrapped entity's state @state
 
         Args:
-            state (USDObjectState): State whose get_value() should be called
+            state (BaseObjectState): State whose get_value() should be called
             *args (tuple): Any arguments to pass to getter, in order
             **kwargs (dict): Any keyword arguments to pass to getter, in order
 
@@ -703,7 +703,7 @@ class BDDLEntity(Wrapper):
         Helper function to set wrapped entity's state @state. Note: Should only be called if the entity exists!
 
         Args:
-            state (USDObjectState): State whose set_value() should be called
+            state (BaseObjectState): State whose set_value() should be called
             *args (tuple): Any arguments to pass to getter, in order
             **kwargs (dict): Any keyword arguments to pass to getter, in order
 

@@ -1,6 +1,6 @@
 import torch as th
 
-from omnigibson.object_states.object_state_base import USDObjectState
+from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
@@ -9,7 +9,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 log = create_module_logger(module_name=__name__)
 
 
-class LinkBasedStateMixin(USDObjectState):
+class LinkBasedStateMixin(BaseObjectState):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

@@ -607,7 +607,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the objects with a given state in the scene.
 
         Args:
-            state (USDObjectState): state of the objects to get
+            state (BaseObjectState): state of the objects to get
 
         Returns:
             set: all objects with the given state
@@ -619,7 +619,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the objects with a given state and its subclasses in the scene.
 
         Args:
-            state (USDObjectState): state of the objects to get
+            state (BaseObjectState): state of the objects to get
 
         Returns:
             set: all objects with the given state and its subclasses

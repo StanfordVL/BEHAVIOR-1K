@@ -1,8 +1,8 @@
-from omnigibson.object_states.object_state_base import USDObjectState
+from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.utils.python_utils import classproperty
 
 
-class UpdateStateMixin(USDObjectState):
+class UpdateStateMixin(BaseObjectState):
     """
     A state-mixin that allows for per-sim-step updates via the update() call
     """
@@ -29,7 +29,7 @@ class UpdateStateMixin(USDObjectState):
         return classes
 
 
-class GlobalUpdateStateMixin(USDObjectState):
+class GlobalUpdateStateMixin(BaseObjectState):
     """
     A state-mixin that allows for per-sim-step global updates via the global_update() call
     """

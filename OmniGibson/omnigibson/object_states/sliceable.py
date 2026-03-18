@@ -1,7 +1,7 @@
-from omnigibson.object_states.object_state_base import USDObjectRequirement
+from omnigibson.object_states.object_state_base import BaseObjectRequirement
 
 
-class SliceableRequirement(USDObjectRequirement):
+class SliceableRequirement(BaseObjectRequirement):
     """
     Class for sanity checking objects that request the "sliceable" ability
     """
