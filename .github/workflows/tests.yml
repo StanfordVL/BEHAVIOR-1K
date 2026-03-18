@@ -169,7 +169,7 @@ jobs:
           report-path: './ctrf-report.json'
           pull-request-report: true
           exit-on-fail: true
-          update-comment: true
+          overwrite-comment: true
           status-check: true
           status-check-name: "Test Report"
         env:
