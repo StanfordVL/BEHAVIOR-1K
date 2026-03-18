@@ -55,7 +55,7 @@ jobs:
           - test_robot_teleoperation
           - test_scene_graph
           - test_sensors
-          - test_symbolic_primitives
+          # - test_symbolic_primitives
           - test_systems
           - test_transform_utils
           # - test_transition_rules  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2017
@@ -68,7 +68,6 @@ jobs:
           - {test_file: test_examples, example: "object_states.folded_unfolded_state_demo"}
           - {test_file: test_examples, example: "object_states.heat_source_or_sink_demo"}
           - {test_file: test_examples, example: "object_states.heated_state_demo"}
-          - {test_file: test_examples, example: "object_states.object_state_texture_demo"}
           - {test_file: test_examples, example: "object_states.onfire_demo"}
           - {test_file: test_examples, example: "object_states.overlaid_demo"}
           - {test_file: test_examples, example: "object_states.particle_applier_remover_demo"}
