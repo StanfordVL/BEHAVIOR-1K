@@ -638,20 +638,6 @@ class EntityPrim(XFormPrim):
         # Also set the internal value
         self._visual_only = val
 
-    def contact_list(self):
-        """
-        Get list of all current contacts with this object prim
-        NOTE: This method is slow and uncached, but it works even for sleeping objects.
-        For frequent contact checks, consider using RigidContactAPI for performance.
-
-        Returns:
-            list of CsRawData: raw contact info for this rigid body
-        """
-        contacts = []
-        for link in self._links.values():
-            contacts.extend(link.contact_list())
-        return contacts
-
     def enable_gravity(self) -> None:
         """
         Enables gravity for this entity

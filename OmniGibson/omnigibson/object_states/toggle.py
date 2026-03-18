@@ -99,17 +99,13 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         for scene_idx, (scene, scene_robot_finger_paths) in enumerate(zip(og.sim.scenes, cls._robot_finger_paths)):
             if len(scene_robot_finger_paths) == 0:
                 continue
-            finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in scene_robot_finger_paths]
-            finger_impulses = RigidContactAPI.get_all_impulses(scene_idx)[:, finger_idxs, :]
-            n_bodies = len(finger_impulses)
-            touching_bodies = th.any(finger_impulses.reshape(n_bodies, -1), dim=-1)
-            touching_bodies_idxs = th.where(touching_bodies)[0]
-            if len(touching_bodies_idxs) > 0:
-                for idx in touching_bodies_idxs:
-                    body_prim_path = RigidContactAPI.get_row_idx_prim_path(scene_idx, idx=idx)
-                    obj = scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
-                    if obj is not None:
-                        cls._finger_contact_objs.add(obj)
+
+            # Get the robot finger prim paths' contacts
+            contact_pairs = RigidContactAPI.get_contact_pairs(scene_idx, scene_robot_finger_paths)
+            for contact_pair in contact_pairs:
+                obj = scene.object_registry("prim_path", "/".join(contact_pair[1].split("/")[:-1]))
+                if obj is not None:
+                    cls._finger_contact_objs.add(obj)
 
     @classproperty
     def meta_link_types(cls):

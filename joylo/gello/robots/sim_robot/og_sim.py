@@ -14,7 +14,7 @@ from omnigibson.systems.macro_particle_system import MacroVisualParticleSystem
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.object_states import Filled
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.usd_utils import GripperRigidContactAPI, ControllableObjectViewAPI
+from omnigibson.utils.usd_utils import RigidContactAPI, ControllableObjectViewAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
@@ -423,13 +423,12 @@ class OGRobotServer:
         # Loop over all arms and grab relevant joint info
         joint_pos = self.robot.get_joint_positions()
         joint_vel = self.robot.get_joint_velocities()
-        finger_impulses = GripperRigidContactAPI.get_all_impulses(self.env.scene.idx) if INCLUDE_FINGER_CONTACT_OBS else None
 
         obs = dict()
         obs["active_arm"] = self.active_arm
         obs["in_cooldown"] = self._in_cooldown
-        obs["base_contact"] = any(len(link.contact_list()) > 0 for link in self.robot.non_floor_touching_base_links) if INCLUDE_BASE_CONTACT_OBS else False
-        obs["trunk_contact"] = any(len(link.contact_list()) > 0 for link in self.robot.trunk_links) if INCLUDE_TRUNK_CONTACT_OBS else False
+        obs["base_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.non_floor_touching_base_links)) if INCLUDE_BASE_CONTACT_OBS else False
+        obs["trunk_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.trunk_links)) if INCLUDE_TRUNK_CONTACT_OBS else False
         obs["reset_joints"] = bool(self._joint_cmd["button_y"][0].item())
         obs["waiting_to_resume"] = self._waiting_to_resume
 
@@ -443,8 +442,7 @@ class OGRobotServer:
             obs[f"arm_{arm}_gripper_positions"] = joint_pos[self.robot.gripper_control_idx[arm]]
             obs[f"arm_{arm}_ee_pos_quat"] = th.concatenate(self.robot.eef_links[arm].get_position_orientation())
             # When using VR, this expansive check makes the view glitch
-            obs[f"arm_{arm}_contact"] = any(len(link.contact_list()) > 0 for link in self.robot.arm_links[arm]) if VIEWING_MODE != ViewingMode.VR and INCLUDE_ARM_CONTACT_OBS else False
-            obs[f"arm_{arm}_finger_max_contact"] = th.max(th.sum(th.square(finger_impulses[:, 2*i:2*(i+1), :]), dim=-1)).item() if INCLUDE_FINGER_CONTACT_OBS else 0.0
+            obs[f"arm_{arm}_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.arm_links[arm])) if VIEWING_MODE != ViewingMode.VR and INCLUDE_ARM_CONTACT_OBS else False
 
             obs[f"{arm}_gripper"] = self._joint_cmd[f"{arm}_gripper"].item()
 

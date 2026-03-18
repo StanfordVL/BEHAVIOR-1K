@@ -11,7 +11,6 @@ from omnigibson.object_states import (
     AABB,
     AttachedTo,
     Burnt,
-    ContactBodies,
     ContactParticles,
     Contains,
     Cooked,
@@ -232,30 +231,32 @@ def test_touching(env):
 
 
 @og_test
-def test_contact_bodies(env):
+def test_rigid_contact_bodies(env):
+    from omnigibson.utils.usd_utils import RigidContactAPI
+
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(breakfast_table)
-    for i, obj in enumerate((bowl, dishtowel)):
-        place_objA_on_objB_bbox(obj, breakfast_table)
-        for _ in range(5):
-            og.sim.step()
-
-        # TODO: rigid body's ContactBodies should include cloth
-        if obj.prim_type != PrimType.CLOTH:
-            assert obj.root_link in breakfast_table.states[ContactBodies].get_value()
-        assert breakfast_table.root_link in obj.states[ContactBodies].get_value()
-
-        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
+    place_objA_on_objB_bbox(bowl, breakfast_table)
+    for _ in range(5):
         og.sim.step()
 
-        assert obj.root_link not in breakfast_table.states[ContactBodies].get_value()
-        assert breakfast_table.root_link not in obj.states[ContactBodies].get_value()
+    # Bowl should be in contact with the table
+    assert RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table])
 
-    with pytest.raises(NotImplementedError):
-        bowl.states[ContactBodies].set_value(None)
+    # Let bodies settle/sleep and verify contacts persist
+    for _ in range(300):
+        og.sim.step()
+    assert breakfast_table.is_asleep, "Table should be asleep"
+    assert bowl.root_link.is_asleep, "Bowl should be asleep"
+    assert RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table])
+
+    # Move the bowl far away and verify contacts clear
+    bowl.set_position_orientation(position=th.tensor([10.0, 10.0, 10.0]))
+    og.sim.step()
+    assert not RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table])
+    assert not RigidContactAPI.is_in_contact(scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl])
 
 
 @og_test

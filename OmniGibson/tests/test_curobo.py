@@ -8,6 +8,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
 from omnigibson.macros import gm
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 
 def test_curobo():
@@ -341,19 +342,19 @@ def test_curobo():
             wheel_contact_pairs = set()
             obj_contact_pairs = set()
 
-            for contact in robot.contact_list():
-                assert contact.body0 in robot.link_prim_paths
-                if contact.body1 in robot.link_prim_paths:
-                    self_collision_pairs.add((contact.body0, contact.body1))
-                elif contact.body1 in floor_plane_prim_paths:
-                    if contact.body0 not in floor_touching_base_link_prim_paths:
-                        floor_contact_pairs.add((contact.body0, contact.body1))
+            for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+                assert body0 in robot.link_prim_paths
+                if body1 in robot.link_prim_paths:
+                    self_collision_pairs.add((body0, body1))
+                elif body1 in floor_plane_prim_paths:
+                    if body0 not in floor_touching_base_link_prim_paths:
+                        floor_contact_pairs.add((body0, body1))
                     else:
-                        wheel_contact_pairs.add((contact.body0, contact.body1))
-                elif contact.body1 in obj.link_prim_paths:
-                    obj_contact_pairs.add((contact.body0, contact.body1))
+                        wheel_contact_pairs.add((body0, body1))
+                elif body1 in obj.link_prim_paths:
+                    obj_contact_pairs.add((body0, body1))
                 else:
-                    assert False, f"Unexpected contact pair: {contact.body0}, {contact.body1}"
+                    assert False, f"Unexpected contact pair: {body0}, {body1}"
 
             touching_itself = len(self_collision_pairs) > 0
             touching_floor = len(floor_contact_pairs) > 0
@@ -454,19 +455,12 @@ def test_curobo():
                         robot.set_joint_positions(q)
                         robot.keep_still()
                         og.sim.step()
-                        for contact in robot.contact_list():
-                            assert contact.body0 in robot.link_prim_paths
-                            if (
-                                contact.body1 in floor_plane_prim_paths
-                                and contact.body0 in floor_touching_base_link_prim_paths
-                            ):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+                            assert body0 in robot.link_prim_paths
+                            if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
-                            if th.tensor(list(contact.impulse)).norm() == 0:
-                                continue
-                            print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
-                            assert (
-                                False
-                            ), f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                            print(f"Unexpected contact pair during traj rollout: {body0}, {body1}")
+                            assert False, f"Unexpected contact pair during traj rollout: {body0}, {body1}"
                     else:
                         # Convert target joint positions to action
                         action = robot.q_to_action(q)
@@ -474,18 +468,13 @@ def test_curobo():
                         print(f"Executing waypoint {i}/{len(q_traj)}")
                         env.step(action)
 
-                        for contact in robot.contact_list():
-                            assert contact.body0 in robot.link_prim_paths
-                            if (
-                                contact.body1 in floor_plane_prim_paths
-                                and contact.body0 in floor_touching_base_link_prim_paths
-                            ):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+                            assert body0 in robot.link_prim_paths
+                            if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
-                            if th.tensor(list(contact.impulse)).norm() == 0:
-                                continue
-                            print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
+                            print(f"Unexpected contact pair during traj rollout: {body0}, {body1}")
                             # Controller is not perfect, so collisions might happen
-                            # assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                            # assert False, f"Unexpected contact pair during traj rollout: {body0}, {body1}"
 
         og.clear()
 

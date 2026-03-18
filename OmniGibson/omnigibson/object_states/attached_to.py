@@ -3,18 +3,16 @@ from collections import defaultdict
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import create_joint, delete_or_deactivate_prim
+from omnigibson.utils.usd_utils import RigidContactAPI, create_joint, delete_or_deactivate_prim
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -44,7 +42,7 @@ m.DEFAULT_BREAK_TORQUE = 10000  # Newton-Meter
 class AttachedTo(
     RelativeObjectState,
     BooleanStateMixin,
-    ContactSubscribedStateMixin,
+    UpdateStateMixin,
     JointBreakSubscribedStateMixin,
     LinkBasedStateMixin,
 ):
@@ -55,8 +53,8 @@ class AttachedTo(
     Note that generally speaking only child.states[AttachedTo].get_value(parent) will return True.
     One of the child's male meta links will be attached to one of the parent's female meta links.
 
-    Subclasses ContactSubscribedStateMixin, JointBreakSubscribedStateMixin
-    on_contact function attempts to attach self.obj to other when a CONTACT_FOUND event happens
+    Subclasses UpdateStateMixin, JointBreakSubscribedStateMixin
+    update function attempts to attach self.obj to any contacting object on each simulation step.
     on_joint_break function breaks the current attachment
     """
 
@@ -86,7 +84,6 @@ class AttachedTo(
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.add(ContactBodies)
         return deps
 
     def _initialize(self):
@@ -116,13 +113,28 @@ class AttachedTo(
         child = self.children[joint_prim_path.split("/")[-2]]
         child.states[AttachedTo].set_value(self.obj, False)
 
-    # Attempts to attach two objects when a CONTACT_FOUND event happens
-    def on_contact(self, other, contact_headers, contact_data):
-        for contact_header in contact_headers:
-            if contact_header.type == lazy.omni.physx.bindings._physx.ContactEventType.CONTACT_FOUND:
-                # If it has successfully attached to something, break.
-                if self.set_value(other, True):
-                    break
+    def _update(self):
+        # If already attached, no-op
+        if self.parent is not None:
+            return
+
+        # Attempt to attach to any contacting object in deterministic order
+        scene_idx = self.obj.scene.idx
+        my_link_paths = [link.prim_path for link in self.obj.links.values()]
+        contacting_paths = {
+            other_contact
+            for this_contact, other_contact in RigidContactAPI.get_contact_pairs(
+                scene_idx=scene_idx, query_set=my_link_paths
+            )
+            if other_contact not in self.obj.link_prim_paths
+        }
+        for prim_path in sorted(contacting_paths):
+            # Contact pairs return link prim paths; map to owning object prim path for lookup.
+            other = og.sim.get_obj_at_prim_path("/".join(prim_path.split("/")[:-1]))
+            if other is None or other == self.obj or AttachedTo not in other.states:
+                continue
+            if self.set_value(other, True):
+                break
 
     def _set_value(
         self, other, new_value, bypass_alignment_checking=False, check_physics_stability=False, can_joint_break=True
@@ -169,7 +181,9 @@ class AttachedTo(
                     else:
                         og.sim.step_physics()
                         # self.obj should not collide with other objects except the parent
-                        success = len(self.obj.states[ContactBodies].get_value(ignore_objs=(other,))) == 0
+                        success = not RigidContactAPI.is_in_contact(
+                            scene_idx=self.obj.scene.idx, query_set=[self.obj], ignore_set=[other]
+                        )
                         if success:
                             return True
                         else:

@@ -16,6 +16,7 @@ import gymnasium as gym
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.objects.usd_object import USDObject
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.sensors import (
     ALL_SENSOR_MODALITIES,
     SENSOR_PRIMS_TO_SENSOR_CLS,
@@ -47,13 +48,12 @@ from omnigibson.controllers import (
     DifferentialDriveController,
 )
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.object_states import ContactBodies
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
-    GripperRigidContactAPI,
+    RigidContactAPI,
     create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
@@ -2077,11 +2077,13 @@ class Robot(USDObject, GymObservable):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                if len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) == 0:
+                if not RigidContactAPI.is_in_contact(
+                    scene_idx=self.scene.idx, query_set=finger_links, with_set=[candidate_obj]
+                ):
                     is_grasping = IsGraspingState.FALSE
         return is_grasping
 
-    def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
+    def _find_gripper_contacts(self, arm="default"):
         """
         Specific for Manipulation Robot
         For arm @arm, calculate any body IDs and corresponding link IDs that are not part of the robot
@@ -2092,8 +2094,6 @@ class Robot(USDObject, GymObservable):
         Returns:
             2-tuple:
                 - set: set of unique contact prim_paths that are not the robot self-collisions.
-                    If @return_contact_positions is True, then returns (prim_path, pos), where pos is the contact
-                    (x,y,z) position
                     Note: if no objects that are not the robot itself are intersecting, the set will be empty.
                 - dict: dictionary mapping unique contact objects defined by the contact prim_path to
                     set of unique robot link prim_paths that it is in contact with
@@ -2107,31 +2107,20 @@ class Robot(USDObject, GymObservable):
         # Get robot links
         link_paths = set(self.link_prim_paths)
 
-        if not return_contact_positions:
-            raw_contact_data = {
-                (row, col)
-                for row, col in GripperRigidContactAPI.get_contact_pairs(self.scene.idx, column_prim_paths=finger_paths)
-                if row not in link_paths
-            }
-        else:
-            raw_contact_data = {
-                (row, col, point)
-                for row, col, force, point, normal, sep in GripperRigidContactAPI.get_contact_data(
-                    self.scene.idx, column_prim_paths=finger_paths
-                )
-                if row not in link_paths
-            }
+        raw_contact_data = {
+            (link_contact, other_contact)
+            for link_contact, other_contact in RigidContactAPI.get_contact_pairs(
+                scene_idx=self.scene.idx, query_set=finger_paths
+            )
+            if other_contact not in link_paths
+        }
 
         # Translate to robot contact data
         robot_contact_links = dict()
         contact_data = set()
         for con_data in raw_contact_data:
-            if not return_contact_positions:
-                other_contact, link_contact = con_data
-                contact_data.add(other_contact)
-            else:
-                other_contact, link_contact, point = con_data
-                contact_data.add((other_contact, point))
+            link_contact, other_contact = con_data
+            contact_data.add(other_contact)
             if other_contact not in robot_contact_links:
                 robot_contact_links[other_contact] = set()
             robot_contact_links[other_contact].add(link_contact)
@@ -3247,7 +3236,11 @@ class Robot(USDObject, GymObservable):
             # Calculate position of the object link. Only allow this for objects currently.
             obj_prim_path, link_name = prim_path.rsplit("/", 1)
             candidate_obj = self.scene.object_registry("prim_path", obj_prim_path, None)
-            if candidate_obj is None or link_name not in candidate_obj.links:
+            if (
+                candidate_obj is None
+                or link_name not in candidate_obj.links
+                or not isinstance(candidate_obj.links[link_name], RigidDynamicPrim)
+            ):
                 continue
             candidate_link = candidate_obj.links[link_name]
             dist = th.norm(candidate_link.get_position_orientation()[0] - gripper_center_pos)
@@ -3597,6 +3590,8 @@ class Robot(USDObject, GymObservable):
             return
 
         # Compute the contact position in world frame
+        # Note that this relies on the legacy contact sensor API and not the RigidContactAPI,
+        # because the position information is not reliably available through the RigidContactAPI.
         target_link_prim_path = target_obj.links[target_link_name].prim_path
         finger_paths = {link.prim_path for link in self.finger_links[arm]}
         contact_pos_world = None

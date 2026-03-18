@@ -9,7 +9,6 @@ from omnigibson.sensors import VisionSensor
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
-from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 
 
 def setup_environment(flatcache):
@@ -268,7 +267,7 @@ def test_grasping_mode():
             return robot._ag_obj_in_hand[robot.default_arm] == obj
         elif grasping_mode == "physical":
             prim_paths = robot._find_gripper_raycast_collisions()
-            return obj in {obj for (obj, _) in prim_paths_to_rigid_prims(prim_paths, obj.scene)}
+            return len(prim_paths.intersection(obj.link_prim_paths)) > 0
         else:
             raise ValueError(f"Unknown grasping mode: {grasping_mode}")
 

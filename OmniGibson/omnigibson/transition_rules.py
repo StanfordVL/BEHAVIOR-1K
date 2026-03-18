@@ -379,44 +379,20 @@ class TouchingAnyCondition(RuleCondition):
         self._filter_1_name = filter_1_name
         self._filter_2_name = filter_2_name
 
-        # Will be filled in during self.initialize
-        # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 1
-        self._filter_1_idxs = None
-
-        # If optimized, filter_2_idxs will be used, otherwise filter_2_bodies will be used!
-        # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 2
-        self._filter_2_idxs = None
-
-    def refresh(self, object_candidates):
-        # Register idx mappings
-        self._filter_1_idxs = {
-            obj: [RigidContactAPI.get_body_row_idx(link.prim_path)[1] for link in obj.links.values()]
-            for obj in object_candidates[self._filter_1_name]
-        }
-        self._filter_2_idxs = {
-            obj: th.tensor(
-                [RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()],
-                dtype=th.float32,
-            )
-            for obj in object_candidates[self._filter_2_name]
-        }
-
     def __call__(self, object_candidates):
         # Keep any object that has non-zero impulses between itself and any of the @filter_2_name's objects
         objs = []
 
+        with_set_by_scene = defaultdict(list)
+        for obj in object_candidates[self._filter_2_name]:
+            with_set_by_scene[obj.scene].append(obj)
+
         # Batch check for each object
         for obj in object_candidates[self._filter_1_name]:
-            # Get all impulses between @obj and any object in @filter_2_name that are in the same scene
-            idxs_to_check = th.cat(
-                [
-                    self._filter_2_idxs[obj2]
-                    for obj2 in object_candidates[self._filter_2_name]
-                    if obj2.scene == obj.scene
-                ]
-            )
-            if th.any(
-                RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check.tolist()]
+            if obj.scene not in with_set_by_scene:
+                continue
+            if RigidContactAPI.is_in_contact(
+                scene_idx=obj.scene.idx, query_set=[obj], with_set=with_set_by_scene[obj.scene]
             ):
                 objs.append(obj)
 
