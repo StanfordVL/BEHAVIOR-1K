@@ -409,10 +409,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     @property
     def view_row_indices(self):
-        return th.as_tensor(
-            ControllableObjectViewAPI.get_member_view_indices(self.routing_path, self._articulation_root_paths),
-            dtype=th.long,
-        )
+        return ControllableObjectViewAPI.get_member_view_indices(self.routing_path, self._articulation_root_paths)
 
     def clip_control(self, control):
         """
@@ -470,7 +467,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         if not active_mask.any():
             return
 
-        all_view_rows = self.view_row_indices
+        all_view_rows = th.tensor(self.view_row_indices, dtype=th.long)
         enabled_rows = all_view_rows[active_mask]
         enabled_controls = self._controls[active_mask]  # (N_en, control_dim)
         routing_path = self.routing_path

@@ -1026,16 +1026,16 @@ class BatchControlViewAPIImpl:
     def set_all_joint_position_targets(self, enabled_rows, controls, dof_idx):
         """
         Args:
-            enabled_rows: th.tensor — view row indices for enabled members (pre-filtered)
+            enabled_rows: list[int] — view row indices for enabled members (pre-filtered)
             controls: (N_enabled, len(dof_idx)) array — pre-stacked by controller
             dof_idx: DOF column indices (cb.arr_type)
         """
         if "dof_position_targets" not in self._read_cache:
             self._read_cache["dof_position_targets"] = cb.from_torch(self._view.get_dof_position_targets())
         targets = self._read_cache["dof_position_targets"]
-        row_idx = enabled_rows.reshape(-1, 1)
+        row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
         targets[row_idx, dof_idx] = cb.from_torch(controls) if isinstance(controls, th.Tensor) else controls
-        self._write_idx_cache["dof_position_targets"].update(enabled_rows.tolist())
+        self._write_idx_cache["dof_position_targets"].update(enabled_rows)
 
     def set_all_joint_velocity_targets(self, enabled_rows, velocities, dof_idx):
         if "dof_velocity_targets" not in self._read_cache:
@@ -1043,7 +1043,7 @@ class BatchControlViewAPIImpl:
         targets = self._read_cache["dof_velocity_targets"]
         row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
         targets[row_idx, dof_idx] = cb.from_torch(velocities) if isinstance(velocities, th.Tensor) else velocities
-        self._write_idx_cache["dof_velocity_targets"].update(enabled_rows.tolist())
+        self._write_idx_cache["dof_velocity_targets"].update(enabled_rows)
 
     def set_all_joint_efforts(self, enabled_rows, efforts, dof_idx):
         if "dof_actuation_forces" not in self._read_cache:
@@ -1051,7 +1051,7 @@ class BatchControlViewAPIImpl:
         targets = self._read_cache["dof_actuation_forces"]
         row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
         targets[row_idx, dof_idx] = cb.from_torch(efforts) if isinstance(efforts, th.Tensor) else efforts
-        self._write_idx_cache["dof_actuation_forces"].update(enabled_rows.tolist())
+        self._write_idx_cache["dof_actuation_forces"].update(enabled_rows)
 
     def get_all_root_transform(self):
         if "root_transforms" not in self._read_cache:
