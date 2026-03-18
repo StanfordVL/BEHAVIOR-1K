@@ -9,10 +9,9 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.geometry_utils import wrap_angle
-from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.constants import GROUND_CATEGORIES
-from omnigibson.object_states import ContactBodies
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create module logger
 logger = create_module_logger(module_name=__name__)
@@ -519,7 +518,7 @@ def detect_robot_collision(context, verbose=False):
 
 def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=True):
     """
-    Detects robot collisions with the environment, but not with itself using the ContactBodies API
+    Detects robot collisions with the environment, but not with itself using the RigidContactAPI cache.
 
     Args:
         robot (BaseRobot): Robot object to detect collisions for
@@ -538,16 +537,18 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
                 if robot._ag_obj_in_hand[arm] is not None:
                     filter_objs.append(robot._ag_obj_in_hand[arm])
             elif robot.grasping_mode == "physical":
-                prim_paths = robot._find_gripper_raycast_collisions(arm=arm)
-                for obj, _ in prim_paths_to_rigid_prims(prim_paths, robot.scene):
-                    filter_objs.append(obj)
+                filter_objs.extend(robot._find_gripper_raycast_collisions(arm=arm))
             else:
                 raise ValueError(f"Unknown grasping mode: {robot.grasping_mode}")
 
     for category in GROUND_CATEGORIES:
         filter_objs.extend(robot.scene.object_registry("category", category, []))
 
-    return any(robot.states[ContactBodies].get_value(ignore_objs=tuple(filter_objs), non_zero_impulse=True))
+    # Always exclude robot self-collisions (internal link-to-link contacts)
+    if robot not in filter_objs:
+        filter_objs.append(robot)
+
+    return RigidContactAPI.is_in_contact(scene_idx=robot.scene.idx, query_set=[robot], ignore_set=filter_objs)
 
 
 def astar(search_map, start, goal, eight_connected=True):

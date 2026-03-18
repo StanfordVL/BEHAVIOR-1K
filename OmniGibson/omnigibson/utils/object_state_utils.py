@@ -7,11 +7,11 @@ import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import Dict, create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
 from omnigibson.utils.constants import GROUND_CATEGORIES, PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint, create_module_logger
 from omnigibson.utils.constants import JointType
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -160,6 +160,12 @@ def sample_kinematics(
         )
 
     # Attempt sampling
+    def _is_in_contact():
+        if objA.prim_type == PrimType.RIGID:
+            return RigidContactAPI.is_in_contact(scene_idx=objA.scene.idx, query_set=[objA])
+        else:
+            return len(objA.root_link.get_contacts()) > 0
+
     for i in range(max_trials):
         pos = None
         if hasattr(objA, "orientations") and objA.orientations is not None:
@@ -245,7 +251,7 @@ def sample_kinematics(
 
             og.sim.step_physics()
             objA.keep_still()
-            success = len(objA.states[ContactBodies].get_value()) == 0
+            success = not _is_in_contact()
 
         if macros.utils.sampling_utils.DEBUG_SAMPLING:
             debug_breakpoint(f"sample_kinematics: {success}")
@@ -281,7 +287,8 @@ def sample_kinematics(
         # step until (a) max steps is reached (restarted from 0) or (b) velocity is below some threshold
         n_steps_max = int(0.5 / og.sim.get_physics_dt())
         i = 0
-        while len(objA.states[ContactBodies].get_value()) == 0 and i < n_steps_max:
+
+        while not _is_in_contact() and i < n_steps_max:
             og.sim.step_physics()
             i += 1
         objA.keep_still()
@@ -361,7 +368,7 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
         obj.keep_still()
 
         og.sim.step_physics()
-        success = len(obj.states[ContactBodies].get_value()) == 0
+        success = len(obj.root_link.get_contacts()) == 0
 
         if success:
             break

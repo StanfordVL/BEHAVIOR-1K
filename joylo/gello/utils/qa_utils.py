@@ -5,7 +5,6 @@ from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.backend_utils import _compute_backend as cb
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 from omnigibson.robots import LocomotionRobot
 from gello.robots.sim_robot.og_teleop_utils import GHOST_APPEAR_THRESHOLD
 import torch as th
@@ -796,16 +795,12 @@ class HeadCameraUprightMetric(EnvMetric):
         return results
 
 
-def check_robot_self_collision(env, min_threshold=None):
+def check_robot_self_collision(env):
     # TODO: What about gripper finger self collision?
     for robot in env.robots:
-        link_paths = robot.link_prim_paths
-        if min_threshold is None:
-            if RigidContactAPI.in_contact(link_paths, link_paths):
-                return True
-        else:
-            if th.any(th.norm(RigidContactAPI.get_impulses(link_paths, link_paths), dim=-1) > min_threshold).item():
-                return True
+        link_paths = list(robot.link_prim_paths)
+        if RigidContactAPI.is_in_contact(env.scene.idx, link_paths, with_set=link_paths):
+            return True
     return False
 
 
@@ -824,45 +819,27 @@ def check_robot_base_nonarm_nonkinematic_collision(env):
             robot_link_paths -= set(link.prim_path for link in robot.arm_links[arm])
             robot_link_paths -= set(link.prim_path for link in robot.gripper_links[arm])
             robot_link_paths -= set(link.prim_path for link in robot.finger_links[arm])
-    robot_link_idxs = [RigidContactAPI.get_body_col_idx(link_path)[1] for link_path in robot_link_paths]
-    robot_contacts = RigidContactAPI.get_all_impulses(env.scene.idx)[robot_link_idxs]
+        if RigidContactAPI.is_in_contact(env.scene.idx, robot_link_paths, ignore_set={robot}):
+            return True
 
-    return th.any(robot_contacts).item()
+    return False
 
 
 def check_robot_nonarm_nonground_collision(env):
+    ground_objects = []
+    for cat in GROUND_CATEGORIES:
+        ground_objects.extend(env.scene.object_registry("category", cat, []))
+
     for robot in env.robots:
         robot_arm_paths = set()
-        robot_prim_path = robot.prim_path
         for arm in robot.arm_names:
             robot_arm_paths = robot_arm_paths.union(set(link.prim_path for link in robot.arm_links[arm]))
             robot_arm_paths = robot_arm_paths.union(set(link.prim_path for link in robot.gripper_links[arm]))
             robot_arm_paths = robot_arm_paths.union(set(link.prim_path for link in robot.finger_links[arm]))
-        for link in robot.links.values():
-            # Skip if link is an arm link
-            if link.prim_path in robot_arm_paths:
-                continue
-            for c in link.contact_list():
-                # Skip if it's a self-collision
-                if robot_prim_path in c.body0:
-                    if robot_prim_path in c.body1:
-                        continue
-                    else:
-                        c_prim_path = c.body1
-                else:
-                    c_prim_path = c.body0
-                # Ignore if zero-impulse
-                if np.linalg.norm(tuple(c.impulse)) == 0:
-                    continue
-                # Check which object this is
-                rigid_prims = prim_paths_to_rigid_prims([c_prim_path], robot.scene)
-                # Skip if obj is part of ground categories
-                assert len(rigid_prims) == 1
-                obj = next(iter(rigid_prims))[0]
-                if obj.category in GROUND_CATEGORIES:
-                    continue
-                # Otherwise this is a valid contact, so immediately return True
-                return True
+        non_arm_links = set(link for link in robot.links.values() if link.prim_path not in robot_arm_paths)
+
+        if RigidContactAPI.is_in_contact(env.scene.idx, non_arm_links, ignore_set=ground_objects + [robot]):
+            return True
 
     return False
 

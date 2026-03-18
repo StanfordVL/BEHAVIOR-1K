@@ -1200,7 +1200,7 @@ class BDDLSampler:
                         # If we're sampling kinematics, sort children based on (a) whether they are cloth or not, and
                         # then (b) their AABB, so that first all rigid objects are sampled before all cloth objects,
                         # and within each group the larger objects are sampled first. This is needed because rigid
-                        # objects currently don't detect collisions with cloth objects (rigid_obj.states[ContactBodies]
+                        # objects currently don't detect collisions with cloth objects (rigid-object contact checks
                         # is empty even when a cloth object is in contact with it).
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]

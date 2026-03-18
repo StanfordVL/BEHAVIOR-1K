@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import json
 import logging
 import math
@@ -9,16 +10,34 @@ import socket
 import sys
 import tempfile
 import traceback
-from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
+from cProfile import Profile
+
+
+def with_profiler(name):
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            profiler = getattr(self, name)
+            if profiler is not None:
+                profiler.enable()
+            try:
+                return fn(self, *args, **kwargs)
+            finally:
+                if profiler is not None:
+                    profiler.disable()
+
+        return wrapper
+
+    return decorator
+
 
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
@@ -46,7 +65,6 @@ from omnigibson.utils.ui_utils import (
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
-    GripperRigidContactAPI,
     PoseAPI,
     RigidContactAPI,
 )
@@ -156,79 +174,90 @@ def _launch_app():
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
 
-    # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
-    if not gm.DEBUG:
-        import warnings
+    # Clear the argv - Isaac Sim unfortunately reads from it directly, so we need to clear it to avoid issues.
+    # Otherwise it will inherit the arguments of the entrypoint script.
+    _saved_argv = sys.argv[:]
+    try:
+        sys.argv = []
 
+        # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
+        if not gm.DEBUG:
+            import warnings
+
+            try:
+                from numba.core.errors import NumbaPerformanceWarning
+
+                warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+            except ImportError:
+                pass
+
+            # Find a more elegant way to prune omni logging
+            if gm.NO_OMNI_LOGS:
+                sys.argv.append("--/log/level=error")
+                sys.argv.append("--/log/fileLogLevel=error")
+                sys.argv.append("--/log/outputStreamLevel=error")
+
+        # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
+        # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
+        # On the regular omniverse launcher version this should not have any impact.
         try:
-            from numba.core.errors import NumbaPerformanceWarning
-
-            warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+            os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
+            import isaacsim  # noqa: F401
         except ImportError:
             pass
 
-        # Find a more elegant way to prune omni logging
-        if gm.NO_OMNI_LOGS:
-            sys.argv.append("--/log/level=error")
-            sys.argv.append("--/log/fileLogLevel=error")
-            sys.argv.append("--/log/outputStreamLevel=error")
+        # First obtain the Isaac Sim version
+        isaac_path = os.environ["ISAAC_PATH"]
+        version_file_path = os.path.join(isaac_path, "VERSION")
+        assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
+        with open(version_file_path, "r") as file:
+            version_content = file.read().strip()
+            isaac_version_str = version_content.split("-")[0]
+            isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
+            assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
+            kit_file_name = m.KIT_FILES[isaac_version_tuple]
 
-    # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
-    # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
-    # On the regular omniverse launcher version this should not have any impact.
-    try:
-        os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
-        import isaacsim  # noqa: F401
-    except ImportError:
-        pass
+        # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+        # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+        # ensure that the kit file is always up to date.
+        assert (
+            "EXP_PATH" in os.environ
+        ), "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+        exp_path = os.environ["EXP_PATH"]
+        kit_file = Path(__file__).parent / kit_file_name
+        kit_file_target = Path(exp_path) / kit_file_name
+        icon_file = Path(__file__).parents[2] / "docs" / "assets" / "OmniGibson_logo.png"
+        icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
 
-    # First obtain the Isaac Sim version
-    isaac_path = os.environ["ISAAC_PATH"]
-    version_file_path = os.path.join(isaac_path, "VERSION")
-    assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
-    with open(version_file_path, "r") as file:
-        version_content = file.read().strip()
-        isaac_version_str = version_content.split("-")[0]
-        isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
-        assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
-        kit_file_name = m.KIT_FILES[isaac_version_tuple]
+        try:
+            shutil.copyfile(kit_file, kit_file_target)
+            shutil.copyfile(icon_file, icon_file_target)
+        except Exception as e:
+            raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
-    # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
-    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
-    # ensure that the kit file is always up to date.
-    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
-    exp_path = os.environ["EXP_PATH"]
-    kit_file = Path(__file__).parent / kit_file_name
-    kit_file_target = Path(exp_path) / kit_file_name
-    icon_file = Path(__file__).parents[2] / "docs" / "assets" / "OmniGibson_logo.png"
-    icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
+        # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
+        os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
 
-    try:
-        shutil.copyfile(kit_file, kit_file_target)
-        shutil.copyfile(icon_file, icon_file_target)
-    except Exception as e:
-        raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
+        launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
-    # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
-    os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
+        # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
+        local_appdata = Path(gm.APPDATA_PATH) / "local"
+        local_appdata.mkdir(parents=True, exist_ok=True)
+        sys.argv.extend(["--portable-root", str(local_appdata)])
 
-    launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
+        global_cache_dir = Path(gm.APPDATA_PATH) / "global" / "cache"
+        global_cache_dir.mkdir(parents=True, exist_ok=True)
+        sys.argv.append(f"--/app/tokens/omni_global_cache={global_cache_dir}")
 
-    # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
-    local_appdata = Path(gm.APPDATA_PATH) / "local"
-    local_appdata.mkdir(parents=True, exist_ok=True)
-    sys.argv.extend(["--portable-root", str(local_appdata)])
+        global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
+        global_data_dir.mkdir(parents=True, exist_ok=True)
+        sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
 
-    global_cache_dir = Path(gm.APPDATA_PATH) / "global" / "cache"
-    global_cache_dir.mkdir(parents=True, exist_ok=True)
-    sys.argv.append(f"--/app/tokens/omni_global_cache={global_cache_dir}")
-
-    global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
-    global_data_dir.mkdir(parents=True, exist_ok=True)
-    sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
-
-    with launch_context(None):
-        app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        with launch_context(None):
+            app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+    finally:
+        # Always restore the caller's argv, even if Isaac Sim startup raises.
+        sys.argv = _saved_argv
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.isaacsim.core.utils.stage.close_stage()
@@ -398,6 +427,12 @@ def _launch_simulator(*args, **kwargs):
             self._camera_mover = None
             self._render_on_step = True
             self.currently_stepping = False
+            self.pre_step_exception = None
+            self.post_step_exception = None
+
+            self._pre_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
+            self._post_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
+            self._non_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
 
             self._floor_plane = None
             self._skybox = None
@@ -418,9 +453,6 @@ def _launch_simulator(*args, **kwargs):
             self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
             self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
             self._physx_fabric_interface = None
-            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
-                self._on_contact
-            )
             # The callback will be called right *before* the physics step
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
@@ -441,7 +473,6 @@ def _launch_simulator(*args, **kwargs):
 
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
-            self._objects_require_contact_callback = False
             self._objects_require_joint_break_callback = False
 
             # Maps callback name to callback
@@ -459,9 +490,6 @@ def _launch_simulator(*args, **kwargs):
             # Set the lighting mode to be stage by default
             self.set_lighting_mode(mode=LightingMode.STAGE)
 
-            # Mapping from link IDs assigned from omni to the object that they reference
-            self._link_id_to_objects = dict()
-
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = [
@@ -469,9 +497,6 @@ def _launch_simulator(*args, **kwargs):
                 for state in self.object_state_types
                 if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))
             ]
-            self.object_state_types_on_contact = {
-                state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)
-            }
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
@@ -872,10 +897,6 @@ def _launch_simulator(*args, **kwargs):
             for callback in self._callbacks_on_add_obj.values():
                 callback(obj)
 
-            # Cache the mapping from link IDs to object
-            for link in obj.links.values():
-                self._link_id_to_objects[lazy.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
-
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self._objects_to_initialize.append(obj)
 
@@ -956,10 +977,6 @@ def _launch_simulator(*args, **kwargs):
             for callback in self._callbacks_on_remove_obj.values():
                 callback(obj)
 
-            # pop all link ids
-            for link in obj.links.values():
-                self._link_id_to_objects.pop(lazy.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path))
-
             # If it was queued up to be initialized, remove it from the queue as well
             for i, initialize_obj in enumerate(self._objects_to_initialize):
                 if obj.name == initialize_obj.name:
@@ -1035,9 +1052,9 @@ def _launch_simulator(*args, **kwargs):
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
-            GripperRigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
 
+        @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
             """
             Complete any non-physics steps such as state updates.
@@ -1048,6 +1065,9 @@ def _launch_simulator(*args, **kwargs):
 
             # If we're playing we, also run additional logic
             if self.is_playing():
+                # Update persistent rigid contact caches from the latest step
+                RigidContactAPI.update_contact_cache()
+
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
                 if n_objects_to_initialize > 0 and self.is_playing():
@@ -1062,8 +1082,6 @@ def _launch_simulator(*args, **kwargs):
                         obj = self._objects_to_initialize[i]
                         obj.initialize()
                         scenes_modified.add(obj.scene)
-                        if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
-                            self._objects_require_contact_callback = True
                         if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
                             self._objects_require_joint_break_callback = True
                         obj.keep_still()
@@ -1209,9 +1227,11 @@ def _launch_simulator(*args, **kwargs):
             for _ in range(self._n_steps_per_loop):
                 if render:
                     super().step(render=True)
+                    self._report_step_exceptions()
                 else:
                     for i in range(self.n_physics_timesteps_per_render):
                         super().step(render=False)
+                        self._report_step_exceptions()
 
             # Additionally run non physics things
             self._non_physics_step()
@@ -1225,67 +1245,60 @@ def _launch_simulator(*args, **kwargs):
             Step the physics a single step.
             """
             self._physics_context._step(current_time=self.current_time)
+            self._report_step_exceptions()
 
+            # Update persistent rigid contact caches from the latest step. We normally do this on the non-physics step,
+            # but this step_physics function is usually used to let contacts propagate during sampling etc, which
+            # means that we need to update the contact cache here too.
+            RigidContactAPI.update_contact_cache()
+
+        @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
-            # Make it possible to identify that we are currently within a step
-            self.currently_stepping = True
+            try:
+                # Make it possible to identify that we are currently within a step
+                self.currently_stepping = True
 
-            # Invalidate various APIs so that any reads from them will be updated
-            PoseAPI.invalidate()
-            RigidContactAPI.clear()
-            GripperRigidContactAPI.clear()
+                # Invalidate various APIs so that any reads from them will be updated
+                PoseAPI.invalidate()
 
-            # Only do this if we're not in the warmup phase
-            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                # Run the controller step on every controllable object
-                for scene in self.scenes:
-                    for robot in scene.robots:
-                        robot.step()
+                # Only do this if we're not in the warmup phase
+                if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                    # Run the controller step on every controllable object
+                    for scene in self.scenes:
+                        for robot in scene.robots:
+                            robot.step()
 
-                # Flush the controls from the ControllableObjectViewAPI
-                ControllableObjectViewAPI.flush_control()
+                    # Flush the controls from the ControllableObjectViewAPI
+                    ControllableObjectViewAPI.flush_control()
+            except Exception as e:
+                self.currently_stepping = False
+                self.pre_step_exception = e
+                raise
 
+        @with_profiler(name="_post_physics_step_profiler")
         def _on_post_physics_step(self):
-            # Only do this if we're not in the warmup phase
-            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                # Run the post physics update for backend view
-                ControllableObjectViewAPI.post_physics_step()
+            try:
+                # Only do this if we're not in the warmup phase
+                if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                    # Run the post physics update for backend view
+                    ControllableObjectViewAPI.post_physics_step()
 
-            # Record that we are done with the step context.
-            self.currently_stepping = False
+                # Record that we are done with the step context.
+                self.currently_stepping = False
+            except Exception as e:
+                self.currently_stepping = False
+                self.post_step_exception = e
+                raise
 
-        def _on_contact(self, contact_headers, contact_data):
-            """
-            This callback will be invoked after every PHYSICS step if there is any contact.
-            For each of the pair of objects in each contact, we invoke the on_contact function for each of its states
-            that subclass ContactSubscribedStateMixin. These states update based on contact events.
-            """
-            if gm.ENABLE_OBJECT_STATES and self._objects_require_contact_callback:
-                headers = defaultdict(list)
-                for contact_header in contact_headers:
-                    actor0_obj = self._link_id_to_objects.get(contact_header.actor0, None)
-                    actor1_obj = self._link_id_to_objects.get(contact_header.actor1, None)
-                    # If any of the objects cannot be found, skip
-                    if actor0_obj is None or actor1_obj is None:
-                        continue
-                    # If any of the objects is not initialized, skip
-                    if not actor0_obj.initialized or not actor1_obj.initialized:
-                        continue
-                    # If any of the objects doesn't have states that require on_contact callbacks, skip
-                    if (
-                        len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0
-                        or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0
-                    ):
-                        continue
-                    headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x: x.uuid))].append(contact_header)
-
-                for actor0_obj, actor1_obj in headers:
-                    for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
-                        for state_type in self.object_state_types_on_contact:
-                            if state_type in obj0.states:
-                                obj0.states[state_type].on_contact(
-                                    obj1, headers[(actor0_obj, actor1_obj)], contact_data
-                                )
+        def _report_step_exceptions(self):
+            if self.pre_step_exception is not None:
+                pre_step_exception = self.pre_step_exception
+                self.pre_step_exception = None
+                raise RuntimeError("Exception occurred during pre-physics step") from pre_step_exception
+            if self.post_step_exception is not None:
+                post_step_exception = self.post_step_exception
+                self.post_step_exception = None
+                raise RuntimeError("Exception occurred during post-physics step") from post_step_exception
 
         def get_obj_at_prim_path(self, prim_path):
             for scene in self.scenes:

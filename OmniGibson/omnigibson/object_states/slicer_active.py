@@ -4,7 +4,6 @@ import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty, torch_delete
@@ -31,7 +30,6 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.add(ContactBodies)
         return deps
 
     @classmethod
@@ -115,37 +113,26 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
     @classmethod
     def _currently_touching_sliceables(cls):
-        # Initialize return value as all falses
-        currently_touching = th.zeros_like(cls.PREVIOUSLY_TOUCHING)
-
         # Grab all sliceable objects
-        for scene_idx, scene in enumerate(og.sim.scenes):
+        currently_touching = th.zeros_like(cls.PREVIOUSLY_TOUCHING)
+        for scene in og.sim.scenes:
             sliceable_objs = scene.object_registry("abilities", "sliceable", [])
 
-            # If there's no sliceables, then obviously no slicer is touching any sliceable so immediately return all Falses
+            # If there's no sliceables in the scene, continue to the next scene.
             if len(sliceable_objs) == 0:
-                return currently_touching
+                continue
 
-            # Aggregate all link prim path indices
-            all_slicer_idxs = [
-                [list(RigidContactAPI.get_body_row_idx(prim_path))[1] for prim_path in link_paths]
-                for link_paths in cls.SLICER_LINK_PATHS
-            ]
-            sliceable_idxs = [
-                list(RigidContactAPI.get_body_col_idx(link.prim_path))[1]
-                for obj in sliceable_objs
-                for link in obj.links.values()
-            ]
-            impulses = RigidContactAPI.get_all_impulses(scene_idx)
+            # Get the prim paths of all the sliceables in this scene
+            sliceable_prim_paths = [link_prim_path for obj in sliceable_objs for link_prim_path in obj.link_prim_paths]
 
-            # TODO: This can be vectorized. No point in doing this tensorized state to then compute this in a loop.
-            # Batch check each slicer against all sliceables
-            for i, slicer_idxs in enumerate(all_slicer_idxs):
-                if th.any(impulses[slicer_idxs][:, sliceable_idxs]):
-                    # We are touching at least one sliceable
+            # Aggregate all link prim path indices for the slicers in this scene
+            for i, (obj, link_paths) in enumerate(zip(cls.IDX_OBJS, cls.SLICER_LINK_PATHS)):
+                if obj.scene != scene:
+                    continue
+                if RigidContactAPI.is_in_contact(scene.idx, link_paths, sliceable_prim_paths):
                     currently_touching[i] = True
 
-            return currently_touching
+        return currently_touching
 
     @classproperty
     def value_name(cls):

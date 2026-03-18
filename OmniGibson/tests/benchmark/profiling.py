@@ -1,4 +1,5 @@
 import argparse
+import cProfile
 import json
 import math
 import os
@@ -22,6 +23,7 @@ parser.add_argument("-w", "--fluids", action="store_true")
 parser.add_argument("-g", "--gpu_dynamics", action="store_true")
 parser.add_argument("-p", "--macro_particle_system", action="store_true")
 parser.add_argument("-f", "--flatcache", action="store_true")
+parser.add_argument("-d", "--deep-profiling", action="store_true")
 
 PROFILING_FIELDS = ["FPS", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
 NUM_CLOTH = 5
@@ -45,6 +47,7 @@ def main():
     gm.ENABLE_TRANSITION_RULES = True
     gm.ENABLE_FLATCACHE = args.flatcache
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
+    gm.ENABLE_PROFILING = args.deep_profiling
 
     cfg = {
         "env": {
@@ -132,6 +135,14 @@ def main():
     )
 
     load_start = time.time()
+
+    # Launch OG before setting up the profiler. If we don't do this then the carb profiler
+    # overtakes the profiler and we don't get any useful data.
+    og.launch()
+
+    if args.deep_profiling:
+        load_profiler = cProfile.Profile()
+        load_profiler.enable()
     env = ProfilingEnv(configs=cfg)
     table = env.scene.object_registry("name", "table")
     apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
@@ -158,6 +169,9 @@ def main():
         position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1]
     )
     # record total load time
+    if args.deep_profiling:
+        load_profiler.disable()
+        load_profiler.dump_stats("load.prof")
     total_load_time = time.time() - load_start
 
     for i in range(300):
@@ -200,6 +214,13 @@ def main():
     ret.extend(output)
     with open("output.json", "w") as f:
         json.dump(ret, f, indent=4)
+
+    # Save the simulation profilers
+    if args.deep_profiling:
+        og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
+        og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
+        og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
+
     og.shutdown()
 
 

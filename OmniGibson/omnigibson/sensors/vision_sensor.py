@@ -15,7 +15,6 @@ from omnigibson.utils.constants import (
 )
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import create_module_logger, dock_window
 from omnigibson.utils.vision_utils import Remapper
 
@@ -28,9 +27,9 @@ def render():
     """
     Refreshes the Isaac Sim app rendering components including UI elements and view ports..etc.
     """
-    set_carb_setting(og.app._carb_settings, "/app/player/playSimulations", False)
+    og.app._carb_settings.set_bool("/app/player/playSimulations", False)
     og.app.update()
-    set_carb_setting(og.app._carb_settings, "/app/player/playSimulations", True)
+    og.app._carb_settings.set_bool("/app/player/playSimulations", True)
 
 
 class VisionSensor(BaseSensor):

@@ -73,9 +73,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._flatten_action_space = self.env_config["flatten_action_space"]
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
         self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
-        self._initial_pos_z_offset = self.env_config[
-            "initial_pos_z_offset"
-        ]  # how high to offset object placement to account for one action step of dropping
 
         physics_dt = 1.0 / self.env_config["physics_frequency"]
         rendering_dt = 1.0 / self.env_config["rendering_frequency"]
@@ -179,9 +176,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load variables from config
         """
-        # Store additional variables after config has been loaded fully
-        self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]
-
         # Reset bookkeeping variables
         self._reset_variables()
         self._current_episode = 0  # Manually set this to 0 since resetting actually increments this
@@ -197,15 +191,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             scene_cfg=self.scene_config,
             task_cfg=self.task_config,
         )
-
-        # - Additionally run some sanity checks on these values -
-
-        # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
-        # less than the offset we set (dist = 0.5 * gravity * (t^2))
-        drop_distance = 0.5 * 9.8 * (og.sim.get_sim_step_dt() ** 2)
-        assert (
-            drop_distance < self._initial_pos_z_offset
-        ), f"initial_pos_z_offset is too small for collision checking, must be greater than {drop_distance}"
 
     def _load_task(self, task_config=None):
         """
@@ -757,14 +742,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self._current_step
 
     @property
-    def initial_pos_z_offset(self):
-        """
-        Returns:
-            float: how high to offset object placement to test valid pose & account for one action step of dropping
-        """
-        return self._initial_pos_z_offset
-
-    @property
     def task(self):
         """
         Returns:
@@ -870,7 +847,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "automatic_reset": False,
                 "flatten_action_space": False,
                 "flatten_obs_space": False,
-                "initial_pos_z_offset": 0.1,
                 "external_sensors": None,
             },
             # Rendering kwargs

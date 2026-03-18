@@ -1,5 +1,4 @@
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.joint_state import Joint
 from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.object_states.pose import Pose
@@ -15,7 +14,7 @@ class KinematicsMixin(BaseObjectState):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.update({Pose, Joint, AABB, ContactBodies})
+        deps.update({Pose, Joint, AABB})
         return deps
 
     def cache_info(self, get_value_args):
