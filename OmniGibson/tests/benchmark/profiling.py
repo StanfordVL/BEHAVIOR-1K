@@ -216,10 +216,10 @@ def main():
         json.dump(ret, f, indent=4)
 
     # Save the simulation profilers
-    if args.deep_profiling:
-        og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
-        og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
-        og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
+    # if args.deep_profiling:
+    #     og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
+    #     og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
+    #     og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
 
     og.shutdown()
 
