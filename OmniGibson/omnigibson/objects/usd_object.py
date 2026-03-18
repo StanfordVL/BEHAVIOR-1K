@@ -169,7 +169,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             if isinstance(scale, th.Tensor)
             else th.tensor(scale, dtype=th.float32)
             if isinstance(scale, Iterable)
-            else scale
+            else th.ones(3, dtype=th.float32) * float(scale)
         )
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
