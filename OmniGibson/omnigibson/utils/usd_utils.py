@@ -416,7 +416,7 @@ class RigidContactAPIImpl:
         Converts a set of objects, links, or prim paths to a list of prim paths for contact matrix lookups.
 
         Args:
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to convert to prim paths.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to convert to prim paths.
 
         Returns:
             list[str]: List of prim paths.
@@ -445,7 +445,7 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to get the contact row indices for.
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact row indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to get the contact row indices for.
 
         Returns:
             th.Tensor: Tensor of row indices.
@@ -466,7 +466,7 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to get the contact column indices for.
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact column indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to get the contact column indices for.
 
         Returns:
             th.Tensor: Tensor of column indices.
@@ -485,8 +485,8 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to get the contact pairs for.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact.
+            query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects for contact sensor objects to check.
+            with_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact.
 
         Returns:
             set of tuples: Set of tuples of (query_prim_path, filter_prim_path) pairs that are in contact.
@@ -527,9 +527,9 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to check for contact.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact with.
-            ignore_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to ignore contact with.
+            query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact.
+            with_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact with.
+            ignore_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to ignore contact with.
 
         Returns:
             bool: True if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set, else False.
