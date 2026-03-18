@@ -24,14 +24,14 @@ def main():
 
     import snakeviz.stats as snakeviz_stats
 
-    snake_stats = snakeviz_stats.json_stats(args.profile)
     stats = Stats(args.profile)
+    snake_stats = snakeviz_stats.json_stats(stats)
 
     rows = []
-    for idx, (func_name, payload) in enumerate(sorted(snake_stats["functions"].items(), key=lambda item: item[1][3], reverse=True)):
+    for idx, (func_name, data) in enumerate(sorted(snake_stats.items(), key=lambda item: item[1]["stats"][3], reverse=True)):
         if idx >= args.limit:
             break
-        ccalls, ncalls, tottime, cumtime = payload
+        ccalls, ncalls, tottime, cumtime = data["stats"]
         rows.append(
             "<tr>"
             f"<td>{idx + 1}</td>"
