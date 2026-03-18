@@ -471,12 +471,41 @@ def download_and_unpack_zipped_dataset(dataset_name):
 
 def download_omnigibson_robot_assets():
     """
-    Download OmniGibson assets
+    Clone OmniGibson robot assets from HuggingFace
     """
-    if os.path.exists(get_dataset_path("omnigibson-robot-assets")):
-        print("Assets already downloaded.")
+    dataset_path = get_dataset_path("omnigibson-robot-assets")
+    git_url = "https://huggingface.co/datasets/behavior-1k/omnigibson-robot-assets"
+
+    if os.path.exists(os.path.join(dataset_path, ".git")):
+        print("OmniGibson robot assets already cloned, pulling latest changes...")
+        subprocess.run(["git", "pull"], cwd=dataset_path, check=True)
+        _handle_lfs_pull(dataset_path)
+    elif os.path.exists(dataset_path):
+        print("Directory exists but is not a git repo. Removing and re-cloning...")
+        shutil.rmtree(dataset_path)
+        _clone_robot_assets(dataset_path, git_url)
     else:
-        download_and_unpack_zipped_dataset("omnigibson-robot-assets")
+        _clone_robot_assets(dataset_path, git_url)
+
+
+def _clone_robot_assets(dataset_path, git_url):
+    """Clone the robot assets repository"""
+    print(f"Cloning OmniGibson robot assets from {git_url}...")
+    subprocess.run(["git", "clone", git_url, dataset_path], check=True)
+    _handle_lfs_pull(dataset_path)
+
+
+def _handle_lfs_pull(dataset_path):
+    """Handle git lfs pull if applicable"""
+    gitattributes_path = os.path.join(dataset_path, ".gitattributes")
+    if os.path.exists(gitattributes_path):
+        with open(gitattributes_path, "r") as f:
+            if "lfs" in f.read():
+                print("Detected LFS files, running git lfs pull...")
+                try:
+                    subprocess.run(["git", "lfs", "pull"], cwd=dataset_path, check=True)
+                except subprocess.CalledProcessError:
+                    print("Warning: git lfs pull failed. If files are missing, make sure git-lfs is installed.")
 
 
 def print_user_agreement():
