@@ -465,9 +465,9 @@ class RigidContactAPIImpl:
 
             # What is the last step that the body was awake?
             body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
-            last_awake_body_step = th.where(
-                per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)
-            ).max(dim=0).values  # (num_bodies,)
+            last_awake_body_step = (
+                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+            )  # (num_bodies,)
             awake = last_awake_body_step >= 0  # (num_bodies,)
 
             # -- Per-step pair awakeness: (N, R, C) --
@@ -482,9 +482,9 @@ class RigidContactAPIImpl:
 
             # What is the last step that the pair was awake?
             pair_step_indices = th.arange(N, dtype=th.long).reshape(N, 1, 1).expand_as(per_step_awake_pairs)
-            last_awake_pair_step = th.where(
-                per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)
-            ).max(dim=0).values  # (R, C)
+            last_awake_pair_step = (
+                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+            )  # (R, C)
             pair_was_awake = last_awake_pair_step >= 0  # (R, C)
 
             # "Current" contact matrix: impulses from the last awake step per pair.
