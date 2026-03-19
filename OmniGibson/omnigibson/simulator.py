@@ -1247,9 +1247,10 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context._step(current_time=self.current_time)
             self._report_step_exceptions()
 
-            # Update persistent rigid contact caches from the latest step. We normally do this on the non-physics step,
-            # but this step_physics function is usually used to let contacts propagate during sampling etc, which
-            # means that we need to update the contact cache here too.
+            # Accumulate contact data from this physics step and then flush to cache.
+            # We normally accumulate in _on_post_physics_step and flush in _non_physics_step,
+            # but step_physics bypasses those callbacks so we do both here.
+            RigidContactAPI.add_contacts_from_physics_step()
             RigidContactAPI.update_contact_cache()
 
         @with_profiler(name="_pre_physics_step_profiler")
@@ -1282,6 +1283,9 @@ def _launch_simulator(*args, **kwargs):
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
+
+                # Pull the contact sensor data
+                RigidContactAPI.add_contacts_from_physics_step()
 
                 # Record that we are done with the step context.
                 self.currently_stepping = False

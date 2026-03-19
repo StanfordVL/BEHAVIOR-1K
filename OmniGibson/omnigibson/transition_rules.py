@@ -392,7 +392,7 @@ class TouchingAnyCondition(RuleCondition):
             if obj.scene not in with_set_by_scene:
                 continue
             if RigidContactAPI.is_in_contact(
-                scene_idx=obj.scene.idx, query_set=[obj], with_set=with_set_by_scene[obj.scene]
+                scene_idx=obj.scene.idx, query_set=[obj], with_set=with_set_by_scene[obj.scene], ignore_set=None, current=False
             ):
                 objs.append(obj)
 
