@@ -37,7 +37,6 @@ def start_env(robot_type):
         raise ValueError("Invalid robot configuration")
     robots = load_robot_config(robot_type)
     config = {
-        "env": {"initial_pos_z_offset": 0.1},
         "render": {"viewer_width": 1280, "viewer_height": 720},
         "scene": {
             "type": "InteractiveTraversableScene",

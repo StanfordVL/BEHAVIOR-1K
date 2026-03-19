@@ -27,7 +27,6 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
-from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import (
     mesh_prim_to_trimesh_mesh,
     sample_mesh_keypoints,
@@ -752,7 +751,7 @@ class ClothPrim(GeomPrim):
         normals = th.linalg.cross(v1, v2)
         return normals / th.norm(normals, dim=1).reshape(-1, 1)
 
-    def contact_list(self, keypoints_only=True):
+    def get_contacts(self, keypoints_only=True):
         """
         Get list of all current contacts with this cloth body
 
@@ -760,26 +759,17 @@ class ClothPrim(GeomPrim):
             keypoints_only (bool): If True, will only check contact with this cloth's keypoints
 
         Returns:
-            list of CsRawData: raw contact info for this cloth body
+            list of (contact_prim_path, position) pairs
         """
         contacts = []
 
-        def report_hit(hit):
-            contacts.append(
-                CsRawData(
-                    time=0.0,  # dummy value
-                    dt=0.0,  # dummy value
-                    body0=self.prim_path,
-                    body1=hit.rigid_body,
-                    position=pos,
-                    normal=th.zeros(3),  # dummy value
-                    impulse=th.zeros(3),  # dummy value
-                )
-            )
-            return True
-
         positions = self.keypoint_particle_positions if keypoints_only else self.compute_particle_positions()
         for pos in positions:
+
+            def report_hit(hit):
+                contacts.append((hit.rigid_body, pos))
+                return True
+
             og.sim.psqi.overlap_sphere(self.cloth_system.particle_contact_offset, pos.tolist(), report_hit, False)
 
         return contacts

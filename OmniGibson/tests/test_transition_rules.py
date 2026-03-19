@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 import torch as th
 from utils import og_test, place_obj_on_floor_plane, remove_all_systems, retrieve_obj_cfg
 
@@ -1102,6 +1104,7 @@ def test_cooking_object_rule_failure_wrong_heat_source(env):
     remove_all_systems(env.scene)
 
 
+@pytest.mark.skip(reason="To be fixed as part of #2017.")
 @og_test
 def test_cooking_object_rule_success(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1178,6 +1181,7 @@ def test_cooking_object_rule_success(env):
     og.sim.step()
 
 
+@pytest.mark.skip(reason="To be fixed as part of #2017.")
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_wrong_container(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"

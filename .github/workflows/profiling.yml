@@ -37,6 +37,10 @@ jobs:
           - name: baseline-rs-int-1robot
             args: "-g -f -s Rs_int -r 1"
             label: "Rs_int + 1 Robot"
+          - name: deep-rs-int-1robot
+            args: "-g -f -s Rs_int -r 1 -d"
+            label: "Rs_int + 1 Robot (deep profile)"
+            deep_profile: true
           # Scenes (flatcache vs non-flatcache)
           - name: scene-house
             args: "-f -r 1 -s house_single_floor"
@@ -72,10 +76,23 @@ jobs:
       - name: Install OmniGibson
         run: pip install -e .[dev,primitives,eval] --no-build-isolation
 
+      - name: Install deep profiling dependencies
+        if: matrix.deep_profile
+        run: pip install snakeviz
+
       - name: Run profiling
         run: |
           rm -f output.json
           python tests/benchmark/profiling.py ${{ matrix.args }}
+
+      - name: Convert deep profile to HTML
+        if: matrix.deep_profile
+        run: |
+          for prof in load.prof pre_physics_step.prof post_physics_step.prof non_physics_step.prof; do
+            python ../.github/scripts/cprofile_to_html.py \
+              --profile "$prof" \
+              --output "${prof%.prof}.html"
+          done
 
       - name: Upload results
         uses: actions/upload-artifact@v4
@@ -83,6 +100,22 @@ jobs:
         with:
           name: profiling-${{ matrix.name }}
           path: OmniGibson/output.json
+          if-no-files-found: warn
+
+      - name: Upload deep profile outputs
+        uses: actions/upload-artifact@v4
+        if: always() && matrix.deep_profile
+        with:
+          name: profiling-deep-${{ matrix.name }}
+          path: |
+            OmniGibson/load.prof
+            OmniGibson/load.html
+            OmniGibson/pre_physics_step.prof
+            OmniGibson/pre_physics_step.html
+            OmniGibson/post_physics_step.prof
+            OmniGibson/post_physics_step.html
+            OmniGibson/non_physics_step.prof
+            OmniGibson/non_physics_step.html
           if-no-files-found: warn
 
   report:
@@ -204,6 +237,18 @@ jobs:
                       cell += delta(m, pv, bv)
                   row += f" | {cell}"
               lines.append(row + " |")
+
+          lines.append("")
+          lines.append("### Deep profile artifacts")
+          lines.append(
+              f"Download deep profile HTML reports and raw .prof files from the "
+              f"[Actions artifacts](https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}#artifacts) "
+              f"(artifact prefix: `profiling-deep-`). Includes:"
+          )
+          lines.append("- `load` — environment loading")
+          lines.append("- `pre_physics_step` — pre-physics step processing")
+          lines.append("- `post_physics_step` — post-physics step processing")
+          lines.append("- `non_physics_step` — non-physics step processing")
 
           lines.append("")
           lines.append("<details><summary>Legend</summary>\n")

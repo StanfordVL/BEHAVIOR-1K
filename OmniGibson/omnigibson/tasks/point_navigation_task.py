@@ -16,7 +16,6 @@ from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.point_goal import PointGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.sim_utils import land_object, test_valid_pose
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -317,26 +316,12 @@ class PointNavigationTask(BaseTask):
         env.robots[self._robot_idn].reset()
 
         # We attempt to sample valid initial poses and goal positions
-        success, max_trials = False, 100
-
-        initial_pos, initial_quat, goal_pos = None, None, None
-        for i in range(max_trials):
-            initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env)
-            # Make sure the sampled robot start pose and goal position are both collision-free
-            success = test_valid_pose(
-                env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset
-            ) and test_valid_pose(env.robots[self._robot_idn], goal_pos, None, env.initial_pos_z_offset)
-
-            # Don't need to continue iterating if we succeeded
-            if success:
-                break
-
-        # Notify user if we failed to reset a collision-free sampled pose
-        if not success:
-            log.warning("Failed to reset robot without collision")
+        # TODO: There used to be a test for collision-free, but it was removed because it involved
+        # stepping the simulator and checking for collisions. We should consider alternatives.
+        initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env)
 
         # Land the robot
-        land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
+        env.robots[self._robot_idn].set_position_orientation(position=initial_pos, orientation=initial_quat)
 
         # Store the sampled values internally
         self._initial_pos = initial_pos
