@@ -164,13 +164,14 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        load_config["scale"] = (
-            scale
-            if isinstance(scale, th.Tensor)
-            else th.tensor(scale, dtype=th.float32)
-            if isinstance(scale, Iterable)
-            else th.ones(3, dtype=th.float32) * float(scale)
-        )
+        if scale is not None:
+            load_config["scale"] = (
+                scale
+                if isinstance(scale, th.Tensor)
+                else th.tensor(scale, dtype=th.float32)
+                if isinstance(scale, Iterable)
+                else th.ones(3, dtype=th.float32) * float(scale)
+            )
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["kinematic_only"] = kinematic_only
