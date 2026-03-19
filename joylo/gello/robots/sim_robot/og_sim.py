@@ -427,8 +427,8 @@ class OGRobotServer:
         obs = dict()
         obs["active_arm"] = self.active_arm
         obs["in_cooldown"] = self._in_cooldown
-        obs["base_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.non_floor_touching_base_links)) if INCLUDE_BASE_CONTACT_OBS else False
-        obs["trunk_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.trunk_links)) if INCLUDE_TRUNK_CONTACT_OBS else False
+        obs["base_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.non_floor_touching_base_links), with_set=None, ignore_set=None, current_only=False) if INCLUDE_BASE_CONTACT_OBS else False
+        obs["trunk_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.trunk_links), with_set=None, ignore_set=None, current_only=False) if INCLUDE_TRUNK_CONTACT_OBS else False
         obs["reset_joints"] = bool(self._joint_cmd["button_y"][0].item())
         obs["waiting_to_resume"] = self._waiting_to_resume
 
@@ -442,7 +442,7 @@ class OGRobotServer:
             obs[f"arm_{arm}_gripper_positions"] = joint_pos[self.robot.gripper_control_idx[arm]]
             obs[f"arm_{arm}_ee_pos_quat"] = th.concatenate(self.robot.eef_links[arm].get_position_orientation())
             # When using VR, this expansive check makes the view glitch
-            obs[f"arm_{arm}_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.arm_links[arm])) if VIEWING_MODE != ViewingMode.VR and INCLUDE_ARM_CONTACT_OBS else False
+            obs[f"arm_{arm}_contact"] = RigidContactAPI.is_in_contact(self.env.scene.idx, set(self.robot.arm_links[arm]), with_set=None, ignore_set=None, current_only=False) if VIEWING_MODE != ViewingMode.VR and INCLUDE_ARM_CONTACT_OBS else False
 
             obs[f"{arm}_gripper"] = self._joint_cmd[f"{arm}_gripper"].item()
 
