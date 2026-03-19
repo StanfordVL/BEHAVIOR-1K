@@ -55,10 +55,10 @@ jobs:
           - test_robot_teleoperation
           - test_scene_graph
           - test_sensors
-          # - test_symbolic_primitives
+          - test_symbolic_primitives
           - test_systems
           - test_transform_utils
-          # - test_transition_rules  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2017
+          - test_transition_rules
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
@@ -119,7 +119,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 30
 
-      - name: Create missing XML if needed
+      - name: Check for failures, errors, or missing XML
         if: always()
         run: |
           xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
@@ -132,6 +132,13 @@ jobs:
             </testcase>
           </testsuite>
           EOF
+            echo "Error: XML file not found, probably due to segfault or timeout"
+            exit 1
+          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$xml"; then
+            echo "Error: Test failures or errors found"
+            exit 1
+          else
+            echo "All tests passed successfully"
           fi
 
       - name: Deploy artifact

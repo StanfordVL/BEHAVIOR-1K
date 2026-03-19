@@ -190,8 +190,14 @@ class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator.
 
-    Contact information is cached per-physics-step and only updated for body pairs whose relative positions change.
-    This allows contact checks to persist for sleeping rigid body pairs.
+    This API checks for contacts on every physics step, and then aggregates this into a boolean contact matrix
+    on every non-physics step. Callers can then use this API to query either for contacts that are still ongoing,
+    or contacts that occurred at any point since the last non-physics step (e.g. for checking for contact events).
+    Contact information is cached per-physics-step and only updated for body pairs who have at least one side
+    not asleep, which allows this API to bypass the limitations of the view (which returns contacts only for awake bodies).
+
+    Since there is no direct tensorized way to check for object sleep state, this API approximates this by checking for
+    the net contact force on an object (only reported for awake bodies) and also the position change since the last step.
     """
 
     def __init__(self):
@@ -214,8 +220,12 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
 
-        # Current contacts over all tracked rigid bodies at the current timestep. Shape: (R, C)
+        # Contact matrix tracking contacts that occurred at any point during the last N physics steps
+        # (between consecutive update_contact_cache calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
+
+        # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
+        self._CURRENT_CONTACT_MATRIX = dict()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
@@ -224,8 +234,14 @@ class RigidContactAPIImpl:
         # Cached body transforms used for change detection. Shape: (N, 7) [pos(3), quat(4)]
         self._BODY_TRANSFORMS = dict()
 
+        # Accumulated impulse matrices and transforms from individual physics steps,
+        # collected between consecutive update_contact_cache calls.
+        self._PENDING_IMPULSES = dict()
+        self._PENDING_TRANSFORMS = dict()
+        self._PENDING_NET_FORCES = dict()
+
         # Position / orientation tolerances for deciding whether a pair should be updated
-        self._POS_EPS = 1e-4
+        self._POS_EPS = 1e-6
         self._ORI_EPS = 1e-4
 
     @classmethod
@@ -257,6 +273,7 @@ class RigidContactAPIImpl:
         # Snapshot the old contact matrices and path mappings so we can carry over
         # cached contact state for pairs of bodies that already existed.
         prev_contact_matrix = dict(self._CONTACT_MATRIX)
+        prev_current_contact_matrix = dict(self._CURRENT_CONTACT_MATRIX)
         prev_path_to_row_idx = dict(self._PATH_TO_ROW_IDX)
         prev_path_to_col_idx = dict(self._PATH_TO_COL_IDX)
 
@@ -343,13 +360,26 @@ class RigidContactAPIImpl:
                 self._INDEX_MATRIX[scene_idx] = th.stack([ii, jj], dim=-1)
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().clone()
 
-                # Build the new contact matrix. Start from current impulses (captures contacts
+                # Build the new contact matrices. Start from current impulses (captures contacts
                 # for newly added bodies), then overwrite with previously cached values for
                 # every pair of bodies that already existed before the rebuild.
                 initial_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
-                self._CONTACT_MATRIX[scene_idx] = th.any(initial_impulses != 0, dim=-1)
+                initial_contacts = th.any(initial_impulses != 0, dim=-1)
+                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
+                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
 
+                # Initialize pending accumulation lists for this scene
+                # Note that existing data in these lists will be lost when the view is rebuilt.
+                # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
+                # This TODO can be accomplished after the follow-up PR removes RigidContactAPI use in assisted grasping.
+                self._PENDING_IMPULSES[scene_idx] = []
+                self._PENDING_TRANSFORMS[scene_idx] = []
+                self._PENDING_NET_FORCES[scene_idx] = []
+
+                # Finally, remap data from the old matrices into the new ones. This lets us avoid losing our
+                # cached data when new bodies are added or removed.
                 old_matrix = prev_contact_matrix.get(scene_idx)
+                old_current_matrix = prev_current_contact_matrix.get(scene_idx)
                 old_row_map = prev_path_to_row_idx.get(scene_idx)
                 old_col_map = prev_path_to_col_idx.get(scene_idx)
                 if old_matrix is not None and old_row_map is not None and old_col_map is not None:
@@ -368,48 +398,142 @@ class RigidContactAPIImpl:
                         self._CONTACT_MATRIX[scene_idx][new_row_idxs[:, None], new_col_idxs[None, :]] = old_matrix[
                             old_row_idxs[:, None], old_col_idxs[None, :]
                         ]
+                        self._CURRENT_CONTACT_MATRIX[scene_idx][new_row_idxs[:, None], new_col_idxs[None, :]] = (
+                            old_current_matrix[old_row_idxs[:, None], old_col_idxs[None, :]]
+                        )
 
-    def update_contact_cache(self):
+    def add_contacts_from_physics_step(self):
         """
-        Updates contact caches from the latest physics step.
+        Fetches contact impulse matrices and body transforms from the current physics step
+        and appends them to pending lists. Should be called by the simulator after every
+        individual physics step. The accumulated data is later processed in bulk by
+        update_contact_cache.
         """
+        assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
+
         for scene_idx in list(self._CONTACT_VIEW.keys()):
             try:
-                current_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
+                # Get the contact impulse and net force matrices for this scene
+                impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
+                net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt())
             except Exception:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
                     "This is expected if the physics sim view is not yet initialized, e.g. you are loading "
                     "a scene for the first time."
                 )
-                # Keep previous cache if the view is transiently invalid.
                 continue
 
+            # Get the body transforms for this scene
             transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
+
+            # Append the data to the pending lists. Note that we have to clone these matrices because
+            # the view actually reuses the buffer.
+            if scene_idx not in self._PENDING_IMPULSES:
+                self._PENDING_IMPULSES[scene_idx] = []
+                self._PENDING_TRANSFORMS[scene_idx] = []
+                self._PENDING_NET_FORCES[scene_idx] = []
+            self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
+            self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
+            self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
+
+    def update_contact_cache(self):
+        """
+        Processes all accumulated physics-step data (collected via add_contacts_from_physics_step)
+        to update both the "recent" contact matrix (any contact in the last N steps) and the
+        "current" contact matrix (contact at only the most recent step).
+
+        Awakeness is evaluated per individual physics step by prepending the previously cached
+        transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
+        force are also treated as awake.  Contact matrices are only updated from awake steps.
+        """
+        for scene_idx in list(self._CONTACT_VIEW.keys()):
+            # Get the pending data for this scene
+            pending_impulses = self._PENDING_IMPULSES[scene_idx]
+            pending_transforms = self._PENDING_TRANSFORMS[scene_idx]
+            pending_net_forces = self._PENDING_NET_FORCES[scene_idx]
+            assert len(pending_impulses) == len(pending_transforms), "Number of impulses and transforms must match"
+            assert len(pending_impulses) == len(pending_net_forces), "Number of impulses and net forces must match"
+            N = len(pending_impulses)
+            if N == 0:
+                continue
+
+            # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
+            all_impulses = th.stack(pending_impulses, dim=0)
+            all_transforms = th.stack(pending_transforms, dim=0)
+            all_net_forces = th.stack(pending_net_forces, dim=0)
+
+            # Get the previous body transforms for the cache
             prev_transforms = self._BODY_TRANSFORMS[scene_idx]
 
-            # Find the indices of the rigid body rows that have changed
-            pos_changed = th.any(th.abs(transforms[:, :3] - prev_transforms[:, :3]) > self._POS_EPS, dim=1)
-            ori_changed = th.abs(th.sum(transforms[:, 3:7] * prev_transforms[:, 3:7], dim=1)) < (1.0 - self._ORI_EPS)
-            changed = pos_changed | ori_changed
+            # Apply the position-based sleep state approximation. Here we compute the delta between
+            # each physics step's transform with the previous physics step's transform (using the cached transform
+            # for the first physics step).
+            extended_transforms = th.cat([prev_transforms.unsqueeze(0), all_transforms], dim=0)  # (N+1, num_bodies, 7)
+            pos_changed = th.any(
+                th.abs(extended_transforms[1:, :, :3] - extended_transforms[:-1, :, :3]) > self._POS_EPS, dim=-1
+            )  # (N, num_bodies)
+            quat_dot = th.sum(
+                extended_transforms[1:, :, 3:7] * extended_transforms[:-1, :, 3:7], dim=-1
+            )  # (N, num_bodies)
+            ori_changed = th.abs(quat_dot) < (1.0 - self._ORI_EPS)  # (N, num_bodies)
+            per_step_awake = pos_changed | ori_changed  # (N, num_bodies)
 
-            # Now, for each row index and column index in the contact matrix, check if the rigid body has moved
-            did_row_change = changed[self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]]
-            did_col_change = th.zeros(len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]), dtype=th.bool)
-            # Here we ignore kinematic-only columns, which do not appear in the rigid-body view.
-            # They are fixed-position, so treating them as "unchanged"
-            # preserves persistence correctness while avoiding invalid indexing.
+            # Other than the position change, we also know that an object cannot be asleep if the net contact force is nonzero.
+            row_to_rigid = self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]
+            net_force_awake = th.any(all_net_forces != 0, dim=-1)  # (N, R)
+            per_step_awake[:, row_to_rigid] = per_step_awake[:, row_to_rigid] | net_force_awake
+
+            # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
+            # data for all the indices where the object is not asleep.
+            body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
+            last_awake_body_step = (
+                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+            )  # (num_bodies,)
+
+            # For each step, compute the rows that are awake
+            per_step_row_awake = per_step_awake[:, row_to_rigid]  # (N, R)
+
+            # For each step, compute the columns that are awake
+            col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
             valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
-            valid_col_rows = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx][valid_col_mask]
-            did_col_change[valid_col_mask] = changed[valid_col_rows]
+            per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
+            per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
-            # Then, update the contact matrix for every pair where at least one body has changed
-            changed_pairs = did_row_change[:, None] | did_col_change[None, :]
-            self._CONTACT_MATRIX[scene_idx][changed_pairs] = th.any(current_impulses[changed_pairs] != 0, dim=-1)
+            # For each step, compute the pairs that are awake. This is an outer-OR of the row and column awake masks.
+            per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
 
-            # Finally, update the body transforms. Note that we're only updating the transforms for the rows that have changed.
-            # This way we prevent error from accumulating over time for very slow-moving objects.
-            self._BODY_TRANSFORMS[scene_idx][changed] = transforms[changed]
+            # What is the last step that the pair was awake?
+            pair_step_indices = th.arange(N, dtype=th.long).reshape(N, 1, 1).expand_as(per_step_awake_pairs)
+            last_awake_pair_step = (
+                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+            )  # (R, C)
+            pair_was_awake = last_awake_pair_step >= 0  # (R, C)
+
+            # "Current" contact matrix: impulses from the last awake step per pair.
+            # Pairs that were never awake retain their previous value.
+            awake_rc = th.where(pair_was_awake)
+            awake_pair_steps = last_awake_pair_step[pair_was_awake]
+            last_awake_impulses = all_impulses[awake_pair_steps, awake_rc[0], awake_rc[1]]  # (num_awake, 3)
+            self._CURRENT_CONTACT_MATRIX[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
+
+            # "Recent" contact matrix: any contact across awake steps for awake pairs,
+            # or the (now-updated) current contact value for non-awake pairs.
+            any_contact_per_step = th.any(all_impulses != 0, dim=-1)  # (N, R, C)
+            any_awake_contact = th.any(any_contact_per_step & per_step_awake_pairs, dim=0)  # (R, C)
+            self._CONTACT_MATRIX[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
+            self._CONTACT_MATRIX[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX[scene_idx][~pair_was_awake]
+
+            # Update body transforms from each body's last awake step
+            awake_body_indices = th.where(last_awake_body_step >= 0)[0]
+            self._BODY_TRANSFORMS[scene_idx][awake_body_indices] = all_transforms[
+                last_awake_body_step[awake_body_indices], awake_body_indices
+            ]
+
+            # Clear pending data for this scene
+            self._PENDING_IMPULSES[scene_idx] = []
+            self._PENDING_TRANSFORMS[scene_idx] = []
+            self._PENDING_NET_FORCES[scene_idx] = []
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
@@ -479,21 +603,24 @@ class RigidContactAPIImpl:
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
         return th.tensor([self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths])
 
-    def get_contact_pairs(self, scene_idx, query_set, with_set=None):
+    def get_contact_pairs(self, scene_idx, query_set, with_set, current_only):
         """
         Get pairs of prim paths that are in contact.
 
         Args:
             scene_idx (int): Scene index to get the contact pairs for.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact.
+            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check. Must be specified.
+            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact. Can be None to check for contact with any object.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             set of tuples: Set of tuples of (query_prim_path, filter_prim_path) pairs that are in contact.
         """
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return set()
-        contact_matrix = self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         assert contact_matrix.ndim == 2, f"Contact matrix should be 2D, found shape {contact_matrix.shape}"
 
         # Get the row indices corresponding to the sensor prim paths
@@ -521,15 +648,18 @@ class RigidContactAPIImpl:
             for row, col in original_indices
         }
 
-    def is_in_contact(self, scene_idx, query_set, with_set=None, ignore_set=None):
+    def is_in_contact(self, scene_idx, query_set, with_set, ignore_set, current_only):
         """
         Check if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set.
 
         Args:
             scene_idx (int): Scene index to check for contact.
             query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact with.
-            ignore_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to ignore contact with.
+            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact with. Can be None to check for contact with any object.
+            ignore_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to ignore contact with. Can be None to not ignore any objects.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             bool: True if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set, else False.
@@ -540,7 +670,7 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return False
 
-        contact_matrix = self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         rows = self.get_contact_row_indices(scene_idx, query_set)
         if with_set is not None:
             cols = self.get_contact_col_indices(scene_idx, with_set)
@@ -589,7 +719,7 @@ class RigidContactAPIImpl:
         mask[idxs] = True
         return mask
 
-    def is_in_contact_batch(self, scene_idx, query_masks, with_masks=None, ignore_masks=None):
+    def is_in_contact_batch(self, scene_idx, query_masks, with_masks, ignore_masks, current_only):
         """
         Batch contact check for N queries, fully tensorized.
 
@@ -609,9 +739,12 @@ class RigidContactAPIImpl:
             query_masks (th.Tensor): ``(N, R)`` boolean tensor. ``query_masks[i, j]`` is True
                 if contact-matrix row ``j`` belongs to query set ``i``.
             with_masks (th.Tensor or None): ``(N, C)`` boolean tensor. ``with_masks[i, j]`` is
-                True if contact-matrix column ``j`` belongs to the with-set for query ``i``.
+                True if contact-matrix column ``j`` belongs to the with-set for query ``i``. Can be None to check for contact with any object.
             ignore_masks (th.Tensor or None): ``(N, C)`` boolean tensor. ``ignore_masks[i, j]``
-                is True if contact-matrix column ``j`` should be *ignored* for query ``i``.
+                is True if contact-matrix column ``j`` should be *ignored* for query ``i``. Can be None to not ignore any objects.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             th.Tensor: ``(N,)`` boolean tensor of contact results.
@@ -621,7 +754,7 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return th.zeros(query_masks.shape[0], dtype=th.bool)
 
-        contact_matrix = self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
 
         # query_contacts[i, c] = True iff any row in query set i is in contact with column c.
         # We use float matmul for speed: (N, R) @ (R, C) -> (N, C), then threshold.
@@ -648,8 +781,12 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX = dict()
         self._INDEX_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
+        self._PENDING_IMPULSES = dict()
+        self._PENDING_TRANSFORMS = dict()
+        self._PENDING_NET_FORCES = dict()
 
 
 # Instantiate the RigidContactAPI

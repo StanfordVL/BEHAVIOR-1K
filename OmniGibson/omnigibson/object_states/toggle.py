@@ -101,7 +101,9 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
                 continue
 
             # Get the robot finger prim paths' contacts
-            contact_pairs = RigidContactAPI.get_contact_pairs(scene_idx, scene_robot_finger_paths)
+            contact_pairs = RigidContactAPI.get_contact_pairs(
+                scene_idx, scene_robot_finger_paths, with_set=None, current_only=True
+            )
             for contact_pair in contact_pairs:
                 obj = scene.object_registry("prim_path", "/".join(contact_pair[1].split("/")[:-1]))
                 if obj is not None:

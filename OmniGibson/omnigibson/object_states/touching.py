@@ -14,7 +14,11 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         kinematic_obj = obj_a if obj_a.kinematic_only else obj_b
         non_kinematic_obj = obj_b if obj_a.kinematic_only else obj_a
         return RigidContactAPI.is_in_contact(
-            scene_idx=kinematic_obj.scene.idx, query_set=[non_kinematic_obj], with_set=[kinematic_obj]
+            scene_idx=kinematic_obj.scene.idx,
+            query_set=[non_kinematic_obj],
+            with_set=[kinematic_obj],
+            ignore_set=None,
+            current_only=True,
         )
 
     @staticmethod

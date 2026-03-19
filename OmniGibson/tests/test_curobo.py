@@ -342,7 +342,9 @@ def test_curobo():
             wheel_contact_pairs = set()
             obj_contact_pairs = set()
 
-            for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+            for body0, body1 in RigidContactAPI.get_contact_pairs(
+                env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+            ):
                 assert body0 in robot.link_prim_paths
                 if body1 in robot.link_prim_paths:
                     self_collision_pairs.add((body0, body1))
@@ -455,7 +457,9 @@ def test_curobo():
                         robot.set_joint_positions(q)
                         robot.keep_still()
                         og.sim.step()
-                        for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+                        ):
                             assert body0 in robot.link_prim_paths
                             if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
@@ -468,7 +472,9 @@ def test_curobo():
                         print(f"Executing waypoint {i}/{len(q_traj)}")
                         env.step(action)
 
-                        for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+                        ):
                             assert body0 in robot.link_prim_paths
                             if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue

@@ -548,7 +548,9 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
     if robot not in filter_objs:
         filter_objs.append(robot)
 
-    return RigidContactAPI.is_in_contact(scene_idx=robot.scene.idx, query_set=[robot], ignore_set=filter_objs)
+    return RigidContactAPI.is_in_contact(
+        scene_idx=robot.scene.idx, query_set=[robot], with_set=None, ignore_set=filter_objs, current_only=False
+    )
 
 
 def astar(search_map, start, goal, eight_connected=True):

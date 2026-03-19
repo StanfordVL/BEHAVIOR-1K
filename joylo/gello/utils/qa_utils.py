@@ -799,7 +799,7 @@ def check_robot_self_collision(env):
     # TODO: What about gripper finger self collision?
     for robot in env.robots:
         link_paths = list(robot.link_prim_paths)
-        if RigidContactAPI.is_in_contact(env.scene.idx, link_paths, with_set=link_paths):
+        if RigidContactAPI.is_in_contact(env.scene.idx, link_paths, with_set=link_paths, ignore_set=None, current_only=False):
             return True
     return False
 
@@ -819,7 +819,7 @@ def check_robot_base_nonarm_nonkinematic_collision(env):
             robot_link_paths -= set(link.prim_path for link in robot.arm_links[arm])
             robot_link_paths -= set(link.prim_path for link in robot.gripper_links[arm])
             robot_link_paths -= set(link.prim_path for link in robot.finger_links[arm])
-        if RigidContactAPI.is_in_contact(env.scene.idx, robot_link_paths, ignore_set={robot}):
+        if RigidContactAPI.is_in_contact(env.scene.idx, robot_link_paths, with_set=None, ignore_set={robot}, current_only=False):
             return True
 
     return False
@@ -838,7 +838,7 @@ def check_robot_nonarm_nonground_collision(env):
             robot_arm_paths = robot_arm_paths.union(set(link.prim_path for link in robot.finger_links[arm]))
         non_arm_links = set(link for link in robot.links.values() if link.prim_path not in robot_arm_paths)
 
-        if RigidContactAPI.is_in_contact(env.scene.idx, non_arm_links, ignore_set=ground_objects + [robot]):
+        if RigidContactAPI.is_in_contact(env.scene.idx, non_arm_links, with_set=None, ignore_set=ground_objects + [robot], current_only=False):
             return True
 
     return False
