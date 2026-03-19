@@ -182,7 +182,11 @@ class AttachedTo(
                         og.sim.step_physics()
                         # self.obj should not collide with other objects except the parent
                         success = not RigidContactAPI.is_in_contact(
-                            scene_idx=self.obj.scene.idx, query_set=[self.obj], with_set=None, ignore_set=[other], current=False
+                            scene_idx=self.obj.scene.idx,
+                            query_set=[self.obj],
+                            with_set=None,
+                            ignore_set=[other],
+                            current=False,
                         )
                         if success:
                             return True
