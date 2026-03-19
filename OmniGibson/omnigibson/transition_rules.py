@@ -396,7 +396,7 @@ class TouchingAnyCondition(RuleCondition):
                 query_set=[obj],
                 with_set=with_set_by_scene[obj.scene],
                 ignore_set=None,
-                current=False,
+                current_only=False,
             ):
                 objs.append(obj)
 

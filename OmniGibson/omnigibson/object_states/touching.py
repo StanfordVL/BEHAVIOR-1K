@@ -18,7 +18,7 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             query_set=[non_kinematic_obj],
             with_set=[kinematic_obj],
             ignore_set=None,
-            current=True,
+            current_only=True,
         )
 
     @staticmethod

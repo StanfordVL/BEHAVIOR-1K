@@ -243,10 +243,10 @@ def test_rigid_contact_bodies(env):
 
     # Bowl should be in contact with the table
     assert RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current=False
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
     )
     assert RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current=True
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=True
     )
 
     # Let bodies settle/sleep and verify contacts persist
@@ -255,26 +255,26 @@ def test_rigid_contact_bodies(env):
     assert breakfast_table.is_asleep, "Table should be asleep"
     assert bowl.root_link.is_asleep, "Bowl should be asleep"
     assert RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current=False
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
     )
     assert RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current=True
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=True
     )
 
     # Move the bowl far away and verify contacts clear
     bowl.set_position_orientation(position=th.tensor([10.0, 10.0, 10.0]))
     og.sim.step()
     assert not RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current=False
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
     )
     assert not RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current=True
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=True
     )
     assert not RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl], ignore_set=None, current=False
+        scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl], ignore_set=None, current_only=False
     )
     assert not RigidContactAPI.is_in_contact(
-        scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl], ignore_set=None, current=True
+        scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl], ignore_set=None, current_only=True
     )
 
 

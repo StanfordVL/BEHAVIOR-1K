@@ -163,7 +163,7 @@ def sample_kinematics(
     def _is_in_contact():
         if objA.prim_type == PrimType.RIGID:
             return RigidContactAPI.is_in_contact(
-                scene_idx=objA.scene.idx, query_set=[objA], with_set=None, ignore_set=None, current=False
+                scene_idx=objA.scene.idx, query_set=[objA], with_set=None, ignore_set=None, current_only=False
             )
         else:
             return len(objA.root_link.get_contacts()) > 0

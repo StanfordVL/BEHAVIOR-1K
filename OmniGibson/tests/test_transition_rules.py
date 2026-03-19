@@ -292,8 +292,6 @@ def test_dicing_rule_uncooked(env):
     for obj in deleted_objs:
         assert env.scene.object_registry("name", obj.name) is None
 
-    og.sim.save_contact_debug_plot()
-
     # Move the knife away so that it doesn't immediately dice the half_apple again once it's imported back
     table_knife.set_position_orientation(
         position=[-0.05, 0.0, 1.15], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))

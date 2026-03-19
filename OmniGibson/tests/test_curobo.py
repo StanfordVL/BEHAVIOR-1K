@@ -343,7 +343,7 @@ def test_curobo():
             obj_contact_pairs = set()
 
             for body0, body1 in RigidContactAPI.get_contact_pairs(
-                env.scene.idx, set(robot.links.values()), with_set=None, current=False
+                env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
             ):
                 assert body0 in robot.link_prim_paths
                 if body1 in robot.link_prim_paths:
@@ -458,7 +458,7 @@ def test_curobo():
                         robot.keep_still()
                         og.sim.step()
                         for body0, body1 in RigidContactAPI.get_contact_pairs(
-                            env.scene.idx, set(robot.links.values()), with_set=None, current=False
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
                         ):
                             assert body0 in robot.link_prim_paths
                             if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
@@ -473,7 +473,7 @@ def test_curobo():
                         env.step(action)
 
                         for body0, body1 in RigidContactAPI.get_contact_pairs(
-                            env.scene.idx, set(robot.links.values()), with_set=None, current=False
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
                         ):
                             assert body0 in robot.link_prim_paths
                             if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:

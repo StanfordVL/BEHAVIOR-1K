@@ -2082,7 +2082,7 @@ class Robot(USDObject, GymObservable):
                     query_set=finger_links,
                     with_set=[candidate_obj],
                     ignore_set=None,
-                    current=False,
+                    current_only=False,
                 ):
                     is_grasping = IsGraspingState.FALSE
         return is_grasping
@@ -2114,7 +2114,7 @@ class Robot(USDObject, GymObservable):
         raw_contact_data = {
             (link_contact, other_contact)
             for link_contact, other_contact in RigidContactAPI.get_contact_pairs(
-                scene_idx=self.scene.idx, query_set=finger_paths, with_set=None, current=False
+                scene_idx=self.scene.idx, query_set=finger_paths, with_set=None, current_only=False
             )
             if other_contact not in link_paths
         }

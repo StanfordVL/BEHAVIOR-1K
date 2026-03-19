@@ -130,7 +130,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 if obj.scene != scene:
                     continue
                 if RigidContactAPI.is_in_contact(
-                    scene.idx, link_paths, with_set=sliceable_prim_paths, ignore_set=None, current=False
+                    scene.idx, link_paths, with_set=sliceable_prim_paths, ignore_set=None, current_only=False
                 ):
                     currently_touching[i] = True
 

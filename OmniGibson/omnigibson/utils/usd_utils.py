@@ -398,6 +398,8 @@ class RigidContactAPIImpl:
         individual physics step. The accumulated data is later processed in bulk by
         update_contact_cache.
         """
+        assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
+
         for scene_idx in list(self._CONTACT_VIEW.keys()):
             try:
                 impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
@@ -580,23 +582,24 @@ class RigidContactAPIImpl:
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
         return th.tensor([self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths])
 
-    def get_contact_pairs(self, scene_idx, query_set, with_set, current):
+    def get_contact_pairs(self, scene_idx, query_set, with_set, current_only):
         """
         Get pairs of prim paths that are in contact.
 
         Args:
             scene_idx (int): Scene index to get the contact pairs for.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact.
-            current (bool): If True, only checks the most recent physics step. If False (default),
-                checks whether contact occurred at any point during the last N physics steps.
+            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check. Must be specified.
+            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact. Can be None to check for contact with any object.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             set of tuples: Set of tuples of (query_prim_path, filter_prim_path) pairs that are in contact.
         """
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return set()
-        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current else self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         assert contact_matrix.ndim == 2, f"Contact matrix should be 2D, found shape {contact_matrix.shape}"
 
         # Get the row indices corresponding to the sensor prim paths
@@ -624,17 +627,18 @@ class RigidContactAPIImpl:
             for row, col in original_indices
         }
 
-    def is_in_contact(self, scene_idx, query_set, with_set, ignore_set, current):
+    def is_in_contact(self, scene_idx, query_set, with_set, ignore_set, current_only):
         """
         Check if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set.
 
         Args:
             scene_idx (int): Scene index to check for contact.
             query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact with.
-            ignore_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to ignore contact with.
-            current (bool): If True, only checks the most recent physics step. If False (default),
-                checks whether contact occurred at any point during the last N physics steps.
+            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact with. Can be None to check for contact with any object.
+            ignore_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to ignore contact with. Can be None to not ignore any objects.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             bool: True if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set, else False.
@@ -645,7 +649,7 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return False
 
-        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current else self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         rows = self.get_contact_row_indices(scene_idx, query_set)
         if with_set is not None:
             cols = self.get_contact_col_indices(scene_idx, with_set)
@@ -694,7 +698,7 @@ class RigidContactAPIImpl:
         mask[idxs] = True
         return mask
 
-    def is_in_contact_batch(self, scene_idx, query_masks, with_masks, ignore_masks, current):
+    def is_in_contact_batch(self, scene_idx, query_masks, with_masks, ignore_masks, current_only):
         """
         Batch contact check for N queries, fully tensorized.
 
@@ -714,11 +718,12 @@ class RigidContactAPIImpl:
             query_masks (th.Tensor): ``(N, R)`` boolean tensor. ``query_masks[i, j]`` is True
                 if contact-matrix row ``j`` belongs to query set ``i``.
             with_masks (th.Tensor or None): ``(N, C)`` boolean tensor. ``with_masks[i, j]`` is
-                True if contact-matrix column ``j`` belongs to the with-set for query ``i``.
+                True if contact-matrix column ``j`` belongs to the with-set for query ``i``. Can be None to check for contact with any object.
             ignore_masks (th.Tensor or None): ``(N, C)`` boolean tensor. ``ignore_masks[i, j]``
-                is True if contact-matrix column ``j`` should be *ignored* for query ``i``.
-            current (bool): If True, only checks the most recent physics step. If False (default),
-                checks whether contact occurred at any point during the last N physics steps.
+                is True if contact-matrix column ``j`` should be *ignored* for query ``i``. Can be None to not ignore any objects.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             th.Tensor: ``(N,)`` boolean tensor of contact results.
@@ -728,7 +733,7 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
             return th.zeros(query_masks.shape[0], dtype=th.bool)
 
-        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current else self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
 
         # query_contacts[i, c] = True iff any row in query set i is in contact with column c.
         # We use float matmul for speed: (N, R) @ (R, C) -> (N, C), then threshold.
