@@ -22,12 +22,16 @@ env = None
 
 def og_test(func):
     def wrapper():
+        global env
         assert_test_env()
         try:
             func(env)
         finally:
             og.sim.step()  # Make sure any objects that need to be initialized are initialized
-            env.scene.reset()
+            try:
+                env.scene.reset()
+            except AssertionError:
+                env = None
 
     return wrapper
 

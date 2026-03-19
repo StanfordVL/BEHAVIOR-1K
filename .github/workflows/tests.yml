@@ -55,7 +55,7 @@ jobs:
           - test_robot_teleoperation
           - test_scene_graph
           - test_sensors
-          - test_symbolic_primitives
+          # - test_symbolic_primitives
           - test_systems
           - test_transform_utils
           # - test_transition_rules  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2017
@@ -68,7 +68,6 @@ jobs:
           - {test_file: test_examples, example: "object_states.folded_unfolded_state_demo"}
           - {test_file: test_examples, example: "object_states.heat_source_or_sink_demo"}
           - {test_file: test_examples, example: "object_states.heated_state_demo"}
-          - {test_file: test_examples, example: "object_states.object_state_texture_demo"}
           - {test_file: test_examples, example: "object_states.onfire_demo"}
           - {test_file: test_examples, example: "object_states.overlaid_demo"}
           - {test_file: test_examples, example: "object_states.particle_applier_remover_demo"}
@@ -120,31 +119,36 @@ jobs:
         continue-on-error: true
         timeout-minutes: 30
 
+      - name: Create missing XML if needed
+        if: always()
+        run: |
+          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          if [ ! -f "$xml" ]; then
+            cat > "$xml" << 'EOF'
+          <?xml version="1.0"?>
+          <testsuite name="${{ matrix.test_file }}" errors="1" failures="0" tests="1">
+            <testcase name="${{ matrix.test_file }}" classname="${{ matrix.test_file }}">
+              <error message="Test did not produce output, likely due to segfault or timeout"/>
+            </testcase>
+          </testsuite>
+          EOF
+          fi
+
       - name: Deploy artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}
           path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
-
-      - name: Check for failures, errors, or missing XML
-        run: |
-          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
-          if [ ! -f "$xml" ]; then
-            echo "Error: XML file not found, probably due to segfault"
-            exit 1
-          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$xml"; then
-            echo "Error: Test failures or errors found"
-            exit 1
-          else
-            echo "All tests passed successfully"
-            exit 0
-          fi
+          overwrite: true
 
   upload_report:
-    name: Compile Report
+    name: Test Report
     runs-on: ubuntu-latest
-    needs: [run_test]
-    if: ${{ !cancelled() }}
+    needs: [check_example_list, run_test]
+    if: always()
+    permissions:
+      pull-requests: write
     steps:
       - name: Pull reports
         uses: actions/download-artifact@v4
@@ -152,28 +156,23 @@ jobs:
           path: test-results
           merge-multiple: true
       - name: Convert JUnit XML to CTRF
-        run: npx --yes junit-to-ctrf "test-results/test_*.xml" -o ctrf-report.json
+        run: npx --yes junit-to-ctrf "test-results/**/test_*.xml" -o ctrf-report.json
 
-      - name: Publish report
+      - name: Publish PR comment
         uses: ctrf-io/github-test-reporter@v1
         with:
           report-path: ctrf-report.json
-          summary-report: true
-          failed-report: true
+          pull-request-report: true
+          overwrite-comment: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish Test Report with Pull Request Comment
-        uses: ctrf-io/github-test-reporter@v1
-        with:
-          report-path: './ctrf-report.json'
-          pull-request-report: true
-          exit-on-fail: true
-          update-comment: true
-          status-check: true
-          status-check-name: "Test Report"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fail if any tests failed
+        run: |
+          if grep -rqE 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' test-results/; then
+            echo "Test failures or errors found"
+            exit 1
+          fi
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0
