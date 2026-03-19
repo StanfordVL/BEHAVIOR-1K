@@ -145,7 +145,6 @@ jobs:
     needs: [run_test]
     if: ${{ !cancelled() }}
     permissions:
-      checks: write
       pull-requests: write
     steps:
       - name: Pull reports
@@ -156,18 +155,26 @@ jobs:
       - name: Convert JUnit XML to CTRF
         run: npx --yes junit-to-ctrf "test-results/**/test_*.xml" -o ctrf-report.json
 
-      - name: Publish Test Report
+      - name: Publish PR comment
         if: ${{ !cancelled() }}
         uses: ctrf-io/github-test-reporter@v1
         with:
           report-path: ctrf-report.json
           pull-request-report: true
-          exit-on-fail: true
           overwrite-comment: true
-          status-check: true
-          status-check-name: "Test Report"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tests_pass:
+    name: Test Report
+    runs-on: ubuntu-latest
+    needs: [check_example_list, run_test]
+    if: always()
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            exit 1
+          fi
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0
