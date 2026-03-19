@@ -473,7 +473,9 @@ class RigidContactAPIImpl:
             pos_changed = th.any(
                 th.abs(extended_transforms[1:, :, :3] - extended_transforms[:-1, :, :3]) > self._POS_EPS, dim=-1
             )  # (N, num_bodies)
-            quat_dot = th.sum(extended_transforms[1:, :, 3:7] * extended_transforms[:-1, :, 3:7], dim=-1)  # (N, num_bodies)
+            quat_dot = th.sum(
+                extended_transforms[1:, :, 3:7] * extended_transforms[:-1, :, 3:7], dim=-1
+            )  # (N, num_bodies)
             ori_changed = th.abs(quat_dot) < (1.0 - self._ORI_EPS)  # (N, num_bodies)
             per_step_awake = pos_changed | ori_changed  # (N, num_bodies)
 
