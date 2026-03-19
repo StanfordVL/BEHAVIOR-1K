@@ -232,6 +232,7 @@ class RigidContactAPIImpl:
         # collected between consecutive update_contact_cache calls.
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
+        self._PENDING_NET_FORCES = dict()
 
         # Position / orientation tolerances for deciding whether a pair should be updated
         self._POS_EPS = 1e-6
@@ -364,6 +365,7 @@ class RigidContactAPIImpl:
                 # Initialize pending accumulation lists for this scene
                 self._PENDING_IMPULSES[scene_idx] = []
                 self._PENDING_TRANSFORMS[scene_idx] = []
+                self._PENDING_NET_FORCES[scene_idx] = []
 
                 old_matrix = prev_contact_matrix.get(scene_idx)
                 old_current_matrix = prev_current_contact_matrix.get(scene_idx)
@@ -399,6 +401,7 @@ class RigidContactAPIImpl:
         for scene_idx in list(self._CONTACT_VIEW.keys()):
             try:
                 impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
+                net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt())
             except Exception:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
@@ -410,58 +413,104 @@ class RigidContactAPIImpl:
             if scene_idx not in self._PENDING_IMPULSES:
                 self._PENDING_IMPULSES[scene_idx] = []
                 self._PENDING_TRANSFORMS[scene_idx] = []
+                self._PENDING_NET_FORCES[scene_idx] = []
             self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
             self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
+            self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
 
     def update_contact_cache(self):
         """
         Processes all accumulated physics-step data (collected via add_contacts_from_physics_step)
         to update both the "recent" contact matrix (any contact in the last N steps) and the
         "current" contact matrix (contact at only the most recent step).
-        """       
+
+        Awakeness is evaluated per individual physics step by prepending the previously cached
+        transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
+        force are also treated as awake.  Contact matrices are only updated from awake steps.
+        """
         for scene_idx in list(self._CONTACT_VIEW.keys()):
             pending_impulses = self._PENDING_IMPULSES[scene_idx]
             pending_transforms = self._PENDING_TRANSFORMS[scene_idx]
+            pending_net_forces = self._PENDING_NET_FORCES[scene_idx]
             assert len(pending_impulses) == len(pending_transforms), "Number of impulses and transforms must match"
+            assert len(pending_impulses) == len(pending_net_forces), "Number of impulses and net forces must match"
             if len(pending_impulses) == 0:
                 continue
+
+            N = len(pending_impulses)
 
             # Stack accumulated data: (N, R, C, 3) and (N, num_bodies, 7)
             all_impulses = th.stack(pending_impulses, dim=0)
             all_transforms = th.stack(pending_transforms, dim=0)
+            all_net_forces = th.stack(pending_net_forces, dim=0)
 
-            latest_transforms = all_transforms[-1]
             prev_transforms = self._BODY_TRANSFORMS[scene_idx]
 
-            # Find the indices of the rigid body rows that are awake
-            pos_changed = th.any(th.abs(latest_transforms[:, :3] - prev_transforms[:, :3]) > self._POS_EPS, dim=1)
-            ori_changed = th.abs(th.sum(latest_transforms[:, 3:7] * prev_transforms[:, 3:7], dim=1)) < (1.0 - self._ORI_EPS)
-            awake = pos_changed | ori_changed
+            # -- Per-step awakeness via consecutive transform diffs --
+            # Prepend cached transforms so diff[i] = transforms[i] - transforms[i-1]
+            extended = th.cat([prev_transforms.unsqueeze(0), all_transforms], dim=0)  # (N+1, num_bodies, 7)
 
-            # For each row index and column index in the contact matrix, check if the rigid body has moved
-            did_row_change = awake[self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]]
-            did_col_change = th.zeros(len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]), dtype=th.bool)
+            pos_changed = th.any(
+                th.abs(extended[1:, :, :3] - extended[:-1, :, :3]) > self._POS_EPS, dim=-1
+            )  # (N, num_bodies)
+            quat_dot = th.sum(extended[1:, :, 3:7] * extended[:-1, :, 3:7], dim=-1)  # (N, num_bodies)
+            ori_changed = th.abs(quat_dot) < (1.0 - self._ORI_EPS)  # (N, num_bodies)
+
+            per_step_awake = pos_changed | ori_changed  # (N, num_bodies)
+
+            # Other than the position change, we also know that an object cannot be asleep if the net contact force is nonzero.
+            row_to_rigid = self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]
+            net_force_awake = th.any(all_net_forces != 0, dim=-1)  # (N, R)
+            per_step_awake[:, row_to_rigid] = per_step_awake[:, row_to_rigid] | net_force_awake
+
+            # What is the last step that the body was awake?
+            body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
+            last_awake_body_step = th.where(
+                per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)
+            ).max(dim=0).values  # (num_bodies,)
+            awake = last_awake_body_step >= 0  # (num_bodies,)
+
+            # -- Per-step pair awakeness: (N, R, C) --
+            per_step_row_awake = per_step_awake[:, row_to_rigid]  # (N, R)
+
+            col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
             valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
-            valid_col_rows = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx][valid_col_mask]
-            did_col_change[valid_col_mask] = awake[valid_col_rows]
+            per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
+            per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
-            awake_pairs = did_row_change[:, None] | did_col_change[None, :]
+            per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
 
-            # "Current" contact matrix: only the most recent physics step's impulses
-            latest_impulses = all_impulses[-1]
-            self._CURRENT_CONTACT_MATRIX[scene_idx][awake_pairs] = th.any(latest_impulses[awake_pairs] != 0, dim=-1)
+            # What is the last step that the pair was awake?
+            pair_step_indices = th.arange(N, dtype=th.long).reshape(N, 1, 1).expand_as(per_step_awake_pairs)
+            last_awake_pair_step = th.where(
+                per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)
+            ).max(dim=0).values  # (R, C)
+            pair_was_awake = last_awake_pair_step >= 0  # (R, C)
 
-            # "Recent" contact matrix: any contact across all accumulated steps
+            # "Current" contact matrix: impulses from the last awake step per pair.
+            # Pairs that were never awake retain their previous value.
+            awake_rc = th.where(pair_was_awake)
+            awake_pair_steps = last_awake_pair_step[pair_was_awake]
+            last_awake_impulses = all_impulses[awake_pair_steps, awake_rc[0], awake_rc[1]]  # (num_awake, 3)
+            self._CURRENT_CONTACT_MATRIX[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
+
+            # "Recent" contact matrix: any contact across awake steps for awake pairs,
+            # or the (now-updated) current contact value for non-awake pairs.
             any_contact_per_step = th.any(all_impulses != 0, dim=-1)  # (N, R, C)
-            any_contact_any_step = th.any(any_contact_per_step, dim=0)  # (R, C)
-            self._CONTACT_MATRIX[scene_idx][awake_pairs] = any_contact_any_step[awake_pairs]
+            any_awake_contact = th.any(any_contact_per_step & per_step_awake_pairs, dim=0)  # (R, C)
+            self._CONTACT_MATRIX[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
+            self._CONTACT_MATRIX[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX[scene_idx][~pair_was_awake]
 
-            # Update body transforms only for awake bodies to prevent error accumulation
-            self._BODY_TRANSFORMS[scene_idx][awake] = latest_transforms[awake]
+            # Update body transforms from each body's last awake step
+            awake_body_indices = th.where(awake)[0]
+            self._BODY_TRANSFORMS[scene_idx][awake_body_indices] = all_transforms[
+                last_awake_body_step[awake_body_indices], awake_body_indices
+            ]
 
             # Clear pending data for this scene
             self._PENDING_IMPULSES[scene_idx] = []
             self._PENDING_TRANSFORMS[scene_idx] = []
+            self._PENDING_NET_FORCES[scene_idx] = []
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
@@ -711,6 +760,7 @@ class RigidContactAPIImpl:
         self._BODY_TRANSFORMS = dict()
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
+        self._PENDING_NET_FORCES = dict()
 
 
 # Instantiate the RigidContactAPI
