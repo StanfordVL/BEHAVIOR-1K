@@ -119,31 +119,34 @@ jobs:
         continue-on-error: true
         timeout-minutes: 30
 
+      - name: Create missing XML if needed
+        if: always()
+        run: |
+          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          if [ ! -f "$xml" ]; then
+            cat > "$xml" << 'EOF'
+          <?xml version="1.0"?>
+          <testsuite name="${{ matrix.test_file }}" errors="1" failures="0" tests="1">
+            <testcase name="${{ matrix.test_file }}" classname="${{ matrix.test_file }}">
+              <error message="Test did not produce output, likely due to segfault or timeout"/>
+            </testcase>
+          </testsuite>
+          EOF
+          fi
+
       - name: Deploy artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}
           path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
-
-      - name: Check for failures, errors, or missing XML
-        run: |
-          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
-          if [ ! -f "$xml" ]; then
-            echo "Error: XML file not found, probably due to segfault"
-            exit 1
-          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$xml"; then
-            echo "Error: Test failures or errors found"
-            exit 1
-          else
-            echo "All tests passed successfully"
-            exit 0
-          fi
+          overwrite: true
 
   upload_report:
-    name: Compile Report
+    name: Test Report
     runs-on: ubuntu-latest
-    needs: [run_test]
-    if: ${{ !cancelled() }}
+    needs: [check_example_list, run_test]
+    if: always()
     permissions:
       pull-requests: write
     steps:
@@ -156,7 +159,6 @@ jobs:
         run: npx --yes junit-to-ctrf "test-results/**/test_*.xml" -o ctrf-report.json
 
       - name: Publish PR comment
-        if: ${{ !cancelled() }}
         uses: ctrf-io/github-test-reporter@v1
         with:
           report-path: ctrf-report.json
@@ -165,14 +167,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  tests_pass:
-    name: Test Report
-    runs-on: ubuntu-latest
-    needs: [check_example_list, run_test]
-    if: always()
-    steps:
-      - run: |
-          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+      - name: Fail if any tests failed
+        run: |
+          if grep -rqE 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' test-results/; then
+            echo "Test failures or errors found"
             exit 1
           fi
 
