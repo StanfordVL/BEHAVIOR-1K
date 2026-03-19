@@ -154,18 +154,10 @@ jobs:
           path: test-results
           merge-multiple: true
       - name: Convert JUnit XML to CTRF
-        run: npx --yes junit-to-ctrf "test-results/test_*.xml" -o ctrf-report.json
+        run: npx --yes junit-to-ctrf "test-results/**/test_*.xml" -o ctrf-report.json
 
-      - name: Publish report
-        uses: ctrf-io/github-test-reporter@v1
-        with:
-          report-path: ctrf-report.json
-          summary-report: true
-          failed-report: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish Test Report with Pull Request Comment
+      - name: Publish Test Report
+        if: ${{ !cancelled() }}
         uses: ctrf-io/github-test-reporter@v1
         with:
           report-path: ctrf-report.json
