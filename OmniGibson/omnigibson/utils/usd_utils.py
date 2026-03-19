@@ -190,8 +190,14 @@ class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator.
 
-    Contact information is cached per-physics-step and only updated for body pairs whose relative positions change.
-    This allows contact checks to persist for sleeping rigid body pairs.
+    This API checks for contacts on every physics step, and then aggregates this into a boolean contact matrix
+    on every non-physics step. Callers can then use this API to query either for contacts that are still ongoing,
+    or contacts that occurred at any point since the last non-physics step (e.g. for checking for contact events).
+    Contact information is cached per-physics-step and only updated for body pairs who have at least one side
+    not asleep, which allows this API to bypass the limitations of the view (which returns contacts only for awake bodies).
+
+    Since there is no direct tensorized way to check for object sleep state, this API approximates this by checking for
+    the net contact force on an object (only reported for awake bodies) and also the position change since the last step.
     """
 
     def __init__(self):
@@ -363,10 +369,15 @@ class RigidContactAPIImpl:
                 self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
 
                 # Initialize pending accumulation lists for this scene
+                # Note that existing data in these lists will be lost when the view is rebuilt.
+                # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
+                # This TODO can be accomplished after the follow-up PR removes RigidContactAPI use in assisted grasping.
                 self._PENDING_IMPULSES[scene_idx] = []
                 self._PENDING_TRANSFORMS[scene_idx] = []
                 self._PENDING_NET_FORCES[scene_idx] = []
 
+                # Finally, remap data from the old matrices into the new ones. This lets us avoid losing our
+                # cached data when new bodies are added or removed.
                 old_matrix = prev_contact_matrix.get(scene_idx)
                 old_current_matrix = prev_current_contact_matrix.get(scene_idx)
                 old_row_map = prev_path_to_row_idx.get(scene_idx)
@@ -402,6 +413,7 @@ class RigidContactAPIImpl:
 
         for scene_idx in list(self._CONTACT_VIEW.keys()):
             try:
+                # Get the contact impulse and net force matrices for this scene
                 impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
                 net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt())
             except Exception:
@@ -411,7 +423,12 @@ class RigidContactAPIImpl:
                     "a scene for the first time."
                 )
                 continue
+
+            # Get the body transforms for this scene
             transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
+
+            # Append the data to the pending lists. Note that we have to clone these matrices because
+            # the view actually reuses the buffer.
             if scene_idx not in self._PENDING_IMPULSES:
                 self._PENDING_IMPULSES[scene_idx] = []
                 self._PENDING_TRANSFORMS[scene_idx] = []
@@ -431,33 +448,33 @@ class RigidContactAPIImpl:
         force are also treated as awake.  Contact matrices are only updated from awake steps.
         """
         for scene_idx in list(self._CONTACT_VIEW.keys()):
+            # Get the pending data for this scene
             pending_impulses = self._PENDING_IMPULSES[scene_idx]
             pending_transforms = self._PENDING_TRANSFORMS[scene_idx]
             pending_net_forces = self._PENDING_NET_FORCES[scene_idx]
             assert len(pending_impulses) == len(pending_transforms), "Number of impulses and transforms must match"
             assert len(pending_impulses) == len(pending_net_forces), "Number of impulses and net forces must match"
-            if len(pending_impulses) == 0:
+            N = len(pending_impulses)
+            if N == 0:
                 continue
 
-            N = len(pending_impulses)
-
-            # Stack accumulated data: (N, R, C, 3) and (N, num_bodies, 7)
+            # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
             all_impulses = th.stack(pending_impulses, dim=0)
             all_transforms = th.stack(pending_transforms, dim=0)
             all_net_forces = th.stack(pending_net_forces, dim=0)
 
+            # Get the previous body transforms for the cache
             prev_transforms = self._BODY_TRANSFORMS[scene_idx]
 
-            # -- Per-step awakeness via consecutive transform diffs --
-            # Prepend cached transforms so diff[i] = transforms[i] - transforms[i-1]
-            extended = th.cat([prev_transforms.unsqueeze(0), all_transforms], dim=0)  # (N+1, num_bodies, 7)
-
+            # Apply the position-based sleep state approximation. Here we compute the delta between
+            # each physics step's transform with the previous physics step's transform (using the cached transform
+            # for the first physics step).
+            extended_transforms = th.cat([prev_transforms.unsqueeze(0), all_transforms], dim=0)  # (N+1, num_bodies, 7)
             pos_changed = th.any(
-                th.abs(extended[1:, :, :3] - extended[:-1, :, :3]) > self._POS_EPS, dim=-1
+                th.abs(extended_transforms[1:, :, :3] - extended_transforms[:-1, :, :3]) > self._POS_EPS, dim=-1
             )  # (N, num_bodies)
-            quat_dot = th.sum(extended[1:, :, 3:7] * extended[:-1, :, 3:7], dim=-1)  # (N, num_bodies)
+            quat_dot = th.sum(extended_transforms[1:, :, 3:7] * extended_transforms[:-1, :, 3:7], dim=-1)  # (N, num_bodies)
             ori_changed = th.abs(quat_dot) < (1.0 - self._ORI_EPS)  # (N, num_bodies)
-
             per_step_awake = pos_changed | ori_changed  # (N, num_bodies)
 
             # Other than the position change, we also know that an object cannot be asleep if the net contact force is nonzero.
@@ -465,21 +482,23 @@ class RigidContactAPIImpl:
             net_force_awake = th.any(all_net_forces != 0, dim=-1)  # (N, R)
             per_step_awake[:, row_to_rigid] = per_step_awake[:, row_to_rigid] | net_force_awake
 
-            # What is the last step that the body was awake?
+            # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
+            # data for all the indices where the object is not asleep.
             body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
             last_awake_body_step = (
                 th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
             )  # (num_bodies,)
-            awake = last_awake_body_step >= 0  # (num_bodies,)
 
-            # -- Per-step pair awakeness: (N, R, C) --
+            # For each step, compute the rows that are awake
             per_step_row_awake = per_step_awake[:, row_to_rigid]  # (N, R)
 
+            # For each step, compute the columns that are awake
             col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
             valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
             per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
             per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
+            # For each step, compute the pairs that are awake. This is an outer-OR of the row and column awake masks.
             per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
 
             # What is the last step that the pair was awake?
@@ -504,7 +523,7 @@ class RigidContactAPIImpl:
             self._CONTACT_MATRIX[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX[scene_idx][~pair_was_awake]
 
             # Update body transforms from each body's last awake step
-            awake_body_indices = th.where(awake)[0]
+            awake_body_indices = th.where(last_awake_body_step >= 0)[0]
             self._BODY_TRANSFORMS[scene_idx][awake_body_indices] = all_transforms[
                 last_awake_body_step[awake_body_indices], awake_body_indices
             ]
