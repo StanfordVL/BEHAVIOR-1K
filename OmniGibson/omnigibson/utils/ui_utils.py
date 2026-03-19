@@ -305,8 +305,10 @@ def choose_from_options(options, name, random_selection=False, selected_option=N
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
         if "pytest" in sys.modules:
-            random.seed(0)
-        k = random.choice(range(len(options)))
+            local_rng = random.Random(0)
+            k = local_rng.choice(range(len(options)))
+        else:
+            k = random.choice(range(len(options)))
         print("Choosing {}: {} randomly".format(k, list(options)[k]))
 
     # Return requested option
