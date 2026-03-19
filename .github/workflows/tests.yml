@@ -55,10 +55,10 @@ jobs:
           - test_robot_teleoperation
           - test_scene_graph
           - test_sensors
-          # - test_symbolic_primitives
+          - test_symbolic_primitives
           - test_systems
           - test_transform_utils
-          # - test_transition_rules  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2017
+          - test_transition_rules
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}

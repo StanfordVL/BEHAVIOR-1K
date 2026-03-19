@@ -229,7 +229,6 @@ def test_touching(env):
         bowl.states[Touching].set_value(breakfast_table, None)
 
 
-@pytest.mark.skip(reason="flaky due to rigid contact body issues")
 @og_test
 def test_rigid_contact_bodies(env):
     from omnigibson.utils.usd_utils import RigidContactAPI
