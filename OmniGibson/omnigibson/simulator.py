@@ -1248,9 +1248,7 @@ def _launch_simulator(*args, **kwargs):
             self._report_step_exceptions()
 
             # Accumulate contact data from this physics step and then flush to cache.
-            # We normally accumulate in _on_post_physics_step and flush in _non_physics_step,
-            # but step_physics bypasses those callbacks so we do both here.
-            RigidContactAPI.add_contacts_from_physics_step()
+            # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
             RigidContactAPI.update_contact_cache()
 
         @with_profiler(name="_pre_physics_step_profiler")
