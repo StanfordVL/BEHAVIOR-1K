@@ -303,19 +303,25 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
             if self._motor_type == "position":
                 base_value = all_joint_positions[:, self.dof_idx]
-                vel_base = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][:, self.dof_idx]
+                vel_base = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[
+                    rows, :
+                ][:, self.dof_idx]
                 position_error = target - base_value
                 vel_pos_error = -vel_base
                 u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
-                base_value = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][:, self.dof_idx]
+                base_value = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[
+                    rows, :
+                ][:, self.dof_idx]
                 velocity_error = target - base_value
                 u = velocity_error * self.vel_kp
             else:  # effort
                 u = target
 
             # Apply impedances via mass matrix (batched over all N members)
-            all_mm = ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)[rows, :, :] # (N, n_dof_total, n_dof_total)
+            all_mm = ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)[
+                rows, :, :
+            ]  # (N, n_dof_total, n_dof_total)
 
             # Compute offset between generalized DoFs and actuated joint DoFs (handles floating-base robots).
             base_dof_offset = all_mm.shape[-1] - all_joint_positions.shape[-1]
@@ -327,14 +333,20 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             u = cb.get_custom_method("compute_joint_torques_batch")(u, all_mm, dof_idx_arr)  # (N, control_dim)
 
             if self._use_gravity_compensation:
-                u = u + ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)[rows, :][
+                u = (
+                    u
+                    + ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)[rows, :][
                         :, effective_dof_idx
                     ]
+                )
 
             if self._use_cc_compensation:
-                u = u + ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)[
+                u = (
+                    u
+                    + ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)[
                         rows, :
                     ][:, effective_dof_idx]
+                )
 
         else:
             u = target

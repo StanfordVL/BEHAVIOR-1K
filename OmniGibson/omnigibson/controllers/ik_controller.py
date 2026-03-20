@@ -153,12 +153,8 @@ class InverseKinematicsController(JointController, ManipulationController):
                         cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
                     ]
                 else:
-                    command_input_limits[0][3:] = cb.full(
-                        (len(command_input_limits[0][3:]),), -math.pi
-                    )
-                    command_input_limits[1][3:] = cb.full(
-                        (len(command_input_limits[1][3:]),), math.pi
-                    )
+                    command_input_limits[0][3:] = cb.full((len(command_input_limits[0][3:]),), -math.pi)
+                    command_input_limits[1][3:] = cb.full((len(command_input_limits[1][3:]),), math.pi)
             if command_output_limits is not None:
                 if not isinstance(command_output_limits, str) and isinstance(command_output_limits, Iterable):
                     command_output_limits = [
@@ -171,12 +167,8 @@ class InverseKinematicsController(JointController, ManipulationController):
                         cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
                     ]
                 else:
-                    command_output_limits[0][3:] = cb.full(
-                        (len(command_output_limits[0][3:]),), -math.pi
-                    )
-                    command_output_limits[1][3:] = cb.full(
-                        (len(command_output_limits[1][3:]),), math.pi
-                    )
+                    command_output_limits[0][3:] = cb.full((len(command_output_limits[0][3:]),), -math.pi)
+                    command_output_limits[1][3:] = cb.full((len(command_output_limits[1][3:]),), math.pi)
         # Run super init
         super().__init__(
             control_freq=control_freq,
@@ -230,9 +222,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
             if cb.item_bool(self._goal_set[controller_idx]):
-                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(
-                    self._goals["target_ori_mat"][controller_idx]
-                )
+                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(self._goals["target_ori_mat"][controller_idx])
             else:
                 self._fixed_quat_targets[controller_idx] = None
 

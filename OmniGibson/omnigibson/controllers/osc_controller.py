@@ -174,11 +174,7 @@ class OperationalSpaceController(ManipulationController):
         # Store gains for direct use in the solver
         self.kp = self.nums2array(nums=kp, dim=6) if kp is not None else None
         self.damping_ratio = damping_ratio
-        self.kp_null = (
-            self.nums2array(nums=kp_null, dim=control_dim)
-            if kp_null is not None
-            else None
-        )
+        self.kp_null = self.nums2array(nums=kp_null, dim=control_dim) if kp_null is not None else None
         self.kd_null = 2 * cb.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
         self.kp_limits = cb.array(list(kp_limits))
         self.damping_ratio_limits = cb.array(list(damping_ratio_limits))
@@ -318,9 +314,7 @@ class OperationalSpaceController(ManipulationController):
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
             if cb.item_bool(self._goal_set[controller_idx]):
-                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(
-                    self._goals["target_ori_mat"][controller_idx]
-                )
+                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(self._goals["target_ori_mat"][controller_idx])
 
     def _clear_variable_gains(self):
         """
@@ -438,7 +432,7 @@ class OperationalSpaceController(ManipulationController):
         q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
         qd_all = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
             :, self.dof_idx
-        ] # (N, ctrl_dim)
+        ]  # (N, ctrl_dim)
 
         # Batched mass matrix: slice to (N, ctrl_dim, ctrl_dim)
         all_mm_full = ControllableObjectViewAPI.get_all_generalized_mass_matrices(
@@ -448,9 +442,7 @@ class OperationalSpaceController(ManipulationController):
         mm_dof_idx = self.dof_idx + mm_col_offset
         mm_dof_idx_arr = cb.int_array(mm_dof_idx)
         dof_idxs_mat = cb.meshgrid(mm_dof_idx_arr, mm_dof_idx_arr)
-        mm_all = all_mm_full[rows, :, :][
-            :, dof_idxs_mat[0], dof_idxs_mat[1]
-        ]  # (N, ctrl_dim, ctrl_dim)
+        mm_all = all_mm_full[rows, :, :][:, dof_idxs_mat[0], dof_idxs_mat[1]]  # (N, ctrl_dim, ctrl_dim)
 
         # Batched jacobians
         jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(
@@ -475,9 +467,9 @@ class OperationalSpaceController(ManipulationController):
         ee_ang_vel_all = ControllableObjectViewAPI.get_all_link_relative_angular_velocity(
             self.routing_path, link_name, estimate=True
         )[rows]  # (N, 3)
-        base_lin_vel_all = ControllableObjectViewAPI.get_all_relative_linear_velocity(
-            self.routing_path, estimate=True
-        )[rows]  # (N, 3)
+        base_lin_vel_all = ControllableObjectViewAPI.get_all_relative_linear_velocity(self.routing_path, estimate=True)[
+            rows
+        ]  # (N, 3)
         base_ang_vel_all = ControllableObjectViewAPI.get_all_relative_angular_velocity(
             self.routing_path, estimate=True
         )[rows]  # (N, 3)

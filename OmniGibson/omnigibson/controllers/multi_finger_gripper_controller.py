@@ -220,7 +220,9 @@ class MultiFingerGripperController(GripperController):
         target_batch = goals["target"]  # (N, command_dim)
 
         rows = self.view_row_indices
-        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
+        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][
+            :, self.dof_idx
+        ]  # (N, ctrl_dim)
 
         unregistered_mask = self._unregistered_controllers == 1  # (N,)
 
@@ -273,7 +275,7 @@ class MultiFingerGripperController(GripperController):
         rows = self.view_row_indices
         all_joint_vel = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
             :, self.dof_idx
-        ] # (N, ctrl_dim)
+        ]  # (N, ctrl_dim)
 
         # Update velocity history for all members
         finger_vels = self._vel_filter.estimate_batch(all_joint_vel)  # (N, ctrl_dim)

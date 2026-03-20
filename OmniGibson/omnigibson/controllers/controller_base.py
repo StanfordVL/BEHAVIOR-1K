@@ -88,7 +88,7 @@ class BaseController(Serializable, Registerable, Recreatable):
     copied into the group's batched goal buffers. Per-member ``_goal_set`` is a compute-backend **bool**
     vector (``cb.bool_zeros`` / ``cb.bool_array``). Internal goals, controls, and
     :meth:`compute_control` I/O use ``cb``. Serialized / :meth:`_dump_state` goal payloads use
-    ``cb.to_torch``; :meth:`_load_state` accepts torch tensors and ``cb.from_torch``. 
+    ``cb.to_torch``; :meth:`_load_state` accepts torch tensors and ``cb.from_torch``.
     """
 
     def __init__(
@@ -256,13 +256,9 @@ class BaseController(Serializable, Registerable, Recreatable):
             controller_idx = len(self._articulation_root_paths)
             self._articulation_root_paths.append(articulation_root_path)
             self._goal_set = cb.cat([self._goal_set, cb.bool_zeros(1)], dim=0)
-            self._control_enabled = cb.cat(
-                [self._control_enabled, cb.int_array([1 if control_enabled else 0])], dim=0
-            )
+            self._control_enabled = cb.cat([self._control_enabled, cb.int_array([1 if control_enabled else 0])], dim=0)
             self._controls = cb.cat([self._controls, cb.zeros((1, self.control_dim))], dim=0)
-            self._unregistered_controllers = cb.cat(
-                [self._unregistered_controllers, cb.int_array([0])], dim=0
-            )
+            self._unregistered_controllers = cb.cat([self._unregistered_controllers, cb.int_array([0])], dim=0)
             for key, shape in self._goal_shapes.items():
                 new_row = cb.zeros((1, *shape))
                 if key in self._goals:

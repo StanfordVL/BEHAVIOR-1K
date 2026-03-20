@@ -231,7 +231,6 @@ class ControllerView:
     def get_use_delta_commands(cls, group_key: str) -> bool:
         return cls._controller_groups[group_key].use_delta_commands
 
-
     @classmethod
     def get_controller_type_str(cls, group_key: str) -> str:
         """Python class name of the batched controller (e.g. ``JointController``), for UI / diagnostics."""

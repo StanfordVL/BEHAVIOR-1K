@@ -384,4 +384,3 @@ class UniformSubsampler(Subsampler):
             self.counter = 0
             return observation
         return None
-
