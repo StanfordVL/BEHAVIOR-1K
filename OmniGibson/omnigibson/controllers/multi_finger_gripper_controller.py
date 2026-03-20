@@ -215,40 +215,40 @@ class MultiFingerGripperController(GripperController):
                     target: (N, command_dim) desired gripper target
 
         Returns:
-            Tensor: (N, control_dim) outputted (non-clipped!) control signal to deploy
+            Array: (N, control_dim) outputted (non-clipped!) control signal to deploy
         """
         target_batch = goals["target"]  # (N, command_dim)
 
         rows = self.view_row_indices
-        all_joint_pos = cb.to_torch(
-            ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]
-        )  # (N, ctrl_dim)
+        all_joint_pos = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
 
         unregistered_mask = self._unregistered_controllers == 1  # (N,)
 
         # Choose what to do based on control mode
         if self._mode == "binary":
             should_open = target_batch[:, 0] >= 0.0 if not self._inverted else target_batch[:, 0] > 0.0  # (N,)
-            open_limit = cb.to_torch(
+            open_limit = (
                 self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
                 if self._open_qpos is None
                 else self._open_qpos
             )  # (ctrl_dim,)
-            closed_limit = cb.to_torch(
+            closed_limit = (
                 self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
                 if self._closed_qpos is None
                 else self._closed_qpos
             )  # (ctrl_dim,)
-            u = th.where(should_open.unsqueeze(1), open_limit, closed_limit)  # (N, ctrl_dim)
+            u = cb.where(should_open[:, None], open_limit, closed_limit)  # (N, ctrl_dim)
         else:
-            u = (
-                target_batch.expand(-1, self.control_dim) if target_batch.shape[1] == 1 else target_batch
-            )  # (N, ctrl_dim)
+            # Broadcast single-column target across control_dim if needed
+            if target_batch.shape[1] == 1:
+                u = target_batch * cb.ones(self.control_dim)
+            else:
+                u = target_batch  # (N, ctrl_dim)
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
         if self._motor_type in {"velocity", "torque"}:
-            pos_hi = cb.to_torch(self._control_limits[ControlType.POSITION][1][self.dof_idx])  # (ctrl_dim,)
-            pos_lo = cb.to_torch(self._control_limits[ControlType.POSITION][0][self.dof_idx])  # (ctrl_dim,)
+            pos_hi = self._control_limits[ControlType.POSITION][1][self.dof_idx]  # (ctrl_dim,)
+            pos_lo = self._control_limits[ControlType.POSITION][0][self.dof_idx]  # (ctrl_dim,)
             violate_upper_limit = all_joint_pos > pos_hi - self._limit_tolerance  # (N, ctrl_dim)
             violate_lower_limit = all_joint_pos < pos_lo + self._limit_tolerance  # (N, ctrl_dim)
             violation = (violate_upper_limit & (u > 0)) | (violate_lower_limit & (u < 0))
@@ -260,22 +260,20 @@ class MultiFingerGripperController(GripperController):
         # Zero out unregistered members
         u[unregistered_mask] = 0.0
 
-        return u  # tensor with shape (N, control_dim)
+        return u  # array with shape (N, control_dim)
 
     def _update_grasping_state(self, joint_pos, control):
         """
         Updates internal inferred grasping state for the controller at @controller_idx.
 
         Args:
-            joint_pos (Tensor): joint positions for this group's members' controlled DOFs, shape (N, ctrl_dim)
-            control (Tensor): the control signal being applied, shape (N, ctrl_dim)
+            joint_pos (Array): joint positions for this group's members' controlled DOFs, shape (N, ctrl_dim)
+            control (Array): the control signal being applied, shape (N, ctrl_dim)
         """
         rows = self.view_row_indices
-        all_joint_vel = cb.to_torch(
-            ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
-                :, self.dof_idx
-            ]
-        )  # (N, ctrl_dim)
+        all_joint_vel = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
+            :, self.dof_idx
+        ] # (N, ctrl_dim)
 
         # Update velocity history for all members
         finger_vels = self._vel_filter.estimate_batch(all_joint_vel)  # (N, ctrl_dim)
@@ -285,8 +283,8 @@ class MultiFingerGripperController(GripperController):
             is_grasping_result = [IsGraspingState.UNKNOWN] * self.n_members
 
         else:
-            #  Different values in the command for non-independent mode - cannot use heuristics
-            non_uniform_mask = ~th.all(control == control[:, :1], dim=1)  # (N,)
+            # Different values in the command for non-independent mode - cannot use heuristics
+            non_uniform_mask = ~cb.all(control == control[:, :1], 1)  # (N,)
 
             # Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the gripper
             # controller's tolerance of zero-ing out velocities, which makes the heuristics invalid.
@@ -296,16 +294,16 @@ class MultiFingerGripperController(GripperController):
             else:
                 # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
                 if self._motor_type == "position":
-                    no_move_mask = (control - joint_pos).abs().mean(dim=1) < m.POS_TOLERANCE  # (N,)
+                    no_move_mask = cb.mean(cb.abs(control - joint_pos), dim=1) < m.POS_TOLERANCE  # (N,)
                 # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
                 elif self._motor_type in {"velocity", "torque"}:
-                    no_move_mask = control.abs().mean(dim=1) < m.VEL_TOLERANCE  # (N,)
+                    no_move_mask = cb.mean(cb.abs(control), dim=1) < m.VEL_TOLERANCE  # (N,)
                 else:
-                    no_move_mask = th.zeros(self.n_members, dtype=th.bool)
+                    no_move_mask = cb.zeros(self.n_members) > 0  # all-False bool array
 
                 # Otherwise, the last control signal intends to "move" the gripper
-                min_pos = cb.to_torch(self._control_limits[ControlType.POSITION][0][self.dof_idx])  # (ctrl_dim,)
-                max_pos = cb.to_torch(self._control_limits[ControlType.POSITION][1][self.dof_idx])  # (ctrl_dim,)
+                min_pos = self._control_limits[ControlType.POSITION][0][self.dof_idx]  # (ctrl_dim,)
+                max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]  # (ctrl_dim,)
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
                 finger_pos = joint_pos.clip(min_pos, max_pos)  # (N, ctrl_dim)
                 # Check distance from both ends of the joint limits
@@ -313,12 +311,12 @@ class MultiFingerGripperController(GripperController):
                 dist_from_upper_limit = max_pos - finger_pos  # (N, ctrl_dim)
 
                 # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
-                valid_grasp_pos = (dist_from_lower_limit.mean(dim=1) > m.POS_TOLERANCE) | (
-                    dist_from_upper_limit.mean(dim=1) > m.POS_TOLERANCE
+                valid_grasp_pos = (cb.mean(dist_from_lower_limit, dim=1) > m.POS_TOLERANCE) | (
+                    cb.mean(dist_from_upper_limit, dim=1) > m.POS_TOLERANCE
                 )  # (N,)
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
-                valid_grasp_vel = th.all(finger_vels.abs() < m.VEL_TOLERANCE, dim=1)  # (N,)
+                valid_grasp_vel = cb.all(cb.abs(finger_vels) < m.VEL_TOLERANCE, 1)  # (N,)
 
                 # Then the gripper is grasping something, which stops the gripper from reaching its desired state
                 is_grasping_true = valid_grasp_pos & valid_grasp_vel  # (N,)

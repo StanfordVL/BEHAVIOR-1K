@@ -149,33 +149,33 @@ class InverseKinematicsController(JointController, ManipulationController):
             if command_input_limits is not None:
                 if type(command_input_limits) is str and command_input_limits == "default":
                     command_input_limits = [
-                        th.tensor([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi], dtype=th.float32),
-                        th.tensor([1.0, 1.0, 1.0, math.pi, math.pi, math.pi], dtype=th.float32),
+                        cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
+                        cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
                     ]
                 else:
-                    command_input_limits[0][3:] = th.full(
-                        (len(command_input_limits[0][3:]),), -math.pi, dtype=th.float32
+                    command_input_limits[0][3:] = cb.full(
+                        (len(command_input_limits[0][3:]),), -math.pi
                     )
-                    command_input_limits[1][3:] = th.full(
-                        (len(command_input_limits[1][3:]),), math.pi, dtype=th.float32
+                    command_input_limits[1][3:] = cb.full(
+                        (len(command_input_limits[1][3:]),), math.pi
                     )
             if command_output_limits is not None:
                 if not isinstance(command_output_limits, str) and isinstance(command_output_limits, Iterable):
                     command_output_limits = [
-                        th.tensor(list(command_output_limits[0]), dtype=th.float32),
-                        th.tensor(list(command_output_limits[1]), dtype=th.float32),
+                        cb.array(list(command_output_limits[0])),
+                        cb.array(list(command_output_limits[1])),
                     ]
                 if type(command_output_limits) is str and command_output_limits == "default":
                     command_output_limits = [
-                        th.tensor([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi], dtype=th.float32),
-                        th.tensor([1.0, 1.0, 1.0, math.pi, math.pi, math.pi], dtype=th.float32),
+                        cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
+                        cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
                     ]
                 else:
-                    command_output_limits[0][3:] = th.full(
-                        (len(command_output_limits[0][3:]),), -math.pi, dtype=th.float32
+                    command_output_limits[0][3:] = cb.full(
+                        (len(command_output_limits[0][3:]),), -math.pi
                     )
-                    command_output_limits[1][3:] = th.full(
-                        (len(command_output_limits[1][3:]),), math.pi, dtype=th.float32
+                    command_output_limits[1][3:] = cb.full(
+                        (len(command_output_limits[1][3:]),), math.pi
                     )
         # Run super init
         super().__init__(
@@ -194,9 +194,9 @@ class InverseKinematicsController(JointController, ManipulationController):
             isaac_kd=isaac_kd,
             smoothing_filter_size=smoothing_filter_size,
         )
-        # Reuse the limits already cached by the base class; unsqueeze(0) lets clip() broadcast over N
-        self._q_lower = self._clip_lo.unsqueeze(0)
-        self._q_upper = self._clip_hi.unsqueeze(0)
+        # Reuse the limits already cached by the base class; adding a leading dim lets clip() broadcast over N
+        self._q_lower = cb.view(self._clip_lo, (1, -1))
+        self._q_upper = cb.view(self._clip_hi, (1, -1))
 
     def add_member(self, articulation_root_path, control_enabled=True):
         """
@@ -230,7 +230,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
             if self._goal_set[controller_idx]:
-                self._fixed_quat_targets[controller_idx] = TT.mat2quat(self._goals["target_ori_mat"][controller_idx])
+                self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(
+                    self._goals["target_ori_mat"][controller_idx]
+                )
             else:
                 self._fixed_quat_targets[controller_idx] = None
 
@@ -242,10 +244,6 @@ class InverseKinematicsController(JointController, ManipulationController):
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
             prim_path, link_name
         )
-        # Ensure all values are torch tensors for consistent downstream processing
-        command = cb.to_torch(command).float()
-        pos_relative = cb.to_torch(pos_relative).float()
-        quat_relative = cb.to_torch(quat_relative).float()
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
@@ -258,25 +256,25 @@ class InverseKinematicsController(JointController, ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_targets[controller_idx] is None:
-                self._fixed_quat_targets[controller_idx] = quat_relative
+                self._fixed_quat_targets[controller_idx] = cb.copy(quat_relative)
             target_quat = self._fixed_quat_targets[controller_idx]
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation
             target_quat = quat_relative
         elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
             # Received "delta" ori is in fact the desired absolute orientation
-            target_quat = TT.axisangle2quat(command[3:6])
+            target_quat = cb.T.axisangle2quat(command[3:6])
         else:  # pose_delta_ori control
             # Grab dori and compute target ori
-            dori = TT.quat2mat(TT.axisangle2quat(command[3:6]))
-            target_quat = TT.mat2quat(dori @ TT.quat2mat(quat_relative))
+            dori = cb.T.quat2mat(cb.T.axisangle2quat(command[3:6]))
+            target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
 
         # Possibly limit to workspace if specified
         if self.workspace_pose_limiter is not None:
             target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat)
         goal_dict = dict(
-            target_pos=target_pos.float(),
-            target_ori_mat=TT.quat2mat(target_quat),
+            target_pos=target_pos,
+            target_ori_mat=cb.T.quat2mat(target_quat),
         )
 
         return goal_dict
@@ -287,21 +285,21 @@ class InverseKinematicsController(JointController, ManipulationController):
         for all N group members.
 
         Args:
-            goals (Dict[str, Tensor]): batched goals with shape (N, *shape) per key.
+            goals (Dict[str, Array]): batched goals with shape (N, *shape) per key.
                 Must include:
                     target_pos: (N, 3) desired EEF positions
                     target_ori_mat: (N, 3, 3) desired EEF orientation matrices
 
         Returns:
-            Tensor: (N, control_dim) outputted (non-clipped!) control signal to deploy
+            Array: (N, control_dim) outputted (non-clipped!) control signal to deploy
         """
 
         link_name = self._link_name
         rows = self.view_row_indices
 
-        # Batched state reads
+        # Batched state reads — convert from Isaac (torch) to compute backend type
         all_q = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)  # (N_view, n_joint_dof)
-        q_all = cb.to_torch(all_q[rows, :][:, self.dof_idx]).float()  # (N, ctrl_dim)
+        q_all = all_q[rows, :][:, self.dof_idx]  # (N, ctrl_dim)
         jac_all = ControllableObjectViewAPI.get_all_relative_jacobians(
             self.routing_path
         )  # (N_view, n_links, 6, n_dof_total)
@@ -312,15 +310,15 @@ class InverseKinematicsController(JointController, ManipulationController):
         # Compute offset from full tensor shapes before row-slicing.
         jac_col_offset = jac_all.shape[-1] - all_q.shape[-1]
         jac_dof_idx = self.dof_idx + jac_col_offset
-        j_eef_all = cb.to_torch(jac_all[rows][:, jac_row, :, :][:, :, jac_dof_idx]).float()  # (N, 6, ctrl_dim)
+        j_eef_all = jac_all[rows][:, jac_row, :, :][:, :, jac_dof_idx]  # (N, 6, ctrl_dim)
         ee_pos_all, ee_quat_all = ControllableObjectViewAPI.get_all_link_relative_position_orientation(
             self.routing_path, link_name
         )  # (N_view, 3), (N_view, 4)
-        ee_pos_all = cb.to_torch(ee_pos_all[rows]).float()
-        ee_quat_all = cb.to_torch(ee_quat_all[rows]).float()
-        ee_mat_all = TT.quat2mat(ee_quat_all)  # (N, 3, 3)
+        ee_pos_all = ee_pos_all[rows]
+        ee_quat_all = ee_quat_all[rows]
+        ee_mat_all = cb.T.quat2mat(ee_quat_all)  # (N, 3, 3)
 
-        target_joint_pos_batch = _compute_ik_qpos_batch_torch(
+        target_joint_pos_batch = cb.get_custom_method("compute_ik_qpos_batch")(
             q=q_all,
             j_eef=j_eef_all,
             ee_pos=ee_pos_all,
@@ -331,7 +329,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             q_upper_limit=self._q_upper,
         )  # (N, ctrl_dim)
 
-        # Apply smoothing filter if present (result is already torch)
+        # Apply smoothing filter if present
         if self._control_filter is not None:
             target_joint_pos_batch = self._control_filter.estimate_batch(target_joint_pos_batch)
 
@@ -345,11 +343,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
             prim_path, link_name
         )
-        pos_relative = cb.to_torch(pos_relative).float().clone()  # clone: stored directly as goal
-        quat_relative = cb.to_torch(quat_relative).float()  # no clone: quat2mat produces a new tensor
         goal_dict = dict(
-            target_pos=pos_relative,
-            target_ori_mat=TT.quat2mat(quat_relative),
+            target_pos=cb.copy(pos_relative),
+            target_ori_mat=cb.T.quat2mat(quat_relative),
         )
         return goal_dict
 
@@ -360,10 +356,8 @@ class InverseKinematicsController(JointController, ManipulationController):
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
             prim_path, link_name
         )
-        pos_relative = cb.to_torch(pos_relative).float()
-        quat_relative = cb.to_torch(quat_relative).float()
 
-        command = th.zeros(6)
+        command = cb.zeros(6)
 
         # Handle position
         if self.mode == "absolute_pose":
@@ -374,7 +368,7 @@ class InverseKinematicsController(JointController, ManipulationController):
 
         # Handle orientation
         if self.mode in ("pose_absolute_ori", "absolute_pose"):
-            command[3:] = TT.quat2axisangle(quat_relative)
+            command[3:] = cb.T.quat2axisangle(quat_relative)
         else:
             # For these modes, we don't need to add orientation to the command
             pass

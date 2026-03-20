@@ -156,8 +156,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._unregistered_controllers = th.zeros(0, dtype=th.long)
 
         # Cached control limits for this controller's dof_idx — used by clip_control every step
-        self._clip_lo = th.as_tensor(self._control_limits[self.control_type][0][self.dof_idx], dtype=th.float32)
-        self._clip_hi = th.as_tensor(self._control_limits[self.control_type][1][self.dof_idx], dtype=th.float32)
+        self._clip_lo = cb.array(self._control_limits[self.control_type][0][self.dof_idx])
+        self._clip_hi = cb.array(self._control_limits[self.control_type][1][self.dof_idx])
 
         # Initialize command scaling variables
         self._command_scale_factor = None
@@ -242,7 +242,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             self._control_enabled[controller_idx] = 1 if control_enabled else 0
             self._unregistered_controllers[controller_idx] = 0
             for key, shape in self._goal_shapes.items():
-                self._goals[key][controller_idx] = th.zeros(shape)
+                self._goals[key][controller_idx] = cb.zeros(shape)
         else:
             # No tombstone available — append a new slot
             controller_idx = len(self._articulation_root_paths)
@@ -307,7 +307,6 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[float]: Processed command vector
         """
-        # Make sure command is a th.tensor
         command = cb.array([command]) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
@@ -424,8 +423,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         clipped_control = control.clip(self._clip_lo, self._clip_hi)
         # Undo the clipping of unlimited position joints
         if self.control_type == ControlType.POSITION:
-            idx = cb.to_torch(self._dof_has_limits[self.dof_idx]).bool()
-            clipped_control[:, ~idx] = control[:, ~idx]
+            no_limit_mask = ~(self._dof_has_limits[self.dof_idx] > 0)
+            clipped_control[:, no_limit_mask] = control[:, no_limit_mask]
         return clipped_control
 
     def step(self):
@@ -452,22 +451,24 @@ class BaseController(Serializable, Registerable, Recreatable):
                     self._goals[k][i] = v if isinstance(v, th.Tensor) else th.as_tensor(v, dtype=th.float32)
                 self._goal_set[i] = True
 
-        # Compute batched control: (N, control_dim)
-        control_output = self.compute_control(self._goals)
+        # Compute batched control: (N, control_dim) — pass goals in compute-backend type
+        cb_goals = {k: cb.from_torch(v) for k, v in self._goals.items()}
+        control_output = self.compute_control(cb_goals)
         assert control_output.shape == (
             N,
             self.control_dim,
         ), f"compute_control must return shape ({N}, {self.control_dim}), got {control_output.shape}"
 
-        # Clip, store per-member controls, then write batched
+        # Clip, convert to torch for internal state, then write batched
         control_output = self.clip_control(control_output)
+        control_output = cb.to_torch(control_output)
         self._controls[active_mask] = control_output[active_mask]
 
         # Write batched control signals to Isaac via a single tensor op per control type.
         if not active_mask.any():
             return
 
-        all_view_rows = th.tensor(self.view_row_indices, dtype=th.long)
+        all_view_rows = cb.to_torch(cb.int_array(self.view_row_indices))
         enabled_rows = all_view_rows[active_mask]
         enabled_controls = self._controls[active_mask]  # (N_en, control_dim)
         routing_path = self.routing_path
@@ -477,7 +478,7 @@ class BaseController(Serializable, Registerable, Recreatable):
                 routing_path, enabled_rows, enabled_controls, self.dof_idx
             )
             ControllableObjectViewAPI.set_all_joint_velocity_targets(
-                routing_path, enabled_rows, th.zeros_like(enabled_controls), self.dof_idx
+                routing_path, enabled_rows, enabled_controls * 0, self.dof_idx
             )
         elif self.control_type == ControlType.VELOCITY:
             ControllableObjectViewAPI.set_all_joint_velocity_targets(
@@ -496,9 +497,9 @@ class BaseController(Serializable, Registerable, Recreatable):
         if self._unregistered_controllers[controller_idx] == 1:
             return
         self._goal_set[controller_idx] = False
-        self._controls[controller_idx] = th.zeros(self.control_dim)
+        self._controls[controller_idx] = cb.zeros(self.control_dim)
         for k in self._goals:
-            self._goals[k][controller_idx] = th.zeros(self._goal_shapes[k])
+            self._goals[k][controller_idx] = cb.zeros(self._goal_shapes[k])
 
     def unregister_member(self, controller_idx):
         """Mark member at controller_idx as a tombstone (can be reused by new member)."""
@@ -539,12 +540,10 @@ class BaseController(Serializable, Registerable, Recreatable):
             for k, v in no_op_goal.items():
                 self._goals[k][controller_idx] = v
         command = self._compute_no_op_command(controller_idx)
-        # Ensure the no-op command matches the active controller backend before preprocessing.
-        # Some controllers return torch.Tensors even when the controller backend is NumPy,
-        # which would cause type mismatches inside _reverse_preprocess_command (e.g., when
-        # comparing or clamping against NumPy limits). Convert to a NumPy array in that case.
-        if isinstance(command, th.Tensor) and cb is not th:
-            command = command.detach().cpu().numpy()
+        # Ensure the no-op command is in the compute backend's array type
+        if not isinstance(command, cb.arr_type):
+            command = cb.array(command)
+        command = cb.as_float32(command)
         return cb.to_torch(self._reverse_preprocess_command(command))
 
     def _compute_no_op_command(self, controller_idx):
@@ -561,7 +560,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     def _dump_state(self, controller_idx: int) -> dict:
         """Dump state for one controller member."""
-        goals = {k: v[controller_idx].clone() for k, v in self._goals.items()}
+        goals = {k: cb.copy(v[controller_idx]) for k, v in self._goals.items()}
         return {
             "goal_set": bool(self._goal_set[controller_idx]),
             "goals": goals,
@@ -584,10 +583,10 @@ class BaseController(Serializable, Registerable, Recreatable):
     def _load_state(self, controller_idx: int, state: dict):
         """Load state for one controller member."""
         goal_set = state["goal_set"]
-        if isinstance(goal_set, th.Tensor):
+        if isinstance(goal_set, cb.arr_type):
             goal_set = bool(goal_set.item())
         self._goal_set[controller_idx] = goal_set
-        self._controls[controller_idx] = th.zeros(self.control_dim)
+        self._controls[controller_idx] = cb.zeros(self.control_dim)
         self._unregistered_controllers[controller_idx] = 0  # we won't load a unregistered controller
         for name, val in state["goals"].items():
             if name in self._goals:
@@ -648,7 +647,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             dim (int): Size of array to broadcast input to
 
         Returns:
-            th.tensor: Array filled with values specified in @nums
+            cb.Array: Array filled with values specified in @nums
         """
         # First run sanity check to make sure no strings are being inputted
         if isinstance(nums, str):
