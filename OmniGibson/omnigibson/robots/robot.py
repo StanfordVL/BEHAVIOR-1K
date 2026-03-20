@@ -725,15 +725,23 @@ class Robot(USDObject, GymObservable):
             if len(scene_body_filters) > 0 and len(finger_paths) > 0:
                 self._contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=scene_body_filters,
-                    filter_patterns=finger_paths,
+                    filter_patterns=[finger_paths] * len(scene_body_filters),
                     max_contact_data_count=256 * len(finger_paths),
                 )
 
                 # Create maps from path to index
-                self._contact_view_path_to_row_idx = {path: i for i, path in enumerate(scene_body_filters)}
-                self._contact_view_path_to_col_idx = {path: i for i, path in enumerate(finger_paths)}
-                self._contact_view_row_idx_to_path = {i: path for i, path in enumerate(scene_body_filters)}
-                self._contact_view_col_idx_to_path = {i: path for i, path in enumerate(finger_paths)}
+                self._contact_view_path_to_row_idx = {
+                    path: i for i, path in enumerate(scene_body_filters)
+                }
+                self._contact_view_path_to_col_idx = {
+                    path: i for i, path in enumerate(finger_paths)
+                }
+                self._contact_view_row_idx_to_path = {
+                    i: path for i, path in enumerate(scene_body_filters)
+                }
+                self._contact_view_col_idx_to_path = {
+                    i: path for i, path in enumerate(finger_paths)
+                }
             else:
                 self._contact_view = None
                 self._contact_view_path_to_row_idx = dict()
@@ -2131,7 +2139,6 @@ class Robot(USDObject, GymObservable):
                 in_contact = False
                 if self._contact_view is not None:
                     import torch as th
-
                     forces = self._contact_view.get_contact_force_matrix(dt=og.sim.get_physics_dt())
                     impulses = th.norm(forces, dim=-1)
 
@@ -2177,7 +2184,6 @@ class Robot(USDObject, GymObservable):
 
         if self._contact_view is not None:
             import torch as th
-
             forces = self._contact_view.get_contact_force_matrix(dt=og.sim.get_physics_dt())
             impulses = th.norm(forces, dim=-1)
 
@@ -3668,9 +3674,7 @@ class Robot(USDObject, GymObservable):
         contact_pos_world = None
 
         if self._contact_view is not None:
-            forces, points, normals, separations, contact_counts, start_indices = self._contact_view.get_contact_data(
-                dt=og.sim.get_physics_dt()
-            )
+            forces, points, normals, separations, contact_counts, start_indices = self._contact_view.get_contact_data(dt=og.sim.get_physics_dt())
             row_idx = self._contact_view_path_to_row_idx.get(target_link_prim_path)
             if row_idx is not None:
                 for finger_path in finger_paths:
