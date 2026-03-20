@@ -210,8 +210,8 @@ class MovingAverageFilter(Filter):
     def _dump_state(self, controller_idx):
         return {
             "past_samples": cb.to_torch(self.past_samples[controller_idx]),
-            "current_idx": cb.to_torch(self.current_idx[controller_idx]),
-            "fully_filled": cb.to_torch(self.fully_filled[controller_idx]),
+            "current_idx": cb.item_int(self.current_idx[controller_idx]),
+            "fully_filled": cb.item_bool(self.fully_filled[controller_idx]),
         }
 
     def load_state(self, controller_idx, state, serialized=False):
@@ -226,16 +226,15 @@ class MovingAverageFilter(Filter):
 
     def _load_state(self, controller_idx, state):
         self.past_samples[controller_idx] = cb.from_torch(state["past_samples"])
-        self.current_idx[controller_idx] = cb.as_int(cb.from_torch(state["current_idx"]))
-        ff = state["fully_filled"]
-        self.fully_filled[controller_idx] = cb.from_torch(ff) if isinstance(ff, th.Tensor) else ff
+        self.current_idx[controller_idx] = state["current_idx"]
+        self.fully_filled[controller_idx] = state["fully_filled"]
 
     def serialize(self, state, controller_idx):
         return th.cat(
             [
                 state["past_samples"].flatten(),
-                state["current_idx"].float().reshape(1),
-                state["fully_filled"].float().reshape(1),
+                th.tensor([state["current_idx"]], dtype=th.float32),
+                th.tensor([state["fully_filled"]], dtype=th.float32),
             ]
         )
 
@@ -243,8 +242,8 @@ class MovingAverageFilter(Filter):
         samples_len = self.filter_width * self.obs_dim
         state_dict = {
             "past_samples": state[:samples_len].reshape(self.filter_width, self.obs_dim),
-            "current_idx": state[samples_len].long(),
-            "fully_filled": state[samples_len + 1].bool(),
+            "current_idx": int(state[samples_len].item()),
+            "fully_filled": bool(state[samples_len + 1].item()),
         }
         return state_dict, samples_len + 2
 

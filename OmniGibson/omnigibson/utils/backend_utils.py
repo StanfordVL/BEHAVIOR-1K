@@ -103,7 +103,7 @@ class _ComputeTorchBackend(_ComputeBackend):
     zeros = lambda *args: th.zeros(*args, dtype=th.float32)
     ones = lambda *args: th.ones(*args, dtype=th.float32)
     to_numpy = lambda x: x.numpy()
-    from_numpy = lambda x: th.from_numpy(x)
+    from_numpy = lambda x: th.from_numpy(x) if isinstance(x, np.ndarray) else th.as_tensor(x)
     to_torch = lambda x: x
     from_torch = lambda x: x
     allclose = th.allclose
@@ -127,8 +127,10 @@ class _ComputeTorchBackend(_ComputeBackend):
     where = th.where
     squeeze = lambda arr, dim=None: arr.squeeze(dim=dim)
     T = TT
-    indices_where = lambda mask: th.nonzero(mask, as_tuple=True)[0]
+    indices_where = lambda mask: th.nonzero(mask)[0].tolist()
     item_bool = lambda x: bool(x.item())
+    item_int = lambda x: int(x.item())
+    item_float = lambda x: float(x.item())
 
 
 class _ComputeNumpyBackend(_ComputeBackend):
@@ -142,7 +144,7 @@ class _ComputeNumpyBackend(_ComputeBackend):
     ones = lambda *args: np.ones(*args, dtype=np.float32)
     to_numpy = lambda x: x
     from_numpy = lambda x: x
-    to_torch = lambda x: th.from_numpy(x)
+    to_torch = lambda x: th.from_numpy(x) if isinstance(x, np.ndarray) else th.as_tensor(x)
     from_torch = lambda x: x.numpy()
     allclose = np.allclose
     arr_type = np.ndarray
@@ -165,8 +167,10 @@ class _ComputeNumpyBackend(_ComputeBackend):
     where = np.where
     squeeze = lambda arr, dim=None: arr.squeeze(axis=dim)
     T = NT
-    indices_where = lambda mask: th.as_tensor(np.flatnonzero(np.asarray(mask)), dtype=th.long)
-    item_bool = lambda x: bool(np.asarray(x).item())
+    indices_where = lambda mask: np.nonzero(mask)[0]
+    item_bool = lambda x: bool(x)
+    item_int = lambda x: int(x)
+    item_float = lambda x: float(x)
 
 
 _compute_backend = _ComputeBackend

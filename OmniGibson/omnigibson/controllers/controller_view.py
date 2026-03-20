@@ -243,11 +243,17 @@ class ControllerView:
 
     @classmethod
     def get_isaac_kp(cls, group_key: str):
-        return cb.to_torch(cls._controller_groups[group_key].isaac_kp)
+        isaac_kp = cls._controller_groups[group_key].isaac_kp
+        if isaac_kp is None:
+            return None
+        return cb.to_torch(isaac_kp)
 
     @classmethod
     def get_isaac_kd(cls, group_key: str):
-        return cb.to_torch(cls._controller_groups[group_key].isaac_kd)
+        isaac_kd = cls._controller_groups[group_key].isaac_kd
+        if isaac_kd is None:
+            return None
+        return cb.to_torch(isaac_kd)
 
     @classmethod
     def get_command_input_limits(cls, group_key: str):

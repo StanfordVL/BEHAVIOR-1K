@@ -138,12 +138,12 @@ class BaseController(Serializable, Registerable, Recreatable):
                 continue
 
             self._control_limits[ControlType.get_type(motor_type)] = [
-                control_limits[motor_type][0],
-                control_limits[motor_type][1],
+                cb.from_torch(control_limits[motor_type][0]),
+                cb.from_torch(control_limits[motor_type][1]),
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = cb.array(control_limits["has_limit"])
-        self._dof_idx = cb.as_int(dof_idx)
+        self._dof_idx = cb.int_array(dof_idx)
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
