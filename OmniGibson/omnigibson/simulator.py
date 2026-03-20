@@ -22,6 +22,9 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.touching import (
+    Touching,
+)  # This is temporary because we haven't implemented RelativeTensorizedStates yet
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.object_base import BaseObject
@@ -496,7 +499,7 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_requiring_update = [
                 state
                 for state in self.object_state_types
-                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedValueState))
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedValueState) or state is Touching)
             ]
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
@@ -510,7 +513,7 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
 
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, TensorizedValueState):
+                if issubclass(state, TensorizedValueState) or state is Touching:
                     state.global_initialize()
 
             # Now start rebuilding everything
@@ -1106,7 +1109,7 @@ def _launch_simulator(*args, **kwargs):
                 if gm.ENABLE_OBJECT_STATES:
                     # Step the object states in global topological order (if the scene exists)
                     for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedValueState):
+                        if issubclass(state_type, TensorizedValueState) or state_type is Touching:
                             state_type.global_update()
                         if issubclass(state_type, UpdateStateMixin):
                             for scene in self.scenes:
@@ -1743,7 +1746,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, TensorizedValueState):
+                if issubclass(state, TensorizedValueState) or state is Touching:
                     state.global_initialize()
 
             # Clear all materials

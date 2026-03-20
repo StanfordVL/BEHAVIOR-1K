@@ -634,6 +634,44 @@ class RigidContactAPIImpl:
 
         return query_contacts.any(dim=1)
 
+    def get_contact_matrix(self, scene_idx):
+        """
+        Returns the (R, C) bool contact matrix for @scene_idx, or None if not yet built.
+        """
+        return self._CONTACT_MATRIX.get(scene_idx)
+
+    def update_block_contact_matrix(self, scene_idxs, block_contact_matrix, row_offsets, col_offsets):
+        """
+        Fill a pre-allocated (R_total, C_total) block contact matrix in-place from the
+        current per-scene contact matrices. Call once per step before compute_pairwise_contacts().
+
+        Args:
+            scene_idxs (list[int]): Ordered scene indices matching block layout.
+            block_contact_matrix (th.Tensor): (R_total, C_total) float — pre-allocated, mutated in-place.
+            row_offsets (list[int]): Row start index in block matrix for each scene.
+            col_offsets (list[int]): Col start index in block matrix for each scene.
+        """
+        for s, r_off, c_off in zip(scene_idxs, row_offsets, col_offsets):
+            cm = self._CONTACT_MATRIX.get(s)
+            if cm is not None:
+                block_contact_matrix[r_off : r_off + cm.shape[0], c_off : c_off + cm.shape[1]] = cm.float()
+
+    def compute_pairwise_contacts(self, block_contact_matrix, obj_row_masks, obj_col_masks):
+        """
+        Compute NxN pairwise object contact matrix via two matmuls.
+
+        Args:
+            block_contact_matrix (th.Tensor): (R_total, C_total) float — filled this step.
+            obj_row_masks (th.Tensor): (N, R_total) float — which dynamic prims belong to each object.
+            obj_col_masks (th.Tensor): (N, C_total) float — which rigid prims belong to each object.
+
+        Returns:
+            th.Tensor: (N, N) bool — one_way[i,j] is True if any dynamic prim of obj_i
+                is in contact with any rigid prim of obj_j.
+        """
+        query_contacts = obj_row_masks @ block_contact_matrix  # (N, C_total)
+        return (query_contacts @ obj_col_masks.T) > 0  # (N, N)
+
     def clear(self):
         """
         Clears internal contact views, mappings, and caches.
