@@ -247,8 +247,8 @@ class MultiFingerGripperController(GripperController):
             else:
                 u = target_batch  # (N, ctrl_dim)
 
-        # If we're near the joint limits and we're using velocity / torque control, we zero out the action
-        if self._motor_type in {"velocity", "torque"}:
+        # If we're near the joint limits and we're using velocity / effort control, we zero out the action
+        if self._motor_type in {"velocity", "effort"}:
             pos_hi = self._control_limits[ControlType.POSITION][1][self.dof_idx]  # (ctrl_dim,)
             pos_lo = self._control_limits[ControlType.POSITION][0][self.dof_idx]  # (ctrl_dim,)
             violate_upper_limit = all_joint_pos > pos_hi - self._limit_tolerance  # (N, ctrl_dim)
@@ -297,8 +297,8 @@ class MultiFingerGripperController(GripperController):
                 # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
                 if self._motor_type == "position":
                     no_move_mask = cb.mean(cb.abs(control - joint_pos), dim=1) < m.POS_TOLERANCE  # (N,)
-                # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
-                elif self._motor_type in {"velocity", "torque"}:
+                # For joint velocity / effort control, if the desired velocities / efforts are zeros, is_grasping unknown
+                elif self._motor_type in {"velocity", "effort"}:
                     no_move_mask = cb.mean(cb.abs(control), dim=1) < m.VEL_TOLERANCE  # (N,)
                 else:
                     no_move_mask = cb.bool_zeros(self.n_members)  # all-False

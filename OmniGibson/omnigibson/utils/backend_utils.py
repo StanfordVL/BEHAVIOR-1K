@@ -127,7 +127,7 @@ class _ComputeTorchBackend(_ComputeBackend):
     where = th.where
     squeeze = lambda arr, dim=None: arr.squeeze(dim=dim)
     T = TT
-    indices_where = lambda mask: th.nonzero(mask)[0].tolist()
+    indices_where = lambda mask: th.nonzero(mask, as_tuple=False).squeeze(-1)
     item_bool = lambda x: bool(x.item())
     item_int = lambda x: int(x.item())
     item_float = lambda x: float(x.item())
