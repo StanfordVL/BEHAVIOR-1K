@@ -201,7 +201,7 @@ class MultiFingerGripperController(GripperController):
         return super()._preprocess_command(command=command)
 
     def _update_goal(self, controller_idx, command):
-        # Directly store command as the goal
+        # Directly store command as the goal (compute-backend array)
         return dict(target=command)
 
     def compute_control(self, goals):
@@ -299,7 +299,7 @@ class MultiFingerGripperController(GripperController):
                 elif self._motor_type in {"velocity", "torque"}:
                     no_move_mask = cb.mean(cb.abs(control), dim=1) < m.VEL_TOLERANCE  # (N,)
                 else:
-                    no_move_mask = cb.zeros(self.n_members) > 0  # all-False bool array
+                    no_move_mask = cb.bool_zeros(self.n_members)  # all-False
 
                 # Otherwise, the last control signal intends to "move" the gripper
                 min_pos = self._control_limits[ControlType.POSITION][0][self.dof_idx]  # (ctrl_dim,)
@@ -333,6 +333,10 @@ class MultiFingerGripperController(GripperController):
         self._is_grasping = is_grasping_result
 
     def compute_no_op_goal(self, controller_idx):
+        """
+        Returns:
+            dict: ``target`` as a compute-backend array (shape matches command space).
+        """
         prim_path = self._articulation_root_paths[controller_idx]
 
         # Take care of the special case of binary control

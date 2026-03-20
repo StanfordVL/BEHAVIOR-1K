@@ -827,18 +827,19 @@ class Robot(USDObject, GymObservable):
             control = ControllerView.get_control(group_key, controller_idx)
             if control is None:
                 applying_grasp = False
-            elif self._grasping_direction == "lower":
-                applying_grasp = (
-                    th.any(control < self.joint_upper_limits[controlled_joints])
-                    if ControllerView.get_control_type(group_key) == ControlType.POSITION
-                    else th.any(control < 0)
-                )
             else:
-                applying_grasp = (
-                    th.any(control > self.joint_lower_limits[controlled_joints])
-                    if ControllerView.get_control_type(group_key) == ControlType.POSITION
-                    else th.any(control > 0)
-                )
+                if self._grasping_direction == "lower":
+                    applying_grasp = (
+                        th.any(control < self.joint_upper_limits[controlled_joints])
+                        if ControllerView.get_control_type(group_key) == ControlType.POSITION
+                        else th.any(control < 0)
+                    )
+                else:
+                    applying_grasp = (
+                        th.any(control > self.joint_lower_limits[controlled_joints])
+                        if ControllerView.get_control_type(group_key) == ControlType.POSITION
+                        else th.any(control > 0)
+                    )
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
                 if self._ag_release_counter[arm] is not None:

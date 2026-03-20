@@ -317,7 +317,7 @@ class OperationalSpaceController(ManipulationController):
 
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
-            if self._goal_set[controller_idx]:
+            if cb.item_bool(self._goal_set[controller_idx]):
                 self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(
                     self._goals["target_ori_mat"][controller_idx]
                 )
@@ -360,6 +360,9 @@ class OperationalSpaceController(ManipulationController):
         Args:
             command (n-array): Preprocessed command
             controller_idx (int): idx of the controller that need to update goal
+
+        Returns:
+            dict: ``target_pos`` and ``target_ori_mat`` as compute-backend (``cb``) arrays
         """
         prim_path = self._articulation_root_paths[controller_idx]
         link_name = self._link_name
@@ -382,7 +385,7 @@ class OperationalSpaceController(ManipulationController):
             if self._fixed_quat_targets[controller_idx] is None:
                 self._fixed_quat_targets[controller_idx] = (
                     cb.copy(quat_relative)
-                    if not self._goal_set[controller_idx]
+                    if not cb.item_bool(self._goal_set[controller_idx])
                     else cb.T.mat2quat(self._goals["target_ori_mat"][controller_idx])
                 )
             target_quat = self._fixed_quat_targets[controller_idx]
@@ -531,6 +534,10 @@ class OperationalSpaceController(ManipulationController):
         return u
 
     def compute_no_op_goal(self, controller_idx):
+        """
+        Returns:
+            dict: Current EEF pose as ``cb`` arrays (``target_pos``, ``target_ori_mat``).
+        """
         # No-op is maintaining current pose
         prim_path = self._articulation_root_paths[controller_idx]
         link_name = self._link_name

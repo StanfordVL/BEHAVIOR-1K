@@ -96,7 +96,7 @@ class DifferentialDriveController(LocomotionController):
         )
 
     def _update_goal(self, controller_idx, command):
-        # Directly store command as the velocity goal
+        # Directly store command as the velocity goal (compute-backend array)
         return dict(vel=command)
 
     def compute_control(self, goals):
@@ -116,7 +116,7 @@ class DifferentialDriveController(LocomotionController):
         return goals["vel"] @ self._wheel_vel_transform
 
     def compute_no_op_goal(self, controller_idx):
-        # This is zero-vector, since we want zero linear / angular velocity
+        # Zero (lin, ang) velocity as ``cb`` array
         return dict(vel=cb.zeros(2))
 
     def _compute_no_op_command(self, controller_idx):

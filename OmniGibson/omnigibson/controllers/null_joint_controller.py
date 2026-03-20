@@ -85,7 +85,7 @@ class NullJointController(JointController):
         )
 
     def compute_no_op_goal(self, controller_idx):
-        # Set the goal to be internal stored default value
+        # Set the goal to be internal stored default value (``cb`` array)
         return dict(target=self.default_goal)
 
     def _preprocess_command(self, command):

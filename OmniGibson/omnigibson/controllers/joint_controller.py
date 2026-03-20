@@ -233,6 +233,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         )
 
     def _update_goal(self, controller_idx, command):
+        """
+        Returns:
+            dict: ``target`` joint setpoint as a compute-backend array
+        """
         # If we're using delta commands, add this value
         if self._use_delta_commands:
             prim_path = self._articulation_root_paths[controller_idx]
@@ -298,30 +302,20 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             all_joint_positions = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :]
 
             if self._motor_type == "position":
-                base_value = cb.as_float32(cb.from_torch(all_joint_positions[:, self.dof_idx]))
-                vel_base = cb.as_float32(cb.from_torch(
-                    ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
-                        :, self.dof_idx
-                    ]
-                ))
+                base_value = all_joint_positions[:, self.dof_idx]
+                vel_base = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][:, self.dof_idx]
                 position_error = target - base_value
                 vel_pos_error = -vel_base
                 u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
-                base_value = cb.as_float32(cb.from_torch(
-                    ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
-                        :, self.dof_idx
-                    ]
-                ))
+                base_value = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][:, self.dof_idx]
                 velocity_error = target - base_value
                 u = velocity_error * self.vel_kp
             else:  # effort
                 u = target
 
             # Apply impedances via mass matrix (batched over all N members)
-            all_mm = cb.as_float32(cb.from_torch(
-                ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)[rows, :, :]
-            ))  # (N, n_dof_total, n_dof_total)
+            all_mm = ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)[rows, :, :] # (N, n_dof_total, n_dof_total)
 
             # Compute offset between generalized DoFs and actuated joint DoFs (handles floating-base robots).
             base_dof_offset = all_mm.shape[-1] - all_joint_positions.shape[-1]
@@ -333,18 +327,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             u = cb.get_custom_method("compute_joint_torques_batch")(u, all_mm, dof_idx_arr)  # (N, control_dim)
 
             if self._use_gravity_compensation:
-                u = u + cb.as_float32(cb.from_torch(
-                    ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)[rows, :][
+                u = u + ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)[rows, :][
                         :, effective_dof_idx
                     ]
-                ))
 
             if self._use_cc_compensation:
-                u = u + cb.as_float32(cb.from_torch(
-                    ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)[
+                u = u + ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)[
                         rows, :
                     ][:, effective_dof_idx]
-                ))
 
         else:
             u = target
@@ -352,10 +342,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return u
 
     def compute_no_op_goal(self, controller_idx):
+        """
+        Returns:
+            dict: ``target`` as a compute-backend array (hold position or zeros by motor type)
+        """
         prim_path = self._articulation_root_paths[controller_idx]
 
         if self._motor_type == "position":
-            target = cb.as_float32(cb.from_torch(ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]))
+            target = ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]
         else:
             target = cb.zeros(self.control_dim)
 
@@ -368,12 +362,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             if self._use_delta_commands:
                 return cb.zeros(self.command_dim)
             else:
-                return cb.as_float32(cb.from_torch(ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]))
+                return ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]
         elif self.motor_type == "velocity":
             if self._use_delta_commands:
-                return -cb.as_float32(cb.from_torch(
-                    ControllableObjectViewAPI.get_joint_velocities(prim_path, estimate=True)[self.dof_idx]
-                ))
+                return -ControllableObjectViewAPI.get_joint_velocities(prim_path, estimate=True)[self.dof_idx]
             else:
                 return cb.zeros(self.command_dim)
 

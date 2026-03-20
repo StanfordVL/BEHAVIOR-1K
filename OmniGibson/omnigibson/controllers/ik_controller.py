@@ -229,7 +229,7 @@ class InverseKinematicsController(JointController, ManipulationController):
 
         # Restore per-member fixed orientation targets from loaded goals.
         if self.mode == "position_fixed_ori":
-            if self._goal_set[controller_idx]:
+            if cb.item_bool(self._goal_set[controller_idx]):
                 self._fixed_quat_targets[controller_idx] = cb.T.mat2quat(
                     self._goals["target_ori_mat"][controller_idx]
                 )
@@ -237,6 +237,10 @@ class InverseKinematicsController(JointController, ManipulationController):
                 self._fixed_quat_targets[controller_idx] = None
 
     def _update_goal(self, controller_idx, command):
+        """
+        Returns:
+            dict: ``target_pos`` and ``target_ori_mat`` as compute-backend (``cb``) arrays
+        """
         prim_path = self._articulation_root_paths[controller_idx]
         link_name = self._link_name
 
@@ -272,12 +276,10 @@ class InverseKinematicsController(JointController, ManipulationController):
         # Possibly limit to workspace if specified
         if self.workspace_pose_limiter is not None:
             target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat)
-        goal_dict = dict(
+        return dict(
             target_pos=target_pos,
             target_ori_mat=cb.T.quat2mat(target_quat),
         )
-
-        return goal_dict
 
     def compute_control(self, goals):
         """
@@ -337,17 +339,20 @@ class InverseKinematicsController(JointController, ManipulationController):
         return super().compute_control(dict(target=target_joint_pos_batch))
 
     def compute_no_op_goal(self, controller_idx):
+        """
+        Returns:
+            dict: Current relative EEF pose as ``cb`` arrays (``target_pos``, ``target_ori_mat``).
+        """
         prim_path = self._articulation_root_paths[controller_idx]
         link_name = self._link_name
 
         pos_relative, quat_relative = ControllableObjectViewAPI.get_link_relative_position_orientation(
             prim_path, link_name
         )
-        goal_dict = dict(
+        return dict(
             target_pos=cb.copy(pos_relative),
             target_ori_mat=cb.T.quat2mat(quat_relative),
         )
-        return goal_dict
 
     def _compute_no_op_command(self, controller_idx):
         prim_path = self._articulation_root_paths[controller_idx]

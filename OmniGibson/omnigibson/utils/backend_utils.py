@@ -26,6 +26,8 @@ class _ComputeBackend:
 
     array = None
     int_array = None
+    bool_array = None
+    bool_zeros = None
     prod = None
     cat = None
     zeros = None
@@ -48,6 +50,7 @@ class _ComputeBackend:
     sqrt = None
     norm = None
     mean = None
+    sum = None
     copy = None
     eye = None
     view = None
@@ -55,6 +58,8 @@ class _ComputeBackend:
     where = None
     squeeze = None
     T = None
+    indices_where = None
+    item_bool = None
 
     @classmethod
     def get_custom_method(cls, method_name):
@@ -92,6 +97,8 @@ class _ComputeBackend:
 class _ComputeTorchBackend(_ComputeBackend):
     array = lambda *args: th.tensor(*args, dtype=th.float32)
     int_array = lambda *args: th.tensor(*args, dtype=th.int32)
+    bool_array = lambda *args: th.tensor(*args, dtype=th.bool)
+    bool_zeros = lambda *args: th.zeros(*args, dtype=th.bool)
     prod = th.prod
     cat = th.cat
     zeros = lambda *args: th.zeros(*args, dtype=th.float32)
@@ -114,6 +121,7 @@ class _ComputeTorchBackend(_ComputeBackend):
     sqrt = th.sqrt
     norm = lambda val, dim=None, keepdim=False: th.norm(val, dim=dim, keepdim=keepdim)
     mean = lambda val, dim=None, keepdim=False: th.mean(val, dim=dim, keepdim=keepdim)
+    sum = lambda val, dim=None, keepdim=False: th.sum(val, dim=dim, keepdim=keepdim)
     copy = lambda arr: arr.clone()
     eye = th.eye
     view = lambda arr, shape: arr.view(shape)
@@ -121,13 +129,17 @@ class _ComputeTorchBackend(_ComputeBackend):
     where = th.where
     squeeze = lambda arr, dim=None: arr.squeeze(dim=dim)
     T = TT
+    indices_where = lambda mask: th.nonzero(mask, as_tuple=True)[0]
+    item_bool = lambda x: bool(x.item())
 
 
 class _ComputeNumpyBackend(_ComputeBackend):
     array = lambda *args: np.array(*args, dtype=np.float32)
     int_array = lambda *args: np.array(*args, dtype=np.int32)
+    bool_array = lambda *args: np.array(*args, dtype=bool)
+    bool_zeros = lambda *args: np.zeros(*args, dtype=bool)
     prod = np.prod
-    cat = np.concatenate
+    cat = lambda tensors, dim=0: np.concatenate(tensors, axis=dim)
     zeros = lambda *args: np.zeros(*args, dtype=np.float32)
     ones = lambda *args: np.ones(*args, dtype=np.float32)
     to_numpy = lambda x: x
@@ -148,6 +160,7 @@ class _ComputeNumpyBackend(_ComputeBackend):
     sqrt = np.sqrt
     norm = lambda val, dim=None, keepdim=False: np.linalg.norm(val, axis=dim, keepdims=keepdim)
     mean = lambda val, dim=None, keepdim=False: np.mean(val, axis=dim, keepdims=keepdim)
+    sum = lambda val, dim=None, keepdim=False: np.sum(val, axis=dim, keepdims=keepdim)
     copy = lambda arr: arr.copy()
     eye = np.eye
     view = lambda arr, shape: arr.reshape(shape)
@@ -155,6 +168,8 @@ class _ComputeNumpyBackend(_ComputeBackend):
     where = np.where
     squeeze = lambda arr, dim=None: arr.squeeze(axis=dim)
     T = NT
+    indices_where = lambda mask: th.as_tensor(np.flatnonzero(np.asarray(mask)), dtype=th.long)
+    item_bool = lambda x: bool(np.asarray(x).item())
 
 
 _compute_backend = _ComputeBackend

@@ -2,6 +2,8 @@ import torch as th
 from typing import Dict, Optional, Tuple
 import hashlib
 
+from omnigibson.utils.backend_utils import _compute_backend as cb
+
 
 class ControllerView:
     """
@@ -113,9 +115,27 @@ class ControllerView:
             controller_idx (int): index of the controller within the group
 
         Returns:
-            Array: no-op command for this controller
+            torch.Tensor: no-op command for this controller
         """
         return cls._controller_groups[group_key].compute_no_op_action(controller_idx)
+
+    @classmethod
+    def reverse_preprocess_command(cls, group_key: str, command):
+        """
+        Undo command scaling (same as :meth:`BaseController._reverse_preprocess_command`).
+
+        Args:
+            command: torch tensor or array-like in *scaled* command space
+
+        Returns:
+            torch.Tensor: command in normalized input space (for stacking into a flat action vector)
+        """
+        controller = cls._controller_groups[group_key]
+        if isinstance(command, th.Tensor):
+            cmd = cb.from_torch(command)
+        else:
+            cmd = cb.as_float32(cb.array(command))
+        return cb.to_torch(controller._reverse_preprocess_command(cmd))
 
     @classmethod
     def reset(cls, group_key: str, controller_idx: int):
