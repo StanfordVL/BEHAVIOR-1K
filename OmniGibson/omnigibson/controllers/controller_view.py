@@ -13,6 +13,15 @@ class ControllerView:
     grouped into a single controller instance. Each member is assigned a controller_idx that
     indexes into the group's batched state.
 
+    **Torch boundary:** Callers interact with this view using **torch tensors** (and plain Python
+    scalars / lists where controllers already accept them). Batched controllers internally use
+    compute-backend arrays (``cb``). The view translates **on the way in** (e.g. ``torch.Tensor``
+    → ``cb`` for :meth:`update_goal`) and **on the way out** (e.g. ``cb`` → ``torch.Tensor`` for
+    :meth:`get_control`, :meth:`get_goal`, :meth:`get_dof_idx`, gains, and command limits) so that
+    **no ``cb`` array is returned from or required by** the public view API. If a compute-backend
+    array is passed in, it is normalized through torch and re-imported into ``cb`` before reaching
+    the controller—prefer passing ``torch.Tensor`` from new code.
+
     Usage:
         # At controller load time:
         group_key, controller_idx = ControllerView.register(
@@ -97,16 +106,17 @@ class ControllerView:
         Args:
             group_key (str): key identifying the controller group
             controller_idx (int): index of the controller within the group
-            command (Array): action command for this controller
+            command (torch.Tensor or array-like): action command for this controller (see class docstring)
         """
-        cls._controller_groups[group_key].update_goal(controller_idx, command)
+        cmd = cb.from_torch(command)
+        cls._controller_groups[group_key].update_goal(controller_idx, cmd)
 
     @classmethod
     def set_control_enabled(cls, group_key: str, controller_idx: int, enabled: bool):
         cls._controller_groups[group_key].set_control_enabled(controller_idx, enabled)
 
     @classmethod
-    def compute_no_op_action(cls, group_key: str, controller_idx: int):
+    def compute_no_op_action(cls, group_key: str, controller_idx: int) -> th.Tensor:
         """
         Compute the no-op action command for the controller at @controller_idx in group @group_key.
 
@@ -117,10 +127,11 @@ class ControllerView:
         Returns:
             torch.Tensor: no-op command for this controller
         """
-        return cls._controller_groups[group_key].compute_no_op_action(controller_idx)
+        out = cls._controller_groups[group_key].compute_no_op_action(controller_idx)
+        return cb.to_torch(out)
 
     @classmethod
-    def reverse_preprocess_command(cls, group_key: str, command):
+    def reverse_preprocess_command(cls, group_key: str, command) -> th.Tensor:
         """
         Undo command scaling (same as :meth:`BaseController._reverse_preprocess_command`).
 
@@ -131,10 +142,7 @@ class ControllerView:
             torch.Tensor: command in normalized input space (for stacking into a flat action vector)
         """
         controller = cls._controller_groups[group_key]
-        if isinstance(command, th.Tensor):
-            cmd = cb.from_torch(command)
-        else:
-            cmd = cb.as_float32(cb.array(command))
+        cmd = cb.from_torch(command)
         return cb.to_torch(controller._reverse_preprocess_command(cmd))
 
     @classmethod
@@ -193,8 +201,8 @@ class ControllerView:
         return cls._controller_groups[group_key].control_dim
 
     @classmethod
-    def get_dof_idx(cls, group_key: str):
-        return cls._controller_groups[group_key].dof_idx
+    def get_dof_idx(cls, group_key: str) -> th.Tensor:
+        return cb.to_torch(cls._controller_groups[group_key].dof_idx)
 
     @classmethod
     def get_control_type(cls, group_key: str):
@@ -212,23 +220,22 @@ class ControllerView:
 
     @classmethod
     def get_goal(cls, group_key: str, controller_idx: int) -> dict:
-        return cls._controller_groups[group_key].get_goal(controller_idx)
+        raw = cls._controller_groups[group_key].get_goal(controller_idx)
+        return {k: cb.to_torch(v) for k, v in raw.items()}
 
     @classmethod
-    def get_control(cls, group_key: str, controller_idx: int):
-        return cls._controller_groups[group_key].get_control(controller_idx)
-
-    @classmethod
-    def reverse_preprocess_command(cls, group_key: str, command):
-        return cls._controller_groups[group_key]._reverse_preprocess_command(command)
+    def get_control(cls, group_key: str, controller_idx: int) -> th.Tensor:
+        return cb.to_torch(cls._controller_groups[group_key].get_control(controller_idx))
 
     @classmethod
     def get_use_delta_commands(cls, group_key: str) -> bool:
         return cls._controller_groups[group_key].use_delta_commands
 
+
     @classmethod
-    def get_controller(cls, group_key: str):
-        return cls._controller_groups[group_key]
+    def get_controller_type_str(cls, group_key: str) -> str:
+        """Python class name of the batched controller (e.g. ``JointController``), for UI / diagnostics."""
+        return type(cls._controller_groups[group_key]).__name__
 
     @classmethod
     def is_controller_type(cls, group_key: str, controller_cls) -> bool:
@@ -236,15 +243,19 @@ class ControllerView:
 
     @classmethod
     def get_isaac_kp(cls, group_key: str):
-        return cls._controller_groups[group_key].isaac_kp
+        return cb.to_torch(cls._controller_groups[group_key].isaac_kp)
 
     @classmethod
     def get_isaac_kd(cls, group_key: str):
-        return cls._controller_groups[group_key].isaac_kd
+        return cb.to_torch(cls._controller_groups[group_key].isaac_kd)
 
     @classmethod
     def get_command_input_limits(cls, group_key: str):
-        return cls._controller_groups[group_key].command_input_limits
+        limits = cls._controller_groups[group_key].command_input_limits
+        if limits is None:
+            return None
+        lo, hi = limits
+        return (cb.to_torch(lo), cb.to_torch(hi))
 
     @classmethod
     def get_motor_type(cls, group_key: str) -> str:

@@ -1663,7 +1663,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     raise ValueError(
-                        f"Unsupported base controller: {ControllerView.get_controller(base_group_key).__class__.__name__}"
+                        f"Unsupported base controller: {ControllerView.get_controller_type_str(base_group_key)}"
                     )
 
                 yield self._postprocess_action(action)
@@ -1714,7 +1714,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 base_action[1] = ang_vel
             else:
                 raise ValueError(
-                    f"Unsupported base controller: {ControllerView.get_controller(base_group_key).__class__.__name__}"
+                    f"Unsupported base controller: {ControllerView.get_controller_type_str(base_group_key)}"
                 )
 
             action[self.robot.controller_action_idx["base"]] = base_action

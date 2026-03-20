@@ -603,7 +603,7 @@ class Robot(USDObject, GymObservable):
                 control_enabled=self.control_enabled,
             )
             # Verify the controller's DOFs can all be driven
-            for idx in ControllerView.get_dof_idx(group_key):
+            for idx in ControllerView.get_dof_idx(group_key).tolist():
                 assert self._joints[
                     self.dof_names_ordered[idx]
                 ].driven, "Controllers should only control driveable joints!"
@@ -620,10 +620,10 @@ class Robot(USDObject, GymObservable):
             isaac_kp = ControllerView.get_isaac_kp(group_key)
             isaac_kd = ControllerView.get_isaac_kd(group_key)
             control_type = ControllerView.get_control_type(group_key)
-            for i, dof in enumerate(ControllerView.get_dof_idx(group_key)):
+            for i, dof in enumerate(ControllerView.get_dof_idx(group_key).tolist()):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
-                assert dof.item() in unused_dofs
-                unused_dofs.remove(dof.item())
+                assert dof in unused_dofs
+                unused_dofs.remove(dof)
                 dof_joint = self._joints[self.dof_names_ordered[dof]]
                 dof_joint.set_control_type(
                     control_type=control_type,
@@ -2249,7 +2249,7 @@ class Robot(USDObject, GymObservable):
         """
         Returns:
             dict: Mapping from controller names (e.g.: head, base, arm, etc.) to corresponding
-                indices (list) of the joint state vector controlled by each controller
+                1-D ``torch.long`` indices of the joint state vector controlled by each controller
         """
         dic = {}
         for controller in self.controller_order:

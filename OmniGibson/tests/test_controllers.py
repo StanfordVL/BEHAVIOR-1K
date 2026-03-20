@@ -422,7 +422,7 @@ def test_two_fetch_reload_reuses_slots():
     group_key_b, idx_b = env.robots[1].controllers[f"arm_{arm_name}"]
     assert group_key_a == group_key_b
 
-    controller = ControllerView.get_controller(group_key_a)
+    controller = ControllerView._controller_groups[group_key_a]
     unregistered = list(controller._unregistered_controllers)
     active_slots = [i for i, u in enumerate(unregistered) if u == 0]
 
@@ -507,7 +507,7 @@ def test_reload_changes_controller_mode_in_shared_group():
         group_key_b, idx_b = env.robots[1].controllers[f"arm_{arm_name}"]
         assert group_key_a == group_key_b
 
-        controller = ControllerView.get_controller(group_key_a)
+        controller = ControllerView._controller_groups[group_key_a]
         unregistered = list(controller._unregistered_controllers)
         active_slots = [i for i, u in enumerate(unregistered) if u == 0]
         assert idx_a in active_slots and idx_b in active_slots
@@ -579,8 +579,8 @@ def test_mixed_models_no_cross_group_contamination():
     assert group_key_fetch_a == group_key_fetch_b
     assert group_key_fetch_a != group_key_franka
 
-    ctrl_fetch = ControllerView.get_controller(group_key_fetch_a)
-    ctrl_franka = ControllerView.get_controller(group_key_franka)
+    ctrl_fetch = ControllerView._controller_groups[group_key_fetch_a]
+    ctrl_franka = ControllerView._controller_groups[group_key_franka]
     assert ctrl_fetch.n_members >= 2
     assert ctrl_franka.n_members == 1
 

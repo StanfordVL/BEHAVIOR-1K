@@ -7,7 +7,6 @@ from omnigibson.controllers import ControllerView
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
 
@@ -310,7 +309,7 @@ def test_grasping_mode():
         group_key, controller_idx = robot.controllers["gripper_0"]
 
         # Grasp the box
-        ControllerView.update_goal(group_key, controller_idx, cb.array([-1]))
+        ControllerView.update_goal(group_key, controller_idx, th.tensor([-1.0]))
         for _ in range(30):
             og.sim.step()
 
@@ -328,7 +327,7 @@ def test_grasping_mode():
         ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
         # Release the box
-        ControllerView.update_goal(group_key, controller_idx, cb.array([1]))
+        ControllerView.update_goal(group_key, controller_idx, th.tensor([1.0]))
         for _ in range(20):
             og.sim.step()
 
