@@ -231,9 +231,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
     def _preapply_articulation_root(self, usd_path):
         """
-        Opens @usd_path with the pxr library, strips any existing ArticulationRootAPI from the default
-        prim and its direct children, determines the correct prim to carry it, applies it there, and
-        returns a path to the modified USD written to a temp file.
+        Opens @usd_path with the pxr library, strips any existing ArticulationRootAPI, determines the correct prim to
+        carry it, applies it there, and returns a path to the modified USD written to a temp file.
         """
         stage = lazy.pxr.Usd.Stage.Open(usd_path)
         default_prim = stage.GetDefaultPrim()
@@ -390,29 +389,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
 
-        # First, remove any articulation root API that already exists at the object-level or root link level prim
-        if self._prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
-            self._prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
-            self._prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
-
-        if self.root_prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
-            self.root_prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
-            self.root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
-
-        if og.sim.is_playing():
-            log.warning(
-                "An object's articulation root API was changed while simulation is playing. This may cause issues."
-            )
-
-        # Potentially add articulation root APIs and also set self collisions
         root_prim = (
             None
             if self.articulation_root_path is None
             else lazy.isaacsim.core.utils.prims.get_prim_at_path(self.articulation_root_path)
         )
         if root_prim is not None:
-            lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
-            lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
         # Set position / velocity solver iterations if we're not cloth and not kinematic only

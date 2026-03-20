@@ -2443,7 +2443,7 @@ add_compute_function(
 
 def count_joints(prim):
     """
-    BFS from @prim to count movable joints, fixed joints, and attachment points.
+    Search from @prim to count movable joints, fixed joints, and attachment points.
 
     Args:
         prim (Usd.Prim): Root prim to search from.
