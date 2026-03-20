@@ -280,7 +280,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                         body1_rel = rels.get("physics:body1")
                         if body0_rel is None or body1_rel is None:
                             continue
-                        if len(body0_rel.GetTargets()) > 0:
+                        if len(body0_rel.GetTargets()) > 0 and len(body1_rel.GetTargets()) > 0:
                             joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
                 valid_roots = list(set(link_names) - joint_children)
                 assert len(valid_roots) == 1, (
