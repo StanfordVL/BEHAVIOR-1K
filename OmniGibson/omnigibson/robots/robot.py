@@ -53,7 +53,6 @@ from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
-    RigidContactAPI,
     create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
@@ -305,6 +304,11 @@ class Robot(USDObject, GymObservable):
 
         # Store internal placeholders that will be filled in later
         self._dof_to_joints = None  # dict that will map DOF indices to JointPrims
+        self._contact_view = None
+        self._contact_view_path_to_row_idx = dict()
+        self._contact_view_path_to_col_idx = dict()
+        self._contact_view_row_idx_to_path = dict()
+        self._contact_view_col_idx_to_path = dict()
         self._last_action = None
         self._controllers = None
         self.dof_names_ordered = None
@@ -690,6 +694,60 @@ class Robot(USDObject, GymObservable):
             if self._action_type == "discrete"
             else self._create_continuous_action_space()
         )
+
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        super().update_handles()
+
+        # Update the contact view if this is a manipulation robot using non-physical grasping
+        if self.is_manipulation and self.grasping_mode != "physical":
+            import omnigibson as og
+            from omnigibson.utils.constants import PrimType
+            from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+            from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
+
+            # Collect all rigid dynamic links in the scene (as row pattern)
+            scene_body_filters = []
+            for obj in self.scene.objects:
+                if obj.prim_type == PrimType.RIGID:
+                    for link in obj.links.values():
+                        if isinstance(link, (RigidDynamicPrim, RigidKinematicPrim)) and link.contact_reporting_enabled:
+                            scene_body_filters.append(link.prim_path)
+
+            # Collect all finger links of the robot (as col pattern)
+            finger_paths = []
+            for links in self.finger_links.values():
+                for link in links:
+                    finger_paths.append(link.prim_path)
+
+            if len(scene_body_filters) > 0 and len(finger_paths) > 0:
+                self._contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
+                    pattern=scene_body_filters,
+                    filter_patterns=finger_paths,
+                    max_contact_data_count=256 * len(finger_paths),
+                )
+
+                # Create maps from path to index
+                self._contact_view_path_to_row_idx = {
+                    path: i for i, path in enumerate(scene_body_filters)
+                }
+                self._contact_view_path_to_col_idx = {
+                    path: i for i, path in enumerate(finger_paths)
+                }
+                self._contact_view_row_idx_to_path = {
+                    i: path for i, path in enumerate(scene_body_filters)
+                }
+                self._contact_view_col_idx_to_path = {
+                    i: path for i, path in enumerate(finger_paths)
+                }
+            else:
+                self._contact_view = None
+                self._contact_view_path_to_row_idx = dict()
+                self._contact_view_path_to_col_idx = dict()
+                self._contact_view_row_idx_to_path = dict()
+                self._contact_view_col_idx_to_path = dict()
 
     def reset(self):
         if self.is_holonomic_base:
@@ -2077,13 +2135,24 @@ class Robot(USDObject, GymObservable):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                if not RigidContactAPI.is_in_contact(
-                    scene_idx=self.scene.idx,
-                    query_set=finger_links,
-                    with_set=[candidate_obj],
-                    ignore_set=None,
-                    current_only=False,
-                ):
+
+                in_contact = False
+                if self._contact_view is not None:
+                    import torch as th
+                    forces = self._contact_view.get_contact_force_matrix(dt=og.sim.get_physics_dt())
+                    impulses = th.norm(forces, dim=-1)
+
+                    candidate_obj_link_paths = {link.prim_path for link in candidate_obj.links.values()}
+                    finger_paths = {link.prim_path for link in finger_links}
+
+                    for row, col in zip(*th.nonzero(impulses > 0, as_tuple=True)):
+                        other_contact = self._contact_view_row_idx_to_path.get(row.item())
+                        link_contact = self._contact_view_col_idx_to_path.get(col.item())
+                        if link_contact in finger_paths and other_contact in candidate_obj_link_paths:
+                            in_contact = True
+                            break
+
+                if not in_contact:
                     is_grasping = IsGraspingState.FALSE
         return is_grasping
 
@@ -2111,13 +2180,19 @@ class Robot(USDObject, GymObservable):
         # Get robot links
         link_paths = set(self.link_prim_paths)
 
-        raw_contact_data = {
-            (link_contact, other_contact)
-            for link_contact, other_contact in RigidContactAPI.get_contact_pairs(
-                scene_idx=self.scene.idx, query_set=finger_paths, with_set=None, current_only=False
-            )
-            if other_contact not in link_paths
-        }
+        raw_contact_data = set()
+
+        if self._contact_view is not None:
+            import torch as th
+            forces = self._contact_view.get_contact_force_matrix(dt=og.sim.get_physics_dt())
+            impulses = th.norm(forces, dim=-1)
+
+            for row, col in zip(*th.nonzero(impulses > 0, as_tuple=True)):
+                other_contact = self._contact_view_row_idx_to_path.get(row.item())
+                link_contact = self._contact_view_col_idx_to_path.get(col.item())
+                # the finger must be in finger_paths and the other_contact shouldn't be a link path of the robot
+                if link_contact in finger_paths and other_contact not in link_paths:
+                    raw_contact_data.add((link_contact, other_contact))
 
         # Translate to robot contact data
         robot_contact_links = dict()
@@ -3594,24 +3669,29 @@ class Robot(USDObject, GymObservable):
             return
 
         # Compute the contact position in world frame
-        # Note that this relies on the legacy contact sensor API and not the RigidContactAPI,
-        # because the position information is not reliably available through the RigidContactAPI.
         target_link_prim_path = target_obj.links[target_link_name].prim_path
         finger_paths = {link.prim_path for link in self.finger_links[arm]}
         contact_pos_world = None
-        for finger_path in finger_paths:
-            raw_data = og.sim.contact_sensor.get_rigid_body_raw_data(finger_path)
-            for c in raw_data:
-                # Convert body handles to prim paths for robust matching
-                body0 = og.sim.contact_sensor.decode_body_name(c[2])
-                body1 = og.sim.contact_sensor.decode_body_name(c[3])
-                if (body0 == finger_path and body1 == target_link_prim_path) or (
-                    body0 == target_link_prim_path and body1 == finger_path
-                ):
-                    contact_pos_world = th.as_tensor(c[4], dtype=th.float32)
-                    break
-            if contact_pos_world is not None:
-                break
+
+        if self._contact_view is not None:
+            forces, points, normals, separations, contact_counts, start_indices = self._contact_view.get_contact_data(dt=og.sim.get_physics_dt())
+            row_idx = self._contact_view_path_to_row_idx.get(target_link_prim_path)
+            if row_idx is not None:
+                for finger_path in finger_paths:
+                    col_idx = self._contact_view_path_to_col_idx.get(finger_path)
+                    if col_idx is not None:
+                        count = contact_counts[row_idx, col_idx].item()
+                        if count > 0:
+                            start_idx = start_indices[row_idx, col_idx].item()
+                            # Simply use the first contact point
+                            contact_pos_world = th.as_tensor(points[start_idx], dtype=th.float32)
+                            break
+                if contact_pos_world is None:
+                    # In case the roles are reversed in the view (pattern vs filter_patterns)
+                    # Although we setup row=scene_bodies, col=fingers
+                    # We double check
+                    pass
+
         if contact_pos_world is None:
             return
 
