@@ -38,7 +38,7 @@ class DifferentialDriveController(LocomotionController):
                 "has_limit": [...bool...]
 
                 Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+            dof_idx (Array[int]): specific dof indices controlled by this controller. Used for inferring
                 controller-relevant values during control computations
             command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
                 if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
@@ -59,6 +59,13 @@ class DifferentialDriveController(LocomotionController):
         # Store internal variables
         self._wheel_radius = wheel_radius
         self._wheel_axle_halflength = wheel_axle_length / 2.0
+
+        # Precompute (2, 2) transform: vel_batch (N, 2) @ _wheel_vel_transform -> (N, 2) [left, right] wheel vels
+        # left  = lin_vel / r - ang_vel * half / r
+        # right = lin_vel / r + ang_vel * half / r
+        inv_r = 1.0 / wheel_radius
+        half_inv_r = self._wheel_axle_halflength / wheel_radius
+        self._wheel_vel_transform = cb.array([[inv_r, inv_r], [-half_inv_r, half_inv_r]])  # (2, 2)
 
         # If we're using default command output limits, map this to maximum linear / angular velocities
         if type(command_output_limits) is str and command_output_limits == "default":
@@ -88,41 +95,31 @@ class DifferentialDriveController(LocomotionController):
             isaac_kd=isaac_kd,
         )
 
-    def _update_goal(self, command, control_dict):
-        # Directly store command as the velocity goal
+    def _update_goal(self, controller_idx, command):
+        # Directly store command as the velocity goal (compute-backend array)
         return dict(vel=command)
 
-    def compute_control(self, goal_dict, control_dict):
+    def compute_control(self, goals):
         """
-        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal.
-        This processes converts the desired (lin_vel, ang_vel) command into (left, right) wheel joint velocity control
-        signals.
+        Converts the (already preprocessed) batched goals into deployable (non-clipped!) joint control signals
+        for all N group members.
 
         Args:
-            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                goals necessary for controller computation. Must include the following keys:
-                    vel: desired (lin_vel, ang_vel) of the controlled body
-            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                states necessary for controller computation. Must include the following keys:
+            goals (Dict[str, Tensor]): batched goals with shape (N, *shape) per key.
+                Must include:
+                    vel: (N, 2) desired (lin_vel, ang_vel) of the controlled bodies
 
         Returns:
-            Array[float]: outputted (non-clipped!) velocity control signal to deploy
-                to the [left, right] wheel joints
+            Tensor: (N, 2) outputted (non-clipped!) velocity control signal to deploy to the [left, right] wheel joints
         """
-        lin_vel, ang_vel = goal_dict["vel"]
+        # (N, 2) @ (2, 2) -> (N, 2) [left, right] wheel joint velocities
+        return goals["vel"] @ self._wheel_vel_transform
 
-        # Convert to wheel velocities
-        left_wheel_joint_vel = (lin_vel - ang_vel * self._wheel_axle_halflength) / self._wheel_radius
-        right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
-
-        # Return desired velocities
-        return cb.array([left_wheel_joint_vel, right_wheel_joint_vel])
-
-    def compute_no_op_goal(self, control_dict):
-        # This is zero-vector, since we want zero linear / angular velocity
+    def compute_no_op_goal(self, controller_idx):
+        # Zero (lin, ang) velocity as ``cb`` array
         return dict(vel=cb.zeros(2))
 
-    def _compute_no_op_command(self, control_dict):
+    def _compute_no_op_command(self, controller_idx):
         return cb.zeros(2)
 
     def _get_goal_shapes(self):
