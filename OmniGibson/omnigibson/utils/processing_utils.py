@@ -7,6 +7,9 @@ from omnigibson.utils.python_utils import Serializable
 class Filter(Serializable):
     """
     A base class for filtering a noisy data stream in an online fashion.
+
+    Implementations store state as compute-backend arrays (``cb.arr_type``) and accept observations
+    as ``cb`` arrays, torch tensors, or Python sequences (converted at the call boundary).
     """
 
     def estimate(self, observation):
@@ -14,10 +17,10 @@ class Filter(Serializable):
         Takes an observation and returns a de-noised estimate.
 
         Args:
-            observation (n-array): A current observation.
+            observation: Current observation, cb.arr_type.
 
         Returns:
-            n-array: De-noised estimate.
+            cb.arr_type: De-noised estimate.
         """
         raise NotImplementedError
 
@@ -59,6 +62,10 @@ class MovingAverageFilter(Filter):
     Supports a batch of n_members independent filter rows. Each member has its own circular
     buffer row; estimate() targets one member, estimate_batch() processes all rows at once
     using matrix operations and broadcasting with no intermediate large allocations.
+
+    Internal buffers are compute-backend arrays (``cb``). The per-member ``fully_filled`` row uses
+    ``cb.bool_zeros`` / ``cb.logical_or``. Serialized / dumped state uses torch tensors (``cb.to_torch``);
+    loads convert incoming torch tensors back to ``cb``.
     """
 
     def __init__(self, obs_dim, filter_width, n_members=1):
@@ -73,12 +80,12 @@ class MovingAverageFilter(Filter):
         self.filter_width = filter_width
         self.n_members = n_members
         # (n_members, filter_width, obs_dim) — unfilled slots stay zero so sum/count gives correct mean
-        self.past_samples = th.zeros(n_members, filter_width, obs_dim)
-        self.current_idx = th.zeros(n_members, dtype=th.long)
-        # bool tensor enables in-place updates and broadcasting in estimate_batch
-        self.fully_filled = th.zeros(n_members, dtype=th.bool)
+        self.past_samples = cb.zeros((n_members, filter_width, obs_dim))
+        self.current_idx = cb.int_array([0] * n_members)
+        # True once the circular buffer has wrapped at least once for that member
+        self.fully_filled = cb.bool_zeros(n_members)
         # cached row indices to avoid re-allocating in estimate_batch
-        self._member_arange = th.arange(n_members)
+        self._member_arange = cb.arange(n_members)
 
         super().__init__()
 
@@ -94,17 +101,17 @@ class MovingAverageFilter(Filter):
         """
         if slot < self.n_members:
             # Reuse: clear the slot so it starts fresh
-            self.past_samples[slot].zero_()
+            self.past_samples[slot] *= 0.0
             self.current_idx[slot] = 0
             self.fully_filled[slot] = False
             # n_members and _member_arange stay the same — slot count is unchanged
             return
         # New slot: append a fresh row
-        self.past_samples = th.cat([self.past_samples, th.zeros(1, self.filter_width, self.obs_dim)], dim=0)
-        self.current_idx = th.cat([self.current_idx, th.zeros(1, dtype=th.long)])
-        self.fully_filled = th.cat([self.fully_filled, th.zeros(1, dtype=th.bool)])
+        self.past_samples = cb.cat([self.past_samples, cb.zeros((1, self.filter_width, self.obs_dim))], dim=0)
+        self.current_idx = cb.cat([self.current_idx, cb.int_array([0])], dim=0)
+        self.fully_filled = cb.cat([self.fully_filled, cb.bool_zeros(1)], dim=0)
         # rebuild arange to include the new member
-        self._member_arange = th.arange(self.n_members + 1)
+        self._member_arange = cb.arange(self.n_members + 1)
         self.n_members += 1
 
     def unregister_member(self, member_idx):
@@ -113,7 +120,7 @@ class MovingAverageFilter(Filter):
         Args:
             member_idx (int): Index of the member to unregister.
         """
-        self.past_samples[member_idx].zero_()
+        self.past_samples[member_idx] *= 0.0
         self.current_idx[member_idx] = 0
         self.fully_filled[member_idx] = False
 
@@ -123,22 +130,22 @@ class MovingAverageFilter(Filter):
 
         Args:
             member_idx (int): Index of the controller member whose row to update.
-            observation (n-array): New observation of shape (obs_dim,).
+            observation: New observation of shape (obs_dim,) as ``cb``, torch, or sequence.
 
         Returns:
-            n-array: New estimate of state.
+            cb.arr_type: New estimate of state.
         """
-        idx = self.current_idx[member_idx].item()
+        idx = int(cb.to_torch(self.current_idx[member_idx]).item())
         self.past_samples[member_idx, idx, :] = observation
 
         # Compute value based on whether we're fully filled or not
-        if not self.fully_filled[member_idx]:
-            val = self.past_samples[member_idx, : idx + 1, :].mean(dim=0)
+        if not cb.item_bool(self.fully_filled[member_idx]):
+            val = cb.mean(self.past_samples[member_idx, : idx + 1, :], dim=0)
             # Denote that we're fully filled if we're at the end of the buffer
             if idx == self.filter_width - 1:
                 self.fully_filled[member_idx] = True
         else:
-            val = self.past_samples[member_idx].mean(dim=0)
+            val = cb.mean(self.past_samples[member_idx], dim=0)
 
         # Increment the index to write the next sample to
         self.current_idx[member_idx] = (idx + 1) % self.filter_width
@@ -153,28 +160,26 @@ class MovingAverageFilter(Filter):
         allocating intermediate large tensors.
 
         Args:
-            observations (Tensor): (N, obs_dim) new observations for all members.
+            observations: (N, obs_dim) new observations for all members, cb.arr_type.
 
         Returns:
-            Tensor: (N, obs_dim) smoothed estimates.
+            cb.arr_type: (N, obs_dim) smoothed estimates.
         """
         # Write new observations in-place via advanced indexing — no new large tensor
         self.past_samples[self._member_arange, self.current_idx] = observations
 
-        # fill_count: filter_width for fully-filled rows, current_idx+1 for partial rows
-        # th.where produces a (N,) tensor — unavoidable but small
-        fill_count = th.where(self.fully_filled, self.filter_width, self.current_idx + 1)
+        fill_count = cb.where(self.fully_filled, float(self.filter_width), self.current_idx + 1.0)
 
-        # Sum over the filter dimension; unfilled slots contribute 0, so result is correct.
-        # unsqueeze(-1) broadcasts fill_count (N,) against (N, obs_dim) — no copy
-        vals = self.past_samples.sum(dim=1) / fill_count.unsqueeze(-1)
+        sample_sums = cb.sum(self.past_samples, dim=1)
+        fill_bc = cb.view(fill_count, (-1, 1))
+        vals = sample_sums / fill_bc
 
-        # Update fully_filled in-place for any rows that just hit the last slot
-        self.fully_filled |= self.current_idx == self.filter_width - 1
+        hit_end = self.current_idx == (self.filter_width - 1)
+        self.fully_filled = cb.logical_or(self.fully_filled, hit_end)
 
         # Advance circular buffer pointer in-place
-        self.current_idx += 1
-        self.current_idx %= self.filter_width
+        self.current_idx = cb.as_int(self.current_idx + 1)
+        self.current_idx = cb.as_int(self.current_idx % self.filter_width)
 
         return vals
 
@@ -186,11 +191,11 @@ class MovingAverageFilter(Filter):
             member_idx (int or None): Member to reset. Resets all members if None.
         """
         if member_idx is None:
-            self.past_samples.zero_()
-            self.current_idx.zero_()
-            self.fully_filled.zero_()
+            self.past_samples *= 0.0
+            self.current_idx *= 0
+            self.fully_filled = cb.bool_zeros(self.n_members)
         else:
-            self.past_samples[member_idx].zero_()
+            self.past_samples[member_idx] *= 0.0
             self.current_idx[member_idx] = 0
             self.fully_filled[member_idx] = False
 
@@ -204,9 +209,9 @@ class MovingAverageFilter(Filter):
 
     def _dump_state(self, controller_idx):
         return {
-            "past_samples": self.past_samples[controller_idx].clone(),
-            "current_idx": self.current_idx[controller_idx].clone(),
-            "fully_filled": self.fully_filled[controller_idx].clone(),
+            "past_samples": cb.to_torch(self.past_samples[controller_idx]),
+            "current_idx": cb.to_torch(self.current_idx[controller_idx]),
+            "fully_filled": cb.to_torch(self.fully_filled[controller_idx]),
         }
 
     def load_state(self, controller_idx, state, serialized=False):
@@ -220,9 +225,10 @@ class MovingAverageFilter(Filter):
         self._load_state(controller_idx, state)
 
     def _load_state(self, controller_idx, state):
-        self.past_samples[controller_idx] = state["past_samples"]
-        self.current_idx[controller_idx] = state["current_idx"]
-        self.fully_filled[controller_idx] = state["fully_filled"]
+        self.past_samples[controller_idx] = cb.from_torch(state["past_samples"])
+        self.current_idx[controller_idx] = cb.as_int(cb.from_torch(state["current_idx"]))
+        ff = state["fully_filled"]
+        self.fully_filled[controller_idx] = cb.from_torch(ff) if isinstance(ff, th.Tensor) else ff
 
     def serialize(self, state, controller_idx):
         return th.cat(
@@ -268,10 +274,10 @@ class ExponentialAverageFilter(Filter):
         Do an online hold for state estimation given a recent observation.
 
         Args:
-            observation (n-array): New observation to hold internal estimate of state.
+            observation: New observation, cb.arr_type.
 
         Returns:
-            n-array: New estimate of state.
+            cb.arr_type: New estimate of state.
         """
         self.avg = self.alpha * observation + (1.0 - self.alpha) * self.avg
         self.num_samples += 1
@@ -380,9 +386,3 @@ class UniformSubsampler(Subsampler):
             return observation
         return None
 
-
-if __name__ == "__main__":
-    f = MovingAverageFilter(3, 10)
-    a = th.tensor([1, 1, 1])
-    for i in range(500):
-        print(f.estimate(a + th.randn_like(a) * 0.1))
