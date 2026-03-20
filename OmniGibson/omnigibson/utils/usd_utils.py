@@ -1363,6 +1363,11 @@ class BatchControlViewAPIImpl:
         else:
             return self._get_all_root_velocities(estimate=estimate)
 
+    def _get_velocities(self, prim_path, estimate=False):
+        """World-frame linear + angular velocity for one articulation (6,) from the batched cache."""
+        idx = self._idx[prim_path]
+        return self._get_all_velocities(estimate=estimate)[idx]
+
     def _get_all_relative_velocities(self, estimate=False):
         """Returns (N, n_links+1, 6) relative velocities for all robots; final slot [-1] is the base."""
         vel_str = "velocities_estimate" if estimate else "velocities"

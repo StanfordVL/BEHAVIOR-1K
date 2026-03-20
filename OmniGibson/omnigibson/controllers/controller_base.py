@@ -88,8 +88,7 @@ class BaseController(Serializable, Registerable, Recreatable):
     copied into the group's batched goal buffers. Per-member ``_goal_set`` is a compute-backend **bool**
     vector (``cb.bool_zeros`` / ``cb.bool_array``). Internal goals, controls, and
     :meth:`compute_control` I/O use ``cb``. Serialized / :meth:`_dump_state` goal payloads use
-    ``cb.to_torch``; :meth:`_load_state` accepts torch tensors and ``cb.from_torch``. Only
-    :meth:`compute_no_op_action` returns a **torch.Tensor** (for gym / action consumers).
+    ``cb.to_torch``; :meth:`_load_state` accepts torch tensors and ``cb.from_torch``. 
     """
 
     def __init__(
@@ -538,14 +537,14 @@ class BaseController(Serializable, Registerable, Recreatable):
             controller_idx (int): index of the controller in this group
 
         Returns:
-            torch.Tensor: no-op action command (torch for gym / action consumers)
+            cb.arr_type: no-op action command
         """
         if not cb.item_bool(self._goal_set[controller_idx]):
             no_op_goal = self.compute_no_op_goal(controller_idx)
             for k, v in no_op_goal.items():
                 self._goals[k][controller_idx] = cb.copy(v)
         command = self._compute_no_op_command(controller_idx)
-        return cb.to_torch(self._reverse_preprocess_command(cb.as_float32(command)))
+        return self._reverse_preprocess_command(cb.as_float32(command))
 
     def _compute_no_op_command(self, controller_idx):
         """

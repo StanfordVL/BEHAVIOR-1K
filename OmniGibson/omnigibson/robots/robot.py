@@ -808,6 +808,10 @@ class Robot(USDObject, GymObservable):
         Run per-robot assisted grasping logic after ControllerView.step_all() writes controls to the Isaac buffer
         but before ControllableObjectViewAPI.flush_control() flushes them.
         """
+        if not self.control_enabled:
+            return
+        if self._articulation_view is None:
+            return
         if self.is_manipulation:
             if self.grasping_mode != "physical" and not self._disable_grasp_handling:
                 self._handle_assisted_grasping()
