@@ -2649,7 +2649,7 @@ class Robot(USDObject, GymObservable):
         Otherwise, return None.
 
         Args:
-            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_obj (USDObject): Object targeted for an assisted grasp
             target_link_name (str): Name of the link of the object to be grasped
 
         Returns:
@@ -3584,7 +3584,7 @@ class Robot(USDObject, GymObservable):
         so we only perform some final checks.
 
         Args:
-            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_obj (USDObject): Object targeted for an assisted grasp
             target_link_name (str): Name of the link of the object to be grasped
             arm (str): Name of the arm to create the joint for
         """
@@ -3631,7 +3631,7 @@ class Robot(USDObject, GymObservable):
         state of the world is such that it should establish a grasp.
 
         Args:
-            target_obj (BaseObject): Object targeted for an assisted grasp
+            target_obj (USDObject): Object targeted for an assisted grasp
             target_link_name (str): Name of the link of the object to be grasped
             arm (str): Name of the arm to create the joint for
             contact_pos_world (th.tensor): Position of the contact point in world frame
@@ -3676,7 +3676,7 @@ class Robot(USDObject, GymObservable):
         It does not take into account any world frame position or orientation. As a result, its inputs can be safely stored and restored from a saved state.
 
         The constraint params dictionary is expected to have the following keys:
-        - target_obj: BaseObject: Object targeted for an assisted grasp
+        - target_obj: USDObject: Object targeted for an assisted grasp
         - target_link_name: str: Name of the link of the object to be grasped
         - parent_frame_pos: th.tensor: Position of the parent frame
         - parent_frame_orn: th.tensor: Orientation of the parent frame

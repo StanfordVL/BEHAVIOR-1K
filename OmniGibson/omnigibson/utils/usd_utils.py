@@ -540,7 +540,7 @@ class RigidContactAPIImpl:
         Converts a set of objects, links, or prim paths to a list of prim paths for contact matrix lookups.
 
         Args:
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to convert to prim paths.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to convert to prim paths.
 
         Returns:
             list[str]: List of prim paths.
@@ -569,7 +569,7 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to get the contact row indices for.
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact row indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to get the contact row indices for.
 
         Returns:
             th.Tensor: Tensor of row indices.
@@ -590,7 +590,7 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to get the contact column indices for.
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact column indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to get the contact column indices for.
 
         Returns:
             th.Tensor: Tensor of column indices.
@@ -609,8 +609,8 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to get the contact pairs for.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check. Must be specified.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact. Can be None to check for contact with any object.
+            query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects for contact sensor objects to check. Must be specified.
+            with_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact. Can be None to check for contact with any object.
             current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
                 The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
                 The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
@@ -654,9 +654,9 @@ class RigidContactAPIImpl:
 
         Args:
             scene_idx (int): Scene index to check for contact.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact with. Can be None to check for contact with any object.
-            ignore_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to ignore contact with. Can be None to not ignore any objects.
+            query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact.
+            with_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact with. Can be None to check for contact with any object.
+            ignore_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to ignore contact with. Can be None to not ignore any objects.
             current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
                 The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
                 The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).

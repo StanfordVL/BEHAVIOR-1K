@@ -87,7 +87,7 @@ class TransitionRuleAPI:
         # Set of active rules
         self.active_rules = set()
 
-        # Maps BaseObject instances to dictionary with the following keys:
+        # Maps USDObject instances to dictionary with the following keys:
         # "states": None or dict mapping object states to arguments to set for that state when the object is initialized
         # "callback": None or function to execute when the object is initialized
         self.obj_init_info = dict()
@@ -100,7 +100,7 @@ class TransitionRuleAPI:
 
         Args:
             rule (BaseTransitionRule): Transition rule whose candidates should be computed
-            objects (list of BaseObject): List of objects that will be used to compute object candidates
+            objects (list of USDObject): List of objects that will be used to compute object candidates
 
         Returns:
             None or dict: None if no valid candidates are found, otherwise mapping from filter key to list of object
@@ -188,7 +188,7 @@ class TransitionRuleAPI:
         Executes the transition for the given added and removed objects.
 
         :param added_obj_attrs: List of ObjectAttrs instances to add to the scene
-        :param removed_objs: List of BaseObject instances to remove from the scene
+        :param removed_objs: List of USDObject instances to remove from the scene
         """
         # Process all transition results
         if len(removed_objs) > 0:
@@ -655,7 +655,7 @@ class BaseTransitionRule(Registerable):
         this TransitionRule
 
         Args:
-            objects (list of BaseObject): Objects to filter for valid transition rule candidates
+            objects (list of USDObject): Objects to filter for valid transition rule candidates
 
         Returns:
             dict: Maps filter name to valid object(s) that satisfy that filter
@@ -1191,7 +1191,7 @@ class RecipeRule(BaseTransitionRule):
 
         Args:
             recipe (dict): Recipe whose systems should be checked
-            container (BaseObject): Container object that should contain all of @recipe's input systems
+            container (USDObject): Container object that should contain all of @recipe's input systems
 
         Returns:
             bool: True if all the input systems are contained
@@ -1208,7 +1208,7 @@ class RecipeRule(BaseTransitionRule):
 
         Args:
             recipe (dict): Recipe whose systems should be checked
-            container (BaseObject): Container object that should contain all of @recipe's input systems
+            container (USDObject): Container object that should contain all of @recipe's input systems
 
         Returns:
             bool: True if none of the non-relevant systems are contained
@@ -1316,7 +1316,7 @@ class RecipeRule(BaseTransitionRule):
             Return True/False, and a set of objects that belong to the subtree rooted at the current node
 
             Args:
-                obj (BaseObject): Subtree root node to check
+                obj (USDObject): Subtree root node to check
                 should_check_in_volume (bool): Whether to check if the object is in the volume or not
             Returns:
                 bool: True if the subtree rooted at the current node is satisfied
@@ -1716,7 +1716,7 @@ class RecipeRule(BaseTransitionRule):
         proportional to the number of items transformed.
 
         Args:
-            container (BaseObject): Container object which will have its contained elements transformed into
+            container (USDObject): Container object which will have its contained elements transformed into
                 @output_system
             recipe (dict): Recipe to execute. Should include, at the minimum, "input_objects", "input_systems",
                 "output_objects", and "output_systems" keys

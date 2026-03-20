@@ -42,7 +42,7 @@ from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
@@ -858,7 +858,7 @@ def _launch_simulator(*args, **kwargs):
             the simulator; it is assumed that this is handled externally
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to add
+                objs (Iterable[USDObject]): list of objects to add
             """
             SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
             if self.is_playing() and SimulationManager._physics_sim_view:
@@ -889,9 +889,9 @@ def _launch_simulator(*args, **kwargs):
             Post import an object into the simulator, handling any additional setup that needs to be done.
 
             Args:
-                obj (BaseObject): an object to load
+                obj (USDObject): an object to load
             """
-            assert isinstance(obj, BaseObject), "_post_import_object can only be called with BaseObject"
+            assert isinstance(obj, USDObject), "_post_import_object can only be called with USDObject"
 
             # Run any callbacks
             for callback in self._callbacks_on_add_obj.values():
@@ -905,7 +905,7 @@ def _launch_simulator(*args, **kwargs):
             Add a set of objects from the simulator.
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to add
+                objs (Iterable[USDObject]): list of objects to add
                 scenes (Iterable[BaseScene]): list of scenes corresponding to each object to load
             """
             with self.adding_objects(objs=objs):
@@ -920,7 +920,7 @@ def _launch_simulator(*args, **kwargs):
             the simulator; it is assumed that this is handled externally
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to remove
+                objs (Iterable[USDObject]): list of objects to remove
             """
             playing = self.is_playing()
             if playing:
@@ -971,7 +971,7 @@ def _launch_simulator(*args, **kwargs):
             Remove a non-robot object from the simulator. Should not be called directly by the user.
 
             Args:
-                obj (BaseObject): a non-robot object to remove
+                obj (USDObject): a non-robot object to remove
             """
             # Run any callbacks
             for callback in self._callbacks_on_remove_obj.values():
@@ -988,7 +988,7 @@ def _launch_simulator(*args, **kwargs):
             Remove a set of objects from the simulator.
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to remove
+                objs (Iterable[USDObject]): list of objects to remove
             """
             with self.removing_objects(objs=objs):
                 for obj in objs:
@@ -1452,7 +1452,7 @@ def _launch_simulator(*args, **kwargs):
                 name (str): Name of the callback
                 callback (function): Callback function. Function signature is expected to be:
 
-                    def callback(obj: BaseObject) --> None
+                    def callback(obj: USDObject) --> None
             """
             self._callbacks_on_add_obj[name] = callback
 
@@ -1465,7 +1465,7 @@ def _launch_simulator(*args, **kwargs):
                 name (str): Name of the callback
                 callback (function): Callback function. Function signature is expected to be:
 
-                    def callback(obj: BaseObject) --> None
+                    def callback(obj: USDObject) --> None
             """
             self._callbacks_on_remove_obj[name] = callback
 
