@@ -27,7 +27,6 @@ from omnigibson.sensors import (
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.asset_utils import get_dataset_path
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import merge_nested_dicts, assert_valid_key
@@ -597,7 +596,7 @@ class Robot(USDObject, GymObservable):
             # then adds this robot as a member and returns its per-member index.
             group_key, controller_idx = ControllerView.register(
                 body_part=name,
-                controller_cfg=cb.from_torch_recursive(cfg),
+                controller_cfg=cfg,
                 articulation_root_path=self.articulation_root_path,
                 link_name=link_name,
                 control_enabled=self.control_enabled,
@@ -731,8 +730,8 @@ class Robot(USDObject, GymObservable):
 
         return gym.spaces.Box(
             shape=(self.action_dim,),
-            low=cb.to_numpy(cb.cat(low)),
-            high=cb.to_numpy(cb.cat(high)),
+            low=th.cat(low).numpy(),
+            high=th.cat(high).numpy(),
             dtype=NumpyTypes.FLOAT32,
         )
 
@@ -773,9 +772,6 @@ class Robot(USDObject, GymObservable):
             self.action_dim, len(action)
         )
 
-        # Convert action from torch if necessary
-        action = cb.from_torch(action)
-
         # First, loop over all controllers, and update the desired command
         idx = 0
         for group_key, controller_idx in self._controllers.values():
@@ -806,7 +802,7 @@ class Robot(USDObject, GymObservable):
     def post_step(self):
         """
         Run per-robot assisted grasping logic after ControllerView.step_all() writes controls to the Isaac buffer
-        but before ControllableObjectViewAPI.flush_control() flushes them.
+        but before the ControllableObjectViewAPI flushes buffered articulation commands for the step.
         """
         if not self.control_enabled:
             return
@@ -1394,15 +1390,10 @@ class Robot(USDObject, GymObservable):
         Returns:
             dict: keyword-mapped proprioception observations available for this robot.
         """
-        joint_positions = cb.to_torch(
-            cb.copy(ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path))
-        )
-        joint_velocities = cb.to_torch(
-            cb.copy(ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path))
-        )
-        joint_efforts = cb.to_torch(cb.copy(ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)))
-        pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
-        pos, quat = cb.to_torch(cb.copy(pos)), cb.to_torch(cb.copy(quat))
+        joint_positions = self.get_joint_positions()
+        joint_velocities = self.get_joint_velocities()
+        joint_efforts = self.get_joint_efforts()
+        pos, quat = self.get_position_orientation()
         ori = T.quat2euler(quat)
 
         ori_2d = T.z_angle_from_quat(quat).unsqueeze(0)  # Convert to 1D tensor
@@ -1420,12 +1411,8 @@ class Robot(USDObject, GymObservable):
             robot_2d_ori=ori_2d,
             robot_2d_ori_cos=th.cos(ori_2d),
             robot_2d_ori_sin=th.sin(ori_2d),
-            robot_lin_vel=cb.to_torch(
-                cb.copy(ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path))
-            ),
-            robot_ang_vel=cb.to_torch(
-                cb.copy(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path))
-            ),
+            robot_lin_vel=self.get_linear_velocity(),
+            robot_ang_vel=self.get_angular_velocity(),
         )
 
         if self.is_manipulation:
@@ -1439,14 +1426,9 @@ class Robot(USDObject, GymObservable):
                 dic["arm_{}_qpos_cos".format(arm)] = th.cos(joint_positions[self.arm_control_idx[arm]])
                 dic["arm_{}_qvel".format(arm)] = joint_velocities[self.arm_control_idx[arm]]
 
-                # Add eef and grasping info
-                eef_pos, eef_quat = ControllableObjectViewAPI.get_link_relative_position_orientation(
-                    self.articulation_root_path, self.eef_link_names[arm]
-                )
-                dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = (
-                    cb.to_torch(eef_pos),
-                    cb.to_torch(eef_quat),
-                )
+                # Add eef and grasping info (relative to articulation root / robot base frame)
+                eef_pos, eef_quat = self.get_relative_eef_pose(arm=arm)
+                dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = eef_pos, eef_quat
                 dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)])
                 dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
                 dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
@@ -1466,9 +1448,7 @@ class Robot(USDObject, GymObservable):
             dic["base_qvel"] = joint_velocities[self.base_control_idx]
         if self.is_two_wheel:
             # Grab wheel joint velocity info
-            l_vel, r_vel = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)[
-                self.base_control_idx
-            ]
+            l_vel, r_vel = joint_velocities[self.base_control_idx].tolist()
 
             # Compute linear and angular velocities
             lin_vel = (l_vel + r_vel) / 2.0 * self.wheel_radius

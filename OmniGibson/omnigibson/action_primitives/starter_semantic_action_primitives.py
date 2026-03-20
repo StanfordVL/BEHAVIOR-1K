@@ -180,7 +180,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._reset_eef_pose = {}
         if self.robot.is_manipulation:
             # Batched read of joint positions for all controllers
-            joint_positions = cb.to_torch(self.robot.get_joint_positions())
+            joint_positions = self.robot.get_joint_positions()
             for arm_name in self.robot.arm_names:
                 eef = f"eef_{arm_name}"
                 arm = f"arm_{arm_name}"
@@ -188,8 +188,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 if ControllerView.is_controller_type(arm_group_key, InverseKinematicsController):
                     # Use the current relative end-effector pose as the IK target
                     pos_relative_np, quat_relative_np = self.robot.get_relative_eef_pose(arm_name)
-                    pos_relative = cb.to_torch(pos_relative_np)
-                    quat_relative = cb.to_torch(quat_relative_np)
+                    pos_relative = pos_relative_np
+                    quat_relative = quat_relative_np
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:

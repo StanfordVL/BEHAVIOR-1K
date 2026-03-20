@@ -36,7 +36,6 @@ class _ComputeBackend:
     from_numpy = None
     to_torch = None
     from_torch = None
-    from_torch_recursive = None
     allclose = None
     arr_type = None
     as_int = None
@@ -107,7 +106,6 @@ class _ComputeTorchBackend(_ComputeBackend):
     from_numpy = lambda x: th.from_numpy(x)
     to_torch = lambda x: x
     from_torch = lambda x: x
-    from_torch_recursive = lambda dic: dic
     allclose = th.allclose
     arr_type = th.Tensor
     as_int = lambda arr: arr.int()
@@ -146,7 +144,6 @@ class _ComputeNumpyBackend(_ComputeBackend):
     from_numpy = lambda x: x
     to_torch = lambda x: th.from_numpy(x)
     from_torch = lambda x: x.numpy()
-    from_torch_recursive = recursively_convert_from_torch
     allclose = np.allclose
     arr_type = np.ndarray
     as_int = lambda arr: arr.astype(int)
