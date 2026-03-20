@@ -1635,10 +1635,3 @@ class EntityPrim(XFormPrim):
                 idx += self.n_joints
 
         return state_dict, idx
-
-    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
-        # Subclass must implement this method for duplication functionality
-        raise NotImplementedError(
-            "Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
-            "functionality for EntityPrim!"
-        )

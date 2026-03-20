@@ -13,7 +13,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.constants import ROBOT_CATEGORY
@@ -176,7 +176,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the objects in the scene.
 
         Returns:
-            list of BaseObject: Standalone object(s) that are currently in this scene
+            list of USDObject: Standalone object(s) that are currently in this scene
         """
         return self.object_registry.objects
 
@@ -585,7 +585,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         registry.add(
             obj=SerializableRegistry(
                 name="object_registry",
-                class_types=BaseObject,
+                class_types=USDObject,
                 default_key="name",
                 hash_key="uuid",
                 unique_keys=self.object_registry_unique_keys,
@@ -642,7 +642,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         scene.load() is called. The object should also be accessible through scene.objects.
 
         Args:
-            obj (BaseObject): the object to load into the simulator
+            obj (USDObject): the object to load into the simulator
         """
         pass
 
@@ -651,7 +651,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Add an object to the scene. The scene should already be loaded.
 
         Args:
-            obj (BaseObject): the object to load
+            obj (USDObject): the object to load
             register (bool): Whether to register @obj internally in the scene object registry or not, as well as run
                 additional scene-specific logic in addition to the obj being loaded
             _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
@@ -696,7 +696,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Method to remove an object from the simulator
 
         Args:
-            obj (BaseObject): Object to remove
+            obj (USDObject): Object to remove
             _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
                 a context externally. In general, this should NOT be explicitly set by the user
         """

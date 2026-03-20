@@ -241,13 +241,3 @@ class LightObject(USDObject):
             texture_file_path (str): path of texture file that should be used for this light
         """
         self._light_link.set_attribute("inputs:texture:file", lazy.pxr.Sdf.AssetPath(texture_file_path))
-
-    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
-        # Add additional kwargs (bounding_box is already captured in load_config)
-        return self.__class__(
-            relative_prim_path=relative_prim_path,
-            light_type=self.light_type,
-            name=name,
-            intensity=self.intensity,
-            load_config=load_config,
-        )

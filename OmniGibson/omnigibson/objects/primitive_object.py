@@ -66,7 +66,7 @@ class PrimitiveObject(USDObject):
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             kinematic_only (None or bool): Whether this object should be kinematic only (and not get affected by any
                 collisions). If None, then this value will be set to True if @fixed_base is True and some other criteria
-                are satisfied (see object_base.py post_load function), else False.
+                are satisfied (see usd_object.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
@@ -359,22 +359,6 @@ class PrimitiveObject(USDObject):
                         ]
                     )
                 )
-
-    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
-        # Add additional kwargs (bounding_box is already captured in load_config)
-        return self.__class__(
-            relative_prim_path=relative_prim_path,
-            primitive_type=self._primitive_type,
-            name=name,
-            category=self.category,
-            scale=self.scale,
-            visible=self.visible,
-            fixed_base=self.fixed_base,
-            prim_type=self._prim_type,
-            load_config=load_config,
-            abilities=self._abilities,
-            visual_only=self._visual_only,
-        )
 
     def _dump_state(self):
         state = super()._dump_state()

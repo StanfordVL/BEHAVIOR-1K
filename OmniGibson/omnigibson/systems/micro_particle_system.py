@@ -1109,7 +1109,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Generates @n_particles new particle objects and samples their locations on the top surface of object @obj
 
         Args:
-            obj (BaseObject): Object on which to generate a particle instancer with sampled particles on the object's
+            obj (USDObject): Object on which to generate a particle instancer with sampled particles on the object's
                 top surface
             instancer_idn (None or int): Unique identification number of the particle instancer to assign the generated
                 particles to. This is used to deterministically reproduce individual particle instancer states

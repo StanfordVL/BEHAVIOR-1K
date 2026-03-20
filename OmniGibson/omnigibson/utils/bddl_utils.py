@@ -672,7 +672,7 @@ class BDDLEntity(Wrapper):
         Sets the internal entity, overriding any if it already exists
 
         Args:
-            entity (BaseSystem or BaseObject): Entity to set internally
+            entity (BaseSystem or USDObject): Entity to set internally
         """
         self.wrapped_obj = entity
 
@@ -745,7 +745,7 @@ class BDDLSampler:
         self._room_type_to_object_instance = None  # dict
         self._inroom_object_instances = None  # set of str
         self._object_sampling_orders = None  # dict mapping str to list of str
-        self._sampled_objects = None  # set of BaseObject
+        self._sampled_objects = None  # set of USDObject
         self._future_obj_instances = None  # set of str
         self._inroom_object_conditions = None  # list of (condition, positive) tuple
         self._inroom_object_scope_filtered_initial = None  # dict mapping str to BDDLEntity

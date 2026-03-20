@@ -106,7 +106,7 @@ def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=N
 
     Args:
       robot (BaseRobot): the robot object
-      target_obj (BaseObject): the object to open/close a joint of
+      target_obj (USDObject): the object to open/close a joint of
       should_open (bool): a boolean indicating whether we are opening or closing
       relevant_joint (Joint or None): the joint to open/close if we want to do a particular one in advance
       num_waypoints (int or str): the number of waypoints to interpolate between the start and end poses (default is "default")
@@ -159,7 +159,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     Args:
       robot (BaseRobot): the robot object
-      target_obj (BaseObject): the object to open
+      target_obj (USDObject): the object to open
       relevant_joint (Joint): the prismatic joint to open
       should_open (bool): a boolean indicating whether we are opening or closing
       num_waypoints (int or str): the number of waypoints to interpolate between the start and end poses (default is "default")
@@ -322,7 +322,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     Args:
       robot (BaseRobot): the robot object
-      target_obj (BaseObject): the object to open
+      target_obj (USDObject): the object to open
       relevant_joint (Joint): the revolute joint to open
       should_open (bool): a boolean indicating whether we are opening or closing
 

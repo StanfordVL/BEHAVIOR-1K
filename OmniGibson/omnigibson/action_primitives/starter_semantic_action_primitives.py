@@ -37,7 +37,7 @@ from omnigibson.controllers import (
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.macros import macros
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots import Robot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -235,7 +235,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             [gym.spaces.Discrete(self.num_objects), gym.spaces.Discrete(len(StarterSemanticActionPrimitiveSet))]
         )
 
-    def get_action_from_primitive_and_object(self, primitive: StarterSemanticActionPrimitiveSet, obj: BaseObject):
+    def get_action_from_primitive_and_object(self, primitive: StarterSemanticActionPrimitiveSet, obj: USDObject):
         assert obj in self.addressable_objects
         primitive_int = int(primitive)
         return primitive_int, self.addressable_objects.index(obj)
@@ -483,7 +483,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Samples an eef grasp pose for the object
 
         Args:
-            obj (BaseObject): Object to sample grasp pose for
+            obj (USDObject): Object to sample grasp pose for
 
         Returns:
             Tuple[th.tensor, th.tensor]: Pregrasp pose and grasp pose of the robot eef in the world frame
@@ -521,7 +521,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to grasp or None if grasp completed
         """
-        if obj is None or not isinstance(obj, BaseObject):
+        if obj is None or not isinstance(obj, USDObject):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "You need to provide an object to grasp",
@@ -674,7 +674,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to place or None if place completed
         """
-        if obj is None or not isinstance(obj, BaseObject):
+        if obj is None or not isinstance(obj, USDObject):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "You need to provide an object to place the object in your hand on",

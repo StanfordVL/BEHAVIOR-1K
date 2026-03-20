@@ -12,7 +12,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
 from omnigibson.macros import gm, macros
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.config_utils import TorchEncoder
@@ -637,7 +637,7 @@ class DataCollectionWrapper(DataWrapper):
         Adds transition info to the current sim step for specific object @obj.
 
         Args:
-            obj (BaseObject or BaseSystem): Object / system whose information should be stored
+            obj (USDObject or BaseSystem): Object / system whose information should be stored
             add (bool): If True, assumes the object is being imported. Else, assumes the object is being removed
         """
         # If we're at the current checkpoint idx, this means that we JUST created a checkpoint and we're still at
@@ -658,8 +658,8 @@ class DataCollectionWrapper(DataWrapper):
             }
 
         # Add info based on type -- only need to store name unless we're an object being added
-        info = obj.get_init_info() if isinstance(obj, BaseObject) and add else obj.name
-        dic_key = "objects" if isinstance(obj, BaseObject) else "systems"
+        info = obj.get_init_info() if isinstance(obj, USDObject) and add else obj.name
+        dic_key = "objects" if isinstance(obj, USDObject) else "systems"
         val_key = "add" if add else "remove"
         self.current_transitions[self.env.episode_steps][dic_key][val_key].append(info)
 

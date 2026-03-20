@@ -16,7 +16,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
     resulting orientations
 
     Args:
-        obj (BaseObject): Object whose orientations will be sampled
+        obj (USDObject): Object whose orientations will be sampled
         n_samples (int): How many sampled orientations will be recorded
         drop_aabb_offset (float): Offset to apply in the z-direction when dropping the object
 
@@ -49,7 +49,7 @@ def compute_bbox_offset(obj):
     its root link frame, expressed in the world frame
 
     Args:
-        obj (BaseObject): Object whose bbox offset will be computed
+        obj (USDObject): Object whose bbox offset will be computed
 
     Returns:
         n-array: (x,y,z) offset specifying the relative position from the root link to @obj's bounding box center
@@ -66,7 +66,7 @@ def compute_native_bbox_extent(obj):
     orientation (0, 0, 0, 1) and scale (1, 1, 1)
 
     Args:
-        obj (BaseObject): Object whose native bbox extent will be computed
+        obj (USDObject): Object whose native bbox extent will be computed
 
     Returns:
         n-array: (x,y,z) native bounding box extent
@@ -107,7 +107,7 @@ def compute_obj_kinematic_metadata(obj):
     bounding box extents, and base_aligned_bboxes
 
     Args:
-        obj (BaseObject): Object whose metadata will be computed
+        obj (USDObject): Object whose metadata will be computed
 
     Returns:
         dict: Relevant metadata, with the following keys:
