@@ -1581,6 +1581,9 @@ class Robot(USDObject, GymObservable):
         """
         Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
         """
+        # Remove all controllers
+        ControllerView.unregister_robot(self._controllers)
+
         # Remove all sensors
         for sensor in self._sensors.values():
             sensor.remove()
