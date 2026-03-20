@@ -2665,3 +2665,60 @@ def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
 add_compute_function(
     name="compute_relative_poses", np_function=_compute_relative_poses_numpy, th_function=_compute_relative_poses_torch
 )
+
+
+def count_joints(prim):
+    """
+    Search from @prim to count movable joints, fixed joints, and attachment points.
+
+    Args:
+        prim (Usd.Prim): Root prim to search from.
+
+    Returns:
+        tuple: (n_joints, n_fixed_joints, has_attachment) where
+            n_joints (int): number of non-fixed physics joints,
+            n_fixed_joints (int): number of fixed physics joints,
+            has_attachment (bool): whether any prim name contains "attachment".
+    """
+    n_joints = 0
+    n_fixed_joints = 0
+    has_attachment = False
+    children = list(prim.GetChildren())
+    while children:
+        child_prim = children.pop()
+        children.extend(child_prim.GetChildren())
+        prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
+        if "joint" in prim_type:
+            if "fixed" in prim_type:
+                n_fixed_joints += 1
+            else:
+                n_joints += 1
+        if "attachment" in child_prim.GetName().lower():
+            has_attachment = True
+    return n_joints, n_fixed_joints, has_attachment
+
+
+def compute_kinematic_only(fixed_base, scale, n_joints, n_fixed_joints, kinematic_only_config, has_attachment):
+    """
+    Determine whether an object should be kinematic-only based on its properties.
+
+    Args:
+        fixed_base (bool): Whether the object has a fixed base.
+        scale (th.Tensor): 3-element scale tensor.
+        n_joints (int): Number of non-fixed joints.
+        n_fixed_joints (int): Number of fixed joints.
+        kinematic_only_config: Value of the kinematic_only load config key (True, False, or None).
+        has_attachment (bool): Whether the object has attachment points.
+
+    Returns:
+        bool: True if the object should be kinematic only.
+    """
+    if not fixed_base:
+        return False
+    if kinematic_only_config is False:
+        return False
+    return (
+        n_joints == 0
+        and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or n_fixed_joints == 0)
+        and not has_attachment
+    )
