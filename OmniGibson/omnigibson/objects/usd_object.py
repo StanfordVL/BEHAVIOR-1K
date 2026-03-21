@@ -183,10 +183,10 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config["kinematic_only"] = kinematic_only
         load_config["self_collisions"] = self_collisions
         load_config["prim_type"] = prim_type
-        
+
         # Store this category
         OBJECT_CATEGORIES.add(self.category)
-        
+
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -422,7 +422,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Add semantics
         add_semantic_label(prim=self._prim, label=self.category)
-        
+
         # Prepare the object states
         self._states = {}
         self.prepare_object_states()
