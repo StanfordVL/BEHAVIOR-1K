@@ -3,7 +3,6 @@ from collections.abc import Iterable
 
 import numpy as np
 import torch as th
-from numba import jit
 
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
@@ -381,64 +380,129 @@ class InverseKinematicsController(JointController, ManipulationController):
         return IK_MODE_COMMAND_DIMS[self.mode]
 
 
-@th.jit.script
-def _compute_ik_qpos_torch(
-    q: th.Tensor,
-    j_eef: th.Tensor,
-    ee_pos: th.Tensor,
-    ee_mat: th.Tensor,
-    goal_pos: th.Tensor,
-    goal_ori_mat: th.Tensor,
-    q_lower_limit: th.Tensor,
-    q_upper_limit: th.Tensor,
+def _jparse_compute_torch(
+    jacobian: th.Tensor,
+    gamma: float = 0.1,
+    singular_direction_gain: float = 1.0,
+) -> th.Tensor:
+    """Batched J-PARSE pseudo-inverse (torch implementation).
+
+    Vectorized over the batch dimension for use with the IK controller.
+    J-PARSE: Jacobian-based Projection Algorithm for Resolving Singularities
+    Effectively. Clamps small singular values and adds smooth feedback in
+    singular directions for singularity-robust IK control.
+    Reference: https://github.com/armlabstanford/jparse
+    """
+    J = jacobian.double()
+    N, m, _ = J.shape
+
+    U, S, Vh = th.linalg.svd(J, full_matrices=False)
+
+    sigma_max = S[:, 0]  # (N,)
+    threshold = gamma * sigma_max  # (N,)
+
+    nonsing_mask = S > threshold[:, None]  # (N, k)
+    sing_mask = ~nonsing_mask
+
+    # ---- J_safety: clamp singular values below threshold ----
+    S_safety = th.clamp(S, min=threshold[:, None])  # (N, k)
+    J_safety = U @ (S_safety.unsqueeze(-1) * Vh)  # (N, m, n)
+
+    # ---- J_proj: retain only non-singular directions ----
+    n_nonsing = nonsing_mask.sum(dim=1)  # (N,)
+
+    if (n_nonsing > 0).all():
+        S_proj = S * nonsing_mask  # (N, k)
+        J_proj = U @ (S_proj.unsqueeze(-1) * Vh)
+    else:
+        J_proj = th.zeros_like(J)
+        has_nonsing = n_nonsing > 0
+        S_proj = S * nonsing_mask
+        J_proj[has_nonsing] = (U[has_nonsing] * S_proj[has_nonsing, None, :]) @ Vh[has_nonsing]
+
+    # ---- Phi_singular: smooth feedback in singular directions ----
+    n_sing = sing_mask.sum(dim=1)  # (N,)
+    Phi_singular = th.zeros(N, m, m, dtype=J.dtype, device=J.device)
+
+    has_sing = n_sing > 0
+    if has_sing.any():
+        gains = th.full((m,), singular_direction_gain, dtype=J.dtype, device=J.device)
+        Kp = th.diag(gains)  # (m, m)
+
+        S_ratio = S[has_sing] / sigma_max[has_sing, None]  # (N_sing, k)
+        phi_vals = S_ratio / gamma  # (N_sing, k)
+        phi_vals = phi_vals * sing_mask[has_sing]  # zero out non-singular
+
+        U_sing = U[has_sing]  # (N_sing, m, k)
+        Phi_mat = th.diag_embed(phi_vals)  # (N_sing, k, k)
+        Phi_singular[has_sing] = U_sing @ Phi_mat @ U_sing.transpose(-2, -1) @ Kp
+
+    # ---- Combine ----
+    J_safety_pinv = th.linalg.pinv(J_safety)
+    J_proj_pinv = th.linalg.pinv(J_proj)
+
+    J_parse = J_safety_pinv @ J_proj @ J_proj_pinv
+    J_parse = J_parse + J_safety_pinv @ Phi_singular
+
+    return J_parse.float()
+
+
+def _jparse_compute_numpy(
+    jacobian,
+    gamma=0.1,
+    singular_direction_gain=1.0,
 ):
-    # Compute the pose error. Note that this is computed NOT in the EEF frame but still
-    # in the base frame.
-    pos_err = goal_pos - ee_pos
-    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
-    err = th.cat([pos_err, ori_err])
+    """Batched J-PARSE pseudo-inverse (numpy implementation).
 
-    # Use the jacobian to compute a local approximation
-    j_eef_pinv = th.linalg.pinv(j_eef)
-    delta_j = j_eef_pinv @ err
-    target_joint_pos = q + delta_j
+    Vectorized over the batch dimension for use with the IK controller.
+    J-PARSE: Jacobian-based Projection Algorithm for Resolving Singularities
+    Effectively. Clamps small singular values and adds smooth feedback in
+    singular directions for singularity-robust IK control.
+    Reference: https://github.com/armlabstanford/jparse
+    """
+    J = jacobian.astype(np.float64)
+    N, m, _ = J.shape
 
-    # Clip values to be within the joint limits
-    return target_joint_pos.clip(
-        min=q_lower_limit,
-        max=q_upper_limit,
-    )
+    U, S, Vh = np.linalg.svd(J, full_matrices=False)
 
+    sigma_max = S[:, 0]  # (N,)
+    threshold = gamma * sigma_max  # (N,)
 
-# Use numba since faster
-@jit(nopython=True)
-def _compute_ik_qpos_numpy(
-    q,
-    j_eef,
-    ee_pos,
-    ee_mat,
-    goal_pos,
-    goal_ori_mat,
-    q_lower_limit,
-    q_upper_limit,
-):
-    # Compute the pose error. Note that this is computed NOT in the EEF frame but still
-    # in the base frame.
-    pos_err = goal_pos - ee_pos
-    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
-    err = np.concatenate((pos_err, ori_err))
+    nonsing_mask = S > threshold[:, None]  # (N, k)
+    sing_mask = ~nonsing_mask
 
-    # Use the jacobian to compute a local approximation
-    j_eef_pinv = np.linalg.pinv(j_eef)
-    delta_j = j_eef_pinv @ err
-    target_joint_pos = q + delta_j
+    # ---- J_safety: clamp singular values below threshold ----
+    S_safety = np.clip(S, threshold[:, None], None)  # (N, k)
+    J_safety = U @ (S_safety[:, :, None] * Vh)  # (N, m, n)
 
-    # Clip values to be within the joint limits
-    return target_joint_pos.clip(q_lower_limit, q_upper_limit)
+    # ---- J_proj: retain only non-singular directions ----
+    S_proj = S * nonsing_mask  # (N, k)
+    J_proj = U @ (S_proj[:, :, None] * Vh)
 
+    # ---- Phi_singular: smooth feedback in singular directions ----
+    n_sing = sing_mask.sum(axis=1)  # (N,)
+    Phi_singular = np.zeros((N, m, m), dtype=np.float64)
 
-# Set these as part of the backend values
-add_compute_function(name="compute_ik_qpos", np_function=_compute_ik_qpos_numpy, th_function=_compute_ik_qpos_torch)
+    has_sing = n_sing > 0
+    if has_sing.any():
+        gains = np.full(m, singular_direction_gain, dtype=np.float64)
+        Kp = np.diag(gains)  # (m, m)
+
+        S_ratio = S[has_sing] / sigma_max[has_sing, None]  # (N_sing, k)
+        phi_vals = (S_ratio / gamma) * sing_mask[has_sing]  # (N_sing, k)
+
+        U_sing = U[has_sing]  # (N_sing, m, k)
+        Phi_mat = np.apply_along_axis(np.diag, -1, phi_vals)  # (N_sing, k, k)
+        Phi_singular[has_sing] = U_sing @ Phi_mat @ U_sing.transpose(0, 2, 1) @ Kp
+
+    # ---- Combine ----
+    J_safety_pinv = np.linalg.pinv(J_safety)
+    J_proj_pinv = np.linalg.pinv(J_proj)
+
+    J_parse = J_safety_pinv @ J_proj @ J_proj_pinv
+    J_parse = J_parse + J_safety_pinv @ Phi_singular
+
+    return J_parse.astype(np.float32)
 
 
 def _compute_ik_qpos_batch_torch(
@@ -454,7 +518,7 @@ def _compute_ik_qpos_batch_torch(
     pos_err = goal_pos - ee_pos
     ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
     err = th.cat([pos_err, ori_err], dim=-1)
-    j_eef_pinv = th.linalg.pinv(j_eef)
+    j_eef_pinv = _jparse_compute_torch(j_eef)
     delta_j = (j_eef_pinv @ err.unsqueeze(-1)).squeeze(-1)
     target_joint_pos = q + delta_j
     return target_joint_pos.clip(min=q_lower_limit, max=q_upper_limit)
@@ -473,7 +537,7 @@ def _compute_ik_qpos_batch_numpy(
     pos_err = goal_pos - ee_pos
     ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
     err = np.concatenate([pos_err, ori_err], axis=-1)
-    j_eef_pinv = np.linalg.pinv(j_eef)
+    j_eef_pinv = _jparse_compute_numpy(j_eef)
     delta_j = (j_eef_pinv @ err[..., None])[..., 0]
     target_joint_pos = q + delta_j
     return target_joint_pos.clip(q_lower_limit, q_upper_limit)
