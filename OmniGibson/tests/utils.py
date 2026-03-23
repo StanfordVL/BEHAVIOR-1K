@@ -1,3 +1,4 @@
+import functools
 import math
 
 import torch as th
@@ -120,7 +121,9 @@ num_objs = 0
 def og_test(*obj_names, needs_robot=False):
     """
     Decorator factory that creates a fresh minimal environment for each test with only
-    the specified objects, then tears it down via og.clear() afterwards.
+    the specified objects. On the first use it configures required macros and launches
+    the simulator; on subsequent uses it clears the existing simulator via og.clear()
+    before creating a new environment to ensure test isolation.
 
     Usage:
         @og_test("breakfast_table", "bowl")
@@ -131,8 +134,12 @@ def og_test(*obj_names, needs_robot=False):
         def test_with_robot(env):
             ...
     """
+    unknown = [name for name in obj_names if name not in _OBJ_KWARGS]
+    if unknown:
+        raise ValueError(f"Unknown object name(s): {unknown}. Available: {sorted(_OBJ_KWARGS)}")
 
     def decorator(func):
+        @functools.wraps(func)
         def wrapper():
             global num_objs
             num_objs = 0
@@ -171,7 +178,13 @@ def og_test(*obj_names, needs_robot=False):
                     obj.root_link.set_collision_approximation("boundingCube")
             og.sim.play()
 
-            func(env)
+            try:
+                func(env)
+            finally:
+                # Ensure the simulator is stopped and the stage is cleared even if the test raises
+                if og.sim is not None:
+                    og.sim.stop()
+                og.clear()
 
         return wrapper
 
