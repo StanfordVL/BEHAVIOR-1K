@@ -1,4 +1,3 @@
-import functools
 import math
 
 import torch as th
@@ -139,48 +138,44 @@ def og_test(*obj_names, needs_robot=False):
         raise ValueError(f"Unknown object name(s): {unknown}")
 
     def decorator(func):
-        @functools.wraps(func)
-        def wrapper():
-            global num_objs
-            num_objs = 0
+        global num_objs
+        num_objs = 0
 
-            if og.sim is None:
-                # First test: set required macros before launching
-                gm.ENABLE_OBJECT_STATES = True
-                gm.USE_GPU_DYNAMICS = True
-                gm.ENABLE_FLATCACHE = False
-                gm.ENABLE_TRANSITION_RULES = True
-            else:
-                # Subsequent tests: fully reset stage and relaunch sim
-                og.clear()
+        if og.sim is None:
+            # First test: set required macros before launching
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = False
+            gm.ENABLE_TRANSITION_RULES = True
+        else:
+            # Subsequent tests: fully reset stage and relaunch sim
+            og.clear()
 
-            cfg = {
-                "scene": {"type": "Scene"},
-                "objects": [get_obj_cfg(**_OBJ_KWARGS[name]) for name in obj_names],
-            }
-            if needs_robot:
-                cfg["robots"] = [
-                    {
-                        "type": "Fetch",
-                        "obs_modalities": "rgb",
-                        "position": [150, 150, 100],
-                        "orientation": [0, 0, 0, 1],
-                    }
-                ]
+        cfg = {
+            "scene": {"type": "Scene"},
+            "objects": [get_obj_cfg(**_OBJ_KWARGS[name]) for name in obj_names],
+        }
+        if needs_robot:
+            cfg["robots"] = [
+                {
+                    "type": "Fetch",
+                    "obs_modalities": "rgb",
+                    "position": [150, 150, 100],
+                    "orientation": [0, 0, 0, 1],
+                }
+            ]
 
-            env = og.Environment(configs=cfg)
+        env = og.Environment(configs=cfg)
 
-            # Additional processing for the tests to pass more deterministically
-            og.sim.stop()
-            bounding_box_object_names = ["bagel_dough", "raw_egg"]
-            for name in bounding_box_object_names:
-                obj = env.scene.object_registry("name", name)
-                obj.root_link.set_collision_approximation("boundingCube")
-            og.sim.play()
+        # Additional processing for the tests to pass more deterministically
+        og.sim.stop()
+        bounding_box_object_names = ["bagel_dough", "raw_egg"]
+        for name in bounding_box_object_names:
+            obj = env.scene.object_registry("name", name)
+            obj.root_link.set_collision_approximation("boundingCube")
+        og.sim.play()
 
-            func(env)
-
-        return wrapper
+        func(env)
 
     return decorator
 
