@@ -5,7 +5,7 @@ import omnigibson as og
 from omnigibson.utils.constants import semantic_class_id_to_name
 
 
-@og_test
+@og_test("breakfast_table", "dishtowel")
 def test_segmentation_modalities(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     dishtowel = env.scene.object_registry("name", "dishtowel")
@@ -87,7 +87,7 @@ def test_segmentation_modalities(env):
         env.scene.clear_system(system.name)
 
 
-@og_test
+@og_test("breakfast_table", "dishtowel")
 def test_bbox_modalities(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     dishtowel = env.scene.object_registry("name", "dishtowel")

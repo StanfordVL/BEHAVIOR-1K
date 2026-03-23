@@ -47,7 +47,7 @@ from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.physx_utils import apply_force_at_pos
 
 
-@og_test
+@og_test("bookcase_back", "bookcase_shelf", "bookcase_baseboard")
 def test_attached_to(env):
     bookcase_back = env.scene.object_registry("name", "bookcase_back")
     bookcase_shelf = env.scene.object_registry("name", "bookcase_shelf")
@@ -120,7 +120,7 @@ def test_attached_to(env):
     assert not bookcase_baseboard.states[AttachedTo].get_value(bookcase_back)
 
 
-@og_test
+@og_test("breakfast_table", "bowl", "dishtowel")
 def test_on_top(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     bowl = env.scene.object_registry("name", "bowl")
@@ -146,7 +146,7 @@ def test_on_top(env):
         bowl.states[OnTop].set_value(breakfast_table, False)
 
 
-@og_test
+@og_test("bottom_cabinet", "bowl", "dishtowel")
 def test_inside(env):
     bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
     bowl = env.scene.object_registry("name", "bowl")
@@ -178,7 +178,7 @@ def test_inside(env):
         bowl.states[OnTop].set_value(bottom_cabinet, False)
 
 
-@og_test
+@og_test("breakfast_table", "bowl", "dishtowel")
 def test_under(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     bowl = env.scene.object_registry("name", "bowl")
@@ -204,7 +204,7 @@ def test_under(env):
         bowl.states[Under].set_value(breakfast_table, False)
 
 
-@og_test
+@og_test("breakfast_table", "bowl", "dishtowel")
 def test_touching(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     bowl = env.scene.object_registry("name", "bowl")
@@ -229,7 +229,7 @@ def test_touching(env):
         bowl.states[Touching].set_value(breakfast_table, None)
 
 
-@og_test
+@og_test("breakfast_table", "bowl")
 def test_rigid_contact_bodies(env):
     from omnigibson.utils.usd_utils import RigidContactAPI
 
@@ -278,7 +278,7 @@ def test_rigid_contact_bodies(env):
     )
 
 
-@og_test
+@og_test("bottom_cabinet", "bowl", "dishtowel")
 def test_next_to(env):
     bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
     bowl = env.scene.object_registry("name", "bowl")
@@ -303,7 +303,7 @@ def test_next_to(env):
         bowl.states[NextTo].set_value(bottom_cabinet, None)
 
 
-@og_test
+@og_test("breakfast_table", "carpet")
 def test_overlaid(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     carpet = env.scene.object_registry("name", "carpet")
@@ -327,7 +327,7 @@ def test_overlaid(env):
         carpet.states[Overlaid].set_value(breakfast_table, False)
 
 
-@og_test
+@og_test("breakfast_table", "dishtowel")
 def test_pose(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     dishtowel = env.scene.object_registry("name", "dishtowel")
@@ -351,7 +351,7 @@ def test_pose(env):
         breakfast_table.states[Pose].set_value(None)
 
 
-@og_test
+@og_test("breakfast_table", "bottom_cabinet")
 def test_joint(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
@@ -368,7 +368,7 @@ def test_joint(env):
         bottom_cabinet.states[Joint].set_value(None)
 
 
-@og_test
+@og_test("breakfast_table", "dishtowel")
 def test_aabb(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     dishtowel = env.scene.object_registry("name", "dishtowel")
@@ -401,7 +401,7 @@ def test_aabb(env):
         breakfast_table.states[AABB].set_value(None)
 
 
-@og_test
+@og_test("bottom_cabinet", "bowl", "dishtowel")
 def test_adjacency(env):
     bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
     bowl = env.scene.object_registry("name", "bowl")
@@ -440,7 +440,7 @@ def test_adjacency(env):
         bottom_cabinet.states[VerticalAdjacency].set_value(None)
 
 
-@og_test
+@og_test("microwave", "stove", "fridge", "plywood", "bagel", "cookable_dishtowel")
 def test_temperature(env):
     microwave = env.scene.object_registry("name", "microwave")
     stove = env.scene.object_registry("name", "stove")
@@ -579,7 +579,7 @@ def test_temperature(env):
     assert dishtowel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
 
 
-@og_test
+@og_test("bagel", "cookable_dishtowel")
 def test_max_temperature(env):
     bagel = env.scene.object_registry("name", "bagel")
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
@@ -601,7 +601,7 @@ def test_max_temperature(env):
     assert dishtowel.states[MaxTemperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
 
 
-@og_test
+@og_test("microwave", "stove", "fridge")
 def test_heat_source_or_sink(env):
     microwave = env.scene.object_registry("name", "microwave")
     stove = env.scene.object_registry("name", "stove")
@@ -652,7 +652,7 @@ def test_heat_source_or_sink(env):
     assert stove.states[HeatSourceOrSink].get_value()
 
 
-@og_test
+@og_test("bagel", "cookable_dishtowel")
 def test_cooked(env):
     bagel = env.scene.object_registry("name", "bagel")
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
@@ -681,7 +681,7 @@ def test_cooked(env):
     assert dishtowel.states[MaxTemperature].get_value() >= dishtowel.states[Cooked].cook_temperature
 
 
-@og_test
+@og_test("bagel", "cookable_dishtowel")
 def test_burnt(env):
     bagel = env.scene.object_registry("name", "bagel")
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
@@ -710,7 +710,7 @@ def test_burnt(env):
     assert dishtowel.states[MaxTemperature].get_value() >= dishtowel.states[Burnt].burn_temperature
 
 
-@og_test
+@og_test("bagel", "cookable_dishtowel")
 def test_frozen(env):
     bagel = env.scene.object_registry("name", "bagel")
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
@@ -739,7 +739,7 @@ def test_frozen(env):
     assert dishtowel.states[Temperature].get_value() <= dishtowel.states[Frozen].freeze_temperature
 
 
-@og_test
+@og_test("bagel", "cookable_dishtowel")
 def test_heated(env):
     bagel = env.scene.object_registry("name", "bagel")
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
@@ -768,7 +768,7 @@ def test_heated(env):
     assert dishtowel.states[Temperature].get_value() >= dishtowel.states[Heated].heat_temperature
 
 
-@og_test
+@og_test("plywood")
 def test_on_fire(env):
     plywood = env.scene.object_registry("name", "plywood")
 
@@ -793,7 +793,7 @@ def test_on_fire(env):
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
 
-@og_test
+@og_test("stove", needs_robot=True)
 def test_toggled_on(env):
     stove = env.scene.object_registry("name", "stove")
     robot = env.robots[0]
@@ -854,7 +854,7 @@ def test_toggled_on(env):
     assert not stove.states[ToggledOn].get_value()
 
 
-@og_test
+@og_test("furniture_sink")
 def test_particle_source(env):
     sink = env.scene.object_registry("name", "furniture_sink")
 
@@ -882,7 +882,7 @@ def test_particle_source(env):
     water_system.remove_all_particles()
 
 
-@og_test
+@og_test("furniture_sink")
 def test_particle_sink(env):
     sink = env.scene.object_registry("name", "furniture_sink")
     place_obj_on_floor_plane(sink)
@@ -911,7 +911,7 @@ def test_particle_sink(env):
     water_system.remove_all_particles()
 
 
-@og_test
+@og_test("breakfast_table", "acetone_atomizer", "applier_dishtowel")
 def test_particle_applier(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     acetone_atomizer = env.scene.object_registry("name", "acetone_atomizer")
@@ -972,7 +972,7 @@ def test_particle_applier(env):
     water_system.remove_all_particles()
 
 
-@og_test
+@og_test("breakfast_table", "vacuum", "remover_dishtowel")
 def test_particle_remover(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     vacuum = env.scene.object_registry("name", "vacuum")
@@ -1037,7 +1037,7 @@ def test_particle_remover(env):
     water_system.remove_all_particles()
 
 
-@og_test
+@og_test("remover_dishtowel")
 def test_saturated(env):
     remover_dishtowel = env.scene.object_registry("name", "remover_dishtowel")
 
@@ -1073,7 +1073,7 @@ def test_saturated(env):
     water_system.remove_all_particles()
 
 
-@og_test
+@og_test("microwave", "bottom_cabinet")
 def test_open(env):
     microwave = env.scene.object_registry("name", "microwave")
     bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
@@ -1119,7 +1119,7 @@ def test_open(env):
     assert not bottom_cabinet.states[Open].get_value()
 
 
-@og_test
+@og_test("carpet")
 def test_folded_unfolded(env):
     carpet = env.scene.object_registry("name", "carpet")
 
@@ -1177,7 +1177,7 @@ def test_folded_unfolded(env):
         carpet.states[Folded].set_value(True)
 
 
-@og_test
+@og_test("breakfast_table", "carpet")
 def test_draped(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     carpet = env.scene.object_registry("name", "carpet")
@@ -1203,7 +1203,7 @@ def test_draped(env):
         carpet.states[Draped].set_value(breakfast_table, False)
 
 
-@og_test
+@og_test("stockpot")
 def test_filled(env):
     stockpot = env.scene.object_registry("name", "stockpot")
     systems = [
@@ -1230,7 +1230,7 @@ def test_filled(env):
         assert not stockpot.states[Filled].get_value(system)
 
 
-@og_test
+@og_test("stockpot")
 def test_contains(env):
     stockpot = env.scene.object_registry("name", "stockpot")
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
@@ -1268,7 +1268,7 @@ def test_contains(env):
         system.remove_all_particles()
 
 
-@og_test
+@og_test("bracelet", "bowl", "microwave")
 def test_covered(env):
     bracelet = env.scene.object_registry("name", "bracelet")
     bowl = env.scene.object_registry("name", "bowl")

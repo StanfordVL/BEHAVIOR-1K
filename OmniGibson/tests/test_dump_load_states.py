@@ -8,7 +8,7 @@ from omnigibson.object_states import Covered
 from omnigibson.systems import VisualParticleSystem
 
 
-@og_test
+@og_test("breakfast_table")
 def test_dump_load(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
@@ -28,7 +28,7 @@ def test_dump_load(env):
         env.scene.clear_system(system_name)
 
 
-@og_test
+@og_test("breakfast_table")
 def test_dump_load_serialized(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
@@ -47,7 +47,7 @@ def test_dump_load_serialized(env):
         env.scene.clear_system(system_name)
 
 
-@og_test
+@og_test("breakfast_table")
 def test_save_restore_partial(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
 
@@ -66,7 +66,7 @@ def test_save_restore_partial(env):
     assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None
 
 
-@og_test
+@og_test("breakfast_table")
 def test_save_restore_full(env):
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
