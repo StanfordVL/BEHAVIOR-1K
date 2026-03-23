@@ -54,6 +54,31 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
     @classmethod
     def _rebuild_block_state(cls):
+        """
+        (Re)build all pre-allocated tensors that map objects to their rows/cols in the
+        physics contact matrix.  Must be called whenever the set of tracked objects changes
+        (object added or removed).
+
+        Layout
+        ------
+        RigidContactAPI exposes a per-scene contact matrix of shape (R, C).  Each rigid body
+        occupies a contiguous slice of rows (as reporter) and a contiguous slice of columns
+        (as reportee).  We pre-build two block-diagonal projection matrices:
+
+          _BLOCK_OBJ_TO_CONTACT_ROWS  (N_total, R_total) float32
+          _BLOCK_OBJ_TO_CONTACT_COLS  (N_total, C_total) float32
+
+        Row i of each matrix is a 0/1 mask that selects the contact-matrix rows/cols that
+        belong to object i.  Scenes are stacked block-diagonally so multi-scene environments
+        are handled with a single pair of matmuls.
+
+        _BLOCK_CONTACT_MATRIX  (R_total, C_total) float32
+          Pre-allocated buffer filled in-place every step from the live physics data.
+
+        _INTER_OBJECT_TOUCHING_MATRIX  (N_total, N_total) bool
+          Final output: entry [i, j] is True when objects i and j are in contact.
+          Updated by global_update() each step.
+        """
         if not cls._IDX_OBJS:
             cls._BLOCK_OBJ_TO_CONTACT_ROWS = None
             cls._BLOCK_OBJ_TO_CONTACT_COLS = None
@@ -106,10 +131,20 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
     @classmethod
     def global_update(cls):
+        """
+        Refresh _INTER_OBJECT_TOUCHING_MATRIX from the current physics contact cache.
+
+        Called automatically every sim step via the normal global_update machinery.
+        May also be called manually after og.sim.step_physics()-only sequences (e.g.
+        sample_kinematics) when the raw contact cache is fresh but the touching matrix
+        would otherwise be stale.
+        """
         if cls._BLOCK_CONTACT_MATRIX is None:
             return
 
-        # Fill pre-allocated block contact matrix in-place (no allocation)
+        # Pull the latest contact data from physics into the pre-allocated buffer.
+        # step_physics() already keeps RigidContactAPI's raw cache current, so this
+        # is just a copy into our block layout — no physics query overhead.
         RigidContactAPI.update_block_contact_matrix(
             cls._ACTIVE_SCENE_IDXS,
             cls._BLOCK_CONTACT_MATRIX,
@@ -117,14 +152,16 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             cls._SCENE_COL_OFFSETS,
         )
 
-        # Two matmuls → (N_total, N_total) one-way contact
+        # Two matmuls produce (N_total, N_total) one-way contact:
+        #   one_way[i, j] = 1  iff object i reports contact with object j
         one_way = RigidContactAPI.compute_pairwise_contacts(
             cls._BLOCK_CONTACT_MATRIX,
             cls._BLOCK_OBJ_TO_CONTACT_ROWS,
             cls._BLOCK_OBJ_TO_CONTACT_COLS,
         )
 
-        # Symmetrize — kinematic objects have no rows, so OR both directions
+        # Symmetrize via OR: kinematic objects have no contact rows of their own,
+        # so contact is only reported in one direction; OR catches both cases.
         cls._INTER_OBJECT_TOUCHING_MATRIX[:] = one_way | one_way.T
         cls._INTER_OBJECT_TOUCHING_MATRIX.fill_diagonal_(False)
 
