@@ -305,6 +305,10 @@ class RigidContactAPIImpl:
                             if isinstance(link, RigidDynamicPrim) and link.contact_reporting_enabled:
                                 scene_dynamic_body_filters.append(link.prim_path)
 
+                # If there are only kinematic/static bodies, skip view creation for this scene.
+                if len(scene_dynamic_body_filters) == 0:
+                    continue
+
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=f"/World/scene_{scene_idx}/*/*",
                     filter_patterns=scene_body_filters,
