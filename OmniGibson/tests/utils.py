@@ -136,7 +136,7 @@ def og_test(*obj_names, needs_robot=False):
     """
     unknown = [name for name in obj_names if name not in _OBJ_KWARGS]
     if unknown:
-        raise ValueError(f"Unknown object name(s): {unknown}. Available: {sorted(_OBJ_KWARGS)}")
+        raise ValueError(f"Unknown object name(s): {unknown}")
 
     def decorator(func):
         @functools.wraps(func)
@@ -145,7 +145,7 @@ def og_test(*obj_names, needs_robot=False):
             num_objs = 0
 
             if og.sim is None:
-                # First ever test: set required macros before launching
+                # First test: set required macros before launching
                 gm.ENABLE_OBJECT_STATES = True
                 gm.USE_GPU_DYNAMICS = True
                 gm.ENABLE_FLATCACHE = False
@@ -170,21 +170,15 @@ def og_test(*obj_names, needs_robot=False):
 
             env = og.Environment(configs=cfg)
 
-            # Post-processing for determinism
+            # Additional processing for the tests to pass more deterministically
             og.sim.stop()
-            for obj_name in obj_names:
-                if obj_name in ("bagel_dough", "raw_egg"):
-                    obj = env.scene.object_registry("name", obj_name)
-                    obj.root_link.set_collision_approximation("boundingCube")
+            bounding_box_object_names = ["bagel_dough", "raw_egg"]
+            for name in bounding_box_object_names:
+                obj = env.scene.object_registry("name", name)
+                obj.root_link.set_collision_approximation("boundingCube")
             og.sim.play()
 
-            try:
-                func(env)
-            finally:
-                # Ensure the simulator is stopped and the stage is cleared even if the test raises
-                if og.sim is not None:
-                    og.sim.stop()
-                og.clear()
+            func(env)
 
         return wrapper
 
