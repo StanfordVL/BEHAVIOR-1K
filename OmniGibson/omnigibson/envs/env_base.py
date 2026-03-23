@@ -30,6 +30,7 @@ from omnigibson.utils.python_utils import (
     merge_nested_dicts,
 )
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.vision_utils import change_pcd_frame
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -118,6 +119,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Scene list
         self._scenes = []
+
+        # Sensor registry for obs-key-first iteration (built in post_play_load)
+        self._robot_sensor_map = {}      # (robot_name, sensor_name) -> [sensor_per_env]
+        self._robot_has_proprio = {}     # robot_name -> bool
+        self._ext_sensor_map = {}        # sensor_name -> [sensor_per_env]
 
         # Create the scene graph builder
         self._scene_graph_builder = None
@@ -470,6 +476,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.load_observation_space()
         self._load_action_space()
 
+        # Build sensor registry for get_obs()
+        self._build_sensor_registry()
+
         self.reset()
 
         # Start the scene graph builder
@@ -505,6 +514,32 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """No-op to satisfy certain RL frameworks."""
         pass
 
+    def _build_sensor_registry(self):
+        """
+        Build cross-scene sensor maps for obs-key-first observation gathering.
+        All scenes share the same robot/sensor configuration, so scene 0 is used as the template.
+        """
+        self._robot_sensor_map = {}
+        self._robot_has_proprio = {}
+
+        for robot_idx, robot in enumerate(self._scenes[0].robots):
+            self._robot_has_proprio[robot.name] = "proprio" in robot._obs_modalities
+            for sensor_name in robot.sensors:
+                self._robot_sensor_map[(robot.name, sensor_name)] = [
+                    self._scenes[env_idx].robots[robot_idx].sensors[sensor_name]
+                    for env_idx in range(self.num_envs)
+                ]
+
+        self._ext_sensor_map = {}
+        if self._external_sensors is not None:
+            for sensor_name in self._external_sensors[0]:
+                if not self._external_sensors_include_in_obs.get(sensor_name, False):
+                    continue
+                self._ext_sensor_map[sensor_name] = [
+                    self._external_sensors[env_idx][sensor_name]
+                    for env_idx in range(self.num_envs)
+                ]
+
     def get_obs(self, env_indices=None):
         """
         Get the current environment observation.
@@ -518,41 +553,71 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 list[dict]: Additional information about the observations per env
         """
         if env_indices is None:
-            env_indices = range(self.num_envs)
-        all_obs = []
-        all_info = []
-        for env_idx in env_indices:
-            obs = dict()
-            info = dict()
-            scene = self._scenes[env_idx]
+            env_indices = list(range(self.num_envs))
+        else:
+            env_indices = [int(i) for i in env_indices]
 
-            # Grab all observations from each robot
-            for robot in scene.robots:
-                if maxdim(robot.observation_space) > 0:
-                    obs[robot.name], info[robot.name] = robot.get_obs()
+        # Pre-allocate result dicts for each requested env
+        all_obs = [{} for _ in env_indices]
+        all_info = [{} for _ in env_indices]
 
-            # Add task observations
-            if maxdim(self._task.observation_space) > 0:
-                obs["task"] = self._task.get_obs(env=self, env_idx=env_idx)
+        # --- Robot observations ---
+        for robot_idx, robot_0 in enumerate(self._scenes[0].robots):
+            robot_name = robot_0.name
+            if maxdim(robot_0.observation_space) <= 0:
+                continue
 
-            # Add external sensor observations if they exist
-            if self._external_sensors is not None:
-                external_obs = dict()
-                external_info = dict()
-                for sensor_name, sensor in self._external_sensors[env_idx].items():
-                    if not self._external_sensors_include_in_obs[sensor_name]:
-                        continue
+            # Initialize per-env robot obs/info dicts
+            for i in range(len(env_indices)):
+                all_obs[i][robot_name] = {}
+                all_info[i][robot_name] = {}
 
-                    external_obs[sensor_name], external_info[sensor_name] = sensor.get_obs()
-                obs["external"] = external_obs
-                info["external"] = external_info
+            # Sensor observations
+            for (rname, sensor_name), sensors in self._robot_sensor_map.items():
+                if rname != robot_name:
+                    continue
+                # TODO: Replace with a single batched tiled rendering call
+                for i, env_idx in enumerate(env_indices):
+                    s_obs, s_info = sensors[env_idx].get_obs()
+                    # Convert pointcloud from world frame to robot base frame
+                    for key in s_obs:
+                        if "pointcloud" in key:
+                            robot = self._scenes[env_idx].robots[robot_idx]
+                            s_obs[key] = change_pcd_frame(
+                                pcd=s_obs[key],
+                                rel_pose=th.cat(robot.get_position_orientation()),
+                            )
+                    all_obs[i][robot_name][sensor_name] = s_obs
+                    all_info[i][robot_name][sensor_name] = s_info
 
-            # Possibly flatten obs if requested
-            if self._flatten_obs_space:
-                obs = recursively_generate_flat_dict(dic=obs)
+            # Proprioception
+            if self._robot_has_proprio.get(robot_name, False):
+                for i, env_idx in enumerate(env_indices):
+                    robot = self._scenes[env_idx].robots[robot_idx]
+                    all_obs[i][robot_name]["proprio"], all_info[i][robot_name]["proprio"] = robot.get_proprioception()
 
-            all_obs.append(obs)
-            all_info.append(info)
+        # --- Task observations ---
+        if maxdim(self._task.observation_space) > 0:
+            for i, env_idx in enumerate(env_indices):
+                all_obs[i]["task"] = self._task.get_obs(env=self, env_idx=env_idx)
+
+        # --- External sensor observations ---
+        if self._external_sensors is not None:
+            for i in range(len(env_indices)):
+                all_obs[i]["external"] = {}
+                all_info[i]["external"] = {}
+
+            for sensor_name, sensors in self._ext_sensor_map.items():
+                # TODO: Replace with a single batched tiled rendering call
+                for i, env_idx in enumerate(env_indices):
+                    s_obs, s_info = sensors[env_idx].get_obs()
+                    all_obs[i]["external"][sensor_name] = s_obs
+                    all_info[i]["external"][sensor_name] = s_info
+
+        # --- Flatten if requested ---
+        if self._flatten_obs_space:
+            for i in range(len(env_indices)):
+                all_obs[i] = recursively_generate_flat_dict(dic=all_obs[i])
 
         return all_obs, all_info
 
