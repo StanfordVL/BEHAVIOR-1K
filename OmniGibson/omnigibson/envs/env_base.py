@@ -111,10 +111,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._external_sensors = None
         self._external_sensors_include_in_obs = None
         self._loaded = None
-        self._current_episodes = th.zeros(self.num_envs, dtype=th.int64)
+        self._current_episodes = th.zeros(self.num_envs, dtype=th.int32)
 
         # Variables reset at the beginning of each episode
-        self._current_steps = th.zeros(self.num_envs, dtype=th.int64)
+        self._current_steps = th.zeros(self.num_envs, dtype=th.int32)
 
         # Scene list
         self._scenes = []
@@ -180,7 +180,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Reset bookkeeping variables
         self._reset_variables()
-        self._current_episodes = th.zeros(self.num_envs, dtype=th.int64)
+        self._current_episodes = th.zeros(self.num_envs, dtype=th.int32)
 
         # - Potentially overwrite the USD entry for the scene if none is specified and we're online sampling -
 
