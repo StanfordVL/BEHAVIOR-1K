@@ -728,21 +728,15 @@ class Robot(USDObject, GymObservable):
                     max_contact_data_count=256 * len(finger_paths),
                 )
 
-                row_paths = list(getattr(self._contact_view, "body_paths", getattr(self._contact_view, "sensor_paths", [])))
+                row_paths = list(
+                    getattr(self._contact_view, "body_paths", getattr(self._contact_view, "sensor_paths", []))
+                )
                 col_paths = list(getattr(self._contact_view, "filter_patterns", finger_paths))
 
-                self._contact_view_path_to_row_idx = {
-                    path: i for i, path in enumerate(row_paths)
-                }
-                self._contact_view_path_to_col_idx = {
-                    path: i for i, path in enumerate(col_paths)
-                }
-                self._contact_view_row_idx_to_path = {
-                    i: path for i, path in enumerate(row_paths)
-                }
-                self._contact_view_col_idx_to_path = {
-                    i: path for i, path in enumerate(col_paths)
-                }
+                self._contact_view_path_to_row_idx = {path: i for i, path in enumerate(row_paths)}
+                self._contact_view_path_to_col_idx = {path: i for i, path in enumerate(col_paths)}
+                self._contact_view_row_idx_to_path = {i: path for i, path in enumerate(row_paths)}
+                self._contact_view_col_idx_to_path = {i: path for i, path in enumerate(col_paths)}
             else:
                 self._contact_view = None
                 self._contact_view_path_to_row_idx = dict()
