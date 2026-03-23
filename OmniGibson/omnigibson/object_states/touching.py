@@ -67,10 +67,10 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         r_off = c_off = 0
 
         for scene_idx in cls._ACTIVE_SCENE_IDXS:
-            cm = RigidContactAPI.get_contact_matrix(scene_idx)
-            if cm is None:
+            contact_matrix = RigidContactAPI.get_contact_matrix(scene_idx)
+            if contact_matrix is None:
                 continue
-            R, C = cm.shape
+            R, C = contact_matrix.shape
             scene_objs = [obj for obj in cls._IDX_OBJS if obj.scene.idx == scene_idx]
             N = len(scene_objs)
             row_masks = th.zeros((N, R), dtype=th.float32)

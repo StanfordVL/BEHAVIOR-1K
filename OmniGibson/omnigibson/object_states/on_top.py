@@ -29,10 +29,14 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             self.obj.reset()
 
         for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
-            if sample_kinematics("onTop", self.obj, other, use_trav_map=use_trav_map) and self.get_value(other):
-                return True
-            else:
-                og.sim.load_state(state, serialized=False)
+            if sample_kinematics("onTop", self.obj, other, use_trav_map=use_trav_map):
+                # sample_kinematics uses step_physics() internally, which keeps the raw contact
+                # cache fresh but does not run Touching.global_update(). Refresh the Touching
+                # matrix here so get_value() reads current contact state.
+                Touching.global_update()
+                if self.get_value(other):
+                    return True
+            og.sim.load_state(state, serialized=False)
 
         return False
 
