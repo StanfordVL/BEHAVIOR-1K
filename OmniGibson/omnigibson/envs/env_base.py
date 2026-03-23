@@ -125,10 +125,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._robot_has_proprio = {}  # robot_name -> bool
         self._ext_sensor_map = {}  # sensor_name -> [sensor_per_env]
 
-        # Create the scene graph builder
-        self._scene_graph_builder = None
+        # Create the scene graph builders (one per scene)
+        self._scene_graph_builders = []
         if "scene_graph" in self.config and self.config["scene_graph"] is not None:
-            self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
+            self._scene_graph_builders = [SceneGraphBuilder(**self.config["scene_graph"]) for _ in range(self.num_envs)]
 
         # Load this environment
         self.load()
@@ -481,9 +481,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         self.reset()
 
-        # Start the scene graph builder
-        if self._scene_graph_builder:
-            self._scene_graph_builder.start(self._scenes[0])
+        # Start the scene graph builders
+        for builder, scene in zip(self._scene_graph_builders, self._scenes):
+            builder.start(scene)
 
         # Denote that the scene is loaded
         self._loaded = True
@@ -619,15 +619,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         return all_obs, all_info
 
-    def get_scene_graph(self):
+    def get_scene_graph(self, env_idx=0):
         """
-        Get the current scene graph.
+        Get the current scene graph for a given environment.
+
+        Args:
+            env_idx (int): Index of the environment to get the scene graph for. Default is 0.
 
         Returns:
             SceneGraph: Current scene graph
         """
-        assert self._scene_graph_builder is not None, "Scene graph builder must be specified in config!"
-        return self._scene_graph_builder.get_scene_graph()
+        assert self._scene_graph_builders, "Scene graph builder must be specified in config!"
+        return self._scene_graph_builders[env_idx].get_scene_graph()
 
     def _populate_info(self, infos):
         """
@@ -642,8 +645,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for env_idx in range(self.num_envs):
             infos[env_idx]["episode_length"] = self._current_steps[env_idx].item()
 
-        if self._scene_graph_builder is not None:
-            infos[0]["scene_graph"] = self.get_scene_graph()
+        for i, builder in enumerate(self._scene_graph_builders):
+            infos[i]["scene_graph"] = builder.get_scene_graph()
 
     def _convert_action_dict_to_tensor(self, action_dict):
         """Convert a single action dict's values to tensors.
@@ -719,9 +722,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab observations
         obs_list, obs_info_list = self.get_obs()
 
-        # Step the scene graph builder if necessary
-        if self._scene_graph_builder is not None:
-            self._scene_graph_builder.step(self._scenes[0])
+        # Step the scene graph builders if necessary
+        for builder, scene in zip(self._scene_graph_builders, self._scenes):
+            builder.step(scene)
 
         # Grab reward, done, and info, and populate with internal info
         rewards, dones, infos = self.task.step(self, action)

@@ -68,9 +68,9 @@ class ProfilingEnv(og.Environment):
             # Grab observations
             obs, obs_info = self.get_obs()
 
-            # Step the scene graph builder if necessary
-            if self._scene_graph_builder is not None:
-                self._scene_graph_builder.step(self.scene)
+            # Step the scene graph builders if necessary
+            for builder, scene in zip(self._scene_graph_builders, self.scenes):
+                builder.step(scene)
 
             # Grab reward, done, and info, and populate with internal info
             reward, done, info = self.task.step(self, action)
