@@ -340,7 +340,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         assert og.sim.is_stopped(), "Simulator must be stopped before loading external sensors!"
         sensors_config = self.env_config["external_sensors"]
         if sensors_config is not None:
-            self._external_sensors = dict()
+            self._external_sensors = []
             self._external_sensors_include_in_obs = dict()
             for i, sensor_config in enumerate(sensors_config):
                 # Add a name for the object if necessary
@@ -349,25 +349,33 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Determine prim path if not specified
                 if "relative_prim_path" not in sensor_config:
                     sensor_config["relative_prim_path"] = f"/{sensor_config['name']}"
-                # Pop the desired position and orientation
-                sensor_config = deepcopy(sensor_config)
-                position, orientation = sensor_config.pop("position", None), sensor_config.pop("orientation", None)
-                pose_frame = sensor_config.pop("pose_frame", "scene")
-                # Pop whether or not to include this sensor in the observation
-                include_in_obs = sensor_config.pop("include_in_obs", True)
-                # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
-                sensor = create_sensor(**sensor_config)
-                # Load an initialize this sensor
-                sensor.load(self._scenes[0])
-                sensor.initialize()
-                sensor.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
-                self._external_sensors[sensor.name] = sensor
-                self._external_sensors_include_in_obs[sensor.name] = include_in_obs
+            # Create separate sensor instances for each scene
+            for scene_idx, scene in enumerate(self._scenes):
+                scene_sensors = dict()
+                for i, sensor_config in enumerate(sensors_config):
+                    sc = deepcopy(sensor_config)
+                    # Pop the desired position and orientation
+                    position, orientation = sc.pop("position", None), sc.pop("orientation", None)
+                    pose_frame = sc.pop("pose_frame", "scene")
+                    # Pop whether or not to include this sensor in the observation
+                    include_in_obs = sc.pop("include_in_obs", True)
+                    # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
+                    sensor = create_sensor(**sc)
+                    # Load an initialize this sensor
+                    sensor.load(scene)
+                    sensor.initialize()
+                    sensor.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
+                    scene_sensors[sensor.name] = sensor
+                    # Populate include_in_obs only once (same for all scenes)
+                    if scene_idx == 0:
+                        self._external_sensors_include_in_obs[sensor.name] = include_in_obs
+                self._external_sensors.append(scene_sensors)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading external sensors!"
 
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
+        # Assumes all scenes share the same robot/sensor configuration
         obs_space = dict()
 
         for robot in self._scenes[0].robots:
@@ -384,7 +392,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Also load any external sensors
         if self._external_sensors is not None:
             external_obs_space = dict()
-            for sensor_name, sensor in self._external_sensors.items():
+            for sensor_name, sensor in self._external_sensors[0].items():
                 if not self._external_sensors_include_in_obs[sensor_name]:
                     continue
 
@@ -528,10 +536,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 obs["task"] = self._task.get_obs(env=self, env_idx=env_idx)
 
             # Add external sensor observations if they exist
-            if env_idx == 0 and self._external_sensors is not None:
+            if self._external_sensors is not None:
                 external_obs = dict()
                 external_info = dict()
-                for sensor_name, sensor in self._external_sensors.items():
+                for sensor_name, sensor in self._external_sensors[env_idx].items():
                     if not self._external_sensors_include_in_obs[sensor_name]:
                         continue
 
@@ -729,7 +737,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Get the RGB sensors
         rgb_sensors = [
             x
-            for x in self._external_sensors.values()
+            for x in self._external_sensors[0].values()
             if isinstance(x, VisionSensor) and (x.modalities == "all" or "rgb" in x.modalities)
         ]
         if not rgb_sensors:
@@ -859,8 +867,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
     def external_sensors(self):
         """
         Returns:
-            None or dict: If self.env_config["external_sensors"] is specified, returns the dict mapping sensor name to
-                instantiated sensor. Otherwise, returns None
+            None or list[dict]: If self.env_config["external_sensors"] is specified, returns a list of dicts
+                (one per scene), each mapping sensor name to instantiated sensor. Otherwise, returns None
         """
         return self._external_sensors
 
