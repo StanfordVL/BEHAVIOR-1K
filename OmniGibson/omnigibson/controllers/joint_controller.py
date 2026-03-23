@@ -16,8 +16,6 @@ from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
-from omnigibson.utils.processing_utils import MovingAverageFilter
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -58,7 +56,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         use_cc_compensation=True,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
-        smoothing_filter_size=None,
     ):
         """
         Args:
@@ -73,7 +70,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 "has_limit": [...bool...]
 
                 Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this controller. Used for inferring
+            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
                 controller-relevant values during control computations
             command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
                 if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
@@ -131,9 +128,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self._use_impedances = use_impedances
         self._use_gravity_compensation = use_gravity_compensation
         self._use_cc_compensation = use_cc_compensation
-        self._smoothing_filter_size = smoothing_filter_size
-        self._filter_obs_dim = len(dof_idx)
-        self._control_filter = None  # single batched filter for all members
 
         # Warn the user about gravity compensation being experimental.
         if self._use_gravity_compensation:
@@ -159,71 +153,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             isaac_kd=isaac_kd,
         )
 
-    def add_member(self, articulation_root_path, control_enabled=True):
-        idx = super().add_member(articulation_root_path, control_enabled=control_enabled)
-        if self._smoothing_filter_size not in {None, 0}:
-            if self._control_filter is None:
-                # First-ever member: create the batched filter (idx is always 0 here)
-                self._control_filter = MovingAverageFilter(
-                    obs_dim=self._filter_obs_dim,
-                    filter_width=self._smoothing_filter_size,
-                    n_members=1,
-                )
-            else:
-                # Pass idx so the filter reuses the slot in-place or appends as appropriate
-                self._control_filter.add_member(idx)
-        return idx
-
-    def unregister_member(self, controller_idx):
-        """Mark member at controller_idx as a tombstone in both controller and smoothing filter.
-
-        Args:
-            controller_idx (int): index of the member to unregister
-        """
-        super().unregister_member(controller_idx)
-        if self._control_filter is not None:
-            self._control_filter.unregister_member(controller_idx)
-
-    def reset(self, controller_idx):
-        super().reset(controller_idx)
-        if self._control_filter is not None:
-            self._control_filter.reset(controller_idx)
-
-    @property
-    def state_size(self):
-        if self._control_filter is None:
-            return super().state_size
-        return super().state_size + self._control_filter.state_size
-
-    def _dump_state(self, controller_idx):
-        state = super()._dump_state(controller_idx=controller_idx)
-        state["control_filter"] = (
-            None if self._control_filter is None else self._control_filter.dump_state(controller_idx)
-        )
-        return state
-
-    def _load_state(self, controller_idx, state):
-        super()._load_state(controller_idx=controller_idx, state=state)
-        if self._control_filter is not None and state.get("control_filter") is not None:
-            self._control_filter.load_state(controller_idx, state["control_filter"])
-
-    def serialize(self, state, controller_idx):
-        state_flat = super().serialize(state=state, controller_idx=controller_idx)
-        filter_part = (
-            th.tensor([])
-            if self._control_filter is None or state.get("control_filter") is None
-            else self._control_filter.serialize(state["control_filter"], controller_idx)
-        )
-        return th.cat([state_flat, filter_part])
-
-    def deserialize(self, state, controller_idx):
-        state_dict, idx = super().deserialize(state=state, controller_idx=controller_idx)
-        state_dict["control_filter"] = None
-        if self._control_filter is not None:
-            state_dict["control_filter"], samples_len = self._control_filter.deserialize(state[idx:], controller_idx)
-            idx += samples_len
-        return state_dict, idx
-
     def _generate_default_command_output_limits(self):
         # Use motor type instead of default control type, since, e.g, use_impedances is commanding joint positions
         # but controls low-level efforts
@@ -232,21 +161,11 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx],
         )
 
-    def _update_goal(self, controller_idx, command):
-        """
-        Returns:
-            dict: ``target`` joint setpoint as a compute-backend array
-        """
+    def _update_goal(self, command, control_dict):
         # If we're using delta commands, add this value
         if self._use_delta_commands:
-            prim_path = self._articulation_root_paths[controller_idx]
             # Compute the base value for the command
-            if self._motor_type == "position":
-                base_value = ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]
-            elif self._motor_type == "velocity":
-                base_value = ControllableObjectViewAPI.get_joint_velocities(prim_path, estimate=True)[self.dof_idx]
-            else:
-                base_value = ControllableObjectViewAPI.get_joint_efforts(prim_path)[self.dof_idx]
+            base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
 
             # Apply the command to the base value.
             target = base_value + command
@@ -280,104 +199,77 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         return dict(target=target)
 
-    def compute_control(self, goals):
+    def compute_control(self, goal_dict, control_dict):
         """
-        Converts the (already preprocessed) batched goals into deployable (non-clipped!) joint control signals
-        for all N group members.
+        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal
 
         Args:
-            goals (Dict[str, Array]): batched goals with shape (N, *shape) per key.
-                Must include:
-                    target: (N, control_dim) desired joint values used as setpoint
+            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                goals necessary for controller computation. Must include the following keys:
+                    target: desired N-dof absolute joint values used as setpoint
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation. Must include the following keys:
+                    joint_position: Array of current joint positions
+                    joint_velocity: Array of current joint velocities
+                    joint_effort: Array of current joint effort
 
         Returns:
-            Array: (N, control_dim) outputted (non-clipped!) control signal to deploy
+            Array[float]: outputted (non-clipped!) control signal to deploy
         """
+        base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
+        target = goal_dict["target"]
 
-        target = goals["target"]  # (N, control_dim)
-
+        # Convert control into efforts
         if self._use_impedances:
-            rows = self.view_row_indices
-            # Joint indices are defined over actuated joints; generalized dynamics tensors may include extra base DoFs.
-            all_joint_positions = ControllableObjectViewAPI.get_all_joint_positions(self.routing_path)[rows, :]
-
             if self._motor_type == "position":
-                base_value = all_joint_positions[:, self.dof_idx]
-                vel_base = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[
-                    rows, :
-                ][:, self.dof_idx]
+                # Run impedance controller -- effort = pos_err * kp + vel_err * kd
                 position_error = target - base_value
-                vel_pos_error = -vel_base
+                vel_pos_error = -control_dict["joint_velocity"][self.dof_idx]
                 u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
-                base_value = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[
-                    rows, :
-                ][:, self.dof_idx]
+                # Compute command torques via PI velocity controller plus gravity compensation torques
                 velocity_error = target - base_value
                 u = velocity_error * self.vel_kp
             else:  # effort
                 u = target
 
-            # Apply impedances via mass matrix (batched over all N members)
-            all_mm = ControllableObjectViewAPI.get_all_generalized_mass_matrices(self.routing_path)[
-                rows, :, :
-            ]  # (N, n_dof_total, n_dof_total)
+            u = cb.get_custom_method("compute_joint_torques")(u, control_dict["mass_matrix"], self.dof_idx)
 
-            # Compute offset between generalized DoFs and actuated joint DoFs (handles floating-base robots).
-            base_dof_offset = all_mm.shape[-1] - all_joint_positions.shape[-1]
-            if base_dof_offset < 0:
-                base_dof_offset = 0
-            effective_dof_idx = [idx + base_dof_offset for idx in self.dof_idx]
-            dof_idx_arr = cb.int_array(effective_dof_idx)
-
-            u = cb.get_custom_method("compute_joint_torques_batch")(u, all_mm, dof_idx_arr)  # (N, control_dim)
-
+            # Add gravity compensation
             if self._use_gravity_compensation:
-                u = (
-                    u
-                    + ControllableObjectViewAPI.get_all_gravity_compensation_forces(self.routing_path)[rows, :][
-                        :, effective_dof_idx
-                    ]
-                )
+                u += control_dict["gravity_force"][self.dof_idx]
 
+            # Add Coriolis / centrifugal compensation
             if self._use_cc_compensation:
-                u = (
-                    u
-                    + ControllableObjectViewAPI.get_all_coriolis_and_centrifugal_compensation_forces(self.routing_path)[
-                        rows, :
-                    ][:, effective_dof_idx]
-                )
+                u += control_dict["cc_force"][self.dof_idx]
 
         else:
+            # Desired is the exact goal
             u = target
 
+        # Return control
         return u
 
-    def compute_no_op_goal(self, controller_idx):
-        """
-        Returns:
-            dict: ``target`` as a compute-backend array (hold position or zeros by motor type)
-        """
-        prim_path = self._articulation_root_paths[controller_idx]
-
+    def compute_no_op_goal(self, control_dict):
+        # Compute based on mode
         if self._motor_type == "position":
-            target = ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]
+            # Maintain current qpos
+            target = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
         else:
+            # For velocity / effort, directly set to 0
             target = cb.zeros(self.control_dim)
 
         return dict(target=target)
 
-    def _compute_no_op_command(self, controller_idx):
-        prim_path = self._articulation_root_paths[controller_idx]
-
+    def _compute_no_op_command(self, control_dict):
         if self.motor_type == "position":
             if self._use_delta_commands:
                 return cb.zeros(self.command_dim)
             else:
-                return ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]
+                return control_dict["joint_position"][self.dof_idx]
         elif self.motor_type == "velocity":
             if self._use_delta_commands:
-                return -ControllableObjectViewAPI.get_joint_velocities(prim_path, estimate=True)[self.dof_idx]
+                return -control_dict["joint_velocity"][self.dof_idx]
             else:
                 return cb.zeros(self.command_dim)
 
@@ -386,7 +278,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
     def _get_goal_shapes(self):
         return dict(target=(self.control_dim,))
 
-    def is_grasping(self, controller_idx):
+    def is_grasping(self):
         # No good heuristic to determine grasping, so return UNKNOWN
         return IsGraspingState.UNKNOWN
 
@@ -461,35 +353,4 @@ def _compute_joint_torques_numpy(
 # Set these as part of the backend values
 add_compute_function(
     name="compute_joint_torques", np_function=_compute_joint_torques_numpy, th_function=_compute_joint_torques_torch
-)
-
-
-@torch_compile
-def _compute_joint_torques_batch_torch(
-    u: th.Tensor,
-    mm: th.Tensor,
-    dof_idx: th.Tensor,
-):
-    dof_idxs_mat = th.meshgrid(dof_idx, dof_idx, indexing="xy")
-    mm_sub = mm[:, dof_idxs_mat[0], dof_idxs_mat[1]]  # (N, ctrl_dim, ctrl_dim)
-    return (mm_sub @ u.unsqueeze(-1)).squeeze(-1)  # (N, ctrl_dim)
-
-
-@jit(nopython=True)
-def _compute_joint_torques_batch_numpy(
-    u,
-    mm,
-    dof_idx,
-):
-    N = u.shape[0]
-    result = np.zeros_like(u)
-    for i in range(N):
-        result[i] = numba_ix(mm[i], dof_idx, dof_idx) @ u[i]
-    return result
-
-
-add_compute_function(
-    name="compute_joint_torques_batch",
-    np_function=_compute_joint_torques_batch_numpy,
-    th_function=_compute_joint_torques_batch_torch,
 )

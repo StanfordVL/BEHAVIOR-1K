@@ -1,5 +1,5 @@
 from typing import Any
-from omnigibson.controllers.controller_view import ControllerView
+
 from omnigibson.controllers.controller_base import (
     REGISTERED_CONTROLLERS,
     REGISTERED_LOCOMOTION_CONTROLLERS,
@@ -38,7 +38,6 @@ def create_controller(name, **kwargs: Any):
 
 
 __all__ = [
-    "ControllerView",
     "ControlType",
     "create_controller",
     "DifferentialDriveController",
