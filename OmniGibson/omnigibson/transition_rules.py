@@ -25,6 +25,7 @@ from omnigibson.object_states import (
     Heated,
     HeatSourceOrSink,
     MaxTemperature,
+    Temperature,
     OnTop,
     Open,
     Saturated,
@@ -2303,12 +2304,11 @@ class CookingRule(RecipeRule):
             object_candidates=object_candidates, container=container, global_info=global_info
         )
 
-        # Compute whether each heatsource is affecting the container
-        info["heatsource_categories"] = set(
-            obj.category
-            for obj in object_candidates["heatSource"]
-            if obj.states[HeatSourceOrSink].affects_obj(container)
+        # Collect categories of heat sources from the candidates actively affecting the container.
+        affecting_heatsources = Temperature.get_objs_affected_by_heatsource(
+            heatsources=object_candidates["heatSource"], objs=[container]
         )
+        info["heatsource_categories"] = {obj.category for obj in affecting_heatsources}
 
         return info
 

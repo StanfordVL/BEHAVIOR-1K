@@ -1,16 +1,13 @@
 import torch as th
 
-import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.open_state import Open
+from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.object_states.toggle import ToggledOn
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, torch_delete
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -24,16 +21,142 @@ m.DEFAULT_HEATING_RATE = 0.04
 m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 
 
-class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
+class HeatSourceOrSink(LinkBasedStateMixin, TensorizedValueState):
     """
     This state indicates the heat source or heat sink state of the object.
 
-    Currently, if the object is not an active heat source/sink, this returns (False, None).
-    Otherwise, it returns True and the position of the heat source element, or (True, None) if the heat source has no
-    heating element / only checks for Inside.
-    E.g. on a stove object, True and the coordinates of the heating element will be returned.
-    on a microwave object, True and None will be returned.
+    Tensorized storage
+    ------------------
+    VALUES[:] — (N,) bool — active gate per heat source. True when the source is
+    currently emitting heat (toggled on if required, not open if required).
+
+    All geometry and config tensors are public (no leading underscore) so that
+    Temperature._apply_heat_source_influence() can read them directly without
+    violating encapsulation, following the MaxTemperature.TEMPERATURE_IDXS pattern.
     """
+
+    # ── Construction-time constants (resized at _add_obj / _remove_obj) ──────
+    TEMPERATURES = None  # (N,) float32 — target temperature of each heat source
+    HEATING_RATES = None  # (N,) float32 — rate of temperature change per second
+    DISTANCE_THRESHOLDS = None  # (N,) float32 — spatial range (near mode); unused for inside mode
+    REQUIRES_INSIDE = None  # (N,) bool
+    REQUIRES_TOGGLED_ON = None  # (N,) bool
+    REQUIRES_CLOSED = None  # (N,) bool
+    TOGGLED_ON_IDXS = None  # (N,) int64 — index into ToggledOn.VALUES; -1 if not applicable
+
+    # ── Per-step geometry (refreshed in global_update, read by Temperature) ──
+    POSITIONS = None  # (N, 3) float32 — emitter position (near) or AABB center (inside)
+    AABB_LO = None  # (N, 3) float32
+    AABB_HI = None  # (N, 3) float32
+
+    @classproperty
+    def value_shape(cls):
+        return ()
+
+    @classproperty
+    def value_type(cls):
+        return th.bool
+
+    @classproperty
+    def value_name(cls):
+        return "active"
+
+    @classmethod
+    def global_initialize(cls):
+        super().global_initialize()
+        cls.TEMPERATURES = th.empty(0, dtype=th.float32)
+        cls.HEATING_RATES = th.empty(0, dtype=th.float32)
+        cls.DISTANCE_THRESHOLDS = th.empty(0, dtype=th.float32)
+        cls.REQUIRES_INSIDE = th.empty(0, dtype=th.bool)
+        cls.REQUIRES_TOGGLED_ON = th.empty(0, dtype=th.bool)
+        cls.REQUIRES_CLOSED = th.empty(0, dtype=th.bool)
+        cls.TOGGLED_ON_IDXS = th.empty(0, dtype=th.int64)
+        cls.POSITIONS = th.empty((0, 3), dtype=th.float32)
+        cls.AABB_LO = th.empty((0, 3), dtype=th.float32)
+        cls.AABB_HI = th.empty((0, 3), dtype=th.float32)
+
+        # Register callback to keep TOGGLED_ON_IDXS consistent when a ToggledOn is removed.
+        # Pattern mirrors MaxTemperature's TEMPERATURE_IDXS update on Temperature removal.
+        def _update_toggled_on_idxs(obj):
+            if obj not in ToggledOn.OBJ_IDXS:
+                return
+            deleted_idx = ToggledOn.OBJ_IDXS[obj]
+            # Only decrement valid indices (>= 0) that point past the deleted slot.
+            valid = cls.TOGGLED_ON_IDXS >= 0
+            cls.TOGGLED_ON_IDXS = th.where(
+                valid & (cls.TOGGLED_ON_IDXS >= deleted_idx),
+                cls.TOGGLED_ON_IDXS - 1,
+                cls.TOGGLED_ON_IDXS,
+            )
+
+        ToggledOn.add_callback_on_remove(
+            name="HeatSourceOrSink_toggled_on_idx_update", callback=_update_toggled_on_idxs
+        )
+
+    @classmethod
+    def _add_obj(cls, obj):
+        super()._add_obj(obj=obj)
+        # Append placeholder rows; actual values are written in __init__ after super() returns.
+        cls.TEMPERATURES = th.cat([cls.TEMPERATURES, th.zeros(1, dtype=th.float32)])
+        cls.HEATING_RATES = th.cat([cls.HEATING_RATES, th.zeros(1, dtype=th.float32)])
+        cls.DISTANCE_THRESHOLDS = th.cat([cls.DISTANCE_THRESHOLDS, th.zeros(1, dtype=th.float32)])
+        cls.REQUIRES_INSIDE = th.cat([cls.REQUIRES_INSIDE, th.zeros(1, dtype=th.bool)])
+        cls.REQUIRES_TOGGLED_ON = th.cat([cls.REQUIRES_TOGGLED_ON, th.zeros(1, dtype=th.bool)])
+        cls.REQUIRES_CLOSED = th.cat([cls.REQUIRES_CLOSED, th.zeros(1, dtype=th.bool)])
+        cls.TOGGLED_ON_IDXS = th.cat([cls.TOGGLED_ON_IDXS, th.full((1,), -1, dtype=th.int64)])
+        cls.POSITIONS = th.cat([cls.POSITIONS, th.zeros((1, 3), dtype=th.float32)], dim=0)
+        cls.AABB_LO = th.cat([cls.AABB_LO, th.zeros((1, 3), dtype=th.float32)], dim=0)
+        cls.AABB_HI = th.cat([cls.AABB_HI, th.zeros((1, 3), dtype=th.float32)], dim=0)
+
+    @classmethod
+    def _remove_obj(cls, obj):
+        deleted_idx = cls.OBJ_IDXS[obj]
+        cls.TEMPERATURES = torch_delete(cls.TEMPERATURES, [deleted_idx])
+        cls.HEATING_RATES = torch_delete(cls.HEATING_RATES, [deleted_idx])
+        cls.DISTANCE_THRESHOLDS = torch_delete(cls.DISTANCE_THRESHOLDS, [deleted_idx])
+        cls.REQUIRES_INSIDE = torch_delete(cls.REQUIRES_INSIDE, [deleted_idx])
+        cls.REQUIRES_TOGGLED_ON = torch_delete(cls.REQUIRES_TOGGLED_ON, [deleted_idx])
+        cls.REQUIRES_CLOSED = torch_delete(cls.REQUIRES_CLOSED, [deleted_idx])
+        cls.TOGGLED_ON_IDXS = torch_delete(cls.TOGGLED_ON_IDXS, [deleted_idx])
+        cls.POSITIONS = torch_delete(cls.POSITIONS, [deleted_idx])
+        cls.AABB_LO = torch_delete(cls.AABB_LO, [deleted_idx])
+        cls.AABB_HI = torch_delete(cls.AABB_HI, [deleted_idx])
+        super()._remove_obj(obj=obj)
+
+    @classmethod
+    def _update_values(cls, values):
+        active = th.ones(len(cls.IDX_OBJS), dtype=th.bool)
+        # ToggledOn IS a TensorizedValueState — pure tensor index lookup, no loop
+        if cls.REQUIRES_TOGGLED_ON.any():
+            toggled = ToggledOn.VALUES[cls.TOGGLED_ON_IDXS[cls.REQUIRES_TOGGLED_ON], 0] > 0.5
+            active[cls.REQUIRES_TOGGLED_ON] &= toggled
+        # Open is NOT a TensorizedValueState — per-object call is unavoidable
+        for i in th.where(cls.REQUIRES_CLOSED)[0].tolist():
+            if cls.IDX_OBJS[i].states[Open].get_value():
+                active[i] = False
+        return active
+
+    @classmethod
+    def global_update(cls):
+        if not cls.IDX_OBJS:
+            return
+
+        # Refresh per-step geometry (loop over N_hs, typically < 10).
+        # Will become a pure tensor op once AABB is tensorized.
+        for i, obj in enumerate(cls.IDX_OBJS):
+            lo, hi = obj.states[AABB].get_value()
+            cls.AABB_LO[i] = lo
+            cls.AABB_HI[i] = hi
+            if cls.REQUIRES_INSIDE[i]:
+                cls.POSITIONS[i] = (lo + hi) / 2.0
+            else:
+                hs_state = obj.states[cls]
+                link = hs_state.link
+                cls.POSITIONS[i] = (
+                    link.aabb_center if link == hs_state._default_link else link.get_position_orientation()[0]
+                )
+
+        super().global_update()  # calls _update_values → refreshes VALUES (active flags)
 
     def __init__(
         self,
@@ -63,29 +186,35 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 will mean that the "heating element" link for the object will be
                 ignored.
         """
+        # super().__init__ calls _add_obj, which appends placeholder rows to class tensors.
         super(HeatSourceOrSink, self).__init__(obj)
+
+        # Set per-instance config (same semantics as original).
         self._temperature = temperature if temperature is not None else m.DEFAULT_TEMPERATURE
         self._heating_rate = heating_rate if heating_rate is not None else m.DEFAULT_HEATING_RATE
         self.distance_threshold = distance_threshold if distance_threshold is not None else m.DEFAULT_DISTANCE_THRESHOLD
 
-        # If the heat source needs to be toggled on, we assert the presence
-        # of that ability.
         if requires_toggled_on:
             assert ToggledOn in self.obj.states
         self.requires_toggled_on = requires_toggled_on
 
-        # If the heat source needs to be closed, we assert the presence
-        # of that ability.
         if requires_closed:
             assert Open in self.obj.states
         self.requires_closed = requires_closed
 
-        # If the heat source needs to contain an object inside to heat it,
-        # we record that for use in the heat transfer process.
         self.requires_inside = requires_inside
 
-        # Internal state that gets cached
-        self._affected_objects = None
+        # Write actual config into class-level tensors at our index.
+        idx = type(self).OBJ_IDXS[obj]
+        type(self).TEMPERATURES[idx] = self._temperature
+        type(self).HEATING_RATES[idx] = self._heating_rate
+        type(self).DISTANCE_THRESHOLDS[idx] = self.distance_threshold
+        type(self).REQUIRES_INSIDE[idx] = requires_inside
+        type(self).REQUIRES_TOGGLED_ON[idx] = requires_toggled_on
+        type(self).REQUIRES_CLOSED[idx] = requires_closed
+        if requires_toggled_on and ToggledOn in obj.states:
+            type(self).TOGGLED_ON_IDXS[idx] = ToggledOn.OBJ_IDXS[obj]
+        # else: stays -1 as set by _add_obj
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -162,134 +291,5 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         super()._initialize()
         self.initialize_link_mixin()
 
-    def _get_value(self):
-        # Check the toggle state.
-        if self.requires_toggled_on and not self.obj.states[ToggledOn].get_value():
-            return False
-
-        # Check the open state.
-        if self.requires_closed and self.obj.states[Open].get_value():
-            return False
-
-        return True
-
-    def affects_obj(self, obj):
-        """
-        Computes whether this heat source or sink object is affecting object @obj
-        Computes the temperature delta that may be applied to object @obj. NOTE: This value is agnostic to simulation
-        stepping speed, and should be scaled accordingly
-
-        Args:
-            obj (StatefulObject): Object whose temperature delta should be computed
-
-        Returns:
-            bool: Whether this heat source or sink is currently affecting @obj's temperature
-        """
-        # No change if we're not on
-        if not self.get_value():
-            return False
-
-        # If the object is not affected, we return False
-        if obj not in self._affected_objects:
-            return False
-
-        # If all checks pass, we're actively influencing the object!
-        return True
-
-    def _update(self):
-        # Avoid circular imports
-        from omnigibson.object_states.temperature import Temperature
-
-        # Update the internally tracked nearby objects to accelerate filtering for affects_obj
-        affected_objects = set()
-
-        # Only update if we're valid
-        if self.get_value():
-
-            def overlap_callback(hit):
-                nonlocal affected_objects
-                # global affected_objects
-                obj = self.obj.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
-                if obj is not None and obj != self.obj and obj in Temperature.OBJ_IDXS:
-                    affected_objects.add(obj)
-                # Always continue traversal
-                return True
-
-            if self.requires_inside:
-                # Use overlap_box check to check for objects inside the box!
-                aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
-                half_extent = (aabb_upper - aabb_lower) / 2.0
-                aabb_center = (aabb_upper + aabb_lower) / 2.0
-
-                og.sim.psqi.overlap_box(
-                    halfExtent=half_extent.tolist(),
-                    pos=aabb_center.tolist(),
-                    rot=[0, 0, 0, 1.0],
-                    reportFn=overlap_callback,
-                )
-
-                # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
-                cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
-                n_cloth_objs = len(cloth_objs)
-                if n_cloth_objs > 0:
-                    cloth_positions = th.zeros((n_cloth_objs, 3))
-                    for i, obj in enumerate(cloth_objs):
-                        cloth_positions[i] = obj.get_position_orientation()[0]
-                    for idx in th.where(
-                        th.all(
-                            (aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)),
-                            dim=-1,
-                        )
-                    )[0]:
-                        # Only add if object has temperature
-                        if cloth_objs[idx] in Temperature.OBJ_IDXS:
-                            affected_objects.add(cloth_objs[idx])
-
-                # Additionally prune objects based on Temperature / Inside requirement -- cast to avoid in-place operations
-                for obj in tuple(affected_objects):
-                    if not obj.states[Inside].get_value(self.obj):
-                        affected_objects.remove(obj)
-
-            else:
-                # Position is either the AABB center of the default link or the meta link position itself
-                heat_source_pos = (
-                    self.link.aabb_center
-                    if self.link == self._default_link
-                    else self.link.get_position_orientation()[0]
-                )
-
-                # Use overlap_sphere check!
-                og.sim.psqi.overlap_sphere(
-                    radius=self.distance_threshold,
-                    pos=heat_source_pos.tolist(),
-                    reportFn=overlap_callback,
-                )
-
-                # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
-                cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
-                n_cloth_objs = len(cloth_objs)
-                if n_cloth_objs > 0:
-                    cloth_positions = th.zeros((n_cloth_objs, 3))
-                    for i, obj in enumerate(cloth_objs):
-                        cloth_positions[i] = obj.get_position_orientation()[0]
-                    for idx in th.where(
-                        th.norm(heat_source_pos.reshape(1, 3) - cloth_positions, dim=-1) <= self.distance_threshold
-                    )[0]:
-                        # Only add if object has temperature
-                        if cloth_objs[idx] in Temperature.OBJ_IDXS:
-                            affected_objects.add(cloth_objs[idx])
-
-        # Remove self (we cannot affect ourselves) and update the internal set of objects, and remove self
-        if self.obj in affected_objects:
-            affected_objects.remove(self.obj)
-        self._affected_objects = affected_objects
-
-        # Propagate the affected objects' temperatures
-        if len(self._affected_objects) > 0:
-            Temperature.update_temperature_from_heatsource_or_sink(
-                objs=self._affected_objects,
-                temperature=self.temperature,
-                rate=self.heating_rate,
-            )
-
-    # Nothing needs to be done to save/load HeatSource
+    # Nothing needs to be done to save/load HeatSource beyond the inherited
+    # TensorizedValueState._dump_state / _load_state (which handle VALUES["active"]).

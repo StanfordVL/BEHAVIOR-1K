@@ -1,6 +1,9 @@
+import torch as th
+
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.temperature import Temperature
+from omnigibson.utils.python_utils import torch_delete
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -21,6 +24,56 @@ class OnFire(HeatSourceOrSink):
     It may include a heatsource_link annotation (e.g. candle wick), in which case the fire visualization will be placed
     under that meta link. Otherwise (e.g. charcoal), the fire visualization will be placed under the root link.
     """
+
+    TEMPERATURE_IDXS = None  # (N,) int64   — index into Temperature.VALUES for each OnFire object
+    IGNITION_TEMPERATURES = None  # (N,) float32  — ignition threshold per object
+
+    @classmethod
+    def global_initialize(cls):
+        super().global_initialize()
+        cls.TEMPERATURE_IDXS = th.empty(0, dtype=th.int64)
+        cls.IGNITION_TEMPERATURES = th.empty(0, dtype=th.float32)
+
+        # TEMPERATURE_IDXS[i] is an integer slot index into Temperature.VALUES.
+        # When a Temperature object is removed, TensorizedValueState._remove_obj deletes its
+        # row from Temperature.VALUES and all subsequent rows shift down by one.  Any stored
+        # index that pointed past the deleted slot now refers to the wrong object.
+        # This callback fires before the deletion and decrements every stored index that is
+        # >= the deleted slot, keeping TEMPERATURE_IDXS in sync with Temperature.VALUES.
+        # The same pattern is used for HeatSourceOrSink.TOGGLED_ON_IDXS (registered on
+        # ToggledOn removal) and MaxTemperature.TEMPERATURE_IDXS (registered on Temperature removal).
+        def _update_temperature_idxs(obj):
+            if obj not in Temperature.OBJ_IDXS:
+                return
+            deleted_idx = Temperature.OBJ_IDXS[obj]
+            valid = cls.TEMPERATURE_IDXS >= 0
+            cls.TEMPERATURE_IDXS = th.where(
+                valid & (cls.TEMPERATURE_IDXS >= deleted_idx),
+                cls.TEMPERATURE_IDXS - 1,
+                cls.TEMPERATURE_IDXS,
+            )
+
+        Temperature.add_callback_on_remove(name="OnFire_temperature_idx_update", callback=_update_temperature_idxs)
+
+    @classmethod
+    def _add_obj(cls, obj):
+        super()._add_obj(obj)
+        cls.TEMPERATURE_IDXS = th.cat([cls.TEMPERATURE_IDXS, th.full((1,), -1, dtype=th.int64)])
+        cls.IGNITION_TEMPERATURES = th.cat([cls.IGNITION_TEMPERATURES, th.zeros(1, dtype=th.float32)])
+
+    @classmethod
+    def _remove_obj(cls, obj):
+        deleted_idx = cls.OBJ_IDXS[obj]
+        cls.TEMPERATURE_IDXS = torch_delete(cls.TEMPERATURE_IDXS, [deleted_idx])
+        cls.IGNITION_TEMPERATURES = torch_delete(cls.IGNITION_TEMPERATURES, [deleted_idx])
+        super()._remove_obj(obj)
+
+    @classmethod
+    def _update_values(cls, values):
+        # OnFire is active when the object's current temperature >= its ignition threshold.
+        # Pure tensor op: no loop needed.
+        temps = Temperature.VALUES[cls.TEMPERATURE_IDXS]  # (N,) current temp of each fire object
+        return temps >= cls.IGNITION_TEMPERATURES  # (N,) bool
 
     def __init__(
         self,
@@ -59,6 +112,11 @@ class OnFire(HeatSourceOrSink):
         )
         self.ignition_temperature = ignition_temperature
 
+        # Write OnFire-specific config into class tensors at our index.
+        idx = type(self).OBJ_IDXS[obj]
+        type(self).TEMPERATURE_IDXS[idx] = Temperature.OBJ_IDXS[obj]
+        type(self).IGNITION_TEMPERATURES[idx] = ignition_temperature
+
     @classmethod
     def requires_meta_link(cls, **kwargs):
         # Does not require meta link to be specified
@@ -74,14 +132,6 @@ class OnFire(HeatSourceOrSink):
         deps = super().get_dependencies()
         deps.add(Temperature)
         return deps
-
-    def _update(self):
-        # Call super first
-        super()._update()
-
-        # If it's on fire, maintain the fire temperature
-        if self.get_value():
-            self.obj.states[Temperature].set_value(self.temperature)
 
     def _get_value(self):
         return self.obj.states[Temperature].get_value() >= self.ignition_temperature
