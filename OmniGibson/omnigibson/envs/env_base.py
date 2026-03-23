@@ -121,9 +121,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._scenes = []
 
         # Sensor registry for obs-key-first iteration (built in post_play_load)
-        self._robot_sensor_map = {}      # (robot_name, sensor_name) -> [sensor_per_env]
-        self._robot_has_proprio = {}     # robot_name -> bool
-        self._ext_sensor_map = {}        # sensor_name -> [sensor_per_env]
+        self._robot_sensor_map = {}  # (robot_name, sensor_name) -> [sensor_per_env]
+        self._robot_has_proprio = {}  # robot_name -> bool
+        self._ext_sensor_map = {}  # sensor_name -> [sensor_per_env]
 
         # Create the scene graph builder
         self._scene_graph_builder = None
@@ -526,8 +526,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             self._robot_has_proprio[robot.name] = "proprio" in robot._obs_modalities
             for sensor_name in robot.sensors:
                 self._robot_sensor_map[(robot.name, sensor_name)] = [
-                    self._scenes[env_idx].robots[robot_idx].sensors[sensor_name]
-                    for env_idx in range(self.num_envs)
+                    self._scenes[env_idx].robots[robot_idx].sensors[sensor_name] for env_idx in range(self.num_envs)
                 ]
 
         self._ext_sensor_map = {}
@@ -536,8 +535,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if not self._external_sensors_include_in_obs.get(sensor_name, False):
                     continue
                 self._ext_sensor_map[sensor_name] = [
-                    self._external_sensors[env_idx][sensor_name]
-                    for env_idx in range(self.num_envs)
+                    self._external_sensors[env_idx][sensor_name] for env_idx in range(self.num_envs)
                 ]
 
     def get_obs(self, env_indices=None):

@@ -109,7 +109,9 @@ class DataWrapper(EnvironmentWrapper):
         if isinstance(action, dict):
             action = th.cat([act for act in action.values()])
 
-        obs_list, rewards, terminateds, truncateds, infos = self.env.step(action, n_render_iterations=n_render_iterations)
+        obs_list, rewards, terminateds, truncateds, infos = self.env.step(
+            action, n_render_iterations=n_render_iterations
+        )
         self.step_count += 1
 
         next_obs = obs_list[0]

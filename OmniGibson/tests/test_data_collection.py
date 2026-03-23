@@ -80,7 +80,9 @@ def test_data_collect_and_playback():
         # Checkpoint state here for our first episode
         if i == 0:
             env.update_checkpoint()
-            robot_eef_state = {arm: env.scene.robots[0].get_eef_position(arm=arm) for arm in env.scene.robots[0].arm_names}
+            robot_eef_state = {
+                arm: env.scene.robots[0].get_eef_position(arm=arm) for arm in env.scene.robots[0].arm_names
+            }
 
             # Take one step to avoid creating the system immediately after the checkpoint is updated, which
             # will cause downstream errors during playback
@@ -109,7 +111,9 @@ def test_data_collect_and_playback():
         elif i == 1:
             # Checkpoint state here for our second episode
             env.update_checkpoint()
-            robot_eef_state = {arm: env.scene.robots[0].get_eef_position(arm=arm) for arm in env.scene.robots[0].arm_names}
+            robot_eef_state = {
+                arm: env.scene.robots[0].get_eef_position(arm=arm) for arm in env.scene.robots[0].arm_names
+            }
 
             # Take one step to avoid clearing the system immediately after the checkpoint is updated, which
             # will cause downstream errors during playback
