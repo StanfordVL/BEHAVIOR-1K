@@ -260,6 +260,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Only actually load robots if no robot has been imported from the scene loading directly yet
         loaded_from_config = False
+
+        # Pre-assign robot names so all scenes share the same names
+        for robot_config in self.robots_config:
+            if "name" not in robot_config:
+                robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
+
         for scene in self._scenes:
             if len(scene.robots) == 0:
                 loaded_from_config = True
@@ -268,9 +274,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Iterate over all robots to generate in the robot config
                 for robot_config in self.robots_config:
                     robot_config = deepcopy(robot_config)
-                    # Add a name for the robot if necessary
-                    if "name" not in robot_config:
-                        robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
                     if "model" in robot_config:
                         assert (
                             "type" not in robot_config
