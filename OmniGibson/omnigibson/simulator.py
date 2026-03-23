@@ -69,6 +69,7 @@ from omnigibson.utils.usd_utils import (
     RigidContactAPI,
 )
 from omnigibson.utils.usd_utils import clear as clear_usd_utils
+from omnigibson.controllers import ControllerView
 from omnigibson.utils.usd_utils import triangularize_mesh
 
 # Create module logger
@@ -1262,10 +1263,13 @@ def _launch_simulator(*args, **kwargs):
 
                 # Only do this if we're not in the warmup phase
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                    # Run the controller step on every controllable object
+                    # Batch-step all controller groups (computes control and writes to Isaac buffer)
+                    ControllerView.step_all()
+
+                    # Per-robot post-step: override frozen gripper positions, handle assisted grasping
                     for scene in self.scenes:
                         for robot in scene.robots:
-                            robot.step()
+                            robot.post_step()
 
                     # Flush the controls from the ControllableObjectViewAPI
                     ControllableObjectViewAPI.flush_control()
@@ -1756,6 +1760,9 @@ def _launch_simulator(*args, **kwargs):
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
+
+            # Clear all controller groups so robots re-register on next load
+            ControllerView.clear()
 
         def close(self):
             """

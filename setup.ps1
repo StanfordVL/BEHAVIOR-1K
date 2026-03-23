@@ -356,12 +356,11 @@ if ($extrasList.Count -gt 0) {
     
     # Check if already installed
     $isaacInstalled = $false
-    try {
-        python -c "import isaacsim" 2>$null
+    python -c "import isaacsim" 2>$null
+    if ($LASTEXITCODE -eq 0) {
         $isaacInstalled = $true
         Write-Host "Isaac Sim already installed, skipping..."
-    }
-    catch {
+    } else {
         Write-Host "Installing Isaac Sim via pip..."
     }
     
@@ -405,10 +404,8 @@ if ($extrasList.Count -gt 0) {
             pip install $wheelFiles
             
             # Verify installation
-            try {
-                python -c "import isaacsim" 2>$null
-            }
-            catch {
+            python -c "import isaacsim" 2>$null
+            if ($LASTEXITCODE -ne 0) {
                 Write-Error "ERROR: Isaac Sim installation verification failed"
                 exit 1
             }
