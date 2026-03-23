@@ -188,8 +188,8 @@ def test_robot_load_drive(robot_name):
 
             action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
 
-            eef_pos = env.robots[0].get_eef_position()
-            eef_orn = env.robots[0].get_eef_orientation()
+            eef_pos = env.scene.robots[0].get_eef_position()
+            eef_orn = env.scene.robots[0].get_eef_orientation()
             if robot.model == "stretch":  # Stretch arm faces the y-axis
                 target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
             else:

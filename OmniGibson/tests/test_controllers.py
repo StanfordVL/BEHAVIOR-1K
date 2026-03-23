@@ -402,24 +402,24 @@ def test_two_fetch_reload_reuses_slots():
     - stepping the scene does not crash after repeated reloads
     """
     env = _make_two_fetch_env()
-    _stabilize_and_reset(env.robots)
+    _stabilize_and_reset(env.scene.robots)
 
-    for robot in env.robots:
+    for robot in env.scene.robots:
         controller_config = {
             f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names
         }
         robot.reload_controllers(controller_config)
 
     # Reload each robot once more; reused slots should prevent group growth.
-    for robot in env.robots:
+    for robot in env.scene.robots:
         controller_config = {
             f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names
         }
         robot.reload_controllers(controller_config)
 
-    arm_name = env.robots[0].arm_names[0]
-    group_key_a, idx_a = env.robots[0].controllers[f"arm_{arm_name}"]
-    group_key_b, idx_b = env.robots[1].controllers[f"arm_{arm_name}"]
+    arm_name = env.scene.robots[0].arm_names[0]
+    group_key_a, idx_a = env.scene.robots[0].controllers[f"arm_{arm_name}"]
+    group_key_b, idx_b = env.scene.robots[1].controllers[f"arm_{arm_name}"]
     assert group_key_a == group_key_b
 
     controller = ControllerView._controller_groups[group_key_a]
@@ -433,7 +433,7 @@ def test_two_fetch_reload_reuses_slots():
     assert set(active_slots) == {idx_a, idx_b}
     assert sum(unregistered) == 0
 
-    actions = {r.name: th.zeros(r.action_dim) for r in env.robots}
+    actions = {r.name: th.zeros(r.action_dim) for r in env.scene.robots}
     for _ in range(5):
         env.step(actions)
 
@@ -449,15 +449,15 @@ def test_shared_group_disable_one_member():
     the enabled robot still moves forward.
     """
     env = _make_two_fetch_env()
-    _stabilize_and_reset(env.robots)
+    _stabilize_and_reset(env.scene.robots)
 
-    for robot in env.robots:
+    for robot in env.scene.robots:
         controller_config = {
             f"arm_{arm}": {"name": "InverseKinematicsController", "mode": "pose_delta_ori"} for arm in robot.arm_names
         }
         robot.reload_controllers(controller_config)
 
-    robot_a, robot_b = env.robots
+    robot_a, robot_b = env.scene.robots
     arm_a = robot_a.arm_names[0]
     arm_b = robot_b.arm_names[0]
     init_pos_a, _ = robot_a.get_relative_eef_pose(arm=arm_a)
@@ -490,21 +490,21 @@ def test_reload_changes_controller_mode_in_shared_group():
     ensuring both robots remain active members in the shared group and can still step successfully.
     """
     env = _make_two_fetch_env()
-    _stabilize_and_reset(env.robots)
+    _stabilize_and_reset(env.scene.robots)
 
-    arm_name = env.robots[0].arm_names[0]
+    arm_name = env.scene.robots[0].arm_names[0]
     mode_sequence = ["pose_delta_ori", "absolute_pose", "pose_delta_ori"]
 
     for mode in mode_sequence:
-        for robot in env.robots:
+        for robot in env.scene.robots:
             cfg = {f"arm_{arm}": {"name": "InverseKinematicsController", "mode": mode} for arm in robot.arm_names}
             if mode == "absolute_pose":
                 cfg[f"arm_{arm_name}"]["command_input_limits"] = None
                 cfg[f"arm_{arm_name}"]["command_output_limits"] = None
             robot.reload_controllers(cfg)
 
-        group_key_a, idx_a = env.robots[0].controllers[f"arm_{arm_name}"]
-        group_key_b, idx_b = env.robots[1].controllers[f"arm_{arm_name}"]
+        group_key_a, idx_a = env.scene.robots[0].controllers[f"arm_{arm_name}"]
+        group_key_b, idx_b = env.scene.robots[1].controllers[f"arm_{arm_name}"]
         assert group_key_a == group_key_b
 
         controller = ControllerView._controller_groups[group_key_a]
@@ -512,7 +512,7 @@ def test_reload_changes_controller_mode_in_shared_group():
         active_slots = [i for i, u in enumerate(unregistered) if u == 0]
         assert idx_a in active_slots and idx_b in active_slots
 
-        actions = {r.name: th.zeros(r.action_dim) for r in env.robots}
+        actions = {r.name: th.zeros(r.action_dim) for r in env.scene.robots}
         env.step(actions)
 
     og.clear()
@@ -560,7 +560,7 @@ def test_mixed_models_no_cross_group_contamination():
     }
     env = og.Environment(configs=cfg)
 
-    for i, robot in enumerate(env.robots):
+    for i, robot in enumerate(env.scene.robots):
         robot.set_position_orientation(
             position=th.tensor([0.0, i * 5.0, 0.0]), orientation=th.tensor([0.0, 0.0, 0.0, 1.0])
         )
@@ -568,7 +568,7 @@ def test_mixed_models_no_cross_group_contamination():
     for _ in range(5):
         og.sim.step()
 
-    fetch_a, fetch_b, franka = env.robots
+    fetch_a, fetch_b, franka = env.scene.robots
     fetch_arm = fetch_a.arm_names[0]
     franka_arm = franka.arm_names[0]
 
