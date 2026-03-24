@@ -1,117 +1,31 @@
-import json
-import tempfile
-
 import pytest
 import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
-from omnigibson.macros import gm
 from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
 
-# ---------------------------------------------------------------------------
-# Robots & Tasks to cover
-# ---------------------------------------------------------------------------
-ROBOTS = ["fetch", "tiago", "r1", "r1pro"]
-TASK_TYPES = ["DummyTask", "PointNavigationTask", "PointReachingTask", "GraspTask"]
+from utils import (
+    MULTI_ENV_ROBOTS,
+    multi_env_progress,
+    multi_env_passed,
+    setup_multi_environment,
+)
 
-# GraspTask requires an explicit object config
-GRASP_OBJECTS_CFG = [
-    {
-        "type": "PrimitiveObject",
-        "name": "grasp_obj",
-        "primitive_type": "Cube",
-        "rgba": [1.0, 0, 0, 1.0],
-        "scale": [0.04, 0.04, 0.04],
-        "mass": 0.1,
-        "position": [0.5, 0.0, 0.55],
-    }
-]
-
-# Number of trunk + default-arm joints per robot (for precached reset poses).
-ROBOT_JOINT_COUNTS = {"fetch": 8, "tiago": 8, "r1": 10, "r1pro": 11}
-
-
-def _grasp_reset_pose_path(robot):
-    """Create a temporary precached reset pose file sized for the given robot."""
-    n_joints = ROBOT_JOINT_COUNTS[robot]
-    reset_poses = [{"joint_pos": [0.0] * n_joints, "base_pos": [0.0, 0.0, 0.0], "base_ori": [0.0, 0.0, 0.0, 1.0]}]
-    f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-    json.dump(reset_poses, f)
-    f.close()
-    return f.name
-
+TASK_TYPE = "DummyTask"
 
 # Test counter for progress tracking
-_test_counter = {"current": 0, "total": 84}
-
-
-def _task_cfg(task_type, robot="fetch"):
-    """Return the task config dict for a given task type string."""
-    if task_type == "GraspTask":
-        return {
-            "type": "GraspTask",
-            "obj_name": "grasp_obj",
-            "objects_config": GRASP_OBJECTS_CFG,
-            "termination_config": {"max_steps": 10},
-            "precached_reset_pose_path": _grasp_reset_pose_path(robot),
-        }
-    return {"type": task_type}
+_test_counter = {"current": 0, "total": 36}
 
 
 def _progress(test_name):
-    """Print progress for the current test."""
-    _test_counter["current"] += 1
-    n = _test_counter["current"]
-    total = _test_counter["total"]
-    print(f"\n{'='*60}")
-    print(f"[{n}/{total}] RUNNING: {test_name}")
-    print(f"{'='*60}")
+    multi_env_progress(test_name, _test_counter)
 
 
 def _passed(test_name):
-    """Print pass confirmation."""
-    print(f"[PASSED] {test_name}")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-def _init_macros():
-    """Set simulator macros (only once, before first Environment is created)."""
-    if og.sim is None:
-        gm.RENDER_VIEWER_CAMERA = False
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
-        gm.ENABLE_TRANSITION_RULES = False
-    else:
-        og.sim.stop()
-
-
-def setup_multi_environment(num_of_envs, robot="fetch", task_type="DummyTask", additional_objects_cfg=None):
-    """Create an Environment with *num_of_envs* cloned scenes."""
-    _init_macros()
-
-    cfg = {
-        "env": {"num_envs": num_of_envs},
-        "scene": {
-            "type": "InteractiveTraversableScene",
-            "scene_model": "Rs_int",
-            "load_object_categories": ["floors", "walls"],
-        },
-        "robots": [{"model": robot, "obs_modalities": []}],
-        "task": _task_cfg(task_type, robot=robot),
-    }
-    if additional_objects_cfg:
-        cfg["objects"] = additional_objects_cfg
-
-    print(f"  Setting up env: num_envs={num_of_envs}, robot={robot}, task={task_type}")
-    env = og.Environment(configs=cfg)
-    print(f"  Environment created successfully")
-    return env
+    multi_env_passed(test_name)
 
 
 # ===================================================================
@@ -164,6 +78,11 @@ class TestEnvConstruction:
                 assert dist > 1.0, f"Scenes {i} and {j} are too close: {dist:.2f}"
         og.clear()
         _passed("TestEnvConstruction::test_scenes_spatially_separated")
+
+
+# ===================================================================
+#  Section 2 – step() / reset() contract tests
+# ===================================================================
 
 
 class TestStepAndReset:
@@ -241,23 +160,21 @@ class TestStepAndReset:
 
 
 # ===================================================================
-#  Section 2 – Task / reward / termination tensor tests
-#              Parametrized over robots & task types
+#  Section 3 – Task / reward / termination tensor tests (DummyTask)
 # ===================================================================
 
 
-@pytest.mark.parametrize("robot", ROBOTS)
-@pytest.mark.parametrize("task_type", TASK_TYPES)
+@pytest.mark.parametrize("robot", MULTI_ENV_ROBOTS)
 class TestTaskTensors:
-    """Verify that task step outputs have correct tensor shapes across robots & tasks."""
+    """Verify that DummyTask step outputs have correct tensor shapes across robots."""
 
-    def test_task_step_tensors(self, robot, task_type):
+    def test_task_step_tensors(self, robot):
         """Task reward / done / success are (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_task_step_tensors[{task_type}-{robot}]"
+        test_id = f"TestTaskTensors::test_task_step_tensors[{TASK_TYPE}-{robot}]"
         _progress(test_id)
         num_envs = 2
 
-        env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=task_type)
+        env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
 
         actions = th.stack(
@@ -272,12 +189,12 @@ class TestTaskTensors:
         og.clear()
         _passed(test_id)
 
-    def test_reward_tensor_returns(self, robot, task_type):
+    def test_reward_tensor_returns(self, robot):
         """Reward functions return (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_reward_tensor_returns[{task_type}-{robot}]"
+        test_id = f"TestTaskTensors::test_reward_tensor_returns[{TASK_TYPE}-{robot}]"
         _progress(test_id)
         num_envs = 2
-        env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=task_type)
+        env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
 
         actions = th.stack(
@@ -293,12 +210,12 @@ class TestTaskTensors:
         og.clear()
         _passed(test_id)
 
-    def test_termination_tensor_returns(self, robot, task_type):
+    def test_termination_tensor_returns(self, robot):
         """Termination conditions return (num_envs,) bool tensors."""
-        test_id = f"TestTaskTensors::test_termination_tensor_returns[{task_type}-{robot}]"
+        test_id = f"TestTaskTensors::test_termination_tensor_returns[{TASK_TYPE}-{robot}]"
         _progress(test_id)
         num_envs = 2
-        env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=task_type)
+        env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
 
         actions = th.stack(
@@ -317,113 +234,7 @@ class TestTaskTensors:
 
 
 # ===================================================================
-#  Section 3 – Navigation-specific tests (PointNavigation & PointReaching)
-# ===================================================================
-
-
-@pytest.mark.parametrize("robot", ROBOTS)
-@pytest.mark.parametrize("task_type", ["PointNavigationTask", "PointReachingTask"])
-class TestNavigationTasks:
-    """Goal-based navigation task tests across robots."""
-
-    def test_multi_step_and_goal_shape(self, robot, task_type):
-        """Run a few steps and verify goal positions exist per env."""
-        test_id = f"TestNavigationTasks::test_multi_step_and_goal_shape[{task_type}-{robot}]"
-        _progress(test_id)
-        num_envs = 2
-        env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=task_type)
-        env.reset()
-
-        for step_i in range(3):
-            actions = th.stack(
-                [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(num_envs)]
-            )
-            obs_list, rewards, terminateds, truncateds, infos = env.step(actions)
-            print(f"  step {step_i+1}/3: rewards={rewards}")
-
-        assert rewards.shape == (num_envs,)
-        assert terminateds.shape == (num_envs,)
-
-        for env_idx in range(num_envs):
-            goal = env.task.get_goal_pos(env_idx)
-            print(f"  env {env_idx} goal_pos={goal}")
-            assert goal.shape == (3,)
-        og.clear()
-        _passed(test_id)
-
-
-# ===================================================================
-#  Section 4 – Grasp task specific test
-# ===================================================================
-
-
-@pytest.mark.parametrize("robot", ROBOTS)
-class TestGraspTask:
-    """GraspTask-specific tests across robots."""
-
-    # GraspTask CuRobo-based reset is not yet working in multi-env.
-    # See grasp_curobo_reset_debug.md for details.
-    # def test_grasp_task_step(self, robot):
-    #     """GraspTask loads objects and runs a step without errors."""
-    #     test_id = f"TestGraspTask::test_grasp_task_step[{robot}]"
-    #     _progress(test_id)
-    #     num_envs = 2
-    #     if robot == "fetch":
-    #         with pytest.raises(ValueError, match="Could not reset task"):
-    #             setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type="GraspTask")
-    #         _passed(test_id)
-    #         return
-    #     env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type="GraspTask")
-    #     env.reset()
-    #     actions = th.stack([
-    #         th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()
-    #         for i in range(num_envs)
-    #     ])
-    #     obs_list, rewards, terminateds, truncateds, infos = env.step(actions)
-    #     assert rewards.shape == (num_envs,)
-    #     assert terminateds.shape == (num_envs,)
-    #     for env_idx in range(num_envs):
-    #         obj = env.scenes[env_idx].object_registry("name", "grasp_obj")
-    #         assert obj is not None, f"grasp_obj not found in scene {env_idx}"
-    #     og.clear()
-    #     _passed(test_id)
-
-    def test_grasp_task_precached_reset(self, robot):
-        """GraspTask resets correctly using precached_reset_pose_path."""
-        test_id = f"TestGraspTask::test_grasp_task_precached_reset[{robot}]"
-        _progress(test_id)
-        num_envs = 2
-
-        _init_macros()
-        cfg = {
-            "env": {"num_envs": num_envs},
-            "scene": {
-                "type": "InteractiveTraversableScene",
-                "scene_model": "Rs_int",
-                "load_object_categories": ["floors", "walls"],
-            },
-            "robots": [{"model": robot, "obs_modalities": []}],
-            "task": _task_cfg("GraspTask", robot=robot),
-        }
-        env = og.Environment(configs=cfg)
-        env.reset()
-
-        # Verify reset succeeded and objects exist
-        for env_idx in range(num_envs):
-            obj = env.scenes[env_idx].object_registry("name", "grasp_obj")
-            assert obj is not None, f"grasp_obj not found in scene {env_idx}"
-            robot_obj = env.scenes[env_idx].robots[0]
-            pos = robot_obj.get_position_orientation(frame="scene")[0]
-            print(f"  scene {env_idx}: robot at {pos}")
-
-        # Reset again to verify repeated resets work
-        env.reset()
-        og.clear()
-        _passed(test_id)
-
-
-# ===================================================================
-#  Section 5 – Scene coordinate system & state tests
+#  Section 4 – Scene coordinate system & state tests
 # ===================================================================
 
 
@@ -602,11 +413,11 @@ class TestSceneCoordinates:
 
 
 # ===================================================================
-#  Section 6 – Robot-specific getter/setter tests (parametrized)
+#  Section 5 – Robot-specific getter/setter tests (parametrized)
 # ===================================================================
 
 
-@pytest.mark.parametrize("robot", ROBOTS)
+@pytest.mark.parametrize("robot", MULTI_ENV_ROBOTS)
 class TestRobotGetterSetter:
     """Position/orientation getter and setter correctness across robots."""
 
@@ -725,7 +536,7 @@ class TestRobotGetterSetter:
 
 
 # ===================================================================
-#  Section 7 – Particle system test
+#  Section 6 – Particle system test
 # ===================================================================
 
 
