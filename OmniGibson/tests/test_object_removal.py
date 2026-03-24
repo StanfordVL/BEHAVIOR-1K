@@ -1,11 +1,10 @@
 import pytest
-from utils import og_test
 
 import omnigibson as og
 from omnigibson.objects import DatasetObject
 
 
-@og_test()
+@pytest.mark.og_objects()
 def test_removal_and_readdition(env):
     # Add an apple
     apple = DatasetObject(
@@ -43,7 +42,7 @@ def test_removal_and_readdition(env):
     env.scene.remove_object(apple2)
 
 
-@og_test()
+@pytest.mark.og_objects()
 def test_readdition(env):
     # Add an apple
     apple = DatasetObject(
