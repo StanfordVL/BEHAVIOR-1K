@@ -172,8 +172,9 @@ def og_test(*obj_names, needs_robot=False):
             og.sim.stop()
             bounding_box_object_names = ["bagel_dough", "raw_egg"]
             for name in bounding_box_object_names:
-                obj = env.scene.object_registry("name", name)
-                obj.root_link.set_collision_approximation("boundingCube")
+                if name in obj_names:
+                    obj = env.scene.object_registry("name", name)
+                    obj.root_link.set_collision_approximation("boundingCube")
             og.sim.play()
 
             func(env)
