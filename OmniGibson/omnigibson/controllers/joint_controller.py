@@ -307,8 +307,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         target = goals["target"]  # (N, control_dim)
 
         # Optionally pass through smoothing filter for better stability
-        if self.control_filter is not None:
-            target = self.control_filter.estimate(target)
+        if self._control_filter is not None:
+            target = self._control_filter.estimate_batch(target)
 
         # Convert control into efforts
         if self._use_impedances:

@@ -236,7 +236,7 @@ def test_dicing_rule_cooked(env):
         assert env.scene.object_registry("name", obj.name) is not None
 
     table_knife.set_position_orientation(
-        position=[-0.05, 0.0, 0.11], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+        position=[-0.05, 0.0, 0.065], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
     )
     og.sim.step()
 
@@ -286,7 +286,7 @@ def test_dicing_rule_uncooked(env):
         assert env.scene.object_registry("name", obj.name) is not None
 
     table_knife.set_position_orientation(
-        position=[-0.05, 0.0, 0.11], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+        position=[-0.05, 0.0, 0.065], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
     )
     og.sim.step()
 

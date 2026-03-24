@@ -36,7 +36,7 @@ Choose your installation method:
             Clone the latest stable release (recommended):
 
             ```shell
-            git clone -b v3.8.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
+            git clone -b v3.7.2 https://github.com/StanfordVL/BEHAVIOR-1K.git
             cd BEHAVIOR-1K
             ```
             

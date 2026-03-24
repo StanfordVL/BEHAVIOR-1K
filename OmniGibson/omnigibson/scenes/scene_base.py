@@ -508,7 +508,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Remove any vision sensors attached to this scene
         # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
         for sensor in tuple(VisionSensor.SENSORS.values()):
-            if self.prim_path in sensor.prim_path:
+            scene_prefix = self.prim_path.rstrip("/") + "/"
+            if sensor.prim_path.startswith(scene_prefix):
                 sensor.remove()
 
         # Remove the scene prim.
@@ -721,7 +722,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # internally
                 sensor_prim_paths -= set([sensor.prim_path for sensor in obj.sensors.values()])
             # Only delete sensors attached to the object (nested prim path)
-            sensor_prim_paths = {spp for spp in sensor_prim_paths if obj.prim_path in spp}
+            base_prim_path = obj.prim_path.rstrip("/")
+            sensor_prim_paths = {
+                spp for spp in sensor_prim_paths if spp == base_prim_path or spp.startswith(base_prim_path + "/")
+            }
             for prim_path in sensor_prim_paths:
                 VisionSensor.SENSORS[prim_path].remove()
 

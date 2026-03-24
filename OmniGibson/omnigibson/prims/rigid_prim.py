@@ -118,7 +118,6 @@ class RigidPrim(XFormPrim):
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
-
         self.update_meshes()
 
         # Possibly set the mass / density

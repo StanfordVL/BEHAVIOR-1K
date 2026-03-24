@@ -733,7 +733,6 @@ def import_obj_metadata(
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
         keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
-        import_render_channels (bool, optional): Flag to import rendering channels. Defaults to False.
         force_asset_pipeline_materials (bool, optional): Flag to force the use of asset pipeline materials. Defaults to False.
 
     Raises:
