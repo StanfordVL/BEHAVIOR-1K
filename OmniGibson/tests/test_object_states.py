@@ -48,7 +48,6 @@ from omnigibson.utils.physx_utils import apply_force_at_pos
 
 
 def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
-    og.sim.play()
     # Lower the mass of the shelf - otherwise, the gravity will create enough torque to break the joint
     bookcase_shelf.root_link.mass = 0.1
 
@@ -117,7 +116,6 @@ def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
 
 
 def test_on_top(env, breakfast_table, bowl, dishtowel):
-    og.sim.play()
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
         place_objA_on_objB_bbox(obj, breakfast_table)
@@ -139,7 +137,6 @@ def test_on_top(env, breakfast_table, bowl, dishtowel):
 
 
 def test_inside(env, bottom_cabinet, bowl, dishtowel):
-    og.sim.play()
     place_obj_on_floor_plane(bottom_cabinet)
     bowl.set_position_orientation(position=[0.0, 0.0, 0.08])
     dishtowel.set_position_orientation(position=[0, 0.0, 0.5])
@@ -167,7 +164,6 @@ def test_inside(env, bottom_cabinet, bowl, dishtowel):
 
 
 def test_under(env, breakfast_table, bowl, dishtowel):
-    og.sim.play()
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
         place_obj_on_floor_plane(obj)
@@ -189,7 +185,6 @@ def test_under(env, breakfast_table, bowl, dishtowel):
 
 
 def test_touching(env, breakfast_table, bowl, dishtowel):
-    og.sim.play()
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
         place_objA_on_objB_bbox(obj, breakfast_table)
@@ -210,7 +205,6 @@ def test_touching(env, breakfast_table, bowl, dishtowel):
 
 
 def test_rigid_contact_bodies(env, breakfast_table, bowl):
-    og.sim.play()
     from omnigibson.utils.usd_utils import RigidContactAPI
 
     place_obj_on_floor_plane(breakfast_table)
@@ -256,7 +250,6 @@ def test_rigid_contact_bodies(env, breakfast_table, bowl):
 
 
 def test_next_to(env, bottom_cabinet, bowl, dishtowel):
-    og.sim.play()
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
         place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.3})
@@ -277,7 +270,6 @@ def test_next_to(env, bottom_cabinet, bowl, dishtowel):
 
 
 def test_overlaid(env, breakfast_table, carpet):
-    og.sim.play()
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
 
@@ -298,7 +290,6 @@ def test_overlaid(env, breakfast_table, carpet):
 
 
 def test_pose(env, breakfast_table, dishtowel):
-    og.sim.play()
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
 
@@ -319,7 +310,6 @@ def test_pose(env, breakfast_table, dishtowel):
 
 
 def test_joint(env, breakfast_table, bottom_cabinet):
-    og.sim.play()
     lo = bottom_cabinet.joint_lower_limits
     hi = bottom_cabinet.joint_upper_limits
     q_rand = lo + (hi - lo) * th.rand(bottom_cabinet.n_joints)
@@ -333,7 +323,6 @@ def test_joint(env, breakfast_table, bottom_cabinet):
 
 
 def test_aabb(env, breakfast_table, dishtowel):
-    og.sim.play()
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
 
@@ -363,7 +352,6 @@ def test_aabb(env, breakfast_table, dishtowel):
 
 
 def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
-    og.sim.play()
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
         place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.4})
@@ -398,7 +386,6 @@ def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
 
 
 def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dishtowel):
-    og.sim.play()
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     place_obj_on_floor_plane(microwave)
@@ -532,7 +519,6 @@ def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dis
 
 
 def test_max_temperature(env, bagel, cookable_dishtowel):
-    og.sim.play()
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert bagel.states[MaxTemperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
@@ -553,7 +539,6 @@ def test_max_temperature(env, bagel, cookable_dishtowel):
 
 
 def test_heat_source_or_sink(env, microwave, stove, fridge):
-    og.sim.play()
     assert microwave.states[HeatSourceOrSink].requires_inside
     assert microwave.states[HeatSourceOrSink].requires_closed
     assert microwave.states[HeatSourceOrSink].requires_toggled_on
@@ -600,7 +585,6 @@ def test_heat_source_or_sink(env, microwave, stove, fridge):
 
 
 def test_cooked(env, bagel, cookable_dishtowel):
-    og.sim.play()
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Cooked].get_value()
@@ -628,7 +612,6 @@ def test_cooked(env, bagel, cookable_dishtowel):
 
 
 def test_burnt(env, bagel, cookable_dishtowel):
-    og.sim.play()
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Burnt].get_value()
@@ -656,7 +639,6 @@ def test_burnt(env, bagel, cookable_dishtowel):
 
 
 def test_frozen(env, bagel, cookable_dishtowel):
-    og.sim.play()
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Frozen].get_value()
@@ -684,7 +666,6 @@ def test_frozen(env, bagel, cookable_dishtowel):
 
 
 def test_heated(env, bagel, cookable_dishtowel):
-    og.sim.play()
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Heated].get_value()
@@ -712,7 +693,6 @@ def test_heated(env, bagel, cookable_dishtowel):
 
 
 def test_on_fire(env, plywood):
-    og.sim.play()
     assert not plywood.states[OnFire].get_value()
 
     plywood.states[Temperature].set_value(plywood.states[OnFire].ignition_temperature + 1)
@@ -735,7 +715,6 @@ def test_on_fire(env, plywood):
 
 
 def test_toggled_on(env, stove, robot):
-    og.sim.play()
     stove.set_position_orientation([1.487, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, math.pi], dtype=th.float32)))
     robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
 
@@ -793,7 +772,6 @@ def test_toggled_on(env, stove, robot):
 
 
 def test_particle_source(env, furniture_sink):
-    og.sim.play()
     sink = env.scene.object_registry("name", "furniture_sink")
 
     place_obj_on_floor_plane(sink)
@@ -821,7 +799,6 @@ def test_particle_source(env, furniture_sink):
 
 
 def test_particle_sink(env, furniture_sink):
-    og.sim.play()
     sink = env.scene.object_registry("name", "furniture_sink")
     place_obj_on_floor_plane(sink)
     for _ in range(3):
@@ -850,7 +827,6 @@ def test_particle_sink(env, furniture_sink):
 
 
 def test_particle_applier(env, breakfast_table, acetone_atomizer, applier_dishtowel):
-    og.sim.play()
     # Test projection
 
     place_obj_on_floor_plane(breakfast_table)
@@ -907,7 +883,6 @@ def test_particle_applier(env, breakfast_table, acetone_atomizer, applier_dishto
 
 
 def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
-    og.sim.play()
     # Test projection
 
     place_obj_on_floor_plane(breakfast_table)
@@ -968,7 +943,6 @@ def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
 
 
 def test_saturated(env, remover_dishtowel):
-    og.sim.play()
     place_obj_on_floor_plane(remover_dishtowel)
 
     for _ in range(5):
@@ -1002,7 +976,6 @@ def test_saturated(env, remover_dishtowel):
 
 
 def test_open(env, microwave, bottom_cabinet):
-    og.sim.play()
     # By default, objects should not be open.
     assert not microwave.states[Open].get_value()
     assert not bottom_cabinet.states[Open].get_value()
@@ -1045,7 +1018,6 @@ def test_open(env, microwave, bottom_cabinet):
 
 
 def test_folded_unfolded(env, carpet):
-    og.sim.play()
     place_obj_on_floor_plane(carpet)
 
     for _ in range(10):
@@ -1101,7 +1073,6 @@ def test_folded_unfolded(env, carpet):
 
 
 def test_draped(env, breakfast_table, carpet):
-    og.sim.play()
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
 
@@ -1124,7 +1095,6 @@ def test_draped(env, breakfast_table, carpet):
 
 
 def test_filled(env, stockpot):
-    og.sim.play()
     systems = [
         env.scene.get_system(system_name)
         for system_name, system_class in SYSTEM_EXAMPLES.items()
@@ -1150,7 +1120,6 @@ def test_filled(env, stockpot):
 
 
 def test_contains(env, stockpot):
-    og.sim.play()
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         print(f"Testing Contains {stockpot.name} with {system.name}")
@@ -1187,7 +1156,6 @@ def test_contains(env, stockpot):
 
 
 def test_covered(env, bracelet, bowl, microwave):
-    og.sim.play()
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for obj in (bracelet, bowl, microwave):
         for system in systems:

@@ -27,7 +27,6 @@ from omnigibson.transition_rules import REGISTERED_RULES
 
 
 def test_dryer_rule(env, clothes_dryer, remover_dishtowel, bowl):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     water = env.scene.get_system("water")
 
@@ -81,7 +80,6 @@ def test_dryer_rule(env, clothes_dryer, remover_dishtowel, bowl):
 
 
 def test_washer_rule(env, baking_sheet, washer, remover_dishtowel, bowl):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     water = env.scene.get_system("water")
     dust = env.scene.get_system("dust")  # always remove
@@ -148,7 +146,6 @@ def test_washer_rule(env, baking_sheet, washer, remover_dishtowel, bowl):
 
 
 def test_slicing_rule(env, apple, table_knife):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
     deleted_objs = [apple]
@@ -199,7 +196,6 @@ def test_slicing_rule(env, apple, table_knife):
 
 
 def test_dicing_rule_cooked(env, half_apple, table_knife):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     cooked_diced_apple = env.scene.get_system("cooked__diced__apple")
 
@@ -249,7 +245,6 @@ def test_dicing_rule_cooked(env, half_apple, table_knife):
 
 
 def test_dicing_rule_uncooked(env, half_apple, table_knife):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     diced_apple = env.scene.get_system("diced__apple")
 
@@ -297,7 +292,6 @@ def test_dicing_rule_uncooked(env, half_apple, table_knife):
 
 
 def test_melting_rule(env, stove, stockpot, swiss_cheese):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     melted_swiss_cheese = env.scene.get_system("melted__swiss_cheese")
 
@@ -344,7 +338,6 @@ def test_melting_rule(env, stove, stockpot, swiss_cheese):
 
 
 def test_cooking_physical_particle_rule_failure_recipe_systems(env, stove, stockpot):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     brown_rice = env.scene.get_system("brown_rice")
     water = env.scene.get_system("water")
@@ -382,7 +375,6 @@ def test_cooking_physical_particle_rule_failure_recipe_systems(env, stove, stock
 
 
 def test_cooking_physical_particle_rule_success(env, stove, stockpot):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     brown_rice = env.scene.get_system("brown_rice")
     water = env.scene.get_system("water")
@@ -427,7 +419,6 @@ def test_cooking_physical_particle_rule_success(env, stove, stockpot):
 
 
 def test_mixing_rule_failure_recipe_systems(env, bowl, tablespoon):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     water = env.scene.get_system("water")
     granulated_sugar = env.scene.get_system("granulated_sugar")
@@ -472,7 +463,6 @@ def test_mixing_rule_failure_recipe_systems(env, bowl, tablespoon):
 
 
 def test_mixing_rule_failure_nonrecipe_systems(env, bowl, tablespoon):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     water = env.scene.get_system("water")
     granulated_sugar = env.scene.get_system("granulated_sugar")
@@ -522,7 +512,6 @@ def test_mixing_rule_failure_nonrecipe_systems(env, bowl, tablespoon):
 
 
 def test_mixing_rule_success(env, bowl, tablespoon):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     water = env.scene.get_system("water")
     granulated_sugar = env.scene.get_system("granulated_sugar")
@@ -564,7 +553,6 @@ def test_mixing_rule_success(env, bowl, tablespoon):
 
 
 def test_cooking_system_rule_failure_recipe_systems(env, stove, stockpot, chicken):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     chicken_broth = env.scene.get_system("chicken_broth")
     diced_carrot = env.scene.get_system("diced__carrot")
@@ -618,7 +606,6 @@ def test_cooking_system_rule_failure_recipe_systems(env, stove, stockpot, chicke
 
 
 def test_cooking_system_rule_failure_nonrecipe_systems(env, stove, stockpot, chicken):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     water = env.scene.get_system("water")
     chicken_broth = env.scene.get_system("chicken_broth")
@@ -676,7 +663,6 @@ def test_cooking_system_rule_failure_nonrecipe_systems(env, stove, stockpot, chi
 
 
 def test_cooking_system_rule_failure_nonrecipe_objects(env, stove, stockpot, chicken, bowl):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     chicken_broth = env.scene.get_system("chicken_broth")
     diced_carrot = env.scene.get_system("diced__carrot")
@@ -733,7 +719,6 @@ def test_cooking_system_rule_failure_nonrecipe_objects(env, stove, stockpot, chi
 
 
 def test_cooking_system_rule_success(env, stove, stockpot, chicken):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     chicken_broth = env.scene.get_system("chicken_broth")
     diced_carrot = env.scene.get_system("diced__carrot")
@@ -796,7 +781,6 @@ def test_cooking_system_rule_success(env, stove, stockpot, chicken):
 
 
 def test_cooking_object_rule_failure_wrong_container(env, oven, stockpot, bagel_dough, raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     sesame_seed = env.scene.get_system("sesame_seed")
 
@@ -834,7 +818,6 @@ def test_cooking_object_rule_failure_wrong_container(env, oven, stockpot, bagel_
 
 
 def test_cooking_object_rule_failure_recipe_objects(env, oven, baking_sheet, bagel_dough, raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     sesame_seed = env.scene.get_system("sesame_seed")
 
@@ -871,7 +854,6 @@ def test_cooking_object_rule_failure_recipe_objects(env, oven, baking_sheet, bag
 
 
 def test_cooking_object_rule_failure_unary_states(env, oven, baking_sheet, bagel_dough, raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     sesame_seed = env.scene.get_system("sesame_seed")
 
@@ -911,7 +893,6 @@ def test_cooking_object_rule_failure_unary_states(env, oven, baking_sheet, bagel
 
 
 def test_cooking_object_rule_failure_binary_system_states(env, oven, baking_sheet, bagel_dough, raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     sesame_seed = env.scene.get_system("sesame_seed")
 
@@ -951,7 +932,6 @@ def test_cooking_object_rule_failure_binary_system_states(env, oven, baking_shee
 
 
 def test_cooking_object_rule_failure_binary_object_states(env, oven, baking_sheet, bagel_dough, raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     sesame_seed = env.scene.get_system("sesame_seed")
 
@@ -991,7 +971,6 @@ def test_cooking_object_rule_failure_binary_object_states(env, oven, baking_shee
 
 
 def test_cooking_object_rule_failure_wrong_heat_source(env, stove, baking_sheet, bagel_dough, raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     sesame_seed = env.scene.get_system("sesame_seed")
 
@@ -1037,7 +1016,6 @@ def test_cooking_object_rule_failure_wrong_heat_source(env, stove, baking_sheet,
 
 @pytest.mark.skip(reason="To be fixed as part of #2017.")
 def test_cooking_object_rule_success(env, oven, baking_sheet, bagel_dough, raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     sesame_seed = env.scene.get_system("sesame_seed")
 
@@ -1109,7 +1087,6 @@ def test_cooking_object_rule_success(env, oven, baking_sheet, bagel_dough, raw_e
 
 @pytest.mark.skip(reason="To be fixed as part of #2017.")
 def test_single_toggleable_machine_rule_output_system_failure_wrong_container(env, food_processor, scoop_of_ice_cream):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
     milk = env.scene.get_system("whole_milk")
@@ -1158,7 +1135,6 @@ def test_single_toggleable_machine_rule_output_system_failure_wrong_container(en
 
 
 def test_single_toggleable_machine_rule_output_system_failure_recipe_systems(env, blender, scoop_of_ice_cream):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
     milk = env.scene.get_system("whole_milk")
@@ -1205,7 +1181,6 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_systems(env
 
 
 def test_single_toggleable_machine_rule_output_system_failure_recipe_objects(env, blender, scoop_of_ice_cream):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
     milk = env.scene.get_system("whole_milk")
@@ -1244,7 +1219,6 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_objects(env
 
 
 def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(env, blender, scoop_of_ice_cream):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
     milk = env.scene.get_system("whole_milk")
@@ -1294,7 +1268,6 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(
 
 
 def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(env, blender, scoop_of_ice_cream, bowl):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
     milk = env.scene.get_system("whole_milk")
@@ -1347,7 +1320,6 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
 
 
 def test_single_toggleable_machine_rule_output_system_success(env, blender, scoop_of_ice_cream):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
     milk = env.scene.get_system("whole_milk")
@@ -1397,7 +1369,6 @@ def test_single_toggleable_machine_rule_output_system_success(env, blender, scoo
 def test_single_toggleable_machine_rule_output_object_failure_unary_states(
     env, electric_mixer, raw_egg, another_raw_egg
 ):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     flour = env.scene.get_system("flour")
     granulated_sugar = env.scene.get_system("granulated_sugar")
@@ -1468,7 +1439,6 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states(
 
 
 def test_single_toggleable_machine_rule_output_object_success(env, electric_mixer, raw_egg, another_raw_egg):
-    og.sim.play()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
     flour = env.scene.get_system("flour")
     granulated_sugar = env.scene.get_system("granulated_sugar")

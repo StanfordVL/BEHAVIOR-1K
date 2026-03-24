@@ -9,7 +9,6 @@ from omnigibson.systems import VisualParticleSystem
 
 
 def test_dump_load(env, breakfast_table):
-    og.sim.play()
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
@@ -28,7 +27,6 @@ def test_dump_load(env, breakfast_table):
 
 
 def test_dump_load_serialized(env, breakfast_table):
-    og.sim.play()
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
@@ -46,7 +44,6 @@ def test_dump_load_serialized(env, breakfast_table):
 
 
 def test_save_restore_partial(env, breakfast_table):
-    og.sim.play()
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
 
@@ -63,7 +60,6 @@ def test_save_restore_partial(env, breakfast_table):
 
 
 def test_save_restore_full(env, breakfast_table):
-    og.sim.play()
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
 

@@ -7,9 +7,52 @@ from omnigibson.objects import DatasetObject
 from omnigibson.robots import Robot
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 
+_ALL_OBJECT_FIXTURE_NAMES = {
+    "robot",
+    "breakfast_table",
+    "bottom_cabinet",
+    "dishtowel",
+    "carpet",
+    "bowl",
+    "bagel",
+    "cookable_dishtowel",
+    "microwave",
+    "stove",
+    "fridge",
+    "plywood",
+    "bookcase_back",
+    "bookcase_shelf",
+    "bookcase_baseboard",
+    "bracelet",
+    "furniture_sink",
+    "stockpot",
+    "applier_dishtowel",
+    "remover_dishtowel",
+    "acetone_atomizer",
+    "vacuum",
+    "blender",
+    "oven",
+    "baking_sheet",
+    "bagel_dough",
+    "raw_egg",
+    "another_raw_egg",
+    "scoop_of_ice_cream",
+    "food_processor",
+    "electric_mixer",
+    "swiss_cheese",
+    "apple",
+    "table_knife",
+    "half_apple",
+    "tablespoon",
+    "chicken",
+    "washer",
+    "clothes_dryer",
+    "oyster",
+}
+
 
 @pytest.fixture
-def env():
+def stopped_env():
     if og.sim is None:
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
@@ -21,11 +64,21 @@ def env():
     og.clear()
 
 
+@pytest.fixture
+def env(request, stopped_env):
+    for name in _ALL_OBJECT_FIXTURE_NAMES:
+        if name in request.fixturenames:
+            request.getfixturevalue(name)
+
+    og.sim.play()
+    yield stopped_env
+
+
 # --- Robot fixture ---
 
 
 @pytest.fixture
-def robot(env):
+def robot(stopped_env):
     obj = Robot(
         name="fetch",
         model="fetch",
@@ -33,7 +86,7 @@ def robot(env):
         position=[150, 150, 100],
         orientation=[0, 0, 0, 1],
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
@@ -41,58 +94,58 @@ def robot(env):
 
 
 @pytest.fixture
-def breakfast_table(env):
+def breakfast_table(stopped_env):
     obj = DatasetObject(name="breakfast_table", category="breakfast_table", model="skczfi")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bottom_cabinet(env):
+def bottom_cabinet(stopped_env):
     obj = DatasetObject(name="bottom_cabinet", category="bottom_cabinet", model="immwzb")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def dishtowel(env):
+def dishtowel(stopped_env):
     obj = DatasetObject(
         name="dishtowel", category="dishtowel", model="dtfspn", prim_type=PrimType.CLOTH, abilities={"cloth": {}}
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def carpet(env):
+def carpet(stopped_env):
     obj = DatasetObject(
         name="carpet", category="carpet", model="ctclvd", prim_type=PrimType.CLOTH, abilities={"cloth": {}}
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bowl(env):
+def bowl(stopped_env):
     obj = DatasetObject(name="bowl", category="bowl", model="ajzltc")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bagel(env):
+def bagel(stopped_env):
     obj = DatasetObject(
         name="bagel",
         category="bagel",
         model="zlxkry",
         abilities={"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}},
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def cookable_dishtowel(env):
+def cookable_dishtowel(stopped_env):
     obj = DatasetObject(
         name="cookable_dishtowel",
         category="dishtowel",
@@ -100,110 +153,110 @@ def cookable_dishtowel(env):
         prim_type=PrimType.CLOTH,
         abilities={"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}, "cloth": {}},
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def microwave(env):
+def microwave(stopped_env):
     obj = DatasetObject(name="microwave", category="microwave", model="hjjxmi")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def stove(env):
+def stove(stopped_env):
     obj = DatasetObject(name="stove", category="stove", model="yhjzwg")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def fridge(env):
+def fridge(stopped_env):
     obj = DatasetObject(name="fridge", category="fridge", model="xyejdx")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def plywood(env):
+def plywood(stopped_env):
     obj = DatasetObject(name="plywood", category="plywood", model="fkmkqa", abilities={"flammable": {}})
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bookcase_back(env):
+def bookcase_back(stopped_env):
     obj = DatasetObject(name="bookcase_back", category="bookcase_back", model="gjsnrt", abilities={"attachable": {}})
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bookcase_shelf(env):
+def bookcase_shelf(stopped_env):
     obj = DatasetObject(name="bookcase_shelf", category="bookcase_shelf", model="ymtnqa", abilities={"attachable": {}})
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bookcase_baseboard(env):
+def bookcase_baseboard(stopped_env):
     obj = DatasetObject(
         name="bookcase_baseboard", category="bookcase_baseboard", model="hlhneo", abilities={"attachable": {}}
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bracelet(env):
+def bracelet(stopped_env):
     obj = DatasetObject(name="bracelet", category="bracelet", model="thqqmo")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def furniture_sink(env):
+def furniture_sink(stopped_env):
     obj = DatasetObject(name="furniture_sink", category="furniture_sink", model="bnpjjy", scale=th.ones(3))
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def stockpot(env):
+def stockpot(stopped_env):
     obj = DatasetObject(
         name="stockpot", category="stockpot", model="dcleem", abilities={"fillable": {}, "heatable": {}}
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def applier_dishtowel(env):
+def applier_dishtowel(stopped_env):
     obj = DatasetObject(
         name="applier_dishtowel",
         category="dishtowel",
         model="dtfspn",
         abilities={"particleApplier": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}},
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def remover_dishtowel(env):
+def remover_dishtowel(stopped_env):
     obj = DatasetObject(
         name="remover_dishtowel",
         category="dishtowel",
         model="dtfspn",
         abilities={"particleRemover": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}},
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def acetone_atomizer(env):
+def acetone_atomizer(stopped_env):
     obj = DatasetObject(
         name="acetone_atomizer",
         category="acetone_atomizer",
@@ -217,12 +270,12 @@ def acetone_atomizer(env):
             },
         },
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def vacuum(env):
+def vacuum(stopped_env):
     obj = DatasetObject(
         name="vacuum",
         category="vacuum",
@@ -236,12 +289,12 @@ def vacuum(env):
             },
         },
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def blender(env):
+def blender(stopped_env):
     obj = DatasetObject(
         name="blender",
         category="blender",
@@ -249,28 +302,28 @@ def blender(env):
         bounding_box=[0.316, 0.318, 0.649],
         abilities={"fillable": {}, "toggleable": {}, "heatable": {}},
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def oven(env):
+def oven(stopped_env):
     obj = DatasetObject(name="oven", category="oven", model="cgtaer", bounding_box=[0.943, 0.837, 1.297])
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def baking_sheet(env):
+def baking_sheet(stopped_env):
     obj = DatasetObject(name="baking_sheet", category="baking_sheet", model="yhurut")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def bagel_dough(env):
+def bagel_dough(stopped_env):
     obj = DatasetObject(name="bagel_dough", category="bagel_dough", model="iuembm", bounding_box=[0.20, 0.20, 0.02])
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     og.sim.stop()
     obj.root_link.set_collision_approximation("boundingCube")
     og.sim.play()
@@ -278,9 +331,9 @@ def bagel_dough(env):
 
 
 @pytest.fixture
-def raw_egg(env):
+def raw_egg(stopped_env):
     obj = DatasetObject(name="raw_egg", category="raw_egg", model="ydgivr")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     og.sim.stop()
     obj.root_link.set_collision_approximation("boundingCube")
     og.sim.play()
@@ -288,9 +341,9 @@ def raw_egg(env):
 
 
 @pytest.fixture
-def another_raw_egg(env):
+def another_raw_egg(stopped_env):
     obj = DatasetObject(name="another_raw_egg", category="raw_egg", model="ydgivr")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     og.sim.stop()
     obj.root_link.set_collision_approximation("boundingCube")
     og.sim.play()
@@ -298,88 +351,88 @@ def another_raw_egg(env):
 
 
 @pytest.fixture
-def scoop_of_ice_cream(env):
+def scoop_of_ice_cream(stopped_env):
     obj = DatasetObject(
         name="scoop_of_ice_cream", category="scoop_of_ice_cream", model="dodndj", bounding_box=[0.076, 0.077, 0.065]
     )
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def food_processor(env):
+def food_processor(stopped_env):
     obj = DatasetObject(name="food_processor", category="food_processor", model="gamkbo")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def electric_mixer(env):
+def electric_mixer(stopped_env):
     obj = DatasetObject(name="electric_mixer", category="electric_mixer", model="qornxa")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def swiss_cheese(env):
+def swiss_cheese(stopped_env):
     obj = DatasetObject(name="swiss_cheese", category="swiss_cheese", model="hwxeto")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def apple(env):
+def apple(stopped_env):
     obj = DatasetObject(name="apple", category="apple", model="agveuv")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def table_knife(env):
+def table_knife(stopped_env):
     obj = DatasetObject(name="table_knife", category="table_knife", model="jxdfyy")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def half_apple(env):
+def half_apple(stopped_env):
     obj = DatasetObject(name="half_apple", category="half_apple", model="sguztn")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def tablespoon(env):
+def tablespoon(stopped_env):
     obj = DatasetObject(name="tablespoon", category="tablespoon", model="huudhe")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def chicken(env):
+def chicken(stopped_env):
     obj = DatasetObject(name="chicken", category="chicken", model="nppsmz", scale=th.ones(3) * 0.7)
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def washer(env):
+def washer(stopped_env):
     obj = DatasetObject(name="washer", category="washer", model="dobgmu")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def clothes_dryer(env):
+def clothes_dryer(stopped_env):
     obj = DatasetObject(name="clothes_dryer", category="clothes_dryer", model="smcyys")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
 @pytest.fixture
-def oyster(env):
+def oyster(stopped_env):
     obj = DatasetObject(name="oyster", category="oyster", model="enzocs")
-    env.scene.add_object(obj)
+    stopped_env.scene.add_object(obj)
     return obj
 
 
