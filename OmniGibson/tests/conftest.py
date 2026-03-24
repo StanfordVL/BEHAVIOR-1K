@@ -280,9 +280,7 @@ def baking_sheet(stopped_env):
 def bagel_dough(stopped_env):
     obj = DatasetObject(name="bagel_dough", category="bagel_dough", model="iuembm", bounding_box=[0.20, 0.20, 0.02])
     stopped_env.scene.add_object(obj)
-    og.sim.stop()
     obj.root_link.set_collision_approximation("boundingCube")
-    og.sim.play()
     return obj
 
 
@@ -290,9 +288,7 @@ def bagel_dough(stopped_env):
 def raw_egg(stopped_env):
     obj = DatasetObject(name="raw_egg", category="raw_egg", model="ydgivr")
     stopped_env.scene.add_object(obj)
-    og.sim.stop()
     obj.root_link.set_collision_approximation("boundingCube")
-    og.sim.play()
     return obj
 
 
@@ -300,9 +296,7 @@ def raw_egg(stopped_env):
 def another_raw_egg(stopped_env):
     obj = DatasetObject(name="another_raw_egg", category="raw_egg", model="ydgivr")
     stopped_env.scene.add_object(obj)
-    og.sim.stop()
     obj.root_link.set_collision_approximation("boundingCube")
-    og.sim.play()
     return obj
 
 
