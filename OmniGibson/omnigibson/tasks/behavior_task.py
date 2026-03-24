@@ -4,15 +4,10 @@ from pathlib import Path
 import random
 
 import torch as th
+from bddl.task import Task
 from bddl.activity import (
-    Conditions,
-    evaluate_goal_conditions,
-    get_goal_conditions,
-    get_ground_goal_state_options,
-    get_initial_conditions,
     get_natural_goal_conditions,
     get_natural_initial_conditions,
-    get_object_scope,
 )
 
 import omnigibson as og
@@ -31,8 +26,7 @@ from omnigibson.utils.bddl_utils import (
     BEHAVIOR_ACTIVITIES,
     BDDLEntity,
     BDDLSampler,
-    OmniGibsonBDDLBackend,
-    get_processed_bddl,
+        get_processed_bddl,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.config_utils import TorchEncoder
@@ -113,17 +107,12 @@ class BehaviorTask(BaseTask):
             online_object_sampling and use_presampled_robot_pose
         ), "Cannot use presampled robot pose if online_object_sampling is True!"
 
-        # Initialize relevant variables
-
-        # BDDL
-        self.backend = OmniGibsonBDDLBackend()
-
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
         self.activity_instance_id = activity_instance_id
         self.predefined_problem = predefined_problem
-        self.activity_conditions = None
+        self.task = None
         self.activity_initial_conditions = None
         self.activity_goal_conditions = None
         self.ground_goal_state_options = None
@@ -302,54 +291,44 @@ class BehaviorTask(BaseTask):
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
-        self.activity_conditions = Conditions(
+        self.task = Task(
             activity_name,
             activity_definition_id,
-            simulator_name="omnigibson",
+            simulator_name="behavior-1k",
             predefined_problem=predefined_problem,
         )
 
         # Get scope, making sure agent is the first entry
         self.object_scope = {"agent.n.01_1": None}
-        self.object_scope.update(get_object_scope(self.activity_conditions))
+        self.object_scope.update(self.task.object_scope)
 
         # Object info
         self.object_instance_to_category = {
             obj_inst: obj_cat
-            for obj_cat in self.activity_conditions.parsed_objects
-            for obj_inst in self.activity_conditions.parsed_objects[obj_cat]
+            for obj_cat in self.task.parsed_objects
+            for obj_inst in self.task.parsed_objects[obj_cat]
         }
 
         # Generate initial and goal conditions
-        self.activity_initial_conditions = get_initial_conditions(
-            self.activity_conditions, self.backend, self.object_scope
-        )
-        self.activity_goal_conditions = get_goal_conditions(self.activity_conditions, self.backend, self.object_scope)
-        self.ground_goal_state_options = get_ground_goal_state_options(
-            self.activity_conditions, self.backend, self.object_scope, self.activity_goal_conditions
-        )
+        self.activity_initial_conditions = self.task.initial_conditions
+        self.activity_goal_conditions = self.task.goal_conditions
+        self.ground_goal_state_options = self.task.ground_goal_state_options
 
         # Demo attributes
-        self.instruction_order = th.arange(len(self.activity_conditions.parsed_goal_conditions))
+        self.instruction_order = th.arange(len(self.task.conditions.parsed_goal_conditions))
         self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
 
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
-        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
-        self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.activity_conditions)
+        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.task.conditions)
+        self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.task.conditions)
 
     def get_potential(self, env):
-        """
-        Compute task-specific potential: distance to the goal
+        from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
+        def eval_cb(predicate_name, *entities):
+            return evaluate_bddl_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
 
-        Args:
-            env (Environment): Current active environment instance
-
-        Returns:
-            float: Computed potential
-        """
-        # Evaluate the first ground goal state option as the potential
-        _, satisfied_predicates = evaluate_goal_conditions(self.ground_goal_state_options[0])
+        _, satisfied_predicates = self.task.check_goal(eval_cb)
         success_score = len(satisfied_predicates["satisfied"]) / (
             len(satisfied_predicates["satisfied"]) + len(satisfied_predicates["unsatisfied"])
         )
@@ -373,7 +352,7 @@ class BehaviorTask(BaseTask):
         # Generate sampler
         self.sampler = BDDLSampler(
             env=env,
-            activity_conditions=self.activity_conditions,
+            activity_conditions=self.task.conditions,
             object_scope=self.object_scope,
             backend=self.backend,
         )
@@ -395,11 +374,6 @@ class BehaviorTask(BaseTask):
             # Load existing scene cache and assign object scope accordingly
             self.assign_object_scope_with_cache(env)
 
-        # Generate goal condition with the fully populated self.object_scope
-        self.activity_goal_conditions = get_goal_conditions(self.activity_conditions, self.backend, self.object_scope)
-        self.ground_goal_state_options = get_ground_goal_state_options(
-            self.activity_conditions, self.backend, self.object_scope, self.activity_goal_conditions
-        )
         return accept_scene, feedback
 
     def get_agent(self, env):
@@ -599,7 +573,7 @@ class BehaviorTask(BaseTask):
         Increment the instruction
         """
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(
-            self.activity_conditions.parsed_goal_conditions
+            self.task.conditions.parsed_goal_conditions
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 

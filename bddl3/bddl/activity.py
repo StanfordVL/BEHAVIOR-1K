@@ -68,11 +68,13 @@ def get_object_scope(conds):
     return create_scope(conds.parsed_objects)
 
 
-def get_initial_conditions(conds, backend, scope, generate_ground_options=True):
+def get_initial_conditions(conds, scope, generate_ground_options=True):
     """Create compiled initial conditions that can be checked and sampled
 
     Args:
         conds (Conditions): conditions for the particular activity and definition
+        scope (dict): object scope mapping
+        generate_ground_options (bool): whether to generate ground goal options
 
     Returns:
         list<bddl.condition_evaluation.HEAD>: compiled conditions if initial
@@ -86,7 +88,6 @@ def get_initial_conditions(conds, backend, scope, generate_ground_options=True):
                 for cond in conds.parsed_initial_conditions
                 if cond[0] not in ["inroom"]
             ],
-            backend,
             scope=scope,
             object_map=conds.parsed_objects,
             generate_ground_options=generate_ground_options,
@@ -94,14 +95,12 @@ def get_initial_conditions(conds, backend, scope, generate_ground_options=True):
         return initial_conditions
 
 
-def get_goal_conditions(conds, backend, scope, generate_ground_options=True):
+def get_goal_conditions(conds, scope, generate_ground_options=True):
     """Create compiled goal conditions with a populated object scope for checking
 
     Args:
         conds (Conditions): conditions for the particular activity and definition
-        populated_object_scope (dict<str: simulator object>): scope mapping object
-                                                                terms in BDDL to
-                                                                simulator objects
+        scope (dict<str: str>): scope mapping object terms in BDDL to strings
 
     Returns:
         list<bddl.condition_evaluation.HEAD>: compiled conditions if goal condition
@@ -110,7 +109,6 @@ def get_goal_conditions(conds, backend, scope, generate_ground_options=True):
     if bool(conds.parsed_goal_conditions[0]):
         goal_conditions = compile_state(
             conds.parsed_goal_conditions,
-            backend,
             scope=scope,
             object_map=conds.parsed_objects,
             generate_ground_options=generate_ground_options,
@@ -118,15 +116,14 @@ def get_goal_conditions(conds, backend, scope, generate_ground_options=True):
         return goal_conditions
 
 
-def get_ground_goal_state_options(conds, backend, scope, goal_conditions):
+def get_ground_goal_state_options(conds, scope, goal_conditions):
     """Create compiled ground solutions to goal state with a populated object scope
         for checking progress on specific solutions
 
     Args:
         conds (Conditions): conditions for the particular activity and definition
-        populated_object_scope (dict<str: simulator object>): scope mapping object
-                                                                terms in BDDL to
-                                                                simulator objects
+        scope (dict<str: str>): scope mapping object terms in BDDL to simulator objects
+        goal_conditions: the goal conditions
 
     Returns:
         list<bddl.condition_evaluation.HEAD>: compiled goal solutions
@@ -135,24 +132,25 @@ def get_ground_goal_state_options(conds, backend, scope, goal_conditions):
         AssertionError if there are no ground solutions
     """
     ground_goal_state_options = get_ground_state_options(
-        goal_conditions, backend, scope=scope, object_map=conds.parsed_objects
+        goal_conditions, scope=scope, object_map=conds.parsed_objects
     )
     assert len(ground_goal_state_options) > 0
     return ground_goal_state_options
 
 
-def evaluate_goal_conditions(goal_conditions):
+def evaluate_goal_conditions(goal_conditions, evaluate_fn):
     """Evaluate compiled goal state to see if current simulator state has been met
 
     Args:
         goal_conditions (list<bddl.condition_evaluation.HEAD>): list of compiled
                                                                 goal conditions with
                                                                 populated scope
+        evaluate_fn (function): callback function to evaluate condition predicates
 
     Returns:
         bool, dict<str: list<int>>: [description]
     """
-    return evaluate_state(goal_conditions)
+    return evaluate_state(goal_conditions, evaluate_fn)
 
 
 def get_natural_initial_conditions(conds):
@@ -212,17 +210,18 @@ def get_instance_count(act):
     return len(ids)
 
 
-def get_reward(ground_goal_state_options):
+def get_reward(ground_goal_state_options, evaluate_fn):
     """Return reward given ground goal state options.
        Reward formulated as max(<percent literals that are satisfied in the option> for option in ground_goal_state_options)
 
     Args:
         ground_goal_state_options (list<list<HEAD>>): list of compiled ground goal state options
+        evaluate_fn (function): callback function evaluated over primitives
 
     Returns:
         float: reward
     """
     return max(
-        len(evaluate_state(option)[-1]["satisfied"]) / float(len(option))
+        len(evaluate_state(option, evaluate_fn)[-1]["satisfied"]) / float(len(option))
         for option in ground_goal_state_options
     )

@@ -539,7 +539,7 @@ def construct_full_bddl(
     )
     bddl = f"""(define\n
                    (problem {behavior_activity}_{activity_definition})\n
-                   (:domain igibson)\n
+                   (:domain behavior-100)\n
                 {object_list}\n
                 {init_state}\n
                 {goal_state}\n
@@ -553,7 +553,7 @@ def construct_bddl_from_parsed(
     parsed_object_list,
     parsed_init_state,
     parsed_goal_state,
-    domain="omnigibson",
+    domain="behavior-1k",
 ):
     object_list = "(:objects\n"
     for object_cat, object_insts in parsed_object_list.items():
@@ -597,9 +597,9 @@ if __name__ == "__main__":
         refined_bddl = remove_bddl_whitespace()
     if sys.argv[1] == "construct_from_parsed":
         activity = "cleaning_up_after_a_meal"
-        __, objs, init, goal = parse_problem(activity, 0, "igibson")
+        __, objs, init, goal = parse_problem(activity, 0, "behavior-100")
         reconstruction = construct_bddl_from_parsed(
-            activity, 0, objs, init, goal, domain="igibson"
+            activity, 0, objs, init, goal, domain="behavior-100"
         )
         with open(f"activity_definitions/{activity}/problem0.bddl", "r") as f:
             defn_lines = f.read().split("\n")

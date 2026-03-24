@@ -7,11 +7,11 @@ from copy import deepcopy
 import bddl
 import networkx as nx
 import torch as th
-from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
-from bddl.backend_abc import BDDLBackend
+
+
 from bddl.condition_evaluation import Negation
 from bddl.config import get_definition_filename
-from bddl.logic_base import AtomicFormula, BinaryAtomicFormula, UnaryAtomicFormula
+
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
@@ -125,55 +125,63 @@ BAD_CLOTH_MODELS = {
 
 
 class UnsampleablePredicate:
-    def _sample(self, *args, **kwargs):
+    @classmethod
+    def sample(cls, *args, **kwargs):
         raise NotImplementedError()
 
 
-class ObjectStateInsourcePredicate(UnsampleablePredicate, BinaryAtomicFormula):
-    def _evaluate(self, entity, **kwargs):
+class ObjectStateInsourcePredicate(UnsampleablePredicate):
+    @classmethod
+    def evaluate(cls, entity, **kwargs):
         # Always returns True
         return True
 
 
-class ObjectStateFuturePredicate(UnsampleablePredicate, UnaryAtomicFormula):
+class ObjectStateFuturePredicate(UnsampleablePredicate):
     STATE_NAME = "future"
 
-    def _evaluate(self, entity, **kwargs):
+    @classmethod
+    def evaluate(cls, entity, **kwargs):
         return not entity.exists
 
 
-class ObjectStateRealPredicate(UnsampleablePredicate, UnaryAtomicFormula):
+class ObjectStateRealPredicate(UnsampleablePredicate):
     STATE_NAME = "real"
 
-    def _evaluate(self, entity, **kwargs):
+    @classmethod
+    def evaluate(cls, entity, **kwargs):
         return entity.exists
 
 
-class ObjectStateUnaryPredicate(UnaryAtomicFormula):
+class ObjectStateUnaryPredicate:
     STATE_CLASS = None
     STATE_NAME = None
 
-    def _evaluate(self, entity, **kwargs):
-        return entity.get_state(self.STATE_CLASS, **kwargs)
+    @classmethod
+    def evaluate(cls, entity, **kwargs):
+        return entity.get_state(cls.STATE_CLASS, **kwargs)
 
-    def _sample(self, entity, binary_state, **kwargs):
-        return entity.set_state(self.STATE_CLASS, binary_state, **kwargs)
+    @classmethod
+    def sample(cls, entity, binary_state, **kwargs):
+        return entity.set_state(cls.STATE_CLASS, binary_state, **kwargs)
 
 
-class ObjectStateBinaryPredicate(BinaryAtomicFormula):
+class ObjectStateBinaryPredicate:
     STATE_CLASS = None
     STATE_NAME = None
 
-    def _evaluate(self, entity1, entity2, **kwargs):
+    @classmethod
+    def evaluate(cls, entity1, entity2, **kwargs):
         return (
-            entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs)
+            entity1.get_state(cls.STATE_CLASS, entity2.wrapped_obj, **kwargs)
             if (entity2.exists and entity2.initialized)
             else False
         )
 
-    def _sample(self, entity1, entity2, binary_state, **kwargs):
+    @classmethod
+    def sample(cls, entity1, entity2, binary_state, **kwargs):
         return (
-            entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs)
+            entity1.set_state(cls.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs)
             if (entity2.exists and entity2.initialized)
             else None
         )
@@ -232,6 +240,13 @@ def process_single_condition(condition):
 
 
 # TODO: Add remaining predicates.
+
+def evaluate_bddl_predicate(predicate_name, *entities):
+    return SUPPORTED_PREDICATES[predicate_name].evaluate(*entities)
+
+def sample_bddl_predicate(predicate_name, *args, **kwargs):
+    return SUPPORTED_PREDICATES[predicate_name].sample(*args, **kwargs)
+
 SUPPORTED_PREDICATES = {
     "inside": get_binary_predicate_for_state(object_states.Inside, "inside"),
     "nextto": get_binary_predicate_for_state(object_states.NextTo, "nextto"),
@@ -609,9 +624,6 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
     return "".join(raw_bddl)
 
 
-class OmniGibsonBDDLBackend(BDDLBackend):
-    def get_predicate_class(self, predicate_name):
-        return SUPPORTED_PREDICATES[predicate_name]
 
 
 class BDDLEntity(Wrapper):
@@ -717,7 +729,7 @@ class BDDLEntity(Wrapper):
 
 
 class BDDLSampler:
-    def __init__(self, env, activity_conditions, object_scope, backend):
+    def __init__(self, env, task):
         # Avoid circular imports here
         from omnigibson.scenes.traversable_scene import TraversableScene
 
@@ -725,9 +737,9 @@ class BDDLSampler:
         self._env = env
         self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, TraversableScene) else None
         self._agent = self._env.robots[0]
-        self._backend = backend
-        self._activity_conditions = activity_conditions
-        self._object_scope = object_scope
+        
+        self._activity_conditions = task.activity_conditions
+        self._object_scope = task.object_scope
         self._object_instance_to_synset = {
             obj_inst: obj_cat
             for obj_cat in self._activity_conditions.parsed_objects

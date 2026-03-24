@@ -5,7 +5,7 @@ import numpy as np
 
 import bddl
 from bddl.logic_base import Expression
-from bddl.utils import UnsupportedPredicateError
+from bddl.utils import UncontrolledCategoryError
 
 #################### RECURSIVE PREDICATES ####################
 
@@ -13,15 +13,14 @@ from bddl.utils import UnsupportedPredicateError
 
 
 class Conjunction(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         new_scope = copy.copy(scope)
         child_predicates = [
-            get_predicate_for_token(subexpression[0], backend)(
+            get_predicate_for_token(subexpression[0])(
                 scope,
-                backend,
-                subexpression[1:],
+                        subexpression[1:],
                 object_map,
                 generate_ground_options=generate_ground_options,
             )
@@ -32,8 +31,8 @@ class Conjunction(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert all(
             [val is not None for val in self.child_values]
         ), "child_values has NoneTypes"
@@ -51,16 +50,15 @@ class Conjunction(Expression):
 
 
 class Disjunction(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         # body = [[predicate1], [predicate2], ..., [predicateN]]
         new_scope = copy.copy(scope)
         child_predicates = [
-            get_predicate_for_token(subexpression[0], backend)(
+            get_predicate_for_token(subexpression[0])(
                 scope,
-                backend,
-                subexpression[1:],
+                        subexpression[1:],
                 object_map,
                 generate_ground_options=generate_ground_options,
             )
@@ -71,8 +69,8 @@ class Disjunction(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert all(
             [val is not None for val in self.child_values]
         ), "child_values has NoneTypes"
@@ -86,8 +84,8 @@ class Disjunction(Expression):
 
 # QUANTIFIERS
 class Universal(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
         iterable, subexpression = body
         param_label, __, category = iterable
         param_label = param_label.strip("?")
@@ -97,9 +95,8 @@ class Universal(Expression):
                 new_scope = copy.copy(scope)
                 new_scope[param_label] = obj_name
                 self.children.append(
-                    get_predicate_for_token(subexpression[0], backend)(
+                    get_predicate_for_token(subexpression[0])(
                         new_scope,
-                        backend,
                         subexpression[1:],
                         object_map,
                         generate_ground_options=generate_ground_options,
@@ -109,8 +106,8 @@ class Universal(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert all(
             [val is not None for val in self.child_values]
         ), "child_values has NoneTypes"
@@ -129,8 +126,8 @@ class Universal(Expression):
 
 
 class Existential(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
         iterable, subexpression = body
         param_label, __, category = iterable
         param_label = param_label.strip("?")
@@ -141,9 +138,8 @@ class Existential(Expression):
                 new_scope[param_label] = obj_name
                 # body = [["param_label", "-", "category"], [predicate]]
                 self.children.append(
-                    get_predicate_for_token(subexpression[0], backend)(
+                    get_predicate_for_token(subexpression[0])(
                         new_scope,
-                        backend,
                         subexpression[1:],
                         object_map,
                         generate_ground_options=generate_ground_options,
@@ -153,8 +149,8 @@ class Existential(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert all(
             [val is not None for val in self.child_values]
         ), "child_values has NoneTypes"
@@ -167,8 +163,8 @@ class Existential(Expression):
 
 
 class NQuantifier(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         N, iterable, subexpression = body
         self.N = int(N[0])
@@ -180,9 +176,8 @@ class NQuantifier(Expression):
                 new_scope = copy.copy(scope)
                 new_scope[param_label] = obj_name
                 self.children.append(
-                    get_predicate_for_token(subexpression[0], backend)(
+                    get_predicate_for_token(subexpression[0])(
                         new_scope,
-                        backend,
                         subexpression[1:],
                         object_map,
                         generate_ground_options=generate_ground_options,
@@ -192,8 +187,8 @@ class NQuantifier(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert all(
             [val is not None for val in self.child_values]
         ), "child_values has NoneTypes"
@@ -217,8 +212,8 @@ class NQuantifier(Expression):
 
 
 class ForPairs(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         iterable1, iterable2, subexpression = body
         param_label1, __, category1 = iterable1
@@ -234,10 +229,9 @@ class ForPairs(Expression):
                         new_scope[param_label1] = obj_name_1
                         new_scope[param_label2] = obj_name_2
                         sub.append(
-                            get_predicate_for_token(subexpression[0], backend)(
+                            get_predicate_for_token(subexpression[0])(
                                 new_scope,
-                                backend,
-                                subexpression[1:],
+                        subexpression[1:],
                                 object_map,
                                 generate_ground_options=generate_ground_options,
                             )
@@ -247,10 +241,10 @@ class ForPairs(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
+    def evaluate(self, evaluate_fn):
         self.child_values = np.array(
             [
-                np.array([subchild.evaluate() for subchild in child])
+                np.array([subchild.evaluate(evaluate_fn) for subchild in child])
                 for child in self.children
             ]
         )
@@ -292,8 +286,8 @@ class ForPairs(Expression):
 
 
 class ForNPairs(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         N, iterable1, iterable2, subexpression = body
         self.N = int(N[0])
@@ -310,10 +304,9 @@ class ForNPairs(Expression):
                         new_scope[param_label1] = obj_name_1
                         new_scope[param_label2] = obj_name_2
                         sub.append(
-                            get_predicate_for_token(subexpression[0], backend)(
+                            get_predicate_for_token(subexpression[0])(
                                 new_scope,
-                                backend,
-                                subexpression[1:],
+                        subexpression[1:],
                                 object_map,
                                 generate_ground_options=generate_ground_options,
                             )
@@ -323,10 +316,10 @@ class ForNPairs(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
+    def evaluate(self, evaluate_fn):
         self.child_values = np.array(
             [
-                np.array([subchild.evaluate() for subchild in child])
+                np.array([subchild.evaluate(evaluate_fn) for subchild in child])
                 for child in self.children
             ]
         )
@@ -358,16 +351,15 @@ class ForNPairs(Expression):
 
 # NEGATION
 class Negation(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         # body = [[predicate]]
         subexpression = body[0]
         self.children.append(
-            get_predicate_for_token(subexpression[0], backend)(
+            get_predicate_for_token(subexpression[0])(
                 scope,
-                backend,
-                subexpression[1:],
+                        subexpression[1:],
                 object_map,
                 generate_ground_options=generate_ground_options,
             )
@@ -377,8 +369,8 @@ class Negation(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert len(self.child_values) == 1, "More than one child value"
         assert all(
             [val is not None for val in self.child_values]
@@ -404,24 +396,22 @@ class Negation(Expression):
 
 # IMPLICATION
 class Implication(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         # body = [[antecedent], [consequent]]
         antecedent, consequent = body
         self.children.append(
-            get_predicate_for_token(antecedent[0], backend)(
+            get_predicate_for_token(antecedent[0])(
                 scope,
-                backend,
                 antecedent[1:],
                 object_map,
                 generate_ground_options=generate_ground_options,
             )
         )
         self.children.append(
-            get_predicate_for_token(consequent[0], backend)(
+            get_predicate_for_token(consequent[0])(
                 scope,
-                backend,
                 consequent[1:],
                 object_map,
                 generate_ground_options=generate_ground_options,
@@ -431,8 +421,8 @@ class Implication(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert all(
             [val is not None for val in self.child_values]
         ), "child_values has NoneTypes"
@@ -465,15 +455,14 @@ class Implication(Expression):
 
 
 class HEAD(Expression):
-    def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
-        super().__init__(scope, backend, body, object_map)
+    def __init__(self, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
 
         subexpression = body
         self.children.append(
-            get_predicate_for_token(subexpression[0], backend)(
+            get_predicate_for_token(subexpression[0])(
                 scope,
-                backend,
-                subexpression[1:],
+                        subexpression[1:],
                 object_map,
                 generate_ground_options=generate_ground_options,
             )
@@ -484,8 +473,8 @@ class HEAD(Expression):
         if generate_ground_options:
             self.get_ground_options()
 
-    def evaluate(self):
-        self.child_values = [child.evaluate() for child in self.children]
+    def evaluate(self, evaluate_fn):
+        self.child_values = [child.evaluate(evaluate_fn) for child in self.children]
         assert len(self.child_values) == 1, "More than one child value"
         self.currently_satisfied = self.child_values[0]
         return self.currently_satisfied
@@ -525,16 +514,13 @@ def create_scope(object_terms):
     return scope
 
 
-def compile_state(
-    parsed_state, backend, scope=None, object_map=None, generate_ground_options=True
-):
+def compile_state(parsed_state, scope=None, object_map=None, generate_ground_options=True):
     compiled_state = []
     for parsed_condition in parsed_state:
         scope = scope if scope is not None else {}
         compiled_state.append(
             HEAD(
                 scope,
-                backend,
                 parsed_condition,
                 object_map,
                 generate_ground_options=generate_ground_options,
@@ -543,17 +529,17 @@ def compile_state(
     return compiled_state
 
 
-def evaluate_state(compiled_state):
+def evaluate_state(compiled_state, evaluate_fn):
     results = {"satisfied": [], "unsatisfied": []}
     for i, compiled_condition in enumerate(compiled_state):
-        if compiled_condition.evaluate():
+        if compiled_condition.evaluate(evaluate_fn):
             results["satisfied"].append(i)
         else:
             results["unsatisfied"].append(i)
     return not bool(results["unsatisfied"]), results
 
 
-def get_ground_state_options(compiled_state, backend, scope=None, object_map=None):
+def get_ground_state_options(compiled_state, scope=None, object_map=None):
     all_options = list(
         itertools.product(
             *[
@@ -579,7 +565,7 @@ def get_ground_state_options(compiled_state, backend, scope=None, object_map=Non
         consistent_unpacked_options.append(option)
 
     consistent_unpacked_options = [
-        compile_state(option, backend, scope=scope, object_map=object_map)
+        compile_state(option, scope=scope, object_map=object_map)
         for option in sorted(consistent_unpacked_options, key=len)
     ]
     return consistent_unpacked_options
@@ -598,6 +584,41 @@ def flatten_list(li):
 
 #################### TOKEN MAPPING ####################
 
+
+class GenericPredicate(Expression):
+    def __init__(self, token, scope, body, object_map, generate_ground_options=True):
+        super().__init__(scope, body, object_map)
+        self.STATE_NAME = token
+        self.inputs = [inp.strip("?") for inp in body]
+        for i, inp in enumerate(self.inputs):
+            try:
+                if isinstance(self.scope[inp], str):
+                    self.inputs[i] = self.scope[inp]
+            except KeyError as e:
+                raise UncontrolledCategoryError(e)
+        if generate_ground_options:
+            self.get_ground_options()
+
+    def evaluate(self, evaluate_fn):
+        mapped_inputs = [self.scope[inp] for inp in self.inputs]
+        if all(i is not None for i in mapped_inputs):
+            return evaluate_fn(self.STATE_NAME, *mapped_inputs, **self.kwargs)
+        else:
+            print("%s has unmapped inputs" % self.STATE_NAME)
+            return False
+
+    def sample(self, sample_fn, binary_state, **kwargs):
+        mapped_inputs = [self.scope[inp] for inp in self.inputs]
+        if all(i is not None for i in mapped_inputs):
+            return sample_fn(self.STATE_NAME, *mapped_inputs, binary_state, **kwargs, **self.kwargs)
+        else:
+            print("%s has unmapped inputs" % self.STATE_NAME)
+            return False
+
+    def get_ground_options(self):
+        self.flattened_condition_options = [[[self.STATE_NAME] + self.inputs]]
+
+
 TOKEN_MAPPING = {
     # BDDL
     "forall": Universal,
@@ -613,11 +634,11 @@ TOKEN_MAPPING = {
 }
 
 
-def get_predicate_for_token(token, backend):
+def get_predicate_for_token(token):
     if token in TOKEN_MAPPING:
         return TOKEN_MAPPING[token]
     else:
-        try:
-            return backend.get_predicate_class(token)
-        except KeyError as e:
-            raise UnsupportedPredicateError(e)
+        # Return a lambda that instantiates a GenericPredicate with the given token
+        return lambda scope, body, object_map, generate_ground_options=True: GenericPredicate(
+            token, scope, body, object_map, generate_ground_options=generate_ground_options
+        )

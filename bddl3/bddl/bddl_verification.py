@@ -13,7 +13,6 @@ import bddl
 from bddl.activity import Conditions
 from bddl.data_generation.tm_submap_params import TM_SUBMAPS_TO_PARAMS
 from bddl.parsing import parse_problem, parse_domain
-from bddl.trivial_backend import *
 
 
 # Files
@@ -29,7 +28,7 @@ TRANSITION_MAP_DIR = BDDL_DIR / "generated_data/transition_map/tm_jsons"
 
 # Constants
 
-*__, domain_predicates = parse_domain("omnigibson")
+*__, domain_predicates = parse_domain("behavior-1k")
 UNARIES = [
     predicate for predicate, inputs in domain_predicates.items() if len(inputs) == 1
 ]
@@ -203,7 +202,7 @@ def _get_defn_elements_from_file(activity):
     defn_fn = os.path.join(PROBLEM_FILE_DIR, activity, "problem0.bddl")
     with open(defn_fn, "r") as f:
         __, objects, init, goal = parse_problem(
-            activity, 0, "omnigibson", predefined_problem=f.read()
+            activity, 0, "behavior-1k", predefined_problem=f.read()
         )
     return activity, objects, init, goal
 
@@ -817,7 +816,7 @@ def no_contradictory_init_atoms(init):
 
 
 def no_uncontrolled_category(activity, defn):
-    conds = bddl.activity.Conditions(activity, 0, "omnigibson", predefined_problem=defn)
+    conds = bddl.activity.Conditions(activity, 0, "behavior-1k", predefined_problem=defn)
     scope = bddl.activity.get_object_scope(conds)
     bddl.activity.get_initial_conditions(
         conds, TrivialBackend(), scope, generate_ground_options=False
@@ -842,7 +841,7 @@ def problem_name_correct(activity, definition_id=0):
     defn_fn = os.path.join(PROBLEM_FILE_DIR, activity, f"problem{definition_id}.bddl")
     with open(defn_fn, "r") as f:
         problem_name, *__ = parse_problem(
-            activity, 0, "omnigibson", predefined_problem=f.read()
+            activity, 0, "behavior-1k", predefined_problem=f.read()
         )
     assert (problem_name == f"{activity}-{definition_id}") or (
         problem_name == f"{activity.lower()}-{definition_id}"

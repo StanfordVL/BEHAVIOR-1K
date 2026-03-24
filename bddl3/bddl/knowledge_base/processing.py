@@ -319,7 +319,7 @@ class KnowledgeBaseProcessor:
         ]
         for act, inst in self.tqdm(tasks):
             # Load task definition
-            conds = Conditions(act, inst, "omnigibson")
+            conds = Conditions(act, inst, "behavior-1k")
             synsets = set(
                 synset for synset in conds.parsed_objects if synset != "agent.n.01"
             )

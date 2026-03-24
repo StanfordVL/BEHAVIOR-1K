@@ -3,7 +3,6 @@ from nltk.corpus import wordnet as wn
 from typing import Tuple, List, Set
 from bddl.activity import get_initial_conditions, get_goal_conditions, get_object_scope
 from bddl.logic_base import UnaryAtomicFormula, BinaryAtomicFormula, Expression
-from bddl.backend_abc import BDDLBackend
 from bddl.parsing import parse_domain
 
 from enum import Enum, auto
@@ -49,7 +48,7 @@ def wn_synset_exists(synset):
         return False
 
 
-*__, domain_predicates = parse_domain("omnigibson")
+*__, domain_predicates = parse_domain("behavior-1k")
 UNARIES = [
     predicate for predicate, inputs in domain_predicates.items() if len(inputs) == 1
 ]
@@ -90,15 +89,6 @@ def gen_binary_token(predicate_name, generate_ground_options=True):
     )
 
 
-class TrivialBackend(BDDLBackend):
-    def get_predicate_class(self, predicate_name):
-        if predicate_name in UNARIES:
-            return gen_unary_token(predicate_name)
-        elif predicate_name in BINARIES:
-            return gen_binary_token(predicate_name)
-        else:
-            raise KeyError(predicate_name)
-
 
 class TrivialGenericObject(object):
     def __init__(self, name):
@@ -111,10 +101,10 @@ def get_initial_and_goal_conditions(conds) -> Tuple[List, List]:
     for name in scope:
         scope[name] = TrivialGenericObject(name)
     initial_conds = get_initial_conditions(
-        conds, TrivialBackend(), scope, generate_ground_options=False
+        conds, scope, generate_ground_options=False
     )
     goal_conds = get_goal_conditions(
-        conds, TrivialBackend(), scope, generate_ground_options=False
+        conds, scope, generate_ground_options=False
     )
     return initial_conds, goal_conds
 

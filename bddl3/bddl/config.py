@@ -11,7 +11,7 @@ READABLE_PREDICATE_NAMES = {"ontop": "on top of", "nextto": "next to"}
 
 def get_definition_filename(behavior_activity, instance, domain=False):
     if domain:
-        return os.path.join(ACTIVITY_CONFIGS_PATH, "domain_igibson.bddl")
+        return os.path.join(ACTIVITY_CONFIGS_PATH, "domain_behavior-100.bddl")
     else:
         return os.path.join(
             ACTIVITY_CONFIGS_PATH, behavior_activity, f"problem{instance}.bddl"
