@@ -7,49 +7,6 @@ from omnigibson.objects import DatasetObject
 from omnigibson.robots import Robot
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 
-_ALL_OBJECT_FIXTURE_NAMES = {
-    "robot",
-    "breakfast_table",
-    "bottom_cabinet",
-    "dishtowel",
-    "carpet",
-    "bowl",
-    "bagel",
-    "cookable_dishtowel",
-    "microwave",
-    "stove",
-    "fridge",
-    "plywood",
-    "bookcase_back",
-    "bookcase_shelf",
-    "bookcase_baseboard",
-    "bracelet",
-    "furniture_sink",
-    "stockpot",
-    "applier_dishtowel",
-    "remover_dishtowel",
-    "acetone_atomizer",
-    "vacuum",
-    "blender",
-    "oven",
-    "baking_sheet",
-    "bagel_dough",
-    "raw_egg",
-    "another_raw_egg",
-    "scoop_of_ice_cream",
-    "food_processor",
-    "electric_mixer",
-    "swiss_cheese",
-    "apple",
-    "table_knife",
-    "half_apple",
-    "tablespoon",
-    "chicken",
-    "washer",
-    "clothes_dryer",
-    "oyster",
-}
-
 
 @pytest.fixture
 def stopped_env():
@@ -66,9 +23,8 @@ def stopped_env():
 
 @pytest.fixture
 def env(request, stopped_env):
-    for name in _ALL_OBJECT_FIXTURE_NAMES:
-        if name in request.fixturenames:
-            request.getfixturevalue(name)
+    for name in request.fixturenames:
+        request.getfixturevalue(name)
 
     og.sim.play()
     yield stopped_env
