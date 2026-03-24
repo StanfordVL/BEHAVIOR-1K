@@ -1,5 +1,5 @@
 (define (problem cook_ramen_noodles-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ramen.n.01_1 - ramen.n.01

@@ -1,5 +1,5 @@
 (define (problem cook_oysters-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         huitre.n.01_1 huitre.n.01_2 huitre.n.01_3 - huitre.n.01

@@ -1,5 +1,5 @@
 (define (problem sending_packages-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         package.n.02_1 package.n.02_2 - package.n.02

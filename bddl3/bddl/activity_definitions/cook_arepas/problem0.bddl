@@ -1,5 +1,5 @@
 (define (problem cook_arepas-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	arepa.n.01_1 - arepa.n.01

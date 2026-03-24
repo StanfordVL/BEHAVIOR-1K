@@ -1,5 +1,5 @@
 (define (problem toast_coconut-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         coconut.n.01_1 - coconut.n.01

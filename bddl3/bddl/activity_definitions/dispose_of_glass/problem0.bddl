@@ -1,5 +1,5 @@
 (define (problem dispose_of_glass-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         water_glass.n.02_1 water_glass.n.02_2 - water_glass.n.02

@@ -1,5 +1,5 @@
 (define (problem sorting_items_for_garage_sale-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ball.n.01_1 - ball.n.01

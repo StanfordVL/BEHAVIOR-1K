@@ -1,5 +1,5 @@
 (define (problem clean_an_eraser-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         eraser.n.01_1 - eraser.n.01

@@ -1,5 +1,5 @@
 (define (problem store_daffodil_bulbs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         daffodil_bulb.n.01_1 daffodil_bulb.n.01_2 daffodil_bulb.n.01_3 - daffodil_bulb.n.01

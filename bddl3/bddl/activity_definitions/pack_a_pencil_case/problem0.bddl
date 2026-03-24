@@ -1,5 +1,5 @@
 (define (problem pack_a_pencil_case-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pencil_box.n.01_1 - pencil_box.n.01

@@ -1,5 +1,5 @@
 (define (problem cleaning_restaurant_table-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dinner_napkin.n.01_1 - dinner_napkin.n.01

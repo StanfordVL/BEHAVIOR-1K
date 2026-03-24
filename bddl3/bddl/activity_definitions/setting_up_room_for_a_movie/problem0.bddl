@@ -1,5 +1,5 @@
 (define (problem setting_up_room_for_a_movie-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         popcorn.n.02_1 - popcorn.n.02

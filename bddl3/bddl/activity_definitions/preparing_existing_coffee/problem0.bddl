@@ -1,5 +1,5 @@
 (define (problem preparing_existing_coffee-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         low-fat_milk.n.01_1 - low-fat_milk.n.01

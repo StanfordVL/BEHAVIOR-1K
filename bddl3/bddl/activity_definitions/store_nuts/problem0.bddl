@@ -1,5 +1,5 @@
 (define (problem store_nuts-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	walnut.n.01_1 walnut.n.01_2 walnut.n.01_3 - walnut.n.01

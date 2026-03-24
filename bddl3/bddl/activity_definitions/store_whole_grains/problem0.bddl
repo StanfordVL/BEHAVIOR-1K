@@ -1,5 +1,5 @@
 (define (problem store_whole_grains-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	white_rice.n.01_1 - white_rice.n.01

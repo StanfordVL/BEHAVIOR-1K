@@ -1,5 +1,5 @@
 (define (problem sorting_newspapers_for_recycling-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         newspaper.n.03_1 newspaper.n.03_2 newspaper.n.03_3 newspaper.n.03_4 newspaper.n.03_5 - newspaper.n.03

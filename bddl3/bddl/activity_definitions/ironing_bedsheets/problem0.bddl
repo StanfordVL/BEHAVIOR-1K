@@ -1,5 +1,5 @@
 (define (problem ironing_bedsheets-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         iron.n.04_1 - iron.n.04

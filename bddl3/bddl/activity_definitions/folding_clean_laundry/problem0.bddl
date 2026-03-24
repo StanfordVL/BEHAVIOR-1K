@@ -1,5 +1,5 @@
 (define (problem folding_clean_laundry-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tablecloth.n.01_1 - tablecloth.n.01

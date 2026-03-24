@@ -1,5 +1,5 @@
 (define (problem clean_a_couch-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         vacuum.n.04_1 - vacuum.n.04

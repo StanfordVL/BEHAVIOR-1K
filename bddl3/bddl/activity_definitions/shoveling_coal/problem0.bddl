@@ -1,5 +1,5 @@
 (define (problem shoveling_coal-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         coal.n.01_1 - coal.n.01

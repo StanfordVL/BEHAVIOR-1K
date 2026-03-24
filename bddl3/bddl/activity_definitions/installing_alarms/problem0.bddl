@@ -1,5 +1,5 @@
 (define (problem installing_alarms-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	alarm.n.02_1 alarm.n.02_2 - alarm.n.02

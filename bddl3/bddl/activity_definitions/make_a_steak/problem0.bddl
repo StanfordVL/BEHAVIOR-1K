@@ -1,5 +1,5 @@
 (define (problem make_a_steak-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         olive_oil.n.01_1 - olive_oil.n.01

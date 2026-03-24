@@ -1,5 +1,5 @@
 (define (problem unpacking_childs_bag-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         backpack.n.01_1 - backpack.n.01

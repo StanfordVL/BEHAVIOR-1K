@@ -1,5 +1,5 @@
 (define (problem store_loose_leaf_tea-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         green_tea.n.01_1 - green_tea.n.01

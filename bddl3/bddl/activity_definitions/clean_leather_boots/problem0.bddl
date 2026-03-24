@@ -1,5 +1,5 @@
 (define (problem clean_leather_boots-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rag.n.01_1 - rag.n.01

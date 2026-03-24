@@ -1,5 +1,5 @@
 (define (problem assembling_furniture-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         desk_top.n.01_1 - desk_top.n.01

@@ -1,5 +1,5 @@
 (define (problem setup_a_garden_party-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bottle__of__champagne.n.01_1 - bottle__of__champagne.n.01

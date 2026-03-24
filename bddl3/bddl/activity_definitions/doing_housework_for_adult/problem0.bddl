@@ -1,5 +1,5 @@
 (define (problem doing_housework_for_adult-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         coffee_table.n.01_1 - coffee_table.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_a_LED_screen-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dust.n.01_1 - dust.n.01

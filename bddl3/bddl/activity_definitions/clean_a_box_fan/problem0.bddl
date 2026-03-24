@@ -1,5 +1,5 @@
 (define (problem clean_a_box_fan-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         electric_fan.n.01_1 - electric_fan.n.01

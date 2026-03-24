@@ -1,5 +1,5 @@
 (define (problem decorating_outside_for_holidays-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         snow.n.01_1 - snow.n.01

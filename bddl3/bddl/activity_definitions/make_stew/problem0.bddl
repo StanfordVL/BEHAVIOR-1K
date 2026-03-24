@@ -1,5 +1,5 @@
 (define (problem make_stew-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         carrot.n.03_1 carrot.n.03_2 carrot.n.03_3 - carrot.n.03

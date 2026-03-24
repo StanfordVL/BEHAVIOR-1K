@@ -1,5 +1,5 @@
 (define (problem clean_prawns-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
     	prawn.n.01_1 prawn.n.01_2 prawn.n.01_3 - prawn.n.01

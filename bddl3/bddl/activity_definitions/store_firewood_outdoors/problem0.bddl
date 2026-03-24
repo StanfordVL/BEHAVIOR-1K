@@ -1,5 +1,5 @@
 (define (problem store_firewood_outdoors-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         firewood.n.01_1 firewood.n.01_2 firewood.n.01_3 firewood.n.01_4 firewood.n.01_5 firewood.n.01_6 - firewood.n.01

@@ -1,5 +1,5 @@
 (define (problem drying_table-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dishtowel.n.01_1 - dishtowel.n.01

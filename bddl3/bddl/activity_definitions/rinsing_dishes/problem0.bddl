@@ -1,5 +1,5 @@
 (define (problem rinsing_dishes-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         plate.n.04_1 - plate.n.04

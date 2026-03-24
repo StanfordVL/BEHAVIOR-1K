@@ -1,5 +1,5 @@
 (define (problem filling_the_bird_feeder-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bird_feeder.n.01_1 - bird_feeder.n.01

@@ -1,5 +1,5 @@
 (define (problem decorating_for_religious_ceremony-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dip.n.07_1 - dip.n.07

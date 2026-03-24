@@ -1,5 +1,5 @@
 (define (problem clean_a_flat_panel_monitor-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rubbing_alcohol.n.01_1 - rubbing_alcohol.n.01

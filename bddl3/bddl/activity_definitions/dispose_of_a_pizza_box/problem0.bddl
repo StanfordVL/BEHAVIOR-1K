@@ -1,5 +1,5 @@
 (define (problem dispose_of_a_pizza_box-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         half__pizza.n.01_1 - half__pizza.n.01

@@ -1,5 +1,5 @@
 (define (problem hanging_up_wind_chimes-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wind_chime.n.01_1 - wind_chime.n.01

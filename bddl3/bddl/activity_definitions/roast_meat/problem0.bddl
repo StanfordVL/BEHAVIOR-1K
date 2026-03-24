@@ -1,5 +1,5 @@
 (define (problem roast_meat-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         virginia_ham.n.01_1 - virginia_ham.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_skateboard_bearings-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         skateboard_deck.n.01_1 - skateboard_deck.n.01

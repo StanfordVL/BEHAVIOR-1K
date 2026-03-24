@@ -1,5 +1,5 @@
 (define (problem wash_a_baseball_cap-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         baseball_cap.n.01_1 baseball_cap.n.01_2 - baseball_cap.n.01

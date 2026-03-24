@@ -1,5 +1,5 @@
 (define (problem mixing_drinks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cola.n.02_1 - cola.n.02

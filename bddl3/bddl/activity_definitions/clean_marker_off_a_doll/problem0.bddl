@@ -1,5 +1,5 @@
 (define (problem clean_marker_off_a_doll-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	rubbing_alcohol.n.01_1 - rubbing_alcohol.n.01
