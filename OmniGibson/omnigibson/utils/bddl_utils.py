@@ -241,11 +241,14 @@ def process_single_condition(condition):
 
 # TODO: Add remaining predicates.
 
+
 def evaluate_bddl_predicate(predicate_name, *entities):
     return SUPPORTED_PREDICATES[predicate_name].evaluate(*entities)
 
+
 def sample_bddl_predicate(predicate_name, *args, **kwargs):
     return SUPPORTED_PREDICATES[predicate_name].sample(*args, **kwargs)
+
 
 SUPPORTED_PREDICATES = {
     "inside": get_binary_predicate_for_state(object_states.Inside, "inside"),
@@ -624,8 +627,6 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
     return "".join(raw_bddl)
 
 
-
-
 class BDDLEntity(Wrapper):
     """
     Thin wrapper class that wraps an object or system if it exists, or nothing if it does not exist. Will
@@ -737,7 +738,7 @@ class BDDLSampler:
         self._env = env
         self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, TraversableScene) else None
         self._agent = self._env.robots[0]
-        
+
         self._activity_conditions = task.activity_conditions
         self._object_scope = task.object_scope
         self._object_instance_to_synset = {

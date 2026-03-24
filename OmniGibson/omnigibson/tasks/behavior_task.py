@@ -26,7 +26,7 @@ from omnigibson.utils.bddl_utils import (
     BEHAVIOR_ACTIVITIES,
     BDDLEntity,
     BDDLSampler,
-        get_processed_bddl,
+    get_processed_bddl,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.config_utils import TorchEncoder
@@ -304,9 +304,7 @@ class BehaviorTask(BaseTask):
 
         # Object info
         self.object_instance_to_category = {
-            obj_inst: obj_cat
-            for obj_cat in self.task.parsed_objects
-            for obj_inst in self.task.parsed_objects[obj_cat]
+            obj_inst: obj_cat for obj_cat in self.task.parsed_objects for obj_inst in self.task.parsed_objects[obj_cat]
         }
 
         # Generate initial and goal conditions
@@ -325,6 +323,7 @@ class BehaviorTask(BaseTask):
 
     def get_potential(self, env):
         from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
+
         def eval_cb(predicate_name, *entities):
             return evaluate_bddl_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
 
