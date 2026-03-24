@@ -10,7 +10,6 @@ testpaths = [
     "tests",
 ]
 
-
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 extend-exclude = ["omnigibson/utils/pynvml_utils.py", "omnigibson/data"]
