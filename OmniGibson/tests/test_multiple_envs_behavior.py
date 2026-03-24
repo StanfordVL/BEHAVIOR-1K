@@ -91,8 +91,10 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
             "reward_config": {"r_potential": 1.0},
         },
     }
-    print(f"  Setting up BehaviorTask env: num_envs={num_envs}, robot=r1pro, "
-          f"activity={ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}")
+    print(
+        f"  Setting up BehaviorTask env: num_envs={num_envs}, robot=r1pro, "
+        f"activity={ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}"
+    )
     env = og.Environment(configs=cfg)
     print(f"  BehaviorTask environment created successfully")
     return env
@@ -275,9 +277,9 @@ class TestBehaviorTaskTensors:
 
         for rf_name, rf in env.task._reward_functions.items():
             print(f"  reward fn '{rf_name}': shape={rf._reward.shape}, values={rf._reward}")
-            assert rf._reward.shape == (NUM_ENVS,), (
-                f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
-            )
+            assert rf._reward.shape == (
+                NUM_ENVS,
+            ), f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
 
         # BehaviorTask must have the potential reward
         assert "potential" in env.task._reward_functions
@@ -299,9 +301,9 @@ class TestBehaviorTaskTensors:
 
         for tc_name, tc in env.task._termination_conditions.items():
             print(f"  termination '{tc_name}': shape={tc._done.shape}, dtype={tc._done.dtype}, values={tc._done}")
-            assert tc._done.shape == (NUM_ENVS,), (
-                f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
-            )
+            assert tc._done.shape == (
+                NUM_ENVS,
+            ), f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
             assert tc._done.dtype == th.bool
 
         # BehaviorTask must have timeout and predicate conditions
@@ -607,9 +609,9 @@ class TestBehaviorTaskLogic:
 
             # Orientation quaternion should be unit length
             ori_norm = ori.norm()
-            assert th.allclose(ori_norm, th.tensor(1.0), atol=1e-2), (
-                f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
-            )
+            assert th.allclose(
+                ori_norm, th.tensor(1.0), atol=1e-2
+            ), f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
 
         og.clear()
         _passed("TestBehaviorTaskLogic::test_presampled_robot_pose")
@@ -629,9 +631,9 @@ class TestBehaviorTaskLogic:
             assert th.isfinite(ori).all(), f"Robot {env_idx} orientation has non-finite values"
 
             ori_norm = ori.norm()
-            assert th.allclose(ori_norm, th.tensor(1.0), atol=1e-2), (
-                f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
-            )
+            assert th.allclose(
+                ori_norm, th.tensor(1.0), atol=1e-2
+            ), f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
 
         og.clear()
         _passed("TestBehaviorTaskLogic::test_no_presampled_robot_pose")
