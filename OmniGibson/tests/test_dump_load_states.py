@@ -1,6 +1,5 @@
 import tempfile
 
-import pytest
 import torch as th
 from utils import SYSTEM_EXAMPLES
 
@@ -9,8 +8,8 @@ from omnigibson.object_states import Covered
 from omnigibson.systems import VisualParticleSystem
 
 
-@pytest.mark.og_objects("breakfast_table")
 def test_dump_load(env, breakfast_table):
+    og.sim.play()
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
@@ -28,8 +27,8 @@ def test_dump_load(env, breakfast_table):
         env.scene.clear_system(system_name)
 
 
-@pytest.mark.og_objects("breakfast_table")
 def test_dump_load_serialized(env, breakfast_table):
+    og.sim.play()
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
@@ -46,8 +45,8 @@ def test_dump_load_serialized(env, breakfast_table):
         env.scene.clear_system(system_name)
 
 
-@pytest.mark.og_objects("breakfast_table")
 def test_save_restore_partial(env, breakfast_table):
+    og.sim.play()
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
 
@@ -63,8 +62,8 @@ def test_save_restore_partial(env, breakfast_table):
     assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None
 
 
-@pytest.mark.og_objects("breakfast_table")
 def test_save_restore_full(env, breakfast_table):
+    og.sim.play()
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
 

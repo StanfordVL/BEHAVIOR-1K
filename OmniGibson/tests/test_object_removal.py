@@ -4,8 +4,8 @@ import omnigibson as og
 from omnigibson.objects import DatasetObject
 
 
-@pytest.mark.og_objects()
 def test_removal_and_readdition(env):
+    og.sim.play()
     # Add an apple
     apple = DatasetObject(
         name="apple_unique",
@@ -42,8 +42,8 @@ def test_removal_and_readdition(env):
     env.scene.remove_object(apple2)
 
 
-@pytest.mark.og_objects()
 def test_readdition(env):
+    og.sim.play()
     # Add an apple
     apple = DatasetObject(
         name="apple_unique",

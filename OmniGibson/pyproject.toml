@@ -9,9 +9,7 @@ exclude = [
 testpaths = [
     "tests",
 ]
-markers = [
-    "og_objects: specify objects (and optionally needs_robot) for the OmniGibson test environment",
-]
+
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

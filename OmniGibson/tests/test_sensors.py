@@ -1,4 +1,3 @@
-import pytest
 import torch as th
 from utils import SYSTEM_EXAMPLES, place_obj_on_floor_plane
 
@@ -6,8 +5,8 @@ import omnigibson as og
 from omnigibson.utils.constants import semantic_class_id_to_name
 
 
-@pytest.mark.og_objects("breakfast_table", "dishtowel")
 def test_segmentation_modalities(env, breakfast_table, dishtowel):
+    og.sim.play()
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation(position=[-0.4, 0.0, 0.55], orientation=[0, 0, 0, 1])
 
@@ -86,8 +85,8 @@ def test_segmentation_modalities(env, breakfast_table, dishtowel):
         env.scene.clear_system(system.name)
 
 
-@pytest.mark.og_objects("breakfast_table", "dishtowel")
 def test_bbox_modalities(env, breakfast_table, dishtowel):
+    og.sim.play()
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation(position=[-0.4, 0.0, 0.55], orientation=[0, 0, 0, 1])
 

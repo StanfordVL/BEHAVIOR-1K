@@ -1,4 +1,3 @@
-import pytest
 import torch as th
 
 from utils import SYSTEM_EXAMPLES
@@ -8,8 +7,8 @@ from omnigibson.object_states import Covered
 from omnigibson.systems import VisualParticleSystem, MicroPhysicalParticleSystem
 
 
-@pytest.mark.og_objects("breakfast_table")
 def test_system_spawn_and_clear(env, breakfast_table):
+    og.sim.play()
     og.sim.viewer_camera.set_position_orientation(
         th.tensor([0.1525, -0.2867, 0.0773]), th.tensor([0.6538, 0.1604, 0.1762, 0.7181])
     )
