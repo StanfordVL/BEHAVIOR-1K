@@ -1308,6 +1308,8 @@ def test_kinematic_only_contact_no_error():
     bodies) must not crash during RigidContactAPI.initialize_view(), and contact queries must
     return False rather than raise an exception.
     """
+    test_clear_sim()
+
     cfg = {
         "scene": {"type": "Scene"},
         "objects": [
@@ -1356,6 +1358,8 @@ def test_kinematic_only_contact_no_error():
     assert not RigidContactAPI.is_in_contact(
         scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=True
     )
+
+    test_clear_sim()
 
 
 def test_clear_sim():
