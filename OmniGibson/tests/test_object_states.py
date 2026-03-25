@@ -45,6 +45,7 @@ from omnigibson.object_states import (
 )
 from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.physx_utils import apply_force_at_pos
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 
 @og_test
@@ -1299,6 +1300,66 @@ def test_covered(env):
                 system.remove_all_particles()
 
         obj.set_position_orientation(position=th.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
+
+
+def test_kinematic_only_contact_no_error():
+    """
+    A scene containing only kinematic/fixed-base rigid objects (no dynamic
+    bodies) must not crash during RigidContactAPI.initialize_view(), and contact queries must
+    return False rather than raise an exception.
+    """
+    test_clear_sim()
+
+    cfg = {
+        "scene": {"type": "Scene"},
+        "objects": [
+            {
+                "type": "DatasetObject",
+                "name": "table",
+                "category": "breakfast_table",
+                "model": "skczfi",
+                "kinematic_only": True,
+                "fixed_base": True,
+                "position": [0, 0, 0.5],
+            },
+            {
+                "type": "DatasetObject",
+                "name": "bowl",
+                "category": "bowl",
+                "model": "ajzltc",
+                "kinematic_only": True,
+                "fixed_base": True,
+                "position": [0, 0, 1.0],
+            },
+        ],
+    }
+    env = og.Environment(configs=cfg)
+
+    # og.sim.step() internally calls RigidContactAPI.initialize_view(); must not raise.
+    og.sim.step()
+
+    # Explicit call must also not raise.
+    RigidContactAPI.initialize_view()
+
+    scene_idx = env.scene.idx
+    table = env.scene.object_registry("name", "table")
+    bowl = env.scene.object_registry("name", "bowl")
+
+    # Contact queries against a kinematic-only scene must return False, not error.
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=False
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=True
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=False
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=True
+    )
+
+    test_clear_sim()
 
 
 def test_clear_sim():

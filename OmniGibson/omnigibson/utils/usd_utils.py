@@ -305,6 +305,11 @@ class RigidContactAPIImpl:
                             if isinstance(link, RigidDynamicPrim) and link.contact_reporting_enabled:
                                 scene_dynamic_body_filters.append(link.prim_path)
 
+                # If there are only kinematic/static bodies, skip view creation for this scene.
+                if len(scene_dynamic_body_filters) == 0:
+                    self._CONTACT_VIEW[scene_idx] = None
+                    continue
+
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=f"/World/scene_{scene_idx}/*/*",
                     filter_patterns=scene_body_filters,
@@ -578,9 +583,10 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths
+        # Otherwise, convert to prim paths, filtering out kinematic-only bodies that are not rows
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths])
+        row_map = self._PATH_TO_ROW_IDX.get(scene_idx, {})
+        return th.tensor([row_map[path] for path in prim_paths if path in row_map])
 
     def get_contact_col_indices(self, scene_idx, objects_links_or_prim_paths):
         """
@@ -672,6 +678,8 @@ class RigidContactAPIImpl:
 
         contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         rows = self.get_contact_row_indices(scene_idx, query_set)
+        if rows.numel() == 0:
+            return False
         if with_set is not None:
             cols = self.get_contact_col_indices(scene_idx, with_set)
             return th.any(contact_matrix[rows, :][:, cols]).item()
