@@ -1060,6 +1060,17 @@ def _launch_simulator(*args, **kwargs):
             RigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
 
+        def refresh_physics(self, sync_usd=False):
+            """
+            Synchronizes and evaluates any physics updates that have occurred since the last fetch.
+            
+            Args:
+                sync_usd (bool): If True, also fetch physics results to USD backings.
+            """
+            self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
+            if sync_usd:
+                self.psi.fetch_results()
+
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
             """
@@ -1082,7 +1093,7 @@ def _launch_simulator(*args, **kwargs):
                     # may be added mid-iteration!!
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
-                    og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+                    self.refresh_physics()
                     scenes_modified = set()
                     for i in range(n_objects_to_initialize):
                         obj = self._objects_to_initialize[i]

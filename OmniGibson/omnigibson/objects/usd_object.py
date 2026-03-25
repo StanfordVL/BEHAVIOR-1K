@@ -184,9 +184,6 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config["self_collisions"] = self_collisions
         load_config["prim_type"] = prim_type
 
-        # Store this category
-        OBJECT_CATEGORIES.add(self.category)
-
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,

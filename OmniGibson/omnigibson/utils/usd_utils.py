@@ -180,7 +180,7 @@ def create_joint(
     # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
     if og.sim.is_playing():
         with suppress_omni_log(channels=["omni.physx.plugin"]):
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+            og.sim.refresh_physics()
 
     # Return this joint
     return joint_prim
@@ -288,7 +288,7 @@ class RigidContactAPIImpl:
             return
 
         # Generate views, making sure to update simulation first so the physx backend is synchronized.
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        og.sim.refresh_physics()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
                 scene_body_filters = body_filters[scene_idx]
@@ -1021,7 +1021,7 @@ class PoseAPI:
             # when flatcache is off
             else:
                 # no time step is taken here
-                og.sim.psi.fetch_results()
+                og.sim.refresh_physics(sync_usd=True)
             cls.mark_valid()
 
     @classmethod

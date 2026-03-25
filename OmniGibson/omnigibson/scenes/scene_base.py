@@ -505,13 +505,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Remove all of the scene's objects.
         og.sim.batch_remove_objects(list(self.objects))
 
-        # Remove any vision sensors attached to this scene
-        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
-        for sensor in tuple(VisionSensor.SENSORS.values()):
-            scene_prefix = self.prim_path.rstrip("/") + "/"
-            if sensor.prim_path.startswith(scene_prefix):
-                sensor.remove()
-
         # Remove the scene prim.
         self._scene_prim.remove()
 
@@ -714,21 +707,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             if self.object_registry.object_is_registered(obj):
                 self.object_registry.remove(obj)
 
-            # Delete any (extra) vision sensors that were externally added to this object
-            # This needs to happen BEFORE the object is removed or else the path to the sensor will become stale
-            sensor_prim_paths = set(VisionSensor.SENSORS.keys())
-            if isinstance(obj, Robot):
-                # However, for robots, we don't want to pre-emptively remove its own sensors since those are handled
-                # internally
-                sensor_prim_paths -= set([sensor.prim_path for sensor in obj.sensors.values()])
-            # Only delete sensors attached to the object (nested prim path)
-            base_prim_path = obj.prim_path.rstrip("/")
-            sensor_prim_paths = {
-                spp for spp in sensor_prim_paths if spp == base_prim_path or spp.startswith(base_prim_path + "/")
-            }
-            for prim_path in sensor_prim_paths:
-                VisionSensor.SENSORS[prim_path].remove()
-
             # Remove from omni stage
             obj.remove()
 
@@ -916,7 +894,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
         # Need to update sim here -- this is because downstream setters called immediately may not be respected,
         # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        og.sim.refresh_physics()
         # Update the cached pose and inverse pose
         pos_ori = self._scene_prim.get_position_orientation()
         pose = T.pose2mat(pos_ori)
@@ -1186,8 +1164,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
             # We need to propagate these changes or else we get a crash
-            og.sim.pi.update_simulation(elapsedStep=0.0, currentTime=og.sim.current_time)
-            og.sim.psi.fetch_results()
+            og.sim.refresh_physics(sync_usd=True)
             # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
