@@ -57,6 +57,7 @@ def add_object_with_parts(scene, obj, pos=None, orn=None):
 
     parent_pos, parent_orn = obj.get_position_orientation()
     all_objs = [obj]
+    connectedparts = []
 
     for i, part in enumerate(parts):
         if part["type"] not in ("connectedpart", "extrapart"):
@@ -93,6 +94,14 @@ def add_object_with_parts(scene, obj, pos=None, orn=None):
         part_obj.set_bbox_center_position_orientation(position=global_bb_pos, orientation=global_bb_orn)
 
         if part["type"] == "connectedpart":
+            connectedparts.append(part_obj)
+
+        all_objs.append(part_obj)
+
+    # Step the simulator to initialize all newly added objects before setting states
+    if connectedparts:
+        og.sim.step()
+        for part_obj in connectedparts:
             if AttachedTo in part_obj.states:
                 success = part_obj.states[AttachedTo].set_value(obj, True, bypass_alignment_checking=True)
                 if not success:
@@ -102,8 +111,6 @@ def add_object_with_parts(scene, obj, pos=None, orn=None):
                     )
             else:
                 log.warning(f"connectedpart {part_obj.name} has no AttachedTo state — missing attachment meta links?")
-
-        all_objs.append(part_obj)
 
     return all_objs
 
