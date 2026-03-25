@@ -16,6 +16,7 @@ from omnigibson.utils.usd_utils import (
     scene_relative_prim_path_to_absolute,
     setup_collision_apis,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -460,11 +461,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 path_to=prim_path,
             )
             prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
-            lazy.isaacsim.core.utils.semantics.add_update_semantics(
-                prim=prim,
-                semantic_label=self.name,
-                type_label="class",
-            )
+            add_semantic_label(prim=prim, label=self.name)
         result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
         return result
@@ -1220,11 +1217,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
             mass_api = lazy.pxr.UsdPhysics.MassAPI.Apply(prim)
             mass_api.GetDensityAttr().Set(self.particle_density)
-            lazy.isaacsim.core.utils.semantics.add_update_semantics(
-                prim=prim,
-                semantic_label=self.name,
-                type_label="class",
-            )
+            add_semantic_label(prim=prim, label=self.name)
         result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
         setup_collision_apis(result.prim)
@@ -1261,7 +1254,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         Should be called every time sim.play() is called
         """
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        og.sim.refresh_physics()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"

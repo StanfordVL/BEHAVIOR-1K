@@ -63,9 +63,14 @@ class XFormPrim(BasePrim):
         super()._post_load()
 
         # Make sure all xforms have pose and scaling info
-        # These only need to be done if we are creating this prim from scratch.
+        # These only need to be done if we are creating this prim from scratch AND it is not an instanceable / proxy prim.
         # Pre-created OG objects' prims always have these things set up ahead of time.
-        if not self._xform_props_pre_loaded:
+        # Note that if this is an instanceable prim, we also don't need write these properties
+        # TODO: This still breaks things downstream so we assert here to make sure we have backwards-compatibility with the expected prim types
+        assert (
+            not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy()
+        ), "Support for instanceable prims has not been implemented yet!"
+        if not self._xform_props_pre_loaded and not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy():
             self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),

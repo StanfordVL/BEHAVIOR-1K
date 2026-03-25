@@ -2,6 +2,7 @@
 param(
     [switch]$Help,
     [switch]$NewEnv,
+    [string]$NewEnvName = "behavior",
     [switch]$OmniGibson,
     [switch]$BDDL,
     [switch]$JoyLo,
@@ -10,7 +11,7 @@ param(
     [switch]$Eval,
     [switch]$AssetPipeline,
     [switch]$Dev,
-    [string]$CudaVersion = "12.4",
+    [string]$CudaVersion = "12.8",
     [switch]$AcceptCondaTos,
     [switch]$AcceptNvidiaEula,
     [switch]$AcceptDatasetTos,
@@ -28,7 +29,8 @@ Usage: .\setup.ps1 [OPTIONS]
 
 Options:
   -Help                   Display this help message
-  -NewEnv                 Create a new conda environment 'behavior'
+  -NewEnv                 Create a new conda environment (use -NewEnvName to specify name, default: behavior)
+  -NewEnvName NAME        Specify conda environment name (default: behavior)
   -OmniGibson             Install OmniGibson (core physics simulator)
   -BDDL                   Install BDDL (Behavior Domain Definition Language)
   -JoyLo                  Install JoyLo (teleoperation interface)
@@ -37,13 +39,14 @@ Options:
   -Eval                   Install evaluation dependencies
   -AssetPipeline          Install the 3D scene and object asset pipeline
   -Dev                    Install development dependencies
-  -CudaVersion VERSION    Specify CUDA version (default: 12.4)
+  -CudaVersion VERSION    Specify CUDA version (default: 12.8)
   -AcceptCondaTos         Automatically accept Conda Terms of Service
   -AcceptNvidiaEula       Automatically accept NVIDIA Isaac Sim EULA
   -AcceptDatasetTos       Automatically accept BEHAVIOR Dataset Terms
   -ConfirmNoConda         Skip confirmation prompt when not in a conda environment
 
 Example: .\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset
+Example (full customization): .\setup.ps1 -NewEnv -NewEnvName my_env -OmniGibson -BDDL -Dataset -JoyLo -Eval -Primitives -CudaVersion 12.6
 Example (non-interactive): .\setup.ps1 -NewEnv -OmniGibson -Dataset -AcceptCondaTos -AcceptNvidiaEula -AcceptDatasetTos
 "@
     exit 0
@@ -52,6 +55,12 @@ Example (non-interactive): .\setup.ps1 -NewEnv -OmniGibson -Dataset -AcceptConda
 # Validate dependencies
 if ($OmniGibson -and -not $BDDL) {
     Write-Error "ERROR: -OmniGibson requires -BDDL"
+    exit 1
+}
+
+# Validate CudaVersion is a valid numeric version string
+if ($CudaVersion -notmatch '^[0-9]+\.[0-9]+$') {
+    Write-Error "ERROR: Invalid CudaVersion '$CudaVersion'. Must be in format X.Y (e.g., 12.8)"
     exit 1
 }
 
@@ -220,7 +229,7 @@ function Invoke-CondaActivate {
 
 # Create conda environment
 if ($NewEnv) {
-    Write-Host "Creating conda environment 'behavior'..."
+    Write-Host "Creating conda environment '$NewEnvName'..."
     
     # Check if conda is available
     try {
@@ -238,20 +247,20 @@ if ($NewEnv) {
     }
     
     # Check if environment already exists and exit with instructions
-    if (Test-CondaEnvironment "behavior") {
+    if (Test-CondaEnvironment $NewEnvName) {
         Write-Host ""
-        Write-Host "ERROR: Conda environment 'behavior' already exists!"
+        Write-Host "ERROR: Conda environment '$NewEnvName' already exists!"
         Write-Host ""
         Write-Host "Please remove or rename the existing environment and re-run this script."
         Write-Host ""
         exit 1
     }
-    
-    # Create environment with only Python 3.10
-    conda create -n behavior python=3.10 -c conda-forge -y
-    
+
+    # Create environment with only Python 3.11
+    conda create -n $NewEnvName python=3.11 -c conda-forge -y
+
     # Activate environment
-    Invoke-CondaActivate "behavior"
+    Invoke-CondaActivate $NewEnvName
     
     # Install PyTorch via pip with CUDA support
     Write-Host "Installing PyTorch with CUDA $CudaVersion support..."
@@ -259,11 +268,11 @@ if ($NewEnv) {
     # Determine the CUDA version string for pip URL (e.g., cu124, cu118, etc.)
     $CudaVerShort = $CudaVersion -replace '\.', ''  # Convert 12.4 to 124
     
-    # Install numpy and setuptools via pip
-    Write-Host "Installing numpy and setuptools..."
-    pip install "numpy<2" "setuptools<=79"
+    # Install numpy <2 to avoid conflicts
+    Write-Host "Installing numpy..."
+    pip install "numpy<2"
     
-    pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url "https://download.pytorch.org/whl/cu$CudaVerShort"
+    pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url "https://download.pytorch.org/whl/cu$CudaVerShort"
     
     Write-Host "PyTorch installation completed"
 }
@@ -307,8 +316,8 @@ if ($OmniGibson) {
     
     # Check Python version
     $pythonVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-    if ($pythonVersion -ne "3.10") {
-        Write-Error "ERROR: Python 3.10 required, found $pythonVersion"
+    if ($pythonVersion -ne "3.11") {
+        Write-Error "ERROR: Python 3.11 required, found $pythonVersion"
         exit 1
     }
     
@@ -367,15 +376,15 @@ if ($extrasList.Count -gt 0) {
     if (-not $isaacInstalled) {
         # Isaac Sim packages to install
         $packages = @(
-            "omniverse_kit-106.5.0.162521", "isaacsim_kernel-4.5.0.0", "isaacsim_app-4.5.0.0",
-            "isaacsim_core-4.5.0.0", "isaacsim_gui-4.5.0.0", "isaacsim_utils-4.5.0.0",
-            "isaacsim_storage-4.5.0.0", "isaacsim_asset-4.5.0.0", "isaacsim_sensor-4.5.0.0",
-            "isaacsim_robot_motion-4.5.0.0", "isaacsim_robot-4.5.0.0", "isaacsim_benchmark-4.5.0.0",
-            "isaacsim_code_editor-4.5.0.0", "isaacsim_ros1-4.5.0.0", "isaacsim_cortex-4.5.0.0",
-            "isaacsim_example-4.5.0.0", "isaacsim_replicator-4.5.0.0", "isaacsim_rl-4.5.0.0",
-            "isaacsim_robot_setup-4.5.0.0", "isaacsim_ros2-4.5.0.0", "isaacsim_template-4.5.0.0",
-            "isaacsim_test-4.5.0.0", "isaacsim-4.5.0.0", "isaacsim_extscache_physics-4.5.0.0",
-            "isaacsim_extscache_kit-4.5.0.0", "isaacsim_extscache_kit_sdk-4.5.0.0"
+            "omniverse_kit-107.3.1.206797", "isaacsim_kernel-5.1.0.0", "isaacsim_app-5.1.0.0",
+            "isaacsim_core-5.1.0.0", "isaacsim_gui-5.1.0.0", "isaacsim_utils-5.1.0.0",
+            "isaacsim_storage-5.1.0.0", "isaacsim_asset-5.1.0.0", "isaacsim_sensor-5.1.0.0",
+            "isaacsim_robot_motion-5.1.0.0", "isaacsim_robot-5.1.0.0", "isaacsim_benchmark-5.1.0.0",
+            "isaacsim_code_editor-5.1.0.0", "isaacsim_ros1-5.1.0.0", "isaacsim_cortex-5.1.0.0",
+            "isaacsim_example-5.1.0.0", "isaacsim_replicator-5.1.0.0", "isaacsim_rl-5.1.0.0",
+            "isaacsim_robot_setup-5.1.0.0", "isaacsim_ros2-5.1.0.0", "isaacsim_template-5.1.0.0",
+            "isaacsim_test-5.1.0.0", "isaacsim-5.1.0.0", "isaacsim_extscache_physics-5.1.0.0",
+            "isaacsim_extscache_kit-5.1.0.0", "isaacsim_extscache_kit_sdk-5.1.0.0"
         )
         
         $tempDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
@@ -385,7 +394,7 @@ if ($extrasList.Count -gt 0) {
             foreach ($pkg in $packages) {
                 $pkgParts = $pkg -split "-"
                 $pkgName = ($pkgParts[0..($pkgParts.Length-2)] -join "-").Replace("_", "-")
-                $filename = "$pkg-cp310-none-win_amd64.whl"
+                $filename = "$pkg-cp311-none-win_amd64.whl"
                 $url = "https://pypi.nvidia.com/$pkgName/$filename"
                 $filepath = Join-Path $tempDir $filename
                 
@@ -456,7 +465,7 @@ if ($Eval) {
     # get torch version via pip
     $TorchVersion = (pip show torch | Select-String "Version" | ForEach-Object { $_.ToString().Split(" ")[-1] })
     pip install torch-cluster -f "https://data.pyg.org/whl/torch-$TorchVersion.html"
-    conda install av -c conda-forge -y
+    conda install av "numpy<2" -c conda-forge -y
 }
 
 # Install asset pipeline
@@ -515,7 +524,7 @@ if ($Dataset) {
 # Installation summary
 Write-Host ""
 Write-Host "=== Installation Complete! ==="
-if ($NewEnv) { Write-Host "Created conda environment 'behavior'" }
+if ($NewEnv) { Write-Host "Created conda environment '$NewEnvName'" }
 if ($OmniGibson) { Write-Host "Installed OmniGibson + Isaac Sim" }
 if ($BDDL) { Write-Host "Installed BDDL" }
 if ($JoyLo) { Write-Host "Installed JoyLo" }
@@ -524,4 +533,4 @@ if ($Eval) { Write-Host "Installed evaluation support" }
 if ($AssetPipeline) { Write-Host "Installed asset pipeline" }
 if ($Dataset) { Write-Host "Downloaded datasets" }
 Write-Host ""
-if ($NewEnv) { Write-Host "To activate: conda activate behavior" }
+if ($NewEnv) { Write-Host "To activate: conda activate $NewEnvName" }

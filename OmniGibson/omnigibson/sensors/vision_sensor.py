@@ -250,8 +250,8 @@ class VisionSensor(BaseSensor):
         # Link the camera and viewport together
         self._viewport.viewport_api.set_active_camera(self.prim_path)
 
-        # Requires 3 render updates to propagate changes
-        for i in range(3):
+        # Requires 4 render updates to propagate changes
+        for i in range(4):
             render()
 
         # Set the viewer size (requires taking one render step afterwards)
@@ -264,8 +264,8 @@ class VisionSensor(BaseSensor):
         self.horizontal_aperture = self._load_config["horizontal_aperture"]
         self.clipping_range = self._load_config["clipping_range"]
 
-        # Requires 3 render updates to propagate changes
-        for i in range(3):
+        # Requires 4 render updates to propagate changes
+        for i in range(4):
             render()
 
     def _initialize(self):
@@ -276,7 +276,7 @@ class VisionSensor(BaseSensor):
 
         # Initialize sensors
         self.initialize_sensors(names=self._modalities)
-        for _ in range(3):
+        for _ in range(4):
             render()
 
     def initialize_sensors(self, names):
@@ -666,8 +666,8 @@ class VisionSensor(BaseSensor):
         # Add the camera params modality if it doesn't already exist
         if "camera_params" not in self._annotators:
             self.initialize_sensors(names="camera_params")
-            # Requires 3 render updates for camera params annotator to become active
-            for _ in range(3):
+            # Requires 4 render updates for camera params annotator to become active
+            for _ in range(4):
                 render()
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
@@ -723,8 +723,8 @@ class VisionSensor(BaseSensor):
         for annotator in self._annotators.values():
             annotator.attach([self._render_product])
 
-        # Requires 3 updates to propagate changes
-        for i in range(3):
+        # Requires 4 updates to propagate changes
+        for i in range(4):
             render()
 
     @property
@@ -758,8 +758,8 @@ class VisionSensor(BaseSensor):
         for annotator in self._annotators.values():
             annotator.attach([self._render_product])
 
-        # Requires 3 updates to propagate changes
-        for i in range(3):
+        # Requires 4 updates to propagate changes
+        for i in range(4):
             render()
 
     @property
@@ -892,6 +892,12 @@ class VisionSensor(BaseSensor):
         cx = (1.0 - P[0, 2]) * width / 2.0
         cy = (1.0 - P[1, 2]) * height / 2.0
         K = th.tensor([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+
+        # Explicitly sanity check for null values here
+        degen_mat = th.zeros(3, 3)
+        degen_mat[2, 2] = 1.0
+        assert not th.all(K == degen_mat).item(), f"intrinsic matrix for sensor: {self.name} is degenerate!"
+
         return K
 
     @property

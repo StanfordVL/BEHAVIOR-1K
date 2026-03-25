@@ -180,7 +180,7 @@ def create_joint(
     # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
     if og.sim.is_playing():
         with suppress_omni_log(channels=["omni.physx.plugin"]):
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+            og.sim.refresh_physics()
 
     # Return this joint
     return joint_prim
@@ -288,7 +288,7 @@ class RigidContactAPIImpl:
             return
 
         # Generate views, making sure to update simulation first so the physx backend is synchronized.
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        og.sim.refresh_physics()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
                 scene_body_filters = body_filters[scene_idx]
@@ -1018,6 +1018,10 @@ class PoseAPI:
             # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
+            # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
+            # check if this is still the case for later versions
+            og.sim.render()
+
             # when flatcache is on
             if og.sim._physx_fabric_interface:
                 # no time step is taken here
@@ -1025,7 +1029,7 @@ class PoseAPI:
             # when flatcache is off
             else:
                 # no time step is taken here
-                og.sim.psi.fetch_results()
+                og.sim.refresh_physics(sync_usd=True)
             cls.mark_valid()
 
     @classmethod
@@ -2348,7 +2352,7 @@ def add_asset_to_stage(asset_path, prim_path):
     """
     # Make sure this is actually a supported asset type
     asset_type = asset_path.split(".")[-1]
-    assert asset_type in {"usd", "usda", "obj"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
+    assert asset_type in {"usd", "usda", "obj", "usdz"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"

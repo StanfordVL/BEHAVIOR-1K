@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="3.7.2",
+    version="3.8.0",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -42,7 +42,8 @@ setup(
         "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
-        "pymeshlab~=2022.2",
+        "pymeshlab~=2022.2; platform_machine!='aarch64'",
+        "pymeshlab>=2022.2; platform_machine=='aarch64'",
         "click>=8.1.3",
         "aenum>=3.1.15",
         "rtree>=1.2.0",
@@ -74,8 +75,7 @@ setup(
         ],
         "primitives": [
             "ninja~=1.13.0",
-            "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@cbaf7d32436160956dad190a9465360fad6aba73",
-            "ompl @ https://storage.googleapis.com/gibson_scenes/ompl-1.6.0-cp310-cp310-manylinux_2_28_x86_64.whl",
+            "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@78612f45cef52c3fa0298de243a54cd7ca614414",
         ],
         "eval": [
             "dm_tree>=0.1.9",

@@ -15,9 +15,9 @@ from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.python_utils import assert_valid_key, torch_compile
+from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
-from omnigibson.utils.processing_utils import MovingAverageFilter
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -53,12 +53,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         pos_kp=None,
         pos_damping_ratio=None,
         vel_kp=None,
+        smoothing_filter_size=None,
         use_impedances=False,
         use_gravity_compensation=False,
         use_cc_compensation=True,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
-        smoothing_filter_size=None,
     ):
         """
         Args:
@@ -95,6 +95,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 damping ratio applied to the joint controller. If None, a default value will be used.
             vel_kp (None or float): If @motor_type is "velocity" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
+            smoothing_filter_size (None or int): if specified, sets the size of a moving average filter to apply
+                on all outputted joint positions.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
             use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
@@ -111,6 +113,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self._motor_type = motor_type.lower()
         self._use_delta_commands = use_delta_commands
         self._compute_delta_in_quat_space = [] if compute_delta_in_quat_space is None else compute_delta_in_quat_space
+
+        # Possibly create control filter
+        command_dim = len(dof_idx)
+        self.control_filter = (
+            None
+            if smoothing_filter_size in {None, 0}
+            else MovingAverageFilter(obs_dim=command_dim, filter_width=smoothing_filter_size)
+        )
 
         # Store control gains
         if self._motor_type == "position":
@@ -296,6 +306,11 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         target = goals["target"]  # (N, control_dim)
 
+        # Optionally pass through smoothing filter for better stability
+        if self._control_filter is not None:
+            target = self._control_filter.estimate_batch(target)
+
+        # Convert control into efforts
         if self._use_impedances:
             rows = self.view_row_indices
             # Joint indices are defined over actuated joints; generalized dynamics tensors may include extra base DoFs.

@@ -34,7 +34,7 @@ from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.utils.asset_utils import decrypt_file
-from omnigibson.utils.constants import EmitterType, PrimType
+from omnigibson.utils.constants import OBJECT_CATEGORIES, EmitterType, PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, extract_class_init_kwargs_from_dict, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
@@ -44,6 +44,7 @@ from omnigibson.utils.usd_utils import (
     count_joints,
     create_joint,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -417,11 +418,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 self._link_physics_materials[link_name] = physics_mat
 
         # Add semantics
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=self._prim,
-            semantic_label=self.category,
-            type_label="class",
-        )
+        add_semantic_label(prim=self._prim, label=self.category)
+
         # Prepare the object states
         self._states = {}
         self.prepare_object_states()
