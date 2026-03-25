@@ -15,8 +15,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots import REGISTERED_ROBOTS, Robot
-from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
