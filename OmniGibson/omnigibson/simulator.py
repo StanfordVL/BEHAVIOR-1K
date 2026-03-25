@@ -1063,7 +1063,7 @@ def _launch_simulator(*args, **kwargs):
         def refresh_physics(self, sync_usd=False):
             """
             Synchronizes and evaluates any physics updates that have occurred since the last fetch.
-            
+
             Args:
                 sync_usd (bool): If True, also fetch physics results to USD backings.
             """
