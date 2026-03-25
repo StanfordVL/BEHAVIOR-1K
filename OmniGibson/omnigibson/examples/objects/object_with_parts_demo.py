@@ -12,7 +12,6 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states.attached_to import AttachedTo
 from omnigibson.utils.object_utils import add_object_with_parts
 
-# Object states must be enabled for AttachedTo (connectedpart) to work
 gm.ENABLE_OBJECT_STATES = True
 
 
@@ -20,18 +19,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     Demo showing how add_object_with_parts spawns a main object together with
     its connectedpart and extrapart children defined in metadata.
-
-    - vodka_bottle/bojwlu has a connectedpart cap (mgirzi): the cap is spawned
-      at the correct offset and immediately attached via a joint.
-    - bed/zrumze has an extrapart pillow (iyjelw): the pillow is spawned at
-      the annotated position on the bed but moves independently in physics.
     """
-    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
-
     cfg = {
         "scene": {"type": "Scene"},
         "objects": [
-            # Table for the bottle to rest on
             dict(
                 type="DatasetObject",
                 name="table",
@@ -40,7 +31,6 @@ def main(random_selection=False, headless=False, short_exec=False):
                 bounding_box=[1.36, 1.081, 0.84],
                 position=[0, 0, 0.42],
             ),
-            # Lights
             dict(
                 type="LightObject",
                 name="light0",
@@ -69,10 +59,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # --- connectedpart example: vodka bottle + cap ---
-    # The bottle metadata lists the cap as a connectedpart. add_object_with_parts
-    # creates both, positions the cap at the annotated offset, and attaches it.
-    # The bottle has a connectedpart cap — it needs attachable so AttachedTo is
-    # included in its states, giving the cap's attachment joint a female link to connect to.
     bottle = DatasetObject(
         name="vodka_bottle",
         category="vodka_bottle",
@@ -82,7 +68,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     bottle_objs = add_object_with_parts(
         scene=scene,
         obj=bottle,
-        pos=th.tensor([0.0, 0.0, 1.05]),  # on the table top
+        pos=th.tensor([0.0, 0.0, 1.2]),  # on the table top
         orn=th.tensor([0.0, 0.0, 0.0, 1.0]),
     )
 
@@ -92,8 +78,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         print(f"  Cap '{cap.name}' attached to bottle: {cap.states[AttachedTo].get_value(bottle)}")
 
     # --- extrapart example: bed + pillow ---
-    # The bed metadata lists a pillow as an extrapart. add_object_with_parts
-    # creates both and positions the pillow at the annotated offset on the bed.
     bed = DatasetObject(
         name="bed",
         category="bed",
