@@ -17,18 +17,15 @@ def stopped_env():
         gm.ENABLE_TRANSITION_RULES = True
 
     env = og.Environment(configs={"scene": {"type": "Scene"}})
-    env._obj_count = 0
-    og.sim.play()
     og.sim.stop()
     yield env
 
 
 def _add_obj(env, obj):
     """Add object to scene and position it away from other objects."""
-    env._obj_count += 1
     env.scene.add_object(obj)
     obj.set_position_orientation(
-        position=th.tensor([150, 150, 150 + env._obj_count * 5], dtype=th.float32), frame="scene"
+        position=th.tensor([150, 150, 150 + len(env.scene.objects) * 5], dtype=th.float32), frame="scene"
     )
 
 
