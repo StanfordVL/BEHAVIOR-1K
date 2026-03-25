@@ -18,9 +18,9 @@ def stopped_env():
 
     env = og.Environment(configs={"scene": {"type": "Scene"}})
     env._obj_count = 0
+    og.sim.play()
+    og.sim.stop()
     yield env
-
-    og.clear()
 
 
 def _add_obj(env, obj):
@@ -41,6 +41,8 @@ def env(request, stopped_env):
     og.sim.play()
     og.sim.step()
     yield stopped_env
+
+    og.clear()
 
 
 # --- Robot fixture ---
