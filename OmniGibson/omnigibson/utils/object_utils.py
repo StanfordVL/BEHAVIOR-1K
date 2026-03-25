@@ -47,11 +47,19 @@ def add_object_with_parts(scene, obj, pos=None, orn=None):
     # object_parts is stored as a list in JSON but USD round-trips it to a dict
     # with string-integer keys {"0": {...}, "1": {...}}. Handle both formats.
     raw_parts = metadata["object_parts"]
-    parts = raw_parts.values() if isinstance(raw_parts, dict) else raw_parts
+    if isinstance(raw_parts, dict):
+        try:
+            sorted_items = sorted(raw_parts.items(), key=lambda kv: int(kv[0]))
+        except (ValueError, TypeError):
+            sorted_items = sorted(raw_parts.items(), key=lambda kv: str(kv[0]))
+        parts = [v for _, v in sorted_items]
+    else:
+        parts = raw_parts
 
-    if AttachedTo not in obj.states:
+    has_connectedpart = any(part.get("type") == "connectedpart" for part in parts)
+    if AttachedTo not in obj.states and has_connectedpart:
         log.warning(
-            f"{obj.name} has connectedpart/extrapart metadata but no AttachedTo state. "
+            f"{obj.name} has connectedpart metadata but no AttachedTo state. "
             f"Create it with abilities={{'attachable': {{}}}} for connectedpart attachment to work."
         )
 

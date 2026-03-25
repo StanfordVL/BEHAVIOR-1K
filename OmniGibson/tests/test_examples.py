@@ -29,6 +29,7 @@ EXAMPLES = [
     "objects.draw_bounding_box",
     "objects.highlight_objects",
     "objects.load_object_selector",
+    "objects.object_with_parts_demo",
     "objects.view_cloth_configurations",
     "objects.visualize_object",
     "robots.all_robots_visualizer",
