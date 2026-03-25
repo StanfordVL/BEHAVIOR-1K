@@ -24,7 +24,8 @@ def stopped_env():
 @pytest.fixture
 def env(request, stopped_env):
     for name in request.fixturenames:
-        request.getfixturevalue(name)
+        if name not in ("env", "stopped_env", "request"):
+            request.getfixturevalue(name)
 
     og.sim.play()
     yield stopped_env
