@@ -18,4 +18,4 @@ docker build \
 docker build \
     -t stanfordvl/behavior-gha:latest \
     -f docker/gh-actions/Dockerfile \
-    .
+    docker/gh-actions
