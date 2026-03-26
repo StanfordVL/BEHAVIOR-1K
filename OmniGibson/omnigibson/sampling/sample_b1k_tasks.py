@@ -32,96 +32,6 @@ from utils import (
 import numpy as np
 import random
 
-
-# TASK_CUSTOM_LISTS = {
-#     ("picking_up_trash", "Rs_int"): {
-#         "whitelist": {
-#             "pad.n.01": {
-#                 "sticky_note": ["tghqep"],
-#             },
-#         },
-#         "blacklist": None,
-#     },
-#     ("packing_recreational_vehicle_for_trip", "Merom_0_garden"): {
-#         "whitelist": {
-#             "wicker_basket.n.01": {
-#                 "wicker_basket": ["tsjvyu"],
-#             },
-#         },
-#         "blacklist": None,
-#     },
-#     ("datagen_tidy_table", "house_single_floor"): {
-#         "whitelist": {
-#             "countertop.n.01": {
-#                 "bar": ["udatjt"],
-#             },
-#             "teacup.n.02": {
-#                 "teacup": ["kccqwj"],
-#             },
-#         },
-#         "blacklist": None,
-#     },
-#     ("datagen_cook_brussels_sprouts", "house_single_floor"): {
-#         "whitelist": {
-#             "countertop.n.01": {
-#                 "bar": ["udatjt"],
-#             },
-#             "burner.n.02": {
-#                 "burner": ["mjvqii"],
-#             },
-#             "brussels_sprouts.n.01": {
-#                 "brussels_sprouts": ["hkwyzk"],
-#             },
-#             "stockpot.n.01": {
-#                 "stockpot": ["grrcna"],
-#             },
-#             "tupperware.n.01": {
-#                 "tupperware": ["mkstwr"],
-#             },
-#         },
-#         "blacklist": None,
-#     },
-#     ("datagen_wash_dishes", "house_single_floor"): {
-#         "whitelist": {
-#             "countertop.n.01": {
-#                 "bar": ["gjeoer"],
-#             },
-#             "frying_pan.n.01": {
-#                 "frying_pan": ["jpzusm"],
-#             },
-#             "scrub_brush.n.01": {
-#                 "scrub_brush": ["hsejyi"],
-#             },
-#         },
-#         "blacklist": None,
-#     },
-#     ("datagen_dishes_away", "house_single_floor"): {
-#         "whitelist": {
-#             "countertop.n.01": {
-#                 "bar": ["gjeoer"],
-#             },
-#             "plate.n.04": {
-#                 "plate": ["akfjxx"],
-#             },
-#             "shelf.n.01": {
-#                 "shelf": ["pfusrd"],
-#             },
-#         },
-#         "blacklist": None,
-#     },
-#     ("datagen_pick", "Rs_int"): {
-#         "whitelist": {
-#             "breakfast_table.n.01": {
-#                 "breakfast_table": ["bhszwe"],
-#             },
-#             "coffee_cup.n.01": {
-#                 "coffee_cup": ["dkxddg"],
-#             },
-#         },
-#         "blacklist": None,
-#     },
-# }
-
 with open("task_custom_lists.json", "r") as f:
     TASK_CUSTOM_LISTS = json.load(f)
 
@@ -184,14 +94,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Priority is:
     # 1. command-line args
     # 2. environment level variables
-    if args.scene_model is None:
-        # This MUST be specified
-        assert os.environ.get(
-            "SAMPLING_SCENE_MODEL"
-        ), "scene model MUST be specified, either as a command-line arg or as an environment variable!"
-        args.scene_model = os.environ["SAMPLING_SCENE_MODEL"]
+
     if args.activities is None and os.environ.get("SAMPLING_ACTIVITIES"):
         args.activities = os.environ["SAMPLING_ACTIVITIES"]
+    args.scene_model = [i for i in TASK_CUSTOM_LISTS[args.activities[0]].keys() if i != "room_types"][0]
+
     if args.start_at is None and os.environ.get("SAMPLING_START_AT"):
         args.start_at = os.environ["SAMPLING_START_AT"]
     if args.thread_id is None:
@@ -374,10 +281,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             reason = f"Unsupported predicate(s): {unsupported_predicates}"
 
         env.task_config["activity_name"] = activity
-        # activity_scene_combo = (activity, args.scene_model)
-        # if activity_scene_combo in TASK_CUSTOM_LISTS:
-        #     whitelist = TASK_CUSTOM_LISTS[activity_scene_combo]["whitelist"]
-        #     blacklist = TASK_CUSTOM_LISTS[activity_scene_combo]["blacklist"]
         if activity in TASK_CUSTOM_LISTS and args.scene_model in TASK_CUSTOM_LISTS[activity]:
             whitelist = TASK_CUSTOM_LISTS[activity][args.scene_model]["whitelist"]
             blacklist = TASK_CUSTOM_LISTS[activity][args.scene_model]["blacklist"]
@@ -411,7 +314,9 @@ def main(random_selection=False, headless=False, short_exec=False):
                         obj.visible = active
 
                 og.log.info(f"Sampling task: {activity}")
-                env._load_task()
+                original_task_cfg = env.task_config
+                original_task_cfg["use_presampled_robot_pose"] = False
+                env._load_task(original_task_cfg)
                 assert og.sim.is_stopped()
 
                 success, feedback = env.task.feedback is None, env.task.feedback
@@ -456,12 +361,23 @@ def main(random_selection=False, headless=False, short_exec=False):
                         feedback = error_msg
                         print("validation failed")
                         print(f"REASON: {feedback}")
+                        # BREAKPOINT: Validation failed - inspect the task state to understand why
+                        # At this breakpoint, you can:
+                        # - Run: for _ in range(1000): og.sim.render()
+                        # - Move the camera around to inspect objects and their states
+                        # - Check env.task for task details
+                        # - Examine feedback variable for the validation error message
                         breakpoint()
 
                 if success:
                     env.scene.load_state(task_final_state)
                     env.scene.update_initial_file()
                     print("sampling succeed")
+                    # BREAKPOINT: Sampling succeeded - inspect the final task state before saving
+                    # At this breakpoint, you can:
+                    # - Run: for _ in range(1000): og.sim.render()
+                    # - Move the camera around to visually verify the sampled task looks correct
+                    # After inspection, continue to save the task to disk
                     breakpoint()
                     env.task.save_task(env=env, override=True, task_relevant_only=False, suffix=task_suffix)
                     og.log.info(f"\n\nSampling success: {activity}\n\n")
@@ -469,6 +385,13 @@ def main(random_selection=False, headless=False, short_exec=False):
                 else:
                     reason = feedback
                     og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
+                    # BREAKPOINT: Sampling failed - inspect to understand what went wrong
+                    # At this breakpoint, you can:
+                    # - Run: for _ in range(1000): og.sim.render()
+                    # - Move the camera to see the current state of the scene
+                    # - Check the feedback/reason variable to see why sampling failed
+                    # - Inspect env.task.object_scope to see what objects were sampled
+                    # - Debug object placement or constraint satisfaction issues
                     breakpoint()
                 og.sim.stop()
             else:
@@ -513,6 +436,12 @@ def main(random_selection=False, headless=False, short_exec=False):
             og.log.error(f"\n\nCaught exception sampling activity {activity} in scene {args.scene_model}:\n\n{e}\n\n")
 
             print("exception")
+            # BREAKPOINT: Exception occurred during sampling - debug the error
+            # At this breakpoint, you can:
+            # - Inspect the exception 'e' and traceback_str for error details
+            # - Run: for _ in range(1000): og.sim.render() (if simulation is still valid)
+            # - Check env state and task configuration that led to the exception
+            # - Examine which part of the sampling process failed
             breakpoint()
 
             if not args.offline:

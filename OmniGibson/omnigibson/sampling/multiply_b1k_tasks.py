@@ -86,13 +86,14 @@ def main():
             "online_object_sampling": False,
             "activity_name": args.activity,
             "activity_instance_id": args.seed,
+            "use_presampled_robot_pose": False,
         },
     }
     env = og.Environment(cfg)
 
     # Define where to save instances
     save_dir = os.path.join(
-        get_dataset_path("behavior-1k-assets"),
+        get_dataset_path("2025-challenge-task-instances"),
         "scenes",
         env.task.scene_name,
         "json",

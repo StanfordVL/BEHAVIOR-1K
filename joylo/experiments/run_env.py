@@ -54,17 +54,11 @@ class Args:
 def main(args):
     if args.mock:
         robot_client = PrintRobot(8, dont_print=True)
-        camera_clients = {}
     else:
-        camera_clients = {
-            # you can optionally add camera nodes here for imitation learning purposes
-            # "wrist": ZMQClientCamera(port=args.wrist_camera_port, host=args.hostname),
-            # "base": ZMQClientCamera(port=args.base_camera_port, host=args.hostname),
-        }
         robot_client = ZMQClientRobot(port=args.robot_port, host=args.hostname)
 
     active_arm = "right"
-    env = RobotEnv(robot_client, control_rate_hz=args.hz, camera_dict=camera_clients, active_arm=active_arm)
+    env = RobotEnv(robot_client, control_rate_hz=args.hz, active_arm=active_arm)
 
     if args.bimanual:
         if args.agent == "gello":

@@ -164,3 +164,6 @@ third_party
 
 # data directory
 data
+
+# configs
+configs
