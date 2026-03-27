@@ -180,7 +180,7 @@ gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_HQ_RENDERING = False
 
 # Whether to use omni's flatcache feature or not (can speed up simulation)
-gm.ENABLE_FLATCACHE = False
+gm.ENABLE_FLATCACHE = True
 
 # Whether to use continuous collision detection or not (slower simulation, but can prevent
 # objects from tunneling through each other)
