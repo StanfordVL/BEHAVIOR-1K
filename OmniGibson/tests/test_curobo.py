@@ -60,6 +60,30 @@ def test_curobo():
 
     robot_cfgs = [
         {
+            "model": "a1",
+            "obs_modalities": "rgb",
+            "position": [0.7, -0.55, 0.0],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+            "action_normalize": False,
+            "controller_config": {
+                "arm_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+            },
+        },
+        {
             "model": "franka",
             "obs_modalities": "rgb",
             "position": [0.7, -0.55, 0.0],

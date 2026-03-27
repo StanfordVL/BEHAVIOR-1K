@@ -249,6 +249,11 @@ class RigidContactAPIImpl:
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
+
+            # Add the (global) floor plane if there is one
+            if og.sim.floor_plane is not None:
+                filters[scene_idx].append(og.sim.floor_plane.prim_path)
+
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
