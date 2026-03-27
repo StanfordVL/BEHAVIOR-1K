@@ -199,7 +199,8 @@ Prompt-ForTerms
 function Test-CondaEnvironment {
     param([string]$EnvName)
     $envList = conda env list 2>$null | Out-String
-    return $envList -match "^$EnvName\s"
+    $escapedEnvName = [regex]::Escape($EnvName)
+    return $envList -match "^\s*\*?\s*$escapedEnvName\s"
 }
 
 # Helper function to activate conda environment
@@ -315,7 +316,8 @@ if ($OmniGibson) {
     }
     
     # Check Python version
-    $pythonVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+    $pythonVersion = (& python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')") -join "`n"
+    $pythonVersion = $pythonVersion.Trim()
     if ($pythonVersion -ne "3.11") {
         Write-Error "ERROR: Python 3.11 required, found $pythonVersion"
         exit 1
@@ -365,11 +367,14 @@ if ($extrasList.Count -gt 0) {
     
     # Check if already installed
     $isaacInstalled = $false
-    python -c "import isaacsim" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $isaacInstalled = $true
-        Write-Host "Isaac Sim already installed, skipping..."
-    } else {
+    try {
+        & python -c "import isaacsim" *> $null -ErrorAction Stop
+        if ($LASTEXITCODE -eq 0) {
+            $isaacInstalled = $true
+            Write-Host "Isaac Sim already installed, skipping..."
+        }
+    }
+    catch {
         Write-Host "Installing Isaac Sim via pip..."
     }
     
@@ -413,8 +418,10 @@ if ($extrasList.Count -gt 0) {
             pip install $wheelFiles
             
             # Verify installation
-            python -c "import isaacsim" 2>$null
-            if ($LASTEXITCODE -ne 0) {
+            try {
+                & python -c "import isaacsim" *> $null -ErrorAction Stop
+            }
+            catch {
                 Write-Error "ERROR: Isaac Sim installation verification failed"
                 exit 1
             }
