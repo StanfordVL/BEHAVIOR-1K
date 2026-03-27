@@ -6,12 +6,12 @@ import glob
 import nltk
 import pathlib
 import bddl
-from bddl.knowledge_base.orm import IntegrityError
 from bddl.object_taxonomy import ObjectTaxonomy
 from bddl.activity import Conditions, get_all_activities, get_instance_count
 from bddl.config import get_definition_filename
 import tqdm
 from bddl.knowledge_base.models import *
+from bddl.knowledge_base.knowledgebase import KnowledgeBase
 from bddl.knowledge_base.utils import *
 
 
@@ -21,9 +21,32 @@ GENERATED_DATA_DIR = BDDL_DIR / "generated_data"
 logger = logging.getLogger(__name__)
 
 
-class KnowledgeBaseProcessor:
-    def __init__(self, verbose=True) -> None:
+def append_unique(items, item):
+    if item not in items:
+        items.append(item)
+
+
+def link_many_to_many(lhs, lhs_field, rhs, rhs_field):
+    append_unique(getattr(lhs, lhs_field), rhs)
+    append_unique(getattr(rhs, rhs_field), lhs)
+
+
+def link_many_to_one(child, child_field, parent, parent_field):
+    setattr(child, child_field, parent)
+    append_unique(getattr(parent, parent_field), child)
+
+
+def get_or_add(get_fn, add_fn, key):
+    obj = get_fn(key)
+    if obj is not None:
+        return obj, False
+    return add_fn(key), True
+
+
+class _KnowledgeBaseBuilder:
+    def __init__(self, kb: KnowledgeBase, verbose=True) -> None:
         self._verbose = verbose
+        self.kb = kb
 
     def tqdm(self, iterable, *args, **kwargs):
         if self._verbose:
@@ -119,44 +142,56 @@ class KnowledgeBaseProcessor:
                 if wn_synset_exists(synset_name)
                 else ""
             )
-            synset, created = Synset.get_or_create(
-                name=synset_name,
-                defaults={
-                    "definition": synset_definition,
-                    "is_custom": synset_is_custom,
-                },
-            )
+            synset = self.kb.get_synset(synset_name)
+            created = synset is None
+            if created:
+                synset = self.kb.add_synset(
+                    name=synset_name,
+                    definition=synset_definition,
+                    is_custom=synset_is_custom,
+                )
             parents = self.object_taxonomy.get_parents(synset_name)
             for parent in parents:
-                parent_obj = Synset.get(name=parent)
-                synset.parents.add(parent_obj)
+                parent_obj = self.kb.get_synset(parent)
+                link_many_to_many(synset, "parents", parent_obj, "children")
             cur_ancestors = self.object_taxonomy.get_ancestors(synset_name)
             for ancestor in sorted(cur_ancestors):
-                ancestor_obj = Synset.get(name=ancestor)
-                synset.ancestors.add(ancestor_obj)
+                ancestor_obj = self.kb.get_synset(ancestor)
+                link_many_to_many(synset, "ancestors", ancestor_obj, "descendants")
 
             # Add any categories
             for category in self.object_taxonomy.get_categories(synset_name):
                 assert not any(
-                    c.name == category for c in Category.all_objects()
+                    c.name == category for c in self.kb.all_categories()
                 ), f"Category {category} of {synset_name} already exists!"
-                Category.get_or_create(name=category, synset=synset)
+                category_obj, _ = get_or_add(
+                    self.kb.get_category,
+                    lambda name: self.kb.add_category(name=name, synset=synset),
+                    category,
+                )
+                link_many_to_one(category_obj, "synset", synset, "categories")
 
             # Add any particle systems
             for particle_system in self.object_taxonomy.get_substances(synset_name):
                 assert not any(
-                    ps.name == particle_system for ps in ParticleSystem.all_objects()
+                    ps.name == particle_system for ps in self.kb.all_particle_systems()
                 ), f"Particle system {particle_system} of {synset_name} already exists!"
-                ParticleSystem.get_or_create(name=particle_system, synset=synset)
+                ps_obj, _ = get_or_add(
+                    self.kb.get_particle_system,
+                    lambda name: self.kb.add_particle_system(name=name, synset=synset),
+                    particle_system,
+                )
+                link_many_to_one(ps_obj, "synset", synset, "particle_systems")
 
             # Add any properties
             if created:
                 for property_name, params in self.object_taxonomy.get_abilities(
                     synset_name
                 ).items():
-                    Property.create(
+                    property_obj = self.kb.add_property(
                         synset=synset, name=property_name, parameters=json.dumps(params)
                     )
+                    link_many_to_one(property_obj, "synset", synset, "properties")
 
     def create_objects(self):
         """
@@ -186,7 +221,7 @@ class KnowledgeBaseProcessor:
 
                 # Create the object
                 orig_category_name = orig_name.split("-")[0]
-                obj = Object.create(
+                obj = self.kb.add_object(
                     name=orig_id,
                     original_category_name=orig_category_name,
                     provider=provider,
@@ -204,8 +239,10 @@ class KnowledgeBaseProcessor:
                     if "openfillable" in existing_meta_types:
                         existing_meta_types.add("fillable")
                     for meta_link in existing_meta_types:
-                        meta_link_obj, _ = MetaLink.get_or_create(name=meta_link)
-                        obj.meta_links.add(meta_link_obj)
+                        meta_link_obj, _ = get_or_add(
+                            self.kb.get_meta_link, self.kb.add_meta_link, meta_link
+                        )
+                        link_many_to_many(obj, "meta_links", meta_link_obj, "on_objects")
 
                     if orig_name in inventory["attachment_pairs"]:
                         existing_attachment_pairs = inventory["attachment_pairs"][
@@ -213,11 +250,23 @@ class KnowledgeBaseProcessor:
                         ]
                         for gender, pairs in existing_attachment_pairs.items():
                             for pair in pairs:
-                                pair_obj, _ = AttachmentPair.get_or_create(name=pair)
+                                pair_obj, _ = get_or_add(
+                                    self.kb.get_attachment_pair, self.kb.add_attachment_pair, pair
+                                )
                                 if gender == "F":
-                                    obj.female_attachment_pairs.add(pair_obj)
+                                    link_many_to_many(
+                                        obj,
+                                        "female_attachment_pairs",
+                                        pair_obj,
+                                        "female_objects",
+                                    )
                                 elif gender == "M":
-                                    obj.male_attachment_pairs.add(pair_obj)
+                                    link_many_to_many(
+                                        obj,
+                                        "male_attachment_pairs",
+                                        pair_obj,
+                                        "male_objects",
+                                    )
                                 else:
                                     raise Exception(
                                         f"Invalid gender {gender} for attachment pair {pair}"
@@ -225,16 +274,16 @@ class KnowledgeBaseProcessor:
 
                 # Add the category and/or particle system
                 category_name = object_name.split("-")[0]
-                particle_system = ParticleSystem.get(name=category_name)
-                category = Category.get(name=category_name)
+                particle_system = self.kb.get_particle_system(category_name)
+                category = self.kb.get_category(category_name)
                 assert (
                     (category is None) != (particle_system is None)
                 ), f"{category_name} should be exactly one of category or particle system"
                 if particle_system is not None:
                     # If it's a particle system, add it to the object
-                    obj.particle_system = particle_system
+                    link_many_to_one(obj, "particle_system", particle_system, "particles")
                 else:
-                    obj.category = category
+                    link_many_to_one(obj, "category", category, "objects")
 
         # Check that all of the renames have happened
         # TODO: Is this really useful? Doubt it.
@@ -251,14 +300,14 @@ class KnowledgeBaseProcessor:
 
                 # Get the particle system. It should already exist from the synset stage.
                 name = row["substance"]
-                particle_system = ParticleSystem.get(name)
+                particle_system = self.kb.get_particle_system(name)
                 assert (
                     particle_system is not None
                 ), f"Particle system {name} does not exist in hierarchy."
 
                 # Confirm the synset assignment
                 synset_name = row["synset"]
-                synset = Synset.get(name=synset_name)
+                synset = self.kb.get_synset(synset_name)
                 assert (
                     particle_system.synset == synset
                 ), f"Particle system {name} is not in the correct synset {synset_name}"
@@ -276,15 +325,16 @@ class KnowledgeBaseProcessor:
         with open(GENERATED_DATA_DIR / "combined_room_object_list.json", "r") as f:
             planned_scene_dict = json.load(f)["scenes"]
             for scene_name in self.tqdm(planned_scene_dict):
-                scene, _ = Scene.get_or_create(name=scene_name)
+                scene, _ = get_or_add(self.kb.get_scene, self.kb.add_scene, scene_name)
                 for room_name in planned_scene_dict[scene_name]:
                     try:
-                        room = Room.create(
+                        room = self.kb.add_room(
                             name=room_name,
                             type=room_name.rsplit("_", 1)[0],
                             scene=scene,
                         )
-                    except IntegrityError:
+                        link_many_to_one(room, "scene", scene, "rooms")
+                    except ValueError:
                         raise Exception(
                             f"room {room_name} in {scene.name} (not ready) already exists!"
                         )
@@ -300,11 +350,13 @@ class KnowledgeBaseProcessor:
                                     orig_name == from_name or orig_name == to_name
                                 ), f"Object {orig_name} is in the rename mapping with the wrong categories {from_name} -> {to_name}."
                                 object_name = to_name
-                            obj = Object.get(name=orig_id)
+                            obj = self.kb.get_object(orig_id)
                             assert (
-                                obj is not None
+                            obj is not None
                             ), f"Scene {scene_name} object {orig_id} does not exist in the database."
-                            RoomObject.create(room=room, object=obj, count=count)
+                            room_object = self.kb.add_room_object(room=room, object=obj, count=count)
+                            link_many_to_one(room_object, "room", room, "roomobjects")
+                            link_many_to_one(room_object, "object", obj, "roomobjects")
 
     def create_tasks(self):
         """
@@ -332,10 +384,12 @@ class KnowledgeBaseProcessor:
 
             # Create task object
             task_name = f"{act}-{inst}"
-            task = Task.create(name=task_name, definition=raw_task_definition)
+            task = self.kb.add_task(name=task_name, definition=raw_task_definition)
             for predicate in all_task_predicates(combined_conds):
-                pred_obj, _ = Predicate.get_or_create(name=predicate)
-                task.uses_predicates.add(pred_obj)
+                pred_obj, _ = get_or_add(
+                    self.kb.get_predicate, self.kb.add_predicate, predicate
+                )
+                link_many_to_many(task, "uses_predicates", pred_obj, "tasks")
 
             # add any synset that is not currently in the database
             for synset_name in sorted(canonicalized_synsets):
@@ -346,7 +400,7 @@ class KnowledgeBaseProcessor:
                     combined_conds, synset_name
                 )
                 # all annotated synsets have been created before, so any newly created synset is illegal
-                synset = Synset.get(synset_name)
+                synset = self.kb.get_synset(synset_name)
                 assert (
                     synset is not None
                 ), f"Synset {synset_name} used by task {task_name} does not exist in the database."
@@ -363,10 +417,12 @@ class KnowledgeBaseProcessor:
                     combined_conds, synset_name
                 )
                 for predicate in synset_used_predicates:
-                    pred_obj, _ = Predicate.get_or_create(name=predicate)
+                    pred_obj, _ = get_or_add(
+                        self.kb.get_predicate, self.kb.add_predicate, predicate
+                    )
                     if pred_obj not in synset.used_in_predicates:
-                        synset.used_in_predicates.add(pred_obj)
-                task.synsets.add(synset)
+                        link_many_to_many(synset, "used_in_predicates", pred_obj, "synsets")
+                link_many_to_many(task, "synsets", synset, "tasks")
 
                 # If the synset ever shows up as future or real, check validity
                 used_as_future_or_real = (
@@ -399,7 +455,9 @@ class KnowledgeBaseProcessor:
                     # in the goal but they will already exist in the initial, and the real is just being
                     # used to say that the object is not entirely used up during the transition.
                     if "future" in initial_preds:
-                        task.future_synsets.add(synset)
+                        link_many_to_many(
+                            task, "future_synsets", synset, "tasks_using_as_future"
+                        )
 
             # generate room requirements for task
             room_synset_requirements = defaultdict(Counter)  # room[synset] = count
@@ -410,13 +468,23 @@ class KnowledgeBaseProcessor:
                 room_synset_requirements[rr_type][rr_synset] += 1
 
             for rr_type, synset_counter in room_synset_requirements.items():
-                room_requirement = RoomRequirement.create(task=task, type=rr_type)
+                room_requirement = self.kb.add_room_requirement(task=task, type=rr_type)
+                link_many_to_one(room_requirement, "task", task, "room_requirements")
                 for rsr_synset, count in synset_counter.items():
-                    rsr_synset_obj = Synset.get(name=rsr_synset)
-                    RoomSynsetRequirement.create(
+                    rsr_synset_obj = self.kb.get_synset(rsr_synset)
+                    rsr_obj = self.kb.add_roomsynset_requirement(
                         room_requirement=room_requirement,
                         synset=rsr_synset_obj,
                         count=count,
+                    )
+                    link_many_to_one(
+                        rsr_obj,
+                        "room_requirement",
+                        room_requirement,
+                        "roomsynsetrequirements",
+                    )
+                    link_many_to_one(
+                        rsr_obj, "synset", rsr_synset_obj, "roomsynsetrequirements"
                     )
 
     def create_transitions(self):
@@ -435,7 +503,7 @@ class KnowledgeBaseProcessor:
         # Create the transition objects
         for transition_data in self.tqdm(transitions):
             rule_name = transition_data["rule_name"]
-            transition = TransitionRule.create(name=rule_name)
+            transition = self.kb.add_transition_rule(name=rule_name)
 
             # Add the default inputs and outputs
             inputs = set(transition_data["input_synsets"].keys())
@@ -453,17 +521,29 @@ class KnowledgeBaseProcessor:
             # assert inputs & outputs == set(), f"Inputs and outputs of {transition.name} overlap!"
 
             for synset_name in inputs:
-                synset = Synset.get(name=synset_name)
-                transition.input_synsets.add(synset)
+                synset = self.kb.get_synset(synset_name)
+                link_many_to_many(
+                    transition, "input_synsets", synset, "used_by_transition_rules"
+                )
             for synset_name in outputs:
-                synset = Synset.get(name=synset_name)
-                transition.output_synsets.add(synset)
+                synset = self.kb.get_synset(synset_name)
+                link_many_to_many(
+                    transition,
+                    "output_synsets",
+                    synset,
+                    "produced_by_transition_rules",
+                )
             for auxiliary_synset_type in ["machine", "heat_source", "container"]:
                 if auxiliary_synset_type in transition_data:
                     machines = transition_data[auxiliary_synset_type]
                     for synset_name in machines:
-                        machine = Synset.get(name=synset_name)
-                        transition.machine_synsets.add(machine)
+                        machine = self.kb.get_synset(synset_name)
+                        link_many_to_many(
+                            transition,
+                            "machine_synsets",
+                            machine,
+                            "machine_in_transition_rules",
+                        )
 
     def create_complaints(self):
         with open(GENERATED_DATA_DIR / "complaints.json", "r") as f:
@@ -476,8 +556,8 @@ class KnowledgeBaseProcessor:
             complaint_response = complaint["complaint"]
 
             # Create the relevant complaint type (even if we are processed we want to show all types)
-            complaint_type, created = ComplaintType.get_or_create(
-                name=complaint_type_name
+            complaint_type, created = get_or_add(
+                self.kb.get_complaint_type, self.kb.add_complaint_type, complaint_type_name
             )
 
             # Skip processed complaints
@@ -485,25 +565,27 @@ class KnowledgeBaseProcessor:
                 continue
 
             # Check if the model ID exists
-            obj = Object.get(name=complaint_model_id)
+            obj = self.kb.get_object(complaint_model_id)
             if obj is None:
                 logger.warning(
                     f"Complained object {complaint_model_id} does not exist in the database. Skipping."
                 )
                 continue
 
-            Complaint.create(
+            complaint_obj = self.kb.add_complaint(
                 object=obj,
                 complaint_type=complaint_type,
                 prompt_additional_info=complaint_additional_info,
                 response=complaint_response,
             )
+            append_unique(obj.complaints, complaint_obj)
+            append_unique(complaint_type.complaints, complaint_obj)
 
     def nuke_unused_synsets(self):
         # Make repeated passes until we propagate far enough up
         while True:
             removal_names = set()
-            for synset in Synset.all_objects():
+            for synset in self.kb.all_synsets():
                 # In a given pass, only leaf nodes can be removed
                 if synset.children:
                     continue
@@ -525,15 +607,30 @@ class KnowledgeBaseProcessor:
                 removal_names.add(synset.name)
 
             if removal_names:
-                for s in list(Synset.all_objects()):
+                for s in list(self.kb.all_synsets()):
                     if s.name in removal_names:
                         s.delete()
             else:
                 break
 
 
+def build_knowledgebase(verbose=True):
+    kb = KnowledgeBase()
+    builder = _KnowledgeBaseBuilder(kb=kb, verbose=verbose)
+    builder.run()
+    kb.sort_all()
+    return kb
+
+
+def populate_knowledgebase(kb: KnowledgeBase, verbose=True):
+    builder = _KnowledgeBaseBuilder(kb=kb, verbose=verbose)
+    builder.run()
+    kb.sort_all()
+    return kb
+
+
 if __name__ == "__main__":
     import IPython
 
-    KnowledgeBaseProcessor().run()
+    build_knowledgebase(verbose=True)
     IPython.embed()
