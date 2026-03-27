@@ -62,7 +62,7 @@ def test_curobo():
         {
             "model": "a1",
             "obs_modalities": "rgb",
-            "position": [0.7, -0.55, 0.0],
+            "position": [0.6, -0.65, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
@@ -354,7 +354,7 @@ def test_curobo():
             og.sim.step_physics()
 
             # To debug
-            # cmg.save_visualization(robot.get_joint_positions(), "/scr/chengshu/Downloads/test.obj")
+            # cmg.save_visualization(robot.get_joint_positions(), "test.obj")
 
             # Sanity check in the GUI that the robot pose makes sense
             for _ in range(10):

@@ -252,7 +252,7 @@ class RigidContactAPIImpl:
 
             # Add the (global) floor plane if there is one
             if og.sim.floor_plane is not None:
-                filters[scene_idx].append(og.sim.floor_plane.prim_path)
+                filters[scene_idx].append(og.sim.floor_plane.prim_path + "/collisionPlane")
 
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
