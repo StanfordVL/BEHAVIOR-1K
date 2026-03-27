@@ -21,6 +21,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
+from omnigibson.object_states import initialize_tensorized_states
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
@@ -1054,6 +1055,7 @@ def _launch_simulator(*args, **kwargs):
             # Finally update any unified views
             RigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+            initialize_tensorized_states()
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1078,6 +1080,7 @@ def _launch_simulator(*args, **kwargs):
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
                     og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+                    initialize_tensorized_states()
                     scenes_modified = set()
                     for i in range(n_objects_to_initialize):
                         obj = self._objects_to_initialize[i]

@@ -178,6 +178,15 @@ class BasePrim(Serializable, Recreatable, ABC):
         return self._state_size
 
     @property
+    def relative_prim_path(self):
+        """
+        Returns:
+            str: scene-relative prim path (e.g. /robot_0/base_link), identical across all scenes
+                in a VectorEnvironment.
+        """
+        return self._relative_prim_path
+
+    @property
     def prim_path(self):
         """
         Returns:

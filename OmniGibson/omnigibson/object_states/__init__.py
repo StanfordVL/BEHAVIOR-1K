@@ -34,6 +34,18 @@ from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.touching import Touching
 from omnigibson.object_states.under import Under
 
+
+def initialize_tensorized_states():
+    """
+    Initialize all TensorizedValueState subclasses in dependency order.
+    Must be called after RigidContactAPI.initialize_view() since ToggledOn depends on it.
+    """
+    Temperature.initialize_view()
+    MaxTemperature.initialize_view()  # depends on Temperature.OBJ_IDXS
+    SlicerActive.initialize_view()
+    ToggledOn.initialize_view()  # depends on RigidContactAPI
+
+
 __all__ = [
     "AABB",
     "AttachedTo",
@@ -77,4 +89,5 @@ __all__ = [
     "Under",
     "Unfolded",
     "VerticalAdjacency",
+    "initialize_tensorized_states",
 ]

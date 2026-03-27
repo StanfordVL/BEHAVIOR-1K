@@ -17,12 +17,20 @@ m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps
 
 
 class Temperature(TensorizedValueState):
-    def __init__(self, obj):
-        # Run super first
-        super(Temperature, self).__init__(obj)
+    @classmethod
+    def initialize_view(cls):
+        # Snapshot which relative paths existed before the rebuild
+        prev_rel_paths = set(cls.OBJ_IDXS.keys()) if cls.OBJ_IDXS is not None else set()
 
-        # Set value to be default
-        self._set_value(m.DEFAULT_TEMPERATURE)
+        # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
+        super().initialize_view()
+
+        # Initialize new VALUE slots (not carried over) to DEFAULT_TEMPERATURE
+        for rel_path, obj_idx in cls.OBJ_IDXS.items():
+            if rel_path not in prev_rel_paths:
+                for s_idx in range(len(cls.IDX_OBJS)):
+                    if cls.IDX_OBJS[s_idx][obj_idx] is not None:
+                        cls.VALUES[s_idx, obj_idx] = m.DEFAULT_TEMPERATURE
 
     @classmethod
     def update_temperature_from_heatsource_or_sink(cls, objs, temperature, rate):
@@ -34,9 +42,10 @@ class Temperature(TensorizedValueState):
             temperature (float): Heat source / sink temperature
             rate (float): Heating rate of the source / sink
         """
-        # Get idxs for objs
-        idxs = [cls.OBJ_IDXS[obj] for obj in objs]
-        cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_sim_step_dt()
+        # Get (scene, obj) index pairs for the affected objects
+        s_idxs = [obj.scene.idx for obj in objs]
+        n_idxs = [cls.OBJ_IDXS[obj.relative_prim_path] for obj in objs]
+        cls.VALUES[s_idxs, n_idxs] += (temperature - cls.VALUES[s_idxs, n_idxs]) * rate * og.sim.get_sim_step_dt()
 
     @classmethod
     def get_dependencies(cls):
