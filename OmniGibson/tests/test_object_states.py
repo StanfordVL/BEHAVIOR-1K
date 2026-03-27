@@ -47,6 +47,8 @@ from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.physx_utils import apply_force_at_pos
 from omnigibson.utils.usd_utils import RigidContactAPI
 
+m.ENABLE_FLATCACHE = False
+
 
 def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
     # Lower the mass of the shelf - otherwise, the gravity will create enough torque to break the joint
@@ -1191,7 +1193,6 @@ def test_kinematic_only_contact_no_error():
     bodies) must not crash during RigidContactAPI.initialize_view(), and contact queries must
     return False rather than raise an exception.
     """
-    test_clear_sim()
 
     cfg = {
         "scene": {"type": "Scene"},
@@ -1213,6 +1214,13 @@ def test_kinematic_only_contact_no_error():
                 "kinematic_only": True,
                 "fixed_base": True,
                 "position": [0, 0, 1.0],
+            },
+            {
+                "type": "DatasetObject",
+                "name": "bottom_cabinet",
+                "category": "bottom_cabinet",
+                "model": "bamfsz",
+                "position": [0, 5, 0],
             },
         ],
     }
@@ -1242,7 +1250,41 @@ def test_kinematic_only_contact_no_error():
         scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=True
     )
 
-    test_clear_sim()
+
+def test_fixed_bodies_falling():
+    if og.sim:
+        og.clear()
+
+    cfg = {
+        "scene": {"type": "Scene"},
+        "objects": [
+            {
+                "type": "DatasetObject",
+                "name": "bottom_cabinet",
+                "category": "bottom_cabinet",
+                "fixed_base": True,
+                "model": "bamfsz",
+                "position": [0, 5, 0],
+            },
+        ],
+    }
+    og.Environment(configs=cfg)
+
+
+def test_unfixed_bodies_crashing():
+    if og.sim:
+        og.clear()
+
+    cfg = {
+        "scene": {
+            "type": "Scene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["laptop"],
+        },
+    }
+    og.Environment(configs=cfg)
+    og.sim.step()
+    og.sim.play()
 
 
 def test_clear_sim():
