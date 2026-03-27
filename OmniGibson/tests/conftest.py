@@ -13,7 +13,7 @@ def stopped_env():
     if og.sim is None:
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
+        gm.ENABLE_FLATCACHE = True
         gm.ENABLE_TRANSITION_RULES = True
 
     env = og.Environment(configs={"scene": {"type": "Scene"}})
