@@ -24,12 +24,9 @@ jobs:
         with:
           submodules: true
 
-      - name: Install BDDL
-        run: pip install -e .
-        working-directory: ${{ github.workspace }}/bddl3
+      - name: Install dependencies
+        run: pip install -e ${{ github.workspace }}/bddl3 -e .[dev,primitives,eval] --no-build-isolation
 
-      - name: Install OmniGibson
-        run: pip install -e .[dev,primitives,eval] --no-build-isolation
       - name: Check example lists are up to date
         run: python tests/update_example_tests.py --check
 
