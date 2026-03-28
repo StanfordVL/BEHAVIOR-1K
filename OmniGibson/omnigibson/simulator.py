@@ -63,6 +63,8 @@ m = create_module_macros(module_path=__file__)
 m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
 
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
 m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
@@ -476,10 +478,6 @@ def _launch_simulator(*args, **kwargs):
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
 
-            # Number of objects currently being removed or initialized. We track this to delay certain operations until after all
-            self._n_removing_objects = 0
-            self._n_adding_objects = 0
-
             # Maps callback name to callback
             self._callbacks_on_play = dict()
             self._callbacks_on_stop = dict()
@@ -859,32 +857,30 @@ def _launch_simulator(*args, **kwargs):
         # TODO: Remove this context manager and call _post_import_object directly since the objects
         # are already known when this is called.
         @contextlib.contextmanager
-        def adding_objects(self):
+        def adding_objects(self, objs):
             """
             Adds a set of objects from the simulator. This is a context manager that handles low-level simulator state
             and should be called externally. Note that this method does not explicitly add the object from
             the simulator; it is assumed that this is handled externally
+
+            Args:
+                objs (Iterable[USDObject]): list of objects to add
             """
-            self._n_adding_objects += 1
-            is_outer = self._n_adding_objects == 1
-
             SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
-
-            if is_outer:
-                objs_before = {scene.idx: set(scene.object_registry.object_names) for scene in self.scenes}
-
-                if self.is_playing() and SimulationManager._physics_sim_view:
-                    # Certain operations during object loading invalidate the physics simulation view.
-                    # Since this view is required later if initialized, we preemptively invalidate
-                    # and de-initialize it to avoid conflicts.
-                    SimulationManager._physics_sim_view.invalidate()
-                    SimulationManager._physics_sim_view = None
+            if self.is_playing() and SimulationManager._physics_sim_view:
+                # Certain operations during object loading invalidate the physics simulation view.
+                # Since this view is required later if initialized, we preemptively invalidate
+                # and de-initialize it to avoid conflicts.
+                SimulationManager._physics_sim_view.invalidate()
+                SimulationManager._physics_sim_view = None
 
             yield
 
-            self._n_adding_objects -= 1
+            # Run all post-processing on all newly added objects
+            for obj in objs:
+                self._post_import_object(obj=obj)
 
-            if is_outer and self.is_playing():
+            if self.is_playing():
                 # The objects have been added to the USD stage but PhysX hasn't been synchronized yet.
                 # We must flush USD changes to PhysX before updating handles to avoid errors like
                 # "Provided pattern list did not match any rigid bodies".
@@ -918,46 +914,62 @@ def _launch_simulator(*args, **kwargs):
                 objs (Iterable[USDObject]): list of objects to add
                 scenes (Iterable[BaseScene]): list of scenes corresponding to each object to load
             """
-            with self.adding_objects():
+            with self.adding_objects(objs=objs):
                 for obj, scene in zip(objs, scenes):
-                    scene.add_object(obj)
+                    scene.add_object(obj, _batched_call=True)
 
         @contextlib.contextmanager
-        def removing_objects(self):
+        def removing_objects(self, objs):
             """
             Remove a set of objects from the simulator. This is a context manager that handles low-level simulator state
             and should be called externally. Note that this method does not explicitly remove the object from
             the simulator; it is assumed that this is handled externally
+
+            Args:
+                objs (Iterable[USDObject]): list of objects to remove
             """
-            self._n_removing_objects += 1
-            is_outer = self._n_removing_objects == 1
-
             playing = self.is_playing()
-            if is_outer and playing:
+            if playing:
                 state = self.dump_state()
-                objs_before = {scene.idx: set(scene.object_registry.object_names) for scene in self.scenes}
 
+                # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
+                # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
+                # we first move the object to a safe location, then remove it.
+                pos = list(m.OBJECT_GRAVEYARD_POS)
+                for ob in objs:
+                    ob.set_position_orientation(pos, th.tensor([0, 0, 0, 1], dtype=th.float32))
+                    pos[0] += max(ob.aabb_extent)
+
+                # One physics timestep will elapse
+                self.step_physics()
+
+            # Run all pre-processing for all objects and record which scenes have been modified
+            scenes_modified = set()
+            for obj in objs:
+                scenes_modified.add(obj.scene)
+                self._pre_remove_object(obj)
+                # Prune from the state if recorded
+                if playing:
+                    obj_registry = state[obj.scene.idx]["registry"]["object_registry"]
+                    if (
+                        obj.name in obj_registry
+                    ):  # a particle system template object might not exist in the registry when it's empty
+                        obj_registry.pop(obj.name)
+
+            # Run the main method
             yield
 
-            self._n_removing_objects -= 1
-
-            if is_outer and playing:
-                # Detect which objects were removed and prune them from saved state
-                scenes_modified = set()
-                for scene in self.scenes:
-                    removed_names = objs_before[scene.idx] - set(scene.object_registry.object_names)
-                    if removed_names:
-                        scenes_modified.add(scene)
-                        obj_registry = state[scene.idx]["registry"]["object_registry"]
-                        for name in removed_names:
-                            obj_registry.pop(name, None)
-
+            # Run post-processing required if we were playing
+            if playing:
+                # Update all handles that are now broken because objects have changed
                 self.update_handles()
 
                 if gm.ENABLE_TRANSITION_RULES:
+                    # Prune the transition rules that are currently active
                     for scene in scenes_modified:
                         scene.transition_rule_api.prune_active_rules()
 
+                # Load the state back
                 self.load_state(state)
 
         def _pre_remove_object(self, obj):
@@ -984,9 +996,9 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[USDObject]): list of objects to remove
             """
-            with self.removing_objects():
+            with self.removing_objects(objs=objs):
                 for obj in objs:
-                    obj.scene.remove_object(obj)
+                    obj.scene.remove_object(obj, _batched_call=True)
 
         def remove_prim(self, prim):
             """
