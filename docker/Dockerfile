@@ -1,9 +1,7 @@
 # --- START ISAAC SIM DOCKERFILE COPY ---
-FROM nvcr.io/nvidia/base/ubuntu:jammy-20251013
+FROM nvcr.io/nvidia/base/ubuntu:noble-20250619
 
 ENV NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=all
-# ENV OMNI_SERVER=https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1
-ENV MIN_DRIVER_VERSION=570.169
 
 # Disable hardware-specific library optimizations in dynamic linker for wider compatibility (legacy Debian/Ubuntu)
 RUN touch /etc/ld.so.nohwcap
@@ -78,16 +76,14 @@ WORKDIR /behavior-src
 # Install the BEHAVIOR environment.
 # We wrap this in a CUDA install-and-uninstall block to save space.
 # (This means curobo will not be able to be rebuilt at runtime).
-# Here we also compile this such that it is compatible with GPU architectures
-# Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
-# We also suppress the output of the installation to avoid the log limit.
+# This is precompiled for RTX 20-, 30-, 40-, 50-, series GPUs and A100, GB-series, and RTX PRO 6000.
 # TODO: Add support for aarch64.
-RUN wget --no-verbose -O /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \ 
+RUN wget --no-verbose -O /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
   dpkg -i /cuda-keyring.deb && rm /cuda-keyring.deb && apt-get update && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -y cuda-toolkit-12-4 && \
-  TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' PATH=/usr/local/cuda-12.4/bin:$PATH LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH \
-    ./setup.sh --new-env --omnigibson --bddl --joylo --primitives --eval --asset-pipeline --dev --cuda-version 12.4 --accept-conda-tos --accept-nvidia-eula && \
-  apt-get remove -y cuda-toolkit-12-4 && apt-get autoremove -y && apt-get autoclean -y && rm -rf /var/lib/apt/lists/*
+  DEBIAN_FRONTEND=noninteractive apt-get install -y cuda-toolkit-12-8 && \
+  TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6;8.9;10.0;12.0+PTX' PATH=/usr/local/cuda-12.8/bin:$PATH LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH \
+    ./setup.sh --new-env --omnigibson --bddl --joylo --primitives --eval --asset-pipeline --dev --cuda-version 12.8 --accept-conda-tos --accept-nvidia-eula && \
+  apt-get remove -y cuda-toolkit-12-8 && apt-get autoremove -y && apt-get autoclean -y && rm -rf /var/lib/apt/lists/*
 
 # Replace the "conda activate" line in bashrc with "conda activate behavior"
 RUN sed -i 's/conda activate/conda activate behavior/' /root/.bashrc

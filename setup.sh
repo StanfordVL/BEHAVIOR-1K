@@ -309,7 +309,7 @@ if [ "$OMNIGIBSON" = true ]; then
         EXTRAS="[${EXTRAS%,}]"
     fi
 
-    pip install -e "$WORKDIR/OmniGibson$EXTRAS"
+    pip install -e "$WORKDIR/OmniGibson$EXTRAS" --no-build-isolation
 
     # Install pre-commit for dev setup
     if [ "$DEV" = true ]; then
