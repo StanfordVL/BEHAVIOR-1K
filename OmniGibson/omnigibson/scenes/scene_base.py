@@ -376,10 +376,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         )
 
         # Now load the objects with their own logic
-        with og.sim.adding_objects(objs=self._init_objs.values()):
+        with og.sim.adding_objects():
             for obj_name, obj in self._init_objs.items():
                 # Import into the simulator
-                self.add_object(obj, _batched_call=True)
+                self.add_object(obj)
                 # Set the init pose accordingly
                 obj.set_position_orientation(
                     position=self._init_state[obj_name]["root_link"]["pos"],
@@ -645,7 +645,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def add_object(self, obj, register=True, _batched_call=False):
+    def add_object(self, obj, register=True):
         """
         Add an object to the scene. The scene should already be loaded.
 
@@ -653,11 +653,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             obj (USDObject): the object to load
             register (bool): Whether to register @obj internally in the scene object registry or not, as well as run
                 additional scene-specific logic in addition to the obj being loaded
-            _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
-                a context externally. In general, this should NOT be explicitly set by the user
         """
-        cxt = contextlib.nullcontext() if _batched_call else og.sim.adding_objects(objs=[obj])
-        with cxt:
+        with og.sim.adding_objects():
             # Make sure all objects in this scene are uniquely named
             assert (
                 obj.name not in self.object_registry.object_names
@@ -687,20 +684,23 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # Add this object to our registry based on its type, if we want to register it
                 self.object_registry.add(obj)
 
+                # Run simulation-level post import callbacks
+                og.sim._post_import_object(obj)
+
                 # Run any additional scene-specific logic with the created object
                 self._add_object(obj)
 
-    def remove_object(self, obj, _batched_call=False):
+    def remove_object(self, obj):
         """
         Method to remove an object from the simulator
 
         Args:
             obj (USDObject): Object to remove
-            _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
-                a context externally. In general, this should NOT be explicitly set by the user
         """
-        cxt = contextlib.nullcontext() if _batched_call else og.sim.removing_objects(objs=[obj])
-        with cxt:
+        with og.sim.removing_objects():
+            # Run any simulation-level callbacks
+            og.sim._pre_remove_object(obj)
+            
             # Remove from the appropriate registry if registered.
             # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
             if self.object_registry.object_is_registered(obj):
