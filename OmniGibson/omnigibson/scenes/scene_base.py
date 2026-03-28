@@ -700,7 +700,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         with og.sim.removing_objects():
             # Run any simulation-level callbacks
             og.sim._pre_remove_object(obj)
-            
+
             # Remove from the appropriate registry if registered.
             # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
             if self.object_registry.object_is_registered(obj):
