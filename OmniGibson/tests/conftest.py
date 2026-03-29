@@ -8,14 +8,14 @@ from omnigibson.robots import Robot
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 
 
+gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
+gm.ENABLE_FLATCACHE = True
+gm.ENABLE_TRANSITION_RULES = True
+
+
 @pytest.fixture
 def stopped_env():
-    if og.sim is None:
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = True
-        gm.ENABLE_TRANSITION_RULES = True
-
     env = og.Environment(configs={"scene": {"type": "Scene"}})
     og.sim.stop()
     yield env

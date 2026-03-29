@@ -1,12 +1,13 @@
 import torch as th
-import pytest
 from utils import SYSTEM_EXAMPLES, place_obj_on_floor_plane
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.constants import semantic_class_id_to_name
 
+gm.ENABLE_FLATCACHE = False
 
-@pytest.mark.skip("disabling tests with cloth")
+
 def test_segmentation_modalities(env, breakfast_table, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation(position=[-0.4, 0.0, 0.55], orientation=[0, 0, 0, 1])
