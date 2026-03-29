@@ -17,13 +17,9 @@ from bddl.knowledge_base.models import (
     ComplaintType,
     Complaint,
 )
+from bddl.knowledge_base.knowledgebase import KnowledgeBase
 
 from bddl.knowledge_base.utils import SynsetState
-
-from bddl.knowledge_base.processing import KnowledgeBaseProcessor
-
-# Load the knowledge base
-KnowledgeBaseProcessor(verbose=False).run()
 
 __all__ = [
     "Property",
@@ -42,4 +38,5 @@ __all__ = [
     "RoomObject",
     "AttachmentPair",
     "SynsetState",
+    "KnowledgeBase",
 ]
