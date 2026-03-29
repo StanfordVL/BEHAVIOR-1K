@@ -247,6 +247,7 @@ class EntityPrim(XFormPrim):
                 "remesh": self._load_config.get("remesh", True),
                 "xform_props_pre_loaded": self._load_config.get("xform_props_pre_loaded", False),
                 "scale": self._load_config.get("scale", None),
+                "visual_only": self._load_config.get("visual_only", False),
             }
 
             # Determine the correct class based on link type and kinematic property

@@ -1,14 +1,11 @@
-from abc import abstractmethod
-from typing import Dict, Protocol
+from abc import ABC, abstractmethod
+from typing import Dict
 
 import numpy as np
 
 
-class Robot(Protocol):
-    """Robot protocol.
-
-    A protocol for a robot that can be controlled.
-    """
+class Robot(ABC):
+    """Base class for a robot that can be controlled."""
 
     @abstractmethod
     def num_dofs(self) -> int:
@@ -67,8 +64,7 @@ class PrintRobot(Robot):
 
     def command_joint_state(self, joint_state: np.ndarray) -> None:
         assert len(joint_state) == (self._num_dofs), (
-            f"Expected joint state of length {self._num_dofs}, "
-            f"got {len(joint_state)}."
+            f"Expected joint state of length {self._num_dofs}, got {len(joint_state)}."
         )
         self._joint_state = joint_state
         if not self._dont_print:
@@ -118,11 +114,3 @@ class BimanualRobot(Robot):
                 raise RuntimeError()
 
         return return_obs
-
-
-def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()

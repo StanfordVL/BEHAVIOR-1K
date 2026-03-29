@@ -26,7 +26,6 @@ class RobotEnv:
     ) -> None:
         self._robot = robot
         self._rate = Rate(control_rate_hz)
-        self._active_arm = active_arm
 
     def robot(self) -> Robot:
         """Get the robot object.
@@ -35,9 +34,6 @@ class RobotEnv:
             robot: the robot object.
         """
         return self._robot
-
-    def __len__(self):
-        return 0
 
     def step(self, joints: np.ndarray) -> Dict[str, Any]:
         """Step the environment forward.
@@ -60,11 +56,3 @@ class RobotEnv:
         """
         robot_obs = self._robot.get_observations()
         return robot_obs
-
-
-def main() -> None:
-    pass
-
-
-if __name__ == "__main__":
-    main()

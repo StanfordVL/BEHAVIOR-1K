@@ -253,6 +253,8 @@ class BehaviorTask(BaseTask):
         if self.use_presampled_robot_pose:
             robot = self.get_agent(env)
             presampled_poses = env.scene.get_task_metadata(key="robot_poses")
+            # make all lowercase
+            presampled_poses = {k.lower(): v for k, v in presampled_poses.items()}
             assert (
                 robot.model in presampled_poses
             ), f"{robot.model} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"

@@ -10,6 +10,7 @@ import tyro
 import os
 
 CONFIG_DIR = f"{os.path.dirname(__file__)}/../configs"
+os.makedirs(CONFIG_DIR, exist_ok=True)
 
 @dataclass
 class Args:

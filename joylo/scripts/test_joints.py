@@ -21,7 +21,7 @@ class Args:
     baudrate: int = 2000000
     """The baudrate of the connected GELLO's dynamixel board."""
     
-    robot: str = "R1" # "R1" or "R1Pro"
+    robot: str = "R1Pro" # "R1" or "R1Pro"
     """The robot type. This is used to determine the number of joints."""
     
 
