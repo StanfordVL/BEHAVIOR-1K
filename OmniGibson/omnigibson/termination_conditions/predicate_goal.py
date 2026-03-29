@@ -14,11 +14,15 @@ class PredicateGoal(SuccessCondition):
             goals = goal_fcn()
 
             where @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
+        evaluate_fn (method): callback function to evaluate condition predicates. Function signature should be:
+
+            result = evaluate_fn(predicate_name, *entities)
     """
 
-    def __init__(self, goal_fcn):
+    def __init__(self, goal_fcn, evaluate_fn):
         # Store internal vars
         self._goal_fcn = goal_fcn
+        self._evaluate_fn = evaluate_fn
         self._goal_status = None
 
         # Run super
@@ -33,7 +37,7 @@ class PredicateGoal(SuccessCondition):
 
     def _step(self, task, env, action):
         # Terminate if all goal conditions are met in the task
-        done, self._goal_status = evaluate_goal_conditions(self._goal_fcn())
+        done, self._goal_status = evaluate_goal_conditions(self._goal_fcn(), self._evaluate_fn)
         return done
 
     @property

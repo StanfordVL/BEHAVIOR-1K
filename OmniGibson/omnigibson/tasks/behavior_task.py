@@ -183,12 +183,20 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
+    def _evaluate_predicate(self, predicate_name, *entities):
+        from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
+
+        return evaluate_bddl_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
+
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
         terminations = dict()
 
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
-        terminations["predicate"] = PredicateGoal(goal_fcn=lambda: self.activity_goal_conditions)
+        terminations["predicate"] = PredicateGoal(
+            goal_fcn=lambda: self.activity_goal_conditions,
+            evaluate_fn=self._evaluate_predicate,
+        )
 
         return terminations
 
@@ -322,12 +330,7 @@ class BehaviorTask(BaseTask):
         self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.task.conditions)
 
     def get_potential(self, env):
-        from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
-
-        def eval_cb(predicate_name, *entities):
-            return evaluate_bddl_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
-
-        _, satisfied_predicates = self.task.check_goal(eval_cb)
+        _, satisfied_predicates = self.task.check_goal(self._evaluate_predicate)
         success_score = len(satisfied_predicates["satisfied"]) / (
             len(satisfied_predicates["satisfied"]) + len(satisfied_predicates["unsatisfied"])
         )
@@ -353,7 +356,6 @@ class BehaviorTask(BaseTask):
             env=env,
             activity_conditions=self.task.conditions,
             object_scope=self.object_scope,
-            backend=self.backend,
         )
 
         # Compose future objects

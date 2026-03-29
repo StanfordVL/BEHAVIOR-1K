@@ -2,7 +2,8 @@ import re
 from nltk.corpus import wordnet as wn
 from typing import Tuple, List, Set
 from bddl.activity import get_initial_conditions, get_goal_conditions, get_object_scope
-from bddl.logic_base import UnaryAtomicFormula, BinaryAtomicFormula, Expression
+from bddl.condition_evaluation import GenericPredicate
+from bddl.logic_base import Expression
 from bddl.parsing import parse_domain
 
 from enum import Enum, auto
@@ -57,39 +58,6 @@ BINARIES = [
 ]
 
 
-class TrivialUnaryFormula(UnaryAtomicFormula):
-    def _evaluate():
-        return True
-
-    def _sample():
-        return True
-
-
-class TrivialBinaryFormula(BinaryAtomicFormula):
-    def _evaluate():
-        return True
-
-    def _sample():
-        return True
-
-
-def gen_unary_token(predicate_name, generate_ground_options=True):
-    return type(
-        f"{predicate_name}StateUnaryPredicate",
-        (TrivialUnaryFormula,),
-        {"STATE_CLASS": "HowDoesItMatter", "STATE_NAME": predicate_name},
-    )
-
-
-def gen_binary_token(predicate_name, generate_ground_options=True):
-    return type(
-        f"{predicate_name}StateBinaryPredicate",
-        (TrivialBinaryFormula,),
-        {"STATE_CLASS": "HowDoesItMatter", "STATE_NAME": predicate_name},
-    )
-
-
-
 class TrivialGenericObject(object):
     def __init__(self, name):
         self.name = name
@@ -112,12 +80,8 @@ def get_initial_and_goal_conditions(conds) -> Tuple[List, List]:
 def get_leaf_conditions(cond) -> List:
     if isinstance(cond, list):
         return [leaf_cond for child in cond for leaf_cond in get_leaf_conditions(child)]
-    # elif isinstance(cond, (UnaryAtomicFormula, BinaryAtomicFormula)):   # This is too slow.
-    if hasattr(cond, "input") or hasattr(cond, "input1"):
-        if cond.children:
-            raise ValueError(f"Found an atomic formula {cond} with children.")
-        else:
-            return [cond]
+    if isinstance(cond, GenericPredicate):
+        return [cond]
     elif isinstance(cond, Expression):
         if not cond.children:
             raise ValueError(f"Found empty expression {cond} in tree.")
@@ -141,15 +105,7 @@ def get_synsets(cond):
         ), f"Invalid synset name: {synset}"
         return synset
 
-    # TODO: Too slow!
-    # assert isinstance(cond, (UnaryAtomicFormula, BinaryAtomicFormula)), "This only works with atomic formulae"
-    if hasattr(cond, "input"):
-        return [get_synset_from_scope_name(cond.input)]
-    else:
-        return [
-            get_synset_from_scope_name(cond.input1),
-            get_synset_from_scope_name(cond.input2),
-        ]
+    return [get_synset_from_scope_name(inp) for inp in cond.inputs]
 
 
 def object_substance_match(cond, synset) -> Tuple[bool, bool]:
@@ -175,7 +131,7 @@ def object_substance_match(cond, synset) -> Tuple[bool, bool]:
     is_used_as_non_substance_in_substance_predicate = any(
         synset == get_synsets(leaf)[0]
         for leaf in leafs
-        if leaf.STATE_NAME in SUBSTANCE_PREDICATES and hasattr(leaf, "input2")
+        if leaf.STATE_NAME in SUBSTANCE_PREDICATES and len(leaf.inputs) == 2
     )
     is_used_as_non_substance = (
         is_used_as_non_substance_in_non_substance_predicate

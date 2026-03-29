@@ -13,7 +13,7 @@ def print_task_custom_list_template(activity_name):
     activity_conditions = Conditions(
         activity_name,
         0,
-        simulator_name="omnigibson",
+        simulator_name="behavior-1k",
         predefined_problem=None,
     )
     init_conds = activity_conditions.parsed_initial_conditions

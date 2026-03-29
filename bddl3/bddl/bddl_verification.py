@@ -1,3 +1,18 @@
+"""Verification and linting utilities for BDDL activity definitions.
+
+This module provides a suite of checker functions that validate the
+correctness and consistency of ``.bddl`` problem files.  Checks include:
+
+- Synset validity (all referenced synsets exist in WordNet and the taxonomy).
+- Object-predicate compatibility (predicates are applied to objects with the
+  right abilities).
+- Goal-init consistency (goals don't reference objects absent from init).
+- Transition-map rule validation.
+- Various structural checks (no duplicate atoms, correct naming, etc.).
+
+These functions are intended for offline batch validation, not runtime use.
+"""
+
 from collections import Counter
 import copy
 import csv
@@ -819,13 +834,13 @@ def no_uncontrolled_category(activity, defn):
     conds = bddl.activity.Conditions(activity, 0, "behavior-1k", predefined_problem=defn)
     scope = bddl.activity.get_object_scope(conds)
     bddl.activity.get_initial_conditions(
-        conds, TrivialBackend(), scope, generate_ground_options=False
+        conds, scope, generate_ground_options=False
     )
     # Pretend scope has been filled
     for name in scope:
-        scope[name] = TrivialGenericObject(name, TrivialSimulator())
+        scope[name] = name
     bddl.activity.get_goal_conditions(
-        conds, TrivialBackend(), scope, generate_ground_options=False
+        conds, scope, generate_ground_options=False
     )
 
 

@@ -9,9 +9,9 @@ import networkx as nx
 import torch as th
 
 
-from bddl.condition_evaluation import Negation
+from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
+from bddl.condition_evaluation import GenericPredicate, Negation
 from bddl.config import get_definition_filename
-
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
@@ -225,8 +225,8 @@ def process_single_condition(condition):
             - Expression: Condition's expression
             - bool: Whether this evaluated condition is positive or negative
     """
-    if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], AtomicFormula):
-        log.debug(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
+    if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], GenericPredicate):
+        log.debug(("Skipping over sampling of predicate that is not a negation or a generic predicate"))
         return None, None
 
     if isinstance(condition.children[0], Negation):
@@ -278,6 +278,7 @@ SUPPORTED_PREDICATES = {
 }
 
 KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATIC_STATE_SET] + ["attached"])
+UNSAMPLEABLE_PREDICATES = frozenset(["insource", "future", "real"])
 
 
 # BEHAVIOR-related
@@ -730,7 +731,7 @@ class BDDLEntity(Wrapper):
 
 
 class BDDLSampler:
-    def __init__(self, env, task):
+    def __init__(self, env, activity_conditions, object_scope):
         # Avoid circular imports here
         from omnigibson.scenes.traversable_scene import TraversableScene
 
@@ -739,8 +740,8 @@ class BDDLSampler:
         self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, TraversableScene) else None
         self._agent = self._env.robots[0]
 
-        self._activity_conditions = task.activity_conditions
-        self._object_scope = task.object_scope
+        self._activity_conditions = activity_conditions
+        self._object_scope = object_scope
         self._object_instance_to_synset = {
             obj_inst: obj_cat
             for obj_cat in self._activity_conditions.parsed_objects
@@ -970,7 +971,7 @@ class BDDLSampler:
         # bddl.condition_evaluation.HEAD, each with one child.
         # This child is either a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate or
         # a Negation of a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate
-        for condition in get_initial_conditions(self._activity_conditions, self._backend, self._object_scope):
+        for condition in get_initial_conditions(self._activity_conditions, self._object_scope):
             condition, positive = process_single_condition(condition)
             if condition is None:
                 continue
@@ -981,7 +982,7 @@ class BDDLSampler:
                 return "Initial condition has negative kinematic conditions: {}".format(condition.body)
 
             # Store any unsampleable conditions separately
-            if isinstance(condition, UnsampleablePredicate):
+            if condition.STATE_NAME in UNSAMPLEABLE_PREDICATES:
                 unsampleable_conditions.append(condition)
                 continue
 
@@ -1231,7 +1232,7 @@ class BDDLSampler:
                                 kwargs["bypass_alignment_checking"] = True
                                 kwargs["check_physics_stability"] = True
                                 kwargs["can_joint_break"] = False
-                            success = condition.sample(binary_state=positive, **kwargs)
+                            success = condition.sample(sample_bddl_predicate, binary_state=positive, **kwargs)
                             log_msg = " ".join(
                                 [
                                     f"{condition_type} kinematic condition sampling",
@@ -1551,9 +1552,9 @@ class BDDLSampler:
         Returns:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
-        activity_goal_conditions = get_goal_conditions(self._activity_conditions, self._backend, self._object_scope)
+        activity_goal_conditions = get_goal_conditions(self._activity_conditions, self._object_scope)
         ground_goal_state_options = get_ground_goal_state_options(
-            self._activity_conditions, self._backend, self._object_scope, activity_goal_conditions
+            self._activity_conditions, self._object_scope, activity_goal_conditions
         )
         num_options = ground_goal_state_options.size(0)
         ground_goal_state_options = ground_goal_state_options[random.sample(range(num_options), num_options)]
@@ -1628,7 +1629,7 @@ class BDDLSampler:
                         while True:
                             num_trials = 1
                             for _ in range(num_trials):
-                                success = condition.sample(binary_state=positive, **kwargs)
+                                success = condition.sample(sample_bddl_predicate, binary_state=positive, **kwargs)
                                 log_msg = " ".join(
                                     [
                                         "initial final kinematic condition sampling",

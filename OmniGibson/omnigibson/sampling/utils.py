@@ -647,7 +647,9 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                 return False, f"Particle systems do not have consistent state. Specific error: {err_msg}"
 
         # Sanity check initial state
-        valid_init_state, results = evaluate_state(prune_unevaluatable_predicates(task.activity_initial_conditions))
+        valid_init_state, results = evaluate_state(
+            prune_unevaluatable_predicates(task.activity_initial_conditions), task._evaluate_predicate
+        )
         if not valid_init_state:
             return False, f"BDDL Task init conditions were invalid. Results: {results}"
 

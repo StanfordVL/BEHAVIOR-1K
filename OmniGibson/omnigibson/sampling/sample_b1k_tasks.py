@@ -364,7 +364,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         should_sample, success, reason = True, False, ""
 
         # Skip any with unsupported predicates, but still record the reason why we can't sample
-        conditions = Conditions(activity, 0, simulator_name="omnigibson")
+        conditions = Conditions(activity, 0, simulator_name="behavior-1k")
         all_predicates = set(
             get_predicates(conditions.parsed_initial_conditions) + get_predicates(conditions.parsed_goal_conditions)
         )
