@@ -130,7 +130,7 @@ class KnowledgeBase:
     def all_rooms(self): return list(self.rooms)
 
     def add_room_object(self, room=None, object=None, count: int = 0, clutter: bool = False):
-        obj = Roomkb_models.Object(room=room, object=object, count=count, clutter=clutter)
+        obj = kb_models.RoomObject(room=room, object=object, count=count, clutter=clutter)
         if obj.id in self.roomobjects_by_id:
             raise ValueError(f"Duplicate key {obj.id} for RoomObject")
         self.roomobjects.append(obj)

@@ -303,9 +303,10 @@ def parse_task_mapping_new():
             mapping = json.load(f)
         return mapping
 
-    from bddl.knowledge_base import Task
+    from bddl.knowledge_base import KnowledgeBase
 
-    tasks = Task.all_objects()
+    kb = KnowledgeBase(populate=True)
+    tasks = kb.all_tasks()
     mapping = dict()
     for task in tasks:
         task_name = task.name[:-2]

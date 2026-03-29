@@ -14,6 +14,14 @@ def UUIDField(**kwargs):
     return field(default_factory=lambda: str(uuid.uuid4()), **kwargs)
 
 
+def _pk_lt(self, other):
+    """Compare dataclass instances by their Meta.pk field for sorting in templates."""
+    if type(self) is not type(other):
+        return NotImplemented
+    pk = self.Meta.pk
+    return getattr(self, pk) < getattr(other, pk)
+
+
 ROOM_TYPE_CHOICES = [
     ("bar", "bar"),
     ("bathroom", "bathroom"),
@@ -507,7 +515,7 @@ class Synset:
         # Is it used in a transition that's used in a task?
         transition_relevant_synsets = {
             anc
-            for t in self.knowledgebase.all_objects(Task)
+            for t in self.knowledgebase.all_tasks()
             for transition in t.relevant_transitions
             for s in list(transition.output_synsets) + list(transition.input_synsets)
             for anc in set(s.ancestors) | {s}
@@ -526,7 +534,7 @@ class Synset:
                 continue
             prop_params = json.loads(prop.parameters)
             conditions = prop_params.get("conditions", {})
-            generated_synsets.update([self.knowledgebase.get(Synset, name) for name in conditions.keys()])
+            generated_synsets.update([self.knowledgebase.get_synset(name) for name in conditions.keys()])
 
         return generated_synsets
 
@@ -599,7 +607,7 @@ class Synset:
             return None
 
         # Find the synset that has this as a child
-        return {s for s in self.knowledgebase.all_objects(Synset) if self in s.derivative_children}
+        return {s for s in self.knowledgebase.all_synsets() if self in s.derivative_children}
 
     @cached_property
     def derivative_children_names(self):
@@ -654,7 +662,7 @@ class Synset:
 
     @cached_property
     def derivative_children(self):
-        return {self.knowledgebase.get(Synset, name) for name in self.derivative_children_names}
+        return {self.knowledgebase.get_synset(name) for name in self.derivative_children_names}
 
     @cached_property
     def derivative_ancestors(self):
@@ -936,7 +944,7 @@ class Task:
     @cached_property
     def scene_matching_dict(self) -> Dict[str, Dict[str, str]]:
         ret = {}
-        for scene in self.knowledgebase.all_objects(Scene):
+        for scene in self.knowledgebase.all_scenes():
             matching_result = self.matching_scene(scene=scene)
             ret[scene] = {
                 "matched": len(matching_result) == 0,
@@ -1034,7 +1042,7 @@ class Task:
                 raise ValueError("Unexpected node.")
 
         # Build a graph from all the transitions
-        G = TransitionRule.get_graph()
+        G = TransitionRule.get_graph(self.knowledgebase)
 
         # Show all the nodes that show up in some path from the initial to the future synsets.
         all_nodes_on_path = set()
@@ -1327,3 +1335,12 @@ class Complaint:
 
     def __str__(self):
         return f"{self.object.name} - {self.complaint_type.name}: {self.response}"
+
+
+# Enable sorting by pk for all model dataclasses (needed by Jinja2 templates).
+for _cls in [
+    Property, MetaLink, AttachmentPair, Predicate, Scene, ParticleSystem,
+    Category, Object, Synset, TransitionRule, Task, RoomRequirement,
+    RoomSynsetRequirement, Room, RoomObject, ComplaintType, Complaint,
+]:
+    _cls.__lt__ = _pk_lt
