@@ -21,9 +21,6 @@ from bddl.knowledge_base.knowledgebase import KnowledgeBase
 
 from bddl.knowledge_base.utils import SynsetState
 
-# Load the knowledge base
-KNOWLEDGEBASE: KnowledgeBase = KnowledgeBase(populate=True, verbose=False)
-
 __all__ = [
     "Property",
     "MetaLink",
@@ -42,5 +39,4 @@ __all__ = [
     "AttachmentPair",
     "SynsetState",
     "KnowledgeBase",
-    "KNOWLEDGEBASE",
 ]
