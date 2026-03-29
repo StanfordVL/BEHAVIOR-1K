@@ -11,6 +11,7 @@ from bddl.object_taxonomy import ObjectTaxonomy
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
+gm.ENABLE_FLATCACHE = False
 
 
 def main(random_selection=False, headless=False, short_exec=False):

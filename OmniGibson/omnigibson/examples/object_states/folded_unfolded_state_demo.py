@@ -12,6 +12,7 @@ from omnigibson.utils.ui_utils import KeyboardEventHandler
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_TRANSITION_RULES = False
+gm.ENABLE_FLATCACHE = False
 
 
 def main(random_selection=False, headless=False, short_exec=False):

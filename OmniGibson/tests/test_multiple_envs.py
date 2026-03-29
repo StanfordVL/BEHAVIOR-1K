@@ -31,7 +31,7 @@ def setup_multi_environment(num_of_envs, robot="fetch", additional_objects_cfg=[
         gm.RENDER_VIEWER_CAMERA = False
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
+        gm.ENABLE_FLATCACHE = True
         gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
