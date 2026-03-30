@@ -86,7 +86,9 @@ def infer_instance_ids_from_hdf5_file(hdf_input_path):
         for instance_id, instance_init_state in instance_init_states.items():
             matched = True
             for name, bddl_inst in env.task.object_scope.items():
-                if bddl_inst.is_system or not bddl_inst.exists or bddl_inst.fixed_base or "agent" in name:
+                from omnigibson.systems.system_base import BaseSystem
+
+                if isinstance(bddl_inst, BaseSystem) or bddl_inst is None or bddl_inst.fixed_base or "agent" in name:
                     continue
                 pos = instance_init_state[name]["root_link"]["pos"]
                 if not th.allclose(pos, bddl_inst.get_position_orientation()[0], atol=1e-2):

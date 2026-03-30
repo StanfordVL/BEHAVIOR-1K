@@ -2,7 +2,7 @@ import re
 from nltk.corpus import wordnet as wn
 from typing import Tuple, List, Set
 from bddl.activity import get_initial_conditions, get_goal_conditions, get_object_scope
-from bddl.condition_evaluation import GenericPredicate
+from bddl.predicates import Predicate
 from bddl.logic_base import Expression
 from bddl.parsing import parse_domain
 
@@ -80,7 +80,7 @@ def get_initial_and_goal_conditions(conds) -> Tuple[List, List]:
 def get_leaf_conditions(cond) -> List:
     if isinstance(cond, list):
         return [leaf_cond for child in cond for leaf_cond in get_leaf_conditions(child)]
-    if isinstance(cond, GenericPredicate):
+    if isinstance(cond, Predicate):
         return [cond]
     elif isinstance(cond, Expression):
         if not cond.children:

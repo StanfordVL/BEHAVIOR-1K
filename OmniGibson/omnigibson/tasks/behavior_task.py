@@ -24,9 +24,10 @@ from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.bddl_utils import (
     BEHAVIOR_ACTIVITIES,
-    BDDLEntity,
     BDDLSampler,
     get_processed_bddl,
+    is_system_bddl_inst,
+    og_categories_from_bddl_inst,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.config_utils import TorchEncoder
@@ -129,7 +130,7 @@ class BehaviorTask(BaseTask):
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
-        self.object_scope = None  # Maps str to BDDLEntity
+        self.object_scope = None  # Maps str to sim object (BaseObject/BaseSystem) or None
         self.object_instance_to_category = None  # Maps str to str
         self.future_obj_instances = None  # set of str
 
@@ -229,10 +230,10 @@ class BehaviorTask(BaseTask):
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
-            for entity in self.object_scope.values():
-                if entity.synset == "agent":
+            for inst, entity in self.object_scope.items():
+                if "agent.n." in inst:
                     continue
-                if not entity.is_system and entity.exists:
+                if not is_system_bddl_inst(inst) and entity is not None:
                     entity.highlighted = True
 
         # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
@@ -265,7 +266,7 @@ class BehaviorTask(BaseTask):
 
         # Force wake objects
         for obj in self.object_scope.values():
-            if obj.exists and isinstance(obj, DatasetObject):
+            if obj is not None and isinstance(obj, DatasetObject):
                 obj.wake()
 
     def _load_non_low_dim_observation_space(self):
@@ -419,10 +420,7 @@ class BehaviorTask(BaseTask):
                     entity = env.robots[idx]
                 else:
                     entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
-            self.object_scope[obj_inst] = BDDLEntity(
-                bddl_inst=obj_inst,
-                entity=entity,
-            )
+            self.object_scope[obj_inst] = entity
 
         # Write back to task metadata
         self.update_bddl_scope_metadata(env)
@@ -434,20 +432,32 @@ class BehaviorTask(BaseTask):
         Args:
             env (Environment): The environment containing the scene to update
         """
+
+        def _get_name(inst, entity):
+            if is_system_bddl_inst(inst):
+                return og_categories_from_bddl_inst(inst)[0]
+            return entity.name
+
         env.scene.write_task_metadata(
-            key="inst_to_name", data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists}
+            key="inst_to_name",
+            data={inst: _get_name(inst, entity) for inst, entity in self.object_scope.items() if entity is not None},
         )
 
     def _get_obs(self, env):
         low_dim_obs = dict()
 
+        # Collect non-system objects with their instance keys and existence status
+        obj_entries = []
+        for inst, obj in self.object_scope.items():
+            if not is_system_bddl_inst(inst):
+                obj_entries.append((inst, obj, obj is not None))
+
         # Batch rpy calculations for much better efficiency
-        objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(
             th.stack(
                 [
                     obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0])
-                    for obj, obj_exist in objs_exist.items()
+                    for _, obj, obj_exist in obj_entries
                 ]
             )
         )
@@ -457,27 +467,25 @@ class BehaviorTask(BaseTask):
         # Always add agent info first
         agent = self.get_agent(env=env)
 
-        for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
-            objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin
+        for (inst, obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
+            obj_entries, objs_rpy, objs_rpy_cos, objs_rpy_sin
         ):
-            # TODO: May need to update checking here to USDObject?
-            # TODO: How to handle systems as part of obs?
             if obj_exist:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = obj.states[Pose].get_value()[0]
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = obj_rpy_cos
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = obj_rpy_sin
+                low_dim_obs[f"{inst}_real"] = th.tensor([1.0])
+                low_dim_obs[f"{inst}_pos"] = obj.states[Pose].get_value()[0]
+                low_dim_obs[f"{inst}_ori_cos"] = obj_rpy_cos
+                low_dim_obs[f"{inst}_ori_sin"] = obj_rpy_sin
                 if obj.name != agent.name:
                     for arm in agent.arm_names:
-                        grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
-                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
+                        grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj)
+                        low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
             else:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = th.zeros(1)
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = th.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = th.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = th.zeros(3)
+                low_dim_obs[f"{inst}_real"] = th.zeros(1)
+                low_dim_obs[f"{inst}_pos"] = th.zeros(3)
+                low_dim_obs[f"{inst}_ori_cos"] = th.zeros(3)
+                low_dim_obs[f"{inst}_ori_sin"] = th.zeros(3)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.zeros(1)
+                    low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.zeros(1)
 
         return low_dim_obs, dict()
 
@@ -498,11 +506,13 @@ class BehaviorTask(BaseTask):
         Args:
             obj (USDObject): Newly imported object
         """
-        # Iterate over all entities, and if they don't exist, check if any category matches @obj's category, and set it
-        # if it does, and immediately return
         for inst, entity in self.object_scope.items():
-            if not entity.exists and not entity.is_system and obj.category in set(entity.og_categories):
-                entity.set_entity(entity=obj)
+            if (
+                entity is None
+                and not is_system_bddl_inst(inst)
+                and obj.category in set(og_categories_from_bddl_inst(inst))
+            ):
+                self.object_scope[inst] = obj
                 return
 
     def _update_bddl_scope_from_removed_obj(self, obj):
@@ -513,11 +523,9 @@ class BehaviorTask(BaseTask):
         Args:
             obj (USDObject): Newly removed object
         """
-        # Iterate over all entities, and if they exist, check if any name matches @obj's name, and remove it
-        # if it does, and immediately return
-        for entity in self.object_scope.values():
-            if entity.exists and not entity.is_system and obj.name == entity.name:
-                entity.clear_entity()
+        for inst, entity in self.object_scope.items():
+            if entity is not None and not is_system_bddl_inst(inst) and obj.name == entity.name:
+                self.object_scope[inst] = None
                 return
 
     def _update_bddl_scope_from_system_init(self, system):
@@ -528,10 +536,9 @@ class BehaviorTask(BaseTask):
         Args:
             system (BaseSystem): Newly initialized system
         """
-        # Iterate over all entities, and potentially match the system to the scope
         for inst, entity in self.object_scope.items():
-            if not entity.exists and entity.is_system and entity.og_categories[0] == system.name:
-                entity.set_entity(entity=system)
+            if entity is None and is_system_bddl_inst(inst) and og_categories_from_bddl_inst(inst)[0] == system.name:
+                self.object_scope[inst] = system
                 return
 
     def _update_bddl_scope_from_system_clear(self, system):
@@ -542,10 +549,9 @@ class BehaviorTask(BaseTask):
         Args:
             system (BaseSystem): Newly cleared system
         """
-        # Iterate over all entities, and potentially remove the matched system from the scope
         for inst, entity in self.object_scope.items():
-            if entity.exists and entity.is_system and system.name == entity.name:
-                entity.clear_entity()
+            if entity is not None and is_system_bddl_inst(inst) and system.name == entity.name:
+                self.object_scope[inst] = None
                 return
 
     def show_instruction(self):
@@ -616,9 +622,9 @@ class BehaviorTask(BaseTask):
         # Save based on whether we're only storing task-relevant object scope states or not
         if task_relevant_only:
             task_relevant_state_dict = {
-                bddl_name: bddl_inst.dump_state(serialized=False)
-                for bddl_name, bddl_inst in env.task.object_scope.items()
-                if bddl_inst.exists
+                bddl_name: bddl_obj.dump_state(serialized=False)
+                for bddl_name, bddl_obj in env.task.object_scope.items()
+                if bddl_obj is not None
             }
             Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
             with open(path, "w+") as f:

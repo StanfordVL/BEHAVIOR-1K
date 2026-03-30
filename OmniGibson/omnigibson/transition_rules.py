@@ -1,13 +1,10 @@
-import json
 import math
 import operator
-import os
 import random
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, namedtuple
 from copy import copy
 
-import bddl
 import networkx as nx
 import torch as th
 
@@ -33,6 +30,13 @@ from omnigibson.object_states import (
 )
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import get_all_object_category_models
+from bddl.transition_rules import (
+    load_cooking_recipes,
+    load_machine_recipes,
+    load_mixing_recipes,
+    load_substance_cooking_recipes,
+    load_washer_rule,
+)
 from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
 from omnigibson.utils.python_utils import Registerable, classproperty, torch_delete
 from omnigibson.utils.registry_utils import Registry
@@ -63,15 +67,6 @@ ObjectAttrs = namedtuple("ObjectAttrs", _attrs_fields, defaults=(None,) * len(_a
 # Tuple of lists of objects to be added or removed returned from transitions, if not None
 TransitionResults = namedtuple("TransitionResults", ["add", "remove"], defaults=(None, None))
 
-# Mapping from transition rule json files to rule classe names
-_JSON_FILES_TO_RULES = {
-    "heat_cook.json": ["CookingObjectRule", "CookingSystemRule"],
-    "mixing_stick.json": ["MixingToolRule"],
-    "single_toggleable_machine.json": ["ToggleableMachineRule"],
-    "substance_cooking.json": ["CookingPhysicalParticleRule"],
-    "substance_watercooking.json": ["CookingPhysicalParticleRule"],
-    "washer.json": ["WasherRule"],
-}
 # Global dicts that will contain mappings
 REGISTERED_RULES = dict()
 
@@ -2582,43 +2577,42 @@ class CookingSystemRule(CookingRule):
 
 
 def import_recipes():
-    for json_file, rule_names in _JSON_FILES_TO_RULES.items():
-        recipe_fpath = os.path.join(
-            os.path.dirname(bddl.__file__), "generated_data", "transition_map", "tm_jsons", json_file
-        )
-        if not os.path.exists(recipe_fpath):
-            log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")
+    # Cooking recipes -> route to CookingObjectRule or CookingSystemRule based on output type
+    log.info("Adding cooking recipes...")
+    for recipe in load_cooking_recipes():
+        og_recipe = translate_bddl_recipe_to_og_recipe(recipe)
+        has_output_system = len(og_recipe["output_systems"]) > 0
+        if has_output_system:
+            CookingSystemRule.add_recipe(**og_recipe)
+        else:
+            CookingObjectRule.add_recipe(**og_recipe)
+    log.info("All cooking recipes imported successfully.")
 
-        with open(recipe_fpath, "r") as f:
-            rule_recipes = json.load(f)
+    # Mixing recipes -> MixingToolRule
+    log.info("Adding mixing recipes...")
+    for recipe in load_mixing_recipes():
+        og_recipe = translate_bddl_recipe_to_og_recipe(recipe)
+        MixingToolRule.add_recipe(**og_recipe)
+    log.info("All mixing recipes imported successfully.")
 
-        for rule_name in rule_names:
-            rule = REGISTERED_RULES[rule_name]
-            if rule == WasherRule:
-                rule.register_cleaning_conditions(translate_bddl_washer_rule_to_og_washer_rule(rule_recipes))
-            elif issubclass(rule, RecipeRule):
-                log.info(f"Adding recipes of rule {rule_name}...")
-                for recipe in rule_recipes:
-                    if "rule_name" in recipe:
-                        recipe["name"] = recipe.pop("rule_name")
-                    if "container" in recipe:
-                        recipe["fillable_synsets"] = set(recipe.pop("container").keys())
-                    if "heat_source" in recipe:
-                        recipe["heatsource_synsets"] = set(recipe.pop("heat_source").keys())
-                    if "machine" in recipe:
-                        recipe["fillable_synsets"] = set(recipe.pop("machine").keys())
+    # Machine recipes -> ToggleableMachineRule
+    log.info("Adding machine recipes...")
+    for recipe in load_machine_recipes():
+        og_recipe = translate_bddl_recipe_to_og_recipe(recipe)
+        ToggleableMachineRule.add_recipe(**og_recipe)
+    log.info("All machine recipes imported successfully.")
 
-                    # Route the recipe to the correct rule: CookingObjectRule or CookingSystemRule
-                    satisfied = True
-                    og_recipe = translate_bddl_recipe_to_og_recipe(**recipe)
-                    has_output_system = len(og_recipe["output_systems"]) > 0
-                    if (rule == CookingObjectRule and has_output_system) or (
-                        rule == CookingSystemRule and not has_output_system
-                    ):
-                        satisfied = False
-                    if satisfied:
-                        rule.add_recipe(**og_recipe)
-                log.info(f"All recipes of rule {rule_name} imported successfully.")
+    # Substance cooking recipes -> CookingPhysicalParticleRule
+    log.info("Adding substance cooking recipes...")
+    for recipe in load_substance_cooking_recipes():
+        og_recipe = translate_bddl_recipe_to_og_recipe(recipe)
+        CookingPhysicalParticleRule.add_recipe(**og_recipe)
+    log.info("All substance cooking recipes imported successfully.")
+
+    # Washer rule
+    washer_rule = load_washer_rule()
+    if washer_rule is not None:
+        WasherRule.register_cleaning_conditions(translate_bddl_washer_rule_to_og_washer_rule(washer_rule))
 
 
 import_recipes()

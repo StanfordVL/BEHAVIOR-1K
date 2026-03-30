@@ -11,8 +11,9 @@ Overview
    and wraps each one in a :class:`HEAD` node whose single child is the
    recursively-compiled sub-expression.
 2. **Evaluation** -- Calling ``head.evaluate(evaluate_fn)`` propagates the
-   ``evaluate_fn`` callback down the tree.  Leaf :class:`GenericPredicate`
-   nodes call ``evaluate_fn(predicate_name, *entity_names)`` and logical
+   ``evaluate_fn`` callback down the tree.  Leaf
+   :class:`~bddl.predicates.Predicate` nodes call
+   ``evaluate_fn(predicate_cls, *entity_names)`` and logical
    connectives combine the results.
 3. **Grounding** -- Each node produces ``flattened_condition_options``: a list
    of *ground options*, where each option is a list of atomic predicates
@@ -47,6 +48,7 @@ import numpy as np
 
 import bddl
 from bddl.logic_base import Expression
+from bddl.predicates import TOKEN_TO_PREDICATE, Predicate
 from bddl.utils import UncontrolledCategoryError
 
 #################### RECURSIVE PREDICATES ####################
@@ -792,88 +794,6 @@ def flatten_list(li):
 #################### TOKEN MAPPING ####################
 
 
-class GenericPredicate(Expression):
-    """Leaf node representing a simulator predicate (e.g. ``ontop``, ``cooked``).
-
-    Unlike the logical connectives above, GenericPredicate does **not** know
-    how to evaluate or sample itself.  Instead it delegates to user-supplied
-    callbacks (``evaluate_fn`` / ``sample_fn``), passing the predicate name
-    and the resolved entity values from the scope.
-
-    This is the only leaf node type created by the standard compilation
-    pipeline.  Any token not found in :data:`TOKEN_MAPPING` is assumed to be
-    a simulator predicate and wrapped in a GenericPredicate.
-
-    Args:
-        token: The predicate name string (e.g. ``"ontop"``).
-        scope: Object scope dict.
-        body: List of argument tokens (e.g. ``["bowl.n.01_1", "table.n.02_1"]``).
-        object_map: Category-to-instances mapping.
-        generate_ground_options: Whether to compute ground options.
-
-    Attributes:
-        STATE_NAME (str): The predicate name.
-        inputs (list[str]): Resolved argument names after stripping ``?`` and
-            following any scope indirections (for quantifier-bound variables).
-    """
-
-    def __init__(self, token, scope, body, object_map, generate_ground_options=True):
-        super().__init__(scope, body, object_map)
-        self.STATE_NAME = token
-        self.inputs = [inp.strip("?") for inp in body]
-        for i, inp in enumerate(self.inputs):
-            try:
-                if isinstance(self.scope[inp], str):
-                    self.inputs[i] = self.scope[inp]
-            except KeyError as e:
-                raise UncontrolledCategoryError(e)
-        if generate_ground_options:
-            self.get_ground_options()
-
-    def evaluate(self, evaluate_fn):
-        """Evaluate this predicate by calling *evaluate_fn*.
-
-        Looks up each input in the scope (which may have been mutated by the
-        simulator to hold entity objects) and passes them to the callback.
-
-        Args:
-            evaluate_fn: ``(predicate_name, *entities) -> bool``.
-
-        Returns:
-            bool: Result of the callback, or False if any input is unmapped.
-        """
-        mapped_inputs = [self.scope[inp] for inp in self.inputs]
-        if all(i is not None for i in mapped_inputs):
-            return evaluate_fn(self.STATE_NAME, *mapped_inputs, **self.kwargs)
-        else:
-            print("%s has unmapped inputs" % self.STATE_NAME)
-            return False
-
-    def sample(self, sample_fn, binary_state, **kwargs):
-        """Request the simulator to set this predicate to *binary_state*.
-
-        Args:
-            sample_fn: ``(predicate_name, *entities, binary_state, **kw) -> bool``.
-            binary_state: Desired truth value (True = make it true, False =
-                make it false).
-            **kwargs: Extra arguments forwarded to *sample_fn* (e.g.
-                ``reset_before_sampling``).
-
-        Returns:
-            bool: Whether sampling succeeded, or False if any input is unmapped.
-        """
-        mapped_inputs = [self.scope[inp] for inp in self.inputs]
-        if all(i is not None for i in mapped_inputs):
-            return sample_fn(self.STATE_NAME, *mapped_inputs, binary_state, **kwargs, **self.kwargs)
-        else:
-            print("%s has unmapped inputs" % self.STATE_NAME)
-            return False
-
-    def get_ground_options(self):
-        """A single predicate has exactly one ground option: itself."""
-        self.flattened_condition_options = [[[self.STATE_NAME] + self.inputs]]
-
-
 TOKEN_MAPPING = {
     # Standard logical connectives
     "forall": Universal,
@@ -890,14 +810,14 @@ TOKEN_MAPPING = {
 
 
 def get_predicate_for_token(token):
-    """Return a constructor for the expression node matching *token*.
+    """Return a constructor for the expression tree node matching *token*.
 
-    If *token* is a known logical connective (e.g. ``"and"``, ``"forall"``),
-    the corresponding class from :data:`TOKEN_MAPPING` is returned directly.
+    If *token* is a logical connective (e.g. ``"and"``, ``"forall"``), the
+    corresponding class from :data:`TOKEN_MAPPING` is returned directly.
 
-    Otherwise *token* is assumed to be a simulator predicate name and a
-    factory lambda is returned that creates a :class:`GenericPredicate`
-    with the token baked in.
+    Otherwise *token* is looked up in :data:`~bddl.predicates.TOKEN_TO_PREDICATE`
+    and a factory is returned that instantiates the predicate class with the
+    token string baked in.
 
     Args:
         token: The first element of a parsed sub-expression.
@@ -905,10 +825,15 @@ def get_predicate_for_token(token):
     Returns:
         callable: A constructor with signature
         ``(scope, body, object_map, generate_ground_options=True)``.
+
+    Raises:
+        KeyError: If *token* is neither a logical connective nor a known
+        predicate.
     """
     if token in TOKEN_MAPPING:
         return TOKEN_MAPPING[token]
     else:
-        return lambda scope, body, object_map, generate_ground_options=True: GenericPredicate(
+        predicate_class = TOKEN_TO_PREDICATE[token]
+        return lambda scope, body, object_map, generate_ground_options=True: predicate_class(
             token, scope, body, object_map, generate_ground_options=generate_ground_options
         )

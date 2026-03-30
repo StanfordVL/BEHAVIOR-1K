@@ -3,9 +3,10 @@
 Every compiled BDDL condition is represented as a tree of :class:`Expression`
 nodes.  Interior nodes are logical connectives (conjunction, negation, etc.)
 defined in :mod:`bddl.condition_evaluation`.  Leaf nodes are predicates --
-either the generic :class:`~bddl.condition_evaluation.GenericPredicate` used by
-the current pipeline, or the legacy :class:`UnaryAtomicFormula` /
-:class:`BinaryAtomicFormula` retained here for backwards compatibility.
+concrete :class:`~bddl.predicates.Predicate` subclasses (e.g.
+:class:`~bddl.predicates.OnTop`, :class:`~bddl.predicates.Cooked`), or the
+legacy :class:`UnaryAtomicFormula` / :class:`BinaryAtomicFormula` retained
+here for backwards compatibility.
 
 Terminology
 -----------
@@ -89,8 +90,8 @@ class Expression(with_metaclass(ABCMeta)):
 # ---------------------------------------------------------------------------
 # These were the original leaf-node classes whose subclasses implemented
 # ``_evaluate`` / ``_sample`` directly.  The current pipeline uses
-# ``GenericPredicate`` (in condition_evaluation.py) instead, which delegates
-# to user-supplied callbacks.  The classes below are retained for any
+# concrete ``Predicate`` subclasses (in predicates.py) instead, which
+# delegate to user-supplied callbacks.  The classes below are retained for any
 # external code that may still reference them, but are not instantiated by
 # the standard compilation path.
 # ---------------------------------------------------------------------------

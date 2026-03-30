@@ -10,9 +10,11 @@ import torch as th
 
 
 from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
-from bddl.condition_evaluation import GenericPredicate, Negation
+from bddl.condition_evaluation import Negation
+from bddl.predicates import Predicate
 from bddl.config import get_definition_filename
 from bddl.object_taxonomy import ObjectTaxonomy
+from bddl import predicates as bddl_predicates
 
 import omnigibson as og
 from omnigibson import object_states
@@ -26,7 +28,6 @@ from omnigibson.utils.asset_utils import (
     get_attachment_meta_links,
 )
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import Wrapper
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -124,83 +125,22 @@ BAD_CLOTH_MODELS = {
 }
 
 
-class UnsampleablePredicate:
-    @classmethod
-    def sample(cls, *args, **kwargs):
-        raise NotImplementedError()
+def synset_from_bddl_inst(bddl_inst):
+    """Derive synset from a BDDL instance name, e.g. 'almond.n.01_1' -> 'almond.n.01'."""
+    return "_".join(bddl_inst.split("_")[:-1])
 
 
-class ObjectStateInsourcePredicate(UnsampleablePredicate):
-    @classmethod
-    def evaluate(cls, entity, **kwargs):
-        # Always returns True
-        return True
+def is_system_bddl_inst(bddl_inst):
+    """Check if a BDDL instance refers to a substance/system."""
+    return is_substance_synset(synset_from_bddl_inst(bddl_inst))
 
 
-class ObjectStateFuturePredicate(UnsampleablePredicate):
-    STATE_NAME = "future"
-
-    @classmethod
-    def evaluate(cls, entity, **kwargs):
-        return not entity.exists
-
-
-class ObjectStateRealPredicate(UnsampleablePredicate):
-    STATE_NAME = "real"
-
-    @classmethod
-    def evaluate(cls, entity, **kwargs):
-        return entity.exists
-
-
-class ObjectStateUnaryPredicate:
-    STATE_CLASS = None
-    STATE_NAME = None
-
-    @classmethod
-    def evaluate(cls, entity, **kwargs):
-        return entity.get_state(cls.STATE_CLASS, **kwargs)
-
-    @classmethod
-    def sample(cls, entity, binary_state, **kwargs):
-        return entity.set_state(cls.STATE_CLASS, binary_state, **kwargs)
-
-
-class ObjectStateBinaryPredicate:
-    STATE_CLASS = None
-    STATE_NAME = None
-
-    @classmethod
-    def evaluate(cls, entity1, entity2, **kwargs):
-        return (
-            entity1.get_state(cls.STATE_CLASS, entity2.wrapped_obj, **kwargs)
-            if (entity2.exists and entity2.initialized)
-            else False
-        )
-
-    @classmethod
-    def sample(cls, entity1, entity2, binary_state, **kwargs):
-        return (
-            entity1.set_state(cls.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs)
-            if (entity2.exists and entity2.initialized)
-            else None
-        )
-
-
-def get_unary_predicate_for_state(state_class, state_name):
-    return type(
-        state_class.__name__ + "StateUnaryPredicate",
-        (ObjectStateUnaryPredicate,),
-        {"STATE_CLASS": state_class, "STATE_NAME": state_name},
-    )
-
-
-def get_binary_predicate_for_state(state_class, state_name):
-    return type(
-        state_class.__name__ + "StateBinaryPredicate",
-        (ObjectStateBinaryPredicate,),
-        {"STATE_CLASS": state_class, "STATE_NAME": state_name},
-    )
+def og_categories_from_bddl_inst(bddl_inst):
+    """Get OG categories for a BDDL instance."""
+    synset = synset_from_bddl_inst(bddl_inst)
+    if is_substance_synset(synset):
+        return OBJECT_TAXONOMY.get_subtree_substances(synset)
+    return OBJECT_TAXONOMY.get_subtree_categories(synset)
 
 
 def is_substance_synset(synset):
@@ -225,7 +165,7 @@ def process_single_condition(condition):
             - Expression: Condition's expression
             - bool: Whether this evaluated condition is positive or negative
     """
-    if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], GenericPredicate):
+    if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], Predicate):
         log.debug(("Skipping over sampling of predicate that is not a negation or a generic predicate"))
         return None, None
 
@@ -239,46 +179,88 @@ def process_single_condition(condition):
     return condition, positive
 
 
-# TODO: Add remaining predicates.
-
-
-def evaluate_bddl_predicate(predicate_name, *entities):
-    return SUPPORTED_PREDICATES[predicate_name].evaluate(*entities)
-
-
-def sample_bddl_predicate(predicate_name, *args, **kwargs):
-    return SUPPORTED_PREDICATES[predicate_name].sample(*args, **kwargs)
-
-
-SUPPORTED_PREDICATES = {
-    "inside": get_binary_predicate_for_state(object_states.Inside, "inside"),
-    "nextto": get_binary_predicate_for_state(object_states.NextTo, "nextto"),
-    "ontop": get_binary_predicate_for_state(object_states.OnTop, "ontop"),
-    "under": get_binary_predicate_for_state(object_states.Under, "under"),
-    "touching": get_binary_predicate_for_state(object_states.Touching, "touching"),
-    "covered": get_binary_predicate_for_state(object_states.Covered, "covered"),
-    "contains": get_binary_predicate_for_state(object_states.Contains, "contains"),
-    "saturated": get_binary_predicate_for_state(object_states.Saturated, "saturated"),
-    "filled": get_binary_predicate_for_state(object_states.Filled, "filled"),
-    "cooked": get_unary_predicate_for_state(object_states.Cooked, "cooked"),
-    "burnt": get_unary_predicate_for_state(object_states.Burnt, "burnt"),
-    "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
-    "hot": get_unary_predicate_for_state(object_states.Heated, "hot"),
-    "open": get_unary_predicate_for_state(object_states.Open, "open"),
-    "toggled_on": get_unary_predicate_for_state(object_states.ToggledOn, "toggled_on"),
-    "on_fire": get_unary_predicate_for_state(object_states.OnFire, "on_fire"),
-    "attached": get_binary_predicate_for_state(object_states.AttachedTo, "attached"),
-    "overlaid": get_binary_predicate_for_state(object_states.Overlaid, "overlaid"),
-    "folded": get_unary_predicate_for_state(object_states.Folded, "folded"),
-    "unfolded": get_unary_predicate_for_state(object_states.Unfolded, "unfolded"),
-    "draped": get_binary_predicate_for_state(object_states.Draped, "draped"),
-    "future": ObjectStateFuturePredicate,
-    "real": ObjectStateRealPredicate,
-    "insource": ObjectStateInsourcePredicate,
+PREDICATE_TO_STATE = {
+    bddl_predicates.Inside: object_states.Inside,
+    bddl_predicates.NextTo: object_states.NextTo,
+    bddl_predicates.OnTop: object_states.OnTop,
+    bddl_predicates.Under: object_states.Under,
+    bddl_predicates.Touching: object_states.Touching,
+    bddl_predicates.Covered: object_states.Covered,
+    bddl_predicates.Contains: object_states.Contains,
+    bddl_predicates.Saturated: object_states.Saturated,
+    bddl_predicates.Filled: object_states.Filled,
+    bddl_predicates.Cooked: object_states.Cooked,
+    bddl_predicates.Frozen: object_states.Frozen,
+    bddl_predicates.Hot: object_states.Heated,
+    bddl_predicates.Open: object_states.Open,
+    bddl_predicates.ToggledOn: object_states.ToggledOn,
+    bddl_predicates.OnFire: object_states.OnFire,
+    bddl_predicates.Attached: object_states.AttachedTo,
+    bddl_predicates.Overlaid: object_states.Overlaid,
+    bddl_predicates.Folded: object_states.Folded,
+    bddl_predicates.Unfolded: object_states.Unfolded,
+    bddl_predicates.Draped: object_states.Draped,
 }
 
 KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATIC_STATE_SET] + ["attached"])
-UNSAMPLEABLE_PREDICATES = frozenset(["insource", "future", "real"])
+UNSAMPLEABLE_PREDICATES = frozenset([bddl_predicates.InSource, bddl_predicates.Future, bddl_predicates.Real])
+
+
+def evaluate_bddl_predicate(predicate_cls, *entities):
+    """Evaluate a BDDL predicate against simulator objects.
+
+    Args:
+        predicate_cls: A :class:`~bddl.predicates.Predicate` subclass.
+        *entities: Raw simulator objects (or None for nonexistent objects).
+
+    Returns:
+        bool: Whether the predicate is satisfied.
+    """
+    if predicate_cls is bddl_predicates.InSource:
+        return True
+    if predicate_cls is bddl_predicates.Future:
+        return entities[0] is None
+    if predicate_cls is bddl_predicates.Real:
+        return entities[0] is not None
+
+    state_class = PREDICATE_TO_STATE[predicate_cls]
+    if predicate_cls.arity == 2:
+        obj1, obj2 = entities[0], entities[1]
+        if obj1 is None or not obj1.initialized:
+            return False
+        if obj2 is None or not obj2.initialized:
+            return False
+        return obj1.states[state_class].get_value(obj2)
+    else:
+        obj = entities[0]
+        if obj is None or not obj.initialized:
+            return False
+        return obj.states[state_class].get_value()
+
+
+def sample_bddl_predicate(predicate_cls, *args, **kwargs):
+    """Request the simulator to set a BDDL predicate to a desired state.
+
+    Args:
+        predicate_cls: A :class:`~bddl.predicates.Predicate` subclass.
+        *args: For unary predicates: (obj, binary_state). For binary: (obj1, obj2, binary_state).
+        **kwargs: Extra arguments forwarded to set_value (e.g. reset_before_sampling).
+
+    Returns:
+        bool or None: Whether sampling succeeded.
+    """
+    if predicate_cls in UNSAMPLEABLE_PREDICATES:
+        raise NotImplementedError(f"Cannot sample unsampleable predicate: {predicate_cls.__name__}")
+
+    state_class = PREDICATE_TO_STATE[predicate_cls]
+    if predicate_cls.arity == 2:
+        obj1, obj2, binary_state = args[0], args[1], args[2]
+        if obj2 is None or not obj2.initialized:
+            return None
+        return obj1.states[state_class].set_value(obj2, binary_state, **kwargs)
+    else:
+        obj, binary_state = args[0], args[1]
+        return obj.states[state_class].set_value(binary_state, **kwargs)
 
 
 # BEHAVIOR-related
@@ -309,11 +291,12 @@ def _populate_input_output_objects_systems(og_recipe, input_synsets, output_syns
 
 
 def _populate_input_output_states(og_recipe, input_states, output_states):
-    # Apply post-processing for input/output states if specified
+    # Apply post-processing for input/output states if specified.
+    # States are dicts mapping synset keys to lists of StateCondition instances.
     for synsets_to_states, states_key in zip((input_states, output_states), ("input_states", "output_states")):
         if synsets_to_states is None:
             continue
-        for synsets, states in synsets_to_states.items():
+        for synsets, state_conditions in synsets_to_states.items():
             # For unary/binary states, synsets is a single synset or a comma-separated pair of synsets, respectively
             synset_split = synsets.split(",")
             if len(synset_split) == 1:
@@ -336,19 +319,16 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
             first_obj_category = obj_categories[0]
 
             if second_synset is None:
-                # Unary states for the first synset
-                for state_type, state_value in states:
-                    state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
+                for sc in state_conditions:
+                    state_class = PREDICATE_TO_STATE[sc.predicate]
                     assert issubclass(
                         state_class, AbsoluteObjectState
-                    ), f"Input/output state type {state_type} must be a unary state!"
-                    # Example: (Cooked, True)
-                    og_recipe[states_key][first_obj_category]["unary"].append((state_class, state_value))
+                    ), f"Input/output state type {sc.predicate.__name__} must be a unary state!"
+                    og_recipe[states_key][first_obj_category]["unary"].append((state_class, sc.value))
             else:
                 assert OBJECT_TAXONOMY.is_leaf(
                     second_synset
                 ), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
-                obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
                 if is_substance_synset(second_synset):
                     second_obj_category = get_system_name_by_synset(second_synset)
                     is_substance = True
@@ -360,28 +340,24 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                     second_obj_category = obj_categories[0]
                     is_substance = False
 
-                for state_type, state_value in states:
-                    state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
+                for sc in state_conditions:
+                    state_class = PREDICATE_TO_STATE[sc.predicate]
                     assert issubclass(
                         state_class, RelativeObjectState
-                    ), f"Input/output state type {state_type} must be a binary state!"
+                    ), f"Input/output state type {sc.predicate.__name__} must be a binary state!"
                     assert is_substance == (
                         state_class in get_system_states()
-                    ), f"Input/output state type {state_type} system state inconsistency found!"
+                    ), f"Input/output state type {sc.predicate.__name__} system state inconsistency found!"
                     if is_substance:
-                        # Non-kinematic binary states, e.g. Covered, Saturated, Filled, Contains.
-                        # Example: (Covered, "sesame_seed", True)
                         og_recipe[states_key][first_obj_category]["binary_system"].append(
-                            (state_class, second_obj_category, state_value)
+                            (state_class, second_obj_category, sc.value)
                         )
                     else:
-                        # Kinematic binary states w.r.t. the second object.
-                        # Example: (OnTop, "raw_egg", True)
                         assert (
                             states_key != "output_states"
-                        ), f"Output state type {state_type} can only be used in input states!"
+                        ), f"Output state type {sc.predicate.__name__} can only be used in input states!"
                         og_recipe[states_key][first_obj_category]["binary_object"].append(
-                            (state_class, second_obj_category, state_value)
+                            (state_class, second_obj_category, sc.value)
                         )
 
 
@@ -396,85 +372,65 @@ def _populate_filter_categories(og_recipe, filter_name, synsets):
                 og_recipe[f"{filter_name}_categories"].add(category)
 
 
-def translate_bddl_recipe_to_og_recipe(
-    name,
-    input_synsets,
-    output_synsets,
-    input_states=None,
-    output_states=None,
-    fillable_synsets=None,
-    heatsource_synsets=None,
-    timesteps=None,
-):
-    """
-    Translate a BDDL recipe to an OG recipe.
+def translate_bddl_recipe_to_og_recipe(recipe):
+    """Translate a BDDL Recipe dataclass to an OG recipe dict.
+
     Args:
-        name (str): Name of the recipe
-        input_synsets (dict): Maps synsets to number of instances required for the recipe
-        output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
-        input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
-            or None if no states are required
-        otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
-            or None if no states are required
-        fillable_synsets (None or set of str): If specified, set of fillable synsets which are allowed for this recipe.
-            If None, any fillable is allowed
-        heatsource_synsets (None or set of str): If specified, set of heatsource synsets which are allowed for this recipe.
-            If None, any heatsource is allowed
-        timesteps (None or int): Number of subsequent heating steps required for the recipe to execute. If None,
-            it will be set to be 1, i.e.: instantaneous execution
+        recipe (bddl.transition_rules.Recipe): A parsed BDDL recipe instance.
+
+    Returns:
+        dict: OG-format recipe dict ready for ``RecipeRule.add_recipe(**og_recipe)``.
     """
+    from bddl.transition_rules import CookingRecipe, MachineRecipe
+
+    # Determine fillable/heatsource synsets from recipe type
+    fillable_synsets = None
+    heatsource_synsets = None
+    timesteps = 1
+    if isinstance(recipe, CookingRecipe):
+        fillable_synsets = recipe.container_synsets or None
+        heatsource_synsets = recipe.heatsource_synsets or None
+        timesteps = recipe.timesteps if recipe.timesteps is not None else 1
+    elif isinstance(recipe, MachineRecipe):
+        fillable_synsets = recipe.machine_synsets or None
+
     og_recipe = {
-        "name": name,
-        # Maps object categories to number of instances required for the recipe
+        "name": recipe.name,
         "input_objects": dict(),
-        # List of system names required for the recipe
         "input_systems": list(),
-        # Maps object categories to number of instances to be spawned in the container when the recipe executes
         "output_objects": dict(),
-        # List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
         "output_systems": list(),
-        # Maps object categories to ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
         "input_states": defaultdict(lambda: defaultdict(list)),
-        # Maps object categories to ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
         "output_states": defaultdict(lambda: defaultdict(list)),
-        # Set of fillable categories which are allowed for this recipe
         "fillable_categories": None,
-        # Set of heatsource categories which are allowed for this recipe
         "heatsource_categories": None,
-        # Number of subsequent heating steps required for the recipe to execute
-        "timesteps": timesteps if timesteps is not None else 1,
+        "timesteps": timesteps,
     }
 
     _populate_input_output_objects_systems(
-        og_recipe=og_recipe, input_synsets=input_synsets, output_synsets=output_synsets
+        og_recipe=og_recipe, input_synsets=recipe.input_synsets, output_synsets=recipe.output_synsets
     )
-    _populate_input_output_states(og_recipe=og_recipe, input_states=input_states, output_states=output_states)
+    _populate_input_output_states(
+        og_recipe=og_recipe, input_states=recipe.input_states, output_states=recipe.output_states
+    )
     _populate_filter_categories(og_recipe=og_recipe, filter_name="fillable", synsets=fillable_synsets)
     _populate_filter_categories(og_recipe=og_recipe, filter_name="heatsource", synsets=heatsource_synsets)
 
     return og_recipe
 
 
-def translate_bddl_washer_rule_to_og_washer_rule(conditions):
-    """
-    Translate BDDL washer rule to OG washer rule.
+def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
+    """Translate a BDDL WasherRule to an OG washer rule dict.
 
     Args:
-        conditions (dict): Dictionary mapping the synset of ParticleSystem (str) to None or list of synsets of
-            ParticleSystem (str). None represents "never", empty list represents "always", or non-empty list represents
-            at least one of the systems in the list needs to be present in the washer for the key system to be removed.
-            E.g. "rust.n.01" -> None: "never remove rust.n.01 from the washer"
-            E.g. "dust.n.01" -> []: "always remove dust.n.01 from the washer"
-            E.g. "cooking_oil.n.01" -> ["sodium_carbonate.n.01", "vinegar.n.01"]: "remove cooking_oil.n.01 from the
-            washer if either sodium_carbonate.n.01 or vinegar.n.01 is present"
-            For keys not present in the dictionary, the default is []: "always remove"
+        washer_rule (bddl.transition_rules.WasherRule): Parsed washer rule.
+
     Returns:
-        dict: Dictionary mapping the system name (str) to None or list of system names (str). None represents "never",
-            empty list represents "always", or non-empty list represents at least one of the systems in the list needs
-            to be present in the washer for the key system to be removed.
+        dict: Maps system name (str) to None (never remove), [] (always remove),
+            or list of system names (remove if any solvent present).
     """
     og_washer_rule = dict()
-    for solute, solvents in conditions.items():
+    for solute, solvents in washer_rule.conditions.items():
         assert OBJECT_TAXONOMY.is_leaf(solute), f"Synset {solute} must be a leaf node in the taxonomy!"
         assert is_substance_synset(solute), f"Synset {solute} must be a substance synset!"
         solute_name = get_system_name_by_synset(solute)
@@ -628,108 +584,6 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
     return "".join(raw_bddl)
 
 
-class BDDLEntity(Wrapper):
-    """
-    Thin wrapper class that wraps an object or system if it exists, or nothing if it does not exist. Will
-    dynamically reference an object / system as they become real in the sim
-    """
-
-    def __init__(
-        self,
-        bddl_inst,
-        entity=None,
-    ):
-        """
-        Args:
-            bddl_inst (str): BDDL synset instance of the entity, e.g.: "almond.n.01_1"
-            entity (None or DatasetObject or BaseSystem): If specified, the BDDL entity to wrap. If not
-                specified, will initially wrap nothing, but may dynamically reference an actual object or system
-                if it exists in the future
-        """
-        # Store synset and other info, and pass entity internally
-        self.bddl_inst = bddl_inst
-        self.synset = "_".join(self.bddl_inst.split("_")[:-1])
-        self.is_system = is_substance_synset(self.synset)
-
-        # Infer the correct category to assign
-        self.og_categories = (
-            OBJECT_TAXONOMY.get_subtree_substances(self.synset)
-            if self.is_system
-            else OBJECT_TAXONOMY.get_subtree_categories(self.synset)
-        )
-
-        super().__init__(obj=entity)
-
-    @property
-    def name(self):
-        """
-        Returns:
-            None or str: Name of this entity, if it exists, else None
-        """
-        if self.exists:
-            return self.og_categories[0] if self.is_system else self.wrapped_obj.name
-        else:
-            return None
-
-    @property
-    def exists(self):
-        """
-        Checks whether the entity referenced by @synset exists
-
-        Returns:
-            bool: Whether the entity referenced by @synset exists
-        """
-        return self.wrapped_obj is not None
-
-    def set_entity(self, entity):
-        """
-        Sets the internal entity, overriding any if it already exists
-
-        Args:
-            entity (BaseSystem or USDObject): Entity to set internally
-        """
-        self.wrapped_obj = entity
-
-    def clear_entity(self):
-        """
-        Clears the internal entity, if any
-        """
-        self.wrapped_obj = None
-
-    def get_state(self, state, *args, **kwargs):
-        """
-        Helper function to grab wrapped entity's state @state
-
-        Args:
-            state (BaseObjectState): State whose get_value() should be called
-            *args (tuple): Any arguments to pass to getter, in order
-            **kwargs (dict): Any keyword arguments to pass to getter, in order
-
-        Returns:
-            any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None), else False
-        """
-        return (
-            self.wrapped_obj.states[state].get_value(*args, **kwargs) if (self.exists and self.initialized) else False
-        )
-
-    def set_state(self, state, *args, **kwargs):
-        """
-        Helper function to set wrapped entity's state @state. Note: Should only be called if the entity exists!
-
-        Args:
-            state (BaseObjectState): State whose set_value() should be called
-            *args (tuple): Any arguments to pass to getter, in order
-            **kwargs (dict): Any keyword arguments to pass to getter, in order
-
-        Returns:
-            any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None)
-        """
-        assert (
-            self.exists and self.initialized
-        ), f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist or is not initialized!"
-        return self.wrapped_obj.states[state].set_value(*args, **kwargs)
-
-
 class BDDLSampler:
     def __init__(self, env, activity_conditions, object_scope):
         # Avoid circular imports here
@@ -762,7 +616,7 @@ class BDDLSampler:
         self._sampled_objects = None  # set of USDObject
         self._future_obj_instances = None  # set of str
         self._inroom_object_conditions = None  # list of (condition, positive) tuple
-        self._inroom_object_scope_filtered_initial = None  # dict mapping str to BDDLEntity
+        self._inroom_object_scope_filtered_initial = None  # dict mapping str to sim object or None
         self._attached_objects = defaultdict(set)  # dict mapping str to set of str
 
     def sample(self, validate_goal=False, sampling_whitelist=None, sampling_blacklist=None):
@@ -876,7 +730,7 @@ class BDDLSampler:
             log.error(error_msg)
             return False, error_msg
 
-        self._object_scope["agent.n.01_1"] = BDDLEntity(bddl_inst="agent.n.01_1", entity=self._agent)
+        self._object_scope["agent.n.01_1"] = self._agent
 
         return True, None
 
@@ -982,7 +836,7 @@ class BDDLSampler:
                 return "Initial condition has negative kinematic conditions: {}".format(condition.body)
 
             # Store any unsampleable conditions separately
-            if condition.STATE_NAME in UNSAMPLEABLE_PREDICATES:
+            if type(condition) in UNSAMPLEABLE_PREDICATES:
                 unsampleable_conditions.append(condition)
                 continue
 
@@ -1038,7 +892,7 @@ class BDDLSampler:
         # Unsampleable obj instances are strictly a superset of future obj instances
         unsampleable_obj_instances = {cond.body[-1] for cond in unsampleable_conditions}
         self._future_obj_instances = {
-            cond.body[0] for cond in unsampleable_conditions if isinstance(cond, ObjectStateFuturePredicate)
+            cond.body[0] for cond in unsampleable_conditions if isinstance(cond, bddl.predicates.Future)
         }
 
         nonparticle_entities = set(self._object_scope.keys()) - self._substance_instances
@@ -1193,7 +1047,7 @@ class BDDLSampler:
                     # These are a list of candidate simulator objects that need sampling test
                     for obj in input_object_scope[room_type][scene_obj][room_inst]:
                         # Temporarily set object_scope to point to this candidate object
-                        self._object_scope[scene_obj] = BDDLEntity(bddl_inst=scene_obj, entity=obj)
+                        self._object_scope[scene_obj] = obj
 
                         success = True
                         # If this candidate object is not involved in any conditions,
@@ -1327,7 +1181,7 @@ class BDDLSampler:
                 # Grab it from the object_scope
                 if parent_inst not in self._inroom_object_instances:
                     assert self._object_scope[parent_inst] is not None
-                    parent_objects.append([self._object_scope[parent_inst].wrapped_obj])
+                    parent_objects.append([self._object_scope[parent_inst]])
                 # If parent_inst is an inroom object, it can refer to multiple objects in the scene in different rooms.
                 # We gather all of them and require that the model choice supports attachment to at least one of them.
                 else:
@@ -1425,11 +1279,8 @@ class BDDLSampler:
                 assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
                 system_name = OBJECT_TAXONOMY.get_subtree_substances(obj_synset)[0]
-                self._object_scope[obj_inst] = BDDLEntity(
-                    bddl_inst=obj_inst,
-                    entity=(
-                        None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
-                    ),
+                self._object_scope[obj_inst] = (
+                    None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
                 )
             else:
                 valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))
@@ -1442,7 +1293,7 @@ class BDDLSampler:
 
                 # Don't explicitly sample if future
                 if obj_inst in self._future_obj_instances:
-                    self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst)
+                    self._object_scope[obj_inst] = None
                     continue
                 # Don't sample if already in room
                 if obj_inst in self._inroom_object_instances:
@@ -1528,7 +1379,7 @@ class BDDLSampler:
                 )
 
                 self._sampled_objects.add(simulator_obj)
-                self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
+                self._object_scope[obj_inst] = simulator_obj
 
         og.sim.play()
         og.sim.stop()
@@ -1778,7 +1629,7 @@ class BDDLSampler:
                     log.debug(("Object scope finalized:"))
                     for obj_inst, obj in matches.items():
                         if obj_inst in obj_inst_to_obj_per_room_inst:
-                            self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=obj)
+                            self._object_scope[obj_inst] = obj
                             log.debug((obj_inst, obj.name))
                     success = True
                     break
