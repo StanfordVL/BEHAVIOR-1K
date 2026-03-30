@@ -22,6 +22,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states import initialize_tensorized_states
+from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
@@ -49,6 +50,7 @@ from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
     PoseAPI,
+    RigidBodyViewAPI,
     RigidContactAPI,
     clear as clear_usd_utils,
     triangularize_mesh,
@@ -1054,6 +1056,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
+            RigidBodyViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
             initialize_tensorized_states()
 
@@ -1068,8 +1071,9 @@ def _launch_simulator(*args, **kwargs):
 
             # If we're playing we, also run additional logic
             if self.is_playing():
-                # Update persistent rigid contact caches from the latest step
+                # Update persistent rigid contact and body pose caches from the latest step
                 RigidContactAPI.update_contact_cache()
+                RigidBodyViewAPI.update_pose_cache()
 
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
@@ -1251,10 +1255,17 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context._step(current_time=self.current_time)
             self._report_step_exceptions()
 
-            # Update persistent rigid contact caches from the latest step. We normally do this on the non-physics step,
-            # but this step_physics function is usually used to let contacts propagate during sampling etc, which
-            # means that we need to update the contact cache here too.
+            # Update persistent rigid contact and body pose caches from the latest step. We normally do this on the
+            # non-physics step, but this step_physics function is usually used to let contacts propagate during
+            # sampling etc, which means that we need to update the caches here too.
             RigidContactAPI.update_contact_cache()
+            RigidBodyViewAPI.update_pose_cache()
+
+            # TODO (andi) is this ideal?
+            # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read
+            # up-to-date AABBs without waiting for the next full _non_physics_step.
+            if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None:
+                AABB.global_update()
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):

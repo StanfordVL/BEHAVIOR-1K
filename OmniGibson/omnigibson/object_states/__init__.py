@@ -38,8 +38,10 @@ from omnigibson.object_states.under import Under
 def initialize_tensorized_states():
     """
     Initialize all TensorizedValueState subclasses in dependency order.
-    Must be called after RigidContactAPI.initialize_view() since ToggledOn depends on it.
+    Must be called after RigidBodyViewAPI.initialize_view() and RigidContactAPI.initialize_view().
     """
+    # TODO (andi) use dependency graph to find order instead of calling one by one
+    AABB.initialize_view()  # depends on RigidBodyViewAPI
     Temperature.initialize_view()
     MaxTemperature.initialize_view()  # depends on Temperature.OBJ_IDXS
     SlicerActive.initialize_view()

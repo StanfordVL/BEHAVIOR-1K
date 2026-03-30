@@ -165,7 +165,6 @@ class TensorizedValueState(AbsoluteObjectState):
         """
         raise NotImplementedError
 
-    # TODO (andi) maybe initialize_view should be put here?
     def __init__(self, *args, **kwargs):
         # Run super first; registration in OBJ_IDXS / IDX_OBJS / VALUES is done by initialize_view()
         super().__init__(*args, **kwargs)

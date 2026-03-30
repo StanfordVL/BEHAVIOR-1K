@@ -186,6 +186,180 @@ def create_joint(
     return joint_prim
 
 
+class RigidBodyViewAPIImpl:
+    """
+    Batched rigid-body pose cache for all rigid bodies across all scenes.
+
+    Pose information is fetched from PhysX each step and cached as (S, P, 4, 4) matrices,
+    where S = number of scenes and P = number of unique rigid bodies (shared index across scenes,
+    keyed by relative prim path — identical in a VectorEnvironment).
+
+    Used by AABB and any other state that needs per-link world transforms in bulk.
+    """
+
+    def __init__(self):
+        # Rigid body view for batched pose reads (one per scene)
+        self._RIGID_BODY_VIEW = []
+
+        # Shared path index across all scenes (relative prim paths identical in VectorEnvironment)
+        self._PATH_TO_IDX = {}  # {rel_path: int}
+        self._IDX_TO_PATH = []  # list[rel_path]
+
+        # Raw poses from PhysX: (S, P, 7) — [px, py, pz, qx, qy, qz, qw]
+        self._POSES = None
+
+        # Cached 4x4 transformation matrices: (S, P, 4, 4)
+        self._POSE_MATRICES = None
+
+        # Tolerances for change detection (same as RigidContactAPIImpl)
+        self._POS_EPS = 1e-4
+        self._ORI_EPS = 1e-4
+
+    def initialize_view(self):
+        """
+        Initializes the rigid body view. Note: Can only be done when sim is playing!
+
+        All scenes in a VectorEnvironment are expected to have the same relative prim paths.
+        The shared path mapping is built from scene 0's ordering and reused for all scenes.
+        Per-scene poses are stacked into (S, P, 7) and converted to (S, P, 4, 4) matrices.
+        """
+        assert og.sim.is_playing(), "Cannot create rigid body view while sim is not playing!"
+
+        # Snapshot for carry-over
+        prev_path_to_idx = dict(self._PATH_TO_IDX)
+        prev_poses = self._POSES
+
+        # Reset
+        self.clear()
+
+        if len(og.sim.scenes) == 0:
+            return
+
+        # If there are no rigid bodies in any scene, return early (view creation would fail)
+        has_rigid_bodies = any(
+            obj.prim_type == PrimType.RIGID and len(obj.links) > 0 for scene in og.sim.scenes for obj in scene.objects
+        )
+        if not has_rigid_bodies:
+            self.clear()
+            return
+
+        poses_list = []
+
+        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            for scene_idx, scene in enumerate(og.sim.scenes):
+                view = og.sim.physics_sim_view.create_rigid_body_view(pattern=f"/World/scene_{scene_idx}/*/*")
+                self._RIGID_BODY_VIEW.append(view)
+
+                # Build shared path mapping from scene 0 only; assert identical across scenes
+                rel_paths = [absolute_prim_path_to_scene_relative(scene, p) for p in list(view.prim_paths)]
+                if scene_idx == 0:
+                    self._IDX_TO_PATH = rel_paths
+                    self._PATH_TO_IDX = {p: i for i, p in enumerate(rel_paths)}
+                else:
+                    if set(rel_paths) != set(self._IDX_TO_PATH):
+                        missing = sorted(set(self._IDX_TO_PATH) - set(rel_paths))
+                        extra = sorted(set(rel_paths) - set(self._IDX_TO_PATH))
+                        raise AssertionError(
+                            f"RigidBodyViewAPI path mismatch for scene {scene_idx}. "
+                            f"Missing ({len(missing)}): {missing}. Extra ({len(extra)}): {extra}."
+                        )
+
+                poses_list.append(view.get_transforms().clone())
+
+        if not poses_list:
+            return
+
+        S = len(poses_list)
+        self._POSES = th.stack(poses_list, dim=0)  # (S, P, 7)
+
+        # Carry over poses for surviving rigid bodies
+        if prev_poses is not None and prev_poses.numel() > 0:
+            surviving = [
+                (old_idx, self._PATH_TO_IDX[p]) for p, old_idx in prev_path_to_idx.items() if p in self._PATH_TO_IDX
+            ]
+            if surviving:
+                old_idxs = th.tensor([o for o, _ in surviving], dtype=th.long)
+                new_idxs = th.tensor([n for _, n in surviving], dtype=th.long)
+                for s in range(min(prev_poses.shape[0], S)):
+                    self._POSES[s, new_idxs] = prev_poses[s, old_idxs]
+
+        self._POSE_MATRICES = self._poses_to_matrices(self._POSES)
+
+    def update_pose_cache(self):
+        """
+        Updates pose cache from the latest physics step.
+        Only recomputes 4x4 matrices for bodies whose pose has changed.
+        """
+        if not self._RIGID_BODY_VIEW:
+            return
+        S = len(self._RIGID_BODY_VIEW)
+        for scene_idx in range(S):
+            try:
+                transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
+            except Exception:
+                log.warning(
+                    "RigidBodyViewAPI cannot fetch transforms because the physics sim view is invalid. "
+                    "This is expected during initial scene loading."
+                )
+                continue
+
+            prev = self._POSES[scene_idx]
+            pos_changed = th.any(th.abs(transforms[:, :3] - prev[:, :3]) > self._POS_EPS, dim=1)
+            ori_changed = th.abs(th.sum(transforms[:, 3:7] * prev[:, 3:7], dim=1)) < (1.0 - self._ORI_EPS)
+            changed = pos_changed | ori_changed
+
+            if not changed.any():
+                continue
+
+            self._POSES[scene_idx, changed] = transforms[changed]
+            # Recompute matrices only for changed bodies in this scene
+            changed_poses = self._POSES[scene_idx, changed].unsqueeze(0)  # (1, K, 7)
+            self._POSE_MATRICES[scene_idx, changed] = self._poses_to_matrices(changed_poses).squeeze(0)
+
+    def get_body_indices(self, links):
+        """
+        Return (K,) int64 tensor of P indices for the given link prims.
+
+        Args:
+            links (list): Link prim objects with .relative_prim_path attribute.
+
+        Returns:
+            th.Tensor: (K,) int64 tensor of indices into the P dimension.
+        """
+        return th.tensor([self._PATH_TO_IDX[link.relative_prim_path] for link in links], dtype=th.long)
+
+    @staticmethod
+    def _poses_to_matrices(poses):
+        """
+        Convert poses tensor to 4x4 transformation matrices.
+
+        Args:
+            poses (th.Tensor): (..., P, 7) — [px, py, pz, qx, qy, qz, qw]
+
+        Returns:
+            th.Tensor: (..., P, 4, 4)
+        """
+        # Flatten all leading dims + P into a single batch dim
+        orig_shape = poses.shape  # (..., P, 7)
+        flat = poses.reshape(-1, 7)
+        pos = flat[:, :3]  # (N, 3)
+        quat_xyzw = flat[:, 3:]  # (N, 4) [qx, qy, qz, qw] — PhysX returns xyzw, T.pose2mat expects xyzw
+        mat = T.pose2mat((pos, quat_xyzw))  # (N, 4, 4)  [batched]
+        return mat.reshape(*orig_shape[:-1], 4, 4)  # (..., P, 4, 4)
+
+    def clear(self):
+        """Reset all cached state."""
+        self._RIGID_BODY_VIEW = []
+        self._PATH_TO_IDX = {}
+        self._IDX_TO_PATH = []
+        self._POSES = None
+        self._POSE_MATRICES = None
+
+
+RigidBodyViewAPI = RigidBodyViewAPIImpl()
+
+
 class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator.
