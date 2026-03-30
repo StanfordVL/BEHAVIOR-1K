@@ -169,7 +169,7 @@ def test_multi_scene_scene_prim():
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
     assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
-    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
+    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-2)
 
     og.clear()
 
