@@ -34,7 +34,7 @@ from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.utils.asset_utils import decrypt_file
-from omnigibson.utils.constants import OBJECT_CATEGORIES, EmitterType, PrimType
+from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, extract_class_init_kwargs_from_dict, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
