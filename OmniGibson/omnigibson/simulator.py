@@ -451,6 +451,7 @@ def _launch_simulator(*args, **kwargs):
             )
 
             # Store other references to variables that will be initialized later
+            self._initialized = False
             self._scenes = []
             self._physx_interface = lazy.omni.physx.get_physx_interface()
             self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
@@ -468,6 +469,7 @@ def _launch_simulator(*args, **kwargs):
                 pre_step=False,
                 order=0,
             )
+            lazy.isaacsim.core.simulation_manager.SimulationManager.enable_post_warm_start_callback(False)
             self._simulation_event_callback = (
                 self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
                     self._on_simulation_event
@@ -506,10 +508,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
-
-            # Cycle play / stop to validate sim.psi object to avoid getPhysXSceneStatistics errors
-            self.play()
-            self.stop()
 
             for state in self.object_state_types_requiring_update:
                 if issubclass(state, GlobalUpdateStateMixin):
@@ -844,6 +842,15 @@ def _launch_simulator(*args, **kwargs):
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
+            # channels = ["omni.usd", "omni.physicsschema.plugin"]
+            # if gm.ENABLE_FLATCACHE:
+            #     channels.append("omni.physx.plugin")
+            # with suppress_omni_log(channels=channels):
+            #     super().play()
+            # self.stop()
+            self.play()
+            self.stop()
+            self._initialized = True
             self.play()
 
             # Initialize the scene
@@ -1187,7 +1194,7 @@ def _launch_simulator(*args, **kwargs):
                 self.render()
 
                 # Update all object handles, unless this is a play during initialization
-                if og.sim is not None:
+                if og.sim is not None and self._initialized:
                     self.update_handles()
 
                 if was_stopped:
@@ -1210,9 +1217,9 @@ def _launch_simulator(*args, **kwargs):
                         # Also refresh any transition rules that became stale while sim was stopped
                         if gm.ENABLE_TRANSITION_RULES:
                             scene.transition_rule_api.refresh_all_rules()
-
-                # Additionally run non physics things
-                self._non_physics_step()
+                if self._initialized:
+                    # Additionally run non physics things
+                    self._non_physics_step()
 
             # Run all callbacks
             for callback in self._callbacks_on_play.values():

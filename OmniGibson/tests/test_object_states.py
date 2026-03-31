@@ -1235,6 +1235,41 @@ def test_kinematic_only_contact_no_error():
         # Explicit call must also not raise.
         RigidContactAPI.initialize_view()
 
+def test_fixed_bodies_falling():
+    if og.sim:
+        og.clear()
+
+    cfg = {
+        "scene": {"type": "Scene"},
+        "objects": [
+            {
+                "type": "DatasetObject",
+                "name": "bottom_cabinet",
+                "category": "bottom_cabinet",
+                "fixed_base": True,
+                "model": "bamfsz",
+                "position": [0, 5, 0],
+            },
+        ],
+    }
+    og.Environment(configs=cfg)
+
+
+def test_unfixed_bodies_crashing():
+    if og.sim:
+        og.clear()
+
+    cfg = {
+        "scene": {
+            "type": "Scene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["laptop"],
+        },
+    }
+    og.Environment(configs=cfg)
+    og.sim.step()
+    og.sim.play()
+
         scene_idx = env.scene.idx
         table = env.scene.object_registry("name", "table")
         bowl = env.scene.object_registry("name", "bowl")
