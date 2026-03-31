@@ -1061,6 +1061,14 @@ def _launch_simulator(*args, **kwargs):
             return self._sim_context.physics_sim_view
 
         @property
+        def pi(self):
+            return self._sim_context.pi
+
+        @property
+        def psi(self):
+            return self._sim_context.psi
+
+        @property
         def current_time_step_index(self):
             return self._sim_context.current_time_step_index
 
