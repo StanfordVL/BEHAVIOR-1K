@@ -452,24 +452,24 @@ def _launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scenes = []
-            self._physx_interface = lazy.omni.physx.get_physx_interface()
-            self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
-            self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
-            self._physx_fabric_interface = None
             # The callback will be called right *before* the physics step
-            self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
-                lambda _: self._on_pre_physics_step(),
-                pre_step=True,
-                order=0,
+            self._sim_context._pre_physics_step_callback = (
+                self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                    lambda _: self._on_pre_physics_step(),
+                    pre_step=True,
+                    order=0,
+                )
             )
             # The callback will be called right *after* the physics step
-            self._post_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
-                lambda _: self._on_post_physics_step(),
-                pre_step=False,
-                order=0,
+            self._sim_context._post_physics_step_callback = (
+                self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                    lambda _: self._on_post_physics_step(),
+                    pre_step=False,
+                    order=0,
+                )
             )
-            self._simulation_event_callback = (
-                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
+            self._sim_context._simulation_event_callback = (
+                self._physics_context._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
                     self._on_simulation_event
                 )
             )
@@ -478,13 +478,13 @@ def _launch_simulator(*args, **kwargs):
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
 
-            # Maps callback name to callback
-            self._callbacks_on_play = dict()
-            self._callbacks_on_stop = dict()
-            self._callbacks_on_add_obj = dict()
-            self._callbacks_on_remove_obj = dict()
-            self._callbacks_on_system_init = dict()
-            self._callbacks_on_system_clear = dict()
+            # Maps callback name to callback (stored on _sim_context so their lifecycle matches the physics context)
+            self._sim_context._callbacks_on_play = dict()
+            self._sim_context._callbacks_on_stop = dict()
+            self._sim_context._callbacks_on_add_obj = dict()
+            self._sim_context._callbacks_on_remove_obj = dict()
+            self._sim_context._callbacks_on_system_init = dict()
+            self._sim_context._callbacks_on_system_clear = dict()
 
             # Update internal settings
             self._set_physics_engine_settings()
@@ -901,7 +901,7 @@ def _launch_simulator(*args, **kwargs):
             assert isinstance(obj, USDObject), "_post_import_object can only be called with USDObject"
 
             # Run any callbacks
-            for callback in self._callbacks_on_add_obj.values():
+            for callback in self._sim_context._callbacks_on_add_obj.values():
                 callback(obj)
 
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
@@ -981,7 +981,7 @@ def _launch_simulator(*args, **kwargs):
                 obj (USDObject): a non-robot object to remove
             """
             # Run any callbacks
-            for callback in self._callbacks_on_remove_obj.values():
+            for callback in self._sim_context._callbacks_on_remove_obj.values():
                 callback(obj)
 
             # If it was queued up to be initialized, remove it from the queue as well
@@ -1017,12 +1017,9 @@ def _launch_simulator(*args, **kwargs):
             # Update all handles that are now broken because prims have changed
             self.update_handles()
 
-        def _reset_variables(self):
-            """
-            Reset internal variables when a new stage is loaded
-            """
-
         # ---- Proxy properties/methods delegating to the SimulationContext instance ----
+        def get_physics_context(self):
+            return self._sim_context.get_physics_context()
 
         @property
         def _physics_context(self):
@@ -1062,11 +1059,15 @@ def _launch_simulator(*args, **kwargs):
 
         @property
         def pi(self):
-            return self._sim_context.pi
+            return self._physics_context._physx_interface
 
         @property
         def psi(self):
-            return self._sim_context.psi
+            return self._physics_context._physx_sim_interface
+
+        @property
+        def psqi(self):
+            return lazy.omni.physx.get_physx_scene_query_interface()
 
         @property
         def current_time_step_index(self):
@@ -1250,7 +1251,7 @@ def _launch_simulator(*args, **kwargs):
                 self._non_physics_step()
 
             # Run all callbacks
-            for callback in self._callbacks_on_play.values():
+            for callback in self._sim_context._callbacks_on_play.values():
                 callback()
 
         def pause(self):
@@ -1262,7 +1263,7 @@ def _launch_simulator(*args, **kwargs):
                 self._sim_context.stop()
 
             # Run all callbacks
-            for callback in self._callbacks_on_stop.values():
+            for callback in self._sim_context._callbacks_on_stop.values():
                 callback()
 
         @property
@@ -1502,7 +1503,7 @@ def _launch_simulator(*args, **kwargs):
 
                     def callback() --> None
             """
-            self._callbacks_on_play[name] = callback
+            self._sim_context._callbacks_on_play[name] = callback
 
         def add_callback_on_stop(self, name, callback):
             """
@@ -1514,7 +1515,7 @@ def _launch_simulator(*args, **kwargs):
 
                     def callback() --> None
             """
-            self._callbacks_on_stop[name] = callback
+            self._sim_context._callbacks_on_stop[name] = callback
 
         def add_callback_on_add_obj(self, name, callback):
             """
@@ -1527,7 +1528,7 @@ def _launch_simulator(*args, **kwargs):
 
                     def callback(obj: USDObject) --> None
             """
-            self._callbacks_on_add_obj[name] = callback
+            self._sim_context._callbacks_on_add_obj[name] = callback
 
         def add_callback_on_remove_obj(self, name, callback):
             """
@@ -1540,7 +1541,7 @@ def _launch_simulator(*args, **kwargs):
 
                     def callback(obj: USDObject) --> None
             """
-            self._callbacks_on_remove_obj[name] = callback
+            self._sim_context._callbacks_on_remove_obj[name] = callback
 
         def add_callback_on_system_init(self, name, callback):
             """
@@ -1552,7 +1553,7 @@ def _launch_simulator(*args, **kwargs):
 
                     def callback(system: System) --> None
             """
-            self._callbacks_on_system_init[name] = callback
+            self._sim_context._callbacks_on_system_init[name] = callback
 
         def add_callback_on_system_clear(self, name, callback):
             """
@@ -1564,7 +1565,7 @@ def _launch_simulator(*args, **kwargs):
 
                     def callback(system: System) --> None
             """
-            self._callbacks_on_system_clear[name] = callback
+            self._sim_context._callbacks_on_system_clear[name] = callback
 
         def remove_callback_on_play(self, name):
             """
@@ -1573,7 +1574,7 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_play.pop(name, None)
+            self._sim_context._callbacks_on_play.pop(name, None)
 
         def remove_callback_on_stop(self, name):
             """
@@ -1582,7 +1583,7 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_stop.pop(name, None)
+            self._sim_context._callbacks_on_stop.pop(name, None)
 
         def remove_callback_on_add_obj(self, name):
             """
@@ -1591,7 +1592,7 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_add_obj.pop(name, None)
+            self._sim_context._callbacks_on_add_obj.pop(name, None)
 
         def remove_callback_on_remove_obj(self, name):
             """
@@ -1600,7 +1601,7 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_remove_obj.pop(name, None)
+            self._sim_context._callbacks_on_remove_obj.pop(name, None)
 
         def remove_callback_on_system_init(self, name):
             """
@@ -1609,7 +1610,7 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_system_init.pop(name, None)
+            self._sim_context._callbacks_on_system_init.pop(name, None)
 
         def remove_callback_on_system_clear(self, name):
             """
@@ -1618,31 +1619,7 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_system_clear.pop(name, None)
-
-        @property
-        def pi(self):
-            """
-            Returns:
-                PhysX: Physx Interface (pi) for controlling low-level physx engine
-            """
-            return self._physx_interface
-
-        @property
-        def psi(self):
-            """
-            Returns:
-                IPhysxSimulation: Physx Simulation Interface (psi) for controlling low-level physx simulation
-            """
-            return self._physx_simulation_interface
-
-        @property
-        def psqi(self):
-            """
-            Returns:
-                PhysXSceneQuery: Physx Scene Query Interface (psqi) for running low-level scene queries
-            """
-            return self._physx_scene_query_interface
+            self._sim_context._callbacks_on_system_clear.pop(name, None)
 
         @property
         def scenes(self):
@@ -1685,10 +1662,10 @@ def _launch_simulator(*args, **kwargs):
             return self._skybox
 
         def get_callbacks_on_system_init(self):
-            return self._callbacks_on_system_init
+            return self._sim_context._callbacks_on_system_init
 
         def get_callbacks_on_system_clear(self):
-            return self._callbacks_on_system_clear
+            return self._sim_context._callbacks_on_system_clear
 
         def restore(self, scene_files):
             """
@@ -1903,7 +1880,7 @@ def _launch_simulator(*args, **kwargs):
             assert self.is_playing()
 
             # Run Serializable.load_state (which calls _load_state)
-            Serializable.load_state(self, state=state, serialized=serialized)
+            super().load_state(state=state, serialized=serialized)
 
             # Highlight that at the current step, the non-kinematic states are potentially inaccurate because a sim
             # step is needed to propagate specific states in physics backend
