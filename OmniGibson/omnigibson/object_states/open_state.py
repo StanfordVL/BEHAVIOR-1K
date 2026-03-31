@@ -3,9 +3,12 @@ import random
 import torch as th
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin
+from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.constants import JointType
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import ArticulatedObjectViewAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -115,20 +118,35 @@ def _get_relevant_joints(obj):
     return both_sides, relevant_joints, joint_directions
 
 
-class Open(AbsoluteObjectState, BooleanStateMixin):
-    def __init__(self, obj):
-        self.relevant_joints_info = None
+class Open(TensorizedValueState, BooleanStateMixin):
+    """
+    Tensorized Open state.
 
-        # Run super method
-        super().__init__(obj=obj)
+    VALUES shape: (S, O) — float 1.0 = open, 0.0 = closed.
+    Updated each step via ArticulatedObjectViewAPI._POSITIONS (pre-allocated DOF cache).
+    """
 
-    def _initialize(self):
-        # Run super first
-        super()._initialize()
+    # (O, max_dof) bool — True for DOF columns that correspond to openable joints
+    OPENABLE_MASK = None
 
-        # Check the metadata info to get relevant joints information
-        self.relevant_joints_info = _get_relevant_joints(self.obj)
-        assert self.relevant_joints_info[1], f"No relevant joints for Open state found for object {self.obj.name}"
+    # (O, max_dof) float — threshold and direction per DOF for side=+1
+    THRESHOLDS_S1 = None
+    DIRECTIONS_S1 = None
+
+    # (O, max_dof) float — threshold and direction per DOF for side=-1 (0 for non-both_sides)
+    THRESHOLDS_S2 = None
+    DIRECTIONS_S2 = None
+
+    # (O,) bool — whether each object uses both-sides open logic
+    BOTH_SIDES = None
+
+    # (S*O,) int64 — pre-built row indices into ArticulatedObjectViewAPI._POSITIONS
+    # rows [obj_idx*S .. (obj_idx+1)*S-1] = scenes 0..S-1 for object obj_idx
+    OBJ_IDXES_IN_ARTICULATION_VIEW = None
+
+    @classproperty
+    def value_name(cls):
+        return "open"
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -169,36 +187,86 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
             else (False, f"No relevant joints for Open state found for asset prim {prim.GetName()}")
         )
 
+    @classmethod
+    def initialize_view(cls):
+        super().initialize_view()  # builds OBJ_IDXS, IDX_OBJS, VALUES (S, O)
+
+        O = len(cls.OBJ_IDXS)
+        if O == 0:
+            cls.OPENABLE_MASK = th.zeros((0, 0), dtype=th.bool)
+            cls.THRESHOLDS_S1 = th.zeros((0, 0))
+            cls.DIRECTIONS_S1 = th.zeros((0, 0))
+            cls.THRESHOLDS_S2 = th.zeros((0, 0))
+            cls.DIRECTIONS_S2 = th.zeros((0, 0))
+            cls.BOTH_SIDES = th.zeros(0, dtype=th.bool)
+            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(0, dtype=th.long)
+            return
+
+        max_dof = ArticulatedObjectViewAPI.get_max_dof()
+
+        cls.OPENABLE_MASK = th.zeros(O, max_dof, dtype=th.bool)
+        cls.THRESHOLDS_S1 = th.zeros(O, max_dof)
+        cls.DIRECTIONS_S1 = th.zeros(O, max_dof)
+        cls.THRESHOLDS_S2 = th.zeros(O, max_dof)
+        cls.DIRECTIONS_S2 = th.zeros(O, max_dof)
+        cls.BOTH_SIDES = th.zeros(O, dtype=th.bool)
+
+        for _rel_path, obj_idx in cls.OBJ_IDXS.items():
+            obj = next(row[obj_idx] for row in cls.IDX_OBJS if row[obj_idx] is not None)
+            if obj.joints is None:
+                continue  # not yet initialized; leave OPENABLE_MASK row as zeros
+            both_sides, relevant_joints, joint_directions = _get_relevant_joints(obj)
+            cls.BOTH_SIDES[obj_idx] = both_sides
+
+            for joint, direction in zip(relevant_joints, joint_directions):
+                for dof_col in joint.dof_indices:
+                    cls.OPENABLE_MASK[obj_idx, dof_col] = True
+                    for side, threshold_attr, direction_attr in [
+                        (1, "THRESHOLDS_S1", "DIRECTIONS_S1"),
+                        (-1, "THRESHOLDS_S2", "DIRECTIONS_S2"),
+                    ]:
+                        threshold, open_end, _ = _compute_joint_threshold(joint, direction * side)
+                        getattr(cls, threshold_attr)[obj_idx, dof_col] = threshold
+                        getattr(cls, direction_attr)[obj_idx, dof_col] = 1.0 if open_end > threshold else -1.0
+
+        # Pre-build row indices into ArticulatedObjectViewAPI — built once, reused every step
+        sorted_rel_paths = [p for p, _ in sorted(cls.OBJ_IDXS.items(), key=lambda x: x[1])]
+        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = ArticulatedObjectViewAPI.build_position_rows(sorted_rel_paths)
+
+    @classmethod
+    def _update_values(cls, values):
+        S = values.shape[0]
+        O = values.shape[1]
+
+        if O == 0 or cls.OBJ_IDXES_IN_ARTICULATION_VIEW.numel() == 0:
+            return values
+
+        # (S*O, max_dof) rows: [O0_S0..O0_S(S-1), O1_S0..O1_S(S-1), ...]
+        pos = ArticulatedObjectViewAPI.get_articulation_positions(cls.OBJ_IDXES_IN_ARTICULATION_VIEW)
+        pos = pos.reshape(O, S, -1)  # (O, S, max_dof)
+
+        mask = cls.OPENABLE_MASK.unsqueeze(1)  # (O, 1, max_dof)
+        t1 = cls.THRESHOLDS_S1.unsqueeze(1)  # (O, 1, max_dof)
+        d1 = cls.DIRECTIONS_S1.unsqueeze(1)
+        t2 = cls.THRESHOLDS_S2.unsqueeze(1)
+        d2 = cls.DIRECTIONS_S2.unsqueeze(1)
+
+        open_s1 = ((pos - t1) * d1 > 0) & mask  # (O, S, max_dof)
+        any_s1 = open_s1.any(dim=2)  # (O, S)
+
+        open_s2 = ((pos - t2) * d2 > 0) & mask
+        any_s2 = open_s2.any(dim=2)
+
+        both = cls.BOTH_SIDES.unsqueeze(1)  # (O, 1)
+        is_open = th.where(both, any_s1 & any_s2, any_s1)  # (O, S)
+
+        values[:] = is_open.T.float()  # (S, O)
+        return values
+
     def _get_value(self):
-        both_sides, relevant_joints, joint_directions = self.relevant_joints_info
-        if not relevant_joints:
-            return False
-
-        # The "sides" variable is used to check open/closed state for objects whose joints can switch
-        # positions. These objects are annotated with the both_sides annotation and the idea is that switching
-        # the directions of *all* of the joints results in a similarly valid checkable state. As a result, to check
-        # each "side", we multiply *all* of the joint directions with the coefficient belonging to that side, which
-        # may be 1 or -1.
-        sides = [1, -1] if both_sides else [1]
-
-        sides_openness = []
-        for side in sides:
-            # Compute a boolean openness state for each joint by comparing positions to thresholds.
-            joint_thresholds = (
-                _compute_joint_threshold(joint, joint_direction * side)
-                for joint, joint_direction in zip(relevant_joints, joint_directions)
-            )
-            joint_positions = [joint.get_state()[0] for joint in relevant_joints]
-            joint_openness = (
-                _is_in_range(position, threshold, open_end)
-                for position, (threshold, open_end, closed_end) in zip(joint_positions, joint_thresholds)
-            )
-
-            # Looking from this side, the object is open if any of its joints is open.
-            sides_openness.append(any(joint_openness))
-
-        # The object is open only if it's open from all of its sides.
-        return all(sides_openness)
+        s = self.obj.scene.idx
+        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+        return bool(self.VALUES[s, obj_idx] > 0.5)
 
     def _set_value(self, new_value, fully=False):
         """
@@ -211,7 +279,7 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
         Returns:
             bool: A boolean indicating the success of the setter. Failure may happen due to unannotated objects.
         """
-        both_sides, relevant_joints, joint_directions = self.relevant_joints_info
+        both_sides, relevant_joints, joint_directions = _get_relevant_joints(self.obj)
         if not relevant_joints:
             return False
 
@@ -226,15 +294,16 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
         for _ in range(m.OPEN_SAMPLING_ATTEMPTS):
             side = random.choice(sides)
 
+            joints_to_set = list(zip(relevant_joints, joint_directions))
+
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.
             if new_value and not fully:
                 num_to_open = th.randint(1, len(relevant_joints) + 1, (1,)).item()
                 random_indices = th.randperm(len(relevant_joints))[:num_to_open]
-                relevant_joints = [relevant_joints[i] for i in random_indices]
-                joint_directions = [joint_directions[i] for i in random_indices]
+                joints_to_set = [joints_to_set[i] for i in random_indices]
 
             # Go through the relevant joints & set random positions.
-            for joint, joint_direction in zip(relevant_joints, joint_directions):
+            for joint, joint_direction in joints_to_set:
                 threshold, open_end, closed_end = _compute_joint_threshold(joint, joint_direction * side)
 
                 # Get the range
@@ -256,8 +325,23 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
                 # Save sampled position.
                 joint.set_pos(joint_pos)
 
-            # If we succeeded, return now.
-            if self._get_value() == new_value:
+            # Check success from joint positions (VALUES is stale here)
+            sides_open = []
+            for check_side in sides:
+                joint_thresholds = (
+                    _compute_joint_threshold(joint, direction * check_side)
+                    for joint, direction in zip(relevant_joints, joint_directions)
+                )
+                joint_positions = [joint.get_state()[0] for joint in relevant_joints]
+                joint_openness = (
+                    _is_in_range(pos, threshold, open_end)
+                    for pos, (threshold, open_end, _) in zip(joint_positions, joint_thresholds)
+                )
+                sides_open.append(any(joint_openness))
+
+            if all(sides_open) == new_value:
+                # Write result into VALUES immediately so get_value() is correct before next global_update()
+                super()._set_value(float(new_value))
                 return True
 
         # We exhausted our attempts and could not find a working sample.

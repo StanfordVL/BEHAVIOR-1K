@@ -47,6 +47,7 @@ from omnigibson.utils.ui_utils import (
     suppress_omni_log,
 )
 from omnigibson.utils.usd_utils import (
+    ArticulatedObjectViewAPI,
     CollisionAPI,
     ControllableObjectViewAPI,
     PoseAPI,
@@ -1057,6 +1058,7 @@ def _launch_simulator(*args, **kwargs):
             # Finally update any unified views
             RigidContactAPI.initialize_view()
             RigidBodyViewAPI.initialize_view()
+            ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
             initialize_tensorized_states()
 
@@ -1074,6 +1076,7 @@ def _launch_simulator(*args, **kwargs):
                 # Update persistent rigid contact and body pose caches from the latest step
                 RigidContactAPI.update_contact_cache()
                 RigidBodyViewAPI.update_pose_cache()
+                ArticulatedObjectViewAPI.update_dof_cache()
 
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
@@ -1260,6 +1263,7 @@ def _launch_simulator(*args, **kwargs):
             # sampling etc, which means that we need to update the caches here too.
             RigidContactAPI.update_contact_cache()
             RigidBodyViewAPI.update_pose_cache()
+            ArticulatedObjectViewAPI.update_dof_cache()
 
             # TODO (andi) is this ideal?
             # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read

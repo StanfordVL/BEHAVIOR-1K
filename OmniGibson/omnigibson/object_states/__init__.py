@@ -46,6 +46,7 @@ def initialize_tensorized_states():
     MaxTemperature.initialize_view()  # depends on Temperature.OBJ_IDXS
     SlicerActive.initialize_view()
     ToggledOn.initialize_view()  # depends on RigidContactAPI
+    Open.initialize_view()  # depends on ArticulatedObjectViewAPI
 
 
 __all__ = [

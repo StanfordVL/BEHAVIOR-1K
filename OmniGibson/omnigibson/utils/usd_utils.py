@@ -360,6 +360,113 @@ class RigidBodyViewAPIImpl:
 RigidBodyViewAPI = RigidBodyViewAPIImpl()
 
 
+class ArticulatedObjectViewAPIImpl:
+    """
+    Batched DOF position cache for non-robot articulated objects across all scenes.
+
+    Creates one homogeneous ArticulationView per unique object type (relative_prim_path),
+    each covering all S scenes.  Results are packed into a pre-allocated
+    _POSITIONS slab of shape (S * O_views, max_dof) updated in-place every step.
+
+    Data layout:
+        _VIEWS       list[ArticulationView]   one per unique non-robot articulated object type
+        _VIEW_IDXES  {relative_prim_path: int}
+        _DOFS        (O_views,) int64         DOF count per view
+        _POSITIONS   (S*O_views, max_dof)     row [i*S+s] = scene s, object type i; padded with 0
+        _OBJ_IDXES   (O_views, S) int64       _OBJ_IDXES[view_idx, scene_idx] = row in
+                                               view.get_dof_positions() for that scene
+    """
+
+    def __init__(self):
+        self._VIEWS = []
+        self._VIEW_IDXES = {}
+        self._DOFS = None
+        self._POSITIONS = None
+        self._OBJ_IDXES = None
+
+    def initialize_view(self):
+        self.clear()
+
+        if len(og.sim.scenes) == 0:
+            return
+
+        from omnigibson.robots import Robot
+
+        scene0_objs = [
+            obj
+            for obj in og.sim.scenes[0].objects
+            if not isinstance(obj, Robot) and obj.articulation_root_path is not None
+        ]
+
+        if not scene0_objs:
+            return
+
+        S = len(og.sim.scenes)
+        dofs_list = []
+
+        for obj in scene0_objs:
+            parts = obj.articulation_root_path.split("/")
+            parts[2] = "scene_*"
+            pattern = "/".join(parts)
+            view = og.sim.physics_sim_view.create_articulation_view(pattern)
+            view_idx = len(self._VIEWS)
+            self._VIEWS.append(view)
+            self._VIEW_IDXES[obj.relative_prim_path] = view_idx
+            dofs_list.append(len(view.dof_paths[0]))
+
+        O_views = len(self._VIEWS)
+        self._DOFS = th.tensor(dofs_list, dtype=th.long)
+        self._OBJ_IDXES = th.zeros(O_views, S, dtype=th.long)
+
+        for view_idx, view in enumerate(self._VIEWS):
+            for row_idx, abs_path in enumerate(view.prim_paths):
+                scene_idx = int(abs_path.split("/")[2].replace("scene_", ""))
+                self._OBJ_IDXES[view_idx, scene_idx] = row_idx
+
+        max_dof = int(self._DOFS.max())
+        self._POSITIONS = th.zeros(S * O_views, max_dof)
+
+    def update_dof_cache(self):
+        """Populate _POSITIONS in-place from all views.  Called every step."""
+        if not self._VIEWS:
+            return
+        S = len(og.sim.scenes)
+        for view_idx, view in enumerate(self._VIEWS):
+            raw = view.get_dof_positions()  # (S, n_dof) — view's internal ordering
+            n_dof = int(self._DOFS[view_idx])
+            perm = self._OBJ_IDXES[view_idx]  # (S,) — perm[scene_idx] = row in raw
+            start = view_idx * S
+            self._POSITIONS[start : start + S, :n_dof] = raw[perm]
+
+    def get_max_dof(self):
+        """Return the padded DOF width of _POSITIONS (max across all views); 0 if not initialized."""
+        return self._POSITIONS.shape[1] if self._POSITIONS is not None else 0
+
+    def build_position_rows(self, relative_prim_paths):
+        """Return (S * len(paths),) int64 index tensor into _POSITIONS.
+
+        Rows are obj-major: [i*S .. (i+1)*S-1] = scenes 0..S-1 for paths[i].
+        Build once in initialize_view() and reuse every step.
+        """
+        S = len(og.sim.scenes)
+        rows = th.cat([th.arange(self._VIEW_IDXES[p] * S, (self._VIEW_IDXES[p] + 1) * S) for p in relative_prim_paths])
+        return rows
+
+    def get_articulation_positions(self, position_rows):
+        """Return _POSITIONS[position_rows] — pure tensor index, no PhysX call."""
+        return self._POSITIONS[position_rows]
+
+    def clear(self):
+        self._VIEWS = []
+        self._VIEW_IDXES = {}
+        self._DOFS = None
+        self._POSITIONS = None
+        self._OBJ_IDXES = None
+
+
+ArticulatedObjectViewAPI = ArticulatedObjectViewAPIImpl()
+
+
 class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator.
@@ -1894,7 +2001,9 @@ def clear():
     """
     PoseAPI.invalidate()
     CollisionAPI.clear()
+    RigidBodyViewAPI.clear()
     RigidContactAPI.clear()
+    ArticulatedObjectViewAPI.clear()
     ControllableObjectViewAPI.clear()
 
 
