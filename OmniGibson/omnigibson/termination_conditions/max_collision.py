@@ -37,6 +37,8 @@ class MaxCollision(FailureCondition):
         robot = env.robots[self._robot_idn]
         floors = list(env.scene.object_registry("category", "floors", []))
         ignore_objs = floors + [robot] if self._ignore_self_collisions else floors
-        in_contact = RigidContactAPI.is_in_contact(scene_idx=robot.scene.idx, query_set=[robot], ignore_set=ignore_objs)
+        in_contact = RigidContactAPI.is_in_contact(
+            scene_idx=robot.scene.idx, query_set=[robot], with_set=None, ignore_set=ignore_objs, current_only=False
+        )
         self._n_collisions += int(in_contact)
         return self._n_collisions > self._max_collisions

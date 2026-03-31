@@ -7,6 +7,7 @@ import datetime
 import logging
 import math
 import random
+import sys
 from pathlib import Path
 
 import imageio
@@ -24,6 +25,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
+from omnigibson.controllers import ControllerView
 
 
 def print_icon():
@@ -269,7 +271,7 @@ def debug_breakpoint(msg):
     embed()
 
 
-def choose_from_options(options, name, random_selection=False):
+def choose_from_options(options, name, random_selection=False, selected_option=None):
     """
     Prints out options from a list, and returns the requested option.
 
@@ -278,6 +280,7 @@ def choose_from_options(options, name, random_selection=False):
             explaining the individual options
         name (str): name of the options
         random_selection (bool): if the selection is random (for automatic demo execution). Default False
+        selected_option (str or None): if specified, directly return this option without prompting. Default None
 
     Returns:
         str: Requested option
@@ -290,7 +293,10 @@ def choose_from_options(options, name, random_selection=False):
         print("[{}] {}{}".format(k + 1, option, docstring))
     print()
 
-    if not random_selection:
+    if selected_option is not None:
+        assert selected_option in options, "selected_option '{}' is not a valid {}.".format(selected_option, name)
+        return selected_option
+    elif not random_selection:
         try:
             s = input("Choose a {} (enter a number from 1 to {}): ".format(name, len(options)))
             # parse input into a number within range
@@ -299,7 +305,12 @@ def choose_from_options(options, name, random_selection=False):
             k = 0
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
-        k = random.choice(range(len(options)))
+        if "pytest" in sys.modules:
+            local_rng = random.Random(0)
+            k = local_rng.choice(range(len(options)))
+        else:
+            k = random.choice(range(len(options)))
+        print("Choosing {}: {} randomly".format(k, list(options)[k]))
 
     # Return requested option
     return list(options)[k]
@@ -590,18 +601,19 @@ class KeyboardRobotController:
         self.robot = robot
         self.action_dim = robot.action_dim
         self.controller_info = dict()
-        self.joint_idx_to_controller = dict()
+        self.joint_idx_to_group_key = dict()
         idx = 0
-        for name, controller in robot._controllers.items():
+
+        for name, (group_key, _) in robot.controllers.items():
             self.controller_info[name] = {
-                "name": type(controller).__name__,
+                "name": ControllerView.get_controller_type_str(group_key),
                 "start_idx": idx,
-                "dofs": controller.dof_idx,
-                "command_dim": controller.command_dim,
+                "dofs": ControllerView.get_dof_idx(group_key),
+                "command_dim": ControllerView.get_command_dim(group_key),
             }
-            idx += controller.command_dim
-            for i in controller.dof_idx.tolist():
-                self.joint_idx_to_controller[i] = controller
+            idx += ControllerView.get_command_dim(group_key)
+            for i in ControllerView.get_dof_idx(group_key).tolist():
+                self.joint_idx_to_group_key[i] = group_key
 
         # Other persistent variables we need to keep track of
         self.joint_names = [name for name in robot.joints.keys()]  # Ordered list of joint names belonging to the robot
@@ -877,11 +889,11 @@ class KeyboardRobotController:
                     # Import here to avoid circular imports
                     from omnigibson.utils.constants import JointType
 
-                    controller = self.joint_idx_to_controller[joint_idx]
+                    gk = self.joint_idx_to_group_key[joint_idx]
                     if (
                         self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC
-                        and controller.use_delta_commands
-                        and controller.motor_type == "position"
+                        and ControllerView.get_use_delta_commands(gk)
+                        and ControllerView.get_motor_type(gk) == "position"
                     ):
                         val *= 0.2
 

@@ -1,19 +1,17 @@
 import torch as th
 
-from utils import SYSTEM_EXAMPLES, og_test
+from utils import SYSTEM_EXAMPLES
 
 import omnigibson as og
 from omnigibson.object_states import Covered
 from omnigibson.systems import VisualParticleSystem, MicroPhysicalParticleSystem
 
 
-@og_test
-def test_system_spawn_and_clear(env):
+def test_system_spawn_and_clear(env, breakfast_table):
     og.sim.viewer_camera.set_position_orientation(
         th.tensor([0.1525, -0.2867, 0.0773]), th.tensor([0.6538, 0.1604, 0.1762, 0.7181])
     )
     og.sim.step()
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         for _ in range(3):
             system = env.scene.get_system(system_name)

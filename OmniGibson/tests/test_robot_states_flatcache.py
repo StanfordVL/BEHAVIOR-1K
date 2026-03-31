@@ -3,10 +3,10 @@ import pytest
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
+from omnigibson.controllers import ControllerView
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
 
@@ -109,7 +109,7 @@ def camera_pose_test(flatcache):
     assert th.allclose(robot.get_position_orientation()[0], th.tensor([150, 150, 100], dtype=th.float32), atol=1e-3)
 
     # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
-    camera_parent_prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3d([2.0, 2.0, 2.0]))
+    camera_parent_prim.scale = th.tensor([2.0, 2.0, 2.0])
     camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
     camera_local_pose = vision_sensor.get_position_orientation(frame="parent")
     expected_mat = camera_parent_world_transform @ pose2mat(camera_local_pose)
@@ -306,10 +306,10 @@ def test_grasping_mode():
         for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
             env.step(action)
 
-        gripper_controller = robot.controllers["gripper_0"]
+        group_key, controller_idx = robot.controllers["gripper_0"]
 
         # Grasp the box
-        gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
+        ControllerView.update_goal(group_key, controller_idx, th.tensor([-1.0]))
         for _ in range(30):
             og.sim.step()
 
@@ -327,7 +327,7 @@ def test_grasping_mode():
         ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
         # Release the box
-        gripper_controller.update_goal(cb.array([1]), robot.get_control_dict())
+        ControllerView.update_goal(group_key, controller_idx, th.tensor([1.0]))
         for _ in range(20):
             og.sim.step()
 

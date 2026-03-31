@@ -180,7 +180,7 @@ def create_joint(
     # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
     if og.sim.is_playing():
         with suppress_omni_log(channels=["omni.physx.plugin"]):
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+            og.sim.refresh_physics()
 
     # Return this joint
     return joint_prim
@@ -471,8 +471,14 @@ class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator.
 
-    Contact information is cached per-physics-step and only updated for body pairs whose relative positions change.
-    This allows contact checks to persist for sleeping rigid body pairs.
+    This API checks for contacts on every physics step, and then aggregates this into a boolean contact matrix
+    on every non-physics step. Callers can then use this API to query either for contacts that are still ongoing,
+    or contacts that occurred at any point since the last non-physics step (e.g. for checking for contact events).
+    Contact information is cached per-physics-step and only updated for body pairs who have at least one side
+    not asleep, which allows this API to bypass the limitations of the view (which returns contacts only for awake bodies).
+
+    Since there is no direct tensorized way to check for object sleep state, this API approximates this by checking for
+    the net contact force on an object (only reported for awake bodies) and also the position change since the last step.
     """
 
     def __init__(self):
@@ -498,8 +504,12 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = None
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = None
 
-        # Current contacts over all tracked rigid bodies at the current timestep. Shape: (S, R, C)
+        # Contact matrix tracking contacts that occurred at any point during the last N physics steps
+        # (between consecutive update_contact_cache calls). Shape: (S, R, C)
         self._CONTACT_MATRIX = None
+
+        # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
+        self._CURRENT_CONTACT_MATRIX = dict()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (S, R, C, 2)
@@ -508,8 +518,14 @@ class RigidContactAPIImpl:
         # Cached body transforms used for change detection. Shape: (S, N, 7) [pos(3), quat(4)]
         self._BODY_TRANSFORMS = None
 
+        # Accumulated impulse matrices and transforms from individual physics steps,
+        # collected between consecutive update_contact_cache calls.
+        self._PENDING_IMPULSES = dict()
+        self._PENDING_TRANSFORMS = dict()
+        self._PENDING_NET_FORCES = dict()
+
         # Position / orientation tolerances for deciding whether a pair should be updated
-        self._POS_EPS = 1e-4
+        self._POS_EPS = 1e-6
         self._ORI_EPS = 1e-4
 
     @classmethod
@@ -524,6 +540,11 @@ class RigidContactAPIImpl:
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
+
+            # Add the (global) floor plane if there is one
+            if og.sim.floor_plane is not None:
+                filters[scene_idx].append(og.sim.floor_plane.prim_path + "/collisionPlane")
+
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
@@ -555,6 +576,7 @@ class RigidContactAPIImpl:
         # Snapshot the old contact matrices and path mappings so we can carry over
         # cached contact state for pairs of bodies that already existed.
         prev_contact_matrix = self._CONTACT_MATRIX
+        prev_current_contact_matrix = dict(self._CURRENT_CONTACT_MATRIX)
         prev_path_to_row_idx = dict(self._PATH_TO_ROW_IDX)
         prev_path_to_col_idx = dict(self._PATH_TO_COL_IDX)
 
@@ -615,18 +637,18 @@ class RigidContactAPIImpl:
         index_matrices = []
 
         # Generate views, making sure to update simulation first so the physx backend is synchronized.
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        og.sim.refresh_physics()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, scene in enumerate(og.sim.scenes):
                 scene_body_filters = body_filters[scene_idx]
-                if len(scene_body_filters) == 0:
+                if len(scene_body_filters) == 0 or len(dynamic_filters[scene_idx]) == 0:
                     continue
 
                 # Convert relative paths to absolute for this scene's PhysX view creation
                 scene_body_filters_absolute = [
                     scene_relative_prim_path_to_absolute(scene, p) for p in col_paths_relative
                 ]
-                self._CONTACT_VIEW.append(
+                contact_matrices.append(
                     og.sim.physics_sim_view.create_rigid_contact_view(
                         pattern=f"/World/scene_{scene_idx}/*/*",
                         filter_patterns=scene_body_filters_absolute,
@@ -694,13 +716,26 @@ class RigidContactAPIImpl:
                 index_matrices.append(index_matrix)
                 body_transforms_list.append(self._RIGID_BODY_VIEW[scene_idx].get_transforms().clone())
 
-                # Build the new contact matrix. Start from current impulses (captures contacts
+                # Build the new contact matrices. Start from current impulses (captures contacts
                 # for newly added bodies), then overwrite with previously cached values for
                 # every pair of bodies that already existed before the rebuild.
                 initial_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
-                contact_matrix = th.any(initial_impulses != 0, dim=-1)
+                initial_contacts = th.any(initial_impulses != 0, dim=-1)
 
-                if prev_contact_matrix is not None and prev_path_to_row_idx and prev_path_to_col_idx:
+                # Initialize pending accumulation lists for this scene
+                # Note that existing data in these lists will be lost when the view is rebuilt.
+                # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
+                # This TODO can be accomplished after the follow-up PR removes RigidContactAPI use in assisted grasping.
+                self._PENDING_IMPULSES[scene_idx] = []
+                self._PENDING_TRANSFORMS[scene_idx] = []
+                self._PENDING_NET_FORCES[scene_idx] = []
+
+                if (
+                    prev_contact_matrix is not None
+                    and prev_current_contact_matrix is not None
+                    and prev_path_to_row_idx
+                    and prev_path_to_col_idx
+                ):
                     # Find rows and columns that existed in both the old and new views (relative paths)
                     surviving_row_paths = [p for p in row_paths_relative if p in prev_path_to_row_idx]
                     surviving_col_paths = [p for p in col_paths_relative if p in prev_path_to_col_idx]
@@ -709,65 +744,153 @@ class RigidContactAPIImpl:
                         old_col_idxs = th.tensor([prev_path_to_col_idx[p] for p in surviving_col_paths], dtype=th.long)
                         new_row_idxs = th.tensor([self._PATH_TO_ROW_IDX[p] for p in surviving_row_paths], dtype=th.long)
                         new_col_idxs = th.tensor([self._PATH_TO_COL_IDX[p] for p in surviving_col_paths], dtype=th.long)
-                        contact_matrix[new_row_idxs[:, None], new_col_idxs[None, :]] = prev_contact_matrix[scene_idx][
+                        initial_contacts[new_row_idxs[:, None], new_col_idxs[None, :]] = prev_contact_matrix[scene_idx][
                             old_row_idxs[:, None], old_col_idxs[None, :]
                         ]
 
-                contact_matrices.append(contact_matrix)
+                contact_matrices.append(initial_contacts)
 
         # Stack per-scene tensors into scene-batched tensors: (S, R, C), (S, N, 7), (S, R, C, 2)
         self._CONTACT_MATRIX = th.stack(contact_matrices, dim=0)
+        self._CURRENT_CONTACT_MATRIX = th.stack(contact_matrices, dim=0)
         self._BODY_TRANSFORMS = th.stack(body_transforms_list, dim=0)
         self._INDEX_MATRIX = th.stack(index_matrices, dim=0)
 
-    def update_contact_cache(self):
+    def add_contacts_from_physics_step(self):
         """
-        Updates contact caches from the latest physics step.
+        Fetches contact impulse matrices and body transforms from the current physics step
+        and appends them to pending lists. Should be called by the simulator after every
+        individual physics step. The accumulated data is later processed in bulk by
+        update_contact_cache.
         """
+        assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
+
         for scene_idx in range(len(self._CONTACT_VIEW)):
             try:
-                current_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
+                # Get the contact impulse and net force matrices for this scene
+                impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
+                net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt())
             except Exception:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
                     "This is expected if the physics sim view is not yet initialized, e.g. you are loading "
                     "a scene for the first time."
                 )
-                # Keep previous cache if the view is transiently invalid.
                 continue
 
+            # Get the body transforms for this scene
             transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
+
+            # Append the data to the pending lists. Note that we have to clone these matrices because
+            # the view actually reuses the buffer.
+            self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
+            self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
+            self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
+
+    def update_contact_cache(self):
+        """
+        Processes all accumulated physics-step data (collected via add_contacts_from_physics_step)
+        to update both the "recent" contact matrix (any contact in the last N steps) and the
+        "current" contact matrix (contact at only the most recent step).
+
+        Awakeness is evaluated per individual physics step by prepending the previously cached
+        transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
+        force are also treated as awake.  Contact matrices are only updated from awake steps.
+        """
+        for scene_idx in list(self._CONTACT_VIEW.keys()):
+            # Get the pending data for this scene
+            pending_impulses = self._PENDING_IMPULSES[scene_idx]
+            pending_transforms = self._PENDING_TRANSFORMS[scene_idx]
+            pending_net_forces = self._PENDING_NET_FORCES[scene_idx]
+            assert len(pending_impulses) == len(pending_transforms), "Number of impulses and transforms must match"
+            assert len(pending_impulses) == len(pending_net_forces), "Number of impulses and net forces must match"
+            N = len(pending_impulses)
+            if N == 0:
+                continue
+
+            # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
+            all_impulses = th.stack(pending_impulses, dim=0)
+            all_transforms = th.stack(pending_transforms, dim=0)
+            all_net_forces = th.stack(pending_net_forces, dim=0)
+
+            # Get the previous body transforms for the cache
             prev_transforms = self._BODY_TRANSFORMS[scene_idx]
 
-            # Find the indices of the rigid body rows that have changed
-            pos_changed = th.any(th.abs(transforms[:, :3] - prev_transforms[:, :3]) > self._POS_EPS, dim=1)
-            ori_changed = th.abs(th.sum(transforms[:, 3:7] * prev_transforms[:, 3:7], dim=1)) < (1.0 - self._ORI_EPS)
-            changed = pos_changed | ori_changed
+            # Apply the position-based sleep state approximation. Here we compute the delta between
+            # each physics step's transform with the previous physics step's transform (using the cached transform
+            # for the first physics step).
+            extended_transforms = th.cat([prev_transforms.unsqueeze(0), all_transforms], dim=0)  # (N+1, num_bodies, 7)
+            pos_changed = th.any(
+                th.abs(extended_transforms[1:, :, :3] - extended_transforms[:-1, :, :3]) > self._POS_EPS, dim=-1
+            )  # (N, num_bodies)
+            quat_dot = th.sum(
+                extended_transforms[1:, :, 3:7] * extended_transforms[:-1, :, 3:7], dim=-1
+            )  # (N, num_bodies)
+            ori_changed = th.abs(quat_dot) < (1.0 - self._ORI_EPS)  # (N, num_bodies)
+            per_step_awake = pos_changed | ori_changed  # (N, num_bodies)
 
-            # Now, for each row index and column index in the contact matrix, check if the rigid body has moved
-            did_row_change = changed[self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS]
-            did_col_change = th.zeros(len(self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS), dtype=th.bool)
-            # Here we ignore kinematic-only columns, which do not appear in the rigid-body view.
-            # They are fixed-position, so treating them as "unchanged"
-            # preserves persistence correctness while avoiding invalid indexing.
-            valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY
-            valid_col_rows = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[valid_col_mask]
-            did_col_change[valid_col_mask] = changed[valid_col_rows]
+            # Other than the position change, we also know that an object cannot be asleep if the net contact force is nonzero.
+            row_to_rigid = self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]
+            net_force_awake = th.any(all_net_forces != 0, dim=-1)  # (N, R)
+            per_step_awake[:, row_to_rigid] = per_step_awake[:, row_to_rigid] | net_force_awake
 
-            # Then, update the contact matrix for every pair where at least one body has changed
-            changed_pairs = did_row_change[:, None] | did_col_change[None, :]
-            self._CONTACT_MATRIX[scene_idx][changed_pairs] = th.any(current_impulses[changed_pairs] != 0, dim=-1)
+            # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
+            # data for all the indices where the object is not asleep.
+            body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
+            last_awake_body_step = (
+                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+            )  # (num_bodies,)
 
-            # Finally, update the body transforms. Note that we're only updating the transforms for the rows that have changed.
-            # This way we prevent error from accumulating over time for very slow-moving objects.
-            self._BODY_TRANSFORMS[scene_idx][changed] = transforms[changed]
+            # For each step, compute the rows that are awake
+            per_step_row_awake = per_step_awake[:, row_to_rigid]  # (N, R)
+
+            # For each step, compute the columns that are awake
+            col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
+            valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
+            per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
+            per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
+
+            # For each step, compute the pairs that are awake. This is an outer-OR of the row and column awake masks.
+            per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
+
+            # What is the last step that the pair was awake?
+            pair_step_indices = th.arange(N, dtype=th.long).reshape(N, 1, 1).expand_as(per_step_awake_pairs)
+            last_awake_pair_step = (
+                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+            )  # (R, C)
+            pair_was_awake = last_awake_pair_step >= 0  # (R, C)
+
+            # "Current" contact matrix: impulses from the last awake step per pair.
+            # Pairs that were never awake retain their previous value.
+            awake_rc = th.where(pair_was_awake)
+            awake_pair_steps = last_awake_pair_step[pair_was_awake]
+            last_awake_impulses = all_impulses[awake_pair_steps, awake_rc[0], awake_rc[1]]  # (num_awake, 3)
+            self._CURRENT_CONTACT_MATRIX[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
+
+            # "Recent" contact matrix: any contact across awake steps for awake pairs,
+            # or the (now-updated) current contact value for non-awake pairs.
+            any_contact_per_step = th.any(all_impulses != 0, dim=-1)  # (N, R, C)
+            any_awake_contact = th.any(any_contact_per_step & per_step_awake_pairs, dim=0)  # (R, C)
+            self._CONTACT_MATRIX[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
+            self._CONTACT_MATRIX[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX[scene_idx][~pair_was_awake]
+
+            # Update body transforms from each body's last awake step
+            awake_body_indices = th.where(last_awake_body_step >= 0)[0]
+            self._BODY_TRANSFORMS[scene_idx][awake_body_indices] = all_transforms[
+                last_awake_body_step[awake_body_indices], awake_body_indices
+            ]
+
+            # Clear pending data for this scene
+            self._PENDING_IMPULSES[scene_idx] = []
+            self._PENDING_TRANSFORMS[scene_idx] = []
+            self._PENDING_NET_FORCES[scene_idx] = []
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
         Converts a set of objects, links, or prim paths to a list of relative prim paths for contact matrix lookups.
 
         Args:
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to convert to relative prim paths.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to convert to relative prim paths.
 
         Returns:
             list[str]: List of relative prim paths (scene-local, e.g. "/robot0/base_link").
@@ -802,7 +925,7 @@ class RigidContactAPIImpl:
         Row indices are shared across all scenes (all scenes have identical relative prim paths).
 
         Args:
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact row indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to get the contact row indices for.
 
         Returns:
             th.Tensor: Tensor of row indices.
@@ -811,7 +934,7 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to relative prim paths
+        # Otherwise, convert to relative prim paths, filtering out kinematic-only bodies that are not rows
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
         return th.tensor([self._PATH_TO_ROW_IDX[path] for path in prim_paths])
 
@@ -824,7 +947,7 @@ class RigidContactAPIImpl:
         Column indices are shared across all scenes (all scenes have identical relative prim paths).
 
         Args:
-            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or BaseObject): Objects, links, or prim paths to get the contact column indices for.
+            objects_links_or_prim_paths (set of EntityPrim, RigidPrim, str, or USDObject): Objects, links, or prim paths to get the contact column indices for.
 
         Returns:
             th.Tensor: Tensor of column indices.
@@ -837,21 +960,24 @@ class RigidContactAPIImpl:
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
         return th.tensor([self._PATH_TO_COL_IDX[path] for path in prim_paths])
 
-    def get_contact_pairs(self, scene_idx, query_set, with_set=None):
+    def get_contact_pairs(self, scene_idx, query_set, with_set, current_only):
         """
         Get pairs of prim paths that are in contact.
 
         Args:
             scene_idx (int): Scene index to get the contact pairs for.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects for contact sensor objects to check.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact.
+            query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects for contact sensor objects to check. Must be specified.
+            with_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to filter the contact pairs by. Only these objects will be considered for contact. Can be None to check for contact with any object.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             set of tuples: Set of tuples of (query_abs_prim_path, filter_abs_prim_path) pairs that are in contact.
         """
         if self._CONTACT_MATRIX is None or scene_idx >= self._CONTACT_MATRIX.shape[0]:
             return set()
-        contact_matrix = self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         assert contact_matrix.ndim == 2, f"Contact matrix should be 2D, found shape {contact_matrix.shape}"
 
         # Get the row indices corresponding to the sensor prim paths
@@ -884,15 +1010,18 @@ class RigidContactAPIImpl:
             for row, col in original_indices
         }
 
-    def is_in_contact(self, scene_idx, query_set, with_set=None, ignore_set=None):
+    def is_in_contact(self, scene_idx, query_set, with_set, ignore_set, current_only):
         """
         Check if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set.
 
         Args:
             scene_idx (int): Scene index to check for contact.
-            query_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact.
-            with_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to check for contact with.
-            ignore_set (set of RigidPrim, str, or BaseObject): Prims, prim paths, or objects to ignore contact with.
+            query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact.
+            with_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact with. Can be None to check for contact with any object.
+            ignore_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to ignore contact with. Can be None to not ignore any objects.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
 
         Returns:
             bool: True if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set, else False.
@@ -903,8 +1032,10 @@ class RigidContactAPIImpl:
         if self._CONTACT_MATRIX is None or scene_idx >= self._CONTACT_MATRIX.shape[0]:
             return False
 
-        contact_matrix = self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         rows = self.get_contact_row_indices(query_set)
+        if rows.numel() == 0:
+            return False
         if with_set is not None:
             cols = self.get_contact_col_indices(with_set)
             return th.any(contact_matrix[rows, :][:, cols]).item()
@@ -954,7 +1085,7 @@ class RigidContactAPIImpl:
         mask[idxs] = True
         return mask
 
-    def is_in_contact_batch(self, query_masks, with_masks=None, ignore_masks=None):
+    def is_in_contact_batch(self, query_masks, with_masks, ignore_masks, current_only):
         """
         Batch contact check across all scenes, fully tensorized.
 
@@ -975,6 +1106,10 @@ class RigidContactAPIImpl:
                 columns belonging to the with-set for each query.
             ignore_masks (th.Tensor or None): ``(S, *K, C)`` boolean tensor. True for contact-matrix
                 columns to be *ignored* for each query.
+            current_only (bool): If True, only checks the most recent physics step. If False, checks whether contact occurred at any physics step since the last non-physics step.
+                The True mode is recommended for use cases like Touching state etc. where a contact at the current position of the object is important.
+                The False mode is recommended for use cases like transition rules etc. where a contact at any point during the last N physics steps is enough (e.g. as a trigger event).
+
 
         Returns:
             th.Tensor: ``(S, *K)`` boolean tensor of contact results.
@@ -984,6 +1119,8 @@ class RigidContactAPIImpl:
         if self._CONTACT_MATRIX is None or self._CONTACT_MATRIX.numel() == 0:
             return th.zeros(query_masks.shape[:-1], dtype=th.bool)
 
+        contact_matrix = self._CURRENT_CONTACT_MATRIX if current_only else self._CONTACT_MATRIX
+
         # Reshape query_masks from (S, *K, R) to (S, K_flat, R) for batched matmul
         orig_shape = query_masks.shape  # (S, *K, R)
         S = orig_shape[0]
@@ -992,10 +1129,10 @@ class RigidContactAPIImpl:
 
         # (S, K_flat, R) @ (S, R, C) → (S, K_flat, C), then threshold
         # query_contacts[s, k, c] = True iff any row in query set k is in contact with column c in scene s.
-        query_contacts = (K_flat.float() @ self._CONTACT_MATRIX.float()) > 0
+        query_contacts = (K_flat.float() @ contact_matrix.float()) > 0
 
         # Reshape back from (S, K_flat, C) to (S, *K, C)
-        C = self._CONTACT_MATRIX.shape[-1]
+        C = contact_matrix.shape[-1]
         query_contacts = query_contacts.reshape(*orig_shape[:-1], C)
 
         if with_masks is not None:
@@ -1019,8 +1156,12 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = None
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = None
         self._CONTACT_MATRIX = None
+        self._CURRENT_CONTACT_MATRIX = dict()
         self._INDEX_MATRIX = None
         self._BODY_TRANSFORMS = None
+        self._PENDING_IMPULSES = dict()
+        self._PENDING_TRANSFORMS = dict()
+        self._PENDING_NET_FORCES = dict()
 
 
 # Instantiate the RigidContactAPI
@@ -1244,6 +1385,10 @@ class PoseAPI:
             # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
+            # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
+            # check if this is still the case for later versions
+            og.sim.render()
+
             # when flatcache is on
             if og.sim._physx_fabric_interface:
                 # no time step is taken here
@@ -1251,7 +1396,7 @@ class PoseAPI:
             # when flatcache is off
             else:
                 # no time step is taken here
-                og.sim.psi.fetch_results()
+                og.sim.refresh_physics(sync_usd=True)
             cls.mark_valid()
 
     @classmethod
@@ -1323,6 +1468,11 @@ class BatchControlViewAPIImpl:
     A centralized view that allows for reading and writing to an ArticulationView that covers multiple
     controllable objects in the scene. This is used to avoid the overhead of reading from many views
     for each robot in each physics step, a source of significant overhead.
+
+    **Compute backend:** Isaac's physics sim articulation view APIs return **torch** tensors. This layer
+    caches **compute-backend arrays** (``cb.arr_type``). All public getters on this class therefore
+    return ``cb`` arrays (positions, quaternions, Jacobians, etc.). Batched writes from controllers
+    expect ``cb`` arrays as well. ``flush_control`` converts cached targets back to torch for the PhysX backend.
     """
 
     def __init__(self, pattern):
@@ -1475,6 +1625,7 @@ class BatchControlViewAPIImpl:
                 obj.base_footprint_link_name if obj.base_footprint_link_name != obj.root_link_name else None
             )
             for obj in controllable_objects
+            if obj.articulation_root_path in expected_prim_paths
         }
 
     def set_joint_position_targets(self, prim_path, positions, indices):
@@ -1519,13 +1670,61 @@ class BatchControlViewAPIImpl:
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    def get_root_transform(self, prim_path):
+    def get_member_view_indices(self, prim_paths):
+        """Return view row index for each prim_path (in input order)."""
+        return [self._idx[p] for p in prim_paths]
+
+    def set_all_joint_position_targets(self, enabled_rows, controls, dof_idx):
+        """
+        Args:
+            enabled_rows: list[int] — view row indices for enabled members (pre-filtered)
+            controls: (N_enabled, len(dof_idx)) compute-backend array — pre-stacked by controller
+            dof_idx: DOF column indices (cb.arr_type)
+        """
+        if "dof_position_targets" not in self._read_cache:
+            self._read_cache["dof_position_targets"] = cb.from_torch(self._view.get_dof_position_targets())
+        targets = self._read_cache["dof_position_targets"]
+        row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
+        targets[row_idx, dof_idx] = controls
+        self._write_idx_cache["dof_position_targets"].update(enabled_rows)
+
+    def set_all_joint_velocity_targets(self, enabled_rows, velocities, dof_idx):
+        if "dof_velocity_targets" not in self._read_cache:
+            self._read_cache["dof_velocity_targets"] = cb.from_torch(self._view.get_dof_velocity_targets())
+        targets = self._read_cache["dof_velocity_targets"]
+        row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
+        targets[row_idx, dof_idx] = velocities
+        self._write_idx_cache["dof_velocity_targets"].update(enabled_rows)
+
+    def set_all_joint_efforts(self, enabled_rows, efforts, dof_idx):
+        if "dof_actuation_forces" not in self._read_cache:
+            self._read_cache["dof_actuation_forces"] = cb.from_torch(self._view.get_dof_actuation_forces())
+        targets = self._read_cache["dof_actuation_forces"]
+        row_idx = cb.int_array(enabled_rows).reshape(-1, 1)
+        targets[row_idx, dof_idx] = efforts
+        self._write_idx_cache["dof_actuation_forces"].update(enabled_rows)
+
+    def get_all_root_transform(self):
         if "root_transforms" not in self._read_cache:
             self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
+        pose = self._read_cache["root_transforms"]
+        return pose[:, :3], pose[:, 3:]
 
+    def get_root_transform(self, prim_path):
         idx = self._idx[prim_path]
-        pose = self._read_cache["root_transforms"][idx]
-        return pose[:3], pose[3:]
+        pos, quat = self.get_all_root_transform()
+        return pos[idx], quat[idx]
+
+    def get_all_position_orientation(self):
+        # Here we want to return the position of the base footprint link.
+        # If the base footprint link is None, we return the position of the root link.
+
+        # we assume that in a view, all base link_name is the same
+        link_name = next(iter(self._base_footprint_link_names.values()))
+        if link_name is None:
+            return self.get_all_root_transform()
+        else:
+            return self.get_all_link_transform(link_name)
 
     def get_position_orientation(self, prim_path):
         # Here we want to return the position of the base footprint link. If the base footprint link is None,
@@ -1536,42 +1735,58 @@ class BatchControlViewAPIImpl:
         else:
             return self.get_root_transform(prim_path)
 
-    def _get_velocities(self, prim_path, estimate=False):
-        if self._base_footprint_link_names[prim_path] is not None:
-            link_name = self._base_footprint_link_names[prim_path]
-            return self._get_link_velocities(prim_path, link_name, estimate=estimate)
+    def _get_all_velocities(self, estimate=False):
+        link_name = next(iter(self._base_footprint_link_names.values()))
+        if link_name is not None:
+            return self._get_all_link_velocities(link_name, estimate=estimate)
         else:
-            return self._get_root_velocities(prim_path, estimate=estimate)
+            return self._get_all_root_velocities(estimate=estimate)
 
-    def _get_relative_velocities(self, prim_path, estimate=False):
+    def _get_velocities(self, prim_path, estimate=False):
+        """World-frame linear + angular velocity for one articulation (6,) from the batched cache."""
+        idx = self._idx[prim_path]
+        return self._get_all_velocities(estimate=estimate)[idx]
+
+    def _get_all_relative_velocities(self, estimate=False):
+        """Returns (N, n_links+1, 6) relative velocities for all robots; final slot [-1] is the base."""
         vel_str = "velocities_estimate" if estimate else "velocities"
 
-        if f"relative_{vel_str}" not in self._read_cache:
-            self._read_cache[f"relative_{vel_str}"] = {}
+        if f"all_relative_{vel_str}" not in self._read_cache:
+            # Warm the (N, L, 6) link velocity cache and fetch it
+            any_link_name = next(iter(self._link_idx[0]))
+            self._get_all_link_velocities(any_link_name, estimate=estimate)
+            link_vels = cb.to_torch(self._read_cache[f"link_{vel_str}"])  # (N, L, 6)
 
-        if prim_path not in self._read_cache[f"relative_{vel_str}"]:
-            # Compute all tfs at once, including base as well as all links
-            idx = self._idx[prim_path]
-            if f"link_{vel_str}" not in self._read_cache:
-                # Force the internal cache to update
-                self._get_link_velocities(
-                    prim_path=prim_path, link_name=next(iter(self._link_idx[idx].keys())), estimate=estimate
-                )
+            # Get base velocities (N, 6): reuse link cache if a base footprint link is configured
+            # (all robots in a view share the same base footprint link name)
+            base_footprint_link_name = next(iter(self._base_footprint_link_names.values()))
+            if base_footprint_link_name is not None:
+                base_link_idx = self._link_idx[0][base_footprint_link_name]
+                base_vels = link_vels[:, base_link_idx, :]  # (N, 6) — already in cache, no extra fetch
+            else:
+                # Warm root velocities cache and get (N, 6)
+                self._get_all_root_velocities(estimate=estimate)
+                base_vels = cb.to_torch(self._read_cache[f"root_{vel_str}"])  # (N, 6)
 
-            vels = cb.zeros((len(self._link_idx[idx]) + 1, 6, 1))
-            # base vel is the final -1 index
-            vels[:-1, :, 0] = self._read_cache[f"link_{vel_str}"][idx, :]
-            vels[-1, :, 0] = self._get_velocities(prim_path=prim_path, estimate=estimate)
+            # Build (N, L+1, 6): link vels followed by base vel (base at final index, matching _get_relative_velocities)
+            all_vels = th.cat([link_vels, base_vels.unsqueeze(1)], dim=1)  # (N, L+1, 6)
 
-            tf = cb.zeros((1, 6, 6))
-            orn_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
-            tf[0, :3, :3] = orn_t
-            tf[0, 3:, 3:] = orn_t
-            # x.T --> transpose (inverse) orientation
-            # (1, 6, 6) @ (n_links, 6, 1) -> (n_links, 6, 1) -> (n_links, 6)
-            self._read_cache[f"relative_{vel_str}"][prim_path] = cb.squeeze(tf @ vels, dim=-1)
+            # Build block-diagonal rotation transform per robot: (N, 6, 6)
+            all_quats = cb.to_torch(self.get_all_position_orientation()[1])  # (N, 4)
+            ori_t_batch = TT.quat2mat(all_quats).transpose(-2, -1)  # (N, 3, 3)
+            tf = th.zeros(all_vels.shape[0], 6, 6, dtype=all_vels.dtype)
+            tf[:, :3, :3] = ori_t_batch
+            tf[:, 3:, 3:] = ori_t_batch
 
-        return self._read_cache[f"relative_{vel_str}"][prim_path]
+            # Batched matmul: (N, 1, 6, 6) @ (N, L+1, 6, 1) → (N, L+1, 6)
+            rel_vels = (tf.unsqueeze(1) @ all_vels.unsqueeze(-1)).squeeze(-1)
+            self._read_cache[f"all_relative_{vel_str}"] = cb.from_torch(rel_vels)
+
+        return self._read_cache[f"all_relative_{vel_str}"]
+
+    def _get_relative_velocities(self, prim_path, estimate=False):
+        idx = self._idx[prim_path]
+        return self._get_all_relative_velocities(estimate=estimate)[idx]
 
     def get_linear_velocity(self, prim_path, estimate=False):
         return self._get_velocities(prim_path, estimate=estimate)[:3]
@@ -1579,7 +1794,7 @@ class BatchControlViewAPIImpl:
     def get_angular_velocity(self, prim_path, estimate=False):
         return self._get_velocities(prim_path, estimate=estimate)[3:]
 
-    def _get_root_velocities(self, prim_path, estimate=False):
+    def _get_all_root_velocities(self, estimate=False):
         vel_str = "velocities_estimate" if estimate else "velocities"
 
         # Use estimated calculation if requested and we have prior history info
@@ -1601,8 +1816,7 @@ class BatchControlViewAPIImpl:
             else:
                 self._read_cache[f"root_{vel_str}"] = cb.from_torch(self._view.get_root_velocities())
 
-        idx = self._idx[prim_path]
-        return self._read_cache[f"root_{vel_str}"][idx]
+        return self._read_cache[f"root_{vel_str}"]
 
     def get_relative_linear_velocity(self, prim_path, estimate=False):
         # base corresponds to final index
@@ -1612,17 +1826,65 @@ class BatchControlViewAPIImpl:
         # base corresponds to final index
         return self._get_relative_velocities(prim_path, estimate=estimate)[-1, 3:]
 
-    def get_joint_positions(self, prim_path):
+    def get_link_index(self, link_name):
+        """Returns the integer body index for the named link in the articulation view's link_paths."""
+        return self._link_idx[0][link_name]
+
+    def get_all_link_relative_position_orientation(self, link_name):
+        """Returns (N, 3) positions and (N, 4) quaternions for the given link across all robots."""
+        cache_key = f"all_link_rel_pose_{link_name}"
+        if cache_key not in self._read_cache:
+            link_idx = self._link_idx[0][link_name]
+            # _get_all_relative_poses returns (N, n_links, 7); slice the desired link: (N, 7)
+            poses = self._get_all_relative_poses()[:, link_idx, :]
+            self._read_cache[cache_key] = poses
+        poses = self._read_cache[cache_key]
+        return poses[:, :3], poses[:, 3:]
+
+    def get_all_link_relative_linear_velocity(self, link_name, estimate=False):
+        """Returns (N, 3) link linear velocities for all robots."""
+        cache_key = f"all_link_rel_lin_vel{'_est' if estimate else ''}_{link_name}"
+        if cache_key not in self._read_cache:
+            link_idx = self._link_idx[0][link_name]
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, link_idx, :3]
+        return self._read_cache[cache_key]
+
+    def get_all_link_relative_angular_velocity(self, link_name, estimate=False):
+        """Returns (N, 3) link angular velocities for all robots."""
+        cache_key = f"all_link_rel_ang_vel{'_est' if estimate else ''}_{link_name}"
+        if cache_key not in self._read_cache:
+            link_idx = self._link_idx[0][link_name]
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, link_idx, 3:]
+        return self._read_cache[cache_key]
+
+    def get_all_relative_linear_velocity(self, estimate=False):
+        """Returns (N, 3) base linear velocities for all robots in this view."""
+        cache_key = f"all_relative_lin_vel{'_est' if estimate else ''}"
+        if cache_key not in self._read_cache:
+            # Base is appended at the final index in _get_all_relative_velocities
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, -1, :3]
+        return self._read_cache[cache_key]
+
+    def get_all_relative_angular_velocity(self, estimate=False):
+        """Returns (N, 3) base angular velocities for all robots in this view."""
+        cache_key = f"all_relative_ang_vel{'_est' if estimate else ''}"
+        if cache_key not in self._read_cache:
+            # Base is appended at the final index in _get_all_relative_velocities
+            self._read_cache[cache_key] = self._get_all_relative_velocities(estimate=estimate)[:, -1, 3:]
+        return self._read_cache[cache_key]
+
+    def get_all_joint_positions(self):
+        """Returns (N, n_dof) joint positions for all robots in this view."""
         if "dof_positions" not in self._read_cache:
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
+        return self._read_cache["dof_positions"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["dof_positions"][idx]
+    def get_joint_positions(self, prim_path):
+        return self.get_all_joint_positions()[self._idx[prim_path]]
 
-    def get_joint_velocities(self, prim_path, estimate=False):
+    def get_all_joint_velocities(self, estimate=False):
+        """Returns (N, n_dof) joint velocities for all robots in this view."""
         vel_str = "velocities_estimate" if estimate else "velocities"
-
-        # Use estimated calculation if requested and we have prior history info
         if f"dof_{vel_str}" not in self._read_cache:
             if estimate and self._last_state is not None:
                 if "dof_positions" not in self._read_cache:
@@ -1632,78 +1894,77 @@ class BatchControlViewAPIImpl:
                 ) / og.sim.get_physics_dt()
             else:
                 self._read_cache[f"dof_{vel_str}"] = cb.from_torch(self._view.get_dof_velocities())
+        return self._read_cache[f"dof_{vel_str}"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache[f"dof_{vel_str}"][idx]
+    def get_joint_velocities(self, prim_path, estimate=False):
+        return self.get_all_joint_velocities(estimate=estimate)[self._idx[prim_path]]
 
-    def get_joint_efforts(self, prim_path):
+    def get_all_joint_efforts(self):
+        """Returns (N, n_dof) joint efforts for all robots in this view."""
         if "dof_projected_joint_forces" not in self._read_cache:
             self._read_cache["dof_projected_joint_forces"] = cb.from_torch(self._view.get_dof_projected_joint_forces())
+        return self._read_cache["dof_projected_joint_forces"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["dof_projected_joint_forces"][idx]
+    def get_joint_efforts(self, prim_path):
+        return self.get_all_joint_efforts()[self._idx[prim_path]]
 
-    def get_generalized_mass_matrices(self, prim_path):
+    def get_all_generalized_mass_matrices(self):
+        """Returns (N, n_dof, n_dof) mass matrices for all robots in this view."""
         if "mass_matrices" not in self._read_cache:
             self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_generalized_mass_matrices())
+        return self._read_cache["mass_matrices"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["mass_matrices"][idx]
+    def get_generalized_mass_matrices(self, prim_path):
+        return self.get_all_generalized_mass_matrices()[self._idx[prim_path]]
 
-    def get_gravity_compensation_forces(self, prim_path):
+    def get_all_gravity_compensation_forces(self):
+        """Returns (N, n_dof) gravity compensation forces for all robots in this view."""
         if "generalized_gravity_forces" not in self._read_cache:
             self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_gravity_compensation_forces())
+        return self._read_cache["generalized_gravity_forces"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["generalized_gravity_forces"][idx]
+    def get_gravity_compensation_forces(self, prim_path):
+        return self.get_all_gravity_compensation_forces()[self._idx[prim_path]]
 
-    def get_coriolis_and_centrifugal_compensation_forces(self, prim_path):
+    def get_all_coriolis_and_centrifugal_compensation_forces(self):
+        """Returns (N, n_dof) Coriolis/centrifugal forces for all robots in this view."""
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
             self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
                 self._view.get_coriolis_and_centrifugal_compensation_forces()
             )
+        return self._read_cache["coriolis_and_centrifugal_forces"]
 
-        idx = self._idx[prim_path]
-        return self._read_cache["coriolis_and_centrifugal_forces"][idx]
+    def get_coriolis_and_centrifugal_compensation_forces(self, prim_path):
+        return self.get_all_coriolis_and_centrifugal_compensation_forces()[self._idx[prim_path]]
 
     def get_link_transform(self, prim_path, link_name):
+        idx = self._idx[prim_path]
+        pos, quat = self.get_all_link_transform(link_name)
+        return pos[idx], quat[idx]
+
+    def get_all_link_transform(self, link_name):
         if "link_transforms" not in self._read_cache:
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
 
-        idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        pose = self._read_cache["link_transforms"][idx, link_idx]
-        return pose[:3], pose[3:]
+        # We assume that in a view, link_idx for the same link_name is the same across all members
+        link_idx = self._link_idx[0][link_name]
+        pose = self._read_cache["link_transforms"][:, link_idx]
+        return pose[:, :3], pose[:, 3:]
 
     def _get_relative_poses(self, prim_path):
-        if "relative_poses" not in self._read_cache:
-            self._read_cache["relative_poses"] = {}
-
-        if prim_path not in self._read_cache["relative_poses"]:
-            # Compute all tfs at once, including base as well as all links
-            if "link_transforms" not in self._read_cache:
-                self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
-
-            idx = self._idx[prim_path]
-            self._read_cache["relative_poses"][prim_path] = cb.get_custom_method("compute_relative_poses")(
-                idx,
-                len(self._link_idx[idx]),
-                self._read_cache["link_transforms"],
-                self.get_position_orientation(prim_path=prim_path),
-            )
-
-        return self._read_cache["relative_poses"][prim_path]
+        idx = self._idx[prim_path]
+        return self._get_all_relative_poses()[idx]
 
     def get_link_relative_position_orientation(self, prim_path, link_name):
         idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        rel_pose = self._get_relative_poses(prim_path)[link_idx]
-        return rel_pose[:3], rel_pose[3:]
+        pos, quat = self.get_all_link_relative_position_orientation(link_name)
+        return pos[idx], quat[idx]
 
-    def _get_link_velocities(self, prim_path, link_name, estimate=False):
+    def _get_all_link_velocities(self, link_name, estimate=False):
+        """Returns (N, 6) velocities (linear + angular) for the given link across all robots."""
         vel_str = "velocities_estimate" if estimate else "velocities"
 
-        # Use estimated calculation if requested and we have prior history info
+        # Build and cache the full (N, L, 6) tensor for all robots and all links
         if f"link_{vel_str}" not in self._read_cache:
             if estimate and self._last_state is not None:
                 # Compute link velocities estimate as delta between prior timestep and current timestep
@@ -1731,51 +1992,136 @@ class BatchControlViewAPIImpl:
             else:
                 self._read_cache[f"link_{vel_str}"] = cb.from_torch(self._view.get_link_velocities())
 
-        idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        vel = self._read_cache[f"link_{vel_str}"][idx, link_idx]
+        link_idx = self._link_idx[0][link_name]
+        return self._read_cache[f"link_{vel_str}"][:, link_idx, :]  # (N, 6)
 
-        return vel
+    def _get_link_velocities(self, prim_path, link_name, estimate=False):
+        idx = self._idx[prim_path]
+        return self._get_all_link_velocities(link_name, estimate=estimate)[idx]
 
     def get_link_linear_velocity(self, prim_path, link_name, estimate=False):
         return self._get_link_velocities(prim_path, link_name, estimate=estimate)[:3]
+
+    def get_all_link_linear_velocity(self, link_name, estimate=False):
+        return self._get_all_link_velocities(link_name, estimate=estimate)[:, :3]
 
     def get_link_relative_linear_velocity(self, prim_path, link_name, estimate=False):
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, :3]
 
-    def get_link_angular_velocity(self, prim_path, link_name, estimate=False):
-        return self._get_link_velocities(prim_path, link_name, estimate=estimate)[3:]
+    def get_all_link_angular_velocity(self, link_name, estimate=False):
+        return self._get_all_link_velocities(link_name, estimate=estimate)[:, 3:]
 
     def get_link_relative_angular_velocity(self, prim_path, link_name, estimate=False):
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, 3:]
 
-    def get_jacobian(self, prim_path):
+    def get_all_jacobian(self):
         if "jacobians" not in self._read_cache:
             self._read_cache["jacobians"] = cb.from_torch(self._view.get_jacobians())
+        return self._read_cache["jacobians"]
 
+    def get_jacobian(self, prim_path):
         idx = self._idx[prim_path]
-        return self._read_cache["jacobians"][idx]
+        return self.get_all_jacobian()[idx]
+
+    def _get_all_relative_poses(self):
+        """Returns (N, n_links, 7) relative poses (pos + quat) for all robots in this view, batched."""
+        if "relative_poses" not in self._read_cache:
+            # All link world transforms: (N, n_links, 7)
+            if "link_transforms" not in self._read_cache:
+                self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
+            all_link_tfs = cb.to_torch(self._read_cache["link_transforms"])  # (N, n_links, 7)
+
+            # All base poses
+            all_pos, all_quat = self.get_all_position_orientation()  # (N, 3), (N, 4)
+            all_pos = cb.to_torch(all_pos)
+            all_quat = cb.to_torch(all_quat)
+
+            N, n_links = all_link_tfs.shape[:2]
+
+            # Build link homogeneous transform matrices: (N, n_links, 4, 4)
+            tfs = th.zeros(N, n_links, 4, 4, dtype=th.float32)
+            tfs[:, :, 3, 3] = 1.0
+            tfs[:, :, :3, 3] = all_link_tfs[:, :, :3]
+            # quat2mat doesn't handle rank-3 input; flatten the N*n_links batch dimension
+            tfs[:, :, :3, :3] = TT.quat2mat(all_link_tfs[:, :, 3:].reshape(-1, 4)).reshape(N, n_links, 3, 3)
+
+            # Build batched base pose inverses: (N, 4, 4)
+            # For a rigid transform [R, t; 0, 1], the inverse is [R^T, -R^T t; 0, 1]
+            base_rot_T = TT.quat2mat(all_quat).transpose(-2, -1)  # (N, 3, 3)
+            base_tf_inv = th.zeros(N, 4, 4, dtype=th.float32)
+            base_tf_inv[:, 3, 3] = 1.0
+            base_tf_inv[:, :3, :3] = base_rot_T
+            base_tf_inv[:, :3, 3] = -(base_rot_T @ all_pos.unsqueeze(-1)).squeeze(-1)
+
+            # Batched matmul: (N, 1, 4, 4) @ (N, n_links, 4, 4) → (N, n_links, 4, 4)
+            rel_tfs = base_tf_inv.unsqueeze(1) @ tfs
+
+            # Convert back to (N, n_links, 7) pos + quat
+            rel_poses = th.zeros(N, n_links, 7, dtype=th.float32)
+            rel_poses[:, :, :3] = rel_tfs[:, :, :3, 3]
+            rel_poses[:, :, 3:] = TT.mat2quat(rel_tfs[:, :, :3, :3].reshape(-1, 3, 3)).reshape(N, n_links, 4)
+
+            self._read_cache["relative_poses"] = cb.from_torch(rel_poses)
+        return self._read_cache["relative_poses"]
+
+    def get_all_relative_jacobians(self):
+        """Returns (N, n_links, 6, n_dof_total) relative jacobians for all robots in this view."""
+        if "relative_jacobians" not in self._read_cache:
+            # All raw jacobians: (N, n_links, 6, n_dof_total)
+            all_jacobians = cb.to_torch(self.get_all_jacobian())
+            # Base orientation quaternions for all robots: (N, 4)
+            all_quats = cb.to_torch(self.get_all_position_orientation()[1])
+            N = all_quats.shape[0]
+
+            # Rotation matrices transposed per robot: (N, 3, 3)
+            ori_t_batch = TT.quat2mat(all_quats).transpose(-2, -1)
+
+            # Build block-diagonal transform tf = [[ori_t, 0], [0, ori_t]]: (N, 6, 6)
+            tf = th.zeros(N, 6, 6, dtype=all_jacobians.dtype)
+            tf[:, :3, :3] = ori_t_batch
+            tf[:, 3:, 3:] = ori_t_batch
+
+            # Batched matmul: (N, 1, 6, 6) @ (N, n_links, 6, n_dof_total) → (N, n_links, 6, n_dof_total)
+            # Run in pytorch since it's order of magnitude faster than numpy!
+            self._read_cache["relative_jacobians"] = cb.from_torch(tf.unsqueeze(1) @ all_jacobians)
+        return self._read_cache["relative_jacobians"]
 
     def get_relative_jacobian(self, prim_path):
-        if "relative_jacobians" not in self._read_cache:
-            self._read_cache["relative_jacobians"] = {}
+        idx = self._idx[prim_path]
+        return self.get_all_relative_jacobians()[idx]
 
-        if prim_path not in self._read_cache["relative_jacobians"]:
-            jacobian = self.get_jacobian(prim_path)
-            ori_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
-            tf = cb.zeros((1, 6, 6))
-            tf[:, :3, :3] = ori_t
-            tf[:, 3:, 3:] = ori_t
-            # Run this explicitly in pytorch since it's order of magnitude faster than numpy!
-            # e.g.: 2e-4 vs. 3e-5 on R1
-            rel_jac = cb.from_torch(cb.to_torch(tf) @ cb.to_torch(jacobian))
-            self._read_cache["relative_jacobians"][prim_path] = rel_jac
 
-        return self._read_cache["relative_jacobians"][prim_path]
+def get_robot_kinematic_tree_pattern(articulation_root_path: str) -> str:
+    """
+    Returns a glob pattern that matches all robots of the same type and fixedness as the
+    given articulation root path.
+
+    The pattern generalizes over scene index and robot instance name, preserving the
+    robot-type component and any path suffix (e.g. base link name for floating-base robots).
+
+    Examples:
+        "/World/scene_0/controllable__fetch__robot0"
+            -> "/World/scene_*/controllable__fetch__*"
+        "/World/scene_0/controllable__fetch__robot0/base_link"
+            -> "/World/scene_*/controllable__fetch__*/base_link"
+    """
+    scene_id, robot_name = articulation_root_path.split("/")[2:4]
+    assert scene_id.startswith("scene_"), f"Prim path 2nd component {articulation_root_path} does not start with scene_"
+    components = robot_name.split("__")
+    assert len(components) == 3, (
+        f"Robot prim path's 3rd component {robot_name} does not match "
+        "expected format of prefix__robottype__robotname."
+    )
+    assert (
+        components[0] == "controllable"
+    ), f"Prim path {articulation_root_path} 3rd component does not start with 'controllable__'"
+    return articulation_root_path.replace(f"/{scene_id}/", "/scene_*/").replace(
+        f"/{robot_name}", f"/{components[0]}__{components[1]}__*"
+    )
 
 
 class ControllableObjectViewAPI:
@@ -1793,6 +2139,11 @@ class ControllableObjectViewAPI:
     The patterns used by the subviews are generated by replacing the robot name with a wildcard, so that all robots
     of the same type are grouped together. If there are fixed base robots, they will be grouped separately from
     non-fixed base robots even within the same robot type, by virtue of their different articulation root paths.
+
+    **Return types:** All kinematic / dynamic getters delegate to :class:`BatchControlViewAPIImpl` and return
+    **compute-backend arrays** (``cb.arr_type`` from :mod:`omnigibson.utils.backend_utils`), after converting
+    Isaac articulation-view **torch** tensors with ``cb.from_torch``. Batched joint commands from controllers
+    should be **compute-backend arrays** (``cb.arr_type``).
     """
 
     # Dictionary mapping from pattern to BatchControlViewAPIImpl
@@ -1810,8 +2161,8 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def clear_object(cls, prim_path):
-        if cls._get_pattern_from_prim_path(prim_path) in cls._VIEWS_BY_PATTERN:
-            cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].clear()
+        if get_robot_kinematic_tree_pattern(prim_path) in cls._VIEWS_BY_PATTERN:
+            cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].clear()
 
     @classmethod
     def flush_control(cls):
@@ -1831,7 +2182,7 @@ class ControllableObjectViewAPI:
         expected_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
 
         # Group the prim paths by robot type
-        patterns = {cls._get_pattern_from_prim_path(prim_path) for prim_path in expected_prim_paths}
+        patterns = {get_robot_kinematic_tree_pattern(prim_path) for prim_path in expected_prim_paths}
 
         # Create the view for each robot type / fixedness combo
         for pattern in patterns:
@@ -1855,144 +2206,164 @@ class ControllableObjectViewAPI:
         assert len(more_than_once) == 0, f"Prim paths {more_than_once} are present in multiple views!"
 
     @classmethod
-    def _get_pattern_from_prim_path(cls, prim_path):
-        """
-        Returns which of the regexes this prim path should be found in.
-
-        Note that since the prim path will be an articulation root path, this works for both fixed base and
-        non-fixed base robots. Fixed and non-fixed versions of the same robot will be mapped to different
-        patterns since they have different articulation root paths (object prim vs base link prim).
-        """
-        scene_id, robot_name = prim_path.split("/")[2:4]
-        assert scene_id.startswith("scene_"), f"Prim path 2nd component {prim_path} does not start with scene_"
-        components = robot_name.split("__")
-        assert (
-            len(components) == 3
-        ), f"Robot prim path's 3rd component {robot_name} does not match expected format of prefix__robottype__robotname."
-        assert (
-            components[0] == "controllable"
-        ), f"Prim path {prim_path} 3rd component does not start with prefix {cls._prefix}__"
-        robot_name_pattern = prim_path.replace(f"/{scene_id}/", "/scene_*/").replace(
-            f"/{robot_name}", f"/{components[0]}__{components[1]}__*"
-        )
-        return robot_name_pattern
-
-    @classmethod
     def set_joint_position_targets(cls, prim_path, positions, indices):
-        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_position_targets(
+        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].set_joint_position_targets(
             prim_path, positions, indices
         )
 
     @classmethod
     def set_joint_velocity_targets(cls, prim_path, velocities, indices):
-        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_velocity_targets(
+        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].set_joint_velocity_targets(
             prim_path, velocities, indices
         )
 
     @classmethod
     def set_joint_efforts(cls, prim_path, efforts, indices):
-        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_efforts(prim_path, efforts, indices)
+        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].set_joint_efforts(
+            prim_path, efforts, indices
+        )
+
+    @classmethod
+    def get_member_view_indices(cls, routing_path, prim_paths):
+        """Return view row indices for prim_paths (all in same view as routing_path)."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(routing_path)].get_member_view_indices(prim_paths)
+
+    @classmethod
+    def set_all_joint_position_targets(cls, routing_path, enabled_rows, controls, dof_idx):
+        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(routing_path)].set_all_joint_position_targets(
+            enabled_rows, controls, dof_idx
+        )
+
+    @classmethod
+    def set_all_joint_velocity_targets(cls, routing_path, enabled_rows, velocities, dof_idx):
+        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(routing_path)].set_all_joint_velocity_targets(
+            enabled_rows, velocities, dof_idx
+        )
+
+    @classmethod
+    def set_all_joint_efforts(cls, routing_path, enabled_rows, efforts, dof_idx):
+        cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(routing_path)].set_all_joint_efforts(
+            enabled_rows, efforts, dof_idx
+        )
 
     @classmethod
     def get_position_orientation(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_position_orientation(prim_path)
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_position_orientation(prim_path)
 
     @classmethod
     def get_root_position_orientation(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_root_transform(prim_path)
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_root_transform(prim_path)
 
     @classmethod
     def get_linear_velocity(cls, prim_path, estimate=False):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_linear_velocity(
             prim_path, estimate=estimate
         )
 
     @classmethod
     def get_angular_velocity(cls, prim_path, estimate=False):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_angular_velocity(
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_angular_velocity(
             prim_path, estimate=estimate
         )
 
     @classmethod
-    def get_relative_linear_velocity(cls, prim_path, estimate=False):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(
-            prim_path, estimate=estimate
-        )
-
-    @classmethod
-    def get_relative_angular_velocity(cls, prim_path, estimate=False):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_angular_velocity(
-            prim_path,
-            estimate=estimate,
-        )
+    def get_all_joint_positions(cls, prim_path):
+        """Returns (N, n_dof) joint positions for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_joint_positions()
 
     @classmethod
     def get_joint_positions(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_joint_positions(prim_path)
+
+    @classmethod
+    def get_all_joint_velocities(cls, prim_path, estimate=False):
+        """Returns (N, n_dof) joint velocities for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_joint_velocities(
+            estimate=estimate
+        )
 
     @classmethod
     def get_joint_velocities(cls, prim_path, estimate=False):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_velocities(
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_joint_velocities(
             prim_path, estimate=estimate
         )
 
     @classmethod
+    def get_all_joint_efforts(cls, prim_path):
+        """Returns (N, n_dof) joint efforts for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_joint_efforts()
+
+    @classmethod
     def get_joint_efforts(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_joint_efforts(prim_path)
 
     @classmethod
-    def get_generalized_mass_matrices(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_mass_matrices(
-            prim_path
-        )
+    def get_all_generalized_mass_matrices(cls, prim_path):
+        """Returns (N, n_dof, n_dof) mass matrices for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_generalized_mass_matrices()
 
     @classmethod
-    def get_gravity_compensation_forces(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_gravity_compensation_forces(
-            prim_path
-        )
+    def get_all_gravity_compensation_forces(cls, prim_path):
+        """Returns (N, n_dof) gravity compensation forces for all robots of the same type as @prim_path."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_gravity_compensation_forces()
 
     @classmethod
-    def get_coriolis_and_centrifugal_compensation_forces(cls, prim_path):
+    def get_all_coriolis_and_centrifugal_compensation_forces(cls, prim_path):
+        """Returns (N, n_dof) Coriolis/centrifugal forces for all robots of the same type as @prim_path."""
         return cls._VIEWS_BY_PATTERN[
-            cls._get_pattern_from_prim_path(prim_path)
-        ].get_coriolis_and_centrifugal_compensation_forces(prim_path)
-
-    @classmethod
-    def get_link_position_orientation(cls, prim_path, link_name):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_transform(
-            prim_path, link_name
-        )
+            get_robot_kinematic_tree_pattern(prim_path)
+        ].get_all_coriolis_and_centrifugal_compensation_forces()
 
     @classmethod
     def get_link_relative_position_orientation(cls, prim_path, link_name):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_position_orientation(
-            prim_path, link_name
+        return cls._VIEWS_BY_PATTERN[
+            get_robot_kinematic_tree_pattern(prim_path)
+        ].get_link_relative_position_orientation(prim_path, link_name)
+
+    @classmethod
+    def get_link_index(cls, prim_path, link_name):
+        """Returns the integer body index for the named link in the articulation view's link_paths."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_link_index(link_name)
+
+    @classmethod
+    def get_all_relative_jacobians(cls, prim_path):
+        """Returns (N, n_links, 6, n_dof_total) relative jacobians for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_relative_jacobians()
+
+    @classmethod
+    def get_all_link_relative_position_orientation(cls, prim_path, link_name):
+        """Returns (N, 3) positions and (N, 4) quaternions for the given link across all robots."""
+        return cls._VIEWS_BY_PATTERN[
+            get_robot_kinematic_tree_pattern(prim_path)
+        ].get_all_link_relative_position_orientation(link_name)
+
+    @classmethod
+    def get_all_link_relative_linear_velocity(cls, prim_path, link_name, estimate=False):
+        """Returns (N, 3) link linear velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_link_relative_linear_velocity(
+            link_name, estimate=estimate
         )
 
     @classmethod
-    def get_link_relative_linear_velocity(cls, prim_path, link_name, estimate=False):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_linear_velocity(
-            prim_path,
-            link_name,
-            estimate=estimate,
+    def get_all_link_relative_angular_velocity(cls, prim_path, link_name, estimate=False):
+        """Returns (N, 3) link angular velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[
+            get_robot_kinematic_tree_pattern(prim_path)
+        ].get_all_link_relative_angular_velocity(link_name, estimate=estimate)
+
+    @classmethod
+    def get_all_relative_linear_velocity(cls, prim_path, estimate=False):
+        """Returns (N, 3) base linear velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_relative_linear_velocity(
+            estimate=estimate
         )
 
     @classmethod
-    def get_link_relative_angular_velocity(cls, prim_path, link_name, estimate=False):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_angular_velocity(
-            prim_path,
-            link_name,
-            estimate=estimate,
+    def get_all_relative_angular_velocity(cls, prim_path, estimate=False):
+        """Returns (N, 3) base angular velocities for all robots of the same type."""
+        return cls._VIEWS_BY_PATTERN[get_robot_kinematic_tree_pattern(prim_path)].get_all_relative_angular_velocity(
+            estimate=estimate
         )
-
-    @classmethod
-    def get_jacobian(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_jacobian(prim_path)
-
-    @classmethod
-    def get_relative_jacobian(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_jacobian(prim_path)
 
 
 def clear():
@@ -2350,7 +2721,7 @@ def add_asset_to_stage(asset_path, prim_path):
     """
     # Make sure this is actually a supported asset type
     asset_type = asset_path.split(".")[-1]
-    assert asset_type in {"usd", "usda", "obj"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
+    assert asset_type in {"usd", "usda", "obj", "usdz"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
@@ -2675,3 +3046,60 @@ def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
 add_compute_function(
     name="compute_relative_poses", np_function=_compute_relative_poses_numpy, th_function=_compute_relative_poses_torch
 )
+
+
+def count_joints(prim):
+    """
+    Search from @prim to count movable joints, fixed joints, and attachment points.
+
+    Args:
+        prim (Usd.Prim): Root prim to search from.
+
+    Returns:
+        tuple: (n_joints, n_fixed_joints, has_attachment) where
+            n_joints (int): number of non-fixed physics joints,
+            n_fixed_joints (int): number of fixed physics joints,
+            has_attachment (bool): whether any prim name contains "attachment".
+    """
+    n_joints = 0
+    n_fixed_joints = 0
+    has_attachment = False
+    children = list(prim.GetChildren())
+    while children:
+        child_prim = children.pop()
+        children.extend(child_prim.GetChildren())
+        prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
+        if "joint" in prim_type:
+            if "fixed" in prim_type:
+                n_fixed_joints += 1
+            else:
+                n_joints += 1
+        if "attachment" in child_prim.GetName().lower():
+            has_attachment = True
+    return n_joints, n_fixed_joints, has_attachment
+
+
+def compute_kinematic_only(fixed_base, scale, n_joints, n_fixed_joints, kinematic_only_config, has_attachment):
+    """
+    Determine whether an object should be kinematic-only based on its properties.
+
+    Args:
+        fixed_base (bool): Whether the object has a fixed base.
+        scale (th.Tensor): 3-element scale tensor.
+        n_joints (int): Number of non-fixed joints.
+        n_fixed_joints (int): Number of fixed joints.
+        kinematic_only_config: Value of the kinematic_only load config key (True, False, or None).
+        has_attachment (bool): Whether the object has attachment points.
+
+    Returns:
+        bool: True if the object should be kinematic only.
+    """
+    if not fixed_base:
+        return False
+    if kinematic_only_config is False:
+        return False
+    return (
+        n_joints == 0
+        and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or n_fixed_joints == 0)
+        and not has_attachment
+    )

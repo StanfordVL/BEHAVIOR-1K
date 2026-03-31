@@ -217,7 +217,12 @@ class CuRoboMotionGenerator:
             self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
 
         for mg in self.mg.values():
-            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size, warmup_joint_delta=0.0)
+            mg.warmup(
+                enable_graph=False,
+                warmup_js_trajopt=False,
+                batch=batch_size,
+                warmup_joint_delta=0.0,
+            )
 
             # Make sure all cuda graphs have been warmed up
             for solver in [mg.ik_solver, mg.trajopt_solver, mg.finetune_trajopt_solver]:
@@ -327,8 +332,8 @@ class CuRoboMotionGenerator:
                 Default is the current joint positions of the robot
             self_collision_check (bool): Whether to check self-collisions or not
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
-            attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
-                link names and the values are the corresponding BaseObject instances to attach to that link
+            attached_obj (None or Dict[str, USDObject]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding USDObject instances to attach to that link
             attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding scale to apply to the attached object
 
@@ -572,8 +577,8 @@ class CuRoboMotionGenerator:
             success_ratio (None or float): If set, specifies the fraction of successes necessary given self.batch_size.
                 If None, will automatically be the smallest ratio (1 / self.batch_size), i.e: any nonzero number of
                 successes
-            attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
-                link names and the values are the corresponding BaseObject instances to attach to that link
+            attached_obj (None or Dict[str, USDObject]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding USDObject instances to attach to that link
             attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding scale to apply to the attached object
             motion_constraint (None or List[float]): If specified, the motion constraint vector is a 6D vector controlling
@@ -942,8 +947,8 @@ class CuRoboMotionGenerator:
         Helper function to attach objects to the robot.
 
         Args:
-            attached_obj (None or Dict[str, BaseObject]): Dictionary mapping end-effector
-                link names to corresponding BaseObject instances
+            attached_obj (None or Dict[str, USDObject]): Dictionary mapping end-effector
+                link names to corresponding USDObject instances
             attached_obj_scale (None or Dict[str, float]): Dictionary mapping end-effector
                 link names to corresponding scale values
             cu_js_batch (JointState): CuRobo joint state object ordered according to kinematics

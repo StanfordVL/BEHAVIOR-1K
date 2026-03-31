@@ -60,6 +60,30 @@ def test_curobo():
 
     robot_cfgs = [
         {
+            "model": "a1",
+            "obs_modalities": "rgb",
+            "position": [0.6, -0.65, 0.0],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+            "action_normalize": False,
+            "controller_config": {
+                "arm_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+            },
+        },
+        {
             "model": "franka",
             "obs_modalities": "rgb",
             "position": [0.7, -0.55, 0.0],
@@ -86,7 +110,7 @@ def test_curobo():
         {
             "model": "r1",
             "obs_modalities": "rgb",
-            "position": [0.7, -0.7, 0.056],
+            "position": [0.7, -0.7, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
@@ -195,7 +219,7 @@ def test_curobo():
         {
             "model": "r1pro",
             "obs_modalities": "rgb",
-            "position": [0.7, -0.75, 0.056],
+            "position": [0.7, -0.75, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
@@ -330,7 +354,7 @@ def test_curobo():
             og.sim.step_physics()
 
             # To debug
-            # cmg.save_visualization(robot.get_joint_positions(), "/scr/chengshu/Downloads/test.obj")
+            # cmg.save_visualization(robot.get_joint_positions(), "test.obj")
 
             # Sanity check in the GUI that the robot pose makes sense
             for _ in range(10):
@@ -342,7 +366,9 @@ def test_curobo():
             wheel_contact_pairs = set()
             obj_contact_pairs = set()
 
-            for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+            for body0, body1 in RigidContactAPI.get_contact_pairs(
+                env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+            ):
                 assert body0 in robot.link_prim_paths
                 if body1 in robot.link_prim_paths:
                     self_collision_pairs.add((body0, body1))
@@ -455,7 +481,9 @@ def test_curobo():
                         robot.set_joint_positions(q)
                         robot.keep_still()
                         og.sim.step()
-                        for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+                        ):
                             assert body0 in robot.link_prim_paths
                             if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
@@ -468,7 +496,9 @@ def test_curobo():
                         print(f"Executing waypoint {i}/{len(q_traj)}")
                         env.step(action)
 
-                        for body0, body1 in RigidContactAPI.get_contact_pairs(env.scene.idx, set(robot.links.values())):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+                        ):
                             assert body0 in robot.link_prim_paths
                             if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue

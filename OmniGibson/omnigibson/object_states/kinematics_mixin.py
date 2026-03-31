@@ -19,7 +19,7 @@ class KinematicsMixin(BaseObjectState):
 
     def cache_info(self, get_value_args):
         # Import here to avoid circular imports
-        from omnigibson.objects.object_base import BaseObject
+        from omnigibson.objects.usd_object import USDObject
 
         # Run super first
         info = super().cache_info(get_value_args=get_value_args)
@@ -27,14 +27,14 @@ class KinematicsMixin(BaseObjectState):
         # Store this object as well as any other objects from @get_value_args
         info[self.obj] = {"q": self.obj.states[Joint].get_value(), "p": self.obj.states[Pose].get_value()}
         for arg in get_value_args:
-            if isinstance(arg, BaseObject):
+            if isinstance(arg, USDObject):
                 info[arg] = {"q": arg.states[Joint].get_value(), "p": arg.states[Pose].get_value()}
 
         return info
 
     def _cache_is_valid(self, get_value_args):
         # Import here to avoid circular imports
-        from omnigibson.objects.object_base import BaseObject
+        from omnigibson.objects.usd_object import USDObject
 
         # Cache is valid if and only if all of our cached objects have not changed
         t = self._cache[get_value_args]["t"]
@@ -42,7 +42,7 @@ class KinematicsMixin(BaseObjectState):
             # If the object is asleep, assume this object hasn't changed, so continue
             if obj.is_asleep:
                 continue
-            if isinstance(obj, BaseObject):
+            if isinstance(obj, USDObject):
                 # If pose has changed, return False
                 if obj.states[Pose].has_changed(get_value_args=(), value=info["p"], info={}, t=t):
                     return False

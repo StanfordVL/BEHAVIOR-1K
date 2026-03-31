@@ -13,10 +13,9 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.constants import ROBOT_CATEGORY
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -30,7 +29,7 @@ from omnigibson.systems.system_base import (
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
+from omnigibson.utils.constants import ROBOT_CATEGORY, STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -176,7 +175,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the objects in the scene.
 
         Returns:
-            list of BaseObject: Standalone object(s) that are currently in this scene
+            list of USDObject: Standalone object(s) that are currently in this scene
         """
         return self.object_registry.objects
 
@@ -585,7 +584,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         registry.add(
             obj=SerializableRegistry(
                 name="object_registry",
-                class_types=BaseObject,
+                class_types=USDObject,
                 default_key="name",
                 hash_key="uuid",
                 unique_keys=self.object_registry_unique_keys,
@@ -642,7 +641,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         scene.load() is called. The object should also be accessible through scene.objects.
 
         Args:
-            obj (BaseObject): the object to load into the simulator
+            obj (USDObject): the object to load into the simulator
         """
         pass
 
@@ -651,7 +650,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Add an object to the scene. The scene should already be loaded.
 
         Args:
-            obj (BaseObject): the object to load
+            obj (USDObject): the object to load
             register (bool): Whether to register @obj internally in the scene object registry or not, as well as run
                 additional scene-specific logic in addition to the obj being loaded
             _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
@@ -696,7 +695,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Method to remove an object from the simulator
 
         Args:
-            obj (BaseObject): Object to remove
+            obj (USDObject): Object to remove
             _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
                 a context externally. In general, this should NOT be explicitly set by the user
         """
@@ -894,7 +893,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
         # Need to update sim here -- this is because downstream setters called immediately may not be respected,
         # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        og.sim.refresh_physics()
         # Update the cached pose and inverse pose
         pos_ori = self._scene_prim.get_position_orientation()
         pose = T.pose2mat(pos_ori)
@@ -1163,6 +1162,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
+            # We need to propagate these changes or else we get a crash
+            og.sim.refresh_physics(sync_usd=True)
+            # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
             self._registry.load_state(state=state, serialized=False)

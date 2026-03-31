@@ -124,7 +124,7 @@ class AttachedTo(
         contacting_paths = {
             other_contact
             for this_contact, other_contact in RigidContactAPI.get_contact_pairs(
-                scene_idx=scene_idx, query_set=my_link_paths
+                scene_idx=scene_idx, query_set=my_link_paths, with_set=None, current_only=False
             )
             if other_contact not in self.obj.link_prim_paths
         }
@@ -182,7 +182,11 @@ class AttachedTo(
                         og.sim.step_physics()
                         # self.obj should not collide with other objects except the parent
                         success = not RigidContactAPI.is_in_contact(
-                            scene_idx=self.obj.scene.idx, query_set=[self.obj], ignore_set=[other]
+                            scene_idx=self.obj.scene.idx,
+                            query_set=[self.obj],
+                            with_set=None,
+                            ignore_set=[other],
+                            current_only=False,
                         )
                         if success:
                             return True

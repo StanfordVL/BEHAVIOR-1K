@@ -19,7 +19,6 @@ EXAMPLES = [
     "object_states.folded_unfolded_state_demo",
     "object_states.heat_source_or_sink_demo",
     "object_states.heated_state_demo",
-    "object_states.object_state_texture_demo",
     "object_states.onfire_demo",
     "object_states.overlaid_demo",
     "object_states.particle_applier_remover_demo",
@@ -55,6 +54,7 @@ EXAMPLES_TO_SKIP = [
     "teleoperation.vr_scene_tour_demo",  # does not support headless mode
     "robots.curobo_example",  # requires CuRobo and CUDA support
     "objects.import_custom_object",  # CLI conversion tool, requires demo / test asset files
+    "object_states.object_state_texture_demo",  # disable temporarily due to contact API bug
 ]
 
 

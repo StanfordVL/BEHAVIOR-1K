@@ -485,7 +485,7 @@ class BehaviorTask(BaseTask):
         for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
             objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin
         ):
-            # TODO: May need to update checking here to USDObject? Or even baseobject?
+            # TODO: May need to update checking here to USDObject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:
                 low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])
@@ -521,7 +521,7 @@ class BehaviorTask(BaseTask):
         bddl object scope
 
         Args:
-            obj (BaseObject): Newly imported object
+            obj (USDObject): Newly imported object
         """
         # Iterate over all entities, and if they don't exist, check if any category matches @obj's category, and set it
         # if it does, and immediately return
@@ -536,7 +536,7 @@ class BehaviorTask(BaseTask):
         bddl object scope
 
         Args:
-            obj (BaseObject): Newly removed object
+            obj (USDObject): Newly removed object
         """
         # Iterate over all entities, and if they exist, check if any name matches @obj's name, and remove it
         # if it does, and immediately return
@@ -581,7 +581,7 @@ class BehaviorTask(BaseTask):
             3-tuple:
                 - str: Current goal condition in natural language
                 - 3-tuple: (R,G,B) color to assign to text
-                - list of BaseObject: Relevant objects for the current instruction
+                - list of USDObject: Relevant objects for the current instruction
         """
         satisfied = (
             self.currently_viewed_instruction in self._termination_conditions["predicate"].goal_status["satisfied"]

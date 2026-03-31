@@ -1,0 +1,59 @@
+[build-system]
+# setuptools>=61.0 provides PEP 660 support for editable installs (minimal working).
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "joylo"
+version = "3.8.0"
+description = "JoyLo for OmniGibson"
+readme = { file = "README.md", content-type = "text/markdown" }
+authors = [{ name = "Stanford University" }]
+urls = { "Homepage" = "https://github.com/StanfordVL/BEHAVIOR-1K" }
+requires-python = ">=3.8"
+license = { text = "MIT" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+  "dm_control",
+  "dynamixel-sdk",
+  "hid",
+  "inputs",
+  "joycon-python",
+  "numpy<2",
+  "numpy-quaternion",
+  "Pillow",
+  "pybullet",
+  "pygame",
+  "pyglm",
+  "PyQt6",
+  "pyquaternion",
+  "pure-python-adb",
+  "quaternion",
+  "termcolor",
+  "tyro",
+  "zmq",
+  "telemoma~=0.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black",
+  "flake8",
+  "flake8-docstrings",
+  "ipdb",
+  "isort",
+  "jupyterlab",
+  "mypy",
+  "neovim",
+  "pyright",
+  "pytest",
+  "python-lsp-server[all]",
+]
+
+[tool.setuptools]
+packages = { find = {} }
+include-package-data = true
+zip-safe = false

@@ -126,7 +126,7 @@ class MaterialPrim(BasePrim):
         self._shader = None
         self._shader_node = None
 
-        # Users of this material: should be a set of BaseObject and BaseSystem
+        # Users of this material: should be a set of USDObject and BaseSystem
         self._users = set()
 
         # Run super init
@@ -205,26 +205,26 @@ class MaterialPrim(BasePrim):
     @property
     def users(self):
         """
-        Users of this material: should be a list of BaseObject and BaseSystem
+        Users of this material: should be a list of USDObject and BaseSystem
         """
         return self._users
 
     def add_user(self, user):
         """
-        Adds a user to the material. This can be a BaseObject or BaseSystem.
+        Adds a user to the material. This can be a USDObject or BaseSystem.
 
         Args:
-            user (BaseObject or BaseSystem): User to add to the material
+            user (USDObject or BaseSystem): User to add to the material
         """
         self._users.add(user)
 
     def remove_user(self, user):
         """
-        Removes a user from the material. This can be a BaseObject or BaseSystem.
+        Removes a user from the material. This can be a USDObject or BaseSystem.
         If there are no users left, the material will be removed.
 
         Args:
-            user (BaseObject or BaseSystem): User to remove from the material
+            user (USDObject or BaseSystem): User to remove from the material
         """
         self._users.remove(user)
         if len(self._users) == 0:
@@ -246,7 +246,7 @@ class MaterialPrim(BasePrim):
 
         # Generate shader reference
         self._shader = lazy.omni.usd.get_shader_from_material(self._prim)
-        self._shader_node = lazy.usd.mdl.RegistryUtils.GetShaderNodeForPrim(self._shader.GetPrim())
+        self._shader_node = lazy.omni.UsdMdl.RegistryUtils.GetShaderNodeForPrim(self._shader.GetPrim())
 
     def bind(self, target_prim_path):
         """

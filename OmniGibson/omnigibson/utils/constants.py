@@ -53,6 +53,10 @@ class ParticleModifyCondition(str, Enum):
     GRAVITY = "gravity"
 
 
+# Object categories -- grabbed directly from the dataset to begin with
+# This will be automatically added to when objects are added with custom categories
+OBJECT_CATEGORIES = set(get_all_object_categories())
+
 # Structure categories that need to always be loaded for stability purposes
 STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "driveway", "fence", "roof", "background"})
 
@@ -182,10 +186,11 @@ def semantic_class_name_to_id():
     Returns:
         dict: class name to class id
     """
-    categories = get_all_object_categories()
     systems = get_all_system_categories(include_cloth=True)
 
-    all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
+    all_semantics = sorted(
+        set(list(OBJECT_CATEGORIES) + systems + ["background", "unlabelled", "object", "light", "agent"])
+    )
 
     # Assign a unique class id to each class name with hashing, the upper limit here is the max of int32
     max_int32 = th.iinfo(th.int32).max + 1

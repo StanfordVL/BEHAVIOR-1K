@@ -26,7 +26,7 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
@@ -46,6 +46,7 @@ from omnigibson.utils.ui_utils import (
     print_logo,
     suppress_omni_log,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 from omnigibson.utils.usd_utils import (
     ArticulatedObjectViewAPI,
     CollisionAPI,
@@ -56,6 +57,7 @@ from omnigibson.utils.usd_utils import (
     clear as clear_usd_utils,
     triangularize_mesh,
 )
+from omnigibson.controllers import ControllerView
 
 
 def with_profiler(name):
@@ -91,7 +93,7 @@ m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 m.KIT_FILES = {
-    (4, 5, 0): "omnigibson_4_5_0.kit",
+    (5, 1, 0): "omnigibson_5_1_0.kit",
 }
 
 
@@ -221,6 +223,8 @@ def _launch_app():
             isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
             assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
             kit_file_name = m.KIT_FILES[isaac_version_tuple]
+            if gm.ENABLE_VR:
+                kit_file_name = kit_file_name.replace(".kit", "_vr.kit")
 
         # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
         # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
@@ -529,18 +533,25 @@ def _launch_simulator(*args, **kwargs):
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
-                self._set_viewer_camera()
+                self._set_viewer_camera(
+                    viewer_width=viewer_width,
+                    viewer_height=viewer_height,
+                )
                 self.viewer_camera.set_position_orientation(
                     position=th.tensor(m.DEFAULT_VIEWER_CAMERA_POS),
                     orientation=th.tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
-                self.viewer_width = viewer_width
-                self.viewer_height = viewer_height
 
             # Acquire contact sensor interface
             self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()
 
-        def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
+        def _set_viewer_camera(
+            self,
+            relative_prim_path="/viewer_camera",
+            viewport_name="Viewport",
+            viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
+            viewer_width=gm.DEFAULT_VIEWER_WIDTH,
+        ):
             """
             Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
             and sets this camera as the active camera for the viewer
@@ -554,8 +565,8 @@ def _launch_simulator(*args, **kwargs):
                 relative_prim_path=relative_prim_path,
                 name=relative_prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
                 modalities="rgb",
-                image_height=self.viewer_height,
-                image_width=self.viewer_width,
+                image_height=viewer_height,
+                image_width=viewer_width,
                 viewport_name=viewport_name,
             )
             self._viewer_camera.load(None)
@@ -742,11 +753,7 @@ def _launch_simulator(*args, **kwargs):
             self._floor_plane.load(None)
 
             # Assign floors category to the floor plane
-            lazy.isaacsim.core.utils.semantics.add_update_semantics(
-                prim=self._floor_plane.prim,
-                semantic_label="floors",
-                type_label="class",
-            )
+            add_semantic_label(prim=self._floor_plane.prim, label="floors")
 
         def add_skybox(self):
             """
@@ -863,7 +870,7 @@ def _launch_simulator(*args, **kwargs):
             the simulator; it is assumed that this is handled externally
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to add
+                objs (Iterable[USDObject]): list of objects to add
             """
             SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
             if self.is_playing() and SimulationManager._physics_sim_view:
@@ -894,9 +901,9 @@ def _launch_simulator(*args, **kwargs):
             Post import an object into the simulator, handling any additional setup that needs to be done.
 
             Args:
-                obj (BaseObject): an object to load
+                obj (USDObject): an object to load
             """
-            assert isinstance(obj, BaseObject), "_post_import_object can only be called with BaseObject"
+            assert isinstance(obj, USDObject), "_post_import_object can only be called with USDObject"
 
             # Run any callbacks
             for callback in self._callbacks_on_add_obj.values():
@@ -910,7 +917,7 @@ def _launch_simulator(*args, **kwargs):
             Add a set of objects from the simulator.
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to add
+                objs (Iterable[USDObject]): list of objects to add
                 scenes (Iterable[BaseScene]): list of scenes corresponding to each object to load
             """
             with self.adding_objects(objs=objs):
@@ -925,7 +932,7 @@ def _launch_simulator(*args, **kwargs):
             the simulator; it is assumed that this is handled externally
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to remove
+                objs (Iterable[USDObject]): list of objects to remove
             """
             playing = self.is_playing()
             if playing:
@@ -976,7 +983,7 @@ def _launch_simulator(*args, **kwargs):
             Remove a non-robot object from the simulator. Should not be called directly by the user.
 
             Args:
-                obj (BaseObject): a non-robot object to remove
+                obj (USDObject): a non-robot object to remove
             """
             # Run any callbacks
             for callback in self._callbacks_on_remove_obj.values():
@@ -993,7 +1000,7 @@ def _launch_simulator(*args, **kwargs):
             Remove a set of objects from the simulator.
 
             Args:
-                objs (Iterable[BaseObject]): list of objects to remove
+                objs (Iterable[USDObject]): list of objects to remove
             """
             with self.removing_objects(objs=objs):
                 for obj in objs:
@@ -1033,8 +1040,8 @@ def _launch_simulator(*args, **kwargs):
                 SimulationManager._backend
             )
             SimulationManager._physics_sim_view.set_subspace_roots("/")
-            SimulationManager._message_bus.dispatch(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
-            SimulationManager._message_bus.dispatch(IsaacEvents.PHYSICS_READY.value, payload={})
+            SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
+            SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -1086,7 +1093,7 @@ def _launch_simulator(*args, **kwargs):
                     # may be added mid-iteration!!
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
-                    og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+                    self.refresh_physics()
                     initialize_tensorized_states()
                     scenes_modified = set()
                     for i in range(n_objects_to_initialize):
@@ -1258,9 +1265,8 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context._step(current_time=self.current_time)
             self._report_step_exceptions()
 
-            # Update persistent rigid contact and body pose caches from the latest step. We normally do this on the
-            # non-physics step, but this step_physics function is usually used to let contacts propagate during
-            # sampling etc, which means that we need to update the caches here too.
+            # Accumulate contact data from this physics step and then flush to cache.
+            # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
             RigidContactAPI.update_contact_cache()
             RigidBodyViewAPI.update_pose_cache()
             ArticulatedObjectViewAPI.update_dof_cache()
@@ -1282,10 +1288,13 @@ def _launch_simulator(*args, **kwargs):
 
                 # Only do this if we're not in the warmup phase
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                    # Run the controller step on every controllable object
+                    # Batch-step all controller groups (computes control and writes to Isaac buffer)
+                    ControllerView.step_all()
+
+                    # Per-robot post-step: override frozen gripper positions, handle assisted grasping
                     for scene in self.scenes:
                         for robot in scene.robots:
-                            robot.step()
+                            robot.post_step()
 
                     # Flush the controls from the ControllableObjectViewAPI
                     ControllableObjectViewAPI.flush_control()
@@ -1301,6 +1310,9 @@ def _launch_simulator(*args, **kwargs):
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
+
+                # Pull the contact sensor data
+                RigidContactAPI.add_contacts_from_physics_step()
 
                 # Record that we are done with the step context.
                 self.currently_stepping = False
@@ -1469,7 +1481,7 @@ def _launch_simulator(*args, **kwargs):
                 name (str): Name of the callback
                 callback (function): Callback function. Function signature is expected to be:
 
-                    def callback(obj: BaseObject) --> None
+                    def callback(obj: USDObject) --> None
             """
             self._callbacks_on_add_obj[name] = callback
 
@@ -1482,7 +1494,7 @@ def _launch_simulator(*args, **kwargs):
                 name (str): Name of the callback
                 callback (function): Callback function. Function signature is expected to be:
 
-                    def callback(obj: BaseObject) --> None
+                    def callback(obj: USDObject) --> None
             """
             self._callbacks_on_remove_obj[name] = callback
 
@@ -1773,6 +1785,9 @@ def _launch_simulator(*args, **kwargs):
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
+
+            # Clear all controller groups so robots re-register on next load
+            ControllerView.clear()
 
         def close(self):
             """
