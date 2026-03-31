@@ -9,6 +9,7 @@ manipulation:
   arm_joint_names:
     "0": ["arm_joint1", "arm_joint2", "arm_joint3", "arm_joint4", "arm_joint5", "arm_joint6"]
   supported_end_effector: ["gripper", "inspire"]
+  eef_support_curobo_attached_object_link_names: ["gripper"]
   end_effectors:
     gripper:
       model: "a1"
@@ -21,6 +22,7 @@ manipulation:
       default_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, 0.0, 0.0, 0.0]
       teleop_rotation_offset:
         "0": [0, 0, 0.707, 0.707]
+      curobo_path: "models/a1/curobo/a1_description_curobo_default.yaml"
       disabled_collision_pairs: [["gripper1", "gripper2"]]
       ag_start_points: [["gripper1", [0.065, -0.014, 0.0115]], ["gripper1", [0.015, -0.014, 0.0115]]]
       ag_end_points: [["gripper2", [0.065, -0.014, 0.0115]], ["gripper2", [0.015, -0.014, 0.0115]]]

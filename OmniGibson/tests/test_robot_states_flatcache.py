@@ -109,7 +109,7 @@ def camera_pose_test(flatcache):
     assert th.allclose(robot.get_position_orientation()[0], th.tensor([150, 150, 100], dtype=th.float32), atol=1e-3)
 
     # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
-    camera_parent_prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3d([2.0, 2.0, 2.0]))
+    camera_parent_prim.scale = th.tensor([2.0, 2.0, 2.0])
     camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
     camera_local_pose = vision_sensor.get_position_orientation(frame="parent")
     expected_mat = camera_parent_world_transform @ pose2mat(camera_local_pose)

@@ -142,9 +142,7 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
-        if not gm.ENABLE_FLATCACHE:
-            # TODO: not sure why this is needed only in USD mode
-            PoseAPI.invalidate()
+        PoseAPI.invalidate()
         # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
@@ -441,6 +439,8 @@ class XFormPrim(BasePrim):
         else:
             scale = th.ones(3, dtype=th.float32) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        # Invalidate PoseAPI
+        PoseAPI.invalidate()
         # Invalidate the cached scale
         self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())

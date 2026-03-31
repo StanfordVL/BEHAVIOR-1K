@@ -249,6 +249,11 @@ class RigidContactAPIImpl:
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
+
+            # Add the (global) floor plane if there is one
+            if og.sim.floor_plane is not None:
+                filters[scene_idx].append(og.sim.floor_plane.prim_path + "/collisionPlane")
+
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
@@ -307,7 +312,6 @@ class RigidContactAPIImpl:
 
                 # If there are only kinematic/static bodies, skip view creation for this scene.
                 if len(scene_dynamic_body_filters) == 0:
-                    self._CONTACT_VIEW[scene_idx] = None
                     continue
 
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
@@ -434,10 +438,6 @@ class RigidContactAPIImpl:
 
             # Append the data to the pending lists. Note that we have to clone these matrices because
             # the view actually reuses the buffer.
-            if scene_idx not in self._PENDING_IMPULSES:
-                self._PENDING_IMPULSES[scene_idx] = []
-                self._PENDING_TRANSFORMS[scene_idx] = []
-                self._PENDING_NET_FORCES[scene_idx] = []
             self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
             self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
             self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
