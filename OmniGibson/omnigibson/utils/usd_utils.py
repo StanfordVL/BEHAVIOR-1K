@@ -1023,9 +1023,9 @@ class PoseAPI:
             og.sim.render()
 
             # when flatcache is on
-            if og.sim._physx_fabric_interface:
+            if og.sim._sim_context._physx_fabric_interface:
                 # no time step is taken here
-                og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+                og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
             # when flatcache is off
             else:
                 # no time step is taken here
