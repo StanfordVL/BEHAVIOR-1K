@@ -21,7 +21,7 @@ from omnigibson.objects.usd_object import USDObject
 from bddl.activity import Conditions
 
 from gello.utils.og_teleop_cfg import *
-from gello import ROOT_DIR
+from gello import REPO_DIR
 
 
 def get_task_relevant_room_types(activity_name):
@@ -1391,7 +1391,7 @@ def load_available_tasks():
     Returns:
         dict: Dictionary of available tasks
     """
-    task_cfg_path = os.path.join(ROOT_DIR, "..", "sampled_task", "available_tasks.yaml")
+    task_cfg_path = os.path.join(REPO_DIR, "..", "datasets", "2025-challenge-task-instances", "metadata", "available_tasks.yaml")
 
     try:
         with open(task_cfg_path, "r") as file:

@@ -1093,6 +1093,10 @@ class OGRobotServer:
             for tro_key, tro_state in tro_state.items():
                 if tro_key == "robot_poses":
                     presampled_robot_poses = tro_state
+                    # make all robot name lower case
+                    presampled_robot_poses = {
+                        k.lower(): v for k, v in presampled_robot_poses.items()
+                    }
                     # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
                     # for orientation
                     robot_pos = presampled_robot_poses[self.robot.model][0]["position"]
