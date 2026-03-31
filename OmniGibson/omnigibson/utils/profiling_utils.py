@@ -59,7 +59,7 @@ class ProfilingEnv(og.Environment):
             sim_start = time()
             if len(og.sim._objects_to_initialize) > 0:
                 og.sim.render()
-            super(type(og.sim), og.sim).step(render=True)
+            og.sim._sim_context.step(render=True)
             omni_time = (time() - sim_start) * 1e3
 
             # Additionally run non physics things
