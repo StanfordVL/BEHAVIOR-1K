@@ -8,16 +8,15 @@ import numpy as np
 import tyro
 
 from gello.agents.bimanual_agent import (
+    ROBOT_TELEOP_CONFIGS,
     BimanualAgent,
     MotorFeedbackConfig,
-    R1_CONFIG,
-    R1PRO_CONFIG,
 )
 from gello.agents.dynamixel_arm_agent import DynamixelArmAgent, DynamixelRobotConfig
 from gello.agents.joycon_agent import JoyconAgent
 from gello.env import RobotEnv
-from gello.robots.robot import PrintRobot
-from gello.zmq_core.robot_node import ZMQClientRobot
+from gello.robots.base_robot import PrintRobot
+from gello.utils.zmq_utils import ZMQRobotClient
 from gello import REPO_DIR
 
 
@@ -35,8 +34,8 @@ class Args:
     hostname: str = "127.0.0.1"
     hz: int = 100
     start_joints: Optional[Tuple[float, ...]] = None
-    gello_model: Literal["r1", "r1pro"] = "r1pro"
-    joint_config_file: Optional[str] = None
+    gello_model: str = "r1pro"
+    gello_name: str = "default"
     gello_port: Optional[str] = None
     mock: bool = False
     damping_motor_kp: float = 0.3
@@ -45,23 +44,15 @@ class Args:
 
 
 def main(args):
-    # Select config based on robot model
-    if args.gello_model == "r1":
-        bimanual_config = R1_CONFIG
-        default_joint_config = "joint_config_black_gello.yaml"
-    elif args.gello_model == "r1pro":
-        bimanual_config = R1PRO_CONFIG
-        default_joint_config = "joint_config_panda_pro.yaml"
-    else:
-        raise ValueError(f"Unsupported gello model: {args.gello_model}")
-
-    if args.joint_config_file is None:
-        args.joint_config_file = default_joint_config
+    assert args.gello_model in ROBOT_TELEOP_CONFIGS, (
+        f"Unsupported gello model: {args.gello_model}"
+    )
+    bimanual_config = ROBOT_TELEOP_CONFIGS[args.gello_model]
 
     if args.mock:
         robot_client = PrintRobot(bimanual_config.joints_per_arm * 2, dont_print=True)
     else:
-        robot_client = ZMQClientRobot(port=args.robot_port, host=args.hostname)
+        robot_client = ZMQRobotClient(port=args.robot_port, host=args.hostname)
 
     env = RobotEnv(robot_client, control_rate_hz=args.hz)
 
@@ -84,7 +75,7 @@ def main(args):
             raise ValueError("No gello port found, please specify one or plug in gello")
 
     # Read joint config from yaml
-    with open(f"{REPO_DIR}/configs/{args.joint_config_file}", "r") as file:
+    with open(f"{REPO_DIR}/configs/joint_config_{args.gello_name}.yaml", "r") as file:
         joint_config = yaml.load(file, Loader=yaml.SafeLoader)
 
     num_motors = bimanual_config.motors_per_arm * 2
@@ -98,29 +89,7 @@ def main(args):
     # Default start joints
     start_joints = args.start_joints
     if start_joints is None:
-        if args.gello_model == "r1":
-            start_joints = np.array(
-                [
-                    np.pi / 2,
-                    np.pi / 2,
-                    np.pi,
-                    np.pi,
-                    -np.pi,
-                    0,
-                    0,
-                    0,
-                    -np.pi / 2,
-                    -np.pi / 2,
-                    np.pi,
-                    np.pi,
-                    -np.pi,
-                    0,
-                    0,
-                    0,
-                ]
-            )
-        elif args.gello_model == "r1pro":
-            start_joints = np.zeros(num_motors)
+        start_joints = bimanual_config.start_joints.copy()
 
     # Create JoyCon agent
     joycon_agent = None
@@ -179,6 +148,11 @@ def main(args):
     )
     print_color(
         "\t Up / Down Button: Raise / Lower the trunk torso",
+        color="magenta",
+        attrs=("bold",),
+    )
+    print_color(
+        "\t Left / Right Button: Toggle gripper light",
         color="magenta",
         attrs=("bold",),
     )

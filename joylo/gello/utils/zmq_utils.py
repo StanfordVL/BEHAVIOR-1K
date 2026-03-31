@@ -1,38 +1,43 @@
+import numpy as np
 import pickle
 import threading
+import zmq
+from gello.robots.base_robot import Robot
 from typing import Any, Dict
 
-import numpy as np
-import zmq
-
-from gello.robots.robot import Robot
 
 DEFAULT_ROBOT_PORT = 6000
 
 
-class ZMQServerRobot:
-    def __init__(
-        self,
-        robot: Robot,
-        port: int = DEFAULT_ROBOT_PORT,
-        host: str = "127.0.0.1",
-    ):
+class ZMQServerThread(threading.Thread):
+    def __init__(self, server):
+        super().__init__()
+        self._server = server
+
+    def run(self):
+        self._server.serve()
+
+    def terminate(self):
+        self._server.stop()
+
+
+class ZMQRobotServer:
+    """A class representing a ZMQ server for a robot."""
+
+    def __init__(self, robot: Robot, host: str = "127.0.0.1", port: int = 5556, verbose=True):
         self._robot = robot
+        self._verbose = verbose
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.REP)
         addr = f"tcp://{host}:{port}"
-        debug_message = f"Robot Sever Binding to {addr}, Robot: {robot}"
-        print(debug_message)
-        self._timout_message = f"Timeout in Robot Server, Robot: {robot}"
         self._socket.bind(addr)
         self._stop_event = threading.Event()
 
     def serve(self) -> None:
-        """Serve the leader robot state over ZMQ."""
+        """Serve the robot state and commands over ZMQ."""
         self._socket.setsockopt(zmq.RCVTIMEO, 1000)  # Set timeout to 1000 ms
         while not self._stop_event.is_set():
             try:
-                # Wait for next request from client
                 message = self._socket.recv()
                 request = pickle.loads(message)
 
@@ -56,16 +61,18 @@ class ZMQServerRobot:
                     )
 
                 self._socket.send(pickle.dumps(result))
-            except zmq.Again:
-                print(self._timout_message)
+            except zmq.error.Again:
+                if self._verbose:
+                    print("Timeout in ZMQLeaderServer serve")
                 # Timeout occurred, check if the stop event is set
 
     def stop(self) -> None:
-        """Signal the server to stop serving."""
         self._stop_event.set()
+        self._socket.close()
+        self._context.term()
 
 
-class ZMQClientRobot(Robot):
+class ZMQRobotClient(Robot):
     """A class representing a ZMQ client for a leader robot."""
 
     def __init__(self, port: int = DEFAULT_ROBOT_PORT, host: str = "127.0.0.1"):

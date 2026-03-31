@@ -19,10 +19,9 @@ from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.asset_utils import get_task_instance_path
 
-from gello.robots.sim_robot.zmq_server import ZMQRobotServer, ZMQServerThread
-
-from gello.robots.sim_robot.og_teleop_cfg import *
-import gello.robots.sim_robot.og_teleop_utils as utils
+import gello.utils.og_teleop_utils as utils
+from gello.utils.zmq_utils import ZMQRobotServer, ZMQServerThread
+from gello.utils.og_teleop_cfg import *
 
 
 class OGRobotServer:
@@ -112,6 +111,11 @@ class OGRobotServer:
 
         assert self.robot.is_manipulation, (
             f"Robot {robot} is not a manipulation robot! Cannot use GELLO"
+        )
+        self.is_bimanual_mobile = (
+            self.robot.is_mobile_manipulation
+            and self.robot.n_arms == 2
+            and self.robot.is_articulated_trunk
         )
 
         self._teleop_config = ROBOT_CONFIGS[robot]
@@ -288,8 +292,6 @@ class OGRobotServer:
             robot=self, host=host, port=port, verbose=False
         )
         self._zmq_server_thread = ZMQServerThread(self._zmq_server)
-
-        self.is_bimanual_mobile = self.robot.is_mobile_manipulation and self.robot.n_arms == 2 and self.robot.is_articulated_trunk
 
     def _setup_teleop_support(self):
         """Set up cameras, visualizations, UI elements"""
@@ -1027,6 +1029,10 @@ class OGRobotServer:
         utils.add_status_event(self.event_queue, "reset", reset_text)
         # Reset internal variables
         self._ghost_appear_counter = {arm: 0 for arm in self.robot.arm_names}
+        # Hide ghost robot on reset
+        if self.ghosting:
+            for link in self.ghost.links.values():
+                link.visible = False
         self._resume_cooldown_time = time.time() + N_COOLDOWN_SECS
         self._in_cooldown = True
         self._current_trunk_translate = DEFAULT_TRUNK_TRANSLATE

@@ -8,7 +8,7 @@ import torch as th
 from gello.agents.agent import Agent
 from gello.agents.dynamixel_arm_agent import DynamixelArmAgent
 from gello.agents.joycon_agent import JoyconAgent
-from gello.dynamixel.driver import OperatingMode
+from gello.utils.dynamixel_utils import OperatingMode
 
 
 class MotorFeedbackConfig(Enum):
@@ -35,6 +35,7 @@ class BimanualAgentConfig:
     default_operation_modes: List[OperatingMode]
     left_lock: ArmLockConfig = field(default_factory=ArmLockConfig)
     right_lock: ArmLockConfig = field(default_factory=ArmLockConfig)
+    start_joints: Optional[np.ndarray] = None
 
 
 R1_CONFIG = BimanualAgentConfig(
@@ -46,6 +47,26 @@ R1_CONFIG = BimanualAgentConfig(
     default_operation_modes=[OperatingMode.NONE] * 16,
     left_lock=ArmLockConfig(7, 2, None, track_wrist_offset=True),
     right_lock=ArmLockConfig(7, 2, None, track_wrist_offset=True),
+    start_joints=np.array(
+        [
+            np.pi / 2,
+            np.pi / 2,
+            np.pi,
+            np.pi,
+            -np.pi,
+            0,
+            0,
+            0,
+            -np.pi / 2,
+            -np.pi / 2,
+            np.pi,
+            np.pi,
+            -np.pi,
+            0,
+            0,
+            0,
+        ]
+    ),
 )
 
 R1PRO_CONFIG = BimanualAgentConfig(
@@ -61,7 +82,13 @@ R1PRO_CONFIG = BimanualAgentConfig(
     right_lock=ArmLockConfig(
         5, 3, OperatingMode.EXTENDED_POSITION, track_wrist_offset=False
     ),
+    start_joints=np.zeros(18),
 )
+
+ROBOT_TELEOP_CONFIGS = {
+    "r1": R1_CONFIG,
+    "r1pro": R1PRO_CONFIG,
+}
 
 
 class BimanualAgent(Agent):

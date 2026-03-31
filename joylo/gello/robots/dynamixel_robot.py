@@ -2,8 +2,8 @@ from typing import Dict, Optional, Sequence, Tuple, List, Union
 
 import numpy as np
 
-from gello.robots.robot import Robot
-from gello.dynamixel.driver import OperatingMode
+from gello.robots.base_robot import Robot
+from gello.utils.dynamixel_utils import OperatingMode
 
 
 class DynamixelRobot(Robot):
@@ -20,7 +20,7 @@ class DynamixelRobot(Robot):
         gripper_config: Optional[Tuple[int, float, float]] = None,
         start_joints: Optional[np.ndarray] = None,
     ):
-        from gello.dynamixel.driver import (
+        from gello.utils.dynamixel_utils import (
             DynamixelDriver,
             DynamixelDriverProtocol,
             FakeDynamixelDriver,

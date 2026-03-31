@@ -1,6 +1,6 @@
 # Script for automatically testing the joint offsets and signs of a JoyLo set
 
-from gello.dynamixel.driver import DynamixelDriver
+from gello.utils.dynamixel_utils import DynamixelDriver
 import numpy as np
 import sys
 from dataclasses import dataclass

@@ -4,8 +4,8 @@ from typing import Optional, Sequence
 import numpy as np
 
 from gello.agents.agent import Agent
-from gello.robots.dynamixel import DynamixelRobot
-from gello.dynamixel.driver import OperatingMode, GainType
+from gello.robots.dynamixel_robot import DynamixelRobot
+from gello.utils.dynamixel_utils import OperatingMode, GainType
 
 
 @dataclass

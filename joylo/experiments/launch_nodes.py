@@ -1,6 +1,6 @@
 import tyro
 from dataclasses import dataclass
-from gello.robots.sim_robot.og_sim import OGRobotServer
+from gello.robots.og_robot import OGRobotServer
 from typing import Optional
 
 

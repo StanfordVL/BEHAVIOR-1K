@@ -20,7 +20,8 @@ from omnigibson.sensors import VisionSensor
 from omnigibson.objects.usd_object import USDObject
 from bddl.activity import Conditions
 
-from gello.robots.sim_robot.og_teleop_cfg import *
+from gello.utils.og_teleop_cfg import *
+from gello import ROOT_DIR
 
 
 def get_task_relevant_room_types(activity_name):
@@ -529,6 +530,7 @@ def setup_robot_visualizers(robot, scene):
                 orientation=quat_offset,
                 frame="parent",
             )
+            vis_geom.visible = True  # Initially visible (not grasping)
             vis_elements["eef_cylinder_geoms"][arm].append(vis_geom)
 
         # Add vis sphere around EEF for reachability
@@ -673,6 +675,9 @@ def setup_flashlights(robot):
         translate_op = light_prim.AddTranslateOp()
         translate_op.Set(lazy.pxr.Gf.Vec3d(-0.01, 0, -0.05))
         light_prim.SetXformOpOrder([translate_op])
+
+        # Start with flashlight off
+        light_prim.GetVisibilityAttr().Set("invisible")
 
         flashlights[arm] = light_prim
 
@@ -1386,11 +1391,7 @@ def load_available_tasks():
     Returns:
         dict: Dictionary of available tasks
     """
-    # Get directory of current file
-    dir_path = os.path.dirname(os.path.abspath(__file__))
-    task_cfg_path = os.path.join(
-        dir_path, "..", "..", "..", "sampled_task", "available_tasks.yaml"
-    )
+    task_cfg_path = os.path.join(ROOT_DIR, "..", "sampled_task", "available_tasks.yaml")
 
     try:
         with open(task_cfg_path, "r") as file:

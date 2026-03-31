@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 import numpy as np
 
-from gello.robots.robot import Robot
+from gello.robots.base_robot import Robot
 
 
 class Rate:
