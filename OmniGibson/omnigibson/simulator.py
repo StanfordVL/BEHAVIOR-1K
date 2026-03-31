@@ -844,7 +844,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
-            self._sim_context.reset()
             self.play()
 
             # Initialize the scene
