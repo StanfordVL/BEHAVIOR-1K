@@ -112,11 +112,12 @@ def clear(
         viewer_height=sim.viewer_height if viewer_height is None else viewer_height,
         device=sim.device if device is None else device,
     )
-    
+
     # Stop the viewport menubar USD watcher before teardown. This revokes the TfNotice
     # listener so that prim deletions during _partial_clear() don't queue deferred
     # callbacks that later fire on an invalid stage and corrupt CUDA/PhysX state.
     from omni.kit.viewport.menubar.core.utils import usd_watch
+
     usd_watch.stop()
 
     # First let the simulator clear everything it owns.

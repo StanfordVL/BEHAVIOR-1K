@@ -761,11 +761,11 @@ def test_toggled_on(env, stove, robot):
     assert not stove.states[ToggledOn].get_value()
 
     # TODO: investigate why extra steps (1 + 9) are needed for the contact to be registered
-    for _ in range(10):                                                                                                                            
-        robot.set_joint_positions(q, drive=False)                                                                                                  
-        robot.keep_still()                                                                                                                         
+    for _ in range(10):
+        robot.set_joint_positions(q, drive=False)
+        robot.keep_still()
         og.sim.step()
-                                                                                                                                
+
     # Enough time has passed, turns True
     assert stove.states[ToggledOn].get_value()
 
@@ -827,6 +827,7 @@ def test_particle_sink(env, furniture_sink):
         sink.states[ParticleSink].set_value(True)
 
     water_system.remove_all_particles()
+
 
 # TODO: Particle applier and particle remover tests do not currently work with FLATCACHE=False
 # see issue #2066 Error: PhysX error: Fetching GPU Narrowphase failed! 700
