@@ -1310,9 +1310,13 @@ def _launch_simulator(*args, **kwargs):
                 self.currently_stepping = False
 
                 if self._deferred_joint_breaks:
-                    for obj, state_type, joint_path in self._deferred_joint_breaks:
-                        obj.states[state_type].on_joint_break(joint_path)
+                    # Copy the current deferred joint breaks and clear the shared list
+                    # before invoking callbacks, so we don't retain stale entries if a
+                    # callback raises an exception.
+                    deferred_breaks = list(self._deferred_joint_breaks)
                     self._deferred_joint_breaks.clear()
+                    for obj, state_type, joint_path in deferred_breaks:
+                        obj.states[state_type].on_joint_break(joint_path)
 
             except Exception as e:
                 self.currently_stepping = False
