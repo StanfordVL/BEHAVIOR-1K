@@ -239,6 +239,22 @@ class DatasetObject(USDObject):
             elif joint.joint_type == JointType.JOINT_REVOLUTE:
                 joint.friction = DEFAULT_REVOLUTE_JOINT_FRICTION
 
+    def _get_preapply_scale(self, default_prim):
+        # If bounding_box is set, scale hasn't been computed yet (that happens in _post_load).
+        # Derive it here from ig:nativeBB so kinematic_only is computed correctly and
+        # PhysxArticulationAPI is pre-applied when needed.
+        bounding_box = self._load_config.get("bounding_box", None)
+        if bounding_box is not None and self._load_config.get("scale", None) is None:
+            native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
+            if native_bb_attr.IsValid():
+                native_bb = th.tensor(list(native_bb_attr.Get()))
+                bb = th.tensor(bounding_box, dtype=th.float32)
+                scale = th.ones(3)
+                valid_idxes = native_bb > 1e-4
+                scale[valid_idxes] = bb[valid_idxes] / native_bb[valid_idxes]
+                return scale
+        return super()._get_preapply_scale(default_prim)
+
     def _post_load(self):
         # If manual bounding box is specified, scale based on ratio between that and the native bbox
         if self._load_config["bounding_box"] is not None:
@@ -258,7 +274,6 @@ class DatasetObject(USDObject):
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
-
         # Run super last
         super()._post_load()
 
