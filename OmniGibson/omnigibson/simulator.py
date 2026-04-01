@@ -1077,10 +1077,15 @@ def _launch_simulator(*args, **kwargs):
             SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
             IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
 
+            stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
             SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
-                SimulationManager._backend
+                SimulationManager._backend, stage_id=stage_id
             )
             SimulationManager._physics_sim_view.set_subspace_roots("/")
+            SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
+                "warp", stage_id=stage_id
+            )
+            SimulationManager._simulation_view_created = True
             SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
             SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
 
@@ -1207,8 +1212,6 @@ def _launch_simulator(*args, **kwargs):
                 channels = ["omni.usd", "omni.physicsschema.plugin"]
                 if gm.ENABLE_FLATCACHE:
                     channels.append("omni.physx.plugin")
-                with suppress_omni_log(channels=channels):
-                    self._sim_context.play()
 
                 if not gm.ENABLE_FLATCACHE:
                     # In Isaac Sim 5.x, articulation child links are not fully registered in PhysX
@@ -1223,6 +1226,9 @@ def _launch_simulator(*args, **kwargs):
                         self._sim_context.play()
                     self._sim_context.stop()
                     SimulationManager.enable_post_warm_start_callback(True)
+
+                with suppress_omni_log(channels=channels):
+                    self._sim_context.play()
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
