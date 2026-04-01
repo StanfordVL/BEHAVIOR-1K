@@ -714,7 +714,10 @@ def test_on_fire(env, plywood):
 
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
-@pytest.mark.skip(reason="investigate why extra steps are needed for the contact to be registered beyond CAN_TOGGLE_STEPS")
+
+@pytest.mark.skip(
+    reason="investigate why extra steps are needed for the contact to be registered beyond CAN_TOGGLE_STEPS"
+)
 def test_toggled_on(env, stove, robot):
     stove.set_position_orientation([1.487, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, math.pi], dtype=th.float32)))
     robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
@@ -759,7 +762,6 @@ def test_toggled_on(env, stove, robot):
 
     # End-effector close to the button, but not enough time has passed, still False
     assert not stove.states[ToggledOn].get_value()
-
 
     robot.set_joint_positions(q, drive=False)
     robot.keep_still()

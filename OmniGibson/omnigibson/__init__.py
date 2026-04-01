@@ -123,7 +123,7 @@ def clear(
     sim._partial_clear()
 
     usd_watcher.start()
-    
+
     # Then close the stage and remove pointers to the simulator object.
     assert lazy.isaacsim.core.utils.stage.close_stage()
     sim = None
