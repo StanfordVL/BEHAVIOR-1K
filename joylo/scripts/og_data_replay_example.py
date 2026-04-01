@@ -7,7 +7,7 @@ from omnigibson.macros import gm
 import argparse
 import sys
 import json
-from gello.robots.sim_robot.og_teleop_utils import optimize_sim_settings
+from gello.utils.og_teleop_utils import optimize_sim_settings
 from gello.utils.qa_utils import *
 from gello.utils.b1k_utils import ALL_QA_METRICS, COMMON_QA_METRICS, TASK_QA_METRICS
 import inspect
