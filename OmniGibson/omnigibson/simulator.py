@@ -1077,10 +1077,15 @@ def _launch_simulator(*args, **kwargs):
             SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
             IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
 
+            stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
             SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
-                SimulationManager._backend
+                SimulationManager._backend, stage_id=stage_id
             )
             SimulationManager._physics_sim_view.set_subspace_roots("/")
+            SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
+                "warp", stage_id=stage_id
+            )
+            SimulationManager._simulation_view_created = True
             SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
             SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
 
@@ -1195,7 +1200,6 @@ def _launch_simulator(*args, **kwargs):
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
                 was_stopped = self.is_stopped()
 
-                # Run super first
                 # We suppress warnings from omni.usd because it complains about values set in the native USD
                 # These warnings occur because the native USD file has some type mismatch in the `scale` property,
                 # where the property expects a double but for whatever reason the USD interprets its values as floats
@@ -1208,6 +1212,21 @@ def _launch_simulator(*args, **kwargs):
                 channels = ["omni.usd", "omni.physicsschema.plugin"]
                 if gm.ENABLE_FLATCACHE:
                     channels.append("omni.physx.plugin")
+
+                if not gm.ENABLE_FLATCACHE:
+                    # In Isaac Sim 5.x, articulation child links are not fully registered in PhysX
+                    # on the first play after objects are loaded into the USD stage. A play/stop cycle
+                    # is needed to prime PhysX before the real play. We use the base SimulationContext
+                    # play/stop to do a bare-bones warmup that avoids OmniGibson's update_handles and
+                    # object initialization logic, which would fail on the missing bodies.
+                    # This issue only happens when flatcache / fabric is disabled.
+                    SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+                    SimulationManager.enable_post_warm_start_callback(False)
+                    with suppress_omni_log(channels=channels):
+                        self._sim_context.play()
+                    self._sim_context.stop()
+                    SimulationManager.enable_post_warm_start_callback(True)
+
                 with suppress_omni_log(channels=channels):
                     self._sim_context.play()
 
