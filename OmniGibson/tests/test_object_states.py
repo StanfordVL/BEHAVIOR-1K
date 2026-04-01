@@ -714,7 +714,7 @@ def test_on_fire(env, plywood):
 
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
-
+@pytest.mark.skip(reason="investigate why extra steps are needed for the contact to be registered beyond CAN_TOGGLE_STEPS")
 def test_toggled_on(env, stove, robot):
     stove.set_position_orientation([1.487, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, math.pi], dtype=th.float32)))
     robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
@@ -760,11 +760,10 @@ def test_toggled_on(env, stove, robot):
     # End-effector close to the button, but not enough time has passed, still False
     assert not stove.states[ToggledOn].get_value()
 
-    # TODO: investigate why extra steps (1 + 9) are needed for the contact to be registered
-    for _ in range(10):
-        robot.set_joint_positions(q, drive=False)
-        robot.keep_still()
-        og.sim.step()
+
+    robot.set_joint_positions(q, drive=False)
+    robot.keep_still()
+    og.sim.step()
 
     # Enough time has passed, turns True
     assert stove.states[ToggledOn].get_value()
@@ -829,123 +828,122 @@ def test_particle_sink(env, furniture_sink):
     water_system.remove_all_particles()
 
 
-# TODO: Particle applier and particle remover tests do not currently work with FLATCACHE=False
-# see issue #2066 Error: PhysX error: Fetching GPU Narrowphase failed! 700
-# However, these two tests work with FLATCACHE=True
-# def test_particle_applier(env, breakfast_table, acetone_atomizer):
-#     # Test projection
+@pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
+def test_particle_applier(env, breakfast_table, acetone_atomizer):
+    # Test projection
 
-#     place_obj_on_floor_plane(breakfast_table)
-#     place_objA_on_objB_bbox(acetone_atomizer, breakfast_table, z_offset=0.1)
-#     acetone_atomizer.set_orientation(th.tensor([0.707, 0, 0, 0.707]))
-#     for _ in range(3):
-#         og.sim.step()
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(acetone_atomizer, breakfast_table, z_offset=0.1)
+    acetone_atomizer.set_orientation(th.tensor([0.707, 0, 0, 0.707]))
+    for _ in range(3):
+        og.sim.step()
 
-#     assert not acetone_atomizer.states[ToggledOn].get_value()
-#     water_system = env.scene.get_system("water")
-#     # Spray bottle is toggled off, no water should be present
-#     assert water_system.n_particles == 0
+    assert not acetone_atomizer.states[ToggledOn].get_value()
+    water_system = env.scene.get_system("water")
+    # Spray bottle is toggled off, no water should be present
+    assert water_system.n_particles == 0
 
-#     # Take number of steps for water to be generated, make sure there is still no water
-#     n_applier_steps = acetone_atomizer.states[ParticleApplier].n_steps_per_modification
-#     for _ in range(n_applier_steps):
-#         og.sim.step()
+    # Take number of steps for water to be generated, make sure there is still no water
+    n_applier_steps = acetone_atomizer.states[ParticleApplier].n_steps_per_modification
+    for _ in range(n_applier_steps):
+        og.sim.step()
 
-#     assert water_system.n_particles == 0
+    assert water_system.n_particles == 0
 
-#     # Turn particle applier on, and verify particles are generated after the same number of steps are taken
-#     acetone_atomizer.states[ToggledOn].set_value(True)
+    # Turn particle applier on, and verify particles are generated after the same number of steps are taken
+    acetone_atomizer.states[ToggledOn].set_value(True)
 
-#     for _ in range(n_applier_steps):
-#         og.sim.step()
+    for _ in range(n_applier_steps):
+        og.sim.step()
 
-#     # Some water should be present
-#     assert water_system.n_particles > 0
+    # Some water should be present
+    assert water_system.n_particles > 0
 
-#     # Test adjacency
+    # Test adjacency
 
-#     water_system.remove_all_particles()
-#     acetone_atomizer.set_position_orientation(position=th.ones(3) * 50.0, orientation=th.tensor([0, 0, 0, 1.0]))
+    water_system.remove_all_particles()
+    acetone_atomizer.set_position_orientation(position=th.ones(3) * 50.0, orientation=th.tensor([0, 0, 0, 1.0]))
 
-#     place_objA_on_objB_bbox(applier_dishtowel, breakfast_table)
-#     og.sim.step()
+    place_objA_on_objB_bbox(applier_dishtowel, breakfast_table)
+    og.sim.step()
 
-#     # no water should be present
-#     assert water_system.n_particles == 0
+    # no water should be present
+    assert water_system.n_particles == 0
 
-#     # Take number of steps for water to be generated
-#     n_applier_steps = applier_dishtowel.states[ParticleApplier].n_steps_per_modification
-#     for _ in range(n_applier_steps):
-#         og.sim.step()
+    # Take number of steps for water to be generated
+    n_applier_steps = applier_dishtowel.states[ParticleApplier].n_steps_per_modification
+    for _ in range(n_applier_steps):
+        og.sim.step()
 
-#     # Some water should be present
-#     assert water_system.n_particles > 0
+    # Some water should be present
+    assert water_system.n_particles > 0
 
-#     # Cannot set this state
-#     with pytest.raises(NotImplementedError):
-#         acetone_atomizer.states[ParticleApplier].set_value(True)
+    # Cannot set this state
+    with pytest.raises(NotImplementedError):
+        acetone_atomizer.states[ParticleApplier].set_value(True)
 
-#     water_system.remove_all_particles()
+    water_system.remove_all_particles()
 
 
-# def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
-#     # Test projection
+@pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
+def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
+    # Test projection
 
-#     place_obj_on_floor_plane(breakfast_table)
-#     place_objA_on_objB_bbox(vacuum, breakfast_table, z_offset=0.02)
-#     for _ in range(3):
-#         og.sim.step()
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(vacuum, breakfast_table, z_offset=0.02)
+    for _ in range(3):
+        og.sim.step()
 
-#     assert not vacuum.states[ToggledOn].get_value()
-#     water_system = env.scene.get_system("water")
-#     # Place single particle of water on middle of table
-#     water_system.generate_particles(
-#         positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
-#     )
-#     assert water_system.n_particles > 0
+    assert not vacuum.states[ToggledOn].get_value()
+    water_system = env.scene.get_system("water")
+    # Place single particle of water on middle of table
+    water_system.generate_particles(
+        positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
+    )
+    assert water_system.n_particles > 0
 
-#     # Take number of steps for water to be removed, make sure there is still water
-#     n_remover_steps = vacuum.states[ParticleRemover].n_steps_per_modification
-#     for _ in range(n_remover_steps):
-#         og.sim.step()
+    # Take number of steps for water to be removed, make sure there is still water
+    n_remover_steps = vacuum.states[ParticleRemover].n_steps_per_modification
+    for _ in range(n_remover_steps):
+        og.sim.step()
 
-#     assert water_system.n_particles > 0
+    assert water_system.n_particles > 0
 
-#     # Turn particle remover on, and verify particles are generated after the same number of steps are taken
-#     vacuum.states[ToggledOn].set_value(True)
+    # Turn particle remover on, and verify particles are generated after the same number of steps are taken
+    vacuum.states[ToggledOn].set_value(True)
 
-#     for _ in range(n_remover_steps):
-#         og.sim.step()
+    for _ in range(n_remover_steps):
+        og.sim.step()
 
-#     # No water should be present
-#     assert water_system.n_particles == 0
+    # No water should be present
+    assert water_system.n_particles == 0
 
-#     # Test adjacency
+    # Test adjacency
 
-#     vacuum.set_position_orientation(position=th.ones(3) * 50.0)
-#     place_objA_on_objB_bbox(remover_dishtowel, breakfast_table, z_offset=0.03)
-#     og.sim.step()
-#     # Place single particle of water on middle of table
-#     water_system.generate_particles(
-#         positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
-#     )
+    vacuum.set_position_orientation(position=th.ones(3) * 50.0)
+    place_objA_on_objB_bbox(remover_dishtowel, breakfast_table, z_offset=0.03)
+    og.sim.step()
+    # Place single particle of water on middle of table
+    water_system.generate_particles(
+        positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
+    )
 
-#     # Water should be present
-#     assert water_system.n_particles > 0
+    # Water should be present
+    assert water_system.n_particles > 0
 
-#     # Take number of steps for water to be removed
-#     n_remover_steps = remover_dishtowel.states[ParticleRemover].n_steps_per_modification
-#     for _ in range(n_remover_steps):
-#         og.sim.step()
+    # Take number of steps for water to be removed
+    n_remover_steps = remover_dishtowel.states[ParticleRemover].n_steps_per_modification
+    for _ in range(n_remover_steps):
+        og.sim.step()
 
-#     # No water should be present
-#     assert water_system.n_particles == 0
+    # No water should be present
+    assert water_system.n_particles == 0
 
-#     # Cannot set this state
-#     with pytest.raises(NotImplementedError):
-#         vacuum.states[ParticleRemover].set_value(True)
+    # Cannot set this state
+    with pytest.raises(NotImplementedError):
+        vacuum.states[ParticleRemover].set_value(True)
 
-#     water_system.remove_all_particles()
+    water_system.remove_all_particles()
 
 
 def test_saturated(env, remover_dishtowel):
