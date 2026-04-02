@@ -1069,6 +1069,17 @@ def _launch_simulator(*args, **kwargs):
             ControllableObjectViewAPI.initialize_view()
             initialize_tensorized_states()
 
+        def refresh_physics(self, sync_usd=False):
+            """
+            Synchronizes and evaluates any physics updates that have occurred since the last fetch.
+
+            Args:
+                sync_usd (bool): If True, also fetch physics results to USD backings.
+            """
+            self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
+            if sync_usd:
+                self.psi.fetch_results()
+
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
             """

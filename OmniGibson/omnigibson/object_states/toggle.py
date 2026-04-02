@@ -197,8 +197,19 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 for links in robot.finger_links.values()
                 for link in links
             ]
-            cls._finger_row_mask = RigidContactAPI.get_contact_row_mask(finger_links)  # (R,)
-        if cls._finger_contact_query_mask is None or cls._finger_contact_query_mask.shape[0] != S:
+            if not finger_links:
+                # No manipulation robots loaded yet — defer until next initialize_view()
+                print(
+                    f"[TOGGLE DEBUG] initialize_view: finger_links empty, deferring (robots in scene: {[r.name for r in scene_0.robots]})"
+                )
+            else:
+                cls._finger_row_mask = RigidContactAPI.get_contact_row_mask(finger_links)  # (R,)
+                print(
+                    f"[TOGGLE DEBUG] initialize_view: finger_row_mask set, {len(finger_links)} links, mask_sum={cls._finger_row_mask.sum()}"
+                )
+        if cls._finger_row_mask is not None and (
+            cls._finger_contact_query_mask is None or cls._finger_contact_query_mask.shape[0] != S
+        ):
             cls._finger_contact_query_mask = cls._finger_row_mask.view(1, 1, -1).expand(S, 1, -1).clone()
 
         # Object with-mask: (S, N, C) — scene 0 is representative; all scenes share identical objects.
@@ -291,15 +302,28 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
             fires state_updated() for any object whose VALUES row changed.
         """
         if cls._finger_contact_query_mask is None or cls._finger_contact_query_mask.numel() == 0:
+            print(
+                f"[TOGGLE DEBUG] global_update early return: _finger_contact_query_mask={cls._finger_contact_query_mask}"
+            )
             return
 
         # Step 1 - batch contact check: returns (S, N) bool
-        cls._finger_contact_result.copy_(
-            RigidContactAPI.is_in_contact_batch(
-                query_masks=cls._finger_contact_query_mask,  # (S, 1, R)
-                with_masks=cls._obj_contact_with_mask,  # (S, N, C)
-            )
+        result = RigidContactAPI.is_in_contact_batch(
+            query_masks=cls._finger_contact_query_mask,  # (S, 1, R)
+            with_masks=cls._obj_contact_with_mask,  # (S, N, C)
+            ignore_masks=None,
+            current_only=False,
         )
+        # Debug: print the raw contact submatrix for finger rows × stove columns
+        _cm = RigidContactAPI._CONTACT_MATRIX
+        if _cm is not None and _cm.numel() > 0:
+            _finger_rows = cls._finger_contact_query_mask[0, 0]  # (R,)
+            _stove_cols = cls._obj_contact_with_mask[0, 0]  # (C,)
+            _sub = _cm[0][_finger_rows][:, _stove_cols]
+            print(f"[TOGGLE DEBUG] contact_mat[finger×stove]={_sub.int().tolist()}, result={result}")
+        else:
+            print(f"[TOGGLE DEBUG] _CONTACT_MATRIX is None/empty, result={result}")
+        cls._finger_contact_result.copy_(result)
 
         # Step 2 - batch value update (calls _update_values, then fires state_updated)
         super().global_update()
@@ -343,7 +367,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         scale = cls.scales[obj_idx]
         # TODO: This is a temporary fix for flatcache before we properly implement trigger volumes
         if marker is None:
-            breakpoint()
+            return False
         og.sim.psqi.overlap_sphere(
             radius=th.min(marker.extent * scale).item(),
             pos=marker.get_position_orientation()[0].tolist(),
@@ -407,7 +431,13 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         # Step 3: overlap check (unavoidable per-object; only for in-contact subset).
         for scene_idx in range(S):
             for obj_idx in th.where(cls._mask_in_contact[scene_idx])[0].tolist():
-                cls._mask_can_toggle[scene_idx, obj_idx] = cls._check_overlap(scene_idx, obj_idx)
+                overlap = cls._check_overlap(scene_idx, obj_idx)
+                print(f"[TOGGLE DEBUG] _update_values: overlap check s={scene_idx} o={obj_idx} → {overlap}")
+                cls._mask_can_toggle[scene_idx, obj_idx] = overlap
+
+        print(
+            f"[TOGGLE DEBUG] _update_values: in_contact={cls._mask_in_contact.tolist()}, can_toggle={cls._mask_can_toggle.tolist()}, steps={cls._can_toggle_steps.tolist()}"
+        )
 
         # Step 4: step counter update.
         # Increment counter for can_toggle objects (can_toggle ⊆ in_contact ⊆ active).

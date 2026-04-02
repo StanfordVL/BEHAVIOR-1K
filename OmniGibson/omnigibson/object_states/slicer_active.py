@@ -122,7 +122,9 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             for obj_idx, link_paths in enumerate(cls.SLICER_LINK_PATHS):
                 if cls.IDX_OBJS[s_idx][obj_idx] is None:
                     continue
-                if RigidContactAPI.is_in_contact(s_idx, link_paths, sliceable_link_paths):
+                if RigidContactAPI.is_in_contact(
+                    s_idx, link_paths, sliceable_link_paths, ignore_set=None, current_only=False
+                ):
                     currently_touching[s_idx, obj_idx] = True
 
         return currently_touching

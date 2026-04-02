@@ -348,6 +348,10 @@ class RigidBodyViewAPIImpl:
         mat = T.pose2mat((pos, quat_xyzw))  # (N, 4, 4)  [batched]
         return mat.reshape(*orig_shape[:-1], 4, 4)  # (..., P, 4, 4)
 
+    def get_pose_matrices(self):
+        """Return cached (S, P, 4, 4) pose matrices; None if not yet initialized."""
+        return self._POSE_MATRICES
+
     def clear(self):
         """Reset all cached state."""
         self._RIGID_BODY_VIEW = []
@@ -508,8 +512,8 @@ class RigidContactAPIImpl:
         # (between consecutive update_contact_cache calls). Shape: (S, R, C)
         self._CONTACT_MATRIX = None
 
-        # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
-        self._CURRENT_CONTACT_MATRIX = dict()
+        # Contact matrix tracking contacts at only the most recent physics step. Shape: (S, R, C)
+        self._CURRENT_CONTACT_MATRIX = None
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (S, R, C, 2)
@@ -576,7 +580,7 @@ class RigidContactAPIImpl:
         # Snapshot the old contact matrices and path mappings so we can carry over
         # cached contact state for pairs of bodies that already existed.
         prev_contact_matrix = self._CONTACT_MATRIX
-        prev_current_contact_matrix = dict(self._CURRENT_CONTACT_MATRIX)
+        prev_current_contact_matrix = self._CURRENT_CONTACT_MATRIX
         prev_path_to_row_idx = dict(self._PATH_TO_ROW_IDX)
         prev_path_to_col_idx = dict(self._PATH_TO_COL_IDX)
 
@@ -633,6 +637,7 @@ class RigidContactAPIImpl:
 
         # Accumulate per-scene tensors; stacked into (S, R, C) after the loop.
         contact_matrices = []
+        current_contact_matrices = []
         body_transforms_list = []
         index_matrices = []
 
@@ -648,7 +653,7 @@ class RigidContactAPIImpl:
                 scene_body_filters_absolute = [
                     scene_relative_prim_path_to_absolute(scene, p) for p in col_paths_relative
                 ]
-                contact_matrices.append(
+                self._CONTACT_VIEW.append(
                     og.sim.physics_sim_view.create_rigid_contact_view(
                         pattern=f"/World/scene_{scene_idx}/*/*",
                         filter_patterns=scene_body_filters_absolute,
@@ -730,29 +735,36 @@ class RigidContactAPIImpl:
                 self._PENDING_TRANSFORMS[scene_idx] = []
                 self._PENDING_NET_FORCES[scene_idx] = []
 
-                if (
-                    prev_contact_matrix is not None
-                    and prev_current_contact_matrix is not None
-                    and prev_path_to_row_idx
-                    and prev_path_to_col_idx
-                ):
-                    # Find rows and columns that existed in both the old and new views (relative paths)
+                current_contacts = initial_contacts.clone()
+
+                # Compute surviving paths once; reused for both carry-overs below.
+                if prev_path_to_row_idx and prev_path_to_col_idx:
                     surviving_row_paths = [p for p in row_paths_relative if p in prev_path_to_row_idx]
                     surviving_col_paths = [p for p in col_paths_relative if p in prev_path_to_col_idx]
-                    if surviving_row_paths and surviving_col_paths and scene_idx < prev_contact_matrix.shape[0]:
+                    if surviving_row_paths and surviving_col_paths:
                         old_row_idxs = th.tensor([prev_path_to_row_idx[p] for p in surviving_row_paths], dtype=th.long)
                         old_col_idxs = th.tensor([prev_path_to_col_idx[p] for p in surviving_col_paths], dtype=th.long)
                         new_row_idxs = th.tensor([self._PATH_TO_ROW_IDX[p] for p in surviving_row_paths], dtype=th.long)
                         new_col_idxs = th.tensor([self._PATH_TO_COL_IDX[p] for p in surviving_col_paths], dtype=th.long)
-                        initial_contacts[new_row_idxs[:, None], new_col_idxs[None, :]] = prev_contact_matrix[scene_idx][
-                            old_row_idxs[:, None], old_col_idxs[None, :]
-                        ]
+
+                        if prev_contact_matrix is not None and scene_idx < prev_contact_matrix.shape[0]:
+                            initial_contacts[new_row_idxs[:, None], new_col_idxs[None, :]] = prev_contact_matrix[
+                                scene_idx
+                            ][old_row_idxs[:, None], old_col_idxs[None, :]]
+
+                        if prev_current_contact_matrix is not None and scene_idx < prev_current_contact_matrix.shape[0]:
+                            current_contacts[new_row_idxs[:, None], new_col_idxs[None, :]] = (
+                                prev_current_contact_matrix[scene_idx][old_row_idxs[:, None], old_col_idxs[None, :]]
+                            )
 
                 contact_matrices.append(initial_contacts)
+                current_contact_matrices.append(current_contacts)
 
         # Stack per-scene tensors into scene-batched tensors: (S, R, C), (S, N, 7), (S, R, C, 2)
+        if not contact_matrices:
+            return
         self._CONTACT_MATRIX = th.stack(contact_matrices, dim=0)
-        self._CURRENT_CONTACT_MATRIX = th.stack(contact_matrices, dim=0)
+        self._CURRENT_CONTACT_MATRIX = th.stack(current_contact_matrices, dim=0)
         self._BODY_TRANSFORMS = th.stack(body_transforms_list, dim=0)
         self._INDEX_MATRIX = th.stack(index_matrices, dim=0)
 
@@ -797,7 +809,7 @@ class RigidContactAPIImpl:
         transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
         force are also treated as awake.  Contact matrices are only updated from awake steps.
         """
-        for scene_idx in list(self._CONTACT_VIEW.keys()):
+        for scene_idx in range(len(self._CONTACT_VIEW)):
             # Get the pending data for this scene
             pending_impulses = self._PENDING_IMPULSES[scene_idx]
             pending_transforms = self._PENDING_TRANSFORMS[scene_idx]
@@ -830,7 +842,7 @@ class RigidContactAPIImpl:
             per_step_awake = pos_changed | ori_changed  # (N, num_bodies)
 
             # Other than the position change, we also know that an object cannot be asleep if the net contact force is nonzero.
-            row_to_rigid = self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]
+            row_to_rigid = self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS
             net_force_awake = th.any(all_net_forces != 0, dim=-1)  # (N, R)
             per_step_awake[:, row_to_rigid] = per_step_awake[:, row_to_rigid] | net_force_awake
 
@@ -845,8 +857,8 @@ class RigidContactAPIImpl:
             per_step_row_awake = per_step_awake[:, row_to_rigid]  # (N, R)
 
             # For each step, compute the columns that are awake
-            col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
-            valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
+            col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS
+            valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY
             per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
             per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
@@ -936,7 +948,7 @@ class RigidContactAPIImpl:
 
         # Otherwise, convert to relative prim paths, filtering out kinematic-only bodies that are not rows
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_ROW_IDX[path] for path in prim_paths])
+        return th.tensor([self._PATH_TO_ROW_IDX[path] for path in prim_paths], dtype=th.long)
 
     def get_contact_col_indices(self, objects_links_or_prim_paths):
         """
@@ -958,7 +970,7 @@ class RigidContactAPIImpl:
 
         # Otherwise, convert to relative prim paths
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_COL_IDX[path] for path in prim_paths])
+        return th.tensor([self._PATH_TO_COL_IDX[path] for path in prim_paths], dtype=th.long)
 
     def get_contact_pairs(self, scene_idx, query_set, with_set, current_only):
         """
@@ -1156,7 +1168,7 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = None
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = None
         self._CONTACT_MATRIX = None
-        self._CURRENT_CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX = None
         self._INDEX_MATRIX = None
         self._BODY_TRANSFORMS = None
         self._PENDING_IMPULSES = dict()
@@ -2759,6 +2771,10 @@ def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
     if relative_prim_path.startswith("/OmniGraph"):
         return relative_prim_path
 
+    # Special case for global floor plane collision prim — already an absolute path
+    if relative_prim_path.endswith("collisionPlane"):
+        return relative_prim_path
+
     # Make sure the relative path is actually relative
     assert not relative_prim_path.startswith("/World"), f"Expected relative prim path, got {relative_prim_path}"
 
@@ -2783,6 +2799,10 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     """
     # Special case for OmniGraph prims
     if absolute_prim_path.startswith("/OmniGraph"):
+        return absolute_prim_path
+
+    # Special case for global floor plane collision prim — not scene-scoped, return unchanged
+    if absolute_prim_path.endswith("collisionPlane"):
         return absolute_prim_path
 
     assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"

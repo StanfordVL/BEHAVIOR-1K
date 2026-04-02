@@ -119,8 +119,8 @@ class AABB(TensorizedValueState):
         P_obj = cls.PRIM_BODY_IDX.shape[0] if cls.PRIM_BODY_IDX is not None else 0
 
         if P_obj > 0:
-            # 1. Gather pose matrices for object rigid links only: (S, P_obj, 4, 4)
-            poses = RigidBodyViewAPI._POSE_MATRICES[:, cls.PRIM_BODY_IDX]  # (S, P_obj, 4, 4)
+            # 1. Gather pose matrices for object rigid links only
+            poses = RigidBodyViewAPI.get_pose_matrices()[:, cls.PRIM_BODY_IDX]  # (S, P_obj, 4, 4)
 
             # 2. Transform local points to world frame
             #    einsum 'spij,pvj->spvi': M[s,p] @ pts[p,v] for each (s,p,v)
