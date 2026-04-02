@@ -1042,7 +1042,7 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
         semantic_id_list.append(bbox_2d[0])
         bbox_2d_list.append(bbox_2d)
     semantic_id_list_np = np.unique(np.array(semantic_id_list))
-    color_list = random_colours(len(semantic_id_list_np.tolist()), True, num_channels)
+    color_list = random_colours(len(semantic_id_list_np.tolist()), False, num_channels)
     for bbox_2d in bbox_2d_list:
         index = np.where(semantic_id_list_np == bbox_2d[0])[0][0]
         bbox_color = color_list[index]

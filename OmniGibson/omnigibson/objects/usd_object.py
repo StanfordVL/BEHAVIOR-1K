@@ -230,6 +230,25 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         return usd_path
 
+    def _get_preapply_scale(self, default_prim):
+        """
+        Returns the scale tensor to use when computing kinematic_only inside _preapply_articulation_root.
+        Subclasses can override to derive scale from USD-side data (e.g. ig:nativeBB for dataset objects).
+
+        Args:
+            default_prim (Usd.Prim): The default prim of the side stage opened by _preapply_articulation_root.
+
+        Returns:
+            th.Tensor: 3-element float scale tensor.
+        """
+        raw_scale = self._load_config.get("scale", None)
+        if raw_scale is not None:
+            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
+            if scale.dim() == 0:
+                scale = scale.expand(3)
+            return scale.float()
+        return th.ones(3)
+
     def _preapply_articulation_root(self, usd_path):
         """
         Opens @usd_path with the pxr library, strips any existing ArticulationRootAPI, determines the correct prim to
@@ -244,14 +263,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
 
-        raw_scale = self._load_config.get("scale", None)
-        if raw_scale is not None:
-            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
-            if scale.dim() == 0:
-                scale = scale.expand(3)
-            scale = scale.float()
-        else:
-            scale = th.ones(3)
+        scale = self._get_preapply_scale(default_prim)
 
         kinematic_only = compute_kinematic_only(
             self.fixed_base,
