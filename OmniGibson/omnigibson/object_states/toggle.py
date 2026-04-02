@@ -58,6 +58,10 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
     # before it can be toggled. Construction-time constant.
     _requires_closed = None
 
+    # (N,) long: index into Open.VALUES columns for each toggle object (-1 if no Open state).
+    # Built once in initialize_view(); used to vectorize the requires_closed guard.
+    _open_col_idx = None
+
     # list[GeomPrim]: visual toggle-button markers, one per tracked object type (N index).
     # Populated during _initialize(); used in _check_overlap and color updates.
     visual_markers = None
@@ -111,6 +115,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
         cls._can_toggle_steps = None
         cls._requires_closed = None
+        cls._open_col_idx = None
         cls.visual_markers = []
         cls.scales = []
         cls._finger_contact_query_mask = None
@@ -159,6 +164,15 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
             for obj_idx, obj in enumerate(s_row):
                 if obj is not None:
                     cls._requires_closed[s_idx, obj_idx] = obj.states[ToggledOn]._requires_closed_init
+
+        # Build _open_col_idx: (N,) long — maps each toggle-object N-index to its column in
+        # Open.VALUES.  -1 for objects that have no Open state.
+        # Uses scene-0 objects as representative (all scenes share the same object types).
+        cls._open_col_idx = th.full((N,), -1, dtype=th.long)
+        for obj_idx, obj in enumerate(cls.IDX_OBJS[0] if cls.IDX_OBJS else []):
+            if obj is not None and Open in obj.states:
+                open_idx = Open.OBJ_IDXS.get(obj.relative_prim_path, -1)
+                cls._open_col_idx[obj_idx] = open_idx
 
         # Rebuild visual_markers and scales lists indexed by N
         # Carry over existing markers/scales for surviving objects; new slots stay None
@@ -390,13 +404,14 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         cls._mask_can_toggle.fill_(False)
         cls._mask_flip.fill_(False)
 
-        # Step 1: requires_closed guard.
-        # TODO Open is not tensorized; loop only over the _requires_closed subset.
-        for scene_idx in range(S):
-            for obj_idx in th.where(cls._requires_closed[scene_idx])[0].tolist():
-                obj = cls.IDX_OBJS[scene_idx][obj_idx]
-                if obj is not None and obj.states[Open].get_value():
-                    cls._mask_force_off[scene_idx, obj_idx] = True
+        # Step 1: requires_closed guard — vectorized via Open.VALUES.
+        # _open_col_idx (N,): column index into Open.VALUES for each toggle object (-1 = no Open state).
+        if cls._requires_closed.any():
+            valid = cls._requires_closed & (cls._open_col_idx >= 0).unsqueeze(0)  # (S, N)
+            if valid.any():
+                safe_idxs = cls._open_col_idx.clamp(min=0)  # (N,) — guard -1 before indexing
+                open_vals = Open.VALUES[:, safe_idxs] > 0.5  # (S, N) bool
+                cls._mask_force_off.copy_(valid & open_vals)
 
         th.logical_not(cls._mask_force_off, out=cls._mask_active)
         # Zero out toggle state for force-off objects (in-place).
