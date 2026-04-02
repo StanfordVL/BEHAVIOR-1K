@@ -89,6 +89,11 @@ class EntityPrim(XFormPrim):
         # Update joint information
         self.update_joints()
 
+        # Re-apply entity scale after physics initialization. Isaac Sim's articulation warmup can reset
+        # xformOp:scale on physics bodies with no collision geometry (e.g. meta links), so we enforce
+        # consistency here by writing the scale back from the root link's current state.
+        self.scale = self.scale
+
     def _load(self):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
@@ -1225,6 +1230,8 @@ class EntityPrim(XFormPrim):
 
     @scale.setter
     def scale(self, scale):
+        if self.name == "plate0":
+            breakpoint()
         # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
         # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
         # We iterate over all rigid bodies owned by this object prim and set their individual scales
