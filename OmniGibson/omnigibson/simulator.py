@@ -453,19 +453,21 @@ def _launch_simulator(*args, **kwargs):
             # Store other references to variables that will be initialized later
             self._scenes = []
             # The callback will be called right *before* the physics step
-            self._physics_context._physx_interface.subscribe_physics_on_step_events(
+            self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
                 pre_step=True,
                 order=0,
             )
             # The callback will be called right *after* the physics step
-            self._physics_context._physx_interface.subscribe_physics_on_step_events(
+            self._post_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_post_physics_step(),
                 pre_step=False,
                 order=0,
             )
-            self._physics_context._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
-                self._on_simulation_event
+            self._simulation_event_callback = (
+                self._physics_context._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
+                    self._on_simulation_event
+                )
             )
 
             # List of objects that need to be initialized during whenever the next sim step occurs
