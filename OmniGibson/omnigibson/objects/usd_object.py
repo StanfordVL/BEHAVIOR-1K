@@ -264,6 +264,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
 
         scale = self._get_preapply_scale(default_prim)
+        self._load_config["scale"] = scale
 
         kinematic_only = compute_kinematic_only(
             self.fixed_base,
@@ -273,6 +274,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self._load_config.get("kinematic_only", None),
             has_attachment,
         )
+        self._load_config["kinematic_only"] = kinematic_only
 
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None

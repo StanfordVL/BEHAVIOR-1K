@@ -244,7 +244,7 @@ def sample_kinematics(
                         # the sampled position of objA is reachable
                         if reachability_map[xy_map[0], xy_map[1]] != 255:
                             pos = None
-
+        success = False
         if pos is None:
             success = False
         else:
