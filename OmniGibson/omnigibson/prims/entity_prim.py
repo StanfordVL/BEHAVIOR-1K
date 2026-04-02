@@ -1230,8 +1230,6 @@ class EntityPrim(XFormPrim):
 
     @scale.setter
     def scale(self, scale):
-        if self.name == "plate0":
-            breakpoint()
         # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
         # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
         # We iterate over all rigid bodies owned by this object prim and set their individual scales
