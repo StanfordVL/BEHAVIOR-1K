@@ -190,7 +190,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             valid_hit = False
             # TODO: This is a temporary fix for flatcache before we properly implement trigger volumes
             og.sim.psqi.overlap_sphere(
-                radius=th.min(self.visual_marker.extent * self.scale).item(),
+                radius=th.min(self.visual_marker.extent * self.scale * self.link.scale).item(),
                 pos=self.visual_marker.get_position_orientation()[0].tolist(),
                 reportFn=overlap_callback,
             )

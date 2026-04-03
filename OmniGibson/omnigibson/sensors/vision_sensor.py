@@ -608,7 +608,7 @@ class VisionSensor(BaseSensor):
 
     def remove(self):
         # Remove from global sensors dictionary
-        self.SENSORS.pop(self.prim_path)
+        self.SENSORS.pop(self.prim_path, None)
 
         # Remove all modalities
         for modality in tuple(self.modalities):
