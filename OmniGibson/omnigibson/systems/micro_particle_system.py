@@ -1436,10 +1436,16 @@ class FluidSystem(MicroPhysicalParticleSystem):
         return 0.99 * 0.6 * self._particle_contact_offset
 
     def _create_particle_prototypes(self):
-        # Simulate particles with simple spheres
         prototype_prim_path = f"{scene_relative_prim_path_to_absolute(self._scene, self.relative_prim_path)}/prototype0"
-        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
-        prototype.CreateRadiusAttr().Set(self.particle_radius)
+        # Use UsdGeom.Mesh instead of UsdGeom.Sphere so that Hydra's PointInstancer
+        # rendering resolves the prototype to a real USD prim path. UsdGeom.Sphere causes
+        # Hydra to create a virtual "instancer/proto0" path that the replicator's semantic
+        # annotator cannot read labels from (it only reads from UsdGeom.Mesh prims).
+        sphere = trimesh.creation.icosphere(subdivisions=1, radius=self.particle_radius)
+        mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage, prototype_prim_path)
+        mesh.GetPointsAttr().Set(lazy.pxr.Vt.Vec3fArray([tuple(float(x) for x in v) for v in sphere.vertices]))
+        mesh.GetFaceVertexCountsAttr().Set(lazy.pxr.Vt.IntArray([3] * len(sphere.faces)))
+        mesh.GetFaceVertexIndicesAttr().Set(lazy.pxr.Vt.IntArray(sphere.faces.flatten().tolist()))
         relative_prototype_prim_path = absolute_prim_path_to_scene_relative(self._scene, prototype_prim_path)
         prototype = GeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
