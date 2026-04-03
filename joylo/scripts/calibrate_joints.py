@@ -1,7 +1,7 @@
 # Script for automatically calibrating a JoyLo set
 # Refer to the README for the correct arm positions for calibration
 
-from gello.dynamixel.driver import DynamixelDriver
+from gello.utils.dynamixel_utils import DynamixelDriver
 import numpy as np
 import sys
 from dataclasses import dataclass
@@ -10,10 +10,11 @@ import tyro
 import os
 
 CONFIG_DIR = f"{os.path.dirname(__file__)}/../configs"
+os.makedirs(CONFIG_DIR, exist_ok=True)
 
 @dataclass
 class Args:
-    gello_name: str
+    gello_name: str = "default"
     """The name of the gello (used to determine which file to write to)"""
 
     port: str = "/dev/ttyUSB0"
