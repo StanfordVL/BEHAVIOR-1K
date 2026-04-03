@@ -89,6 +89,11 @@ class EntityPrim(XFormPrim):
         # Update joint information
         self.update_joints()
 
+        # Re-apply entity scale after physics initialization. Isaac Sim's articulation warmup can reset
+        # xformOp:scale on physics bodies with no collision geometry (e.g. meta links), so we enforce
+        # consistency here by writing the scale back from the root link's current state.
+        self.scale = self.scale
+
     def _load(self):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
@@ -1379,18 +1384,6 @@ class EntityPrim(XFormPrim):
         """
         return lazy.isaacsim.core.utils.prims.get_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions"
-        )
-
-    @self_collisions.setter
-    def self_collisions(self, flag):
-        """
-        Sets whether self-collisions are enabled for this prim or not
-
-        Args:
-            flag (bool): Whether self collisions are enabled for this prim or not
-        """
-        lazy.isaacsim.core.utils.prims.set_prim_property(
-            self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
         )
 
     @cached_property

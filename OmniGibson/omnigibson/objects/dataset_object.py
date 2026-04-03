@@ -256,24 +256,10 @@ class DatasetObject(USDObject):
         return super()._get_preapply_scale(default_prim)
 
     def _post_load(self):
-        # If manual bounding box is specified, scale based on ratio between that and the native bbox
-        if self._load_config["bounding_box"] is not None:
-            scale = th.ones(3)
-            valid_idxes = self.native_bbox > 1e-4
-            scale[valid_idxes] = (
-                th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
-            )
-        elif self._load_config["scale"] is not None:
-            scale = self._load_config["scale"]
-            scale = scale if th.is_tensor(scale) else th.tensor(scale, dtype=th.float32)
-        else:
-            scale = th.ones(3)
-
-        # Assert that the scale does not have too small dimensions
-        assert th.all(th.abs(scale) > 1e-4), f"Scale of {self.name} is too small: {scale}"
-
-        # Set this scale in the load config -- it will automatically scale the object during self.initialize()
-        self._load_config["scale"] = scale
+        # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
+        assert th.all(
+            th.abs(self._load_config["scale"]) > 1e-4
+        ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
         # Run super last
         super()._post_load()
 

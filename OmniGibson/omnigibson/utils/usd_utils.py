@@ -100,6 +100,7 @@ def create_joint(
     joint_frame_in_child_frame_quat=None,
     break_force=None,
     break_torque=None,
+    stage=None,
 ):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
@@ -119,10 +120,12 @@ def create_joint(
         joint_frame_in_child_frame_quat (th.tensor or None): relative orientation of the joint frame to the child frame (body1).
         break_force (float or None): break force for linear dofs, unit is Newton.
         break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
+        stage (None or Usd.Stage): If specified, stage on which the joint should be created. If None, will use og.sim.stage
 
     Returns:
         Usd.Prim: Created joint prim
     """
+    current_stage = stage or og.sim.stage
     # Make sure we have valid joint_type
     assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
 
@@ -132,18 +135,18 @@ def create_joint(
     ), "At least either body0 or body1 must be specified when creating a joint!"
 
     # Create the joint
-    joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
+    joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(current_stage, prim_path)
 
     # Possibly add body0, body1 targets
     if body0 is not None:
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        assert current_stage.GetPrimAtPath(body0).IsValid(), f"Invalid body0 path specified: {body0}"
         joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
     if body1 is not None:
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        assert current_stage.GetPrimAtPath(body1).IsValid(), f"Invalid body1 path specified: {body1}"
         joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
 
     # Get the prim pointed to at this path
-    joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+    joint_prim = current_stage.GetPrimAtPath(prim_path)
 
     # Apply joint API interface
     lazy.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
@@ -151,7 +154,8 @@ def create_joint(
     # We need to step rendering once to auto-fill the local pose before overwriting it.
     # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
     # callback, e.g. when an attachment joint is being created due to contacts.
-    og.sim.render()
+    if stage is None:
+        og.sim.render()
 
     if joint_frame_in_parent_frame_pos is not None:
         joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos.tolist()))
@@ -178,7 +182,7 @@ def create_joint(
     joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
 
     # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
-    if og.sim.is_playing():
+    if stage is None and og.sim.is_playing():
         with suppress_omni_log(channels=["omni.physx.plugin"]):
             og.sim.refresh_physics()
 
