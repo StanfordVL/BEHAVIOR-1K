@@ -648,33 +648,30 @@ class OVXRSystem(TeleopSystem):
         """
         e.consume()
         data_dict = e.payload
-        for hand_name, hand in zip(["left, right"], self.robot_arms):
+        for i, hand in enumerate(self.robot_arms):
+            robot_arm_name = self.robot.arm_names[i]
             if data_dict[f"joint_count_{hand}"] != 0:
-                self.teleop_action.is_valid[hand_name] = True
+                self.teleop_action.is_valid[hand] = True
                 self.raw_data["hand_data"][hand] = {"pos": [], "orn": []}
                 # hand_joint_matrices is an array of flattened 4x4 transform matrices for the 26 hand markers
                 hand_joint_matrices = data_dict[f"joint_matrices_{hand}"]
-                for i in range(26):
+                for j in range(26):
                     # extract the pose from the flattened transform matrix
-                    pos, orn = self.xr2og(hand_joint_matrices[16 * i : 16 * (i + 1)].reshape(4, 4))
+                    pos, orn = self.xr2og(hand_joint_matrices[16 * j : 16 * (j + 1)].reshape(4, 4))
                     self.raw_data["hand_data"][hand]["pos"].append(pos)
                     self.raw_data["hand_data"][hand]["orn"].append(orn)
-                    self.teleop_action[hand_name] = th.cat(
-                        (
-                            self.raw_data["hand_data"][hand]["pos"][0],
-                            th.tensor(
-                                T.quat2euler(
-                                    T.quat_multiply(
-                                        self.raw_data["hand_data"][hand]["orn"][0],
-                                        self.robot.teleop_rotation_offset[
-                                            self.robot.arm_names[self.robot_arms.index(hand)]
-                                        ],
-                                    )
-                                )
-                            ),
-                            th.tensor([0]),
-                        )
+                self.teleop_action[hand] = th.cat(
+                    (
+                        self.raw_data["hand_data"][hand]["pos"][0],
+                        T.quat2euler(
+                            T.quat_multiply(
+                                self.raw_data["hand_data"][hand]["orn"][0],
+                                self.robot.teleop_rotation_offset[robot_arm_name],
+                            )
+                        ),
+                        th.tensor([0]),
                     )
+                )
                 # Get each finger joint's rotation angle from hand tracking data
                 # joint_angles is a 5 x 3 array of joint rotations (from thumb to pinky, from base to tip)
                 joint_angles = th.zeros((5, 3))
@@ -693,4 +690,4 @@ class OVXRSystem(TeleopSystem):
                         v1 /= th.norm(v1)
                         v2 /= th.norm(v2)
                         joint_angles[i, j] = th.arccos(v1 @ v2)
-                self.teleop_action.hand_data[hand_name] = joint_angles
+                self.teleop_action.hand_data[hand] = joint_angles
