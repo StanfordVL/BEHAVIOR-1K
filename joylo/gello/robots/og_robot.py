@@ -6,7 +6,7 @@ from typing import Dict, Optional
 import json
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.envs import DataCollectionWrapper
+from omnigibson.envs import HDF5CollectionWrapper
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
@@ -169,7 +169,7 @@ class OGRobotServer:
         # Recording configuration
         self._recording_path = recording_path
         if self._recording_path is not None:
-            self.env = DataCollectionWrapper(
+            self.env = HDF5CollectionWrapper(
                 env=self.env,
                 output_path=self._recording_path,
                 viewport_camera_path=og.sim.viewer_camera.active_camera_path,

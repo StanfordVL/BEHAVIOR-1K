@@ -54,6 +54,8 @@ setup(
         "cffi==1.17.1",
         "pillow~=11.0.0",
         "websockets>=15.0.1",
+        "omegaconf>=2.3.0",
+        "lerobot @ git+https://github.com/wensi-ai/lerobot@b6508195a56aeebf8fc3f8affc74b77a3f82a24f",
     ],
     extras_require={
         "dev": [
@@ -81,7 +83,6 @@ setup(
             "dm_tree>=0.1.9",
             "hydra-core>=1.3.2",
             "msgpack>=1.1.0",
-            "lerobot @ git+https://github.com/huggingface/lerobot@577cd10974b84bea1f06b6472eb9e5e74e07f77a",
             "gspread>=6.2.1",
             "open3d>=0.19.0",
         ]
