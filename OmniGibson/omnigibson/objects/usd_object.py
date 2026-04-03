@@ -345,10 +345,13 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         assert prim.GetReferences().AddReference(usd_path)
 
     def _load(self):
-        usd_path = self._prepare_to_load()
-        return add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
+        return add_asset_to_stage(asset_path=self._prepared_usd_path, prim_path=self.prim_path)
 
     def load(self, scene):
+        # Always run _prepare_to_load (which calls _preapply_articulation_root) so that
+        # _load_config["kinematic_only"] and _load_config["scale"] are set correctly before
+        # _post_load runs, even when the prim already exists in the stage (e.g. from prebuild).
+        self._prepared_usd_path = self._prepare_to_load()
         prim = super().load(scene)
         log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
