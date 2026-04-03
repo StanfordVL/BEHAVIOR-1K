@@ -1386,18 +1386,6 @@ class EntityPrim(XFormPrim):
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions"
         )
 
-    @self_collisions.setter
-    def self_collisions(self, flag):
-        """
-        Sets whether self-collisions are enabled for this prim or not
-
-        Args:
-            flag (bool): Whether self collisions are enabled for this prim or not
-        """
-        lazy.isaacsim.core.utils.prims.set_prim_property(
-            self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
-        )
-
     @cached_property
     def kinematic_only(self):
         """
