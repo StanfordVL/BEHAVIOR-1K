@@ -120,6 +120,7 @@ def create_joint(
         joint_frame_in_child_frame_quat (th.tensor or None): relative orientation of the joint frame to the child frame (body1).
         break_force (float or None): break force for linear dofs, unit is Newton.
         break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
+        stage (None or Usd.Stage): If specified, stage on which the joint should be created. If None, will use og.sim.stage
 
     Returns:
         Usd.Prim: Created joint prim
