@@ -17,6 +17,7 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.tasks.behavior_task import BehaviorTask
+from omnigibson.utils.asset_utils import get_omnigibson_git_hash
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -79,6 +80,7 @@ class HDF5DataWrapper(DataWrapper):
             config = deepcopy(env.config)
             self.add_metadata(group=data_grp, name="config", data=config)
             self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
+            self.add_metadata(group=data_grp, name="omnigibson_git_hash", data=get_omnigibson_git_hash())
 
     def process_traj_to_dataset(self, traj_data: list[dict]) -> None:
         traj_grp_name = f"demo_{self.traj_count}"
@@ -144,9 +146,13 @@ class HDF5DataWrapper(DataWrapper):
                     )
             else:
                 traj_data = (
-                    th.stack(dat, dim=0)[:num_samples]
-                    if isinstance(dat[0], th.Tensor)
-                    else th.tensor(dat)[:num_samples]
+                    (
+                        th.stack(dat, dim=0)[:num_samples]
+                        if isinstance(dat[0], th.Tensor)
+                        else th.tensor(dat)[:num_samples]
+                    )
+                    .cpu()
+                    .contiguous()
                 )
                 traj_grp.create_dataset(k, data=traj_data, **self.compression)
 

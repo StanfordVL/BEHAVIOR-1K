@@ -170,7 +170,7 @@ def test_lerobot_obs_mapping_proprio():
 def test_lerobot_obs_mapping_rgb():
     mock_env = MagicMock()
     mock_env.observation_space = {
-        "robot::fetch:eef_link:Camera:0::rgb": _MockGymSpace((720, 720, 4)),
+        "robot::fetch:eef_link:Camera:0::rgb": _MockGymSpace((128, 128, 4)),
     }
 
     mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
@@ -179,20 +179,20 @@ def test_lerobot_obs_mapping_rgb():
     key = "observation.rgb.eef_link_camera_0"
     assert key in features
     assert features[key]["dtype"] == "video"
-    assert features[key]["shape"] == (720, 720, 3)
+    assert features[key]["shape"] == (128, 128, 3)
 
 
 def test_lerobot_obs_mapping_depth():
     mock_env = MagicMock()
     mock_env.observation_space = {
-        "robot::fetch:eef_link:Camera:0::depth_linear": _MockGymSpace((720, 720)),
+        "robot::fetch:eef_link:Camera:0::depth_linear": _MockGymSpace((128, 128)),
     }
 
     mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
 
     assert "observation.depth_linear.eef_link_camera_0" in features
     assert features["observation.depth_linear.eef_link_camera_0"]["dtype"] == "video"
-    assert features["observation.depth_linear.eef_link_camera_0"]["shape"] == (720, 720, 1)
+    assert features["observation.depth_linear.eef_link_camera_0"]["shape"] == (128, 128, 1)
 
     tf_key = "observation.robot2cam_pose.eef_link_camera_0"
     assert tf_key in features
@@ -465,7 +465,7 @@ def test_collection_checkpoint_rollback():
 
 def test_hdf5_playback_and_dataset():
     cfg = _get_test_cfg()
-    img_h, img_w = 720, 720
+    img_h, img_w = 128, 128
     _ensure_sim_stopped()
 
     _, collect_hdf5_path = tempfile.mkstemp("test_hdf5_playback_collect.hdf5", dir=og.tempdir)
@@ -522,6 +522,8 @@ def test_hdf5_playback_and_dataset():
         assert f["data"].attrs["n_episodes"] == 2
         assert "demo_0" in f["data"]
         assert "demo_1" in f["data"]
+        assert "omnigibson_git_hash" in f["data"].attrs
+        assert f["data"].attrs["omnigibson_git_hash"] is not None
 
         n_episodes = f["data"].attrs["n_episodes"]
         assert n_episodes == 2, f"Expected 2 episodes, got {n_episodes}"
@@ -582,7 +584,7 @@ def test_hdf5_playback_and_dataset():
 
 def test_lerobot_playback_and_dataset():
     cfg = _get_test_cfg()
-    img_h, img_w = 720, 720
+    img_h, img_w = 128, 128
     _ensure_sim_stopped()
 
     _, collect_hdf5_path = tempfile.mkstemp("test_lerobot_playback_collect.hdf5", dir=og.tempdir)
@@ -667,6 +669,10 @@ def test_lerobot_playback_and_dataset():
         assert (
             batch[key].shape == expected_shape
         ), f"Expected key [{key}] to have shape {expected_shape}, but got {batch[key].shape}"
+
+    # Validate metadata
+    assert dataset.meta.info["omnigibson_git_hash"] is not None
+    assert "cam_intrinsics" in dataset.meta.info
 
     og.sim.stop()
     og.clear(

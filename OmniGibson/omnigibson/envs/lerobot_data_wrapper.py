@@ -12,6 +12,7 @@ from omnigibson.envs.data_wrapper import DataWrapper, DataPlaybackWrapper
 from omnigibson.learning.utils.obs_utils import encode_depth_frame, decode_depth_frame
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.asset_utils import get_omnigibson_git_hash
 from omnigibson.tasks.behavior_task import BehaviorTask
 
 
@@ -311,7 +312,7 @@ class LeRobotDataWrapper(DataWrapper):
                 K = sensor.intrinsic_matrix.cpu()
                 cam_intrinsics[sensor_name] = K.numpy().tolist()
         self.dataset.meta.info["cam_intrinsics"] = cam_intrinsics
-        # TODO: Verify
+        self.dataset.meta.info["omnigibson_git_hash"] = get_omnigibson_git_hash()
         write_info(self.dataset.meta.info, self.dataset.meta.root)
 
     def process_traj_to_dataset(self, traj_data: list[dict]) -> None:
@@ -354,7 +355,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
     """
     An OmniGibson environment wrapper for playing back data and collecting observations to be stored in LeRobotV3 format
 
-    NOTE: This assumes a DataCollectionWrapper environment has been used to collect data!
+    NOTE: This assumes a HDF5CollectionWrapper environment has been used to collect data!
     """
 
     def __init__(

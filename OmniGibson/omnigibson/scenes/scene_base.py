@@ -505,8 +505,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Remove any vision sensors attached to this scene
         # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
         # which will cause segfault during og.clear()
+        scene_prim_path = self.prim_path
+        scene_prim_prefix = f"{scene_prim_path}/"
         for sensor in tuple(VisionSensor.SENSORS.values()):
-            if self.prim_path in sensor.prim_path:
+            if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
                 sensor.remove()
 
         # Remove all of the scene's objects.
