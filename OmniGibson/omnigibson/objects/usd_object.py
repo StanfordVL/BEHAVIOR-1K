@@ -267,7 +267,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Only persist scale to _load_config if the user already provided one, or if a non-trivial
         # scale was derived (e.g. from bounding_box).  Avoid overwriting None with the default
         # ones(3) so that PrimitiveObjects using radius/height/size are not affected.
-        if self._load_config.get("scale", None) is not None or not th.allclose(scale, th.ones(3, dtype=th.float32)):
+        if self._load_config.get("scale", None) is not None or not th.allclose(scale, th.ones_like(scale)):
             self._load_config["scale"] = scale
 
         kinematic_only = compute_kinematic_only(
