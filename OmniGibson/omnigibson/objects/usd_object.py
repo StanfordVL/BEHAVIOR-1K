@@ -264,7 +264,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
 
         scale = self._get_preapply_scale(default_prim)
-        self._load_config["scale"] = scale
+        # Only persist scale to _load_config if the user already provided one, or if a non-trivial
+        # scale was derived (e.g. from bounding_box).  Avoid overwriting None with the default
+        # ones(3) so that PrimitiveObjects using radius/height/size are not affected.
+        if self._load_config.get("scale", None) is not None or not th.allclose(scale, th.ones_like(scale)):
+            self._load_config["scale"] = scale
 
         kinematic_only = compute_kinematic_only(
             self.fixed_base,

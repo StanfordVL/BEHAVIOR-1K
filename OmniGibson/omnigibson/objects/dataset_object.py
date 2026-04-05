@@ -257,6 +257,9 @@ class DatasetObject(USDObject):
 
     def _post_load(self):
         # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
+        # If neither was provided, default to ones(3) (no scaling).
+        if self._load_config.get("scale", None) is None:
+            self._load_config["scale"] = th.ones(3)
         assert th.all(
             th.abs(self._load_config["scale"]) > 1e-4
         ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
