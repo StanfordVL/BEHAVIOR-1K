@@ -55,7 +55,7 @@ setup(
         "pillow~=11.0.0",
         "websockets>=15.0.1",
         "omegaconf>=2.3.0",
-        "lerobot @ git+https://github.com/wensi-ai/lerobot@b1d1d0adc968b91d17b5169765f4bfa2696a8071",
+        "lerobot @ git+https://github.com/wensi-ai/lerobot@release/b1k",
     ],
     extras_require={
         "dev": [
