@@ -479,6 +479,7 @@ def _launch_simulator(*args, **kwargs):
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
+            self._deferred_joint_breaks = []
 
             # Maps callback name to callback
             self._callbacks_on_play = dict()
@@ -1395,6 +1396,16 @@ def _launch_simulator(*args, **kwargs):
 
                 # Record that we are done with the step context.
                 self.currently_stepping = False
+
+                if self._deferred_joint_breaks:
+                    # Copy the current deferred joint breaks and clear the shared list
+                    # before invoking callbacks, so we don't retain stale entries if a
+                    # callback raises an exception.
+                    deferred_breaks = list(self._deferred_joint_breaks)
+                    self._deferred_joint_breaks.clear()
+                    for obj, state_type, joint_path in deferred_breaks:
+                        obj.states[state_type].on_joint_break(joint_path)
+
             except Exception as e:
                 self.currently_stepping = False
                 self.post_step_exception = e
@@ -1445,7 +1456,7 @@ def _launch_simulator(*args, **kwargs):
                         return
                     for state_type in self.object_state_types_on_joint_break:
                         if state_type in obj.states:
-                            obj.states[state_type].on_joint_break(joint_path)
+                            self._deferred_joint_breaks.append((obj, state_type, joint_path))
 
         def is_paused(self):
             """

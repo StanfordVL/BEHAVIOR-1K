@@ -16,6 +16,7 @@ from omnigibson.utils.python_utils import assert_valid_key, torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
+    create_primitive_mesh,
     scene_relative_prim_path_to_absolute,
 )
 from omnigibson.utils.vision_utils import add_semantic_label
@@ -1436,10 +1437,12 @@ class FluidSystem(MicroPhysicalParticleSystem):
         return 0.99 * 0.6 * self._particle_contact_offset
 
     def _create_particle_prototypes(self):
-        # Simulate particles with simple spheres
         prototype_prim_path = f"{scene_relative_prim_path_to_absolute(self._scene, self.relative_prim_path)}/prototype0"
-        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
-        prototype.CreateRadiusAttr().Set(self.particle_radius)
+        # Use UsdGeom.Mesh instead of UsdGeom.Sphere so that Hydra's PointInstancer
+        # rendering resolves the prototype to a real USD prim path. UsdGeom.Sphere causes
+        # Hydra to create a virtual "instancer/proto0" path that the replicator's semantic
+        # annotator cannot read labels from (it only reads from UsdGeom.Mesh prims).
+        create_primitive_mesh(prototype_prim_path, primitive_type="Sphere", extents=2.0 * self.particle_radius)
         relative_prototype_prim_path = absolute_prim_path_to_scene_relative(self._scene, prototype_prim_path)
         prototype = GeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)

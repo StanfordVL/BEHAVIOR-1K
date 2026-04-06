@@ -92,7 +92,7 @@ playback_env = DataPlaybackWrapper.create_from_hdf5(
     robot_obs_modalities=["proprio", "rgb", "depth_linear"],
     robot_sensor_config=your_robot_sensor_config,
     external_sensors_config=your_external_sensors_config,
-    n_render_iterations=5,
+    n_render_iterations=1,
     only_successes=False,
 )
 

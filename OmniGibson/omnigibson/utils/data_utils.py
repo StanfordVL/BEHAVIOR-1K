@@ -183,7 +183,7 @@ def validate_merged_scene(scene, require_robot=True):
     if require_robot:
         robot_count = 0
         for obj in scene["objects_info"]["init_info"].values():
-            if obj["class_name"] in REGISTERED_ROBOTS:
+            if obj["class_name"].lower() in REGISTERED_ROBOTS:
                 robot_count += 1
 
         assert robot_count == 1, f"Scene must have exactly one robot, found {robot_count}"

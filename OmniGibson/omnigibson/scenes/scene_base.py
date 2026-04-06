@@ -10,6 +10,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.sensors.vision_sensor import VisionSensor
 import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
@@ -500,6 +501,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Clears systems so they can be re-initialized.
         for system in self.active_systems.values():
             self.clear_system(system_name=system.name)
+
+        # Remove any vision sensors attached to this scene
+        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+        # which will cause segfault during og.clear()
+        scene_prim_path = self.prim_path
+        scene_prim_prefix = f"{scene_prim_path}/"
+        for sensor in tuple(VisionSensor.SENSORS.values()):
+            if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
+                sensor.remove()
 
         # Remove all of the scene's objects.
         og.sim.batch_remove_objects(list(self.objects))

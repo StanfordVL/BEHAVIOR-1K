@@ -10,7 +10,8 @@ from omnigibson.utils.constants import PrimType
 SYSTEM_EXAMPLES = {
     "water": FluidSystem,
     "white_rice": GranularSystem,
-    "diced__apple": MacroPhysicalParticleSystem,
+    # TODO: disabled due to broken particle physics, see issue #2065
+    # "diced__apple": MacroPhysicalParticleSystem,
     "stain": MacroVisualParticleSystem,
 }
 
