@@ -1259,7 +1259,7 @@ def update_goal_status(
                 current_style.update(
                     {"color": UI_SETTINGS["goal_satisfied_color"]}
                 )  # Green (ABGR)
-                text_labels[idx].set_style(current_style)
+                text_labels[idx].style = current_style
 
         # Update unsatisfied goals - make them red
         for idx in goal_status["unsatisfied"]:
@@ -1268,7 +1268,7 @@ def update_goal_status(
                 current_style.update(
                     {"color": UI_SETTINGS["goal_unsatisfied_color"]}
                 )  # Red (ABGR)
-                text_labels[idx].set_style(current_style)
+                text_labels[idx].style = current_style
 
         # Return the updated status
         return goal_status.copy()
