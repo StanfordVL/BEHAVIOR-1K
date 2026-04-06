@@ -1022,10 +1022,6 @@ class EntityPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
-        # If kinematic only, clear cache for the root link
-        if self.kinematic_only:
-            self.root_link.clear_kinematic_only_cache()
-
         # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             return XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
