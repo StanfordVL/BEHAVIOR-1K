@@ -4,19 +4,22 @@ import itertools
 import json
 import networkx as nx
 from typing import Dict, Optional, Set, List, Tuple
+import uuid
 from bddl.object_taxonomy import ObjectTaxonomy
-from bddl.knowledge_base.orm import (
-    Model,
-    ManyToOne,
-    ManyToMany,
-    OneToMany,
-    ManyToOneField,
-    ManyToManyField,
-    OneToManyField,
-    UUIDField,
-)
 from bddl.knowledge_base.utils import SynsetState
 from collections import defaultdict
+
+
+def UUIDField(**kwargs):
+    return field(default_factory=lambda: str(uuid.uuid4()), **kwargs)
+
+
+def _pk_lt(self, other):
+    """Compare dataclass instances by their Meta.pk field for sorting in templates."""
+    if type(self) is not type(other):
+        return NotImplemented
+    pk = self.Meta.pk
+    return getattr(self, pk) < getattr(other, pk)
 
 
 ROOM_TYPE_CHOICES = [
@@ -65,11 +68,11 @@ OBJECT_TAXONOMY = ObjectTaxonomy()
 
 
 @dataclass(eq=False, order=False)
-class Property(Model):
+class Property:
     name: str
     parameters: str
     id: str = UUIDField()
-    synset_fk: ManyToOne = ManyToOneField("Synset", "properties")
+    synset: Optional["Synset"] = None
 
     class Meta:
         pk = "id"
@@ -81,48 +84,48 @@ class Property(Model):
 
 
 @dataclass(eq=False, order=False)
-class MetaLink(Model):
+class MetaLink:
     name: str
-    on_objects_fk: ManyToMany = ManyToManyField("Object", "meta_links")
+    on_objects: List["Object"] = field(default_factory=list)
 
     class Meta:
         pk = "name"
 
 
 @dataclass(eq=False, order=False)
-class AttachmentPair(Model):
+class AttachmentPair:
     name: str
-    female_objects_fk: ManyToMany = ManyToManyField("Object", "female_attachment_pairs")
-    male_objects_fk: ManyToMany = ManyToManyField("Object", "male_attachment_pairs")
+    female_objects: List["Object"] = field(default_factory=list)
+    male_objects: List["Object"] = field(default_factory=list)
 
     class Meta:
         pk = "name"
 
     @classmethod
-    def view_error_missing_objects(cls):
+    def view_error_missing_objects(cls, kb):
         """Attachment pairs that only have objects on one side"""
         return [
             x
-            for x in cls.all_objects()
+            for x in kb.all_attachment_pairs()
             if len(x.female_objects) == 0 or len(x.male_objects) == 0
         ]
 
 
 @dataclass(eq=False, order=False)
-class Predicate(Model):
+class Predicate:
     name: str
-    synsets_fk: ManyToMany = ManyToManyField("Synset", "used_in_predicates")
-    tasks_fk: ManyToMany = ManyToManyField("Task", "uses_predicates")
+    synsets: List["Synset"] = field(default_factory=list)
+    tasks: List["Task"] = field(default_factory=list)
 
     class Meta:
         pk = "name"
 
 
 @dataclass(eq=False, order=False)
-class Scene(Model):
+class Scene:
     name: str
 
-    rooms_fk: OneToMany = OneToManyField("Room", "scene")
+    rooms: List["Room"] = field(default_factory=list)
 
     @cached_property
     def room_count(self):
@@ -141,11 +144,11 @@ class Scene(Model):
         ordering = ["name"]
 
     @classmethod
-    def view_challenge(cls):
+    def view_challenge(cls, kb):
         """Scenes that are included in the NeurIPS 2025 BEHAVIOR Challenge"""
         return [
             x
-            for x in cls.all_objects()
+            for x in kb.all_scenes()
             if x.name
             in [
                 "house_single_floor",
@@ -156,15 +159,15 @@ class Scene(Model):
 
 
 @dataclass(eq=False, order=False)
-class ParticleSystem(Model):
+class ParticleSystem:
     name: str
     parameters: Optional[str] = None
 
     # the synset that the category belongs to
-    synset_fk: ManyToOne = ManyToOneField("Synset", "particle_systems")
+    synset: Optional["Synset"] = None
 
     # the objects that belong to this particle system as particles
-    particles_fk: OneToMany = OneToManyField("Object", "particle_system")
+    particles: List["Object"] = field(default_factory=list)
 
     def __str__(self):
         return self.name
@@ -197,39 +200,39 @@ class ParticleSystem(Model):
             return SynsetState.PLANNED
 
     @classmethod
-    def view_error_mapped_to_non_leaf_synsets(cls):
+    def view_error_mapped_to_non_leaf_synsets(cls, kb):
         """Particle systems mapped to non-leaf synsets"""
-        return [x for x in cls.all_objects() if len(x.synset.children) > 0]
+        return [x for x in kb.all_particle_systems() if len(x.synset.children) > 0]
 
     @classmethod
-    def view_error_mapped_to_non_substance_synsets(cls):
+    def view_error_mapped_to_non_substance_synsets(cls, kb):
         """Particle systems mapped to non-substance synsets"""
-        return [x for x in cls.all_objects() if not x.synset.is_substance]
+        return [x for x in kb.all_particle_systems() if not x.synset.is_substance]
 
     @classmethod
-    def view_error_missing_particle(cls):
+    def view_error_missing_particle(cls, kb):
         """Particle systems that are missing particles"""
         return [
             x
-            for x in cls.all_objects()
+            for x in kb.all_particle_systems()
             if not x.synset.is_liquid and len(x.particles) == 0
         ]
 
     @classmethod
-    def view_error_missing_params(cls):
+    def view_error_missing_params(cls, kb):
         """Particle systems that are missing parameters"""
-        return [x for x in cls.all_objects() if not x.parameters]
+        return [x for x in kb.all_particle_systems() if not x.parameters]
 
 
 @dataclass(eq=False, order=False)
-class Category(Model):
+class Category:
     name: str
 
     # the synset that the category belongs to
-    synset_fk: ManyToOne = ManyToOneField("Synset", "categories")
+    synset: Optional["Synset"] = None
 
     # objects that belong to this category
-    objects_fk: OneToMany = OneToManyField("Object", "category")
+    objects: List["Object"] = field(default_factory=list)
 
     def __str__(self):
         return self.name
@@ -249,43 +252,39 @@ class Category(Model):
         return {anc.name for anc in self.synset.ancestors} | {self.synset.name}
 
     @classmethod
-    def view_error_mapped_to_non_leaf_synsets(cls):
+    def view_error_mapped_to_non_leaf_synsets(cls, kb):
         """Categories mapped to non-leaf synsets"""
-        return [x for x in cls.all_objects() if len(x.synset.children) > 0]
+        return [x for x in kb.all_categories() if len(x.synset.children) > 0]
 
     @classmethod
-    def view_objectless(cls):
+    def view_objectless(cls, kb):
         """Categories that have no objects"""
-        return [x for x in cls.all_objects() if len(x.objects) == 0]
+        return [x for x in kb.all_categories() if len(x.objects) == 0]
 
 
 @dataclass(eq=False, order=False)
-class Object(Model):
+class Object:
     name: str
     # providing target
     provider: str = ""
     # bounding box size of the object in meters
     bounding_box_size: Optional[Tuple[float, float, float]] = None
     # the category that the object belongs to
-    category_fk: ManyToOne = ManyToOneField(Category, "objects")
+    category: Optional["Category"] = None
     # the particle system that the object belongs to
-    particle_system_fk: ManyToOne = ManyToOneField(ParticleSystem, "particles")
+    particle_system: Optional["ParticleSystem"] = None
     # the category of the object prior to getting renamed
     original_category_name: str = ""
     # meta links owned by the object
-    meta_links_fk: ManyToMany = ManyToManyField(MetaLink, "on_objects")
+    meta_links: List["MetaLink"] = field(default_factory=list)
     # roomobject counts of this object
-    roomobjects_fk: OneToMany = OneToManyField("RoomObject", "object")
+    roomobjects: List["RoomObject"] = field(default_factory=list)
     # QA complaints for this object
-    complaints_fk: OneToMany = OneToManyField("Complaint", "object")
+    complaints: List["Complaint"] = field(default_factory=list)
 
     # attachment pairs this object participates in
-    female_attachment_pairs_fk: ManyToMany = ManyToManyField(
-        AttachmentPair, "female_objects"
-    )
-    male_attachment_pairs_fk: ManyToMany = ManyToManyField(
-        AttachmentPair, "male_objects"
-    )
+    female_attachment_pairs: List["AttachmentPair"] = field(default_factory=list)
+    male_attachment_pairs: List["AttachmentPair"] = field(default_factory=list)
 
     @property
     def owner(self):
@@ -350,18 +349,18 @@ class Object(Model):
         )
 
     @classmethod
-    def view_error_missing_meta_links(cls):
+    def view_error_missing_meta_links(cls, kb):
         """Objects with missing meta links (not including subpart)"""
         return [
             o
-            for o in cls.all_objects()
+            for o in kb.all_objects()
             if o.category is not None
             and not o.fully_supports_synset(o.category.synset, ignore={"subpart"})
         ]
 
 
 @dataclass(eq=False, order=False)
-class Synset(Model):
+class Synset:
     name: str
     # whether the synset is a custom synset or not
     is_custom: bool = field(default=False, repr=False)
@@ -374,31 +373,23 @@ class Synset(Model):
     # whether the synset is ever used as a fillable in any task
     is_used_as_fillable: bool = field(default=False, repr=False)
     # predicates the synset was used in as the first argument
-    used_in_predicates_fk: ManyToMany = ManyToManyField(Predicate, "synsets")
+    used_in_predicates: List["Predicate"] = field(default_factory=list)
     # all it's parents in the synset graph (NOTE: this does not include self)
-    parents_fk: ManyToMany = ManyToManyField("Synset", "children")
-    children_fk: ManyToMany = ManyToManyField("Synset", "parents")
+    parents: List["Synset"] = field(default_factory=list)
+    children: List["Synset"] = field(default_factory=list)
     # all ancestors (NOTE: this does NOT include self)
-    ancestors_fk: ManyToMany = ManyToManyField("Synset", "descendants")
-    descendants_fk: ManyToMany = ManyToManyField("Synset", "ancestors")
+    ancestors: List["Synset"] = field(default_factory=list)
+    descendants: List["Synset"] = field(default_factory=list)
 
-    categories_fk: OneToMany = OneToManyField(Category, "synset")
-    particle_systems_fk: OneToMany = OneToManyField(ParticleSystem, "synset")
-    properties_fk: OneToMany = OneToManyField(Property, "synset")
-    tasks_fk: ManyToMany = ManyToManyField("Task", "synsets")
-    tasks_using_as_future_fk: ManyToMany = ManyToManyField("Task", "future_synsets")
-    used_by_transition_rules_fk: ManyToMany = ManyToManyField(
-        "TransitionRule", "input_synsets"
-    )
-    produced_by_transition_rules_fk: ManyToMany = ManyToManyField(
-        "TransitionRule", "output_synsets"
-    )
-    machine_in_transition_rules_fk: ManyToMany = ManyToManyField(
-        "TransitionRule", "machine_synsets"
-    )
-    roomsynsetrequirements_fk: OneToMany = OneToManyField(
-        "RoomSynsetRequirement", "synset"
-    )
+    categories: List["Category"] = field(default_factory=list)
+    particle_systems: List["ParticleSystem"] = field(default_factory=list)
+    properties: List["Property"] = field(default_factory=list)
+    tasks: List["Task"] = field(default_factory=list)
+    tasks_using_as_future: List["Task"] = field(default_factory=list)
+    used_by_transition_rules: List["TransitionRule"] = field(default_factory=list)
+    produced_by_transition_rules: List["TransitionRule"] = field(default_factory=list)
+    machine_in_transition_rules: List["TransitionRule"] = field(default_factory=list)
+    roomsynsetrequirements: List["RoomSynsetRequirement"] = field(default_factory=list)
 
     class Meta:
         pk = "name"
@@ -524,7 +515,7 @@ class Synset(Model):
         # Is it used in a transition that's used in a task?
         transition_relevant_synsets = {
             anc
-            for t in Task.all_objects()
+            for t in self.knowledgebase.all_tasks()
             for transition in t.relevant_transitions
             for s in list(transition.output_synsets) + list(transition.input_synsets)
             for anc in set(s.ancestors) | {s}
@@ -543,7 +534,7 @@ class Synset(Model):
                 continue
             prop_params = json.loads(prop.parameters)
             conditions = prop_params.get("conditions", {})
-            generated_synsets.update([Synset.get(name) for name in conditions.keys()])
+            generated_synsets.update([self.knowledgebase.get_synset(name) for name in conditions.keys()])
 
         return generated_synsets
 
@@ -616,7 +607,7 @@ class Synset(Model):
             return None
 
         # Find the synset that has this as a child
-        return {s for s in Synset.all_objects() if self in s.derivative_children}
+        return {s for s in self.knowledgebase.all_synsets() if self in s.derivative_children}
 
     @cached_property
     def derivative_children_names(self):
@@ -671,7 +662,7 @@ class Synset(Model):
 
     @cached_property
     def derivative_children(self):
-        return {Synset.get(name) for name in self.derivative_children_names}
+        return {self.knowledgebase.get_synset(name) for name in self.derivative_children_names}
 
     @cached_property
     def derivative_ancestors(self):
@@ -696,11 +687,11 @@ class Synset(Model):
         return descendants
 
     @classmethod
-    def view_error_substance_mismatch(cls):
+    def view_error_substance_mismatch(cls, kb):
         """Synsets that are used in predicates that don't match their substance state"""
         return [
             s
-            for s in cls.all_objects()
+            for s in kb.all_synsets()
             if (
                 (s.is_substance and s.is_used_as_non_substance)
                 or (not s.is_substance and s.is_used_as_substance)
@@ -709,42 +700,42 @@ class Synset(Model):
         ]
 
     @classmethod
-    def view_error_substance_missing_particle_system(cls):
+    def view_error_substance_missing_particle_system(cls, kb):
         """Synsets that are marked as a substance but do not have a particle system"""
         return [
             s
-            for s in cls.all_objects()
+            for s in kb.all_synsets()
             if s.is_substance and len(s.matching_particle_systems) == 0
         ]
 
     @classmethod
-    def view_error_substance_assigned_unrelated_category(cls):
+    def view_error_substance_assigned_unrelated_category(cls, kb):
         """Substance synsets that have assigned categories"""
         return [
-            s for s in cls.all_objects() if s.is_substance and len(s.categories) > 0
+            s for s in kb.all_synsets() if s.is_substance and len(s.categories) > 0
         ]
 
     @classmethod
-    def view_error_object_unsupported_properties(cls):
+    def view_error_object_unsupported_properties(cls, kb):
         """Synsets that do not have at least one object that supports all of annotated properties"""
         return [
             s
-            for s in Synset.all_objects()
+            for s in kb.all_synsets()
             if not s.is_substance and not s.has_fully_supporting_object
         ]
 
     @classmethod
-    def view_error_unnecessary(cls):
+    def view_error_unnecessary(cls, kb):
         """Objectless synsets that are not used in any task or required by any property"""
         useful_synsets = set()
 
         # Iteratively search for useful synsets
         while True:
-            task_relevant = {s for s in cls.all_objects() if s.task_relevant}
-            has_objects = {s for s in cls.all_objects() if len(s.matching_objects) > 0}
+            task_relevant = {s for s in kb.all_synsets() if s.task_relevant}
+            has_objects = {s for s in kb.all_synsets() if len(s.matching_objects) > 0}
             has_particle_system_with_particles = {
                 s
-                for s in cls.all_objects()
+                for s in kb.all_synsets()
                 if len(
                     [
                         particle
@@ -778,47 +769,43 @@ class Synset(Model):
                 break
             useful_synsets.update(delta_useful)
 
-        return set(cls.all_objects()) - useful_synsets
+        return set(kb.all_synsets()) - useful_synsets
 
     @classmethod
-    def view_error_bad_derivative(cls):
+    def view_error_bad_derivative(cls, kb):
         """Derivative synsets that exist even though the original synset is missing the expected property"""
         return [
-            s for s in cls.all_objects() if s.is_derivative and not s.derivative_parents
+            s for s in kb.all_synsets() if s.is_derivative and not s.derivative_parents
         ]
 
     @classmethod
-    def view_error_missing_derivative(cls):
+    def view_error_missing_derivative(cls, kb):
         """Synsets that are missing a derivative synset that is expected to exist from property annotations"""
         return sorted(
             [
                 s
-                for s in cls.all_objects()
+                for s in kb.all_synsets()
                 if len(s.derivative_children_names) != len(s.derivative_children)
             ]
         )
 
     @classmethod
-    def view_error_missing_definition(cls):
+    def view_error_missing_definition(cls, kb):
         """Synsets that are missing a definition"""
-        return [s for s in cls.all_objects() if not s.definition]
+        return [s for s in kb.all_synsets() if not s.definition]
 
     @classmethod
-    def view_unmatched(self):
+    def view_unmatched(cls, kb):
         """Synsets that are unmatched to either an object or a particle system"""
-        return [s for s in self.all_objects() if s.state == SynsetState.UNMATCHED]
+        return [s for s in kb.all_synsets() if s.state == SynsetState.UNMATCHED]
 
 
 @dataclass(eq=False, order=False)
-class TransitionRule(Model):
+class TransitionRule:
     name: str
-    input_synsets_fk: ManyToMany = ManyToManyField(Synset, "used_by_transition_rules")
-    output_synsets_fk: ManyToMany = ManyToManyField(
-        Synset, "produced_by_transition_rules"
-    )
-    machine_synsets_fk: ManyToMany = ManyToManyField(
-        Synset, "machine_in_transition_rules"
-    )
+    input_synsets: List["Synset"] = field(default_factory=list)
+    output_synsets: List["Synset"] = field(default_factory=list)
+    machine_synsets: List["Synset"] = field(default_factory=list)
 
     class Meta:
         pk = "name"
@@ -841,9 +828,9 @@ class TransitionRule(Model):
         )
 
     @staticmethod
-    def get_graph():
+    def get_graph(kb):
         G = nx.DiGraph()
-        for transition in TransitionRule.all_objects():
+        for transition in kb.all_transition_rules():
             G.add_node(transition)
             for input_synset in transition.input_synsets:
                 G.add_edge(input_synset, transition)
@@ -855,17 +842,13 @@ class TransitionRule(Model):
 
 
 @dataclass(eq=False, order=False)
-class Task(Model):
+class Task:
     name: str
     definition: str = field(default="", repr=False)
-    synsets_fk: ManyToMany = ManyToManyField(
-        Synset, "tasks"
-    )  # the synsets required by this task
-    future_synsets_fk: ManyToMany = ManyToManyField(
-        Synset, "tasks_using_as_future"
-    )  # the synsets that show up as future synsets in this task (e.g. don't exist in initial)
-    uses_predicates_fk: ManyToMany = ManyToManyField(Predicate, "tasks")
-    room_requirements_fk: OneToMany = OneToManyField("RoomRequirement", "task")
+    synsets: List["Synset"] = field(default_factory=list)  # the synsets required by this task
+    future_synsets: List["Synset"] = field(default_factory=list)  # the synsets that show up as future synsets in this task (e.g. don't exist in initial)
+    uses_predicates: List["Predicate"] = field(default_factory=list)
+    room_requirements: List["RoomRequirement"] = field(default_factory=list)
 
     class Meta:
         pk = "name"
@@ -961,7 +944,7 @@ class Task(Model):
     @cached_property
     def scene_matching_dict(self) -> Dict[str, Dict[str, str]]:
         ret = {}
-        for scene in Scene.all_objects():
+        for scene in self.knowledgebase.all_scenes():
             matching_result = self.matching_scene(scene=scene)
             ret[scene] = {
                 "matched": len(matching_result) == 0,
@@ -1059,7 +1042,7 @@ class Task(Model):
                 raise ValueError("Unexpected node.")
 
         # Build a graph from all the transitions
-        G = TransitionRule.get_graph()
+        G = TransitionRule.get_graph(self.knowledgebase)
 
         # Show all the nodes that show up in some path from the initial to the future synsets.
         all_nodes_on_path = set()
@@ -1091,22 +1074,22 @@ class Task(Model):
         return len(self.unreachable_goal_synsets) == 0
 
     @classmethod
-    def view_error_transition_failure(cls):
+    def view_error_transition_failure(cls, kb):
         """Tasks that do not have a valid transition path from the initial to the goal"""
-        return [x for x in cls.all_objects() if not x.goal_is_reachable]
+        return [x for x in kb.all_tasks() if not x.goal_is_reachable]
 
     @classmethod
-    def view_error_missing_scene(cls):
+    def view_error_missing_scene(cls, kb):
         """Tasks that are not matched to any scene"""
-        return [x for x in cls.all_objects() if x.scene_state == SynsetState.UNMATCHED]
+        return [x for x in kb.all_tasks() if x.scene_state == SynsetState.UNMATCHED]
 
     @classmethod
-    def view_error_missing_object(cls):
+    def view_error_missing_object(cls, kb):
         """Tasks that are missing some objects or particle systems"""
-        return [x for x in cls.all_objects() if x.synset_state == SynsetState.UNMATCHED]
+        return [x for x in kb.all_tasks() if x.synset_state == SynsetState.UNMATCHED]
 
     @classmethod
-    def view_challenge(cls):
+    def view_challenge(cls, kb):
         """Tasks that are candidates for the challenge"""
         CHALLENGE_TASKS = [
             "putting_away_toys-0",
@@ -1210,18 +1193,16 @@ class Task(Model):
             "clean_a_tie-0",
             "wash_a_baseball_cap-0",
         ]
-        return [Task.get(x) for x in CHALLENGE_TASKS]
+        return [kb.get_task(x) for x in CHALLENGE_TASKS]
 
 
 @dataclass(eq=False, order=False)
-class RoomRequirement(Model):
+class RoomRequirement:
     # TODO: make this one of the room types. enum?
     type: str
     id: str = UUIDField()
-    task_fk: ManyToOne = ManyToOneField(Task, "room_requirements")
-    roomsynsetrequirements_fk: OneToMany = OneToManyField(
-        "RoomSynsetRequirement", "room_requirement"
-    )
+    task: Optional["Task"] = None
+    roomsynsetrequirements: List["RoomSynsetRequirement"] = field(default_factory=list)
 
     class Meta:
         pk = "id"
@@ -1230,12 +1211,10 @@ class RoomRequirement(Model):
 
 
 @dataclass(eq=False, order=False)
-class RoomSynsetRequirement(Model):
+class RoomSynsetRequirement:
     id: str = UUIDField()
-    room_requirement_fk: ManyToOne = ManyToOneField(
-        RoomRequirement, "roomsynsetrequirements"
-    )
-    synset_fk: ManyToOne = ManyToOneField(Synset, "roomsynsetrequirements")
+    room_requirement: Optional["RoomRequirement"] = None
+    synset: Optional["Synset"] = None
     count: int = 0
 
     class Meta:
@@ -1245,16 +1224,16 @@ class RoomSynsetRequirement(Model):
 
 
 @dataclass(eq=False, order=False)
-class Room(Model):
+class Room:
     name: str
     # type of the room
     # TODO: make this one of the room types
     type: str
     id: str = UUIDField()
     # the scene the room belongs to
-    scene_fk: ManyToOne = ManyToOneField(Scene, "rooms")
+    scene: Optional["Scene"] = None
     # the room objects in this object
-    roomobjects_fk: OneToMany = OneToManyField("RoomObject", "room")
+    roomobjects: List["RoomObject"] = field(default_factory=list)
 
     class Meta:
         pk = "id"
@@ -1307,12 +1286,12 @@ class Room(Model):
 
 
 @dataclass(eq=False, order=False)
-class RoomObject(Model):
+class RoomObject:
     id: str = UUIDField()
     # the room that the object belongs to
-    room_fk: ManyToOne = ManyToOneField(Room, "roomobjects")
+    room: Optional["Room"] = None
     # the actual object that the room object maps to
-    object_fk: ManyToOne = ManyToOneField(Object, "roomobjects")
+    object: Optional["Object"] = None
     # number of objects in the room
     count: int = 0
     # whether this count is for clutter objects or not
@@ -1329,9 +1308,9 @@ class RoomObject(Model):
 
 
 @dataclass(eq=False, order=False)
-class ComplaintType(Model):
+class ComplaintType:
     name: str
-    complaints_fk: OneToMany = OneToManyField("Complaint", "complaint_type")
+    complaints: List["Complaint"] = field(default_factory=list)
 
     class Meta:
         pk = "name"
@@ -1343,10 +1322,10 @@ class ComplaintType(Model):
 
 
 @dataclass(eq=False, order=False)
-class Complaint(Model):
+class Complaint:
     id: str = UUIDField()
-    object_fk: ManyToOne = ManyToOneField(Object, "complaints")
-    complaint_type_fk: ManyToOne = ManyToOneField(ComplaintType, "complaints")
+    object: Optional["Object"] = None
+    complaint_type: Optional["ComplaintType"] = None
     prompt_additional_info: str = ""  # provided by the QA script as part of the prompt
     response: str = ""  # provided by the QAing user
 
@@ -1356,3 +1335,12 @@ class Complaint(Model):
 
     def __str__(self):
         return f"{self.object.name} - {self.complaint_type.name}: {self.response}"
+
+
+# Enable sorting by pk for all model dataclasses (needed by Jinja2 templates).
+for _cls in [
+    Property, MetaLink, AttachmentPair, Predicate, Scene, ParticleSystem,
+    Category, Object, Synset, TransitionRule, Task, RoomRequirement,
+    RoomSynsetRequirement, Room, RoomObject, ComplaintType, Complaint,
+]:
+    _cls.__lt__ = _pk_lt
