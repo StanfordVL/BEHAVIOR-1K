@@ -830,8 +830,7 @@ def test_particle_sink(env, furniture_sink):
     water_system.remove_all_particles()
 
 
-@pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
-def test_particle_applier(env, breakfast_table, acetone_atomizer):
+def test_particle_applier(env, breakfast_table, acetone_atomizer, applier_dishtowel):
     # Test projection
 
     place_obj_on_floor_plane(breakfast_table)
@@ -887,7 +886,6 @@ def test_particle_applier(env, breakfast_table, acetone_atomizer):
     water_system.remove_all_particles()
 
 
-@pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
 def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
     # Test projection
 
