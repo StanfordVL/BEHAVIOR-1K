@@ -40,7 +40,6 @@ def test_segmentation_modalities(env, breakfast_table, dishtowel):
     seg_semantic_info = all_info["seg_semantic"]
     assert set(int(x.item()) for x in th.unique(seg_semantic)) == set(seg_semantic_info.keys())
     expected_dict = {
-        335706086: "diced__apple",
         825831922: "floors",
         884110082: "stain",
         1949122937: "breakfast_table",
@@ -56,7 +55,6 @@ def test_segmentation_modalities(env, breakfast_table, dishtowel):
     expected_dict = {
         2: "groundPlane",
         3: "water",
-        4: "diced__apple",
         5: "stain",
         6: "white_rice",
         7: "breakfast_table",
@@ -73,10 +71,8 @@ def test_segmentation_modalities(env, breakfast_table, dishtowel):
         3: "/World/scene_0/dishtowel/base_link_cloth",
         4: "/World/scene_0/water/waterInstancer0/prototype0",
         5: "/World/scene_0/white_rice/white_riceInstancer0/prototype0",
-        6: "/World/scene_0/diced__apple/particles/diced__appleParticle1",
         7: "/World/scene_0/breakfast_table/base_link/stainParticle1",
         8: "/World/scene_0/breakfast_table/base_link/stainParticle0",
-        9: "/World/scene_0/diced__apple/particles/diced__appleParticle0",
     }
     assert set(seg_instance_id_info.values()) == set(expected_dict.values())
 
