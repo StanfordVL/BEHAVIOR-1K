@@ -1055,15 +1055,8 @@ class PoseAPI:
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
             cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-            # If the prim is not yet in Fabric (e.g., just created in USD), force a refresh to sync it
-            if not cls.PRIMS[prim_path].IsValid():
-                cls.invalidate()
 
         cls._refresh()
-
-        # Re-fetch the fabric prim if it's still invalid after the refresh
-        if not cls.PRIMS[prim_path].IsValid():
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
         # Avoid premature imports
         from omnigibson.utils.deprecated_utils import get_world_pose
@@ -1080,15 +1073,8 @@ class PoseAPI:
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
             cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-            # If the prim is not yet in Fabric (e.g., just created in USD), force a refresh to sync it
-            if not cls.PRIMS[prim_path].IsValid():
-                cls.invalidate()
 
         cls._refresh()
-
-        # Re-fetch the fabric prim if it's still invalid after the refresh
-        if not cls.PRIMS[prim_path].IsValid():
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
         # Avoid premature imports
         from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
 
