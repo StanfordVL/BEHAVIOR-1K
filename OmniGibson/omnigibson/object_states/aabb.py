@@ -74,7 +74,7 @@ class AABB(TensorizedValueState):
             # Use scene-0 representative (same structure across all scenes)
             obj = next(row[obj_idx] for row in cls.IDX_OBJS if row[obj_idx] is not None)
 
-            if obj.prim_type == PrimType.CLOTH:
+            if obj.prim_type == PrimType.CLOTH or obj.kinematic_only:
                 cls.CLOTH_OBJ_IDXS.append(obj_idx)
                 continue
 
@@ -147,7 +147,7 @@ class AABB(TensorizedValueState):
             cls._AABB_LO.scatter_reduce_(1, idx, min_p, reduce="amin", include_self=True)
             cls._AABB_HI.scatter_reduce_(1, idx, max_p, reduce="amax", include_self=True)
 
-        # 6. Cloth fallback — per-object, uses existing EntityPrim.aabb
+        # 6. Cloth / kinematic_only fallback — per-object, uses existing EntityPrim.aabb
         for obj_idx in cls.CLOTH_OBJ_IDXS:
             for s_idx, s_row in enumerate(cls.IDX_OBJS):
                 obj = s_row[obj_idx]
