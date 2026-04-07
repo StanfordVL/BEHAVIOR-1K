@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 class KnowledgeBase:
     """Container for one fully materialized BDDL knowledge base instance."""
 
-    def __init__(self, populate: bool = False, verbose: bool = True):
+    def __init__(self, populate: bool = True, verbose: bool = True, load_wordnet: bool = False):
         self.properties: List[Any] = []
         self.properties_by_id: Dict[str, Any] = {}
         self.meta_links: List[Any] = []
@@ -46,7 +46,7 @@ class KnowledgeBase:
         if populate:
             from bddl.knowledge_base.processing import populate_knowledgebase
 
-            populate_knowledgebase(self, verbose=verbose)
+            populate_knowledgebase(self, verbose=verbose, load_wordnet=load_wordnet)
 
     def add_synset(self, name: str, definition: str = "", is_custom: bool = False):
         if name in self.synsets_by_name:

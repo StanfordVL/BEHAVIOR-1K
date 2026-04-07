@@ -3,7 +3,6 @@ from collections import defaultdict, Counter
 import logging
 import json
 import glob
-import nltk
 import pathlib
 import bddl
 from bddl.object_taxonomy import ObjectTaxonomy
@@ -21,19 +20,36 @@ GENERATED_DATA_DIR = BDDL_DIR / "generated_data"
 logger = logging.getLogger(__name__)
 
 
-def append_unique(items, item):
-    if item not in items:
+def _get_shadow_set(obj, field_name):
+    """Get or create a shadow set for O(1) membership checks during population."""
+    if not hasattr(obj, "_shadow_sets"):
+        obj._shadow_sets = {}
+    if field_name not in obj._shadow_sets:
+        # Initialize from existing list contents
+        obj._shadow_sets[field_name] = set(id(x) for x in getattr(obj, field_name))
+    return obj._shadow_sets[field_name]
+
+
+def append_unique(items, item, shadow_set=None):
+    if shadow_set is not None:
+        item_id = id(item)
+        if item_id in shadow_set:
+            return
+        shadow_set.add(item_id)
         items.append(item)
+    else:
+        if item not in items:
+            items.append(item)
 
 
 def link_many_to_many(lhs, lhs_field, rhs, rhs_field):
-    append_unique(getattr(lhs, lhs_field), rhs)
-    append_unique(getattr(rhs, rhs_field), lhs)
+    append_unique(getattr(lhs, lhs_field), rhs, _get_shadow_set(lhs, lhs_field))
+    append_unique(getattr(rhs, rhs_field), lhs, _get_shadow_set(rhs, rhs_field))
 
 
 def link_many_to_one(child, child_field, parent, parent_field):
     setattr(child, child_field, parent)
-    append_unique(getattr(parent, parent_field), child)
+    append_unique(getattr(parent, parent_field), child, _get_shadow_set(parent, parent_field))
 
 
 def get_or_add(get_fn, add_fn, key):
@@ -54,13 +70,15 @@ def debug_print(verbose, *args, **kwargs):
         print(*args, **kwargs)
 
 # =============================== helper functions ===============================
-def preparation(verbose):
+def preparation(verbose, load_wordnet=False):
     """
     put any preparation work (e.g. sanity check) here
     """
     debug_print(verbose, "Running preparation work...")
 
-    nltk.download("wordnet")
+    if load_wordnet:
+        import nltk
+        nltk.download("wordnet")
 
     object_taxonomy = ObjectTaxonomy()
 
@@ -109,24 +127,29 @@ def post_complete_operation():
     # self.generate_object_images()
     # self.nuke_unused_synsets()
 
-def create_synsets(kb, object_taxonomy, verbose):
+def create_synsets(kb, object_taxonomy, verbose, load_wordnet=False):
     """
     create synsets with annotations from propagated_annots_canonical.json and hierarchy from output_hierarchy.json
     """
-    from nltk.corpus import wordnet as wn
-
     debug_print(verbose, "Creating synsets...")
+
+    if load_wordnet:
+        from nltk.corpus import wordnet as wn
+        # Build a set of all valid WordNet synset names upfront for O(1) lookups
+        valid_wn_synsets = set()
+        for s in wn.all_synsets():
+            valid_wn_synsets.add(s.name())
+    else:
+        valid_wn_synsets = None
+
     for synset_name in tqdm_iter(object_taxonomy.get_all_synsets(), verbose):
-        synset_is_custom = not wn_synset_exists(
-            synset_name
-        )  # TODO: use data from hierarchy. synset_sub_hierarchy["is_custom"] == "1"
-        if synset_name != canonicalize(synset_name):
-            debug_print(verbose, f"synset {synset_name} is not canonicalized!")
-        synset_definition = (
-            wn.synset(synset_name).definition()
-            if wn_synset_exists(synset_name)
-            else ""
-        )
+        if valid_wn_synsets is not None:
+            synset_is_custom = synset_name not in valid_wn_synsets
+            synset_definition = wn.synset(synset_name).definition() if not synset_is_custom else ""
+        else:
+            synset_is_custom = False
+            synset_definition = ""
+
         synset = kb.get_synset(synset_name)
         created = synset is None
         if created:
@@ -344,7 +367,7 @@ def create_scenes(kb, object_rename_mapping, deletion_queue, verbose):
                         link_many_to_one(room_object, "room", room, "roomobjects")
                         link_many_to_one(room_object, "object", obj, "roomobjects")
 
-def create_tasks(kb, verbose):
+def create_tasks(kb, verbose, load_wordnet=False):
     """
     create tasks and map to synsets
     """
@@ -361,7 +384,7 @@ def create_tasks(kb, verbose):
         synsets = set(
             synset for synset in conds.parsed_objects if synset != "agent.n.01"
         )
-        canonicalized_synsets = set(canonicalize(synset) for synset in synsets)
+        canonicalized_synsets = set(canonicalize(synset) for synset in synsets) if load_wordnet else synsets
         with open(get_definition_filename(act, inst), "r") as f:
             raw_task_definition = "".join(f.readlines())
 
@@ -621,21 +644,21 @@ def nuke_unused_synsets(kb):
             break
 
 
-def build_knowledgebase(verbose=True):
+def build_knowledgebase(verbose=True, load_wordnet=False):
     kb = KnowledgeBase()
-    populate_knowledgebase(kb, verbose=verbose)
+    populate_knowledgebase(kb, verbose=verbose, load_wordnet=load_wordnet)
     kb.sort_all()
     return kb
 
 
-def populate_knowledgebase(kb: KnowledgeBase, verbose=True):
+def populate_knowledgebase(kb: KnowledgeBase, verbose=True, load_wordnet=False):
     logger.warning("Loading BDDL knowledge base... This may take a few seconds.")
-    object_taxonomy, object_rename_mapping = preparation(verbose)
-    create_synsets(kb, object_taxonomy, verbose)
+    object_taxonomy, object_rename_mapping = preparation(verbose, load_wordnet=load_wordnet)
+    create_synsets(kb, object_taxonomy, verbose, load_wordnet=load_wordnet)
     add_particle_system_parameters(kb)
     deletion_queue = create_objects(kb, object_rename_mapping, verbose)
     create_scenes(kb, object_rename_mapping, deletion_queue, verbose)
-    create_tasks(kb, verbose)
+    create_tasks(kb, verbose, load_wordnet=load_wordnet)
     create_transitions(kb, verbose)
     create_complaints(kb)
     post_complete_operation()

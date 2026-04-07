@@ -265,7 +265,7 @@ def sample_bddl_predicate(predicate_cls, *args, **kwargs):
 
 
 # Shared KnowledgeBase instance for all of OmniGibson
-KB = KnowledgeBase(populate=True)
+KB = KnowledgeBase()
 BEHAVIOR_ACTIVITIES = sorted(set(t.name.rsplit("-", 1)[0] for t in KB.all_tasks()))
 
 

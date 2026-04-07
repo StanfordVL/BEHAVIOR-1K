@@ -1,5 +1,4 @@
 import re
-from nltk.corpus import wordnet as wn
 from typing import Tuple, List, Set
 from bddl.activity import get_initial_conditions, get_goal_conditions, get_object_scope
 from bddl.predicates import Predicate
@@ -35,17 +34,21 @@ FILLABLE_PREDICATES = {"filled", "contains", "empty"}
 
 
 def canonicalize(s):
+    from nltk.corpus import wordnet as wn
+
     try:
         return wn.synset(s).name()
-    except:
+    except Exception:
         return s
 
 
 def wn_synset_exists(synset):
+    from nltk.corpus import wordnet as wn
+
     try:
         wn.synset(synset)
         return True
-    except:
+    except Exception:
         return False
 
 
@@ -174,5 +177,5 @@ def leaf_inroom_conds(raw_cond, synsets: Set[str]) -> List[Tuple[str, str]]:
         if raw_cond[0] == "inroom":
             synset = raw_cond[1].split("?")[-1].rsplit("_", 1)[0]
             assert synset in synsets, f"{synset} not in valid format"
-            ret.append((canonicalize(synset), raw_cond[2]))
+            ret.append((synset, raw_cond[2]))
     return ret
