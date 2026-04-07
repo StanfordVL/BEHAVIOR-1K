@@ -13,7 +13,7 @@ nltk.download("wordnet")
 nltk.download("omw-1.4")
 from nltk.corpus import wordnet as wn
 
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 from b1k_pipeline.utils import PIPELINE_ROOT
 
 

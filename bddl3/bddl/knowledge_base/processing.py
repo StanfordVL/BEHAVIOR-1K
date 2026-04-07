@@ -474,7 +474,15 @@ def create_tasks(kb, verbose):
                 )
 
 def create_transitions(kb, verbose):
-    # Load the transition data
+    from bddl.transition_rules import (
+        load_cooking_recipes,
+        load_machine_recipes,
+        load_mixing_recipes,
+        load_substance_cooking_recipes,
+        load_washer_rule,
+    )
+
+    # Load the transition data from JSON
     json_paths = glob.glob(
         str(GENERATED_DATA_DIR / "transition_map/tm_jsons/*.json")
     )
@@ -486,7 +494,7 @@ def create_transitions(kb, verbose):
         with open(jp) as f:
             transitions.extend(json.load(f))
 
-    # Create the transition objects
+    # Create the transition rule objects with synset linkages
     for transition_data in tqdm_iter(transitions, verbose):
         rule_name = transition_data["rule_name"]
         transition = kb.add_transition_rule(name=rule_name)
@@ -503,8 +511,6 @@ def create_transitions(kb, verbose):
 
         assert inputs, f"Transition {transition.name} has no inputs!"
         assert outputs, f"Transition {transition.name} has no outputs!"
-        # TODO: With washer rules, this is no longer true. Check if this is important
-        # assert inputs & outputs == set(), f"Inputs and outputs of {transition.name} overlap!"
 
         for synset_name in inputs:
             synset = kb.get_synset(synset_name)
@@ -530,6 +536,21 @@ def create_transitions(kb, verbose):
                         machine,
                         "machine_in_transition_rules",
                     )
+
+    # Attach typed recipe dataclasses to the transition rules by name
+    all_typed_recipes = (
+        list(load_cooking_recipes())
+        + list(load_mixing_recipes())
+        + list(load_machine_recipes())
+        + list(load_substance_cooking_recipes())
+    )
+    for recipe in all_typed_recipes:
+        tr = kb.get_transition_rule(recipe.name)
+        if tr is not None:
+            tr.recipe = recipe
+
+    # Store the washer rule on the KB directly
+    kb.washer_rule = load_washer_rule()
 
 def create_complaints(kb):
     with open(GENERATED_DATA_DIR / "complaints.json", "r") as f:

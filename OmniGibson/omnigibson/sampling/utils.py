@@ -3,7 +3,7 @@ from omnigibson.objects import DatasetObject
 from omnigibson.systems import MicroPhysicalParticleSystem
 from omnigibson.utils.asset_utils import get_dataset_path
 import omnigibson.lazy as lazy
-from bddl.activity import evaluate_state
+from bddl.condition_evaluation import evaluate_state
 
 # import numpy as np
 import torch as th
@@ -303,10 +303,9 @@ def parse_task_mapping_new():
             mapping = json.load(f)
         return mapping
 
-    from bddl.knowledge_base import KnowledgeBase
+    from omnigibson.utils.bddl_utils import KB
 
-    kb = KnowledgeBase(populate=True)
-    tasks = kb.all_tasks()
+    tasks = KB.all_tasks()
     mapping = dict()
     for task in tasks:
         task_name = task.name[:-2]

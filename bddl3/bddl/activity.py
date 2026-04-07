@@ -7,9 +7,11 @@ This module is the main entry point for consumers who want to:
 * Evaluate compiled goal conditions against a simulator.
 * Translate conditions into natural language.
 
-Most users should prefer the higher-level :class:`~bddl.task.Task` class,
-which bundles all of the above into a single object.  The functions here are
-the lower-level building blocks that ``Task`` calls internally.
+Most users should prefer the higher-level
+:class:`~bddl.knowledge_base.models.Task` class (accessible via
+``KnowledgeBase.get_task()``), which bundles all of the above into a single
+object.  The functions here are the lower-level building blocks that ``Task``
+calls internally.
 """
 
 import os

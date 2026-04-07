@@ -4,7 +4,6 @@ from pathlib import Path
 import random
 
 import torch as th
-from bddl.task import Task
 from bddl.activity import (
     get_natural_goal_conditions,
     get_natural_initial_conditions,
@@ -25,6 +24,7 @@ from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.bddl_utils import (
     BEHAVIOR_ACTIVITIES,
     BDDLSampler,
+    KB,
     get_processed_bddl,
     is_system_bddl_inst,
     og_categories_from_bddl_inst,
@@ -300,12 +300,8 @@ class BehaviorTask(BaseTask):
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
-        self.task = Task(
-            activity_name,
-            activity_definition_id,
-            simulator_name="behavior-1k",
-            predefined_problem=predefined_problem,
-        )
+        self.task = KB.get_task(f"{activity_name}-{activity_definition_id}")
+        self.task.compile_with_problem(predefined_problem)
 
         # Get scope, making sure agent is the first entry
         self.object_scope = {"agent.n.01_1": None}

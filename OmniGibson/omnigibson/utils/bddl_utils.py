@@ -1,4 +1,3 @@
-import os
 import random
 import re
 from collections import defaultdict
@@ -11,10 +10,10 @@ import torch as th
 
 from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.condition_evaluation import Negation
-from bddl.predicates import Predicate
 from bddl.config import get_definition_filename
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 from bddl import predicates as bddl_predicates
+from bddl.predicates import Predicate
 
 import omnigibson as og
 from omnigibson import object_states
@@ -137,20 +136,22 @@ def is_system_bddl_inst(bddl_inst):
 
 def og_categories_from_bddl_inst(bddl_inst):
     """Get OG categories for a BDDL instance."""
-    synset = synset_from_bddl_inst(bddl_inst)
-    if is_substance_synset(synset):
-        return OBJECT_TAXONOMY.get_subtree_substances(synset)
-    return OBJECT_TAXONOMY.get_subtree_categories(synset)
+    synset_obj = KB.get_synset(synset_from_bddl_inst(bddl_inst))
+    if synset_obj.is_substance:
+        return [ps.name for s in [synset_obj] + synset_obj.descendants for ps in s.particle_systems]
+    return [c.name for s in [synset_obj] + synset_obj.descendants if s.is_leaf for c in s.categories]
 
 
 def is_substance_synset(synset):
-    return "substance" in OBJECT_TAXONOMY.get_abilities(synset)
+    synset_obj = KB.get_synset(synset)
+    return synset_obj is not None and synset_obj.is_substance
 
 
 def get_system_name_by_synset(synset):
-    system_names = OBJECT_TAXONOMY.get_subtree_substances(synset)
-    assert len(system_names) == 1, f"Got zero or multiple systems for {synset}: {system_names}"
-    return system_names[0]
+    synset_obj = KB.get_synset(synset)
+    systems = [ps.name for s in [synset_obj] + synset_obj.descendants for ps in s.particle_systems]
+    assert len(systems) == 1, f"Got zero or multiple systems for {synset}: {systems}"
+    return systems[0]
 
 
 def process_single_condition(condition):
@@ -263,9 +264,9 @@ def sample_bddl_predicate(predicate_cls, *args, **kwargs):
         return obj.states[state_class].set_value(binary_state, **kwargs)
 
 
-# BEHAVIOR-related
-OBJECT_TAXONOMY = ObjectTaxonomy()
-BEHAVIOR_ACTIVITIES = sorted(os.listdir(os.path.join(os.path.dirname(bddl.__file__), "activity_definitions")))
+# Shared KnowledgeBase instance for all of OmniGibson
+KB = KnowledgeBase(populate=True)
+BEHAVIOR_ACTIVITIES = sorted(set(t.name.rsplit("-", 1)[0] for t in KB.all_tasks()))
 
 
 def _populate_input_output_objects_systems(og_recipe, input_synsets, output_synsets):
@@ -274,11 +275,11 @@ def _populate_input_output_objects_systems(og_recipe, input_synsets, output_syns
         (input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")
     ):
         for synset, count in synsets.items():
-            assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
+            assert KB.get_synset(synset).is_leaf, f"Synset {synset} must be a leaf node in the taxonomy!"
             if is_substance_synset(synset):
                 og_recipe[system_key].append(get_system_name_by_synset(synset))
             else:
-                obj_categories = OBJECT_TAXONOMY.get_categories(synset)
+                obj_categories = [c.name for c in KB.get_synset(synset).categories]
                 assert (
                     len(obj_categories) == 1
                 ), f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
@@ -306,13 +307,13 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                 first_synset, second_synset = synset_split
 
             # Assert the first synset is an object because the systems don't have any states.
-            assert OBJECT_TAXONOMY.is_leaf(
+            assert KB.get_synset(
                 first_synset
-            ), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
+            ).is_leaf, f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
             assert not is_substance_synset(
                 first_synset
             ), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
-            obj_categories = OBJECT_TAXONOMY.get_categories(first_synset)
+            obj_categories = [c.name for c in KB.get_synset(first_synset).categories]
             assert (
                 len(obj_categories) == 1
             ), f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
@@ -326,14 +327,14 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                     ), f"Input/output state type {sc.predicate.__name__} must be a unary state!"
                     og_recipe[states_key][first_obj_category]["unary"].append((state_class, sc.value))
             else:
-                assert OBJECT_TAXONOMY.is_leaf(
+                assert KB.get_synset(
                     second_synset
-                ), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                ).is_leaf, f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
                 if is_substance_synset(second_synset):
                     second_obj_category = get_system_name_by_synset(second_synset)
                     is_substance = True
                 else:
-                    obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
+                    obj_categories = [c.name for c in KB.get_synset(second_synset).categories]
                     assert (
                         len(obj_categories) == 1
                     ), f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
@@ -366,9 +367,9 @@ def _populate_filter_categories(og_recipe, filter_name, synsets):
     if synsets is not None:
         og_recipe[f"{filter_name}_categories"] = set()
         for synset in synsets:
-            assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
+            assert KB.get_synset(synset).is_leaf, f"Synset {synset} must be a leaf node in the taxonomy!"
             assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
-            for category in OBJECT_TAXONOMY.get_categories(synset):
+            for category in [c.name for c in KB.get_synset(synset).categories]:
                 og_recipe[f"{filter_name}_categories"].add(category)
 
 
@@ -431,7 +432,7 @@ def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
     """
     og_washer_rule = dict()
     for solute, solvents in washer_rule.conditions.items():
-        assert OBJECT_TAXONOMY.is_leaf(solute), f"Synset {solute} must be a leaf node in the taxonomy!"
+        assert KB.get_synset(solute).is_leaf, f"Synset {solute} must be a leaf node in the taxonomy!"
         assert is_substance_synset(solute), f"Synset {solute} must be a substance synset!"
         solute_name = get_system_name_by_synset(solute)
         if solvents is None:
@@ -439,7 +440,7 @@ def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
         else:
             solvent_names = []
             for solvent in solvents:
-                assert OBJECT_TAXONOMY.is_leaf(solvent), f"Synset {solvent} must be a leaf node in the taxonomy!"
+                assert KB.get_synset(solvent).is_leaf, f"Synset {solvent} must be a leaf node in the taxonomy!"
                 assert is_substance_synset(solvent), f"Synset {solvent} must be a substance synset!"
                 solvent_name = get_system_name_by_synset(solvent)
                 solvent_names.append(solvent_name)
@@ -486,13 +487,18 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
                 instances = instances.split(" ")
 
                 # Synset should be a scene object instance
-                abilities = OBJECT_TAXONOMY.get_abilities(synset)
+                abilities = KB.get_synset(synset).abilities
                 assert (
                     "sceneObject" in abilities
                 ), f"Wildcard can only be used on sceneObject synsets, but got synset: {synset}"
 
                 # Get all valid categories that are mapped to this synset
-                og_categories = OBJECT_TAXONOMY.get_subtree_categories(synset)
+                og_categories = [
+                    c.name
+                    for s in [KB.get_synset(synset)] + KB.get_synset(synset).descendants
+                    if s.is_leaf
+                    for c in s.categories
+                ]
 
                 # Wildcard should be specified in the final instance
                 wildcard_instance = instances[-1]
@@ -744,7 +750,7 @@ class BDDLSampler:
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
                 obj_synset = self._object_instance_to_synset[obj_inst]
-                abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+                abilities = KB.get_synset(obj_synset).abilities
                 if "sceneObject" not in abilities:
                     # Invalid room assignment
                     return (
@@ -959,15 +965,16 @@ class BDDLSampler:
 
                 # We allow burners to be used as if they are stoves
                 # No need to safeguard check for subtree_substances because inroom objects will never be substances
-                categories = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)
+                categories = [
+                    c.name
+                    for s in [KB.get_synset(obj_synset)] + KB.get_synset(obj_synset).descendants
+                    if s.is_leaf
+                    for c in s.categories
+                ]
 
                 # Grab all models that fully support all abilities for the corresponding category
                 valid_models = {
-                    cat: set(
-                        get_all_object_category_models_with_abilities(
-                            cat, OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(cat))
-                        )
-                    )
+                    cat: set(get_all_object_category_models_with_abilities(cat, KB.get_category(cat).synset.abilities))
                     for cat in categories
                 }
                 valid_models = {
@@ -1278,12 +1285,23 @@ class BDDLSampler:
             if is_substance_synset(obj_synset):
                 assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
-                system_name = OBJECT_TAXONOMY.get_subtree_substances(obj_synset)[0]
+                system_name = [
+                    ps.name
+                    for s in [KB.get_synset(obj_synset)] + KB.get_synset(obj_synset).descendants
+                    for ps in s.particle_systems
+                ][0]
                 self._object_scope[obj_inst] = (
                     None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
                 )
             else:
-                valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))
+                valid_categories = set(
+                    [
+                        c.name
+                        for s in [KB.get_synset(obj_synset)] + KB.get_synset(obj_synset).descendants
+                        if s.is_leaf
+                        for c in s.categories
+                    ]
+                )
                 categories = list(valid_categories.intersection(available_categories))
                 if len(categories) == 0:
                     return (
@@ -1307,7 +1325,7 @@ class BDDLSampler:
                     model_choices = set(
                         get_all_object_category_models_with_abilities(
                             category=category,
-                            abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
+                            abilities=KB.get_category(category).synset.abilities,
                         )
                     )
                     model_choices = (
@@ -1363,9 +1381,7 @@ class BDDLSampler:
                     name=f"{category}_{len(self._env.scene.objects)}",
                     category=category,
                     model=model,
-                    prim_type=(
-                        PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID
-                    ),
+                    prim_type=(PrimType.CLOTH if "cloth" in KB.get_synset(obj_synset).abilities else PrimType.RIGID),
                     **obj_kwargs,
                 )
                 num_new_obj += 1

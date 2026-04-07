@@ -857,6 +857,7 @@ class TransitionRule:
     input_synsets: List["Synset"] = field(default_factory=list)
     output_synsets: List["Synset"] = field(default_factory=list)
     machine_synsets: List["Synset"] = field(default_factory=list)
+    recipe: object = field(default=None, repr=False)  # Typed recipe (CookingRecipe, MixingRecipe, etc.) or None
 
     class Meta:
         pk = "name"

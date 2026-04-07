@@ -1,4 +1,4 @@
-from bddl.activity import evaluate_goal_conditions
+from bddl.condition_evaluation import evaluate_state
 
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
@@ -37,7 +37,7 @@ class PredicateGoal(SuccessCondition):
 
     def _step(self, task, env, action):
         # Terminate if all goal conditions are met in the task
-        done, self._goal_status = evaluate_goal_conditions(self._goal_fcn(), self._evaluate_fn)
+        done, self._goal_status = evaluate_state(self._goal_fcn(), self._evaluate_fn)
         return done
 
     @property

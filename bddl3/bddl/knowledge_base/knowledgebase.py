@@ -41,6 +41,7 @@ class KnowledgeBase:
         self.complaint_types_by_name: Dict[str, Any] = {}
         self.complaints: List[Any] = []
         self.complaints_by_id: Dict[str, Any] = {}
+        self.washer_rule = None  # WasherRule instance, set during population
 
         if populate:
             from bddl.knowledge_base.processing import populate_knowledgebase
@@ -171,6 +172,7 @@ class KnowledgeBase:
         obj.knowledgebase = self
         return obj
 
+    def get_transition_rule(self, name: str): return self.transition_rules_by_name.get(name)
     def all_transition_rules(self): return list(self.transition_rules)
 
     def add_meta_link(self, name: str):
