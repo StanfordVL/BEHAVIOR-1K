@@ -6,8 +6,6 @@ from omnigibson.utils import transform_utils as T
 from omnigibson.transition_rules import (
     ToggleableMachineRule,
     MixingToolRule,
-    CookingObjectRule,
-    CookingPhysicalParticleRule,
     CookingSystemRule,
 )
 

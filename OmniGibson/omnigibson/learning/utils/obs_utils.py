@@ -106,15 +106,17 @@ def encode_depth_frame(depth: np.ndarray | th.Tensor) -> av.VideoFrame:
     return frame
 
 
-def decode_depth_frame(frame: np.ndarray) -> np.ndarray:
+def decode_depth_frame(frame: th.Tensor | np.ndarray) -> th.Tensor:
     """
     Decodes a depth frame by extracting the quantized depth from the Y plane and then dequantizing it back to float values.
     Args:
-        frame (np.ndarray): Encoded depth tensor of shape (H, W) with uint16 values.
+        frame (th.Tensor | np.ndarray): Encoded depth tensor of shape (H, W) with uint16 values.
     Returns:
-        np.ndarray: Decoded depth tensor of shape (H, W) with float values.
+        th.Tensor: Decoded depth tensor of shape (H, W) with float values.
     """
-    quantized_depth = frame.astype(np.uint16)
+    if isinstance(frame, np.ndarray):
+        frame = th.from_numpy(frame)
+    quantized_depth = frame.to(th.uint16)
     depth = dequantize_depth(quantized_depth)
     return depth
 

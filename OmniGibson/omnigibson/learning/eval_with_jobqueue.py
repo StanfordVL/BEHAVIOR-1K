@@ -207,7 +207,7 @@ def main():
     try:
         # run metric start callbacks
         for metric in evaluator.metrics:
-            metric.start_callback(evaluator.env)
+            metric.reset(evaluator.env)
 
         # Print first step time
         first_step_time = time.time()
@@ -234,7 +234,7 @@ def main():
 
         # run metric end callbacks
         for metric in evaluator.metrics:
-            metric.end_callback(evaluator.env)
+            metric.aggregate(evaluator.env)
 
         end_time = time.time()
         logger.info(f"Evaluation finished at step {evaluator.env._current_step}.")

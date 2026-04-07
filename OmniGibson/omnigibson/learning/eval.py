@@ -217,7 +217,7 @@ class Evaluator:
                 self.n_success_trials += 1
 
         for metric in self.metrics:
-            metric.step_callback(self.env)
+            metric.step(self.env, self.robot_action, obs, 0.0, terminated, truncated, info)
         return terminated, truncated
 
     @property
@@ -356,7 +356,7 @@ class Evaluator:
         self.obs = self._preprocess_obs(self.env.reset()[0])
         # run metric start callbacks
         for metric in self.metrics:
-            metric.start_callback(self.env)
+            metric.reset(self.env)
         self.policy.reset()
         self.n_success_trials, self.n_trials = 0, 0
 
@@ -478,7 +478,7 @@ if __name__ == "__main__":
                         logger.info(f"Current step: {evaluator.env._current_step}")
                 # run metric end callbacks
                 for metric in evaluator.metrics:
-                    metric.end_callback(evaluator.env)
+                    metric.aggregate(evaluator.env)
                 logger.info(f"Evaluation finished at step {evaluator.env._current_step}.")
                 logger.info(f"Evaluation exit state: {terminated}, {truncated}")
                 logger.info(f"Total trials: {evaluator.n_trials}")

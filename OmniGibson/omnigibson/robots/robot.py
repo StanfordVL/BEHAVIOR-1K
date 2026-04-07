@@ -1259,7 +1259,14 @@ class Robot(USDObject, GymObservable):
 
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
-                    sensor_kwargs = self._sensor_config[sensor_cls.__name__]
+                    link_key = f"{link_name}:{prim_type}:{sensor_counts[prim_type]}"
+                    class_key = sensor_cls.__name__
+                    if link_key in self._sensor_config:
+                        sensor_kwargs = self._sensor_config[link_key]
+                    elif class_key in self._sensor_config:
+                        sensor_kwargs = self._sensor_config[class_key]
+                    else:
+                        sensor_kwargs = {}
                     if "modalities" not in sensor_kwargs:
                         sensor_kwargs["modalities"] = (
                             sensor_cls.all_modalities
