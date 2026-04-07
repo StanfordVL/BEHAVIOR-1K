@@ -45,7 +45,6 @@ with open("task_custom_lists.json", "r") as f:
 
 gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True
 gm.ENABLE_TRANSITION_RULES = True
 

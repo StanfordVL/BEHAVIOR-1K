@@ -36,7 +36,6 @@ import torch as th
 import math
 
 
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 
 PI = th.tensor(th.pi)

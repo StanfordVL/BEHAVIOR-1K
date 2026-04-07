@@ -740,9 +740,10 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         if emitter_type not in self._emitters:
             return
-        # If we're running flatcache and the value is active, we need to manually update the pose in the USD
+        # If we're running fabric and the value is active, we need to manually update the pose in the USD
         # to ensure the rendering is updated properly at the correct pose
-        if gm.ENABLE_FLATCACHE and value:
+        # TODO(#2082): Verify if this is still needed.
+        if value:
             self._sync_emitter_mesh_on_usd(emitter_type=emitter_type)
         if value != self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Get():
             self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Set(value)

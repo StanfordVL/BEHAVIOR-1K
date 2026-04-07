@@ -23,7 +23,6 @@ gpu_id = (
 )
 
 # set global variables to boost performance
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 gm.HEADLESS = True

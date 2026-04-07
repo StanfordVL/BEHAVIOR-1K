@@ -188,7 +188,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         def check_overlap():
             nonlocal valid_hit
             valid_hit = False
-            # TODO: This is a temporary fix for flatcache before we properly implement trigger volumes
+            # TODO: This is a temporary fix for fabric before we properly implement trigger volumes
+            # TODO(#2082): Investigate why overlap_shape doesn't work with fabric still. This is a poor approximation.
             og.sim.psqi.overlap_sphere(
                 radius=th.min(self.visual_marker.extent * self.scale * self.link.scale).item(),
                 pos=self.visual_marker.get_position_orientation()[0].tolist(),

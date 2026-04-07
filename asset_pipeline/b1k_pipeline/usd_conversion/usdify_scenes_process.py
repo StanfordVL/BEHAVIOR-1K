@@ -10,7 +10,6 @@ from omnigibson.macros import gm
 
 # Set some macros. Is this kosher?
 gm.HEADLESS = True
-gm.ENABLE_FLATCACHE = False
 gm.USE_GPU_DYNAMICS = False
 gm.USE_ENCRYPTED_ASSETS = True
 

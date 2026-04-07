@@ -15,8 +15,6 @@ A lot of factors could affect the speed of OmniGibson. Here are a few of them:
 
 3. `RENDER_VIEWER_CAMERA`: viewer camera refers to the camera that shows the default viewport in OmniGibson, if you don't want to view the entire scene (e.g. during training), you can set this to False andit will boost OmniGibson performance.
 
-4. `ENABLE_FLATCACHE`: setting it to True will boost OmniGibson performance.
-
 
 ## Miscellaneous
 
