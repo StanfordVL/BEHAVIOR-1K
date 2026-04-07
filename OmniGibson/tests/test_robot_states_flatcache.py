@@ -9,8 +9,8 @@ from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
-from omnigibson.utils.constants import ObjectsInFOVOfRobot
-from omnigibson.utils.semantic_utils import semantic_class_name_to_id
+from omnigibson.object_states.robot_related_states import ObjectsInFOVOfRobot
+from omnigibson.utils.constants import semantic_class_name_to_id
 
 
 def setup_environment():
