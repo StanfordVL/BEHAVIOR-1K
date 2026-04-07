@@ -206,14 +206,25 @@ class RigidBodyViewAPIImpl:
         self._RIGID_BODY_VIEW = []
 
         # Shared path index across all scenes (relative prim paths identical in VectorEnvironment)
-        self._PATH_TO_IDX = {}  # {rel_path: int}
-        self._IDX_TO_PATH = []  # list[rel_path]
+        self._PATH_TO_IDX = {}  # {relative_prim_path: int}
+        self._IDX_TO_PATH = []  # list[relative_prim_path]
 
-        # Raw poses from PhysX: (S, P, 7) — [px, py, pz, qx, qy, qz, qw]
+        # Raw poses from PhysX: (S, P_physx, 7) — [px, py, pz, qx, qy, qz, qw]
+        # Covers only PhysX-tracked bodies; does NOT grow when kinematic extras are added.
         self._POSES = None
 
-        # Cached 4x4 transformation matrices: (S, P, 4, 4)
+        # Cached 4x4 transformation matrices: (S, P_total, 4, 4)
+        # P_total = P_physx + P_kinematic_extra.  Kinematic-extra slice never touched by
+        # update_pose_cache(); refreshed only by invalidate_kinematic().
         self._POSE_MATRICES = None
+
+        # Scene-0 link prim objects in P-index order (None for slots with no matching link obj).
+        # Indices 0..P_physx-1: PhysX-tracked dynamic links.
+        # Indices P_physx..P_total-1: kinematic links (no physics:RigidBodyAPI).
+        self._LINK_BY_IDX = []
+
+        # Count of extra-kinematic objects whose links were appended beyond the PhysX view.
+        self.n_kinematic_only_objs = 0
 
         # Tolerances for change detection (same as RigidContactAPIImpl)
         self._POS_EPS = 1e-4
@@ -290,6 +301,51 @@ class RigidBodyViewAPIImpl:
 
         self._POSE_MATRICES = self._poses_to_matrices(self._POSES)
 
+        # Append kinematic-extra links (kinematic_only objects whose links PhysX does not track,
+        # e.g. objects without physics:RigidBodyAPI) and populate their initial pose slices.
+        n_dynamic_objs = len(self._PATH_TO_IDX)  # local — boundary between PhysX and kinematic-extra
+        links = [None] * n_dynamic_objs
+        kinematic_obj_paths = set()
+        kinematic_poses_to_fill = []  # (scene_idx, idx, pose_7) collected for post-loop fill
+
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            for obj in scene.objects:
+                is_kinematic = obj.kinematic_only and obj.prim_type != PrimType.CLOTH
+                # For scenes after scene_0 only kinematic extras are relevant
+                if scene_idx > 0 and not is_kinematic:
+                    continue
+                for link in obj.links.values():
+                    path = link.relative_prim_path
+                    if scene_idx == 0:
+                        idx = self._PATH_TO_IDX.get(path)
+                        if idx is not None:
+                            links[idx] = link  # PhysX-tracked link
+                        elif is_kinematic:
+                            idx = len(self._PATH_TO_IDX)
+                            self._PATH_TO_IDX[path] = idx
+                            self._IDX_TO_PATH.append(path)
+                            links.append(link)  # kinematic-extra link
+                            kinematic_obj_paths.add(obj.relative_prim_path)
+                    # Collect initial pose for kinematic-extra links across all scenes.
+                    # cur_idx >= P_physx  ⟺  this link was added as a kinematic extra.
+                    cur_idx = self._PATH_TO_IDX.get(path, -1)
+                    if is_kinematic and cur_idx >= n_dynamic_objs:
+                        pos, quat_wxyz = link.get_position_orientation()
+                        quat_xyzw = th.cat([quat_wxyz[1:], quat_wxyz[:1]])
+                        kinematic_poses_to_fill.append((scene_idx, cur_idx, th.cat([pos, quat_xyzw])))
+
+        self._LINK_BY_IDX = links
+        self.n_kinematic_only_objs = len(kinematic_obj_paths)
+
+        # Extend _POSE_MATRICES with kinematic-extra slots and fill their initial poses.
+        n_kinematic_objs = len(self._PATH_TO_IDX) - n_dynamic_objs
+        if n_kinematic_objs > 0:
+            S = len(og.sim.scenes)
+            extra_matrices = th.zeros(S, n_kinematic_objs, 4, 4)
+            self._POSE_MATRICES = th.cat([self._POSE_MATRICES, extra_matrices], dim=1)
+            for scene_idx, idx, pose in kinematic_poses_to_fill:
+                self._POSE_MATRICES[scene_idx, idx] = self._poses_to_matrices(pose.reshape(1, 1, 7))[0, 0]
+
     def update_pose_cache(self):
         """
         Updates pose cache from the latest physics step.
@@ -317,9 +373,12 @@ class RigidBodyViewAPIImpl:
                 continue
 
             self._POSES[scene_idx, changed] = transforms[changed]
-            # Recompute matrices only for changed bodies in this scene
-            changed_poses = self._POSES[scene_idx, changed].unsqueeze(0)  # (1, K, 7)
-            self._POSE_MATRICES[scene_idx, changed] = self._poses_to_matrices(changed_poses).squeeze(0)
+            # Recompute matrices only for changed bodies in this scene.
+            # Use integer indices rather than the boolean mask because _POSE_MATRICES may be wider
+            # than _POSES (kinematic-extra links appended beyond the PhysX range).
+            changed_idx = th.where(changed)[0]
+            changed_poses = self._POSES[scene_idx, changed_idx].unsqueeze(0)  # (1, K, 7)
+            self._POSE_MATRICES[scene_idx, changed_idx] = self._poses_to_matrices(changed_poses).squeeze(0)
 
     def get_body_indices(self, links):
         """
@@ -356,6 +415,41 @@ class RigidBodyViewAPIImpl:
         """Return cached (S, P, 4, 4) pose matrices; None if not yet initialized."""
         return self._POSE_MATRICES
 
+    def get_links_with_indices(self):
+        """
+        Return list of (link_obj, p_idx) for all rigid links using scene-0 representatives.
+
+        Includes both PhysX-tracked links (p_idx < P_physx) and kinematic-extra links
+        (p_idx >= P_physx).  Used by AABB.initialize_view() to avoid re-scanning objects.
+
+        Returns:
+            list[tuple[RigidPrim, int]]: (link_obj, p_idx) pairs, skipping None slots.
+        """
+        return [(link, idx) for idx, link in enumerate(self._LINK_BY_IDX) if link is not None]
+
+    def invalidate_kinematic(self, links):
+        """
+        Refresh cached pose matrices for kinematic links after an explicit move.
+
+        For kinematic-extra links (no physics:RigidBodyAPI) this is the only update path.
+        For PhysX-tracked kinematic links this write is harmless — the same value is stored,
+        and update_pose_cache() will re-read from PhysX on the next step.
+
+        Args:
+            links: iterable of RigidPrim link objects whose poses should be refreshed.
+        """
+        if self._POSE_MATRICES is None:
+            return
+        for link in links:
+            idx = self._PATH_TO_IDX.get(link.relative_prim_path)
+            if idx is None:
+                continue
+            s = link.scene.idx
+            pos, quat_wxyz = link.get_position_orientation()
+            quat_xyzw = th.cat([quat_wxyz[1:], quat_wxyz[:1]])
+            pose_7 = th.cat([pos, quat_xyzw]).reshape(1, 1, 7)
+            self._POSE_MATRICES[s, idx] = self._poses_to_matrices(pose_7)[0, 0]
+
     def clear(self):
         """Reset all cached state."""
         self._RIGID_BODY_VIEW = []
@@ -363,6 +457,8 @@ class RigidBodyViewAPIImpl:
         self._IDX_TO_PATH = []
         self._POSES = None
         self._POSE_MATRICES = None
+        self._LINK_BY_IDX = []
+        self.n_kinematic_only_objs = 0
 
 
 RigidBodyViewAPI = RigidBodyViewAPIImpl()

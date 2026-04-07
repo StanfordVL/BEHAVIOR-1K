@@ -1,7 +1,6 @@
 import torch as th
 
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
-from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
 
@@ -67,27 +66,29 @@ class AABB(TensorizedValueState):
 
         all_local_points = []  # list of (V_i, 4) per rigid link
         prim_to_obj = []  # O index for each rigid link
-        prim_links = []  # link objects for RigidBodyViewAPI.get_body_indices()
-        cls.CLOTH_OBJ_IDXS = []
+        prim_body_idx = []  # P index into RigidBodyViewAPI for each rigid link
 
-        for obj_idx in range(O):
-            # Use scene-0 representative (same structure across all scenes)
-            obj = next(row[obj_idx] for row in cls.IDX_OBJS if row[obj_idx] is not None)
-
-            if obj.prim_type == PrimType.CLOTH or obj.kinematic_only:
-                cls.CLOTH_OBJ_IDXS.append(obj_idx)
+        # Iterate over all rigid links (dynamic + kinematic) provided by RigidBodyViewAPI.
+        # Kinematic-only objects (including those without physics:RigidBodyAPI) are now covered
+        # by RigidBodyViewAPI's extended _POSE_MATRICES, so they go through the same batched path.
+        for link, link_idx in RigidBodyViewAPI.get_links_with_indices():
+            obj_path = link.relative_prim_path.rsplit("/", 1)[0]
+            obj_idx = cls.OBJ_IDXS.get(obj_path)
+            if obj_idx is None:
+                continue  # not tracked by AABB (robots, etc.)
+            local_pts = link.collision_boundary_points_local  # (V_i, 3) or None
+            if local_pts is None:
                 continue
+            world_scale = link.get_world_scale()  # (3,) — full world-accumulated scale
+            scaled_pts = local_pts * world_scale
+            homog = th.cat([scaled_pts, th.ones(len(scaled_pts), 1)], dim=1)  # (V_i, 4)
+            all_local_points.append(homog)
+            prim_to_obj.append(obj_idx)
+            prim_body_idx.append(link_idx)
 
-            for link in obj.links.values():
-                local_pts = link.collision_boundary_points_local  # (V_i, 3) or None
-                if local_pts is None:
-                    continue
-                world_scale = link.get_world_scale()  # (3,) — full world-accumulated scale, no PoseAPI
-                scaled_pts = local_pts * world_scale  # apply full world-accumulated scale
-                homog = th.cat([scaled_pts, th.ones(len(scaled_pts), 1)], dim=1)  # (V_i, 4)
-                all_local_points.append(homog)
-                prim_to_obj.append(obj_idx)
-                prim_links.append(link)
+        # Cloth fallback: obj_idxs not covered by any rigid link
+        covered = set(prim_to_obj)
+        cls.CLOTH_OBJ_IDXS = [i for i in range(O) if i not in covered]
 
         P_obj = len(all_local_points)
         V_max = max(p.shape[0] for p in all_local_points) if P_obj > 0 else 0
@@ -100,7 +101,7 @@ class AABB(TensorizedValueState):
             cls.POINTS_MASK[i, :V_i] = True
 
         cls.PRIM_TO_OBJ_IDX = th.tensor(prim_to_obj, dtype=th.long)
-        cls.PRIM_BODY_IDX = RigidBodyViewAPI.get_body_indices(prim_links)
+        cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long)
 
         # Allocate scratch buffers — reused each step, never recreated
         cls._AABB_LO = th.full((S, O, 3), float("inf"))
@@ -147,7 +148,7 @@ class AABB(TensorizedValueState):
             cls._AABB_LO.scatter_reduce_(1, idx, min_p, reduce="amin", include_self=True)
             cls._AABB_HI.scatter_reduce_(1, idx, max_p, reduce="amax", include_self=True)
 
-        # 6. Cloth / kinematic_only fallback — per-object, uses existing EntityPrim.aabb
+        # 6. Cloth fallback — per-object, uses existing obj.aabb
         for obj_idx in cls.CLOTH_OBJ_IDXS:
             for s_idx, s_row in enumerate(cls.IDX_OBJS):
                 obj = s_row[obj_idx]
