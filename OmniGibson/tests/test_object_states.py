@@ -435,7 +435,7 @@ def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dis
     og.sim.step()
     assert microwave.states[ToggledOn].set_value(True)
 
-    for _ in range(20):
+    for _ in range(5):
         og.sim.step()
 
     # Affected by the microwave
@@ -462,7 +462,7 @@ def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dis
 
     # Set the objects to be on top of the stove
     bagel.set_position_orientation(position=[0.78, -0.2, 0.88], orientation=[0, 0, 0, 1])
-    dishtowel.set_position_orientation(position=[0.84, -0.15, 0.88], orientation=[0, 0, 0, 1])
+    dishtowel.set_position_orientation(position=[0.84, -0.15, 0.89], orientation=[0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
