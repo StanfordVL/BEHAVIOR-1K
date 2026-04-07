@@ -4,7 +4,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.systems import FluidSystem, GranularSystem, MacroPhysicalParticleSystem, MacroVisualParticleSystem
+from omnigibson.systems import FluidSystem, GranularSystem, MacroVisualParticleSystem
 from omnigibson.utils.constants import PrimType
 
 SYSTEM_EXAMPLES = {
