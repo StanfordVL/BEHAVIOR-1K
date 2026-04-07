@@ -893,36 +893,24 @@ class TransitionRule:
         return G
 
 
-@dataclass(eq=False, order=False)
-class Task:
-    name: str
-    definition: str = field(default="", repr=False)
-    synsets: List["Synset"] = field(default_factory=list)  # the synsets required by this task
-    future_synsets: List["Synset"] = field(default_factory=list)  # the synsets that show up as future synsets in this task (e.g. don't exist in initial)
-    uses_predicates: List["PredicateUsage"] = field(default_factory=list)
-    room_requirements: List["RoomRequirement"] = field(default_factory=list)
+class CompiledTask:
+    """An immutable compiled instance of a BDDL task for a specific environment.
 
-    # Lazy compilation state (not set during KB population)
-    _compiled: bool = field(default=False, repr=False)
-    _conditions: object = field(default=None, repr=False)
-    _object_scope: dict = field(default=None, repr=False)
-    _initial_conditions: list = field(default=None, repr=False)
-    _goal_conditions: list = field(default=None, repr=False)
-    _ground_goal_state_options: list = field(default=None, repr=False)
+    Created by :meth:`Task.compile`. Multiple CompiledTask instances can exist
+    for the same Task (e.g. for different scenes with different wildcard
+    expansions). All runtime evaluation goes through this object.
 
-    class Meta:
-        pk = "name"
-        ordering = ["name"]
+    Attributes:
+        task (Task): The source task definition.
+        object_scope (set[str]): Set of all object instance names.
+        parsed_objects (dict[str, list[str]]): Category-to-instance mapping.
+        conditions: The raw parsed Conditions object.
+        initial_conditions (list[HEAD]): Compiled initial-state condition trees.
+        goal_conditions (list[HEAD]): Compiled goal-state condition trees.
+        ground_goal_state_options (list[list[HEAD]]): All grounded goal solutions.
+    """
 
-    def __str__(self):
-        return self.name
-
-    # ---------- Lazy compilation for runtime evaluation ----------
-
-    def _ensure_compiled(self, problem=None):
-        """Lazily compile conditions from the stored definition."""
-        if self._compiled:
-            return
+    def __init__(self, task, problem_str):
         from bddl.activity import (
             Conditions,
             get_object_scope,
@@ -931,70 +919,21 @@ class Task:
             get_ground_goal_state_options,
         )
 
-        problem = problem or self.definition
-        activity_name, definition_id = self.name.rsplit("-", 1)
-        self._conditions = Conditions(
+        self.task = task
+        activity_name, definition_id = task.name.rsplit("-", 1)
+        self.conditions = Conditions(
             activity_name,
             int(definition_id),
             "behavior-1k",
-            predefined_problem=problem,
+            predefined_problem=problem_str,
         )
-        self._object_scope = get_object_scope(self._conditions)
-        self._initial_conditions = get_initial_conditions(self._conditions, self._object_scope)
-        self._goal_conditions = get_goal_conditions(self._conditions, self._object_scope)
-        self._ground_goal_state_options = get_ground_goal_state_options(
-            self._conditions, self._object_scope, self._goal_conditions
+        self.object_scope = get_object_scope(self.conditions)
+        self.parsed_objects = self.conditions.parsed_objects
+        self.initial_conditions = get_initial_conditions(self.conditions, self.object_scope)
+        self.goal_conditions = get_goal_conditions(self.conditions, self.object_scope)
+        self.ground_goal_state_options = get_ground_goal_state_options(
+            self.conditions, self.object_scope, self.goal_conditions
         )
-        self._compiled = True
-
-    def compile(self, scene_layout=None):
-        """Compile (or recompile) the task conditions.
-
-        If the task definition contains wildcards and a *scene_layout* is
-        provided, wildcards are expanded based on how many matching objects
-        exist in each room before compilation.
-
-        Args:
-            scene_layout: Optional dict mapping ``room_type -> {category: count}``.
-                If provided, wildcards are expanded. If None, the raw
-                definition is compiled as-is (wildcards become literal names).
-        """
-        self._compiled = False
-        problem = self.definition
-        if scene_layout is not None and "*" in problem:
-            from bddl.wildcard import expand_wildcards
-            problem = expand_wildcards(problem, scene_layout, self.knowledgebase)
-        self._ensure_compiled(problem=problem)
-
-    @property
-    def object_scope(self):
-        self._ensure_compiled()
-        return self._object_scope
-
-    @property
-    def initial_conditions(self):
-        self._ensure_compiled()
-        return self._initial_conditions
-
-    @property
-    def goal_conditions(self):
-        self._ensure_compiled()
-        return self._goal_conditions
-
-    @property
-    def ground_goal_state_options(self):
-        self._ensure_compiled()
-        return self._ground_goal_state_options
-
-    @property
-    def parsed_objects(self):
-        self._ensure_compiled()
-        return self._conditions.parsed_objects
-
-    @property
-    def conditions(self):
-        self._ensure_compiled()
-        return self._conditions
 
     def check_goal(self, evaluate_fn):
         """Check whether the goal conditions are currently satisfied.
@@ -1007,8 +946,7 @@ class Task:
         """
         from bddl.condition_evaluation import evaluate_state
 
-        self._ensure_compiled()
-        return evaluate_state(self._goal_conditions, evaluate_fn)
+        return evaluate_state(self.goal_conditions, evaluate_fn)
 
     def check_initial_conditions(self, evaluate_fn):
         """Check whether the initial conditions are currently satisfied.
@@ -1021,8 +959,46 @@ class Task:
         """
         from bddl.condition_evaluation import evaluate_state
 
-        self._ensure_compiled()
-        return evaluate_state(self._initial_conditions, evaluate_fn)
+        return evaluate_state(self.initial_conditions, evaluate_fn)
+
+
+@dataclass(eq=False, order=False)
+class Task:
+    name: str
+    definition: str = field(default="", repr=False)
+    synsets: List["Synset"] = field(default_factory=list)  # the synsets required by this task
+    future_synsets: List["Synset"] = field(default_factory=list)  # the synsets that show up as future synsets in this task (e.g. don't exist in initial)
+    uses_predicates: List["PredicateUsage"] = field(default_factory=list)
+    room_requirements: List["RoomRequirement"] = field(default_factory=list)
+
+    class Meta:
+        pk = "name"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def compile(self, scene_layout=None):
+        """Compile this task for a specific environment.
+
+        Returns a :class:`CompiledTask` containing the compiled conditions,
+        object scope, and evaluation methods. Multiple compilations can
+        coexist for different environments.
+
+        Args:
+            scene_layout: Optional dict mapping ``room_type -> {category: count}``.
+                If provided, wildcards are expanded based on how many matching
+                objects exist in each room. If None, the raw definition is
+                compiled as-is.
+
+        Returns:
+            CompiledTask: A compiled task instance ready for evaluation.
+        """
+        problem = self.definition
+        if scene_layout is not None and "*" in problem:
+            from bddl.wildcard import expand_wildcards
+            problem = expand_wildcards(problem, scene_layout, self.knowledgebase)
+        return CompiledTask(self, problem)
 
     @cached_property
     def state(self):

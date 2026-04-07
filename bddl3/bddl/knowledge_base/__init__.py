@@ -9,6 +9,7 @@ from bddl.knowledge_base.models import (
     Synset,
     TransitionRule,
     Task,
+    CompiledTask,
     RoomRequirement,
     RoomSynsetRequirement,
     Room,

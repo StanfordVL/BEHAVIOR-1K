@@ -135,49 +135,73 @@ class TestTask:
         assert task is not None
         assert task.name == "cleaning_up_after_a_meal-0"
 
-    def test_task_lazy_compilation(self, kb):
-        task = kb.get_task("putting_away_Halloween_decorations-0")
-        assert task._compiled is False
-        _ = task.goal_conditions
-        assert task._compiled is True
+    def test_compile_returns_compiled_task(self, kb):
+        from bddl.knowledge_base.models import CompiledTask
+
+        task = kb.get_task("cleaning_up_after_a_meal-0")
+        ct = task.compile()
+        assert isinstance(ct, CompiledTask)
+        assert ct.task is task
 
     def test_task_check_goal_all_false(self, kb):
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-        ok, results = task.check_goal(lambda cls, *e: False)
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        ok, results = ct.check_goal(lambda cls, *e: False)
         assert ok is False
         assert len(results["unsatisfied"]) > 0
 
     def test_task_check_goal_tracks_satisfied(self, kb):
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-        # With all-True callback, some conditions with negations will fail,
-        # but we should still get a mix of satisfied and unsatisfied
-        ok, results = task.check_goal(lambda cls, *e: True)
-        assert len(results["satisfied"]) + len(results["unsatisfied"]) == len(task.goal_conditions)
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        ok, results = ct.check_goal(lambda cls, *e: True)
+        assert len(results["satisfied"]) + len(results["unsatisfied"]) == len(ct.goal_conditions)
 
     def test_task_object_scope(self, kb):
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-        scope = task.object_scope
-        assert isinstance(scope, set)
-        assert len(scope) > 0
-        # All entries should be instance name strings
-        for name in scope:
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        assert isinstance(ct.object_scope, set)
+        assert len(ct.object_scope) > 0
+        for name in ct.object_scope:
             assert isinstance(name, str)
 
     def test_task_parsed_objects(self, kb):
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-        parsed = task.parsed_objects
-        assert isinstance(parsed, dict)
-        # Should map synset categories to instance name lists
-        for cat, instances in parsed.items():
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        assert isinstance(ct.parsed_objects, dict)
+        for cat, instances in ct.parsed_objects.items():
             assert isinstance(cat, str)
             assert isinstance(instances, list)
             assert all(isinstance(i, str) for i in instances)
 
     def test_task_ground_goal_state_options(self, kb):
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-        options = task.ground_goal_state_options
-        assert isinstance(options, list)
-        assert len(options) > 0
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        assert isinstance(ct.ground_goal_state_options, list)
+        assert len(ct.ground_goal_state_options) > 0
+
+    def test_concurrent_compilations(self, kb):
+        """Two CompiledTasks from the same Task are independent."""
+        task = kb.get_task("carrying_in_groceries-0")
+
+        # Compile with different scene layouts
+        ct1 = task.compile(scene_layout={
+            "garage": {"car": 1, "floor": 1},
+            "kitchen": {"fridge": 2, "floor": 1},
+        })
+        ct2 = task.compile(scene_layout={
+            "garage": {"car": 1, "floor": 1},
+            "kitchen": {"fridge": 4, "floor": 1},
+        })
+
+        # They should have different object scopes (different fridge counts)
+        fridges_1 = {n for n in ct1.object_scope if "electric_refrigerator" in n}
+        fridges_2 = {n for n in ct2.object_scope if "electric_refrigerator" in n}
+        assert len(fridges_1) == 2
+        assert len(fridges_2) == 4
+
+        # Both should be independently evaluable
+        ok1, _ = ct1.check_goal(lambda cls, *e: False)
+        ok2, _ = ct2.check_goal(lambda cls, *e: False)
+        assert isinstance(ok1, bool)
+        assert isinstance(ok2, bool)
+
+        # Task definition is unchanged
+        assert "*" in task.definition
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +211,7 @@ class TestTask:
 
 class TestConditionEvaluation:
     def test_evaluate_predicate_callback_receives_class(self):
-        scope = {"bowl.n.01_1": "bowl.n.01_1", "table.n.02_1": "table.n.02_1"}
+        scope = {"bowl.n.01_1", "table.n.02_1"}
         object_map = {"bowl.n.01": ["bowl.n.01_1"], "table.n.02": ["table.n.02_1"]}
         parsed = [["ontop", "bowl.n.01_1", "table.n.02_1"]]
         compiled = compile_state(parsed, scope=scope, object_map=object_map)
@@ -204,11 +228,7 @@ class TestConditionEvaluation:
         assert received[0][1] == ("bowl.n.01_1", "table.n.02_1")
 
     def test_evaluate_conjunction(self):
-        scope = {
-            "bowl.n.01_1": "bowl.n.01_1",
-            "table.n.02_1": "table.n.02_1",
-            "stain.n.01_1": "stain.n.01_1",
-        }
+        scope = {"bowl.n.01_1", "table.n.02_1", "stain.n.01_1"}
         object_map = {
             "bowl.n.01": ["bowl.n.01_1"],
             "table.n.02": ["table.n.02_1"],
@@ -227,7 +247,7 @@ class TestConditionEvaluation:
         assert ok is False  # Covered returns False
 
     def test_evaluate_negation(self):
-        scope = {"bowl.n.01_1": "bowl.n.01_1", "stain.n.01_1": "stain.n.01_1"}
+        scope = {"bowl.n.01_1", "stain.n.01_1"}
         object_map = {"bowl.n.01": ["bowl.n.01_1"], "stain.n.01": ["stain.n.01_1"]}
         # (not (covered bowl stain))
         parsed = [["not", ["covered", "bowl.n.01_1", "stain.n.01_1"]]]
@@ -243,9 +263,7 @@ class TestConditionEvaluation:
 
     def test_evaluate_forall(self):
         scope = {
-            "bowl.n.01_1": "bowl.n.01_1",
-            "bowl.n.01_2": "bowl.n.01_2",
-            "stain.n.01_1": "stain.n.01_1",
+            "bowl.n.01_1", "bowl.n.01_2", "stain.n.01_1",
         }
         object_map = {
             "bowl.n.01": ["bowl.n.01_1", "bowl.n.01_2"],
@@ -267,9 +285,7 @@ class TestConditionEvaluation:
 
     def test_evaluate_exists(self):
         scope = {
-            "bowl.n.01_1": "bowl.n.01_1",
-            "bowl.n.01_2": "bowl.n.01_2",
-            "table.n.02_1": "table.n.02_1",
+            "bowl.n.01_1", "bowl.n.01_2", "table.n.02_1",
         }
         object_map = {
             "bowl.n.01": ["bowl.n.01_1", "bowl.n.01_2"],
@@ -295,9 +311,7 @@ class TestConditionEvaluation:
 
     def test_evaluate_disjunction(self):
         scope = {
-            "bowl.n.01_1": "bowl.n.01_1",
-            "table.n.02_1": "table.n.02_1",
-            "floor.n.01_1": "floor.n.01_1",
+            "bowl.n.01_1", "table.n.02_1", "floor.n.01_1",
         }
         object_map = {
             "bowl.n.01": ["bowl.n.01_1"],
@@ -322,11 +336,7 @@ class TestConditionEvaluation:
         assert ok is False
 
     def test_evaluate_implication(self):
-        scope = {
-            "bowl.n.01_1": "bowl.n.01_1",
-            "table.n.02_1": "table.n.02_1",
-            "stain.n.01_1": "stain.n.01_1",
-        }
+        scope = {"bowl.n.01_1", "table.n.02_1", "stain.n.01_1"}
         object_map = {
             "bowl.n.01": ["bowl.n.01_1"],
             "table.n.02": ["table.n.02_1"],
@@ -357,10 +367,7 @@ class TestConditionEvaluation:
     def test_evaluate_nested_forall_negation(self):
         """Test forall with negation: all bowls must NOT be covered."""
         scope = {
-            "bowl.n.01_1": "bowl.n.01_1",
-            "bowl.n.01_2": "bowl.n.01_2",
-            "bowl.n.01_3": "bowl.n.01_3",
-            "stain.n.01_1": "stain.n.01_1",
+            "bowl.n.01_1", "bowl.n.01_2", "bowl.n.01_3", "stain.n.01_1",
         }
         object_map = {
             "bowl.n.01": ["bowl.n.01_1", "bowl.n.01_2", "bowl.n.01_3"],
@@ -401,65 +408,47 @@ class TestTaskGoalEvaluation:
       6: forall chairs: NOT covered(chair, stain)
     """
 
-    def test_nothing_satisfied(self, kb):
-        """All predicates return False: covered=False means NOT covered=True,
-        but inside/ontop also False, so those goals fail."""
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-        ok, results = task.check_goal(lambda cls, *e: False)
-        # NOT covered goals pass (covered=False -> not covered=True)
-        # inside/ontop goals fail (False)
+    @pytest.fixture()
+    def ct(self, kb):
+        return kb.get_task("cleaning_up_after_a_meal-0").compile()
+
+    def test_nothing_satisfied(self, ct):
+        ok, results = ct.check_goal(lambda cls, *e: False)
         assert not ok
-        # Goals 0-2,5,6 (not covered) should be satisfied, goals 3,4 (inside, ontop) should not
         assert 3 in results["unsatisfied"] or 4 in results["unsatisfied"]
 
-    def test_all_goal_conditions_met(self, kb):
-        """Simulate a fully solved state."""
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-
+    def test_all_goal_conditions_met(self, ct):
         def solved_eval(cls, *entities):
-            # covered -> False (nothing is stained)
             if cls is Covered:
                 return False
-            # inside(hamburger, sack) -> True
             if cls is Inside:
                 return True
-            # ontop(sack, floor) -> True
             if cls is OnTop:
                 return True
             return False
 
-        ok, results = task.check_goal(solved_eval)
+        ok, results = ct.check_goal(solved_eval)
         assert ok is True
         assert len(results["unsatisfied"]) == 0
 
-    def test_partial_progress(self, kb):
-        """Only some goals met: bowls/table/chairs clean, but hamburgers not in sack."""
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-
+    def test_partial_progress(self, ct):
         def partial_eval(cls, *entities):
             if cls is Covered:
-                return False  # Nothing covered
+                return False
             if cls is OnTop:
-                return True  # Sack on floor
-            # Hamburgers NOT inside sack
+                return True
             if cls is Inside:
                 return False
             return False
 
-        ok, results = task.check_goal(partial_eval)
+        ok, results = ct.check_goal(partial_eval)
         assert ok is False
-        # Goal 3 (forall hamburger inside sack) should fail
         assert 3 in results["unsatisfied"]
-        # Goals 0,1,2,5,6 (not covered) and 4 (ontop) should pass
         assert 4 in results["satisfied"]
 
-    def test_selective_by_entity_name(self, kb):
-        """Use entity names to selectively satisfy predicates."""
-        task = kb.get_task("cleaning_up_after_a_meal-0")
-
+    def test_selective_by_entity_name(self, ct):
         def selective_eval(cls, *entities):
             if cls is Covered:
-                # Only bowl_1 is still dirty
                 return entities[0] == "bowl.n.01_1"
             if cls is Inside:
                 return True
@@ -467,10 +456,8 @@ class TestTaskGoalEvaluation:
                 return True
             return False
 
-        ok, results = task.check_goal(selective_eval)
-        # Goal 0 (forall bowls NOT covered) should fail because bowl_1 is covered
+        ok, results = ct.check_goal(selective_eval)
         assert 0 in results["unsatisfied"]
-        # Goal 3 (hamburgers inside) and 4 (sack ontop) should pass
         assert 3 in results["satisfied"]
         assert 4 in results["satisfied"]
 
@@ -482,7 +469,7 @@ class TestTaskGoalEvaluation:
 
 class TestSampling:
     def test_sample_predicate_callback_receives_class(self):
-        scope = {"bowl.n.01_1": "bowl.n.01_1", "table.n.02_1": "table.n.02_1"}
+        scope = {"bowl.n.01_1", "table.n.02_1"}
         object_map = {"bowl.n.01": ["bowl.n.01_1"], "table.n.02": ["table.n.02_1"]}
         parsed = [["ontop", "bowl.n.01_1", "table.n.02_1"]]
         compiled = compile_state(parsed, scope=scope, object_map=object_map)
@@ -502,7 +489,7 @@ class TestSampling:
         assert received[0][0] is OnTop
 
     def test_sample_returns_callback_result(self):
-        scope = {"bowl.n.01_1": "bowl.n.01_1"}
+        scope = {"bowl.n.01_1"}
         object_map = {"bowl.n.01": ["bowl.n.01_1"]}
         parsed = [["cooked", "bowl.n.01_1"]]
         compiled = compile_state(parsed, scope=scope, object_map=object_map)
@@ -550,7 +537,7 @@ class TestTransitionRules:
 
 class TestPredicates:
     def test_predicate_classes_are_expression_nodes(self):
-        scope = {"a": "a", "b": "b"}
+        scope = {"a", "b"}
         obj_map = {"cat": ["a", "b"]}
         node = OnTop("ontop", scope, ["a", "b"], obj_map, generate_ground_options=False)
         assert isinstance(node, Expression)
@@ -585,50 +572,39 @@ class TestWildcardExpansion:
         task = kb.get_task("carrying_in_groceries-0")
         assert "*" in task.definition
 
-        # electric_refrigerator.n.01 maps to categories: fridge, display_fridge, wine_fridge
-        # Provide a layout with 2 fridges in the kitchen
         layout = {
             "garage": {"car": 1, "floor": 1},
             "kitchen": {"fridge": 2, "floor": 1},
         }
-        task.compile(scene_layout=layout)
+        ct = task.compile(scene_layout=layout)
 
-        # The wildcard should have been expanded
-        assert "electric_refrigerator.n.01_*" not in task.object_scope
-        assert "electric_refrigerator.n.01_1" in task.object_scope
-        assert "electric_refrigerator.n.01_2" in task.object_scope
+        assert "electric_refrigerator.n.01_*" not in ct.object_scope
+        assert "electric_refrigerator.n.01_1" in ct.object_scope
+        assert "electric_refrigerator.n.01_2" in ct.object_scope
 
     def test_expand_wildcards_no_layout(self, kb):
         """Without scene_layout, wildcards stay as literal names."""
-        task = kb.get_task("carrying_in_groceries-0")
-        task.compile()  # No scene_layout
-
-        # The wildcard instance is kept as-is
-        assert "electric_refrigerator.n.01_*" in task.object_scope
+        ct = kb.get_task("carrying_in_groceries-0").compile()
+        assert "electric_refrigerator.n.01_*" in ct.object_scope
 
     def test_wildcard_expansion_count(self, kb):
         """More objects in the scene means more expanded instances."""
-        task = kb.get_task("carrying_in_groceries-0")
-        # 4 total across fridge categories
         layout = {
             "garage": {"car": 1, "floor": 1},
             "kitchen": {"fridge": 3, "display_fridge": 1, "floor": 1},
         }
-        task.compile(scene_layout=layout)
-
-        # Should have 4 refrigerator instances (1 explicit + 3 from wildcard)
-        fridge_instances = [n for n in task.object_scope if "electric_refrigerator" in n]
+        ct = kb.get_task("carrying_in_groceries-0").compile(scene_layout=layout)
+        fridge_instances = [n for n in ct.object_scope if "electric_refrigerator" in n]
         assert len(fridge_instances) == 4
 
     def test_wildcard_task_compiles_and_evaluates(self, kb):
         """Expanded wildcard task can be evaluated with check_goal."""
-        task = kb.get_task("carrying_in_groceries-0")
         layout = {
             "garage": {"car": 1, "floor": 1},
             "kitchen": {"fridge": 2, "floor": 1},
         }
-        task.compile(scene_layout=layout)
+        ct = kb.get_task("carrying_in_groceries-0").compile(scene_layout=layout)
 
-        ok, results = task.check_goal(lambda cls, *e: False)
+        ok, results = ct.check_goal(lambda cls, *e: False)
         assert isinstance(ok, bool)
         assert "satisfied" in results and "unsatisfied" in results

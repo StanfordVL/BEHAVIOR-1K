@@ -112,7 +112,7 @@ class BehaviorTask(BaseTask):
         self.activity_definition_id = activity_definition_id
         self.activity_instance_id = activity_instance_id
         self.predefined_problem = predefined_problem
-        self.task = None
+        self.compiled_task = None
         self.activity_initial_conditions = None
         self.activity_goal_conditions = None
         self.ground_goal_state_options = None
@@ -312,37 +312,41 @@ class BehaviorTask(BaseTask):
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
-        self.task = KB.get_task(f"{activity_name}-{activity_definition_id}")
+        task_def = KB.get_task(f"{activity_name}-{activity_definition_id}")
 
         # Build scene layout for wildcard expansion and compile
         scene_layout = self._build_scene_layout(env.scene)
-        self.task.compile(scene_layout=scene_layout)
+        self.compiled_task = task_def.compile(scene_layout=scene_layout)
 
         # Get scope, making sure agent is the first entry
         self.object_scope = {"agent.n.01_1": None}
-        self.object_scope.update({name: None for name in self.task.object_scope})
+        self.object_scope.update({name: None for name in self.compiled_task.object_scope})
 
         # Object info
         self.object_instance_to_category = {
-            obj_inst: obj_cat for obj_cat in self.task.parsed_objects for obj_inst in self.task.parsed_objects[obj_cat]
+            obj_inst: obj_cat
+            for obj_cat in self.compiled_task.parsed_objects
+            for obj_inst in self.compiled_task.parsed_objects[obj_cat]
         }
 
         # Generate initial and goal conditions
-        self.activity_initial_conditions = self.task.initial_conditions
-        self.activity_goal_conditions = self.task.goal_conditions
-        self.ground_goal_state_options = self.task.ground_goal_state_options
+        self.activity_initial_conditions = self.compiled_task.initial_conditions
+        self.activity_goal_conditions = self.compiled_task.goal_conditions
+        self.ground_goal_state_options = self.compiled_task.ground_goal_state_options
 
         # Demo attributes
-        self.instruction_order = th.arange(len(self.task.conditions.parsed_goal_conditions))
+        self.instruction_order = th.arange(len(self.compiled_task.conditions.parsed_goal_conditions))
         self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
 
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
-        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.task.conditions)
-        self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.task.conditions)
+        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(
+            self.compiled_task.conditions
+        )
+        self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.compiled_task.conditions)
 
     def get_potential(self, env):
-        _, satisfied_predicates = self.task.check_goal(self._evaluate_predicate)
+        _, satisfied_predicates = self.compiled_task.check_goal(self._evaluate_predicate)
         success_score = len(satisfied_predicates["satisfied"]) / (
             len(satisfied_predicates["satisfied"]) + len(satisfied_predicates["unsatisfied"])
         )
@@ -366,7 +370,7 @@ class BehaviorTask(BaseTask):
         # Generate sampler
         self.sampler = BDDLSampler(
             env=env,
-            activity_conditions=self.task.conditions,
+            activity_conditions=self.compiled_task.conditions,
             object_scope=self.object_scope,
         )
 
@@ -591,7 +595,7 @@ class BehaviorTask(BaseTask):
         Increment the instruction
         """
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(
-            self.task.conditions.parsed_goal_conditions
+            self.compiled_task.conditions.parsed_goal_conditions
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 
