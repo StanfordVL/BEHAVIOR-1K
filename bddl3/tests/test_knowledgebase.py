@@ -157,12 +157,11 @@ class TestTask:
     def test_task_object_scope(self, kb):
         task = kb.get_task("cleaning_up_after_a_meal-0")
         scope = task.object_scope
-        assert isinstance(scope, dict)
+        assert isinstance(scope, set)
         assert len(scope) > 0
-        # Keys and values should be strings (instance names mapped to themselves)
-        for k, v in scope.items():
-            assert isinstance(k, str)
-            assert isinstance(v, str)
+        # All entries should be instance name strings
+        for name in scope:
+            assert isinstance(name, str)
 
     def test_task_parsed_objects(self, kb):
         task = kb.get_task("cleaning_up_after_a_meal-0")

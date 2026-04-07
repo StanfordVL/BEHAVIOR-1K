@@ -68,16 +68,8 @@ BINARIES = [
 ]
 
 
-class TrivialGenericObject(object):
-    def __init__(self, name):
-        self.name = name
-
-
 def get_initial_and_goal_conditions(conds) -> Tuple[List, List]:
     scope = get_object_scope(conds)
-    # Pretend scope has been filled
-    for name in scope:
-        scope[name] = TrivialGenericObject(name)
     initial_conds = get_initial_conditions(
         conds, scope, generate_ground_options=False
     )

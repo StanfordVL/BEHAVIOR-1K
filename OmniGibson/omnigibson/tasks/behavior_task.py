@@ -305,7 +305,7 @@ class BehaviorTask(BaseTask):
 
         # Get scope, making sure agent is the first entry
         self.object_scope = {"agent.n.01_1": None}
-        self.object_scope.update(self.task.object_scope)
+        self.object_scope.update({name: None for name in self.task.object_scope})
 
         # Object info
         self.object_instance_to_category = {

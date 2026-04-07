@@ -53,7 +53,8 @@ class Predicate(Expression):
         """
         Args:
             token: The BDDL predicate name string (e.g. ``"ontop"``).
-            scope: Object scope dict.
+            scope: Object scope -- a set of instance names, or a dict with
+                variable bindings from a quantifier.
             body: List of argument tokens (e.g. ``["bowl.n.01_1", "table.n.02_1"]``).
             object_map: Category-to-instances mapping.
             generate_ground_options: Whether to compute ground options.
@@ -61,51 +62,41 @@ class Predicate(Expression):
         super().__init__(scope, body, object_map)
         self.STATE_NAME = token
         self.inputs = [inp.strip("?") for inp in body]
-        for i, inp in enumerate(self.inputs):
-            try:
-                if isinstance(self.scope[inp], str):
-                    self.inputs[i] = self.scope[inp]
-            except KeyError as e:
-                raise UncontrolledCategoryError(e)
+        # Resolve quantifier-bound variables through the scope dict
+        if isinstance(scope, dict):
+            for i, inp in enumerate(self.inputs):
+                if inp in scope:
+                    self.inputs[i] = scope[inp]
+                elif inp not in object_map and not any(inp in insts for insts in object_map.values()):
+                    raise UncontrolledCategoryError(inp)
         if generate_ground_options:
             self.get_ground_options()
 
     def evaluate(self, evaluate_fn):
         """Evaluate this predicate by calling *evaluate_fn*.
 
-        Looks up each input in the scope and passes them to the callback
-        along with this predicate's class as the first argument.
+        Passes the resolved input instance names directly to the callback.
 
         Args:
-            evaluate_fn: ``(predicate_cls, *entities) -> bool``.
+            evaluate_fn: ``(predicate_cls, *entity_names) -> bool``.
 
         Returns:
-            bool: Result of the callback, or False if any input is unmapped.
+            bool: Result of the callback.
         """
-        mapped_inputs = [self.scope[inp] for inp in self.inputs]
-        if all(i is not None for i in mapped_inputs):
-            return evaluate_fn(type(self), *mapped_inputs, **self.kwargs)
-        else:
-            print("%s has unmapped inputs" % self.STATE_NAME)
-            return False
+        return evaluate_fn(type(self), *self.inputs, **self.kwargs)
 
     def sample(self, sample_fn, binary_state, **kwargs):
         """Request the simulator to set this predicate to *binary_state*.
 
         Args:
-            sample_fn: ``(predicate_cls, *entities, binary_state, **kw) -> bool``.
+            sample_fn: ``(predicate_cls, *entity_names, binary_state, **kw) -> bool``.
             binary_state: Desired truth value.
             **kwargs: Extra arguments forwarded to *sample_fn*.
 
         Returns:
-            bool: Whether sampling succeeded, or False if any input is unmapped.
+            bool: Whether sampling succeeded.
         """
-        mapped_inputs = [self.scope[inp] for inp in self.inputs]
-        if all(i is not None for i in mapped_inputs):
-            return sample_fn(type(self), *mapped_inputs, binary_state, **kwargs, **self.kwargs)
-        else:
-            print("%s has unmapped inputs" % self.STATE_NAME)
-            return False
+        return sample_fn(type(self), *self.inputs, binary_state, **kwargs, **self.kwargs)
 
     def get_ground_options(self):
         """A single predicate has exactly one ground option: itself."""

@@ -836,9 +836,6 @@ def no_uncontrolled_category(activity, defn):
     bddl.activity.get_initial_conditions(
         conds, scope, generate_ground_options=False
     )
-    # Pretend scope has been filled
-    for name in scope:
-        scope[name] = name
     bddl.activity.get_goal_conditions(
         conds, scope, generate_ground_options=False
     )

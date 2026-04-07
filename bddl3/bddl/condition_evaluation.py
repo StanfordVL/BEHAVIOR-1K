@@ -51,6 +51,30 @@ from bddl.logic_base import Expression
 from bddl.predicates import TOKEN_TO_PREDICATE, Predicate
 from bddl.utils import UncontrolledCategoryError
 
+#################### SCOPE HELPERS ####################
+
+
+def _iter_scope(scope):
+    """Iterate over instance names in a scope (set or dict)."""
+    if isinstance(scope, dict):
+        return scope.keys()
+    return scope
+
+
+def _bind_variable(scope, param_label, obj_name):
+    """Create a new scope dict with a quantifier variable binding.
+
+    If scope is a set, converts to a dict first. If already a dict
+    (from a parent quantifier), shallow-copies and adds the binding.
+    """
+    if isinstance(scope, set):
+        new_scope = {name: name for name in scope}
+    else:
+        new_scope = copy.copy(scope)
+    new_scope[param_label] = obj_name
+    return new_scope
+
+
 #################### RECURSIVE PREDICATES ####################
 
 # -JUNCTIONS
@@ -163,10 +187,9 @@ class Universal(Expression):
         param_label, __, category = iterable
         param_label = param_label.strip("?")
         assert __ == "-", "Middle was not a hyphen"
-        for obj_name, obj in scope.items():
+        for obj_name in _iter_scope(scope):
             if obj_name in object_map[category]:
-                new_scope = copy.copy(scope)
-                new_scope[param_label] = obj_name
+                new_scope = _bind_variable(scope, param_label, obj_name)
                 self.children.append(
                     get_predicate_for_token(subexpression[0])(
                         new_scope,
@@ -213,10 +236,9 @@ class Existential(Expression):
         param_label, __, category = iterable
         param_label = param_label.strip("?")
         assert __ == "-", "Middle was not a hyphen"
-        for obj_name, obj in scope.items():
+        for obj_name in _iter_scope(scope):
             if obj_name in object_map[category]:
-                new_scope = copy.copy(scope)
-                new_scope[param_label] = obj_name
+                new_scope = _bind_variable(scope, param_label, obj_name)
                 self.children.append(
                     get_predicate_for_token(subexpression[0])(
                         new_scope,
@@ -260,10 +282,9 @@ class NQuantifier(Expression):
         param_label, __, category = iterable
         param_label = param_label.strip("?")
         assert __ == "-", "Middle was not a hyphen"
-        for obj_name, obj in scope.items():
+        for obj_name in _iter_scope(scope):
             if obj_name in object_map[category]:
-                new_scope = copy.copy(scope)
-                new_scope[param_label] = obj_name
+                new_scope = _bind_variable(scope, param_label, obj_name)
                 self.children.append(
                     get_predicate_for_token(subexpression[0])(
                         new_scope,
@@ -321,13 +342,12 @@ class ForPairs(Expression):
         param_label2, __, category2 = iterable2
         param_label1 = param_label1.strip("?")
         param_label2 = param_label2.strip("?")
-        for obj_name_1, obj_1 in scope.items():
+        for obj_name_1 in _iter_scope(scope):
             if obj_name_1 in object_map[category1]:
                 sub = []
-                for obj_name_2, obj_2 in scope.items():
+                for obj_name_2 in _iter_scope(scope):
                     if obj_name_2 in object_map[category2] and obj_name_1 != obj_name_2:
-                        new_scope = copy.copy(scope)
-                        new_scope[param_label1] = obj_name_1
+                        new_scope = _bind_variable(scope, param_label1, obj_name_1)
                         new_scope[param_label2] = obj_name_2
                         sub.append(
                             get_predicate_for_token(subexpression[0])(
@@ -404,13 +424,12 @@ class ForNPairs(Expression):
         param_label2, __, category2 = iterable2
         param_label1 = param_label1.strip("?")
         param_label2 = param_label2.strip("?")
-        for obj_name_1, obj_1 in scope.items():
+        for obj_name_1 in _iter_scope(scope):
             if obj_name_1 in object_map[category1]:
                 sub = []
-                for obj_name_2, obj_2 in scope.items():
+                for obj_name_2 in _iter_scope(scope):
                     if obj_name_2 in object_map[category2] and obj_name_1 != obj_name_2:
-                        new_scope = copy.copy(scope)
-                        new_scope[param_label1] = obj_name_1
+                        new_scope = _bind_variable(scope, param_label1, obj_name_1)
                         new_scope[param_label2] = obj_name_2
                         sub.append(
                             get_predicate_for_token(subexpression[0])(
@@ -631,17 +650,16 @@ class HEAD(Expression):
             list: Scope values (strings or simulator entities) referenced by
             this condition.
         """
-        objects = set(
-            [self.scope[obj_name] for obj_name in self.terms if obj_name in self.scope]
-        )
+        scope_names = self.scope if isinstance(self.scope, set) else set(self.scope.keys())
+        objects = {name for name in self.terms if name in scope_names}
 
         # For quantifiers, the category-relevant objects won't all be caught
         # by the above, so add them here.
         for term in self.terms:
             if term in self.object_map:
-                for obj_name, obj in self.scope.items():
-                    if obj_name in self.object_map[term]:
-                        objects.add(obj)
+                for name in scope_names:
+                    if name in self.object_map[term]:
+                        objects.add(name)
 
         return list(objects)
 
@@ -653,25 +671,19 @@ class HEAD(Expression):
 
 
 def create_scope(object_terms):
-    """Create an object scope mapping every instance name to itself.
-
-    The scope is a ``dict[str, str]`` used during condition compilation.
-    Quantifiers add bound-variable entries to shallow copies of this dict.
-    The simulator may later mutate values (e.g. replacing strings with entity
-    objects) since compiled expressions hold a reference to the same dict.
+    """Create an object scope as a set of all declared instance names.
 
     Args:
         object_terms: ``dict[str, list[str]]`` mapping synset categories to
             their declared instance names.
 
     Returns:
-        dict[str, str]: ``{instance_name: instance_name, ...}`` for every
-        declared instance across all categories.
+        set[str]: All instance names across all categories.
     """
-    scope = {}
+    scope = set()
     for object_cat in object_terms:
         for object_inst in object_terms[object_cat]:
-            scope[object_inst] = object_inst
+            scope.add(object_inst)
     return scope
 
 
