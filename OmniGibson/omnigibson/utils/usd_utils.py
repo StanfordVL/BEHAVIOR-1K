@@ -996,7 +996,7 @@ class PoseAPI:
     This is a singleton class for getting world poses.
     Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
     After that, if we need to access the pose of a prim without stepping physics,
-    this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
+    this class will refresh the poses by syncing across USD-fabric-PhysX.
     """
 
     VALID = False
@@ -1024,16 +1024,11 @@ class PoseAPI:
 
             # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
             # check if this is still the case for later versions
+            # TODO(#2082): This is terrible for performance - let's try to fix this.
             og.sim.render()
 
-            # when flatcache is on
-            if og.sim._sim_context._physx_fabric_interface:
-                # no time step is taken here
-                og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
-            # when flatcache is off
-            else:
-                # no time step is taken here
-                og.sim.refresh_physics(sync_usd=True)
+            og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+
             cls.mark_valid()
 
     @classmethod

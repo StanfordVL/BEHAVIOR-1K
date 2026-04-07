@@ -10,7 +10,6 @@ parser.add_argument("--scene_model", type=str, default=None, help="Scene model t
 
 gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True
 gm.ENABLE_TRANSITION_RULES = False
 

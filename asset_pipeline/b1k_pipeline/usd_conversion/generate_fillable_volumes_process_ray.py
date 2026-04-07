@@ -13,7 +13,6 @@ from scipy.spatial import ConvexHull
 gm.HEADLESS = True
 gm.USE_ENCRYPTED_ASSETS = True
 gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = True
 
 MAX_BBOX = 0.3
 

@@ -443,23 +443,23 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             )
 
             # Store the projection mesh's IDs
-            projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
+            # projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
 
             # We also generate the function for checking overlaps at runtime
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                if gm.ENABLE_FLATCACHE:
-                    # When flatcache is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
-                    aabb = self.link.visual_aabb
-                    og.sim.psqi.overlap_box(
-                        halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
-                        pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
-                        rot=[0, 0, 0, 1.0],
-                        reportFn=overlap_callback,
-                    )
-                else:
-                    og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+                # When fabric is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
+                aabb = self.link.visual_aabb
+                og.sim.psqi.overlap_box(
+                    halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
+                    pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
+                    rot=[0, 0, 0, 1.0],
+                    reportFn=overlap_callback,
+                )
+
+                # TODO(#2082): Investigate why overlap_shape doesn't work with fabric still. This is a poor approximation.
+                # og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
             # Define direction indicator if requested
