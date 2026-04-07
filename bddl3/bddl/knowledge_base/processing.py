@@ -373,7 +373,7 @@ def create_tasks(kb, verbose):
         task = kb.add_task(name=task_name, definition=raw_task_definition)
         for predicate in all_task_predicates(combined_conds):
             pred_obj, _ = get_or_add(
-                kb.get_predicate, kb.add_predicate, predicate
+                kb.get_predicate_usage, kb.add_predicate_usage, predicate
             )
             link_many_to_many(task, "uses_predicates", pred_obj, "tasks")
 
@@ -404,7 +404,7 @@ def create_tasks(kb, verbose):
             )
             for predicate in synset_used_predicates:
                 pred_obj, _ = get_or_add(
-                        kb.get_predicate, kb.add_predicate, predicate
+                        kb.get_predicate_usage, kb.add_predicate_usage, predicate
                 )
                 if pred_obj not in synset.used_in_predicates:
                     link_many_to_many(synset, "used_in_predicates", pred_obj, "synsets")

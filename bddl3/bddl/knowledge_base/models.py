@@ -5,7 +5,6 @@ import json
 import networkx as nx
 from typing import Dict, Optional, Set, List, Tuple
 import uuid
-from bddl.object_taxonomy import ObjectTaxonomy
 from bddl.knowledge_base.utils import SynsetState
 from collections import defaultdict
 
@@ -64,7 +63,49 @@ ROOM_TYPE_CHOICES = [
     ("storage room", "storage_room"),
 ]
 
-OBJECT_TAXONOMY = ObjectTaxonomy()
+
+
+def _get_required_meta_links_for_abilities(abilities):
+    """Compute the set of required meta links for a given abilities dict."""
+    if "substance" in abilities:
+        return set()
+
+    required_links = set()
+
+    for prop in ["heatSource", "coldSource"]:
+        if prop in abilities:
+            if "requires_inside" in abilities[prop] and abilities[prop]["requires_inside"]:
+                continue
+            required_links.add("heatsource")
+
+    if "fillable" in abilities:
+        required_links.add("fillable")
+
+    if "toggleable" in abilities:
+        required_links.add("togglebutton")
+
+    particle_pairs = [
+        ("particleSink", "fluidsink"),
+        ("particleSource", "fluidsource"),
+        ("particleApplier", "particleapplier"),
+        ("particleRemover", "particleremover"),
+    ]
+    for prop, meta_link in particle_pairs:
+        if prop in abilities:
+            if "method" in abilities[prop] and abilities[prop]["method"] != "projection":
+                continue
+            required_links.add(meta_link)
+
+    if "slicer" in abilities:
+        required_links.add("slicer")
+
+    if "sliceable" in abilities:
+        required_links.add("subpart")
+
+    if "openable" in abilities:
+        required_links.add("joint")
+
+    return required_links
 
 
 @dataclass(eq=False, order=False)
@@ -112,7 +153,7 @@ class AttachmentPair:
 
 
 @dataclass(eq=False, order=False)
-class Predicate:
+class PredicateUsage:
     name: str
     synsets: List["Synset"] = field(default_factory=list)
     tasks: List["Task"] = field(default_factory=list)
@@ -373,7 +414,7 @@ class Synset:
     # whether the synset is ever used as a fillable in any task
     is_used_as_fillable: bool = field(default=False, repr=False)
     # predicates the synset was used in as the first argument
-    used_in_predicates: List["Predicate"] = field(default_factory=list)
+    used_in_predicates: List["PredicateUsage"] = field(default_factory=list)
     # all it's parents in the synset graph (NOTE: this does not include self)
     parents: List["Synset"] = field(default_factory=list)
     children: List["Synset"] = field(default_factory=list)
@@ -421,8 +462,21 @@ class Synset:
             return SynsetState.ILLEGAL
 
     @cached_property
+    def is_leaf(self):
+        return len(self.children) == 0
+
+    @cached_property
     def property_names(self):
         return {prop.name for prop in self.properties}
+
+    @cached_property
+    def abilities(self):
+        """Return abilities as a dict matching ObjectTaxonomy.get_abilities format.
+
+        Returns:
+            dict[str, dict]: ``{ability_name: {param: value, ...}, ...}``
+        """
+        return {prop.name: json.loads(prop.parameters) for prop in self.properties}
 
     @cached_property
     def is_substance(self):
@@ -469,10 +523,7 @@ class Synset:
 
     @cached_property
     def required_meta_links(self) -> Set[str]:
-        properties = {
-            prop.name: json.loads(prop.parameters) for prop in self.properties
-        }
-        return OBJECT_TAXONOMY.get_required_meta_links_for_abilities(properties)
+        return _get_required_meta_links_for_abilities(self.abilities)
 
     @cached_property
     def has_fully_supporting_object(self) -> bool:
@@ -847,8 +898,16 @@ class Task:
     definition: str = field(default="", repr=False)
     synsets: List["Synset"] = field(default_factory=list)  # the synsets required by this task
     future_synsets: List["Synset"] = field(default_factory=list)  # the synsets that show up as future synsets in this task (e.g. don't exist in initial)
-    uses_predicates: List["Predicate"] = field(default_factory=list)
+    uses_predicates: List["PredicateUsage"] = field(default_factory=list)
     room_requirements: List["RoomRequirement"] = field(default_factory=list)
+
+    # Lazy compilation state (not set during KB population)
+    _compiled: bool = field(default=False, repr=False)
+    _conditions: object = field(default=None, repr=False)
+    _object_scope: dict = field(default=None, repr=False)
+    _initial_conditions: list = field(default=None, repr=False)
+    _goal_conditions: list = field(default=None, repr=False)
+    _ground_goal_state_options: list = field(default=None, repr=False)
 
     class Meta:
         pk = "name"
@@ -856,6 +915,103 @@ class Task:
 
     def __str__(self):
         return self.name
+
+    # ---------- Lazy compilation for runtime evaluation ----------
+
+    def _ensure_compiled(self, predefined_problem=None):
+        """Lazily compile conditions from the stored definition."""
+        if self._compiled:
+            return
+        from bddl.activity import (
+            Conditions,
+            get_object_scope,
+            get_initial_conditions,
+            get_goal_conditions,
+            get_ground_goal_state_options,
+        )
+
+        problem = predefined_problem or self.definition
+        activity_name, definition_id = self.name.rsplit("-", 1)
+        self._conditions = Conditions(
+            activity_name,
+            int(definition_id),
+            "behavior-1k",
+            predefined_problem=problem,
+        )
+        self._object_scope = get_object_scope(self._conditions)
+        self._initial_conditions = get_initial_conditions(self._conditions, self._object_scope)
+        self._goal_conditions = get_goal_conditions(self._conditions, self._object_scope)
+        self._ground_goal_state_options = get_ground_goal_state_options(
+            self._conditions, self._object_scope, self._goal_conditions
+        )
+        self._compiled = True
+
+    def compile_with_problem(self, predefined_problem):
+        """Force (re-)compilation with a specific problem string.
+
+        Used by simulators that pre-process the BDDL (e.g. expanding wildcards)
+        before compilation.
+        """
+        self._compiled = False
+        self._ensure_compiled(predefined_problem=predefined_problem)
+
+    @property
+    def object_scope(self):
+        self._ensure_compiled()
+        return self._object_scope
+
+    @property
+    def initial_conditions(self):
+        self._ensure_compiled()
+        return self._initial_conditions
+
+    @property
+    def goal_conditions(self):
+        self._ensure_compiled()
+        return self._goal_conditions
+
+    @property
+    def ground_goal_state_options(self):
+        self._ensure_compiled()
+        return self._ground_goal_state_options
+
+    @property
+    def parsed_objects(self):
+        self._ensure_compiled()
+        return self._conditions.parsed_objects
+
+    @property
+    def conditions(self):
+        self._ensure_compiled()
+        return self._conditions
+
+    def check_goal(self, evaluate_fn):
+        """Check whether the goal conditions are currently satisfied.
+
+        Args:
+            evaluate_fn: Callback ``(predicate_cls, *entities) -> bool``.
+
+        Returns:
+            tuple[bool, dict[str, list[int]]]: ``(all_satisfied, results)``.
+        """
+        from bddl.condition_evaluation import evaluate_state
+
+        self._ensure_compiled()
+        return evaluate_state(self._goal_conditions, evaluate_fn)
+
+    def check_initial_conditions(self, evaluate_fn):
+        """Check whether the initial conditions are currently satisfied.
+
+        Args:
+            evaluate_fn: Callback ``(predicate_cls, *entities) -> bool``.
+
+        Returns:
+            tuple[bool, dict[str, list[int]]]: ``(all_satisfied, results)``.
+        """
+        from bddl.condition_evaluation import evaluate_state
+
+        self._ensure_compiled()
+        return evaluate_state(self._initial_conditions, evaluate_fn)
 
     @cached_property
     def state(self):
@@ -1339,7 +1495,7 @@ class Complaint:
 
 # Enable sorting by pk for all model dataclasses (needed by Jinja2 templates).
 for _cls in [
-    Property, MetaLink, AttachmentPair, Predicate, Scene, ParticleSystem,
+    Property, MetaLink, AttachmentPair, PredicateUsage, Scene, ParticleSystem,
     Category, Object, Synset, TransitionRule, Task, RoomRequirement,
     RoomSynsetRequirement, Room, RoomObject, ComplaintType, Complaint,
 ]:

@@ -1,7 +1,7 @@
 from bddl.knowledge_base.models import (
     Property,
     MetaLink,
-    Predicate,
+    PredicateUsage,
     Scene,
     Category,
     Object,

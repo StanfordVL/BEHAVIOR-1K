@@ -138,17 +138,17 @@ class KnowledgeBase:
         obj.knowledgebase = self
         return obj
 
-    def add_predicate(self, name: str):
+    def add_predicate_usage(self, name: str):
         if name in self.predicates_by_name:
-            raise ValueError(f"Duplicate key {name} for Predicate")
-        obj = kb_models.Predicate(name=name)
+            raise ValueError(f"Duplicate key {name} for PredicateUsage")
+        obj = kb_models.PredicateUsage(name=name)
         self.predicates.append(obj)
         self.predicates_by_name[name] = obj
         obj.knowledgebase = self
         return obj
 
-    def get_predicate(self, name: str): return self.predicates_by_name.get(name)
-    def all_predicates(self): return list(self.predicates)
+    def get_predicate_usage(self, name: str): return self.predicates_by_name.get(name)
+    def all_predicate_usages(self): return list(self.predicates)
 
     def add_task(self, name: str, definition: str = ""):
         if name in self.tasks_by_name:
