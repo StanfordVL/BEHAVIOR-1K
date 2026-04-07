@@ -572,3 +572,63 @@ class TestPredicates:
         assert TOKEN_TO_PREDICATE["future"] is Future
         assert TOKEN_TO_PREDICATE["real"] is Real
         assert len(TOKEN_TO_PREDICATE) >= 26  # All domain predicates
+
+
+# ---------------------------------------------------------------------------
+# Wildcard Expansion
+# ---------------------------------------------------------------------------
+
+
+class TestWildcardExpansion:
+    def test_expand_wildcards_basic(self, kb):
+        """Wildcard task expands when given a scene layout with matching objects."""
+        task = kb.get_task("carrying_in_groceries-0")
+        assert "*" in task.definition
+
+        # electric_refrigerator.n.01 maps to categories: fridge, display_fridge, wine_fridge
+        # Provide a layout with 2 fridges in the kitchen
+        layout = {
+            "garage": {"car": 1, "floor": 1},
+            "kitchen": {"fridge": 2, "floor": 1},
+        }
+        task.compile(scene_layout=layout)
+
+        # The wildcard should have been expanded
+        assert "electric_refrigerator.n.01_*" not in task.object_scope
+        assert "electric_refrigerator.n.01_1" in task.object_scope
+        assert "electric_refrigerator.n.01_2" in task.object_scope
+
+    def test_expand_wildcards_no_layout(self, kb):
+        """Without scene_layout, wildcards stay as literal names."""
+        task = kb.get_task("carrying_in_groceries-0")
+        task.compile()  # No scene_layout
+
+        # The wildcard instance is kept as-is
+        assert "electric_refrigerator.n.01_*" in task.object_scope
+
+    def test_wildcard_expansion_count(self, kb):
+        """More objects in the scene means more expanded instances."""
+        task = kb.get_task("carrying_in_groceries-0")
+        # 4 total across fridge categories
+        layout = {
+            "garage": {"car": 1, "floor": 1},
+            "kitchen": {"fridge": 3, "display_fridge": 1, "floor": 1},
+        }
+        task.compile(scene_layout=layout)
+
+        # Should have 4 refrigerator instances (1 explicit + 3 from wildcard)
+        fridge_instances = [n for n in task.object_scope if "electric_refrigerator" in n]
+        assert len(fridge_instances) == 4
+
+    def test_wildcard_task_compiles_and_evaluates(self, kb):
+        """Expanded wildcard task can be evaluated with check_goal."""
+        task = kb.get_task("carrying_in_groceries-0")
+        layout = {
+            "garage": {"car": 1, "floor": 1},
+            "kitchen": {"fridge": 2, "floor": 1},
+        }
+        task.compile(scene_layout=layout)
+
+        ok, results = task.check_goal(lambda cls, *e: False)
+        assert isinstance(ok, bool)
+        assert "satisfied" in results and "unsatisfied" in results

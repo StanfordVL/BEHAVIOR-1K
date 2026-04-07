@@ -919,7 +919,7 @@ class Task:
 
     # ---------- Lazy compilation for runtime evaluation ----------
 
-    def _ensure_compiled(self, predefined_problem=None):
+    def _ensure_compiled(self, problem=None):
         """Lazily compile conditions from the stored definition."""
         if self._compiled:
             return
@@ -931,7 +931,7 @@ class Task:
             get_ground_goal_state_options,
         )
 
-        problem = predefined_problem or self.definition
+        problem = problem or self.definition
         activity_name, definition_id = self.name.rsplit("-", 1)
         self._conditions = Conditions(
             activity_name,
@@ -947,14 +947,24 @@ class Task:
         )
         self._compiled = True
 
-    def compile_with_problem(self, predefined_problem):
-        """Force (re-)compilation with a specific problem string.
+    def compile(self, scene_layout=None):
+        """Compile (or recompile) the task conditions.
 
-        Used by simulators that pre-process the BDDL (e.g. expanding wildcards)
-        before compilation.
+        If the task definition contains wildcards and a *scene_layout* is
+        provided, wildcards are expanded based on how many matching objects
+        exist in each room before compilation.
+
+        Args:
+            scene_layout: Optional dict mapping ``room_type -> {category: count}``.
+                If provided, wildcards are expanded. If None, the raw
+                definition is compiled as-is (wildcards become literal names).
         """
         self._compiled = False
-        self._ensure_compiled(predefined_problem=predefined_problem)
+        problem = self.definition
+        if scene_layout is not None and "*" in problem:
+            from bddl.wildcard import expand_wildcards
+            problem = expand_wildcards(problem, scene_layout, self.knowledgebase)
+        self._ensure_compiled(problem=problem)
 
     @property
     def object_scope(self):

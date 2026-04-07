@@ -25,7 +25,6 @@ from omnigibson.utils.bddl_utils import (
     BEHAVIOR_ACTIVITIES,
     BDDLSampler,
     KB,
-    get_processed_bddl,
     is_system_bddl_inst,
     og_categories_from_bddl_inst,
 )
@@ -218,7 +217,6 @@ class BehaviorTask(BaseTask):
             env=env,
             activity_name=self.activity_name,
             activity_definition_id=self.activity_definition_id,
-            predefined_problem=self.predefined_problem,
         )
 
         # Initialize the current activity
@@ -273,7 +271,34 @@ class BehaviorTask(BaseTask):
         # No non-low dim observations so we return an empty dict
         return dict()
 
-    def update_activity(self, env, activity_name, activity_definition_id, predefined_problem=None):
+    @staticmethod
+    def _build_scene_layout(scene):
+        """Build a scene layout dict for BDDL wildcard expansion.
+
+        Returns:
+            dict: Maps room_type -> {category: count}. For each room type,
+                reports the maximum number of objects per category across
+                all room instances of that type.
+        """
+        from collections import Counter
+
+        from omnigibson.scenes.traversable_scene import TraversableScene
+
+        if not isinstance(scene, TraversableScene):
+            return {}
+
+        layout = {}
+        for room_inst in scene.seg_map.room_ins_name_to_sem_name:
+            room_type = scene.seg_map.room_ins_name_to_sem_name[room_inst]
+            objs = scene.object_registry("in_rooms", room_inst) or set()
+            counts = Counter(obj.category for obj in objs)
+            if room_type not in layout:
+                layout[room_type] = {}
+            for cat, count in counts.items():
+                layout[room_type][cat] = max(layout[room_type].get(cat, 0), count)
+        return layout
+
+    def update_activity(self, env, activity_name, activity_definition_id):
         """
         Update the active Behavior activity being deployed
 
@@ -283,25 +308,15 @@ class BehaviorTask(BaseTask):
             activity_definition_id (int): Specification to load for the desired task. For a given Behavior Task, multiple task
                 specifications can be used (i.e.: differing goal conditions, or "ways" to complete a given task). This
                 ID determines which specification to use
-            predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
-                load. This will automatically override @activity_name and @activity_definition_id.
         """
-        # We parse the raw BDDL to be compatible with OmniGibson
-        # This requires converting wildcard-denoted synset instances into explicit synsets
-        # that are compatible with all valid scene objects in the current OG scene
-        if predefined_problem is None:
-            # Process the task
-            predefined_problem = get_processed_bddl(
-                activity_name,
-                activity_definition_id,
-                scene=env.scene,
-            )
-
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
         self.task = KB.get_task(f"{activity_name}-{activity_definition_id}")
-        self.task.compile_with_problem(predefined_problem)
+
+        # Build scene layout for wildcard expansion and compile
+        scene_layout = self._build_scene_layout(env.scene)
+        self.task.compile(scene_layout=scene_layout)
 
         # Get scope, making sure agent is the first entry
         self.object_scope = {"agent.n.01_1": None}
