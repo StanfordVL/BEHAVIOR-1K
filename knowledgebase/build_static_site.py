@@ -386,7 +386,7 @@ def write_file(rel_path: str, content: str | bytes):
 async def generate_site_async():
     """Generate the entire static site asynchronously."""
     # Setup
-    kb = KnowledgeBase(populate=True)
+    kb = KnowledgeBase(load_wordnet=True)
     register_routes()
     env = setup_jinja_env()
     pages_to_generate = collect_pages(kb)

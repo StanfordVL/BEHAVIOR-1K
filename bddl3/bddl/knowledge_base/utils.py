@@ -34,12 +34,19 @@ FILLABLE_PREDICATES = {"filled", "contains", "empty"}
 
 
 def canonicalize(s):
+    """Assert that a synset name is already in canonical WordNet form.
+
+    Raises AssertionError if the synset exists in WordNet but under a
+    different canonical name, indicating a data error in the BDDL files.
+    """
     from nltk.corpus import wordnet as wn
 
     try:
-        return wn.synset(s).name()
+        canonical = wn.synset(s).name()
     except Exception:
-        return s
+        return s  # Not in WordNet (custom synset) -- pass through
+    assert canonical == s, f"Synset '{s}' is not canonical (expected '{canonical}')"
+    return s
 
 
 def wn_synset_exists(synset):
