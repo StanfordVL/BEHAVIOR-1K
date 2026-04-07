@@ -8,10 +8,20 @@ ROBOT_CAMERA_NAMES = {
         "external": "external::external_camera",
         "wrist": "external::wrist_camera",
     },
+    "Franka": {
+        "external_1": "external::external_camera_1",
+        # "external_2": "external::external_camera_2",
+        "wrist": "robot::robot:camera_link:Camera:0",
+    },
     "R1Pro": {
-        "left_wrist": "robot_r1::robot_r1:left_realsense_link:Camera:0",
-        "right_wrist": "robot_r1::robot_r1:right_realsense_link:Camera:0",
-        "head": "robot_r1::robot_r1:zed_link:Camera:0",
+        "left_wrist": "robot::robot:left_realsense_link:Camera:0",
+        "right_wrist": "robot::robot:right_realsense_link:Camera:0",
+        "head": "robot::robot:zed_link:Camera:0",
+    },
+    "RealR1Pro": {
+        "left_wrist": "robot::robot:left_realsense_link:Camera:0",
+        "right_wrist": "robot::robot:right_realsense_link:Camera:0",
+        "head": "robot::robot:zed_link:Camera:0",
     },
 }
 
@@ -46,7 +56,23 @@ ACTION_QPOS_INDICES = {
             "gripper": np.s_[6:7],
         }
     ),
+    "Franka": OrderedDict(
+        {
+            "arm": np.s_[0:7],
+            "gripper": np.s_[7:8],
+        }
+    ),
     "R1Pro": OrderedDict(
+        {
+            "base": np.s_[0:3],
+            "torso": np.s_[3:7],
+            "left_arm": np.s_[7:14],
+            "left_gripper": np.s_[14:15],
+            "right_arm": np.s_[15:22],
+            "right_gripper": np.s_[22:23],
+        }
+    ),
+    "RealR1Pro": OrderedDict(
         {
             "base": np.s_[0:3],
             "torso": np.s_[3:7],
@@ -73,6 +99,22 @@ PROPRIOCEPTION_INDICES = {
             "grasp_0": np.s_[47:48],
             "gripper_0_qpos": np.s_[48:50],
             "gripper_0_qvel": np.s_[50:52],
+        }
+    ),
+    "Franka": OrderedDict(
+        {
+            "arm_0_qpos": np.s_[0:7],
+            "gripper_0_qpos": np.s_[7:9],
+            "arm_0_qvel": np.s_[9:16],
+            "gripper_0_qvel": np.s_[16:18],
+            "eef_0_pos": np.s_[18:21],
+            "eef_0_quat": np.s_[21:25],
+        }
+    ),
+    "RealR1Pro": OrderedDict(
+        {
+            "joint_qpos": np.s_[0:23],
+            "base_qvel": np.s_[23:26],
         }
     ),
     "R1Pro": OrderedDict(
@@ -130,7 +172,22 @@ PROPRIO_QPOS_INDICES = {
             "gripper": np.s_[6:8],
         }
     ),
+    "Franka": OrderedDict(
+        {
+            "arm": np.s_[0:7],
+            "gripper": np.s_[22:24],
+        }
+    ),
     "R1Pro": OrderedDict(
+        {
+            "torso": np.s_[6:10],
+            "left_arm": np.s_[10:24:2],
+            "right_arm": np.s_[11:24:2],
+            "left_gripper": np.s_[24:26],
+            "right_gripper": np.s_[26:28],
+        }
+    ),
+    "RealR1Pro": OrderedDict(
         {
             "torso": np.s_[6:10],
             "left_arm": np.s_[10:24:2],
@@ -152,6 +209,23 @@ JOINT_RANGE = {
         "gripper": (th.tensor([0.00], dtype=th.float32), th.tensor([0.03], dtype=th.float32)),
     },
     "R1Pro": {
+        "base": (th.tensor([-0.75, -0.75, -1.0], dtype=th.float32), th.tensor([0.75, 0.75, 1.0], dtype=th.float32)),
+        "torso": (
+            th.tensor([-1.1345, -2.7925, -1.8326, -3.0543], dtype=th.float32),
+            th.tensor([1.8326, 2.5307, 1.5708, 3.0543], dtype=th.float32),
+        ),
+        "left_arm": (
+            th.tensor([-4.4506, -0.1745, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=th.float32),
+            th.tensor([1.3090, 3.1416, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=th.float32),
+        ),
+        "left_gripper": (th.tensor([0.00], dtype=th.float32), th.tensor([0.05], dtype=th.float32)),
+        "right_arm": (
+            th.tensor([-4.4506, -3.1416, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=th.float32),
+            th.tensor([1.3090, 0.1745, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=th.float32),
+        ),
+        "right_gripper": (th.tensor([0.00], dtype=th.float32), th.tensor([0.05], dtype=th.float32)),
+    },
+    "RealR1Pro": {
         "base": (th.tensor([-0.75, -0.75, -1.0], dtype=th.float32), th.tensor([0.75, 0.75, 1.0], dtype=th.float32)),
         "torso": (
             th.tensor([-1.1345, -2.7925, -1.8326, -3.0543], dtype=th.float32),

@@ -31,6 +31,8 @@ m.DEFAULT_ATTACHED_OBJECT_SCALE = 0.8
 class CuRoboEmbodimentSelection(str, Enum):
     BASE = "base"
     ARM = "arm"
+    ARM_NO_TORSO = "arm_no_torso"
+    RIGHT_ARM = "right_arm"
     DEFAULT = "default"
 
 
@@ -130,11 +132,11 @@ class CuRoboMotionGenerator:
                 robot_cfg_path_dict = {
                     CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
                 }
-            elif robot.model == "r1pro":
-                print("Detected you are using R1Pro with cuda architecture 12.0 GPU: excluding DEFAULT embodiment.")
-                robot_cfg_path_dict = {
-                    k: v for k, v in robot_cfg_path_dict.items() if k != CuRoboEmbodimentSelection.DEFAULT
-                }
+            # elif robot.model == "r1pro":
+            #     print("Detected you are using R1Pro with cuda architecture 12.0 GPU: excluding DEFAULT embodiment.")
+            #     robot_cfg_path_dict = {
+            #         k: v for k, v in robot_cfg_path_dict.items() if k != CuRoboEmbodimentSelection.DEFAULT
+            #     }
         print("!" * 100)
         robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
 
@@ -216,23 +218,23 @@ class CuRoboMotionGenerator:
             )
             self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
 
-        for mg in self.mg.values():
-            mg.warmup(
-                enable_graph=False,
-                warmup_js_trajopt=False,
-                batch=batch_size,
-                warmup_joint_delta=0.0,
-            )
+        # for mg in self.mg.values():
+        #     mg.warmup(
+        #         enable_graph=False,
+        #         warmup_js_trajopt=False,
+        #         batch=batch_size,
+        #         warmup_joint_delta=0.0,
+        #     )
 
-            # Make sure all cuda graphs have been warmed up
-            for solver in [mg.ik_solver, mg.trajopt_solver, mg.finetune_trajopt_solver]:
-                if solver.solver.use_cuda_graph_metrics:
-                    assert solver.solver.safety_rollout._metrics_cuda_graph_init
-                    if isinstance(solver, lazy.curobo.wrap.reacher.trajopt.TrajOptSolver):
-                        assert solver.interpolate_rollout._metrics_cuda_graph_init
-                for opt in solver.solver.optimizers:
-                    if opt.use_cuda_graph:
-                        assert opt.cu_opt_init
+        #     # Make sure all cuda graphs have been warmed up
+        #     for solver in [mg.ik_solver, mg.trajopt_solver, mg.finetune_trajopt_solver]:
+        #         if solver.solver.use_cuda_graph_metrics:
+        #             assert solver.solver.safety_rollout._metrics_cuda_graph_init
+        #             if isinstance(solver, lazy.curobo.wrap.reacher.trajopt.TrajOptSolver):
+        #                 assert solver.interpolate_rollout._metrics_cuda_graph_init
+        #         for opt in solver.solver.optimizers:
+        #             if opt.use_cuda_graph:
+        #                 assert opt.cu_opt_init
 
     def update_joint_limits(self, robot_cfg_obj, emb_sel):
         joint_limits = robot_cfg_obj.kinematics.kinematics_config.joint_limits
