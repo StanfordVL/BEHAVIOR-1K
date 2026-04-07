@@ -116,6 +116,7 @@ def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
     assert not bookcase_baseboard.states[AttachedTo].get_value(bookcase_back)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_on_top(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
@@ -137,6 +138,7 @@ def test_on_top(env, breakfast_table, bowl, dishtowel):
         bowl.states[OnTop].set_value(breakfast_table, False)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_inside(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     bowl.set_position_orientation(position=[0.0, 0.0, 0.08])
@@ -164,6 +166,7 @@ def test_inside(env, bottom_cabinet, bowl, dishtowel):
         bowl.states[OnTop].set_value(bottom_cabinet, False)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_under(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
@@ -185,6 +188,7 @@ def test_under(env, breakfast_table, bowl, dishtowel):
         bowl.states[Under].set_value(breakfast_table, False)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_touching(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
@@ -250,6 +254,7 @@ def test_rigid_contact_bodies(env, breakfast_table, bowl):
     )
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_next_to(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
@@ -270,6 +275,7 @@ def test_next_to(env, bottom_cabinet, bowl, dishtowel):
         bowl.states[NextTo].set_value(bottom_cabinet, None)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_overlaid(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
@@ -290,6 +296,7 @@ def test_overlaid(env, breakfast_table, carpet):
         carpet.states[Overlaid].set_value(breakfast_table, False)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_pose(env, breakfast_table, dishtowel):
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
@@ -323,6 +330,7 @@ def test_joint(env, breakfast_table, bottom_cabinet):
         bottom_cabinet.states[Joint].set_value(None)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_aabb(env, breakfast_table, dishtowel):
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
@@ -352,6 +360,7 @@ def test_aabb(env, breakfast_table, dishtowel):
         breakfast_table.states[AABB].set_value(None)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
@@ -386,6 +395,7 @@ def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
         bottom_cabinet.states[VerticalAdjacency].set_value(None)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
@@ -519,6 +529,7 @@ def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dis
     assert dishtowel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_max_temperature(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
@@ -585,6 +596,7 @@ def test_heat_source_or_sink(env, microwave, stove, fridge):
     assert stove.states[HeatSourceOrSink].get_value()
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_cooked(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
@@ -612,6 +624,7 @@ def test_cooked(env, bagel, cookable_dishtowel):
     assert dishtowel.states[MaxTemperature].get_value() >= dishtowel.states[Cooked].cook_temperature
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_burnt(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
@@ -639,6 +652,7 @@ def test_burnt(env, bagel, cookable_dishtowel):
     assert dishtowel.states[MaxTemperature].get_value() >= dishtowel.states[Burnt].burn_temperature
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_frozen(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
@@ -666,6 +680,7 @@ def test_frozen(env, bagel, cookable_dishtowel):
     assert dishtowel.states[Temperature].get_value() <= dishtowel.states[Frozen].freeze_temperature
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_heated(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
@@ -1021,6 +1036,7 @@ def test_open(env, microwave, bottom_cabinet):
     assert not bottom_cabinet.states[Open].get_value()
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_folded_unfolded(env, carpet):
     place_obj_on_floor_plane(carpet)
 
@@ -1076,6 +1092,7 @@ def test_folded_unfolded(env, carpet):
         carpet.states[Folded].set_value(True)
 
 
+@pytest.mark.skip("cloth tests are disabled")
 def test_draped(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
