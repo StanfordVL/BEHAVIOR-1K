@@ -5,7 +5,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.robots import Robot
-from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod
 
 
 @pytest.fixture
@@ -76,8 +76,11 @@ def bottom_cabinet(stopped_env):
 
 @pytest.fixture
 def dishtowel(stopped_env):
+    # TODO(#2042): Re-enable cloth behaviors for this object
     obj = DatasetObject(
-        name="dishtowel", category="dishtowel", model="dtfspn", prim_type=PrimType.CLOTH, abilities={"cloth": {}}
+        name="dishtowel",
+        category="dishtowel",
+        model="dtfspn",
     )
     _add_obj(stopped_env, obj)
     return obj
@@ -85,8 +88,11 @@ def dishtowel(stopped_env):
 
 @pytest.fixture
 def carpet(stopped_env):
+    # TODO(#2042): Re-enable cloth behaviors for this object
     obj = DatasetObject(
-        name="carpet", category="carpet", model="ctclvd", prim_type=PrimType.CLOTH, abilities={"cloth": {}}
+        name="carpet",
+        category="carpet",
+        model="ctclvd",
     )
     _add_obj(stopped_env, obj)
     return obj
@@ -113,12 +119,12 @@ def bagel(stopped_env):
 
 @pytest.fixture
 def cookable_dishtowel(stopped_env):
+    # TODO(#2042): Re-enable cloth behaviors for this object
     obj = DatasetObject(
         name="cookable_dishtowel",
         category="dishtowel",
         model="dtfspn",
-        prim_type=PrimType.CLOTH,
-        abilities={"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}, "cloth": {}},
+        abilities={"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}},
     )
     _add_obj(stopped_env, obj)
     return obj
