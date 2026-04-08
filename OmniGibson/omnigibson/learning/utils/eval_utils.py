@@ -271,7 +271,6 @@ def generate_basic_environment_config(task_name, task_cfg):
             "activity_name": task_name,
             "activity_definition_id": 0,
             "activity_instance_id": 0,
-            "predefined_problem": None,
             "online_object_sampling": False,
             "debug_object_sampling": False,
             "highlight_task_relevant_objects": False,

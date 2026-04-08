@@ -47,8 +47,6 @@ class BehaviorTask(BaseTask):
             ID determines which specification to use
         activity_instance_id (int): Specific pre-configured instance of a scene to load for this BehaviorTask. This
             will be used only if @online_object_sampling is False.
-        predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
-            load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
         use_presampled_robot_pose (bool): Whether to use presampled robot poses from scene metadata
         randomize_presampled_pose (bool): If True, randomly selects from available presampled poses. If False, always
@@ -78,7 +76,6 @@ class BehaviorTask(BaseTask):
         activity_name=None,
         activity_definition_id=0,
         activity_instance_id=0,
-        predefined_problem=None,
         online_object_sampling=False,
         use_presampled_robot_pose=True,
         randomize_presampled_pose=False,
@@ -92,15 +89,8 @@ class BehaviorTask(BaseTask):
         # Make sure object states are enabled
         assert gm.ENABLE_OBJECT_STATES, "Must set gm.ENABLE_OBJECT_STATES=True in order to use BehaviorTask!"
 
-        # Make sure task name is valid if not specifying a predefined problem
-        if predefined_problem is None:
-            assert (
-                activity_name is not None
-            ), "Activity name must be specified if no predefined_problem is specified for BehaviorTask!"
-            assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
-        else:
-            # Infer activity name
-            activity_name = predefined_problem.split("problem ")[-1].split("-")[0]
+        assert activity_name is not None, "Activity name must be specified for BehaviorTask!"
+        assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
 
         # Make sure to not use presampled robot pose if we're using online object sampling
         assert not (
@@ -111,7 +101,6 @@ class BehaviorTask(BaseTask):
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
         self.activity_instance_id = activity_instance_id
-        self.predefined_problem = predefined_problem
         self.compiled_task = None
         self.activity_initial_conditions = None
         self.activity_goal_conditions = None
@@ -168,11 +157,7 @@ class BehaviorTask(BaseTask):
 
         # Possibly modify the scene to load if we're using online_object_sampling
         scene_instance, scene_file = scene_cfg["scene_instance"], scene_cfg["scene_file"]
-        activity_name = (
-            task_cfg["predefined_problem"].split("problem ")[-1].split("-")[0]
-            if task_cfg.get("predefined_problem", None) is not None
-            else task_cfg["activity_name"]
-        )
+        activity_name = task_cfg["activity_name"]
         if scene_file is None and scene_instance is None and not task_cfg["online_object_sampling"]:
             scene_instance = cls.get_cached_activity_scene_filename(
                 scene_model=scene_cfg.get("scene_model", "Scene"),
