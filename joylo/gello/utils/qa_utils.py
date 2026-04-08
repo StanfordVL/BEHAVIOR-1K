@@ -726,7 +726,7 @@ class HeadCameraUprightMetric(MetricBase):
             step_metrics[f"robot{i}::head_link_y_ori"] = T.quat2euler(ori)[1]
             base_pos, base_ori = robot.get_position_orientation()
             step_metrics[f"robot{i}::base_pos_x"] = base_pos[0]
-            step_metrics[f"robot{i}::base_pos_y"] = base_ori[1]
+            step_metrics[f"robot{i}::base_pos_y"] = base_pos[1]
             step_metrics[f"robot{i}::base_ori_yaw"] = T.quat2euler(base_ori)[2]
 
         return step_metrics

@@ -464,5 +464,5 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
         last_step = self.current_traj_history[-1]
         assert (
             "obs" in last_step
-        ), "Expected 'obs' key in last step of trajectory history to keep for next segment, but got: {last_step.keys()}"
+        ), f"Expected 'obs' key in last step of trajectory history to keep for next segment, but got: {last_step.keys()}"
         self.current_traj_history = [{"obs": last_step["obs"]}]

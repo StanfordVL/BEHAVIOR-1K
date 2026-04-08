@@ -636,7 +636,7 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             flush_every_n_traj (int): How often to flush (write) current data to file across episodes
-            flushs_every_n_steps (int): How often to flush (write) current data to file within an episode.
+            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
                 This is useful when collecting very long trajectories that may have a large memory footprint before writing to disk.
                 If this is greater than 0, flush_every_n_traj must be set to 1.
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,

@@ -45,7 +45,7 @@ class MetricsWrapper(EnvironmentWrapper):
         """
         self.metrics.pop(name)
 
-    def reset(self) -> None:
+    def reset(self):
         # Call super first
         ret = super().reset()
 

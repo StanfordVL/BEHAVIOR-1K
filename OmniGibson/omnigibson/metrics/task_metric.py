@@ -53,18 +53,3 @@ class TaskMetric(MetricBase):
                 "normalized_time": self.human_stats["steps"] / timesteps if timesteps > 0 else float("inf"),
             },
         }
-
-    def gather_results(self):
-        # Use internal state directly when called without env (e.g., from eval)
-        if hasattr(self, "timesteps"):
-            return {
-                "q_score": {"final": getattr(self, "final_q_score", 0.0)},
-                "time": {
-                    "simulator_steps": self.timesteps,
-                    "simulator_time": self.timesteps * self.render_timestep,
-                    "normalized_time": self.human_stats["steps"] / self.timesteps
-                    if self.timesteps > 0
-                    else float("inf"),
-                },
-            }
-        return dict()

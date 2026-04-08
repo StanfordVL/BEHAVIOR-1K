@@ -64,9 +64,3 @@ class AgentMetric(MetricBase):
             }
         )
         return results
-
-    def gather_results(self):
-        # Use internal state directly when called without env (e.g., from eval)
-        if hasattr(self, "delta_agent_distance"):
-            return self._compute_episode_metrics(None, dict())
-        return dict()

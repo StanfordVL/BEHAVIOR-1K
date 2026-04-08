@@ -591,7 +591,7 @@ class DataPlaybackWrapper(DataWrapper):
                 robot.control_enabled = False
                 # Set all controllers to effort mode with zero gain, this keeps the robot still
                 for controller in robot.controllers.values():
-                    for i, dof in enumerate(ControllerView.get_dof_idx(controller[0])):
+                    for i, dof in enumerate(ControllerView.get_dof_idx(controller[0]).tolist()):
                         dof_joint = robot.joints[robot.dof_names_ordered[dof]]
                         dof_joint.set_control_type(
                             control_type=ControlType.EFFORT,

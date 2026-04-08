@@ -258,11 +258,18 @@ that it falls back to pickle for object arrays.
 """
 
 
-def pack_array(obj):
-    if (isinstance(obj, (np.ndarray, np.generic))) and obj.dtype.kind in ("V", "O", "c"):
-        raise ValueError(f"Unsupported dtype: {obj.dtype}")
+def pack_data(obj):
+    if isinstance(obj, th.Tensor):
+        return {
+            b"__torch__": True,
+            b"data": obj.detach().cpu().numpy().tobytes(),
+            b"dtype": obj.dtype.name,
+            b"shape": tuple(obj.shape),
+        }
 
     if isinstance(obj, np.ndarray):
+        if obj.dtype.kind in ("V", "O", "c"):
+            raise ValueError(f"Unsupported dtype: {obj.dtype}")
         return {
             b"__ndarray__": True,
             b"data": obj.tobytes(),
@@ -280,23 +287,10 @@ def pack_array(obj):
     return obj
 
 
-def pack_tensor(obj):
-    if isinstance(obj, th.Tensor):
-        return {
-            b"__torch__": True,
-            b"data": obj.detach().cpu().numpy().tobytes(),
-            b"dtype": obj.dtype.name,
-            b"shape": tuple(obj.shape),
-        }
-    return obj
+def unpack_data(obj):
+    if b"__torch__" in obj:
+        return th.tensor(np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"]), shape=obj[b"shape"]))
 
-
-def pack_obj(obj):
-    obj = pack_tensor(obj)
-    return pack_array(obj)
-
-
-def unpack_array(obj):
     if b"__ndarray__" in obj:
         return np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"]), shape=obj[b"shape"])
 
@@ -306,19 +300,8 @@ def unpack_array(obj):
     return obj
 
 
-def unpack_tensor(obj):
-    if b"__torch__" in obj:
-        return th.tensor(np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"].decode()), shape=obj[b"shape"]))
-    return obj
+Packer = functools.partial(msgpack.Packer, default=pack_data)
+packb = functools.partial(msgpack.packb, default=pack_data)
 
-
-def unpack_obj(obj):
-    obj = unpack_tensor(obj)
-    return unpack_array(obj)
-
-
-Packer = functools.partial(msgpack.Packer, default=pack_obj)
-packb = functools.partial(msgpack.packb, default=pack_obj)
-
-Unpacker = functools.partial(msgpack.Unpacker, object_hook=unpack_obj)
-unpackb = functools.partial(msgpack.unpackb, object_hook=unpack_obj)
+Unpacker = functools.partial(msgpack.Unpacker, object_hook=unpack_data)
+unpackb = functools.partial(msgpack.unpackb, object_hook=unpack_data)

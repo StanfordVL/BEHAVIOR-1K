@@ -12,18 +12,17 @@ import torch as th
 import traceback
 from av.container import Container
 from av.stream import Stream
-from gello.robots.sim_robot.og_teleop_utils import (
+from gello.utils.og_teleop_utils import (
     augment_rooms,
     load_available_tasks,
     generate_robot_config,
     get_task_relevant_room_types,
 )
-from gello.robots.sim_robot.og_teleop_cfg import DISABLED_TRANSITION_RULES
+from gello.utils.og_teleop_cfg import DISABLED_TRANSITION_RULES
 from hydra.utils import instantiate
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
-from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
     ROBOT_CAMERA_NAMES,
     PROPRIOCEPTION_INDICES,
@@ -386,7 +385,6 @@ class Evaluator:
 
 
 if __name__ == "__main__":
-    register_omegaconf_resolvers()
     # open yaml from task path
     with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda: 0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
@@ -485,7 +483,7 @@ if __name__ == "__main__":
                 logger.info(f"Total success trials: {evaluator.n_success_trials}")
                 # gather metric results and write to file
                 for metric in evaluator.metrics:
-                    metrics.update(metric.gather_results())
+                    metrics.update(metric._compute_episode_metrics())
                 with open(metrics_path / f"{config.task.name}_{idx}_{epi}.json", "w") as f:
                     json.dump(metrics, f)
                 # reset video writer
