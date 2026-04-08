@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
@@ -9,29 +10,23 @@ class AABB(TensorizedValueState):
     """
     Axis-aligned bounding box state, computed in bulk across all objects and scenes.
 
-    For rigid objects, boundary points are pre-scaled into link-local homogeneous coords
-    (P_obj, V_max, 4) and transformed each step via batched pose matrices from RigidBodyViewAPI.
-    Cloth objects fall back to per-object EntityPrim.aabb.
+    For rigid objects, batched AABB computation is delegated to RigidBodyViewAPI.get_aabb(),
+    which uses pre-stored LOCAL_POINTS and _POSE_MATRICES. Cloth objects fall back to
+    per-object EntityPrim.aabb.
 
     VALUES shape: (S, O, 6) — [lo_x, lo_y, lo_z, hi_x, hi_y, hi_z]
     """
 
-    # (P_obj, V_max, 4) — padded homogeneous local boundary points (local * link.scale, w=1)
-    LOCAL_POINTS = None
-
-    # (P_obj, V_max) bool — True for valid (non-padded) point slots
-    POINTS_MASK = None
-
-    # (P_obj,) int64 — O index (object index) for each rigid link
-    PRIM_TO_OBJ_IDX = None
-
-    # (P_obj,) int64 — P index into RigidBodyViewAPI for each rigid link
+    # (N_links_aabb_tracked,) int64 — flat index into RigidBodyViewAPI._POSE_MATRICES / LOCAL_POINTS
     PRIM_BODY_IDX = None
+
+    # (N_links_aabb_tracked,) int64 — pre-computed s*O + obj_idx for scatter in get_aabb()
+    LINK_IDX = None
 
     # list[int] — O indices of cloth objects (per-object fallback)
     CLOTH_OBJ_IDXS = None
 
-    # (S, O, 3) scratch buffers — allocated in initialize_view(), reused each step
+    # (S*O, 3) scratch buffers — pre-allocated in initialize_view(), reused each step via fill_()
     _AABB_LO = None
     _AABB_HI = None
 
@@ -55,57 +50,39 @@ class AABB(TensorizedValueState):
         O = len(cls.OBJ_IDXS)
 
         if S == 0 or O == 0:
-            cls.LOCAL_POINTS = th.zeros((0, 0, 4))
-            cls.POINTS_MASK = th.zeros((0, 0), dtype=th.bool)
-            cls.PRIM_TO_OBJ_IDX = th.zeros((0,), dtype=th.long)
             cls.PRIM_BODY_IDX = th.zeros((0,), dtype=th.long)
+            cls.LINK_IDX = th.zeros((0,), dtype=th.long)
             cls.CLOTH_OBJ_IDXS = []
-            cls._AABB_LO = th.full((S, O, 3), float("inf"))
-            cls._AABB_HI = th.full((S, O, 3), float("-inf"))
+            cls._AABB_LO = th.zeros((0, 3))
+            cls._AABB_HI = th.zeros((0, 3))
             return
 
-        all_local_points = []  # list of (V_i, 4) per rigid link
-        prim_to_obj = []  # O index for each rigid link
-        prim_body_idx = []  # P index into RigidBodyViewAPI for each rigid link
+        prim_body_idx = []
+        link_idx = []
 
-        # Iterate over all rigid links (dynamic + kinematic) provided by RigidBodyViewAPI.
-        # Kinematic-only objects (including those without physics:RigidBodyAPI) are now covered
-        # by RigidBodyViewAPI's extended _POSE_MATRICES, so they go through the same batched path.
-        for link, link_idx in RigidBodyViewAPI.get_links_with_indices():
-            obj_path = link.relative_prim_path.rsplit("/", 1)[0]
-            obj_idx = cls.OBJ_IDXS.get(obj_path)
-            if obj_idx is None:
-                continue  # not tracked by AABB (robots, etc.)
-            local_pts = link.collision_boundary_points_local  # (V_i, 3) or None
-            if local_pts is None:
-                continue
-            world_scale = link.get_world_scale()  # (3,) — full world-accumulated scale
-            scaled_pts = local_pts * world_scale
-            homog = th.cat([scaled_pts, th.ones(len(scaled_pts), 1)], dim=1)  # (V_i, 4)
-            all_local_points.append(homog)
-            prim_to_obj.append(obj_idx)
-            prim_body_idx.append(link_idx)
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            for obj in scene.objects:
+                obj_i = cls.OBJ_IDXS.get(obj.relative_prim_path)
+                if obj_i is None:
+                    continue  # not tracked by AABB (robots, etc.)
+                for link in obj.links.values():
+                    flat_idx = RigidBodyViewAPI.get_flat_idx(link.prim_path)
+                    if flat_idx is None:
+                        continue  # articulated/cloth link not in RigidBodyViewAPI
+                    if not RigidBodyViewAPI.POINTS_MASK[flat_idx].any():
+                        continue  # no collision geometry for this link
+                    prim_body_idx.append(flat_idx)
+                    link_idx.append(scene_idx * O + obj_i)
 
-        # Cloth fallback: obj_idxs not covered by any rigid link
-        covered = set(prim_to_obj)
-        cls.CLOTH_OBJ_IDXS = [i for i in range(O) if i not in covered]
+        covered_obj_idxs = {li % O for li in link_idx}
+        cls.CLOTH_OBJ_IDXS = [i for i in range(O) if i not in covered_obj_idxs]
 
-        P_obj = len(all_local_points)
-        V_max = max(p.shape[0] for p in all_local_points) if P_obj > 0 else 0
-
-        cls.LOCAL_POINTS = th.zeros((P_obj, V_max, 4))
-        cls.POINTS_MASK = th.zeros((P_obj, V_max), dtype=th.bool)
-        for i, pts in enumerate(all_local_points):
-            V_i = pts.shape[0]
-            cls.LOCAL_POINTS[i, :V_i] = pts
-            cls.POINTS_MASK[i, :V_i] = True
-
-        cls.PRIM_TO_OBJ_IDX = th.tensor(prim_to_obj, dtype=th.long)
         cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long)
+        cls.LINK_IDX = th.tensor(link_idx, dtype=th.long)
 
-        # Allocate scratch buffers — reused each step, never recreated
-        cls._AABB_LO = th.full((S, O, 3), float("inf"))
-        cls._AABB_HI = th.full((S, O, 3), float("-inf"))
+        # Pre-allocated scratch buffers — reused each step via fill_(), never recreated
+        cls._AABB_LO = th.full((S * O, 3), float("inf"))
+        cls._AABB_HI = th.full((S * O, 3), float("-inf"))
 
         # Initialize new VALUE slots for objects that just appeared
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -117,49 +94,27 @@ class AABB(TensorizedValueState):
     @classmethod
     def _update_values(cls, values):
         S = values.shape[0]
-        P_obj = cls.PRIM_BODY_IDX.shape[0] if cls.PRIM_BODY_IDX is not None else 0
+        O = values.shape[1]
 
-        if P_obj > 0:
-            # 1. Gather pose matrices for object rigid links only
-            poses = RigidBodyViewAPI.get_pose_matrices()[:, cls.PRIM_BODY_IDX]  # (S, P_obj, 4, 4)
+        cls._AABB_LO.fill_(float("inf"))
+        cls._AABB_HI.fill_(float("-inf"))
 
-            # 2. Transform local points to world frame
-            #    einsum 'spij,pvj->spvi': M[s,p] @ pts[p,v] for each (s,p,v)
-            #    poses: (S, P_obj, 4, 4),  LOCAL_POINTS: (P_obj, V_max, 4)
-            world_pts = th.einsum("spij,pvj->spvi", poses, cls.LOCAL_POINTS)  # (S, P_obj, V_max, 4)
-            world_pts = world_pts[..., :3]  # (S, P_obj, V_max, 3)
+        # Batched AABB for all rigid links (physx_tracked + physx_untracked kinematic)
+        if cls.PRIM_BODY_IDX is not None and cls.PRIM_BODY_IDX.numel() > 0:
+            RigidBodyViewAPI.get_aabb(cls.PRIM_BODY_IDX, cls.LINK_IDX, cls._AABB_LO, cls._AABB_HI)
 
-            # 3. Mask padding slots (invalid points get ±inf so min/max ignores them)
-            mask = cls.POINTS_MASK.unsqueeze(0).expand(S, -1, -1)  # (S, P_obj, V_max)
-            world_pts_min = world_pts.clone()
-            world_pts_max = world_pts.clone()
-            world_pts_min[~mask] = float("inf")
-            world_pts_max[~mask] = float("-inf")
-
-            # 4. Per-prim min/max over V_max dim
-            min_p = world_pts_min.min(dim=2).values  # (S, P_obj, 3)
-            max_p = world_pts_max.max(dim=2).values  # (S, P_obj, 3)
-
-            # 5. Scatter per-prim min/max into per-object AABB using pre-allocated scratch buffers
-            #    Each rigid link maps to exactly one object; scatter_reduce_ aggregates across links
-            idx = cls.PRIM_TO_OBJ_IDX.view(1, -1, 1).expand(S, -1, 3)  # (S, P_obj, 3)
-            cls._AABB_LO.fill_(float("inf"))
-            cls._AABB_HI.fill_(float("-inf"))
-            cls._AABB_LO.scatter_reduce_(1, idx, min_p, reduce="amin", include_self=True)
-            cls._AABB_HI.scatter_reduce_(1, idx, max_p, reduce="amax", include_self=True)
-
-        # 6. Cloth fallback — per-object, uses existing obj.aabb
+        # Cloth fallback — per-object, uses existing obj.aabb
         for obj_idx in cls.CLOTH_OBJ_IDXS:
             for s_idx, s_row in enumerate(cls.IDX_OBJS):
                 obj = s_row[obj_idx]
                 if obj is not None:
                     lo, hi = obj.aabb
-                    cls._AABB_LO[s_idx, obj_idx] = lo
-                    cls._AABB_HI[s_idx, obj_idx] = hi
+                    cls._AABB_LO[s_idx * O + obj_idx] = lo
+                    cls._AABB_HI[s_idx * O + obj_idx] = hi
 
-        # 7. Write into values in-place — no new tensor allocation
-        values[..., :3] = cls._AABB_LO
-        values[..., 3:] = cls._AABB_HI
+        # Write into values in-place — two slice-writes, no th.cat, no new tensor
+        values[..., :3] = cls._AABB_LO.view(S, O, 3)
+        values[..., 3:] = cls._AABB_HI.view(S, O, 3)
         return values
 
     def _get_value(self):
