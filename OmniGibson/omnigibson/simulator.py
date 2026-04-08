@@ -1125,7 +1125,6 @@ def _launch_simulator(*args, **kwargs):
             self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
             if sync_usd:
                 self.psi.fetch_results()
-            self._sim_context._physx_fabric_interface.update(0, self.current_time)
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1288,7 +1287,7 @@ def _launch_simulator(*args, **kwargs):
 
             # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
             # step() may not step physics
-            if len(self._objects_to_initialize) > 0 or not PoseAPI.VALID:
+            if len(self._objects_to_initialize) > 0:
                 self.render()
 
             # Clear all scenes' updated objects
