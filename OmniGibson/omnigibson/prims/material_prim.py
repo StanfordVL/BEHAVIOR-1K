@@ -246,7 +246,7 @@ class MaterialPrim(BasePrim):
 
         # Generate shader reference
         self._shader = lazy.omni.usd.get_shader_from_material(self._prim)
-        self._shader_node = lazy.usd.mdl.RegistryUtils.GetShaderNodeForPrim(self._shader.GetPrim())
+        self._shader_node = lazy.omni.UsdMdl.RegistryUtils.GetShaderNodeForPrim(self._shader.GetPrim())
 
     def bind(self, target_prim_path):
         """

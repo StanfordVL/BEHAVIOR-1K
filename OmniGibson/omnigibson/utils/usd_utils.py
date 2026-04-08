@@ -100,6 +100,7 @@ def create_joint(
     joint_frame_in_child_frame_quat=None,
     break_force=None,
     break_torque=None,
+    stage=None,
 ):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
@@ -119,10 +120,12 @@ def create_joint(
         joint_frame_in_child_frame_quat (th.tensor or None): relative orientation of the joint frame to the child frame (body1).
         break_force (float or None): break force for linear dofs, unit is Newton.
         break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
+        stage (None or Usd.Stage): If specified, stage on which the joint should be created. If None, will use og.sim.stage
 
     Returns:
         Usd.Prim: Created joint prim
     """
+    current_stage = stage or og.sim.stage
     # Make sure we have valid joint_type
     assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
 
@@ -132,18 +135,18 @@ def create_joint(
     ), "At least either body0 or body1 must be specified when creating a joint!"
 
     # Create the joint
-    joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
+    joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(current_stage, prim_path)
 
     # Possibly add body0, body1 targets
     if body0 is not None:
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        assert current_stage.GetPrimAtPath(body0).IsValid(), f"Invalid body0 path specified: {body0}"
         joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
     if body1 is not None:
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        assert current_stage.GetPrimAtPath(body1).IsValid(), f"Invalid body1 path specified: {body1}"
         joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
 
     # Get the prim pointed to at this path
-    joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+    joint_prim = current_stage.GetPrimAtPath(prim_path)
 
     # Apply joint API interface
     lazy.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
@@ -151,7 +154,8 @@ def create_joint(
     # We need to step rendering once to auto-fill the local pose before overwriting it.
     # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
     # callback, e.g. when an attachment joint is being created due to contacts.
-    og.sim.render()
+    if stage is None:
+        og.sim.render()
 
     if joint_frame_in_parent_frame_pos is not None:
         joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos.tolist()))
@@ -178,9 +182,9 @@ def create_joint(
     joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
 
     # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
-    if og.sim.is_playing():
+    if stage is None and og.sim.is_playing():
         with suppress_omni_log(channels=["omni.physx.plugin"]):
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+            og.sim.refresh_physics()
 
     # Return this joint
     return joint_prim
@@ -249,6 +253,11 @@ class RigidContactAPIImpl:
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
+
+            # Add the (global) floor plane if there is one
+            if og.sim.floor_plane is not None:
+                filters[scene_idx].append(og.sim.floor_plane.prim_path + "/collisionPlane")
+
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
@@ -288,7 +297,7 @@ class RigidContactAPIImpl:
             return
 
         # Generate views, making sure to update simulation first so the physx backend is synchronized.
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        og.sim.refresh_physics()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
                 scene_body_filters = body_filters[scene_idx]
@@ -304,6 +313,10 @@ class RigidContactAPIImpl:
 
                             if isinstance(link, RigidDynamicPrim) and link.contact_reporting_enabled:
                                 scene_dynamic_body_filters.append(link.prim_path)
+
+                # If there are only kinematic/static bodies, skip view creation for this scene.
+                if len(scene_dynamic_body_filters) == 0:
+                    continue
 
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=f"/World/scene_{scene_idx}/*/*",
@@ -429,10 +442,6 @@ class RigidContactAPIImpl:
 
             # Append the data to the pending lists. Note that we have to clone these matrices because
             # the view actually reuses the buffer.
-            if scene_idx not in self._PENDING_IMPULSES:
-                self._PENDING_IMPULSES[scene_idx] = []
-                self._PENDING_TRANSFORMS[scene_idx] = []
-                self._PENDING_NET_FORCES[scene_idx] = []
             self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
             self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
             self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
@@ -578,9 +587,10 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths
+        # Otherwise, convert to prim paths, filtering out kinematic-only bodies that are not rows
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths])
+        row_map = self._PATH_TO_ROW_IDX.get(scene_idx, {})
+        return th.tensor([row_map[path] for path in prim_paths if path in row_map])
 
     def get_contact_col_indices(self, scene_idx, objects_links_or_prim_paths):
         """
@@ -672,6 +682,8 @@ class RigidContactAPIImpl:
 
         contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         rows = self.get_contact_row_indices(scene_idx, query_set)
+        if rows.numel() == 0:
+            return False
         if with_set is not None:
             cols = self.get_contact_col_indices(scene_idx, with_set)
             return th.any(contact_matrix[rows, :][:, cols]).item()
@@ -1010,14 +1022,18 @@ class PoseAPI:
             # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
+            # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
+            # check if this is still the case for later versions
+            og.sim.render()
+
             # when flatcache is on
-            if og.sim._physx_fabric_interface:
+            if og.sim._sim_context._physx_fabric_interface:
                 # no time step is taken here
-                og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+                og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
             # when flatcache is off
             else:
                 # no time step is taken here
-                og.sim.psi.fetch_results()
+                og.sim.refresh_physics(sync_usd=True)
             cls.mark_valid()
 
     @classmethod
@@ -2340,7 +2356,7 @@ def add_asset_to_stage(asset_path, prim_path):
     """
     # Make sure this is actually a supported asset type
     asset_type = asset_path.split(".")[-1]
-    assert asset_type in {"usd", "usda", "obj"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
+    assert asset_type in {"usd", "usda", "obj", "usdz"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"

@@ -3853,7 +3853,7 @@ class Robot(USDObject, GymObservable):
     @cached_property
     def trunk_link_names(self):
         assert self.is_articulated_trunk
-        if self._definition.is_articulated_trunk:
+        if self._definition.articulated_trunk:
             return self._definition.articulated_trunk.trunk_link_names
         return []
 

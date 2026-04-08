@@ -3,11 +3,21 @@ import colorsys
 import torch as th
 from PIL import Image, ImageDraw
 import omnigibson.utils.transform_utils as T
+import omnigibson.lazy as lazy
 
-try:
-    import accimage
-except ImportError:
-    accimage = None
+
+def add_semantic_label(prim, label, instance_name="class"):
+    """
+    Helper function to add semantic labels to a prim.
+    This upgrades the prim semantics to labels and adds the specified label.
+
+    Args:
+        prim: The prim to add labels to
+        label (str): The semantic label to add (will be converted to a list internally)
+        instance_name (str): The instance name for the label. Defaults to "class"
+    """
+    lazy.isaacsim.core.utils.semantics.upgrade_prim_semantics_to_labels(prim=prim)
+    lazy.isaacsim.core.utils.semantics.add_labels(prim=prim, labels=[label], instance_name=instance_name)
 
 
 class RandomScale:

@@ -311,7 +311,7 @@ def parse_task_mapping_new():
         task_name = task.name[:-2]
         scenes = []
         for scene, status in task.scene_matching_dict.items():
-            if status["matched_ready"]:
+            if status["matched"]:
                 scenes.append(scene.name)
         mapping[task_name] = scenes
     with open("task_mapping.json", "w") as f:
@@ -467,6 +467,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                     continue
             else:
                 if key == "ori":
+                    val = th.tensor(val) if not isinstance(val, th.Tensor) else val
+                    obj_val = th.tensor(obj_val) if not isinstance(obj_val, th.Tensor) else obj_val
                     # Grab the axis angle representation to compute magnitude difference
                     obj_val = th.norm(T.quat2axisangle(T.quat_distance(val, obj_val)))
                     val = 0.0

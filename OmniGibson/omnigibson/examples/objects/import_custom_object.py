@@ -18,6 +18,12 @@ from omnigibson.utils.asset_conversion_utils import (
 
 @click.command()
 @click.option(
+    "--dataset-name",
+    default="custom-assets",
+    type=click.STRING,
+    help="Name of the dataset to which the imported objects will be written. This is located at get_dataset_path(<DATASET_NAME>)",
+)
+@click.option(
     "--asset-path",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
@@ -48,7 +54,10 @@ from omnigibson.utils.asset_conversion_utils import (
 @click.option("--check_scale", is_flag=True, help="Check meshes scale based on heuristic")
 @click.option("--rescale", is_flag=True, help="Rescale meshes based on heuristic if check_scale ")
 @click.option("--overwrite", is_flag=True, help="Overwrite any pre-existing files")
+@click.option("--no_keep_instanceable", is_flag=True, help="Do not keep instanceable meshes if set")
+@click.option("--no_import_inertia", is_flag=True, help="Do not import native inertia tensor if set")
 def import_custom_object(
+    dataset_name: str,
     asset_path: str,
     category: str,
     model: str,
@@ -60,6 +69,8 @@ def import_custom_object(
     check_scale: bool,
     rescale: bool,
     overwrite: bool,
+    no_keep_instanceable: bool,
+    no_import_inertia: bool,
 ):
     """
     Imports a custom-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
@@ -104,12 +115,15 @@ def import_custom_object(
 
         # Convert to USD
         import_og_asset_from_urdf(
+            dataset_name=dataset_name,
             category=category,
             model=model,
             urdf_path=str(urdf_path),
             collision_method=collision_method,
             hull_count=hull_count,
             overwrite=overwrite,
+            keep_instanceable=not no_keep_instanceable,
+            import_inertia_tensor=not no_import_inertia,
             use_usda=False,
         )
 
@@ -122,6 +136,8 @@ def import_custom_object(
         click.echo("The asset has been successfully imported. You can view it and make changes and save if you'd like.")
         while True:
             og.sim.render()
+
+    og.shutdown()
 
 
 if __name__ == "__main__":

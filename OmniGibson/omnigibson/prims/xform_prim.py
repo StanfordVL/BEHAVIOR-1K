@@ -63,9 +63,14 @@ class XFormPrim(BasePrim):
         super()._post_load()
 
         # Make sure all xforms have pose and scaling info
-        # These only need to be done if we are creating this prim from scratch.
+        # These only need to be done if we are creating this prim from scratch AND it is not an instanceable / proxy prim.
         # Pre-created OG objects' prims always have these things set up ahead of time.
-        if not self._xform_props_pre_loaded:
+        # Note that if this is an instanceable prim, we also don't need write these properties
+        # TODO: This still breaks things downstream so we assert here to make sure we have backwards-compatibility with the expected prim types
+        assert (
+            not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy()
+        ), "Support for instanceable prims has not been implemented yet!"
+        if not self._xform_props_pre_loaded and not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy():
             self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
@@ -137,9 +142,7 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
-        if not gm.ENABLE_FLATCACHE:
-            # TODO: not sure why this is needed only in USD mode
-            PoseAPI.invalidate()
+        PoseAPI.invalidate()
         # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
@@ -436,6 +439,8 @@ class XFormPrim(BasePrim):
         else:
             scale = th.ones(3, dtype=th.float32) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        # Invalidate PoseAPI
+        PoseAPI.invalidate()
         # Invalidate the cached scale
         self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())

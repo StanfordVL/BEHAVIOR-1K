@@ -6,7 +6,7 @@ from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.backend_utils import _compute_backend as cb
 import omnigibson.utils.transform_utils as T
 from omnigibson.robots import LocomotionRobot
-from gello.robots.sim_robot.og_teleop_utils import GHOST_APPEAR_THRESHOLD
+from gello.utils.og_teleop_utils import GHOST_APPEAR_THRESHOLD
 import torch as th
 import numpy as np
 import operator

@@ -177,13 +177,13 @@ class InverseKinematicsController(JointController, ManipulationController):
             pos_damping_ratio=pos_damping_ratio,
             vel_kp=vel_kp,
             motor_type="position",
+            smoothing_filter_size=smoothing_filter_size,
             use_delta_commands=False,
             use_impedances=use_impedances,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
             isaac_kp=isaac_kp,
             isaac_kd=isaac_kd,
-            smoothing_filter_size=smoothing_filter_size,
         )
         # Reuse the limits already cached by the base class; adding a leading dim lets clip() broadcast over N
         self._q_lower = cb.view(self._clip_lo, (1, -1))
@@ -319,10 +319,6 @@ class InverseKinematicsController(JointController, ManipulationController):
             q_lower_limit=self._q_lower,  # (1, ctrl_dim) broadcasts over N via clip()
             q_upper_limit=self._q_upper,
         )  # (N, ctrl_dim)
-
-        # Apply smoothing filter if present
-        if self._control_filter is not None:
-            target_joint_pos_batch = self._control_filter.estimate_batch(target_joint_pos_batch)
 
         # Delegate to JointController.compute_control for impedance handling
         return super().compute_control(dict(target=target_joint_pos_batch))

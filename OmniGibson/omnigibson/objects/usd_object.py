@@ -36,7 +36,7 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, extract_class_init_kwargs_from_dict, get_uuid
-from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     add_asset_to_stage,
@@ -44,6 +44,7 @@ from omnigibson.utils.usd_utils import (
     count_joints,
     create_joint,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -227,6 +228,25 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         return usd_path
 
+    def _get_preapply_scale(self, default_prim):
+        """
+        Returns the scale tensor to use when computing kinematic_only inside _preapply_articulation_root.
+        Subclasses can override to derive scale from USD-side data (e.g. ig:nativeBB for dataset objects).
+
+        Args:
+            default_prim (Usd.Prim): The default prim of the side stage opened by _preapply_articulation_root.
+
+        Returns:
+            th.Tensor: 3-element float scale tensor.
+        """
+        raw_scale = self._load_config.get("scale", None)
+        if raw_scale is not None:
+            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
+            if scale.dim() == 0:
+                scale = scale.expand(3)
+            return scale.float()
+        return th.ones(3)
+
     def _preapply_articulation_root(self, usd_path):
         """
         Opens @usd_path with the pxr library, strips any existing ArticulationRootAPI, determines the correct prim to
@@ -241,14 +261,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
 
-        raw_scale = self._load_config.get("scale", None)
-        if raw_scale is not None:
-            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
-            if scale.dim() == 0:
-                scale = scale.expand(3)
-            scale = scale.float()
-        else:
-            scale = th.ones(3)
+        scale = self._get_preapply_scale(default_prim)
+        # Only persist scale to _load_config if the user already provided one, or if a non-trivial
+        # scale was derived (e.g. from bounding_box).  Avoid overwriting None with the default
+        # ones(3) so that PrimitiveObjects using radius/height/size are not affected.
+        if self._load_config.get("scale", None) is not None or not th.allclose(scale, th.ones_like(scale)):
+            self._load_config["scale"] = scale
 
         kinematic_only = compute_kinematic_only(
             self.fixed_base,
@@ -258,40 +276,55 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self._load_config.get("kinematic_only", None),
             has_attachment,
         )
+        self._load_config["kinematic_only"] = kinematic_only
+
+        # Find root link: the Xform child that is not body1 of any joint that also has a body0.
+        joint_children = set()
+        link_names = []
+        for prim in default_prim.GetChildren():
+            if prim.GetTypeName() != "Xform":
+                continue
+            link_names.append(prim.GetName())
+            for child in prim.GetChildren():
+                if "joint" not in child.GetTypeName().lower():
+                    continue
+                rels = {r.GetName(): r for r in child.GetRelationships()}
+                body0_rel = rels.get("physics:body0")
+                body1_rel = rels.get("physics:body1")
+                if body0_rel is None or body1_rel is None:
+                    continue
+                if len(body0_rel.GetTargets()) > 0 and len(body1_rel.GetTargets()) > 0:
+                    joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
+        valid_roots = list(set(link_names) - joint_children)
+        assert len(valid_roots) == 1, (
+            f"Exactly one root link should have been found for {default_prim.GetName()}, "
+            f"but found none/multiple instead: {valid_roots}"
+        )
+        root_link = default_prim.GetPrimAtPath(valid_roots[0])
+
+        if self.fixed_base and not kinematic_only:
+            create_joint(
+                prim_path=f"{default_prim.GetPath()}/rootJoint",
+                joint_type="FixedJoint",
+                body1=f"{root_link.GetPath()}",
+                stage=stage,
+            )
+            n_fixed_joints += 1
 
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
             if not self.fixed_base and n_joints > 0:
-                # Root link = the Xform child that is not body1 of any joint with a body0
-                joint_children = set()
-                link_names = []
-                for prim in default_prim.GetChildren():
-                    if prim.GetTypeName() != "Xform":
-                        continue
-                    link_names.append(prim.GetName())
-                    for child in prim.GetChildren():
-                        if "joint" not in child.GetTypeName().lower():
-                            continue
-                        rels = {r.GetName(): r for r in child.GetRelationships()}
-                        body0_rel = rels.get("physics:body0")
-                        body1_rel = rels.get("physics:body1")
-                        if body0_rel is None or body1_rel is None:
-                            continue
-                        if len(body0_rel.GetTargets()) > 0 and len(body1_rel.GetTargets()) > 0:
-                            joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
-                valid_roots = list(set(link_names) - joint_children)
-                assert len(valid_roots) == 1, (
-                    f"Exactly one root link should have been found for {default_prim.GetName()}, "
-                    f"but found none/multiple instead: {valid_roots}"
-                )
-                articulation_root_prim = default_prim.GetPrimAtPath(valid_roots[0])
+                articulation_root_prim = root_link
             else:
                 articulation_root_prim = default_prim
 
         if articulation_root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(articulation_root_prim)
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(articulation_root_prim)
+            articulation_root_prim.GetAttribute("physxArticulation:enabledSelfCollisions").Set(
+                bool(self._load_config.get("self_collisions", False))
+            )
 
         # Export to a temp file
         basename = os.path.basename(usd_path)
@@ -314,10 +347,13 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         assert prim.GetReferences().AddReference(usd_path)
 
     def _load(self):
-        usd_path = self._prepare_to_load()
-        return add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
+        return add_asset_to_stage(asset_path=self._prepared_usd_path, prim_path=self.prim_path)
 
     def load(self, scene):
+        # Always run _prepare_to_load (which calls _preapply_articulation_root) so that
+        # _load_config["kinematic_only"] and _load_config["scale"] are set correctly before
+        # _post_load runs, even when the prim already exists in the stage (e.g. from prebuild).
+        self._prepared_usd_path = self._prepare_to_load()
         prim = super().load(scene)
         log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
@@ -334,66 +370,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             state_instance.remove()
 
     def _post_load(self):
-        # Add fixed joint or make object kinematic only if we're fixing the base
-        kinematic_only = False
-        if self.fixed_base:
-            # For optimization purposes, if we only have a single rigid body that has either
-            # (no custom scaling OR no fixed joints), we assume this is not an articulated object so we
-            # merely set this to be a static collider, i.e.: kinematic-only
-            # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
-            # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
-            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
-            if (
-                # no articulated joints
-                self.n_joints == 0
-                # no fixed joints or scaling is [1, 1, 1] (TODO verify [1, 1, 1] is still needed)
-                and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
-                # users force the object to not have kinematic_only
-                and self._load_config["kinematic_only"] is not False  # if can be True or None
-                and not self.has_attachment_points
-            ):
-                kinematic_only = True
-
-        # Validate that we didn't make a kinematic-only decision that does not match
-        assert (
-            self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"]
-        ), f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
-
-        # Actually apply the kinematic-only decision
-        self._load_config["kinematic_only"] = kinematic_only
-
         # Run super first
         super()._post_load()
-
-        # If the object is fixed_base but kinematic only is false, create the joint
-        if self.fixed_base and not self.kinematic_only:
-            # Create fixed joint, and set Body0 to be this object's root prim
-            # This renders, which causes a material lookup error since we're creating a temp file, so we suppress
-            # the error explicitly here
-            with suppress_omni_log(channels=["omni.hydra"]):
-                create_joint(
-                    prim_path=f"{self.prim_path}/rootJoint",
-                    joint_type="FixedJoint",
-                    body1=f"{self.prim_path}/{self._root_link_name}",
-                )
-
-            # Delete n_fixed_joints cached property if it exists since the number of fixed joints has now changed
-            # See https://stackoverflow.com/questions/59899732/python-cached-property-how-to-delete and
-            # https://docs.python.org/3/library/functools.html#functools.cached_property
-            if "n_fixed_joints" in self.__dict__:
-                del self.n_fixed_joints
 
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
-
-        root_prim = (
-            None
-            if self.articulation_root_path is None
-            else lazy.isaacsim.core.utils.prims.get_prim_at_path(self.articulation_root_path)
-        )
-        if root_prim is not None:
-            self.self_collisions = self._load_config["self_collisions"]
 
         # Set position / velocity solver iterations if we're not cloth and not kinematic only
         if self._prim_type != PrimType.CLOTH and not self.kinematic_only:
@@ -415,11 +397,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 self._link_physics_materials[link_name] = physics_mat
 
         # Add semantics
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=self._prim,
-            semantic_label=self.category,
-            type_label="class",
-        )
+        add_semantic_label(prim=self._prim, label=self.category)
+
         # Prepare the object states
         self._states = {}
         self.prepare_object_states()
@@ -854,7 +833,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
     @cached_property
     def articulation_root_path(self):
         has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
-        if self.kinematic_only or ((not has_articulated_joints) and (not has_fixed_joints)):
+        if self.kinematic_only or (not has_articulated_joints and not has_fixed_joints):
             # Kinematic only, or non-jointed single body objects
             return None
         elif not self.fixed_base and has_articulated_joints:
