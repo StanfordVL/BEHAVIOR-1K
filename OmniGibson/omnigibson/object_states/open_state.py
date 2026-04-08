@@ -199,7 +199,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
             cls.THRESHOLDS_S2 = th.zeros((0, 0))
             cls.DIRECTIONS_S2 = th.zeros((0, 0))
             cls.BOTH_SIDES = th.zeros(0, dtype=th.bool)
-            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(0, dtype=th.long)
+            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(0, 0, dtype=th.long)
             return
 
         max_dof = ArticulatedObjectViewAPI.get_max_dof()
@@ -229,38 +229,43 @@ class Open(TensorizedValueState, BooleanStateMixin):
                         getattr(cls, threshold_attr)[obj_idx, dof_col] = threshold
                         getattr(cls, direction_attr)[obj_idx, dof_col] = 1.0 if open_end > threshold else -1.0
 
-        # Pre-build row indices into ArticulatedObjectViewAPI — built once, reused every step
-        sorted_rel_paths = [p for p, _ in sorted(cls.OBJ_IDXS.items(), key=lambda x: x[1])]
-        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = ArticulatedObjectViewAPI.build_position_rows(sorted_rel_paths)
+        # Pre-build (S, O) row index into ArticulatedObjectViewAPI._POSITIONS — built once, reused every step
+        S = len(cls.IDX_OBJS)
+        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(S, O, dtype=th.long)
+        for rel_path, obj_idx in cls.OBJ_IDXS.items():
+            for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
+                obj = scene_row[obj_idx]
+                if obj is not None and obj.articulation_root_path is not None:
+                    row = ArticulatedObjectViewAPI.get_view_row(obj.articulation_root_path)
+                    if row is not None:
+                        cls.OBJ_IDXES_IN_ARTICULATION_VIEW[scene_idx, obj_idx] = row
 
     @classmethod
     def _update_values(cls, values):
-        S = values.shape[0]
-        O = values.shape[1]
+        O = values.shape[1]  # number of objects in a scene
 
         if O == 0 or cls.OBJ_IDXES_IN_ARTICULATION_VIEW.numel() == 0:
             return values
 
-        # (S*O, max_dof) rows: [O0_S0..O0_S(S-1), O1_S0..O1_S(S-1), ...]
+        # (S, O, max_dof) — indexing _POSITIONS with (S, O) rows tensor
         pos = ArticulatedObjectViewAPI.get_articulation_positions(cls.OBJ_IDXES_IN_ARTICULATION_VIEW)
-        pos = pos.reshape(O, S, -1)  # (O, S, max_dof)
 
-        mask = cls.OPENABLE_MASK.unsqueeze(1)  # (O, 1, max_dof)
-        t1 = cls.THRESHOLDS_S1.unsqueeze(1)  # (O, 1, max_dof)
-        d1 = cls.DIRECTIONS_S1.unsqueeze(1)
-        t2 = cls.THRESHOLDS_S2.unsqueeze(1)
-        d2 = cls.DIRECTIONS_S2.unsqueeze(1)
+        mask = cls.OPENABLE_MASK.unsqueeze(0)  # (1, O, max_dof) — broadcast over S
+        t1 = cls.THRESHOLDS_S1.unsqueeze(0)
+        d1 = cls.DIRECTIONS_S1.unsqueeze(0)
+        t2 = cls.THRESHOLDS_S2.unsqueeze(0)
+        d2 = cls.DIRECTIONS_S2.unsqueeze(0)
 
-        open_s1 = ((pos - t1) * d1 > 0) & mask  # (O, S, max_dof)
-        any_s1 = open_s1.any(dim=2)  # (O, S)
+        open_s1 = ((pos - t1) * d1 > 0) & mask  # (S, O, max_dof)
+        any_s1 = open_s1.any(dim=2)  # (S, O)
 
         open_s2 = ((pos - t2) * d2 > 0) & mask
         any_s2 = open_s2.any(dim=2)
 
-        both = cls.BOTH_SIDES.unsqueeze(1)  # (O, 1)
-        is_open = th.where(both, any_s1 & any_s2, any_s1)  # (O, S)
+        both = cls.BOTH_SIDES.unsqueeze(0)  # (1, O)
+        is_open = th.where(both, any_s1 & any_s2, any_s1)  # (S, O)
 
-        values[:] = is_open.T.float()  # (S, O)
+        values[:] = is_open.float()  # (S, O) — no transpose needed
         return values
 
     def _get_value(self):

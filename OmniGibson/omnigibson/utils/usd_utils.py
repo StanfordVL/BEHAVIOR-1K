@@ -499,25 +499,20 @@ class ArticulatedObjectViewAPIImpl:
     """
     Batched DOF position cache for non-robot articulated objects across all scenes.
 
-    Creates one homogeneous ArticulationView per unique object type (relative_prim_path),
-    each covering all S scenes.  Results are packed into a pre-allocated
-    _POSITIONS slab of shape (S * O_views, max_dof) updated in-place every step.
+    Creates a single ArticulationView covering all non-robot articulated objects across all scenes
+    using the pattern "/World/scene_\\d+/articulated_.*" (objects are placed under articulated_<name>
+    by _preapply_articulation_root in usd_object.py).
 
     Data layout:
-        _VIEWS       list[ArticulationView]   one per unique non-robot articulated object type
-        _VIEW_IDXES  {relative_prim_path: int}
-        _DOFS        (O_views,) int64         DOF count per view
-        _POSITIONS   (S*O_views, max_dof)     row [i*S+s] = scene s, object type i; padded with 0
-        _OBJ_IDXES   (O_views, S) int64       _OBJ_IDXES[view_idx, scene_idx] = row in
-                                               view.get_dof_positions() for that scene
+        _VIEW        ArticulationView          single view for all non-robot articulated objects
+        _OBJ_TO_VIEW_IDX  {abs_art_root_path: int}  row index in _POSITIONS
+        _POSITIONS   (N_objects_all_scenes, max_dof)  one row per object per scene, PhysX row order
     """
 
     def __init__(self):
-        self._VIEWS = []
-        self._VIEW_IDXES = {}
-        self._DOFS = None
+        self._VIEW = None
+        self._OBJ_TO_VIEW_IDX = {}
         self._POSITIONS = None
-        self._OBJ_IDXES = None
 
     def initialize_view(self):
         self.clear()
@@ -527,76 +522,42 @@ class ArticulatedObjectViewAPIImpl:
 
         from omnigibson.robots import Robot
 
-        scene0_objs = [
+        articulation_objs = [
             obj
-            for obj in og.sim.scenes[0].objects
-            if not isinstance(obj, Robot) and obj.articulation_root_path is not None
+            for scene in og.sim.scenes
+            for obj in scene.objects
+            if obj.relative_prim_path.startswith("/articulated__") and not isinstance(obj, Robot)
         ]
-
-        if not scene0_objs:
+        if not articulation_objs:
             return
 
-        S = len(og.sim.scenes)
-        dofs_list = []
-
-        for obj in scene0_objs:
-            parts = obj.articulation_root_path.split("/")
-            parts[2] = "scene_*"
-            pattern = "/".join(parts)
-            view = og.sim.physics_sim_view.create_articulation_view(pattern)
-            view_idx = len(self._VIEWS)
-            self._VIEWS.append(view)
-            self._VIEW_IDXES[obj.relative_prim_path] = view_idx
-            dofs_list.append(len(view.dof_paths[0]))
-
-        O_views = len(self._VIEWS)
-        self._DOFS = th.tensor(dofs_list, dtype=th.long)
-        self._OBJ_IDXES = th.zeros(O_views, S, dtype=th.long)
-
-        for view_idx, view in enumerate(self._VIEWS):
-            for row_idx, abs_path in enumerate(view.prim_paths):
-                scene_idx = int(abs_path.split("/")[2].replace("scene_", ""))
-                self._OBJ_IDXES[view_idx, scene_idx] = row_idx
-
-        max_dof = int(self._DOFS.max())
-        self._POSITIONS = th.zeros(S * O_views, max_dof)
+        pattern = "/World/scene_*/articulated__*/*"
+        self._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
+        self._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(self._VIEW.prim_paths)}
+        self._POSITIONS = self._VIEW.get_dof_positions()
 
     def update_dof_cache(self):
-        """Populate _POSITIONS in-place from all views.  Called every step."""
-        if not self._VIEWS:
+        """Populate _POSITIONS in-place from the single view. Called every step."""
+        if self._VIEW is None:
             return
-        S = len(og.sim.scenes)
-        for view_idx, view in enumerate(self._VIEWS):
-            raw = view.get_dof_positions()  # (S, n_dof) — view's internal ordering
-            n_dof = int(self._DOFS[view_idx])
-            perm = self._OBJ_IDXES[view_idx]  # (S,) — perm[scene_idx] = row in raw
-            start = view_idx * S
-            self._POSITIONS[start : start + S, :n_dof] = raw[perm]
+        self._POSITIONS[:] = self._VIEW.get_dof_positions()
+
+    def get_view_row(self, abs_prim_path):
+        """Return row index in _POSITIONS for a given absolute articulation root path, or None."""
+        return self._OBJ_TO_VIEW_IDX.get(abs_prim_path)
 
     def get_max_dof(self):
-        """Return the padded DOF width of _POSITIONS (max across all views); 0 if not initialized."""
+        """Return the padded DOF width of _POSITIONS; 0 if not initialized."""
         return self._POSITIONS.shape[1] if self._POSITIONS is not None else 0
-
-    def build_position_rows(self, relative_prim_paths):
-        """Return (S * len(paths),) int64 index tensor into _POSITIONS.
-
-        Rows are obj-major: [i*S .. (i+1)*S-1] = scenes 0..S-1 for paths[i].
-        Build once in initialize_view() and reuse every step.
-        """
-        S = len(og.sim.scenes)
-        rows = th.cat([th.arange(self._VIEW_IDXES[p] * S, (self._VIEW_IDXES[p] + 1) * S) for p in relative_prim_paths])
-        return rows
 
     def get_articulation_positions(self, position_rows):
         """Return _POSITIONS[position_rows] — pure tensor index, no PhysX call."""
         return self._POSITIONS[position_rows]
 
     def clear(self):
-        self._VIEWS = []
-        self._VIEW_IDXES = {}
-        self._DOFS = None
+        self._VIEW = None
+        self._OBJ_TO_VIEW_IDX = {}
         self._POSITIONS = None
-        self._OBJ_IDXES = None
 
 
 ArticulatedObjectViewAPI = ArticulatedObjectViewAPIImpl()

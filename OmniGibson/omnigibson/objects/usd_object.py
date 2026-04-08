@@ -313,6 +313,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             )
             n_fixed_joints += 1
 
+        # Add articulated_ prefix into prim path so ArticulationView can use a simple pattern match
+        # Only for non-robot articulated objects
+        if (
+            not kinematic_only
+            and (n_joints > 0 or n_fixed_joints > 0)
+            and not self._relative_prim_path.startswith("/controllable")
+        ):
+            self._relative_prim_path = f"/articulated__{self.name}"
+
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
@@ -341,8 +350,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         This is useful for pre-compiling scene USDs, speeding up load times especially for parallel envs.
         """
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
-        prim_path = "/World" + self._relative_prim_path
         usd_path = self._prepare_to_load()
+        prim_path = "/World" + self._relative_prim_path
         prim = stage.GetPrimAtPath(prim_path)
         assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
         prim = stage.DefinePrim(prim_path, "Xform")
