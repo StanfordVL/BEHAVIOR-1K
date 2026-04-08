@@ -250,8 +250,7 @@ msgpack is good for (de)serializing data over a network for multiple reasons:
     than pickle for serializing large arrays using the below strategy
 
 This module supports serializing both NumPy arrays and PyTorch tensors. PyTorch tensors are converted to
-NumPy arrays (zero-copy when possible) before serialization. On deserialization, tensors are automatically
-reconstructed from the serialized data.
+NumPy arrays (zero-copy when possible) before serialization. On deserialization, arrays are returned as NumPy arrays.
 
 The code below is adapted from https://github.com/lebedov/msgpack-numpy. The reason not to use that library directly is
 that it falls back to pickle for object arrays.
@@ -260,11 +259,12 @@ that it falls back to pickle for object arrays.
 
 def pack_data(obj):
     if isinstance(obj, th.Tensor):
+        data = obj.detach().cpu().numpy()
         return {
-            b"__torch__": True,
-            b"data": obj.detach().cpu().numpy().tobytes(),
-            b"dtype": obj.dtype.name,
-            b"shape": tuple(obj.shape),
+            b"__ndarray__": True,
+            b"data": data.tobytes(),
+            b"dtype": data.dtype.str,
+            b"shape": data.shape,
         }
 
     if isinstance(obj, np.ndarray):
@@ -288,9 +288,6 @@ def pack_data(obj):
 
 
 def unpack_data(obj):
-    if b"__torch__" in obj:
-        return th.tensor(np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"]), shape=obj[b"shape"]))
-
     if b"__ndarray__" in obj:
         return np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"]), shape=obj[b"shape"])
 
