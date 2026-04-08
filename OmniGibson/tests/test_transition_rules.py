@@ -445,6 +445,7 @@ def test_mixing_rule_failure_recipe_systems(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -492,6 +493,7 @@ def test_mixing_rule_failure_nonrecipe_systems(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -535,6 +537,7 @@ def test_mixing_rule_success(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
