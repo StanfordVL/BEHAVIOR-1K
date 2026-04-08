@@ -504,6 +504,14 @@ def _launch_simulator(*args, **kwargs):
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
 
+            # Start USD change logger if requested (set OG_USD_CHANGE_LOG to a file path)
+            import os
+
+            if _usd_log_path := os.environ.get("OG_USD_CHANGE_LOG"):
+                from omnigibson.utils import usd_change_logger
+
+                usd_change_logger.start(_usd_log_path, self.stage)
+
             # Cycle play / stop to validate sim.psi object to avoid getPhysXSceneStatistics errors
             self.play()
             self.stop()

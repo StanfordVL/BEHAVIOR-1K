@@ -145,7 +145,9 @@ def cleanup(*args, **kwargs):
     except PermissionError:
         log.info("Permission error when removing temp files. Ignoring")
     from omnigibson.simulator import logo_small
+    from omnigibson.utils import usd_change_logger
 
+    usd_change_logger.stop()
     log.info(f"{'-' * 10} Shutting Down {logo_small()} {'-' * 10}")
 
 

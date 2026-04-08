@@ -111,6 +111,8 @@ jobs:
         run: printenv
 
       - name: Run tests
+        env:
+          OG_USD_CHANGE_LOG: usd_changes.log
         run: >
           pytest -s tests/${{ matrix.test_file }}.py
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
@@ -146,7 +148,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}
-          path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          path: |
+            OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+            OmniGibson/usd_changes.log
           overwrite: true
 
   upload_report:
