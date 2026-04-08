@@ -11,7 +11,6 @@ from numba import jit, prange
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -1001,13 +1000,6 @@ class PoseAPI:
 
     VALID = False
 
-    # Dictionary mapping prim path to fabric prim
-    PRIMS = dict()
-
-    @classmethod
-    def clear(cls):
-        cls.PRIMS = dict()
-
     @classmethod
     def invalidate(cls):
         cls.VALID = False
@@ -1022,12 +1014,7 @@ class PoseAPI:
             # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
-            # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
-            # check if this is still the case for later versions
-            # TODO(#2082): This is terrible for performance - let's try to fix this.
-            og.sim.render()
-
-            og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            og.sim._sim_context._physx_fabric_interface.update(og.sim.current_time, og.sim.get_physics_dt())
 
             cls.mark_valid()
 
@@ -1042,6 +1029,14 @@ class PoseAPI:
                 - torch.Tensor: (x,y,z) position in the world frame
                 - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
         """
+        matrix = cls._get_world_pose_with_scale_from_fabric_hierarchy(prim_path)
+        quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+        position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
+        orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+        return position, orientation
+
+    @classmethod
+    def _get_world_pose_with_scale_from_fabric_hierarchy(cls, prim_path):
         # Check that no reads from PoseAPI are happening during a physics step.
         assert (
             not og.sim.currently_stepping
@@ -1049,15 +1044,7 @@ class PoseAPI:
 
         cls._refresh()
 
-        # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale, get_world_pose
-
-        # Add to stored prims if not already existing or if the Fabric prim is stale
-        if prim_path not in cls.PRIMS or _get_world_pose_transform_w_scale(cls.PRIMS[prim_path]) is None:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-
-        position, orientation = get_world_pose(cls.PRIMS[prim_path])
-        return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
+        return og.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -1065,34 +1052,8 @@ class PoseAPI:
         This is used when information about the prim's global scale is needed,
         e.g. when converting points in the prim frame to the world frame.
         """
-        # Add to stored prims if not already existing
-        if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
-        cls._refresh()
-        # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
-
-        return th.tensor(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path]), dtype=th.float32).T
-
-    @classmethod
-    def convert_world_pose_to_local(cls, prim, position, orientation):
-        """Converts a world pose to a local pose under a prim's parent."""
-        world_transform = T.pose2mat((position, orientation))
-        parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(prim).GetPath())
-        parent_world_transform = cls.get_world_pose_with_scale(parent_path)
-
-        local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
-        local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)  # unscale local transform's rotation
-
-        # Check that the local transform consists only of a position, scale and rotation
-        product = local_transform[:3, :3] @ local_transform[:3, :3].T
-        assert th.allclose(
-            product, th.diag(th.diag(product)), atol=1e-3
-        ), f"{prim.GetPath()} local transform is not orthogonal."
-
-        # Return the local pose
-        return T.mat2pose(local_transform)
+        return th.tensor(cls._get_world_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
 
 
 class BatchControlViewAPIImpl:

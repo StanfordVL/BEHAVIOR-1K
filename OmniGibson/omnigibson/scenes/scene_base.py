@@ -1173,7 +1173,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
             # We need to propagate these changes or else we get a crash
-            og.sim.refresh_physics(sync_usd=True)
+            og.sim.refresh_physics(read_back=True)
             # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:

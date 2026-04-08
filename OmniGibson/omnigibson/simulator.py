@@ -504,6 +504,12 @@ def _launch_simulator(*args, **kwargs):
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
 
+            # Create the Fabric Hierarchy
+            self.usdrt_stage = lazy.isaacsim.core.utils.stage.get_current_stage(fabric=True)
+            self.fabric_hierarchy = lazy.usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(
+                self.usdrt_stage.GetFabricId(), self.usdrt_stage.GetStageIdAsStageId()
+            )
+
             # Cycle play / stop to validate sim.psi object to avoid getPhysXSceneStatistics errors
             self.play()
             self.stop()
@@ -1115,17 +1121,17 @@ def _launch_simulator(*args, **kwargs):
             RigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
 
-        def refresh_physics(self, sync_usd=False):
+        def refresh_physics(self, read_back=False):
             """
             Synchronizes and evaluates any physics updates that have occurred since the last fetch.
 
             Args:
-                sync_usd (bool): If True, also fetch physics results to USD backings.
+                read_back (bool): If True, also fetch physics results to USD backings.
             """
             self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
-            if sync_usd:
+            if read_back:
                 self.psi.fetch_results()
-            self._sim_context._physx_fabric_interface.update(0, self.current_time)
+                self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1809,9 +1815,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all materials
             MaterialPrim.clear()
-
-            # Clear pose API cache
-            PoseAPI.clear()
 
             # Clear uniquely named items and other internal states
             clear_python_utils()

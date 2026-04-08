@@ -141,7 +141,6 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
-        PoseAPI.invalidate()
         # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
@@ -209,45 +208,21 @@ class XFormPrim(BasePrim):
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
             position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
-        # If the current pose is not in parent frame, convert to parent frame since that's what we can set.
-        if frame != "parent":
-            position, orientation = PoseAPI.convert_world_pose_to_local(self._prim, position, orientation)
-
         # Assert validity of the orientation
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
-        # Actually set the local pose now.
-        properties = self.prim.GetPropertyNames()
-        position = lazy.pxr.Gf.Vec3d(*position.tolist())
-        if "xformOp:translate" not in properties:
-            logger.error("Translate property needs to be set for {} before setting its position".format(self.name))
-        self.set_attribute("xformOp:translate", position)
-        orientation = orientation[[3, 0, 1, 2]].tolist()
-        if "xformOp:orient" not in properties:
-            logger.error("Orient property needs to be set for {} before setting its orientation".format(self.name))
-        xform_op = self._prim.GetAttribute("xformOp:orient")
-        if xform_op.GetTypeName() == "quatf":
-            rotq = lazy.pxr.Gf.Quatf(*orientation)
+        # Set and propagate the pose to the Fabric Hierarchy.
+        xform_matrix = lazy.usdrt.Gf.Matrix4d()
+        xform_matrix.SetTranslate(lazy.usdrt.Gf.Vec3d(*position.tolist()))
+        xform_matrix.SetRotate(lazy.usdrt.Gf.Quatd(*orientation[[3, 0, 1, 2]].tolist()))
+        if frame == "parent":
+            og.sim.fabric_hierarchy.set_local_xform(lazy.usdrt.Sdf.Path(self.prim_path), xform_matrix)
         else:
-            rotq = lazy.pxr.Gf.Quatd(*orientation)
-        xform_op.Set(rotq)
+            og.sim.fabric_hierarchy.set_world_xform(lazy.usdrt.Sdf.Path(self.prim_path), xform_matrix)
+        og.sim.fabric_hierarchy.update_world_xforms()
         PoseAPI.invalidate()
-
-        # TODO(#2082) Verify if this is still needed.
-        # If fabric is on, make sure the USD local pose is synced to the fabric local pose.
-        # Ideally we should call usdrt's set local pose directly, but there is no such API.
-        # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
-        xformable_prim = lazy.usdrt.Rt.Xformable(
-            lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
-        )
-        if xformable_prim.HasWorldXform():
-            logger.warning(
-                "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this. As a fallback, we will clear the world xform and set the local xform from USD."
-            )
-            xformable_prim.ClearWorldXform()
-        xformable_prim.SetLocalXformFromUsd()
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """
