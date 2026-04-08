@@ -4,7 +4,9 @@
 
 ### 1. JoyLo Assembly
 
-- **7 DoF R1-Pro**: [Assembly Guide](https://github.com/user-attachments/assets/d6d3ee59-dfac-4ece-92f4-ea44619a2d05)
+- **7 DoF R1-Pro**: [Assembly Guide](ASSEMBLY.md)
+
+[Assembly Video](https://github.com/user-attachments/assets/d6d3ee59-dfac-4ece-92f4-ea44619a2d05)
 
 > **[Deprecated]** For the 6-DoF R1 version, please reference this [guide](https://behavior-robot-suite.github.io/docs/sections/joylo/overview.html) from the [BEHAVIOR Robot Suite](https://behavior-robot-suite.github.io/).
 
@@ -95,14 +97,14 @@ You need to run both scripts once before the first time you perform any data col
 
 ```bash
 # Calibrate JoyCons
-python scripts/calibrate_joycons.py
+python joylo/scripts/calibrate_joycons.py
 ```
 
 This will create two `joycon_calibration_xxx.yaml` files under `joylo/configs`.
 
 ```bash
 # Calibrate joints
-python scripts/calibrate_joints.py
+python joylo/scripts/calibrate_joints.py
 ```
 
 This will create a `joint_config_default.yaml` under `joylo/configs`.
@@ -165,13 +167,13 @@ The system runs two scripts in separate terminals. The scripts are located under
 3. In one terminal, start the recording environment with a specified task:
 
 ```bash
-python experiments/launch_nodes.py --task_name turning_on_radio --recording_path /path/to/recording_file_name.hdf5
+python joylo/scripts/launch_og.py --task_name turning_on_radio --recording_path /path/to/recording_file_name.hdf5
 ```
 
 4. In another terminal, run the JoyLo node:
 
 ```bash
-python experiments/run_joylo.py
+python joylo/scripts/run_joylo.py
 ```
 
 ---
