@@ -495,7 +495,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor([length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()])
         )
         obj_half_height = (obj.aabb[1][2] - obj.aabb[0][2]) / 2
-        grasp_pos[2] -= min(avg_finger_offset, obj_half_height)
+        grasp_pos[2] -= th.minimum(avg_finger_offset, obj_half_height)
 
         # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
         approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
