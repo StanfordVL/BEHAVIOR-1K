@@ -1002,11 +1002,16 @@ class PoseAPI:
     VALID = False
 
     # Dictionary mapping prim path to fabric prim
-    PRIMS = dict()
+    _fabric_hierarchy = None
 
     @classmethod
-    def clear(cls):
-        cls.PRIMS = dict()
+    def _get_fabric_hierarchy(cls):
+        if cls._fabric_hierarchy is None:
+            usdrt_stage = lazy.isaacsim.core.utils.stage.get_current_stage(fabric=True)
+            cls._fabric_hierarchy = lazy.usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(
+                usdrt_stage.GetFabricId(), usdrt_stage.GetStageIdAsStageId()
+            )
+        return cls._fabric_hierarchy
 
     @classmethod
     def invalidate(cls):
@@ -1022,12 +1027,7 @@ class PoseAPI:
             # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
-            # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
-            # check if this is still the case for later versions
-            # TODO(#2082): This is terrible for performance - let's try to fix this.
-            og.sim.render()
-
-            og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            og.sim._sim_context._physx_fabric_interface.force_update(og.sim.get_physics_dt(), og.sim.current_time)
 
             cls.mark_valid()
 
@@ -1042,22 +1042,19 @@ class PoseAPI:
                 - torch.Tensor: (x,y,z) position in the world frame
                 - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
         """
+        matrix = cls._get_world_pose_with_scale_from_fabric_hierarchy(prim_path)
+        quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+        position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
+        orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+        return position, orientation
+
+    @classmethod
+    def _get_world_pose_with_scale_from_fabric_hierarchy(cls, prim_path):
         # Check that no reads from PoseAPI are happening during a physics step.
         assert (
             not og.sim.currently_stepping
         ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
-
-        # Add to stored prims if not already existing
-        if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-
-        cls._refresh()
-
-        # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import get_world_pose
-
-        position, orientation = get_world_pose(cls.PRIMS[prim_path])
-        return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
+        return cls._get_fabric_hierarchy().get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -1065,15 +1062,8 @@ class PoseAPI:
         This is used when information about the prim's global scale is needed,
         e.g. when converting points in the prim frame to the world frame.
         """
-        # Add to stored prims if not already existing
-        if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
-        cls._refresh()
-        # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
-
-        return th.tensor(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path]), dtype=th.float32).T
+        return th.tensor(cls._get_world_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
 
     @classmethod
     def convert_world_pose_to_local(cls, prim, position, orientation):

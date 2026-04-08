@@ -10,7 +10,6 @@ import numpy as np
 import omni
 import omni.timeline
 import torch
-import usdrt
 import warp as wp
 from isaacsim.core.prims import Articulation as _ArticulationView
 from isaacsim.core.prims import RigidPrim as _RigidPrimView
@@ -21,7 +20,6 @@ from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
 from pxr import Gf, PhysxSchema, UsdPhysics
-from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0
 
@@ -1057,25 +1055,3 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
         rgb_img_draw.rectangle([(bbox_2d[1], bbox_2d[2]), (bbox_2d[3], bbox_2d[4])], outline=outline, width=2)
     bboxes_2d_rgb = np.array(rgb_img)
     return bboxes_2d_rgb
-
-
-# This is a faster version than the native implementation, as it avoids pre-processing initially
-def _get_world_pose_transform_w_scale(fabric_prim):
-    # Local import here to avoid circular imports
-
-    # This will return a transformation matrix with translation as the last row and scale included
-    xformable_prim = usdrt.Rt.Xformable(fabric_prim)
-
-    # Directly use hierarchy world matrix attribute and return that value
-    # TODO(#2082): The Isaac Sim version of this function does NOT do this. We should reconsider.
-    # This might even be producing faulty results.
-    return xformable_prim.GetFabricHierarchyWorldMatrixAttr().Get(usdrt.Usd.TimeCode.Default())
-
-
-# This is a faster version than the native implementation, as it avoids pre-processing initially and also avoids
-# re-ordering the quaternion
-def get_world_pose(fabric_prim):
-    result_transform = _get_world_pose_transform_w_scale(fabric_prim)
-    result_transform.Orthonormalize()
-    result_transform = np.transpose(result_transform)
-    return result_transform[:3, 3], R.from_matrix(result_transform[:3, :3]).as_quat()

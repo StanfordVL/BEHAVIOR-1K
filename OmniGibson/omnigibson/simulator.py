@@ -1809,9 +1809,6 @@ def _launch_simulator(*args, **kwargs):
             # Clear all materials
             MaterialPrim.clear()
 
-            # Clear pose API cache
-            PoseAPI.clear()
-
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
