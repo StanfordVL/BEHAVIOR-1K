@@ -4,7 +4,7 @@ import random
 import numpy as np
 import torch as th
 import yaml
-from pytest_rerunfailures import pytest
+import pytest
 
 import omnigibson as og
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
@@ -49,15 +49,13 @@ def setup_environment(load_object_categories, robot="R1"):
     th.backends.cudnn.deterministic = True
 
     if og.sim is None:
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
         gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = False
-        gm.ENABLE_FLATCACHE = False
+        gm.USE_GPU_DYNAMICS = True
+        gm.ENABLE_FLATCACHE = True
         gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
         og.sim.stop()
-
     # Create the environment
     env = og.Environment(configs=cfg)
     env.reset()
@@ -89,7 +87,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
 
 
 ROBOTS_UNDER_TEST = ["Tiago", "R1"]
-if th.cuda.is_available() and th.cuda.get_device_capability(0) == (12, 0):
+if th.cuda.is_available() and th.cuda.get_device_capability(0) >= (12, 0):
     # TODO: Currently for 50 series, only Default embodiment works for Tiago, and for R1Pro, all embodiment except Default work.
     # Here, we remove Tiago for testing.
     ROBOTS_UNDER_TEST = ["R1"]
@@ -154,7 +152,7 @@ class TestPrimitives:
 
         primitive_tester(env, objects, primitives, primitives_args)
 
-    @pytest.mark.skip(reason="primitives are broken")
+    @pytest.mark.skip(reason="Not implemented yet")
     def test_open_prismatic(self, robot):
         categories = ["floors"]
         env = setup_environment(categories, robot=robot)
@@ -174,7 +172,7 @@ class TestPrimitives:
 
         primitive_tester(env, objects, primitives, primitives_args)
 
-    @pytest.mark.skip(reason="primitives are broken")
+    @pytest.mark.skip(reason="Not implemented yet")
     def test_open_revolute(self, robot):
         categories = ["floors"]
         env = setup_environment(categories, robot=robot)

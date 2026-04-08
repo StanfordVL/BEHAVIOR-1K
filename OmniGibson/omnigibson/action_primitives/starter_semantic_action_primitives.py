@@ -490,12 +490,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
         grasp_pos, grasp_quat = random.choice(grasp_poses)
 
-        # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
-        approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
-
+        # Lower the grasp pose so the fingertips wrap around the object
         avg_finger_offset = th.mean(
             th.tensor([length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()])
         )
+        obj_half_height = (obj.aabb[1][2] - obj.aabb[0][2]) / 2
+        grasp_pos[2] -= min(avg_finger_offset, obj_half_height)
+
+        # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
+        approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
+
         pregrasp_offset = avg_finger_offset + m.GRASP_APPROACH_DISTANCE
 
         pregrasp_pos = grasp_pos - approach_dir * pregrasp_offset
@@ -557,7 +561,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Navigating to grasp pose if needed")
         yield from self._navigate_if_needed(obj, eef_pose=pregrasp_pose)
 
-        indented_print("Moving hand to grasp pose")
+        indented_print("Moving hand to pregrasp pose")
         yield from self._move_hand(pregrasp_pose)
 
         if self.robot.grasping_mode == "sticky":
@@ -565,14 +569,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Close the gripper
             yield from self._execute_grasp()
 
-            indented_print("Sticky grasping: approach")
-            # Only translate in the z-axis of the goal frame (assuming z-axis points out of the gripper)
-            # This is the same as requesting the end-effector to move along the approach_dir direction.
-            # By default, it's NOT the z-axis of the world frame unless `project_pose_to_goal_frame=False` is set in curobo.
-            # For sticky grasping, we also need to ignore the object during motion planning because the fingers are already closed.
-            yield from self._move_hand(
-                grasp_pose, motion_constraint=[1, 1, 1, 1, 1, 0], stop_on_ag=True, ignore_objects=[obj]
-            )
+            # If the sticky grasp already captured the object, skip the approach
+            # planning would fail because ignore_objects removes it from the world while
+            # attached_obj tries to look it up for attachment.
+            if self._get_obj_in_hand() is None:
+                indented_print("Sticky grasping: approach")
+                yield from self._move_hand(
+                    grasp_pose, motion_constraint=[1, 1, 1, 1, 1, 0], stop_on_ag=True, ignore_objects=[obj]
+                )
         elif self.robot.grasping_mode == "assisted":
             indented_print("Assisted grasping: approach")
             # Same as above in terms of moving along the approach_dir direction, but we don't ignore the object.
