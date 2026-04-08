@@ -1,3 +1,22 @@
+"""
+Quality Assurance (QA) Metrics for robot trajectory validation.
+
+This module provides a comprehensive framework for validating robot demonstration
+episodes based on various quality metrics including motion smoothness, collision
+detection, task success, and more. Each metric is implemented as a subclass of
+OmniGibson's MetricBase and can be configured with different enforcement modes
+(DISABLED, SOFT, HARD).
+
+The metrics are designed to work with the BEHAVIOR-1K dataset collection framework
+and can be used to filter out low-quality demonstrations during data collection.
+
+Example:
+    >>> from gello.utils.qa_utils import ALL_QA_METRICS, aggregate_episode_validation
+    >>> success, results = aggregate_episode_validation(task_name, episode_metrics)
+    >>> if not success:
+    ...     print("Episode failed validation")
+"""
+
 import omnigibson.utils.transform_utils as T
 import operator
 import torch as th
@@ -25,23 +44,41 @@ COMMON_QA_METRICS = {
 
 
 class MetricMode(IntEnum):
+    """Defines the enforcement mode for QA metrics.
+
+    Attributes:
+        DISABLED: Metric is computed but not used for validation.
+        SOFT: Metric generates warnings but does not fail validation.
+        HARD: Metric must pass or validation fails.
+    """
+
     DISABLED = 0
     SOFT = 1
     HARD = 2
 
 
 def aggregate_episode_validation(task, all_episode_metrics):
-    """
-    Validates the given @all_episode_metrics
+    """Validates the given @all_episode_metrics for a specific task.
+
+    This function aggregates per-metric validation results and determines whether
+    an episode passes QA checks based on the configured MetricMode for each metric.
 
     Args:
-        task (str): The name of the task whose QA metrics are being aggregated
+        task (str): The name of the task whose QA metrics are being aggregated.
         all_episode_metrics (dict): Keyword-mapped aggregated episode metrics
+            with keys in the format "metric_name::sub_metric_name".
 
     Returns:
         2-tuple:
-            - bool: Whether the validation succeeded or not (requires all metric validation checks to pass)
-            - dict: Per-metric information
+            - bool: Whether the validation succeeded or not (requires all metric
+              validation checks to pass based on their mode).
+            - dict: Per-metric validation information containing success status
+              and optional feedback messages.
+
+    Example:
+        >>> task = "pick_up_apple"
+        >>> metrics = {"motion::vel_avg": tensor([0.1]), "collision::n_collision": 0}
+        >>> success, results = aggregate_episode_validation(task, metrics)
     """
     results = dict()
     sorted_metrics = dict()
@@ -80,6 +117,21 @@ def aggregate_episode_validation(task, all_episode_metrics):
 
 
 class MotionMetric(MetricBase):
+    """Metric for validating robot motion quality.
+
+    Computes velocity, acceleration, and jerk statistics for robot arm joints
+    throughout an episode. Helps identify jerky or unsafe movements that may
+    indicate teleoperation issues or trajectory problems.
+
+    Attributes:
+        step_dt (float): Time between simulation steps in seconds.
+
+    Example:
+        >>> metric = MotionMetric(step_dt=0.1)
+        >>> # During episode, automatically tracks joint positions
+        >>> # At episode end, computes motion statistics
+    """
+
     def __init__(self, step_dt):
         """
         Args:
@@ -208,6 +260,20 @@ class MotionMetric(MetricBase):
 
 
 class CollisionMetric(MetricBase):
+    """Metric for detecting robot collisions during episodes.
+
+    Tracks collisions between different robot components (self-collisions,
+    collisions with environment objects) and can visually highlight colliding
+    links by changing their color. Supports adding custom collision checks.
+
+    Attributes:
+        default_color (tuple): Default RGB color for robot links (default: light blue).
+
+    Example:
+        >>> metric = CollisionMetric()
+        >>> metric.add_check("robot_self", check_robot_self_collision, color_robots=red_color)
+    """
+
     def __init__(self, default_color=(0.8235, 0.8235, 1.0000)):
         self.checks = dict()
         self.check_colors = dict()
@@ -289,6 +355,12 @@ class CollisionMetric(MetricBase):
 
 
 class TaskSuccessMetric(MetricBase):
+    """Metric for tracking task completion status.
+
+    Simple metric that records whether the episode terminated with success
+    (i.e., task was completed before timeout or failure conditions).
+    """
+
     def _compute_step_metrics(
         self, env, action, obs, reward, terminated, truncated, info
     ):
@@ -305,6 +377,18 @@ class TaskSuccessMetric(MetricBase):
 
 
 class GhostHandAppearanceMetric(MetricBase):
+    """Metric for detecting ghost hand appearances during teleoperation.
+
+    Detects when the operator's ghost hand (visualized in VR) diverges
+    significantly from the actual robot gripper position. This can indicate
+    tracking issues or operator fatigue. Optionally colors robot arms to
+    highlight when ghost hand is active.
+
+    Attributes:
+        color_arms (bool): Whether to color robot arms when ghost hand is active
+            (default: True).
+    """
+
     def __init__(self, color_arms=True):
         self.color_arms = color_arms
         self.robot_arm_colors = dict()
@@ -444,6 +528,19 @@ class GhostHandAppearanceMetric(MetricBase):
 
 
 class ProlongedPauseMetric(MotionMetric):
+    """Metric for detecting extended periods of robot immobility.
+
+    Inherits from MotionMetric but focuses on identifying long pauses during
+    the episode that may indicate teleoperation issues or task difficulties.
+    A pause is defined as consecutive steps where robot velocity stays below
+    a specified threshold.
+
+    Attributes:
+        step_dt (float): Time between simulation steps in seconds.
+        vel_threshold (float): Velocity threshold below which robot is considered
+            paused (default: 0.001).
+    """
+
     def __init__(self, step_dt, vel_threshold=0.001):
         self.vel_threshold = vel_threshold
         super().__init__(step_dt=step_dt)
@@ -489,6 +586,13 @@ class ProlongedPauseMetric(MotionMetric):
 
 
 class FailedGraspMetric(MetricBase):
+    """Metric for detecting failed grasp attempts.
+
+    Tracks when fingers close completely without successful object grasping.
+    A failed grasp is identified when gripper transitions from open to closed
+    state without acquiring an object.
+    """
+
     def _compute_step_metrics(
         self, env, action, obs, reward, terminated, truncated, info
     ):
@@ -537,6 +641,18 @@ class FailedGraspMetric(MetricBase):
 
 
 class TaskRelevantObjectVelocityMetric(MetricBase):
+    """Metric for tracking velocity of task-relevant objects.
+
+    Computes velocity statistics (mean, std, max) for all non-fixed, non-system
+    objects in the scene. Helps identify if objects are moving too fast (which
+    may indicate improper handling) or not moving at all.
+
+    Only compatible with BehaviorTask environments.
+
+    Attributes:
+        step_dt (float): Time between simulation steps in seconds.
+    """
+
     def __init__(self, step_dt):
         self.step_dt = step_dt
 
@@ -595,6 +711,22 @@ class TaskRelevantObjectVelocityMetric(MetricBase):
 
 
 class FieldOfViewMetric(MetricBase):
+    """Metric for tracking gripper visibility in robot's main camera.
+
+    Tracks whether the gripper is visible in the robot's head camera's field
+    of view. Generates warnings when grasp state changes occur while the
+    gripper is outside the FOV (which may indicate poor camera positioning
+    or unreachable grasps).
+
+    Only compatible with environments that have instance segmentation enabled
+    on the head camera.
+
+    Attributes:
+        head_camera: The head camera sensor providing observation data.
+        gripper_link_paths (dict): Mapping from arm name to set of gripper
+            link prim paths for FOV detection.
+    """
+
     @classmethod
     def is_compatible(cls, env):
         valid = super().is_compatible(env=env)
@@ -694,6 +826,25 @@ class FieldOfViewMetric(MetricBase):
 
 
 class HeadCameraUprightMetric(MetricBase):
+    """Metric for detecting head camera tilt during navigation.
+
+    Tracks whether the head camera is tilted excessively while the robot is
+    navigating (translating or rotating). Prolonged tilted navigation may
+    indicate improper head positioning or comfort issues for the operator.
+
+    Attributes:
+        head_camera_link_name (str): Name of the link containing the head camera.
+        step_dt (float): Time between simulation steps in seconds.
+        navigation_window (float): Time window in seconds to consider as "prolonged"
+            navigation (default: 3.0).
+        translation_threshold (float): Velocity threshold for detecting translation
+            in m/s (default: 0.1).
+        rotation_threshold (float): Angular velocity threshold for detecting rotation
+            in rad/s (default: 0.05).
+        camera_tilt_threshold (float): Euler Y-angle threshold in radians for
+            considering camera tilted (default: 0.4).
+    """
+
     @classmethod
     def is_compatible(cls, env):
         return super().is_compatible(env)
@@ -796,6 +947,14 @@ class HeadCameraUprightMetric(MetricBase):
 
 
 def check_robot_self_collision(env):
+    """Check if any part of the robot is in collision with itself.
+
+    Args:
+        env: The OmniGibson environment instance.
+
+    Returns:
+        bool: True if robot self-collision detected, False otherwise.
+    """
     for robot in env.robots:
         link_paths = list(robot.link_prim_paths)
         if RigidContactAPI.is_in_contact(
@@ -810,6 +969,14 @@ def check_robot_self_collision(env):
 
 
 def check_robot_base_nonarm_nonkinematic_collision(env):
+    """Check if robot base (excluding arms) collides with non-kinematic objects.
+
+    Args:
+        env: The OmniGibson environment instance.
+
+    Returns:
+        bool: True if collision with non-arm, non-kinematic objects detected.
+    """
     for robot in env.robots:
         robot_link_paths = set(robot.link_prim_paths)
         for arm in robot.arm_names:
@@ -829,6 +996,17 @@ def check_robot_base_nonarm_nonkinematic_collision(env):
 
 
 def check_robot_nonarm_nonground_collision(env):
+    """Check if robot non-arm links collide with non-ground objects.
+
+    This check identifies collisions between robot base/torso links and
+    objects in the scene (excluding the ground plane and the robot itself).
+
+    Args:
+        env: The OmniGibson environment instance.
+
+    Returns:
+        bool: True if collision with non-ground, non-robot objects detected.
+    """
     ground_objects = []
     for cat in GROUND_CATEGORIES:
         ground_objects.extend(env.scene.object_registry("category", cat, []))
@@ -868,6 +1046,29 @@ def create_collision_metric(
     include_robot_nonarm_nonkinematic_collision=True,
     include_robot_nonarm_nonground_collision=True,
 ):
+    """Create a CollisionMetric with specified collision checks enabled.
+
+    Factory function for creating a CollisionMetric configured with specific
+    collision detection checks. Each check can be independently enabled or
+    disabled based on the data collection requirements.
+
+    Args:
+        include_robot_self_collision (bool): Enable robot self-collision detection
+            (default: True).
+        include_robot_nonarm_nonkinematic_collision (bool): Enable collision detection
+            between robot non-arm parts and non-kinematic objects (default: True).
+        include_robot_nonarm_nonground_collision (bool): Enable collision detection
+            between robot non-arm parts and non-ground objects (default: True).
+
+    Returns:
+        CollisionMetric: Configured collision metric with the specified checks.
+
+    Example:
+        >>> metric = create_collision_metric(
+        ...     include_robot_self_collision=True,
+        ...     include_robot_nonarm_nonground_collision=True
+        ... )
+    """
     col_metric = CollisionMetric()
     if include_robot_self_collision:
         col_metric.add_check(
@@ -888,6 +1089,32 @@ def create_collision_metric(
 
 
 ALL_QA_METRICS = {
+    """Dictionary of all available QA metrics with their configuration.
+
+    Each key corresponds to a metric name, and the value is a dictionary with:
+        - cls: The metric class.
+        - init: Optional factory function for metric initialization.
+        - mode: MetricMode enum (DISABLED, SOFT, or HARD) for validation enforcement.
+        - warning: Optional warning message for SOFT mode failures.
+        - task_whitelist: List of tasks where this metric applies (None = all).
+        - task_blacklist: List of tasks where this metric is excluded (None = none).
+        - validate_kwargs: Default validation thresholds for this metric.
+
+    The available metrics are:
+        - motion: Joint velocity, acceleration, and jerk limits.
+        - collision: Robot self and environment collision detection.
+        - task_success: Whether the episode completed successfully.
+        - ghost_hand_appearance: VR ghost hand tracking issues.
+        - prolonged_pause: Extended periods without robot motion.
+        - failed_grasp: Gripper closes without successful grasp.
+        - task_relevant_obj_vel: Object velocity limits during episodes.
+        - gripper_in_fov: Gripper visibility in camera field of view.
+        - head_camera_upright_during_navigation: Camera tilt during navigation.
+
+    Example:
+        >>> motion_config = ALL_QA_METRICS["motion"]
+        >>> print(motion_config["mode"])  # MetricMode.HARD
+    """
     "motion": {
         "cls": MotionMetric,
         "init": None,
@@ -1006,4 +1233,3 @@ ALL_QA_METRICS = {
         ),
     },
 }
-
