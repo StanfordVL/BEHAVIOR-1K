@@ -1047,14 +1047,14 @@ class PoseAPI:
             not og.sim.currently_stepping
         ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
 
-        # Add to stored prims if not already existing
-        if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-
         cls._refresh()
 
         # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import get_world_pose
+        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale, get_world_pose
+
+        # Add to stored prims if not already existing or if the Fabric prim is stale
+        if prim_path not in cls.PRIMS or _get_world_pose_transform_w_scale(cls.PRIMS[prim_path]) is None:
+            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
         position, orientation = get_world_pose(cls.PRIMS[prim_path])
         return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
