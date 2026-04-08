@@ -216,7 +216,7 @@ class VisionSensor(BaseSensor):
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
-        should_create_viewport = viewport_name is not None or not gm.HEADLESS
+        should_create_viewport = viewport_name is not None or gm.RENDER_VIEWER_CAMERA
         if should_create_viewport and viewport_name is not None:
             vp_names_to_handles = {vp.name: vp for vp in lazy.omni.kit.viewport.window.get_viewport_window_instances()}
             assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
