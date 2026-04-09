@@ -78,7 +78,7 @@ m.MIN_AG_DEFAULT_GRASP_POINT_PROP = 0.2
 m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.95
 m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
-m.GRASP_WINDOW = 3.0
+m.GRASP_WINDOW = 0.7
 m.RELEASE_WINDOW = 1 / 30.0
 m.MAX_LINEAR_VELOCITY = 1.5
 m.MAX_ANGULAR_VELOCITY = th.pi
@@ -858,7 +858,7 @@ class Robot(USDObject, GymObservable):
                         self._ag_grasp_counter[arm] += 1
 
                         # Check if window is complete
-                        time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_sim_step_dt()
+                        time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_physics_dt()
                         if time_in_grasp >= m.GRASP_WINDOW:
                             # Consider establishing a grasp
                             target_obj, target_link_name = ag_target_object_and_link_name
@@ -1902,7 +1902,7 @@ class Robot(USDObject, GymObservable):
         assert self.is_manipulation
         if self._ag_obj_constraints[arm] is not None:
             self._release_grasp(arm=arm)
-            self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
+            self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_physics_dt()))
             self._handle_release_window(arm=arm)
             assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
 
@@ -3112,7 +3112,7 @@ class Robot(USDObject, GymObservable):
         assert self.is_manipulation
         arm = self.default_arm if arm == "default" else arm
         self._ag_release_counter[arm] += 1
-        time_since_release = self._ag_release_counter[arm] * og.sim.get_sim_step_dt()
+        time_since_release = self._ag_release_counter[arm] * og.sim.get_physics_dt()
         if time_since_release >= m.RELEASE_WINDOW:
             self._ag_obj_in_hand[arm] = None
             self._ag_release_counter[arm] = None
