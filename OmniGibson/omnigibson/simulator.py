@@ -1294,7 +1294,7 @@ def _launch_simulator(*args, **kwargs):
 
             # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
             # step() may not step physics
-            if len(self._objects_to_initialize) > 0 or not PoseAPI.VALID:
+            if len(self._objects_to_initialize) > 0:
                 self.render()
 
             # Clear all scenes' updated objects
