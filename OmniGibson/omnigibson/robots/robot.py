@@ -500,10 +500,11 @@ class Robot(USDObject, GymObservable):
             )
             position, orientation = self.get_position_orientation()
             # Set the world-to-base fixed joint to be at the robot's current pose
-            self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-            self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-            )
+            with og.sim.editing_usd():
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+                )
 
         force_sphere = (
             self.is_holonomic_base
@@ -934,10 +935,11 @@ class Robot(USDObject, GymObservable):
                 self._base_set_position_orientation(position, orientation, frame)
                 # Move the joint frame for the world_base_joint
                 if self._world_base_fixed_joint_prim is not None:
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                        lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-                    )
+                    with og.sim.editing_usd():
+                        self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+                        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                            lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+                        )
             return
 
         if self.is_manipulation:

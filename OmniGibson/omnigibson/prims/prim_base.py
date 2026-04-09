@@ -1,6 +1,7 @@
 import string
 from abc import ABC
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.python_utils import Recreatable, Serializable
 from omnigibson.utils.ui_utils import create_module_logger
@@ -228,12 +229,12 @@ class BasePrim(Serializable, Recreatable, ABC):
         Args:
             visible (bool): flag to set the visibility of the usd prim in stage.
         """
-        imageable = lazy.pxr.UsdGeom.Imageable(self.prim)
-        if visible:
-            imageable.MakeVisible()
-        else:
-            imageable.MakeInvisible()
-        return
+        with og.sim.editing_usd():
+            imageable = lazy.pxr.UsdGeom.Imageable(self.prim)
+            if visible:
+                imageable.MakeVisible()
+            else:
+                imageable.MakeInvisible()
 
     def is_valid(self):
         """
@@ -271,7 +272,8 @@ class BasePrim(Serializable, Recreatable, ABC):
             attr (str): Attribute to set
             val (any): Value to set for the attribute. This should be the valid type for that attribute.
         """
-        self._prim.GetAttribute(attr).Set(val)
+        with og.sim.editing_usd():
+            self._prim.GetAttribute(attr).Set(val)
 
     def create_attribute(self, attr, val):
         """
@@ -281,7 +283,8 @@ class BasePrim(Serializable, Recreatable, ABC):
             attr (str): Attribute to create
             val (any): Value to set for the attribute. This should be the valid type for that attribute.
         """
-        self._prim.CreateAttribute(attr, get_sdf_value_type_name(val))
+        with og.sim.editing_usd():
+            self._prim.CreateAttribute(attr, get_sdf_value_type_name(val))
 
     def get_property(self, prop):
         """

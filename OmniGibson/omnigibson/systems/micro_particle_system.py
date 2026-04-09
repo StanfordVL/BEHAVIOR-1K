@@ -1611,23 +1611,24 @@ class Cloth(MicroParticleSystem):
         Args:
             mesh_prim (Usd.Prim): Mesh prim to clothify
         """
-        # Convert into particle cloth
-        lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
-            stage=og.sim.stage,
-            path=mesh_prim.GetPath(),
-            dynamic_mesh_path=None,
-            particle_system_path=self.system_prim_path,
-            spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
-            spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
-            spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
-            spring_damping=m.CLOTH_DAMPING,
-            self_collision=True,
-            self_collision_filter=True,
-        )
+        with og.sim.editing_usd():
+            # Convert into particle cloth
+            lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
+                stage=og.sim.stage,
+                path=mesh_prim.GetPath(),
+                dynamic_mesh_path=None,
+                particle_system_path=self.system_prim_path,
+                spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
+                spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
+                spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
+                spring_damping=m.CLOTH_DAMPING,
+                self_collision=True,
+                self_collision_filter=True,
+            )
 
-        # Disable welding because it can potentially make thin objects non-manifold
-        auto_particle_cloth_api = lazy.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
-        auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
+            # Disable welding because it can potentially make thin objects non-manifold
+            auto_particle_cloth_api = lazy.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
+            auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
 
     @property
     def _pbd_material_kwargs(self):

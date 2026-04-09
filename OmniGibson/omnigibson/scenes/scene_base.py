@@ -498,28 +498,29 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Clears any internal state before the scene is destroyed
         """
-        # Clears systems so they can be re-initialized.
-        for system in self.active_systems.values():
-            self.clear_system(system_name=system.name)
+        with og.sim.editing_usd():
+            # Clears systems so they can be re-initialized.
+            for system in self.active_systems.values():
+                self.clear_system(system_name=system.name)
 
-        # Remove any vision sensors attached to this scene
-        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
-        # which will cause segfault during og.clear()
-        scene_prim_path = self.prim_path
-        scene_prim_prefix = f"{scene_prim_path}/"
-        for sensor in tuple(VisionSensor.SENSORS.values()):
-            if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
-                sensor.remove()
+            # Remove any vision sensors attached to this scene
+            # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+            # which will cause segfault during og.clear()
+            scene_prim_path = self.prim_path
+            scene_prim_prefix = f"{scene_prim_path}/"
+            for sensor in tuple(VisionSensor.SENSORS.values()):
+                if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
+                    sensor.remove()
 
-        # Remove all of the scene's objects.
-        og.sim.batch_remove_objects(list(self.objects))
+            # Remove all of the scene's objects.
+            og.sim.batch_remove_objects(list(self.objects))
 
-        # Remove the scene prim.
-        self._scene_prim.remove()
+            # Remove the scene prim.
+            self._scene_prim.remove()
 
-        if gm.ENABLE_TRANSITION_RULES:
-            # Clear the transition rule API
-            self._transition_rule_api.clear()
+            if gm.ENABLE_TRANSITION_RULES:
+                # Clear the transition rule API
+                self._transition_rule_api.clear()
 
     def _initialize(self):
         """
@@ -900,18 +901,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             position (th.Tensor): (3,) position of the scene
             orientation (th.Tensor): (4,) orientation of the scene
         """
-        self._scene_prim.set_position_orientation(position=position, orientation=orientation)
-        # Need to update sim here -- this is because downstream setters called immediately may not be respected,
-        # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-        og.sim.refresh_physics()
-        # Update the cached pose and inverse pose
-        pos_ori = self._scene_prim.get_position_orientation()
-        pose = T.pose2mat(pos_ori)
-        self._pose_info = {
-            "pos_ori": pos_ori,
-            "pose": T.pose2mat(pos_ori),
-            "pose_inv": th.linalg.inv_ex(pose).inverse,
-        }
+        with og.sim.editing_usd():
+            self._scene_prim.set_position_orientation(position=position, orientation=orientation)
+            # Need to update sim here -- this is because downstream setters called immediately may not be respected,
+            # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
+            og.sim.refresh_physics()
+            # Update the cached pose and inverse pose
+            pos_ori = self._scene_prim.get_position_orientation()
+            pose = T.pose2mat(pos_ori)
+            self._pose_info = {
+                "pos_ori": pos_ori,
+                "pose": T.pose2mat(pos_ori),
+                "pose_inv": th.linalg.inv_ex(pose).inverse,
+            }
 
     @property
     def prim_path(self):

@@ -4,6 +4,7 @@ import random
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -230,7 +231,8 @@ class DatasetObject(USDObject):
                 for child_child_prim in child_prim.GetChildren():
                     recursive_light_update(child_child_prim)
 
-            recursive_light_update(self._prim)
+            with og.sim.editing_usd():
+                recursive_light_update(self._prim)
 
         # Set the joint frictions based on joint type
         for joint in self._joints.values():
@@ -312,18 +314,19 @@ class DatasetObject(USDObject):
 
             prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
             revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
-            for prismatic_joint in prismatic_joints:
-                prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
-                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
-                prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
-            for revolute_joint in revolute_joints:
-                revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
-                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
-                revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
+            with og.sim.editing_usd():
+                for prismatic_joint in prismatic_joints:
+                    prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
+                    prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
+                    prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
+                for revolute_joint in revolute_joints:
+                    revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
+                    revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
+                    revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
 
         elif self._prim_type == PrimType.CLOTH:
             if category_mass is not None:

@@ -28,6 +28,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.usd_utils import (
+    ensure_usd_api,
     mesh_prim_to_trimesh_mesh,
     sample_mesh_keypoints,
     delete_or_deactivate_prim,
@@ -97,11 +98,7 @@ class ClothPrim(GeomPrim):
         # run super first
         super()._post_load()
 
-        self._mass_api = (
-            lazy.pxr.UsdPhysics.MassAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI)
-            else lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
-        )
+        self._mass_api = ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
 
         # Possibly set the mass / density
         if "mass" in self._load_config and self._load_config["mass"] is not None:
@@ -798,8 +795,9 @@ class ClothPrim(GeomPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        # We have to set the mass directly in the cloth prim
-        self._mass_api.GetMassAttr().Set(mass)
+        with og.sim.editing_usd():
+            # We have to set the mass directly in the cloth prim
+            self._mass_api.GetMassAttr().Set(mass)
 
     @property
     def density(self):

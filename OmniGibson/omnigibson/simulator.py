@@ -442,6 +442,12 @@ def _launch_simulator(*args, **kwargs):
             self._last_scene_edge = None
             self._stage_id = None
 
+            # USD edit guard: detects edits outside editing_usd() context
+            self._editing_usd = False
+            self._in_sim_lifecycle = 0
+            self._usd_guard_enabled = False
+            self._usd_guard_listener = None
+
             # Create the SimulationContext instance (composition instead of inheritance)
             self._sim_context = lazy.isaacsim.core.api.SimulationContext(
                 physics_dt=physics_dt,
@@ -501,14 +507,15 @@ def _launch_simulator(*args, **kwargs):
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
 
-            # Create world prim
-            self.stage.DefinePrim("/World", "Xform")
-
             # Create the Fabric Hierarchy
             self.usdrt_stage = lazy.isaacsim.core.utils.stage.get_current_stage(fabric=True)
             self.fabric_hierarchy = lazy.usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(
                 self.usdrt_stage.GetFabricId(), self.usdrt_stage.GetStageIdAsStageId()
             )
+
+            # Create world prim and set up initial USD state
+            with self.editing_usd():
+                self.stage.DefinePrim("/World", "Xform")
 
             # Cycle play / stop to validate sim.psi object to avoid getPhysXSceneStatistics errors
             self.play()
@@ -541,6 +548,9 @@ def _launch_simulator(*args, **kwargs):
 
             # Acquire contact sensor interface
             self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()
+
+            # Enable the USD edit guard - from now on, any USD edits outside editing_usd() will crash
+            self._enable_usd_guard()
 
         def _set_viewer_camera(
             self,
@@ -727,19 +737,22 @@ def _launch_simulator(*args, **kwargs):
             """
             if self._floor_plane is not None:
                 return
+
             ground_plane_relative_path = "/ground_plane"
-            plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
-                prim_path="/World" + ground_plane_relative_path,
-                name="ground_plane",
-                z_position=0,
-                size=None,
-                color=None if floor_plane_color is None else th.tensor(floor_plane_color),
-                visible=floor_plane_visible,
-                # TODO: update with new PhysicsMaterial API
-                # static_friction=static_friction,
-                # dynamic_friction=dynamic_friction,
-                # restitution=restitution,
-            )
+
+            with self.editing_usd():
+                plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
+                    prim_path="/World" + ground_plane_relative_path,
+                    name="ground_plane",
+                    z_position=0,
+                    size=None,
+                    color=None if floor_plane_color is None else th.tensor(floor_plane_color),
+                    visible=floor_plane_visible,
+                    # TODO: update with new PhysicsMaterial API
+                    # static_friction=static_friction,
+                    # dynamic_friction=dynamic_friction,
+                    # restitution=restitution,
+                )
 
             triangularize_mesh(lazy.pxr.UsdGeom.Mesh.Define(self.stage, plane.prim.GetChildren()[0].GetPath()))
 
@@ -1078,25 +1091,33 @@ def _launch_simulator(*args, **kwargs):
         # ---- End proxy properties/methods ----
 
         def render(self):
-            self._sim_context.render()
-            # During rendering, the Fabric API is updated, so we can mark it as clean
-            PoseAPI.mark_valid()
+            self._in_sim_lifecycle += 1
+            try:
+                self._sim_context.render()
+                # During rendering, the Fabric API is updated, so we can mark it as clean
+                PoseAPI.mark_valid()
+            finally:
+                self._in_sim_lifecycle -= 1
 
         def _refresh_physics_sim_view(self):
-            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
-            IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
+            self._in_sim_lifecycle += 1
+            try:
+                SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+                IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
 
-            stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
-            SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
-                SimulationManager._backend, stage_id=stage_id
-            )
-            SimulationManager._physics_sim_view.set_subspace_roots("/")
-            SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
-                "warp", stage_id=stage_id
-            )
-            SimulationManager._simulation_view_created = True
-            SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
-            SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
+                stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
+                SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
+                    SimulationManager._backend, stage_id=stage_id
+                )
+                SimulationManager._physics_sim_view.set_subspace_roots("/")
+                SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
+                    "warp", stage_id=stage_id
+                )
+                SimulationManager._simulation_view_created = True
+                SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
+                SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
+            finally:
+                self._in_sim_lifecycle -= 1
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -1128,10 +1149,14 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 read_back (bool): If True, also fetch physics results to USD backings.
             """
-            self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
-            if read_back:
-                self.psi.fetch_results()
-                self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
+            self._in_sim_lifecycle += 1
+            try:
+                self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
+                if read_back:
+                    self.psi.fetch_results()
+                    self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
+            finally:
+                self._in_sim_lifecycle -= 1
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1206,6 +1231,13 @@ def _launch_simulator(*args, **kwargs):
                         scene.transition_rule_api.step()
 
         def play(self):
+            self._in_sim_lifecycle += 1
+            try:
+                self._play()
+            finally:
+                self._in_sim_lifecycle -= 1
+
+        def _play(self):
             if not self.is_playing():
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
                 was_stopped = self.is_stopped()
@@ -1265,12 +1297,16 @@ def _launch_simulator(*args, **kwargs):
                 self._sim_context.pause()
 
         def stop(self):
-            if not self.is_stopped():
-                self._sim_context.stop()
+            self._in_sim_lifecycle += 1
+            try:
+                if not self.is_stopped():
+                    self._sim_context.stop()
 
-            # Run all callbacks
-            for callback in self._callbacks_on_stop.values():
-                callback()
+                # Run all callbacks
+                for callback in self._callbacks_on_stop.values():
+                    callback()
+            finally:
+                self._in_sim_lifecycle -= 1
 
         @property
         def n_physics_timesteps_per_render(self):
@@ -1288,45 +1324,53 @@ def _launch_simulator(*args, **kwargs):
             """
             Step the simulation at self.get_sim_step_dt() rate
             """
-            render = self._render_on_step
-            if self.stage is None:
-                raise Exception("There is no stage currently opened, init_stage needed before calling this func")
+            self._in_sim_lifecycle += 1
+            try:
+                render = self._render_on_step
+                if self.stage is None:
+                    raise Exception("There is no stage currently opened, init_stage needed before calling this func")
 
-            # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
-            # step() may not step physics
-            if len(self._objects_to_initialize) > 0:
-                self.render()
+                # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
+                # step() may not step physics
+                if len(self._objects_to_initialize) > 0:
+                    self.render()
 
-            # Clear all scenes' updated objects
-            for scene in self.scenes:
-                scene.clear_updated_objects()
+                # Clear all scenes' updated objects
+                for scene in self.scenes:
+                    scene.clear_updated_objects()
 
-            for _ in range(self._n_steps_per_loop):
-                if render:
-                    self._sim_context.step(render=True)
-                    self._report_step_exceptions()
-                else:
-                    for i in range(self.n_physics_timesteps_per_render):
-                        self._sim_context.step(render=False)
+                for _ in range(self._n_steps_per_loop):
+                    if render:
+                        self._sim_context.step(render=True)
                         self._report_step_exceptions()
+                    else:
+                        for i in range(self.n_physics_timesteps_per_render):
+                            self._sim_context.step(render=False)
+                            self._report_step_exceptions()
 
-            # Additionally run non physics things
-            self._non_physics_step()
+                # Additionally run non physics things
+                self._non_physics_step()
 
-            # TODO (eric): After stage changes (e.g. pose, texture change), it will take two _sim_context.step(render=True) for
-            #  the result to propagate to the rendering. We could have called _sim_context.render() here but it will introduce
-            #  a big performance regression.
+                # TODO (eric): After stage changes (e.g. pose, texture change), it will take two _sim_context.step(render=True) for
+                #  the result to propagate to the rendering. We could have called _sim_context.render() here but it will introduce
+                #  a big performance regression.
+            finally:
+                self._in_sim_lifecycle -= 1
 
         def step_physics(self):
             """
             Step the physics a single step.
             """
-            self._physics_context._step(current_time=self.current_time)
-            self._report_step_exceptions()
+            self._in_sim_lifecycle += 1
+            try:
+                self._physics_context._step(current_time=self.current_time)
+                self._report_step_exceptions()
 
-            # Accumulate contact data from this physics step and then flush to cache.
-            # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-            RigidContactAPI.update_contact_cache()
+                # Accumulate contact data from this physics step and then flush to cache.
+                # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
+                RigidContactAPI.update_contact_cache()
+            finally:
+                self._in_sim_lifecycle -= 1
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
@@ -1508,6 +1552,84 @@ def _launch_simulator(*args, **kwargs):
             self.set_simulation_dt(physics_dt=slow_dt, rendering_dt=slow_dt, sim_step_dt=slow_dt)
             yield
             self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt, sim_step_dt=sim_step_dt)
+
+        @contextlib.contextmanager
+        def editing_usd(self):
+            """
+            Context manager for USD edits with proper Fabric synchronization.
+
+            Under Fabric Scene Delegate (lazy USD-Fabric sync), USD edits are NOT automatically
+            propagated to Fabric. This context manager ensures that USD changes are synchronized
+            to Fabric (via SynchronizeToFabric) when the block exits, so that code immediately
+            after the block can rely on Fabric being up to date.
+
+            This context MUST NOT be nested — opening an editing_usd() context while another is
+            already open will raise an error. All USD edits within a single logical operation
+            should be in one context.
+
+            A guard (enabled after simulator init) detects any USD edits that occur outside this
+            context and raises a RuntimeError with a full backtrace.
+
+            Usage::
+
+                with og.sim.editing_usd():
+                    prim.set_attribute("someAttr", value)
+                    other_prim.visible = False
+                # USD is now synchronized to Fabric
+            """
+            assert not self._editing_usd, (
+                "Cannot nest editing_usd() contexts. All USD edits for a logical operation "
+                "should be in a single editing_usd() block."
+            )
+            assert not self.currently_stepping, "Cannot edit USD while simulation is stepping!"
+            self._editing_usd = True
+            try:
+                yield
+            finally:
+                self._editing_usd = False
+                self.usdrt_stage.SynchronizeToFabric()
+
+        def _enable_usd_guard(self):
+            """Enable the guard that detects USD edits outside editing_usd() context."""
+            if self._usd_guard_enabled:
+                return
+            self._usd_guard_listener = lazy.pxr.Tf.Notice.Register(
+                lazy.pxr.Usd.Notice.ObjectsChanged, self._on_usd_objects_changed, self.stage
+            )
+            self._usd_guard_enabled = True
+
+        def _disable_usd_guard(self):
+            """Disable the USD edit guard."""
+            if self._usd_guard_listener is not None:
+                try:
+                    self._usd_guard_listener.Revoke()
+                except Exception:
+                    pass
+                self._usd_guard_listener = None
+            self._usd_guard_enabled = False
+
+        def _on_usd_objects_changed(self, notice, stage):
+            """Callback fired by Tf.Notice when USD objects change. Crashes if outside editing_usd()."""
+            if not self._usd_guard_enabled or self._editing_usd or self._in_sim_lifecycle > 0:
+                return
+
+            resynced = [str(p) for p in notice.GetResyncedPaths()]
+            info_only = [str(p) for p in notice.GetChangedInfoOnlyPaths()]
+            all_paths = resynced + info_only
+            if not all_paths:
+                return
+
+            stack = "".join(traceback.format_stack()[:-1])
+            paths_str = "\n  ".join(all_paths[:20])
+            if len(all_paths) > 20:
+                paths_str += f"\n  ... and {len(all_paths) - 20} more"
+            raise RuntimeError(
+                f"USD edit detected outside of og.sim.editing_usd() context!\n"
+                f"Changed paths:\n  {paths_str}\n"
+                f"Stack trace:\n{stack}\n"
+                f"All USD edits must be wrapped in a `with og.sim.editing_usd():` block "
+                f"to ensure proper USD-Fabric synchronization."
+            )
 
         def add_callback_on_play(self, name, callback):
             """
@@ -1785,6 +1907,9 @@ def _launch_simulator(*args, **kwargs):
 
         def _partial_clear(self):
             """Partial clear clearing all components owned by the Simulator. Rest is completed in og.clear."""
+            # Disable the USD guard during clearing since we're tearing everything down
+            self._disable_usd_guard()
+
             # Stop the physics
             self.stop()
 

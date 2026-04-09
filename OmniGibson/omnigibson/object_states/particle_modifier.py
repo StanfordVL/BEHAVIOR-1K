@@ -423,6 +423,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             self.projection_mesh.scale = self._projection_mesh_params["extents"]
 
             # Make sure the object updates its meshes, and assert that there's only a single visual mesh
+            # TODO: This is a bad idea. It creates orphaned prims when the mesh lists get overwritten. Why do we need this?
             self.link.update_meshes()
             assert (
                 len(self.link.visual_meshes) == 1

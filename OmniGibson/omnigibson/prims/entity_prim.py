@@ -133,7 +133,8 @@ class EntityPrim(XFormPrim):
             # Import now to avoid too-eager load of Omni classes due to inheritance
             from omnigibson.utils.deprecated_utils import ArticulationView
 
-            self._articulation_view_direct = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
+            with og.sim.editing_usd():
+                self._articulation_view_direct = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -681,9 +682,11 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         if drive:
-            self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
         else:
-            self._articulation_view.set_joint_positions(positions, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_positions(positions, joint_indices=indices)
             PoseAPI.invalidate()
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
@@ -712,9 +715,11 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         if drive:
-            self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
         else:
-            self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
 
     def set_joint_efforts(self, efforts, indices=None, normalized=False):
         """
@@ -738,7 +743,8 @@ class EntityPrim(XFormPrim):
             efforts = self._denormalize_efforts(efforts=efforts, indices=indices)
 
         # Set the DOF states
-        self._articulation_view.set_joint_efforts(efforts, joint_indices=indices)
+        with og.sim.editing_usd():
+            self._articulation_view.set_joint_efforts(efforts, joint_indices=indices)
 
     def _normalize_positions(self, positions, indices=None):
         """
@@ -1057,9 +1063,10 @@ class EntityPrim(XFormPrim):
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         # Actually set the pose.
-        self._articulation_view.set_world_poses(
-            positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
-        )
+        with og.sim.editing_usd():
+            self._articulation_view.set_world_poses(
+                positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
+            )
 
         # Invalidate the pose cache.
         PoseAPI.invalidate()
@@ -1261,9 +1268,10 @@ class EntityPrim(XFormPrim):
             count (int): How many position iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.isaacsim.core.utils.prims.set_prim_property(
-                self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count
-            )
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.prims.set_prim_property(
+                    self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count
+                )
         else:
             for link in self._links.values():
                 link.solver_position_iteration_count = count
@@ -1291,9 +1299,10 @@ class EntityPrim(XFormPrim):
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.isaacsim.core.utils.prims.set_prim_property(
-                self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count
-            )
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.prims.set_prim_property(
+                    self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count
+                )
         else:
             for link in self._links.values():
                 link.solver_velocity_iteration_count = count
@@ -1369,9 +1378,10 @@ class EntityPrim(XFormPrim):
             threshold (float): Sleeping threshold
         """
         if self.articulated:
-            lazy.isaacsim.core.utils.prims.set_prim_property(
-                self.articulation_root_path, "physxArticulation:sleepThreshold", threshold
-            )
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.prims.set_prim_property(
+                    self.articulation_root_path, "physxArticulation:sleepThreshold", threshold
+                )
         else:
             for link in self._links.values():
                 link.sleep_threshold = threshold

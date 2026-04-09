@@ -281,14 +281,15 @@ class MaterialPrim(BasePrim):
             inp (str): Name of the shader input whose value will be set
             val (any): Value to set for the input. This should be the valid type for that attribute.
         """
-        # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
-        if inp in self.shader_input_names:
-            self._shader.GetInput(inp).Set(val)
-        elif inp in self.shader_default_input_names:
-            input_type = get_sdf_value_type_name(val)
-            self._shader.CreateInput(inp, input_type).Set(val)
-        else:
-            raise ValueError(f"Got invalid shader input to set! Got: {inp}")
+        with og.sim.editing_usd():
+            # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
+            if inp in self.shader_input_names:
+                self._shader.GetInput(inp).Set(val)
+            elif inp in self.shader_default_input_names:
+                input_type = get_sdf_value_type_name(val)
+                self._shader.CreateInput(inp, input_type).Set(val)
+            else:
+                raise ValueError(f"Got invalid shader input to set! Got: {inp}")
 
     @property
     def shader(self):

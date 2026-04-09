@@ -2,6 +2,7 @@ import colorsys
 
 import torch as th
 from PIL import Image, ImageDraw
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
 import omnigibson.lazy as lazy
 
@@ -16,8 +17,9 @@ def add_semantic_label(prim, label, instance_name="class"):
         label (str): The semantic label to add (will be converted to a list internally)
         instance_name (str): The instance name for the label. Defaults to "class"
     """
-    lazy.isaacsim.core.utils.semantics.upgrade_prim_semantics_to_labels(prim=prim)
-    lazy.isaacsim.core.utils.semantics.add_labels(prim=prim, labels=[label], instance_name=instance_name)
+    with og.sim.editing_usd():
+        lazy.isaacsim.core.utils.semantics.upgrade_prim_semantics_to_labels(prim=prim)
+        lazy.isaacsim.core.utils.semantics.add_labels(prim=prim, labels=[label], instance_name=instance_name)
 
 
 class RandomScale:
