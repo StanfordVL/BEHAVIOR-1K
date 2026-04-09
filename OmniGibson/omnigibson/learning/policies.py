@@ -1,6 +1,5 @@
 import logging
 import torch as th
-from omnigibson.learning.utils.array_tensor_utils import torch_to_numpy
 from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
 from typing import Optional
 
@@ -65,8 +64,6 @@ class WebsocketPolicy:
     def forward(self, obs: dict, *args, **kwargs) -> th.Tensor:
         if "need_new_action" in obs and not obs["need_new_action"] and self.last_action is not None:
             return self.last_action
-        # convert observation to numpy
-        obs = torch_to_numpy(obs)
         self.last_action = self.policy.act(obs).detach().cpu()
         return self.last_action
 

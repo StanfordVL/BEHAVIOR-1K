@@ -6,8 +6,6 @@ from omnigibson.utils import transform_utils as T
 from omnigibson.transition_rules import (
     ToggleableMachineRule,
     MixingToolRule,
-    CookingObjectRule,
-    CookingPhysicalParticleRule,
     CookingSystemRule,
 )
 
@@ -393,7 +391,6 @@ EXTRA_TASK_RELEVANT_CATEGORIES = {
 OMNIGIBSON_MACROS = {
     "USE_NUMPY_CONTROLLER_BACKEND": True,
     "USE_GPU_DYNAMICS": (USE_FLUID or USE_CLOTH),
-    "ENABLE_FLATCACHE": True,
     "ENABLE_OBJECT_STATES": True,
     "ENABLE_TRANSITION_RULES": True,
     "ENABLE_CCD": True,

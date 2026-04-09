@@ -367,6 +367,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
         overwrite: bool = True,
         only_successes: bool = False,
         flush_every_n_traj: int = 10,
+        flush_every_n_steps: int = 0,
         full_scene_file: str | None = None,
         load_room_instances: list[str] | None = None,
         include_robot_control: bool = True,
@@ -387,6 +388,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             flush_every_n_traj (int): How often to flush (write) current data to file across episodes
+            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
+                This is useful when collecting very long trajectories that may have a large memory footprint before writing to disk.
+                If this is greater than 0, flush_every_n_traj must be set to 1.
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
@@ -408,6 +412,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
             overwrite=overwrite,
             only_successes=only_successes,
             flush_every_n_traj=flush_every_n_traj,
+            flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
@@ -416,3 +421,48 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
             robot_type=robot_type,
             task_name=task_name,
         )
+
+    def flush_partial_traj(self, step_idx: int, total_steps: int, step_data: dict) -> None:
+        """
+        Flush the current trajectory data to the LeRobot dataset. This is used when flush_every_n_steps
+        is greater than 0 to incrementally write trajectory data to disk during an episode.
+
+        With streaming encoding enabled, video data is written to disk in real-time via encoder threads.
+        This method adds frames to the dataset, then resets the trajectory history to free memory.
+
+        Args:
+            step_idx (int): The index of the current step in the overall trajectory.
+            total_steps (int): The total number of steps in the full trajectory.
+            step_data (dict): The data for one step, useful for allocating trajectory data.
+        """
+        log.info(f"Flushing partial trajectory at step {self.current_episode_step_count}...")
+        assert self.flush_every_n_steps > 0, "flush_every_n_steps must be greater than 0 to flush partial trajectory"
+        assert (
+            len(self.current_traj_history) > 0
+        ), "Expected non-empty trajectory history when flushing partial trajectory"
+        # Add frames to the LeRobot dataset incrementally
+        # Skip the first step (only has obs from reset, no action/reward)
+        for frame_idx in range(1, len(self.current_traj_history)):
+            traj_step = self.current_traj_history[frame_idx]
+
+            # Compose frame to add to dataset (same format as process_traj_to_dataset)
+            frame = {
+                "action": traj_step["action"],
+                "next.reward": th.tensor([traj_step["reward"]]),
+                "next.terminated": th.tensor([traj_step["terminated"]]),
+                "next.truncated": th.tensor([traj_step["truncated"]]),
+                **self.current_traj_history[frame_idx - 1]["obs"],
+            }
+            if self.task_name:
+                frame["task"] = self.task_name
+
+            self.dataset.add_frame(frame=frame)
+
+        # Keep the last observation for pairing with next segment's first action
+        # This is needed because obs[t] pairs with action[t+1], and after reset we need
+        # the previous observation to pair with the new action
+        last_step = self.current_traj_history[-1]
+        assert (
+            "obs" in last_step
+        ), f"Expected 'obs' key in last step of trajectory history to keep for next segment, but got: {last_step.keys()}"
+        self.current_traj_history = [{"obs": last_step["obs"]}]

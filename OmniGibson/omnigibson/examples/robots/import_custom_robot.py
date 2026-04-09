@@ -14,7 +14,6 @@ from addict import Dict
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.utils.asset_conversion_utils import (
     _add_xform_properties,
     _space_string_to_tensor,
@@ -23,9 +22,6 @@ from omnigibson.utils.asset_conversion_utils import (
 )
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import create_joint, create_primitive_mesh
-
-# Make sure flatcache is NOT used so we write directly to USD
-gm.ENABLE_FLATCACHE = False
 
 
 _DOCSTRING = """

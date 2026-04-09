@@ -996,7 +996,7 @@ class PoseAPI:
     This is a singleton class for getting world poses.
     Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
     After that, if we need to access the pose of a prim without stepping physics,
-    this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
+    this class will refresh the poses by syncing across USD-fabric-PhysX.
     """
 
     VALID = False
@@ -1024,16 +1024,11 @@ class PoseAPI:
 
             # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
             # check if this is still the case for later versions
+            # TODO(#2082): This is terrible for performance - let's try to fix this.
             og.sim.render()
 
-            # when flatcache is on
-            if og.sim._sim_context._physx_fabric_interface:
-                # no time step is taken here
-                og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
-            # when flatcache is off
-            else:
-                # no time step is taken here
-                og.sim.refresh_physics(sync_usd=True)
+            og.sim._sim_context._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+
             cls.mark_valid()
 
     @classmethod
@@ -1052,14 +1047,14 @@ class PoseAPI:
             not og.sim.currently_stepping
         ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
 
-        # Add to stored prims if not already existing
-        if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-
         cls._refresh()
 
         # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import get_world_pose
+        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale, get_world_pose
+
+        # Add to stored prims if not already existing or if the Fabric prim is stale
+        if prim_path not in cls.PRIMS or _get_world_pose_transform_w_scale(cls.PRIMS[prim_path]) is None:
+            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
         position, orientation = get_world_pose(cls.PRIMS[prim_path])
         return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)

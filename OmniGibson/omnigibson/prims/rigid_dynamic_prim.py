@@ -5,6 +5,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import PoseAPI
 
 from .rigid_prim import RigidPrim
@@ -179,6 +180,19 @@ class RigidDynamicPrim(RigidPrim):
             position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
 
         return position, orientation
+
+    def transform_local_points_to_world(self, points):
+        """Override to use physics-accurate world pose instead of Fabric hierarchy world matrix.
+
+        GetFabricHierarchyWorldMatrixAttr() is a USD-hierarchy-computed attribute and does not
+        reflect the physics world position for newly spawned or recently moved rigid bodies.
+        """
+        pos, ori = self.get_position_orientation(frame="world")
+        scale = self.get_world_scale()
+        transform = th.eye(4, dtype=th.float32)
+        transform[:3, :3] = T.quat2mat(ori) * scale[None, :]
+        transform[:3, 3] = pos
+        return T.transform_points(points, transform)
 
     @property
     def center_of_mass(self):

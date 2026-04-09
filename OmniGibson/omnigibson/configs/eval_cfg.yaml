@@ -1,9 +1,3 @@
-defaults:
-  - _self_  # all below configs will override this conf.yaml
-  - robot: r1pro
-  - task: behavior
-  - policy: ???
-
 env_wrapper: 
   _target_: omnigibson.learning.wrappers.RGBLowResWrapper
 policy_name: ???  # filled by policy

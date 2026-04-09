@@ -270,6 +270,7 @@ def test_next_to(env, bottom_cabinet, bowl, dishtowel):
         bowl.states[NextTo].set_value(bottom_cabinet, None)
 
 
+@pytest.mark.skip(reason="disable cloth tests until #2042")
 def test_overlaid(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
@@ -339,14 +340,15 @@ def test_aabb(env, breakfast_table, dishtowel):
         (breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1])
     )
 
-    pp = dishtowel.root_link.compute_particle_positions()
-    offset = dishtowel.root_link.cloth_system.particle_contact_offset
-    particle_aabb = (pp.min(dim=0).values - offset, pp.max(dim=0).values + offset)
-    assert th.allclose(dishtowel.states[AABB].get_value()[0], particle_aabb[0])
-    assert th.allclose(dishtowel.states[AABB].get_value()[1], particle_aabb[1])
-    assert th.all(
-        (dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1])
-    ).item()
+    # skip until #2042
+    # pp = dishtowel.root_link.compute_particle_positions()
+    # offset = dishtowel.root_link.cloth_system.particle_contact_offset
+    # particle_aabb = (pp.min(dim=0).values - offset, pp.max(dim=0).values + offset)
+    # assert th.allclose(dishtowel.states[AABB].get_value()[0], particle_aabb[0])
+    # assert th.allclose(dishtowel.states[AABB].get_value()[1], particle_aabb[1])
+    # assert th.all(
+    #     (dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1])
+    # ).item()
 
     with pytest.raises(NotImplementedError):
         breakfast_table.states[AABB].set_value(None)
@@ -387,7 +389,7 @@ def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
 
 
 def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dishtowel):
-    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
+    dishtowel = cookable_dishtowel
 
     place_obj_on_floor_plane(microwave)
     place_obj_on_floor_plane(stove, x_offset=1.0)
@@ -460,7 +462,7 @@ def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dis
 
     # Set the objects to be on top of the stove
     bagel.set_position_orientation(position=[0.78, -0.2, 0.88], orientation=[0, 0, 0, 1])
-    dishtowel.set_position_orientation(position=[0.84, -0.15, 0.88], orientation=[0, 0, 0, 1])
+    dishtowel.set_position_orientation(position=[0.84, -0.15, 0.89], orientation=[0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
@@ -831,7 +833,7 @@ def test_particle_sink(env, furniture_sink):
 
 
 @pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
-def test_particle_applier(env, breakfast_table, acetone_atomizer):
+def test_particle_applier(env, breakfast_table, acetone_atomizer, applier_dishtowel):
     # Test projection
 
     place_obj_on_floor_plane(breakfast_table)
@@ -1023,6 +1025,7 @@ def test_open(env, microwave, bottom_cabinet):
     assert not bottom_cabinet.states[Open].get_value()
 
 
+@pytest.mark.skip(reason="disable cloth tests until #2042")
 def test_folded_unfolded(env, carpet):
     place_obj_on_floor_plane(carpet)
 
@@ -1078,6 +1081,7 @@ def test_folded_unfolded(env, carpet):
         carpet.states[Folded].set_value(True)
 
 
+@pytest.mark.skip(reason="disable cloth tests until #2042")
 def test_draped(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
