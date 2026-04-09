@@ -476,8 +476,8 @@ def _launch_simulator(*args, **kwargs):
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
 
-            # Counter for objects currently being added or removed (nested adding_objects / removing_objects scopes).  
-            # We track these to delay certain operations (e.g., callbacks, state updates) until all pending add/remove operations complete.  
+            # Counter for objects currently being added or removed (nested adding_objects / removing_objects scopes).
+            # We track these to delay certain operations (e.g., callbacks, state updates) until all pending add/remove operations complete.
             self._n_adding_removing_objects = 0
 
             # Maps callback name to callback
