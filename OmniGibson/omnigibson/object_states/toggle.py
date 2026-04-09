@@ -71,12 +71,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
     scales = None
 
     # Pre-computed contact masks built in initialize_view(); reused every step.
-    # _finger_row_mask:            (R,)     — finger rows in the contact matrix; computed once (robots are fixed)
-    # _finger_contact_query_mask:  (S, 1, R) — _finger_row_mask broadcast to (S, 1, R); rebuilt when S or R changes
-    # _obj_contact_with_mask:      (S, N, C) — column masks for each toggle object
-    _finger_row_mask = None
-    _finger_contact_query_mask = None
-    _obj_contact_with_mask = None
+    _finger_contact_query_mask = None  # list[Tensor(1, R_s) | None] — finger row mask per scene
+    _obj_contact_with_mask = None  #  list[Tensor(N, C_s) | None] — toggle-object col masks per scene
 
     # (S, N) bool tensor: result of is_in_contact_batch from previous global_update call.
     # Written by global_update(), read by _update_values().
@@ -154,16 +150,16 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 if relative_prim_path not in cls.OBJ_IDXS:
                     continue
                 obj_idx_new = cls.OBJ_IDXS[relative_prim_path]
-                for s_idx in range(min(prev_steps.shape[0], S)):
-                    cls._can_toggle_steps[s_idx, obj_idx_new] = prev_steps[s_idx, obj_idx_old]
+                for scene_idx in range(min(prev_steps.shape[0], S)):
+                    cls._can_toggle_steps[scene_idx, obj_idx_new] = prev_steps[scene_idx, obj_idx_old]
 
         # Build _requires_closed: (S, N) — read _requires_closed_init directly to avoid
         # going through the property before the tensor is fully populated.
         cls._requires_closed = th.zeros((S, N), dtype=th.bool, device="cuda")
-        for s_idx, s_row in enumerate(cls.IDX_OBJS):
+        for scene_idx, s_row in enumerate(cls.IDX_OBJS):
             for obj_idx, obj in enumerate(s_row):
                 if obj is not None:
-                    cls._requires_closed[s_idx, obj_idx] = obj.states[ToggledOn]._requires_closed_init
+                    cls._requires_closed[scene_idx, obj_idx] = obj.states[ToggledOn]._requires_closed_init
 
         # Build _open_col_idx: (N,) long — maps each toggle-object N-index to its column in
         # Open.VALUES.  -1 for objects that have no Open state.
@@ -185,10 +181,9 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 cls.scales[obj_idx_new] = prev_scales[obj_idx_old]
 
         if S == 0 or N == 0:
-            # No objects — allocate empty tensors and return early
-            # _finger_contact_query_mask and _obj_contact_with_mask stay CPU (RigidContactAPI interface)
-            cls._finger_contact_query_mask = th.zeros((0, 1, 0), dtype=th.bool)
-            cls._obj_contact_with_mask = th.zeros((0, 0, 0), dtype=th.bool)
+            # No objects — allocate empty lists/tensors and return early
+            cls._finger_contact_query_mask = []
+            cls._obj_contact_with_mask = []
             cls._finger_contact_result = th.zeros((0, 0), dtype=th.bool, device="cuda")
             cls._mask_force_off = th.zeros((0, 0), dtype=th.bool, device="cuda")
             cls._mask_active = th.zeros((0, 0), dtype=th.bool, device="cuda")
@@ -197,43 +192,46 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
             cls._mask_flip = th.zeros((0, 0), dtype=th.bool, device="cuda")
             return
 
-        # ----- Contact masks via public API (no _* access to RigidContactAPI internals) -----
-        # All scenes share identical relative prim paths → compute once from scene 0, broadcast.
+        # Build per-scene contact masks
+        #     broadcasting against (N, C_s) in is_in_contact_batch gives one result per object.
+        cls._finger_contact_query_mask = []
+        cls._obj_contact_with_mask = []
 
-        # Finger query mask: (S, 1, R). R is num_rows in RigidContactAPI
-        # _finger_row_mask is computed once (robots are fixed); _finger_contact_query_mask is
-        # reshaped from it whenever S or R changes.
-        if cls._finger_row_mask is None:
-            scene_0 = og.sim.scenes[0]
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            # Early return if this scene doesn't have contact view
+            if not RigidContactAPI.has_contact_view(scene_idx):
+                cls._finger_contact_query_mask.append(None)
+                cls._obj_contact_with_mask.append(None)
+                continue
+
             finger_links = [
                 link
-                for robot in scene_0.robots
+                for robot in scene.robots
                 if robot.is_manipulation
                 for links in robot.finger_links.values()
                 for link in links
             ]
-            if finger_links:
-                cls._finger_row_mask = RigidContactAPI.get_contact_row_mask(finger_links)  # (R,)
-        if cls._finger_row_mask is not None and (
-            cls._finger_contact_query_mask is None or cls._finger_contact_query_mask.shape[0] != S
-        ):
-            cls._finger_contact_query_mask = cls._finger_row_mask.view(1, 1, -1).expand(S, 1, -1).clone()
+            # Early return if this scene doesn't have robot fingers
+            if not finger_links:
+                cls._finger_contact_query_mask.append(None)
+                cls._obj_contact_with_mask.append(None)
+                continue
 
-        # Object with-mask: (S, N, C) — scene 0 is representative; all scenes share identical objects.
-        # Only rebuild when S or N changes (new scene or new toggle object type).
-        # C is num_cols in RigidContactAPI
-        if cls._obj_contact_with_mask is None or cls._obj_contact_with_mask.shape[:2] != (S, N):
-            cls._obj_contact_with_mask = (
+            # Build finger mask, shape (1, R_s)
+            row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,)
+            cls._finger_contact_query_mask.append(row_mask.unsqueeze(0))  # (1, R_s)
+
+            # Build toggle-able object mask, shape (N, C_s)
+            cls._obj_contact_with_mask.append(
                 th.stack(
                     [
-                        RigidContactAPI.get_contact_col_mask(list(cls.IDX_OBJS[0][obj_idx].links.values()))
+                        RigidContactAPI.get_contact_col_mask(
+                            scene_idx, list(cls.IDX_OBJS[scene_idx][obj_idx].links.values())
+                        )
                         for obj_idx in range(N)
                     ]
                 )
-                .unsqueeze(0)
-                .expand(S, -1, -1)
-                .clone()
-            )  # (S, N, C)
+            )
 
         # Allocate per-step scratch masks — GPU for computation; contact query masks stay CPU
         cls._finger_contact_result = th.zeros((S, N), dtype=th.bool, device="cuda")
@@ -299,27 +297,27 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
     @classmethod
     def global_update(cls):
         """
-        Step 1 — Batch contact check:
-            Query which toggle objects are touched by robot fingers using is_in_contact_batch.
-            Pre-computed masks (_finger_contact_query_mask, _obj_contact_with_mask) are reused
-            from initialize_view(); no per-step path rebuild.
-
-        Step 2 — Tensorized value update:
-            Delegate to TensorizedValueState.global_update(), which calls _update_values() and
-            fires state_updated() for any object whose VALUES row changed.
+        Step 1 — Batch contact check. Query which toggle objects are touched by robot fingers using is_in_contact_batch.
+        Step 2 — Tensorized value update
         """
-        if cls._finger_contact_query_mask is None or cls._finger_contact_query_mask.numel() == 0:
+        if not cls._finger_contact_query_mask:
             return
 
-        # Step 1 - batch contact check: returns (S, N) bool
-        cls._finger_contact_result.copy_(
-            RigidContactAPI.is_in_contact_batch(
-                query_masks=cls._finger_contact_query_mask,  # (S, 1, R)
-                with_masks=cls._obj_contact_with_mask,  # (S, N, C)
+        # Step 1 - per-scene contact check; results collected into _finger_contact_result (S, N).
+        # query_masks (1, R_s) broadcasts against with_masks (N, C_s) inside is_in_contact_batch,
+        # so the call returns (N,) bool — one entry per toggle object.
+        cls._finger_contact_result.fill_(False)
+        for scene_idx, (finger, object) in enumerate(zip(cls._finger_contact_query_mask, cls._obj_contact_with_mask)):
+            if finger is None:
+                continue
+            result = RigidContactAPI.is_in_contact_batch(
+                scene_idx=scene_idx,
+                query_masks=finger,  # (1, R_s)
+                with_masks=object,  # (N, C_s)
                 ignore_masks=None,
                 current_only=False,
-            )
-        )
+            )  # (N,) bool
+            cls._finger_contact_result[scene_idx].copy_(result)
 
         # Step 2 - batch value update (calls _update_values, then fires state_updated)
         super().global_update()
