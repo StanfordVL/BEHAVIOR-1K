@@ -456,8 +456,10 @@ def _launch_simulator(*args, **kwargs):
                 device=device,
             )
 
-            # CUDA stream used for async GPU→CPU copies of TensorizedValueState.VALUES
+            # CUDA stream for async GPU→CPU copies of TensorizedValueState.VALUES
             self.GPU_TO_CPU = th.cuda.Stream()
+            # CUDA stream for async CPU→GPU copies of PhysX-sourced data (poses, DOF, contacts)
+            self.CPU_TO_GPU = th.cuda.Stream()
 
             # Store other references to variables that will be initialized later
             self._scenes = []
@@ -1154,6 +1156,12 @@ def _launch_simulator(*args, **kwargs):
                 RigidBodyViewAPI.update_pose_cache()
                 ArticulatedObjectViewAPI.update_dof_cache()
 
+                # Async CPU→GPU copies; synchronize before state global_updates read GPU data
+                RigidContactAPI.async_copy_to_gpu()
+                RigidBodyViewAPI.async_copy_to_gpu()
+                ArticulatedObjectViewAPI.async_copy_to_gpu()
+                self.CPU_TO_GPU.synchronize()
+
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
                 if n_objects_to_initialize > 0 and self.is_playing():
@@ -1360,6 +1368,11 @@ def _launch_simulator(*args, **kwargs):
             RigidContactAPI.update_contact_cache()
             RigidBodyViewAPI.update_pose_cache()
             ArticulatedObjectViewAPI.update_dof_cache()
+
+            RigidContactAPI.async_copy_to_gpu()
+            RigidBodyViewAPI.async_copy_to_gpu()
+            ArticulatedObjectViewAPI.async_copy_to_gpu()
+            self.CPU_TO_GPU.synchronize()
 
             # TODO (andi) is this ideal?
             # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read

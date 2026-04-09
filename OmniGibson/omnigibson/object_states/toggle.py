@@ -217,11 +217,11 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 cls._obj_contact_with_mask.append(None)
                 continue
 
-            # Build finger mask, shape (1, R_s)
-            row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,)
-            cls._finger_contact_query_mask.append(row_mask.unsqueeze(0))  # (1, R_s)
+            # Build finger mask, shape (1, R_s) — GPU to match GPU contact matrix in is_in_contact_batch
+            row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,) CPU
+            cls._finger_contact_query_mask.append(row_mask.unsqueeze(0).cuda())  # (1, R_s) GPU
 
-            # Build toggle-able object mask, shape (N, C_s)
+            # Build toggle-able object mask, shape (N, C_s) — GPU
             cls._obj_contact_with_mask.append(
                 th.stack(
                     [
@@ -230,7 +230,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                         )
                         for obj_idx in range(N)
                     ]
-                )
+                ).cuda()
             )
 
         # Allocate per-step scratch masks — GPU for computation; contact query masks stay CPU

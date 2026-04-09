@@ -234,7 +234,8 @@ class RigidBodyViewAPIImpl:
         # shape: (N_links_total, 4, 4)
         # physx_untracked slice is appended after all physx_tracked entries and never
         # overwritten by update_pose_cache(); refreshed only by invalidate_kinematic().
-        self._POSE_MATRICES = None
+        self._POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
+        self._POSE_MATRICES_CPU = None  # pinned CPU staging buffer — written by update_pose_cache()
 
         # Local homogeneous collision points for every rigid link, indexed by flat pose index.
         # shape: (N_links_total, V_max, 4)
@@ -308,7 +309,8 @@ class RigidBodyViewAPIImpl:
                 new_idxs = th.tensor([n for _, n in surviving], dtype=th.long)
                 self._POSES[new_idxs] = prev_poses[old_idxs]
 
-        self._POSE_MATRICES = self._poses_to_matrices(self._POSES).cuda()  # (N_links_physx_tracked, 4, 4) — GPU
+        _pose_matrices_cpu = self._poses_to_matrices(self._POSES)  # (N_links_physx_tracked, 4, 4) — CPU
+        self._POSE_MATRICES = _pose_matrices_cpu.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
 
         # --- Phase C: Add physx_untracked kinematic links and collects collision_boundary_points_local---
         N_physx_total = len(self._PATH_TO_IDX)  # boundary between physx_tracked and physx_untracked
@@ -351,10 +353,13 @@ class RigidBodyViewAPIImpl:
         # --- Phase D: Include kinematics-only links into _POSE_MATRICES ---
         N_untracked = len(self._PATH_TO_IDX) - N_physx_total
         if N_untracked > 0:
-            extra = th.zeros(N_untracked, 4, 4, device="cuda")
-            self._POSE_MATRICES = th.cat([self._POSE_MATRICES, extra], dim=0)
+            extra_cpu = th.zeros(N_untracked, 4, 4)
+            _pose_matrices_cpu = th.cat([_pose_matrices_cpu, extra_cpu], dim=0)
+            self._POSE_MATRICES = th.cat([self._POSE_MATRICES, th.zeros(N_untracked, 4, 4, device="cuda")], dim=0)
             for path_idx, poses in kinematic_poses_to_fill:
-                self._POSE_MATRICES[path_idx] = self._poses_to_matrices(poses.reshape(1, 7))[0].cuda()
+                _pose_matrices_cpu[path_idx] = self._poses_to_matrices(poses.reshape(1, 7))[0]
+
+        self._POSE_MATRICES_CPU = _pose_matrices_cpu.pin_memory()
 
         # --- Phase E: build LOCAL_POINTS and POINTS_MASK tensors---
         N_total = len(self._PATH_TO_IDX)
@@ -396,9 +401,9 @@ class RigidBodyViewAPIImpl:
                 continue
 
             self._POSES[start:end][changed] = transforms[changed]
-            # Convert local changed indices to absolute flat indices in _POSE_MATRICES
+            # Convert local changed indices to absolute flat indices in _POSE_MATRICES_CPU
             changed_flat = start + th.where(changed)[0]
-            self._POSE_MATRICES[changed_flat] = self._poses_to_matrices(self._POSES[changed_flat]).cuda()
+            self._POSE_MATRICES_CPU[changed_flat] = self._poses_to_matrices(self._POSES[changed_flat])
 
     @staticmethod
     def _poses_to_matrices(poses):
@@ -481,7 +486,16 @@ class RigidBodyViewAPIImpl:
             pos, quat_wxyz = link.get_position_orientation()
             quat_xyzw = th.cat([quat_wxyz[1:], quat_wxyz[:1]])
             pose_7 = th.cat([pos, quat_xyzw]).reshape(1, 7)
-            self._POSE_MATRICES[idx] = self._poses_to_matrices(pose_7)[0]
+            mat = self._poses_to_matrices(pose_7)[0]
+            self._POSE_MATRICES_CPU[idx] = mat
+            self._POSE_MATRICES[idx] = mat.cuda()
+
+    def async_copy_to_gpu(self):
+        """Issue non-blocking bulk copy of _POSE_MATRICES_CPU → _POSE_MATRICES on CPU_TO_GPU stream."""
+        if self._POSE_MATRICES_CPU is None:
+            return
+        with th.cuda.stream(og.sim.CPU_TO_GPU):
+            self._POSE_MATRICES.copy_(self._POSE_MATRICES_CPU, non_blocking=True)
 
     def clear(self):
         """Reset all cached state."""
@@ -491,6 +505,7 @@ class RigidBodyViewAPIImpl:
         self._POSES = None
         self._SCENE_PHYSX_OFFSETS = None
         self._POSE_MATRICES = None
+        self._POSE_MATRICES_CPU = None
         self.LOCAL_POINTS = None
         self.POINTS_MASK = None
 
@@ -515,7 +530,8 @@ class ArticulatedObjectViewAPIImpl:
     def __init__(self):
         self._VIEW = None
         self._OBJ_TO_VIEW_IDX = {}
-        self._POSITIONS = None
+        self._POSITIONS = None  # GPU — written by async_copy_to_gpu()
+        self._POSITIONS_CPU = None  # CPU — latest PhysX output, written by update_dof_cache()
 
     def initialize_view(self):
         self.clear()
@@ -537,17 +553,17 @@ class ArticulatedObjectViewAPIImpl:
         pattern = "/World/scene_*/articulated__*/*"
         self._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
         self._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(self._VIEW.prim_paths)}
-        # Pre-allocate _POSITIONS on GPU. PhysX may return CPU or GPU tensors depending on the
-        # physics pipeline; copy_() handles both cases uniformly.
+        # Pre-allocate _POSITIONS on GPU; _POSITIONS_CPU holds the latest PhysX output.
         raw = self._VIEW.get_dof_positions()
+        self._POSITIONS_CPU = raw
         self._POSITIONS = th.zeros_like(raw, device="cuda")
-        self._POSITIONS.copy_(raw)
+        self._POSITIONS.copy_(raw)  # synchronous init so first read is valid
 
     def update_dof_cache(self):
-        """Populate _POSITIONS in-place from the single view. Called every step."""
+        """Fetch latest DOF positions from PhysX into CPU staging buffer. Called every step."""
         if self._VIEW is None:
             return
-        self._POSITIONS.copy_(self._VIEW.get_dof_positions(), non_blocking=True)
+        self._POSITIONS_CPU = self._VIEW.get_dof_positions()
 
     def get_view_row(self, abs_prim_path):
         """Return row index in _POSITIONS for a given absolute articulation root path, or None."""
@@ -561,10 +577,18 @@ class ArticulatedObjectViewAPIImpl:
         """Return _POSITIONS[position_rows] — pure tensor index, no PhysX call."""
         return self._POSITIONS[position_rows]
 
+    def async_copy_to_gpu(self):
+        """Issue non-blocking copy of _POSITIONS_CPU → _POSITIONS on CPU_TO_GPU stream."""
+        if self._POSITIONS_CPU is None:
+            return
+        with th.cuda.stream(og.sim.CPU_TO_GPU):
+            self._POSITIONS.copy_(self._POSITIONS_CPU, non_blocking=True)
+
     def clear(self):
         self._VIEW = None
         self._OBJ_TO_VIEW_IDX = {}
         self._POSITIONS = None
+        self._POSITIONS_CPU = None
 
 
 ArticulatedObjectViewAPI = ArticulatedObjectViewAPIImpl()
@@ -607,9 +631,11 @@ class RigidContactAPIImpl:
         # Contact matrix tracking contacts that occurred at any point during the last N physics steps
         # (between consecutive update_contact_cache calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_GPU = dict()  # GPU mirror — written by async_copy_to_gpu()
 
         # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
         self._CURRENT_CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU mirror — written by async_copy_to_gpu()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
@@ -760,6 +786,8 @@ class RigidContactAPIImpl:
                 initial_contacts = th.any(initial_impulses != 0, dim=-1)
                 self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
                 self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
+                self._CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
 
                 # Initialize pending accumulation lists for this scene
                 # Note that existing data in these lists will be lost when the view is rebuilt.
@@ -1144,10 +1172,12 @@ class RigidContactAPIImpl:
         """
         assert with_masks is None or ignore_masks is None, "Provide either with_masks or ignore_masks, not both."
 
-        if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
-            return th.zeros(query_masks.shape[0], dtype=th.bool)
+        if scene_idx not in self._CONTACT_MATRIX_GPU or scene_idx not in self._PATH_TO_COL_IDX:
+            return th.zeros(query_masks.shape[0], dtype=th.bool, device=query_masks.device)
 
-        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = (
+            self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] if current_only else self._CONTACT_MATRIX_GPU[scene_idx]
+        )
 
         # query_contacts[i, c] = True iff any row in query set i is in contact with column c.
         # We use float matmul for speed: (N, R) @ (R, C) -> (N, C), then threshold.
@@ -1164,6 +1194,15 @@ class RigidContactAPIImpl:
         """Returns True if a valid contact view has been initialized for @scene_idx."""
         return scene_idx in self._CONTACT_MATRIX
 
+    def async_copy_to_gpu(self):
+        """Issue non-blocking copies of CPU contact matrices → GPU mirrors on CPU_TO_GPU stream."""
+        with th.cuda.stream(og.sim.CPU_TO_GPU):
+            for scene_idx in self._CONTACT_MATRIX:
+                self._CONTACT_MATRIX_GPU[scene_idx].copy_(self._CONTACT_MATRIX[scene_idx], non_blocking=True)
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].copy_(
+                    self._CURRENT_CONTACT_MATRIX[scene_idx], non_blocking=True
+                )
+
     def clear(self):
         """
         Clears internal contact views, mappings, and caches.
@@ -1178,7 +1217,9 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_GPU = dict()
         self._CURRENT_CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()
         self._INDEX_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
         self._PENDING_IMPULSES = dict()
