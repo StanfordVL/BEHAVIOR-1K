@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## General Guidelines
 
-- **Use `behavior` conda environment by default** when running Python commands, unless explicitly told otherwise.
+- **Use `behavior` conda environment by default** when running Python commands, unless explicitly told otherwise. You can do this by using the `conda run` command. The conda binary is usually available as ~/miniconda3/condabin/conda.
 - **Make minimal changes** - prefer small, targeted edits over large rewrites. Avoid unnecessary stylistic changes (e.g., reformatting code that isn't relevant to the task).
 
 ## Project Overview
@@ -20,6 +20,8 @@ Supporting components: `asset_pipeline/` (3D asset conversion), `knowledgebase/`
 ## Commands
 
 ### Installation
+You should not have to install any part of this project, the user should have a pre-installed conda env for you. If that's not the case, refuse running things and ask them to install first. But for general reference, the below are the installation commands.
+
 ```bash
 # Modular install via setup script (conda env creation + component selection)
 bash setup.sh --new-env behavior --omnigibson --bddl
@@ -31,12 +33,11 @@ cd OmniGibson && pip install -e .[dev,eval]       # + evaluation dependencies
 ```
 
 ### Testing (OmniGibson)
-Tests require an NVIDIA GPU and Isaac Sim runtime. Run from the `OmniGibson/` directory:
+Tests require an NVIDIA RTX GPU (2080Ti+) and Isaac Sim runtime. Whenever running any tests, you should set the OMNIGIBSON_HEADLESS=1 environment flag so that a DISPLAY is not needed. Run from the `OmniGibson/` directory:
 ```bash
 pytest tests/                           # all tests
 pytest tests/test_object_states.py      # single test file
 pytest tests/test_envs.py -k "test_name" # single test by name
-pytest tests/test_envs.py --reruns 3    # retry flaky tests (pytest_rerunfailures)
 ```
 
 ### Linting
@@ -72,6 +73,11 @@ Key module relationships:
 - **`macros.py`** — Global configuration via `gm` (global macros) object.
 - **`action_primitives/`** — High-level action abstractions (pick, place, navigate).
 - **`learning/`** — RL training utilities.
+
+OmniGibson is based on Isaac Sim, which will be installed in the `behavior` conda env. You can expect to find Isaac Sim source files in the conda env's site packages directory,
+under the `isaacsim` package. Everything from isaacsim needs to be imported using the `omnigibson.lazy` module since these imports are only available after the app has launched
+(e.g. through simulator.py's launch_app). You can follow most of these imports to the source code by finding the appropriate extension inside the isaacsim directory. Especially
+relevant extensions' names start with isaacsim.core.
 
 ### BDDL3 (`bddl3/bddl/`)
 - **`activity_definitions/`** — One file per activity with symbolic pre/post conditions.
