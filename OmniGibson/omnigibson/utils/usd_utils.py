@@ -296,7 +296,7 @@ class RigidBodyViewAPIImpl:
             return
 
         self._SCENE_PHYSX_OFFSETS = th.tensor(physx_offsets, dtype=th.long)
-        self._POSES = th.cat(poses_list, dim=0)  # (N_links_physx_tracked, 7) — CPU, matches PhysX output
+        self._POSES = th.cat(poses_list, dim=0)  # (N_links_physx_tracked, 7), CPU
 
         # --- Phase B: carry over poses for surviving rigid bodies (flat — no scene loop) ---
         if prev_poses is not None and prev_poses.numel() > 0:
@@ -310,8 +310,7 @@ class RigidBodyViewAPIImpl:
 
         self._POSE_MATRICES = self._poses_to_matrices(self._POSES).cuda()  # (N_links_physx_tracked, 4, 4) — GPU
 
-        # --- Phase C: single loop over all scenes × objects × links ---
-        # Extends _PATH_TO_IDX with physx_untracked kinematic links and collects LOCAL_POINTS.
+        # --- Phase C: Add physx_untracked kinematic links and collects collision_boundary_points_local---
         N_physx_total = len(self._PATH_TO_IDX)  # boundary between physx_tracked and physx_untracked
         raw_local_points = {}  # {flat_idx: (V, 4) tensor}
         kinematic_poses_to_fill = []  # [(flat_idx, pose_7)]
@@ -322,46 +321,50 @@ class RigidBodyViewAPIImpl:
                 for link in obj.links.values():
                     abs_path = link.prim_path
 
-                    # Register physx_untracked kinematic links not yet in the index
+                    # Register articulated kinematic-only objects' links
                     if is_untracked and abs_path not in self._PATH_TO_IDX:
                         idx = len(self._PATH_TO_IDX)
                         self._PATH_TO_IDX[abs_path] = idx
                         self._IDX_TO_PATH.append(abs_path)
 
-                    flat_idx = self._PATH_TO_IDX.get(abs_path)
-                    if flat_idx is None:
-                        continue  # articulated non-kinematic link (robot, cabinet) — skip
+                    # Now if path not registered, meaning it's an articulated non-kinematic link (e.g. Robot)
+                    # Skip, should not be covered by this view
+                    path_idx = self._PATH_TO_IDX.get(abs_path)
+                    if path_idx is None:
+                        continue
 
-                    # Collect initial pose for physx_untracked links (only needed once)
-                    if is_untracked and flat_idx >= N_physx_total and abs_path not in prev_path_to_idx:
+                    # Collect initial pose for physx_untracked links
+                    # This is only needed once as they don't move
+                    if is_untracked and path_idx >= N_physx_total and abs_path not in prev_path_to_idx:
                         pos, quat_wxyz = link.get_position_orientation()
                         quat_xyzw = th.cat([quat_wxyz[1:], quat_wxyz[:1]])
-                        kinematic_poses_to_fill.append((flat_idx, th.cat([pos, quat_xyzw])))
+                        kinematic_poses_to_fill.append((path_idx, th.cat([pos, quat_xyzw])))
 
                     # Collect local collision points for AABB
+                    # This is require for all registered links
                     pts = link.collision_boundary_points_local  # (V, 3) or None
                     if pts is not None:
                         scale = link.get_world_scale()
                         homog = th.cat([pts * scale, th.ones(len(pts), 1)], dim=1)  # (V, 4)
-                        raw_local_points[flat_idx] = homog
+                        raw_local_points[path_idx] = homog
 
-        # --- Phase D: extend _POSE_MATRICES for physx_untracked links and fill their poses ---
+        # --- Phase D: Include kinematics-only links into _POSE_MATRICES ---
         N_untracked = len(self._PATH_TO_IDX) - N_physx_total
         if N_untracked > 0:
             extra = th.zeros(N_untracked, 4, 4, device="cuda")
             self._POSE_MATRICES = th.cat([self._POSE_MATRICES, extra], dim=0)
-            for flat_idx, pose_7 in kinematic_poses_to_fill:
-                self._POSE_MATRICES[flat_idx] = self._poses_to_matrices(pose_7.reshape(1, 7))[0].cuda()
+            for path_idx, poses in kinematic_poses_to_fill:
+                self._POSE_MATRICES[path_idx] = self._poses_to_matrices(poses.reshape(1, 7))[0].cuda()
 
-        # --- Phase E: build LOCAL_POINTS / POINTS_MASK ---
+        # --- Phase E: build LOCAL_POINTS and POINTS_MASK tensors---
         N_total = len(self._PATH_TO_IDX)
         V_max = max((p.shape[0] for p in raw_local_points.values()), default=1)
         self.LOCAL_POINTS = th.zeros(N_total, V_max, 4, device="cuda")
         self.POINTS_MASK = th.zeros(N_total, V_max, dtype=th.bool, device="cuda")
-        for flat_idx, pts in raw_local_points.items():
+        for path_idx, pts in raw_local_points.items():
             V = pts.shape[0]
-            self.LOCAL_POINTS[flat_idx, :V] = pts
-            self.POINTS_MASK[flat_idx, :V] = True
+            self.LOCAL_POINTS[path_idx, :V] = pts
+            self.POINTS_MASK[path_idx, :V] = True
 
     def update_pose_cache(self):
         """
@@ -844,6 +847,7 @@ class RigidContactAPIImpl:
             if N == 0:
                 continue
 
+            # TODO(andi) optimize here
             # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
             all_impulses = th.stack(pending_impulses, dim=0)
             all_transforms = th.stack(pending_transforms, dim=0)

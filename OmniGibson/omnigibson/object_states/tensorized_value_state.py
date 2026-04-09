@@ -143,6 +143,11 @@ class TensorizedValueState(AbsoluteObjectState):
 
         cls.VALUES = new_values
 
+        # Async GPU → CPU copy on the shared stream; simulator calls GPU_TO_CPU.synchronize()
+        # after the Pass 1 loop before any VALUES_CPU reads in Pass 2.
+        with th.cuda.stream(og.sim.GPU_TO_CPU):
+            cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
+
     @classmethod
     def _update_values(cls, values):
         """

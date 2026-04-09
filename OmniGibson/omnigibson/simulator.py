@@ -457,7 +457,7 @@ def _launch_simulator(*args, **kwargs):
             )
 
             # CUDA stream used for async GPU→CPU copies of TensorizedValueState.VALUES
-            self.COPY_STREAM = th.cuda.Stream()
+            self.GPU_TO_CPU = th.cuda.Stream()
 
             # Store other references to variables that will be initialized later
             self._scenes = []
@@ -1195,18 +1195,9 @@ def _launch_simulator(*args, **kwargs):
                         if issubclass(state_type, TensorizedValueState):
                             state_type.global_update()
 
-                    # Async GPU → CPU copy for all updated VALUES, then sync before Pass 2.
-                    # UpdateStateMixin states (Inside, OnTop, etc.) call get_value() which reads
-                    # VALUES_CPU, so the sync must complete before their update() calls.
-                    for state_type in self.object_state_types_requiring_update:
-                        if (
-                            issubclass(state_type, TensorizedValueState)
-                            and state_type.VALUES is not None
-                            and state_type.VALUES.numel() > 0
-                        ):
-                            with th.cuda.stream(self.COPY_STREAM):
-                                state_type.VALUES_CPU.copy_(state_type.VALUES, non_blocking=True)
-                    self.COPY_STREAM.synchronize()
+                    # Sync all async GPU→CPU copies issued inside each global_update().
+                    # UpdateStateMixin states read VALUES_CPU in Pass 2, so sync must complete first.
+                    self.GPU_TO_CPU.synchronize()
 
                     # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
                     for state_type in self.object_state_types_requiring_update:
@@ -1374,8 +1365,8 @@ def _launch_simulator(*args, **kwargs):
             # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read
             # up-to-date AABBs without waiting for the next full _non_physics_step.
             if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None and AABB.VALUES.numel() > 0:
-                AABB.global_update()
-                AABB.VALUES_CPU.copy_(AABB.VALUES)  # synchronous; caller needs result immediately
+                AABB.global_update()  # issues async copy on GPU_TO_CPU inside global_update()
+                self.GPU_TO_CPU.synchronize()  # wait before caller reads VALUES_CPU
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
