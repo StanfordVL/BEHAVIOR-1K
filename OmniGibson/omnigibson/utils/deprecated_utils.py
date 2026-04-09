@@ -20,7 +20,7 @@ from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformComman
 from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
-from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
+from pxr import Gf, PhysxSchema, UsdPhysics
 from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0
@@ -1062,53 +1062,14 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
 # This is a faster version than the native implementation, as it avoids pre-processing initially
 def _get_world_pose_transform_w_scale(fabric_prim):
     # Local import here to avoid circular imports
-    from omnigibson.macros import gm
 
     # This will return a transformation matrix with translation as the last row and scale included
     xformable_prim = usdrt.Rt.Xformable(fabric_prim)
 
-    # If using Fabric, directly use hierarchy world matrix attribute and return that value
-    if gm.ENABLE_FLATCACHE:
-        return xformable_prim.GetFabricHierarchyWorldMatrixAttr().Get(usdrt.Usd.TimeCode.Default())
-
-    if xformable_prim.HasWorldXform():
-        world_pos_attr = xformable_prim.GetWorldPositionAttr()
-        if not world_pos_attr.IsValid():
-            world_pos = usdrt.Gf.Vec3d(0)
-        else:
-            world_pos = world_pos_attr.Get(usdrt.Usd.TimeCode.Default())
-        world_orientation_attr = xformable_prim.GetWorldOrientationAttr()
-        if not world_orientation_attr.IsValid():
-            world_orientation = usdrt.Gf.Quatf(1)
-        else:
-            world_orientation = world_orientation_attr.Get(usdrt.Usd.TimeCode.Default())
-        world_scale_attr = xformable_prim.GetWorldScaleAttr()
-        if not world_scale_attr.IsValid():
-            world_scale = usdrt.Gf.Vec3d(1)
-        else:
-            world_scale = world_scale_attr.Get(usdrt.Usd.TimeCode.Default())
-        scale = usdrt.Gf.Matrix4d()
-        rot = usdrt.Gf.Matrix4d()
-        scale.SetScale(usdrt.Gf.Vec3d(world_scale))
-        rot.SetRotate(usdrt.Gf.Quatd(world_orientation))
-        result = scale * rot
-        result.SetTranslateOnly(world_pos)
-        return result
-    elif xformable_prim.HasLocalXform():
-        local_transform = xformable_prim.GetLocalMatrixAttr().Get(usdrt.Usd.TimeCode.Default())
-        parent_prim = fabric_prim.GetParent()
-        parent_world_transform = usdrt.Gf.Matrix4d(1.0)
-        if parent_prim:
-            parent_world_transform = _get_world_pose_transform_w_scale(parent_prim)
-        return local_transform * parent_world_transform
-    else:
-        usd_prim = get_prim_at_path(prim_path=fabric_prim.GetPrimPath().pathString, fabric=False)
-        local_transform = usdrt.Gf.Matrix4d(UsdGeom.Xformable(usd_prim).GetLocalTransformation(Usd.TimeCode.Default()))
-        parent_prim = fabric_prim.GetParent()
-        parent_world_transform = usdrt.Gf.Matrix4d(1.0)
-        if parent_prim:
-            parent_world_transform = _get_world_pose_transform_w_scale(parent_prim)
-        return local_transform * parent_world_transform
+    # Directly use hierarchy world matrix attribute and return that value
+    # TODO(#2082): The Isaac Sim version of this function does NOT do this. We should reconsider.
+    # This might even be producing faulty results.
+    return xformable_prim.GetFabricHierarchyWorldMatrixAttr().Get(usdrt.Usd.TimeCode.Default())
 
 
 # This is a faster version than the native implementation, as it avoids pre-processing initially and also avoids

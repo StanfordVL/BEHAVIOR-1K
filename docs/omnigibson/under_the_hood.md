@@ -22,15 +22,13 @@ PhysX contains an internal physics-only representation of the scene that it uses
 ### Fabric
 Fabric (formerly Flatcache) is an optimized representation of the scene that is a flattened version of the USD scene graph that is optimized for fast accesses to transforms and for rendering.
 
-  * It can be enabled using the ENABLE_FLATCACHE global macro in OmniGibson, which causes the renderer to use Fabric to get object transforms instead of USD, and causes PhysX to stop updating the USD state after every step and update the Fabric state instead.
+  * It is by default enabled in OmniGibson, which causes the renderer to use Fabric to get object transforms instead of USD, and causes PhysX to stop updating the USD state after every step and update the Fabric state instead.
   * The Fabric state exists alongside the USD and captures much of the same information, although it is not as complete as USD. It is optimized for fast reads and writes of object transforms and is used by the renderer to render the scene.
   * The information it contains is usually fresher than the USD, e.g. when Fabric is enabled, special attention needs to be paid in order to not accidentally access stale information from USD instead of Fabric.
   * Fabric stores world transforms directly, e.g. any changes of a transform of an object's parent will not be reflected in the child's position because the child separately stores its world transform. One main advantage of this setup is that it is not necessary to traverse the tree to compute world transforms.
   * A new library called `usdrt` provides an interface that can be used to access Fabric state in a way that is similar to the Pixar USD library. This is used in a number of places in OmniGibson to access Fabric state.
 
-To conclude, with ENABLE_FLATCACHE enabled, there will be three concurrent representations of the scene state in OmniGibson. USD will be the source of truth for the meshes and the hierarchy. While physics simulation is playing, PhysX will be the source of truth for the physics state of the scene, and we will use it for fast accesses to compute controls etc., and finally on every render step, PhysX will update Fabric which will then be the source of truth for the renderer and for the OmniGibson pose APIs.
-
-The ENABLE_FLATCACHE macro is recommended to be enabled since large scenes will be unplayable without it, but it can be disabled for small scenes, in which case the Fabric representation will not be used, PhysX will update the USD's local transforms on every step, and the renderer will use USD directly.
+To conclude, with Fabric enabled, there will be three concurrent representations of the scene state in OmniGibson. USD will be the source of truth for the meshes and the hierarchy. While physics simulation is playing, PhysX will be the source of truth for the physics state of the scene, and we will use it for fast accesses to compute controls etc., and finally on every render step, PhysX will update Fabric which will then be the source of truth for the renderer and for the OmniGibson pose APIs.
 
 ## Playing and Stopping
 First read the [Sources of Truth](#sources-of-truth-usd-physx-and-fabric) section to understand the three representations of the scene in Isaac Sim to understand the different representations of the scene state.

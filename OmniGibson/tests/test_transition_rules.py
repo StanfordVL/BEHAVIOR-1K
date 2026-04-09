@@ -445,6 +445,7 @@ def test_mixing_rule_failure_recipe_systems(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -492,6 +493,7 @@ def test_mixing_rule_failure_nonrecipe_systems(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -535,6 +537,7 @@ def test_mixing_rule_success(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -1386,8 +1389,8 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states(
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.50], orientation=[0, 0, 0, 1])
-    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.45], orientation=[0, 0, 0, 1])
     flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
     granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
     vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))
@@ -1456,8 +1459,8 @@ def test_single_toggleable_machine_rule_output_object_success(env, electric_mixe
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.50], orientation=[0, 0, 0, 1])
-    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.45], orientation=[0, 0, 0, 1])
     flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
     granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
     vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))

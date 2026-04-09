@@ -49,7 +49,6 @@ m.NUM_TRAIN_INSTANCES = 200
 m.NUM_EVAL_INSTANCES = 10
 
 # set global variables to boost performance
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 

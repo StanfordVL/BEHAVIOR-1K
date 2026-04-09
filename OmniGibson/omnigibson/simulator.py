@@ -584,7 +584,7 @@ def _launch_simulator(*args, **kwargs):
             # default collide with each other, and modify settings for speed optimization
             self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
-            self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
+            self._physics_context.enable_fabric(True)
 
             # Enable GPU dynamics based on whether we need omni particles feature
             if gm.USE_GPU_DYNAMICS:
@@ -614,7 +614,7 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/rtx/flow/enabled", True)
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
-            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", True)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
@@ -1125,6 +1125,7 @@ def _launch_simulator(*args, **kwargs):
             self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
             if sync_usd:
                 self.psi.fetch_results()
+            self._sim_context._physx_fabric_interface.update(0, self.current_time)
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1212,23 +1213,7 @@ def _launch_simulator(*args, **kwargs):
                 #   ignore this if the scale is close to uniform.
                 # We also need to suppress the following error when flat cache is used:
                 # [omni.physx.plugin] Transformation change on non-root links is not supported.
-                channels = ["omni.usd", "omni.physicsschema.plugin"]
-                if gm.ENABLE_FLATCACHE:
-                    channels.append("omni.physx.plugin")
-
-                if not gm.ENABLE_FLATCACHE:
-                    # In Isaac Sim 5.x, articulation child links are not fully registered in PhysX
-                    # on the first play after objects are loaded into the USD stage. A play/stop cycle
-                    # is needed to prime PhysX before the real play. We use the base SimulationContext
-                    # play/stop to do a bare-bones warmup that avoids OmniGibson's update_handles and
-                    # object initialization logic, which would fail on the missing bodies.
-                    # This issue only happens when flatcache / fabric is disabled.
-                    SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
-                    SimulationManager.enable_post_warm_start_callback(False)
-                    with suppress_omni_log(channels=channels):
-                        self._sim_context.play()
-                    self._sim_context.stop()
-                    SimulationManager.enable_post_warm_start_callback(True)
+                channels = ["omni.usd", "omni.physicsschema.plugin", "omni.physx.plugin"]
 
                 with suppress_omni_log(channels=channels):
                     self._sim_context.play()
@@ -1246,7 +1231,7 @@ def _launch_simulator(*args, **kwargs):
                     # sim was stopped. We need to reset them to default_kp and default_kd defined defined in Robot.
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
-                    # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
+                    # operations immediately after playing; e.g.: syncing USD poses when fabric is enabled
                     for scene in self.scenes:
                         for robot in scene.robots:
                             if robot.initialized:
@@ -1303,7 +1288,7 @@ def _launch_simulator(*args, **kwargs):
 
             # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
             # step() may not step physics
-            if len(self._objects_to_initialize) > 0:
+            if len(self._objects_to_initialize) > 0 or not PoseAPI.VALID:
                 self.render()
 
             # Clear all scenes' updated objects
