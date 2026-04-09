@@ -23,9 +23,13 @@ class TensorizedValueState(AbsoluteObjectState):
     which is called from ``simulator.py`` after scene changes.
     """
 
-    # Tensor of raw internally tracked values
+    # Tensor of raw internally tracked values — GPU-resident during computation
     # Shape is (S, N, ...), where S = scenes, N = object types, ... = value_shape
     VALUES = None
+
+    # Pinned CPU mirror of VALUES — updated via async DMA after each global_update pass.
+    # _get_value() always reads from here to avoid GPU stalls for Python callers.
+    VALUES_CPU = None
 
     # Dictionary mapping relative prim path to index in the N dimension of VALUES
     OBJ_IDXS = None
@@ -39,8 +43,9 @@ class TensorizedValueState(AbsoluteObjectState):
     @classmethod
     def global_initialize(cls):
         """Initialize the global class-level tensors and indices."""
-        # Shape (0, 0, *value_shape) — zero scenes, zero object types
-        cls.VALUES = th.empty(0, dtype=cls.value_type).reshape(0, 0, *cls.value_shape)
+        # Shape (0, 0, *value_shape) — zero scenes, zero object types; GPU-resident
+        cls.VALUES = th.empty(0, dtype=cls.value_type, device="cuda").reshape(0, 0, *cls.value_shape)
+        cls.VALUES_CPU = th.empty(0, dtype=cls.value_type).pin_memory().reshape(0, 0, *cls.value_shape)
         cls.OBJ_IDXS = {}  # {relative_prim_path: int}
         cls.IDX_OBJS = []  # list[list[obj|None]]
 
@@ -77,7 +82,8 @@ class TensorizedValueState(AbsoluteObjectState):
                     obj_idx = len(cls.OBJ_IDXS)
                     cls.IDX_OBJS.append([None] * obj_idx)
                     cls.VALUES = th.cat(
-                        [cls.VALUES, th.zeros((1, obj_idx, *cls.value_shape), dtype=cls.value_type)], dim=0
+                        [cls.VALUES, th.zeros((1, obj_idx, *cls.value_shape), dtype=cls.value_type, device="cuda")],
+                        dim=0,
                     )
 
                 # Register new relative path if first seen across all scenes
@@ -87,7 +93,11 @@ class TensorizedValueState(AbsoluteObjectState):
                     for s_row in cls.IDX_OBJS:
                         s_row.append(None)
                     cls.VALUES = th.cat(
-                        [cls.VALUES, th.zeros((len(cls.IDX_OBJS), 1, *cls.value_shape), dtype=cls.value_type)], dim=1
+                        [
+                            cls.VALUES,
+                            th.zeros((len(cls.IDX_OBJS), 1, *cls.value_shape), dtype=cls.value_type, device="cuda"),
+                        ],
+                        dim=1,
                     )
 
                 cls.IDX_OBJS[scene_idx][cls.OBJ_IDXS[rel_path]] = obj
@@ -101,6 +111,11 @@ class TensorizedValueState(AbsoluteObjectState):
                 for s_idx in range(min(prev_values.shape[0], len(cls.IDX_OBJS))):
                     if cls.IDX_OBJS[s_idx][obj_idx_new] is not None:
                         cls.VALUES[s_idx, obj_idx_new] = prev_values[s_idx, obj_idx_old]
+
+        # Rebuild pinned CPU mirror — synchronous copy so _get_value() is valid before first async copy
+        cls.VALUES_CPU = th.zeros(cls.VALUES.shape, dtype=cls.value_type).pin_memory()
+        if cls.VALUES.numel() > 0:
+            cls.VALUES_CPU.copy_(cls.VALUES)
 
     @classmethod
     def global_update(cls):
@@ -174,19 +189,21 @@ class TensorizedValueState(AbsoluteObjectState):
         pass
 
     def _get_value(self):
-        # Directly access value from global register using (scene_idx, obj_idx) coordinates
+        # Read from the pinned CPU mirror — no GPU stall for Python callers
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        val = self.VALUES[s, obj_idx].to(self.value_type)
+        val = self.VALUES_CPU[s, obj_idx].to(self.value_type)
         if isinstance(val, th.Tensor) and val.numel() == 1:
             val = val.item()
         return val
 
     def _set_value(self, new_value):
-        # Directly set value in global register using (scene_idx, obj_idx) coordinates
+        # Write to both GPU (VALUES) and CPU mirror (VALUES_CPU) synchronously.
+        # Safe: setters are never called from within _update_values.
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         self.VALUES[s, obj_idx] = new_value
+        self.VALUES_CPU[s, obj_idx] = new_value
         return True
 
     @property

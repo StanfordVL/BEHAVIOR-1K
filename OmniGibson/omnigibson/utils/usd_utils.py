@@ -296,7 +296,7 @@ class RigidBodyViewAPIImpl:
             return
 
         self._SCENE_PHYSX_OFFSETS = th.tensor(physx_offsets, dtype=th.long)
-        self._POSES = th.cat(poses_list, dim=0)  # (N_links_physx_tracked, 7)
+        self._POSES = th.cat(poses_list, dim=0)  # (N_links_physx_tracked, 7) — CPU, matches PhysX output
 
         # --- Phase B: carry over poses for surviving rigid bodies (flat — no scene loop) ---
         if prev_poses is not None and prev_poses.numel() > 0:
@@ -308,7 +308,7 @@ class RigidBodyViewAPIImpl:
                 new_idxs = th.tensor([n for _, n in surviving], dtype=th.long)
                 self._POSES[new_idxs] = prev_poses[old_idxs]
 
-        self._POSE_MATRICES = self._poses_to_matrices(self._POSES)  # (N_links_physx_tracked, 4, 4)
+        self._POSE_MATRICES = self._poses_to_matrices(self._POSES).cuda()  # (N_links_physx_tracked, 4, 4) — GPU
 
         # --- Phase C: single loop over all scenes × objects × links ---
         # Extends _PATH_TO_IDX with physx_untracked kinematic links and collects LOCAL_POINTS.
@@ -348,16 +348,16 @@ class RigidBodyViewAPIImpl:
         # --- Phase D: extend _POSE_MATRICES for physx_untracked links and fill their poses ---
         N_untracked = len(self._PATH_TO_IDX) - N_physx_total
         if N_untracked > 0:
-            extra = th.zeros(N_untracked, 4, 4)
+            extra = th.zeros(N_untracked, 4, 4, device="cuda")
             self._POSE_MATRICES = th.cat([self._POSE_MATRICES, extra], dim=0)
             for flat_idx, pose_7 in kinematic_poses_to_fill:
-                self._POSE_MATRICES[flat_idx] = self._poses_to_matrices(pose_7.reshape(1, 7))[0]
+                self._POSE_MATRICES[flat_idx] = self._poses_to_matrices(pose_7.reshape(1, 7))[0].cuda()
 
         # --- Phase E: build LOCAL_POINTS / POINTS_MASK ---
         N_total = len(self._PATH_TO_IDX)
         V_max = max((p.shape[0] for p in raw_local_points.values()), default=1)
-        self.LOCAL_POINTS = th.zeros(N_total, V_max, 4)
-        self.POINTS_MASK = th.zeros(N_total, V_max, dtype=th.bool)
+        self.LOCAL_POINTS = th.zeros(N_total, V_max, 4, device="cuda")
+        self.POINTS_MASK = th.zeros(N_total, V_max, dtype=th.bool, device="cuda")
         for flat_idx, pts in raw_local_points.items():
             V = pts.shape[0]
             self.LOCAL_POINTS[flat_idx, :V] = pts
@@ -395,7 +395,7 @@ class RigidBodyViewAPIImpl:
             self._POSES[start:end][changed] = transforms[changed]
             # Convert local changed indices to absolute flat indices in _POSE_MATRICES
             changed_flat = start + th.where(changed)[0]
-            self._POSE_MATRICES[changed_flat] = self._poses_to_matrices(self._POSES[changed_flat])
+            self._POSE_MATRICES[changed_flat] = self._poses_to_matrices(self._POSES[changed_flat]).cuda()
 
     @staticmethod
     def _poses_to_matrices(poses):
@@ -534,13 +534,17 @@ class ArticulatedObjectViewAPIImpl:
         pattern = "/World/scene_*/articulated__*/*"
         self._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
         self._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(self._VIEW.prim_paths)}
-        self._POSITIONS = self._VIEW.get_dof_positions()
+        # Pre-allocate _POSITIONS on GPU. PhysX may return CPU or GPU tensors depending on the
+        # physics pipeline; copy_() handles both cases uniformly.
+        raw = self._VIEW.get_dof_positions()
+        self._POSITIONS = th.zeros_like(raw, device="cuda")
+        self._POSITIONS.copy_(raw)
 
     def update_dof_cache(self):
         """Populate _POSITIONS in-place from the single view. Called every step."""
         if self._VIEW is None:
             return
-        self._POSITIONS[:] = self._VIEW.get_dof_positions()
+        self._POSITIONS.copy_(self._VIEW.get_dof_positions(), non_blocking=True)
 
     def get_view_row(self, abs_prim_path):
         """Return row index in _POSITIONS for a given absolute articulation root path, or None."""

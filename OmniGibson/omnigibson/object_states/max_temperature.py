@@ -33,6 +33,7 @@ class MaxTemperature(TensorizedValueState):
         cls.TEMPERATURE_IDXS = th.tensor(
             [Temperature.OBJ_IDXS[rel_path] for rel_path in cls.OBJ_IDXS],
             dtype=th.long,
+            device="cuda",
         )
 
         # Initialize new VALUE slots (not carried over) to -inf

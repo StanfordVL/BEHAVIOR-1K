@@ -46,6 +46,9 @@ class Temperature(TensorizedValueState):
         s_idxs = [obj.scene.idx for obj in objs]
         n_idxs = [cls.OBJ_IDXS[obj.relative_prim_path] for obj in objs]
         cls.VALUES[s_idxs, n_idxs] += (temperature - cls.VALUES[s_idxs, n_idxs]) * rate * og.sim.get_sim_step_dt()
+        # Mirror to CPU immediately — this runs in Pass 2 (after the async sync point), so
+        # VALUES_CPU would otherwise lag by one step for heatsource contributions.
+        cls.VALUES_CPU[s_idxs, n_idxs] = cls.VALUES[s_idxs, n_idxs].cpu()
 
     @classmethod
     def get_dependencies(cls):

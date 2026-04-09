@@ -456,6 +456,9 @@ def _launch_simulator(*args, **kwargs):
                 device=device,
             )
 
+            # CUDA stream used for async GPU→CPU copies of TensorizedValueState.VALUES
+            self.COPY_STREAM = th.cuda.Stream()
+
             # Store other references to variables that will be initialized later
             self._scenes = []
             # The callback will be called right *before* the physics step
@@ -1187,10 +1190,26 @@ def _launch_simulator(*args, **kwargs):
 
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
-                    # Step the object states in global topological order (if the scene exists)
+                    # TensorizedValueState global_updates (GPU computation)
                     for state_type in self.object_state_types_requiring_update:
                         if issubclass(state_type, TensorizedValueState):
                             state_type.global_update()
+
+                    # Async GPU → CPU copy for all updated VALUES, then sync before Pass 2.
+                    # UpdateStateMixin states (Inside, OnTop, etc.) call get_value() which reads
+                    # VALUES_CPU, so the sync must complete before their update() calls.
+                    for state_type in self.object_state_types_requiring_update:
+                        if (
+                            issubclass(state_type, TensorizedValueState)
+                            and state_type.VALUES is not None
+                            and state_type.VALUES.numel() > 0
+                        ):
+                            with th.cuda.stream(self.COPY_STREAM):
+                                state_type.VALUES_CPU.copy_(state_type.VALUES, non_blocking=True)
+                    self.COPY_STREAM.synchronize()
+
+                    # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
+                    for state_type in self.object_state_types_requiring_update:
                         if issubclass(state_type, UpdateStateMixin):
                             for scene in self.scenes:
                                 for obj in scene.get_objects_with_state(state_type):
@@ -1354,8 +1373,9 @@ def _launch_simulator(*args, **kwargs):
             # TODO (andi) is this ideal?
             # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read
             # up-to-date AABBs without waiting for the next full _non_physics_step.
-            if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None:
+            if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None and AABB.VALUES.numel() > 0:
                 AABB.global_update()
+                AABB.VALUES_CPU.copy_(AABB.VALUES)  # synchronous; caller needs result immediately
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):

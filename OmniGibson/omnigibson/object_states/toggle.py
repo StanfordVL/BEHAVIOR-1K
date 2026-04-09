@@ -148,7 +148,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         S, N = len(cls.IDX_OBJS), len(cls.OBJ_IDXS)
 
         # Carry over _can_toggle_steps for surviving objects
-        cls._can_toggle_steps = th.zeros((S, N), dtype=th.float32)
+        cls._can_toggle_steps = th.zeros((S, N), dtype=th.float32, device="cuda")
         if prev_steps is not None:
             for relative_prim_path, obj_idx_old in prev_obj_idxs.items():
                 if relative_prim_path not in cls.OBJ_IDXS:
@@ -159,7 +159,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
         # Build _requires_closed: (S, N) — read _requires_closed_init directly to avoid
         # going through the property before the tensor is fully populated.
-        cls._requires_closed = th.zeros((S, N), dtype=th.bool)
+        cls._requires_closed = th.zeros((S, N), dtype=th.bool, device="cuda")
         for s_idx, s_row in enumerate(cls.IDX_OBJS):
             for obj_idx, obj in enumerate(s_row):
                 if obj is not None:
@@ -168,7 +168,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         # Build _open_col_idx: (N,) long — maps each toggle-object N-index to its column in
         # Open.VALUES.  -1 for objects that have no Open state.
         # Uses scene-0 objects as representative (all scenes share the same object types).
-        cls._open_col_idx = th.full((N,), -1, dtype=th.long)
+        cls._open_col_idx = th.full((N,), -1, dtype=th.long, device="cuda")
         for obj_idx, obj in enumerate(cls.IDX_OBJS[0] if cls.IDX_OBJS else []):
             if obj is not None and Open in obj.states:
                 open_idx = Open.OBJ_IDXS.get(obj.relative_prim_path, -1)
@@ -186,14 +186,15 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
         if S == 0 or N == 0:
             # No objects — allocate empty tensors and return early
+            # _finger_contact_query_mask and _obj_contact_with_mask stay CPU (RigidContactAPI interface)
             cls._finger_contact_query_mask = th.zeros((0, 1, 0), dtype=th.bool)
             cls._obj_contact_with_mask = th.zeros((0, 0, 0), dtype=th.bool)
-            cls._finger_contact_result = th.zeros((0, 0), dtype=th.bool)
-            cls._mask_force_off = th.zeros((0, 0), dtype=th.bool)
-            cls._mask_active = th.zeros((0, 0), dtype=th.bool)
-            cls._mask_in_contact = th.zeros((0, 0), dtype=th.bool)
-            cls._mask_can_toggle = th.zeros((0, 0), dtype=th.bool)
-            cls._mask_flip = th.zeros((0, 0), dtype=th.bool)
+            cls._finger_contact_result = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls._mask_force_off = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls._mask_active = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls._mask_in_contact = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls._mask_can_toggle = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls._mask_flip = th.zeros((0, 0), dtype=th.bool, device="cuda")
             return
 
         # ----- Contact masks via public API (no _* access to RigidContactAPI internals) -----
@@ -234,13 +235,13 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 .clone()
             )  # (S, N, C)
 
-        # Allocate per-step scratch masks
-        cls._finger_contact_result = th.zeros((S, N), dtype=th.bool)
-        cls._mask_force_off = th.zeros((S, N), dtype=th.bool)
-        cls._mask_active = th.zeros((S, N), dtype=th.bool)
-        cls._mask_in_contact = th.zeros((S, N), dtype=th.bool)
-        cls._mask_can_toggle = th.zeros((S, N), dtype=th.bool)
-        cls._mask_flip = th.zeros((S, N), dtype=th.bool)
+        # Allocate per-step scratch masks — GPU for computation; contact query masks stay CPU
+        cls._finger_contact_result = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls._mask_force_off = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls._mask_active = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls._mask_in_contact = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls._mask_can_toggle = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls._mask_flip = th.zeros((S, N), dtype=th.bool, device="cuda")
 
     def __init__(self, obj, scale=None, requires_closed=False):
         # self.scale is a temporary instance variable used only during _initialize() to

@@ -193,23 +193,23 @@ class Open(TensorizedValueState, BooleanStateMixin):
 
         O = len(cls.OBJ_IDXS)
         if O == 0:
-            cls.OPENABLE_MASK = th.zeros((0, 0), dtype=th.bool)
-            cls.THRESHOLDS_S1 = th.zeros((0, 0))
-            cls.DIRECTIONS_S1 = th.zeros((0, 0))
-            cls.THRESHOLDS_S2 = th.zeros((0, 0))
-            cls.DIRECTIONS_S2 = th.zeros((0, 0))
-            cls.BOTH_SIDES = th.zeros(0, dtype=th.bool)
-            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(0, 0, dtype=th.long)
+            cls.OPENABLE_MASK = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls.THRESHOLDS_S1 = th.zeros((0, 0), device="cuda")
+            cls.DIRECTIONS_S1 = th.zeros((0, 0), device="cuda")
+            cls.THRESHOLDS_S2 = th.zeros((0, 0), device="cuda")
+            cls.DIRECTIONS_S2 = th.zeros((0, 0), device="cuda")
+            cls.BOTH_SIDES = th.zeros(0, dtype=th.bool, device="cuda")
+            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(0, 0, dtype=th.long, device="cuda")
             return
 
         max_dof = ArticulatedObjectViewAPI.get_max_dof()
 
-        cls.OPENABLE_MASK = th.zeros(O, max_dof, dtype=th.bool)
-        cls.THRESHOLDS_S1 = th.zeros(O, max_dof)
-        cls.DIRECTIONS_S1 = th.zeros(O, max_dof)
-        cls.THRESHOLDS_S2 = th.zeros(O, max_dof)
-        cls.DIRECTIONS_S2 = th.zeros(O, max_dof)
-        cls.BOTH_SIDES = th.zeros(O, dtype=th.bool)
+        cls.OPENABLE_MASK = th.zeros(O, max_dof, dtype=th.bool, device="cuda")
+        cls.THRESHOLDS_S1 = th.zeros(O, max_dof, device="cuda")
+        cls.DIRECTIONS_S1 = th.zeros(O, max_dof, device="cuda")
+        cls.THRESHOLDS_S2 = th.zeros(O, max_dof, device="cuda")
+        cls.DIRECTIONS_S2 = th.zeros(O, max_dof, device="cuda")
+        cls.BOTH_SIDES = th.zeros(O, dtype=th.bool, device="cuda")
 
         for _rel_path, obj_idx in cls.OBJ_IDXS.items():
             obj = next(row[obj_idx] for row in cls.IDX_OBJS if row[obj_idx] is not None)
@@ -231,7 +231,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
 
         # Pre-build (S, O) row index into ArticulatedObjectViewAPI._POSITIONS — built once, reused every step
         S = len(cls.IDX_OBJS)
-        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(S, O, dtype=th.long)
+        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(S, O, dtype=th.long, device="cuda")
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
             for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
                 obj = scene_row[obj_idx]
@@ -271,7 +271,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
     def _get_value(self):
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        return bool(self.VALUES[s, obj_idx] > 0.5)
+        return bool(self.VALUES_CPU[s, obj_idx] > 0.5)
 
     def _set_value(self, new_value, fully=False):
         """

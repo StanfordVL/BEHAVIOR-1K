@@ -50,11 +50,11 @@ class AABB(TensorizedValueState):
         O = len(cls.OBJ_IDXS)
 
         if S == 0 or O == 0:
-            cls.PRIM_BODY_IDX = th.zeros((0,), dtype=th.long)
-            cls.LINK_IDX = th.zeros((0,), dtype=th.long)
+            cls.PRIM_BODY_IDX = th.zeros((0,), dtype=th.long, device="cuda")
+            cls.LINK_IDX = th.zeros((0,), dtype=th.long, device="cuda")
             cls.CLOTH_OBJ_IDXS = []
-            cls._AABB_LO = th.zeros((0, 3))
-            cls._AABB_HI = th.zeros((0, 3))
+            cls._AABB_LO = th.zeros((0, 3), device="cuda")
+            cls._AABB_HI = th.zeros((0, 3), device="cuda")
             return
 
         prim_body_idx = []
@@ -77,12 +77,12 @@ class AABB(TensorizedValueState):
         covered_obj_idxs = {li % O for li in link_idx}
         cls.CLOTH_OBJ_IDXS = [i for i in range(O) if i not in covered_obj_idxs]
 
-        cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long)
-        cls.LINK_IDX = th.tensor(link_idx, dtype=th.long)
+        cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long, device="cuda")
+        cls.LINK_IDX = th.tensor(link_idx, dtype=th.long, device="cuda")
 
         # Pre-allocated scratch buffers — reused each step via fill_(), never recreated
-        cls._AABB_LO = th.full((S * O, 3), float("inf"))
-        cls._AABB_HI = th.full((S * O, 3), float("-inf"))
+        cls._AABB_LO = th.full((S * O, 3), float("inf"), device="cuda")
+        cls._AABB_HI = th.full((S * O, 3), float("-inf"), device="cuda")
 
         # Initialize new VALUE slots for objects that just appeared
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -120,17 +120,17 @@ class AABB(TensorizedValueState):
     def _get_value(self):
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        v = self.VALUES[s, obj_idx]  # (6,)
+        v = self.VALUES_CPU[s, obj_idx]  # (6,) — CPU mirror, no GPU stall
         return v[:3], v[3:]  # (lo, hi) — matches EntityPrim.aabb return type
 
     def _set_value(self, new_value):
         raise NotImplementedError("AABB is read-only; it is derived from pose and cannot be set directly.")
 
     def _dump_state(self):
-        # Return the raw flat (6,) VALUES row so serialize() receives a tensor, not the (lo, hi) tuple
+        # Return the raw flat (6,) VALUES_CPU row so serialize() receives a CPU tensor
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        return {self.value_name: self.VALUES[s, obj_idx].clone()}
+        return {self.value_name: self.VALUES_CPU[s, obj_idx].clone()}
 
     def _load_state(self, state):
         # AABB is fully derived from pose; it will be recomputed on the next step.
