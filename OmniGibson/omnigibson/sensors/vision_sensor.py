@@ -895,7 +895,7 @@ class VisionSensor(BaseSensor):
         if self._viewport is None:
             raise RuntimeError(
                 "Cannot set active_camera_path because this sensor has no viewport. "
-                "Set OMNIGIBSON_DISABLE_SENSOR_VIEWPORT_TEXTURES=False to enable viewport textures."
+                "Set gm.RENDER_VIEWER_CAMERA=True to enable viewport textures."
             )
         self._viewport.viewport_api.set_active_camera(path)
         # Requires 6 updates to propagate changes
