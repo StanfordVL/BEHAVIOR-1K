@@ -5,7 +5,7 @@ import torch as th
 from typing import Any
 
 import omnigibson as og
-from omnigibson.controllers.controller_base import ControlType
+from omnigibson.controllers import ControllerView, ControlType
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
 from omnigibson.macros import gm, macros
@@ -266,6 +266,7 @@ class DataPlaybackWrapper(DataWrapper):
         overwrite: bool = True,
         only_successes: bool = False,
         flush_every_n_traj: int = 10,
+        flush_every_n_steps: int = 0,
         include_env_wrapper: bool = False,
         additional_wrapper_configs: list[dict[str, Any]] | None = None,
         full_scene_file: str | None = None,
@@ -285,11 +286,14 @@ class DataPlaybackWrapper(DataWrapper):
             output_path (str): Absolute path to the output hdf5 file that will contain the recorded observations from
                 the replayed data
             robot_obs_modalities (list): Robot observation modalities to use. This list is directly passed into
-                the robot_cfg (`obs_modalities` kwarg) when spawning the robot
+                the robot_cfg (`obs_modalities` kwarg) when spawning the robot.
+                This will be the default value for robot sensors if not specified in @robot_sensor_config.
             robot_proprio_keys (None or list of str): If specified, a list of proprioception keys to use for the robot.
             robot_sensor_config (None or dict): If specified, the sensor configuration to use for the robot. See the
                 example sensor_config in fetch_behavior.yaml env config. This can be used to specify relevant sensor
-                params, such as image_height and image_width
+                params, such as image_height and image_width. Supports both class-level keys (e.g., "VisionSensor")
+                and instance-level keys (e.g., "wrist:Camera:0") for specifying per-sensor kwargs. Instance-level
+                keys take precedence over class-level keys.
             external_sensors_config (None or list): If specified, external sensor(s) to use. This will override the
                 external_sensors kwarg in the env config when the environment is loaded. Each entry should be a
                 dictionary specifying an individual external sensor's relevant parameters. See the example
@@ -310,6 +314,9 @@ class DataPlaybackWrapper(DataWrapper):
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             flush_every_n_traj (int): How often to flush (write) current data to file
+            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
+                This is useful when collecting very long trajectories that may have a large memory footprint before writing to disk.
+                If this is greater than 0, flush_every_n_traj must be set to 1.
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
                 environment wrappers to wrap the internal environment class in
@@ -401,19 +408,6 @@ class DataPlaybackWrapper(DataWrapper):
         # Load env
         env = Environment(configs=config)
 
-        # Update robot sensor / proprio configuration
-        if robot_proprio_keys is not None:
-            for robot in env.robots:
-                robot._proprio_obs = list(robot_proprio_keys)
-        if robot_sensor_config is not None:
-            for robot in env.robots:
-                for sensor in robot.sensors.values():
-                    sensor_cls_name = sensor.__class__.__name__
-                    sensor_kwargs = robot_sensor_config.get(sensor_cls_name, dict()).get("sensor_kwargs", dict())
-                    for kwarg, value in sensor_kwargs.items():
-                        setattr(sensor, kwarg, value)
-            env.load_observation_space()
-
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
             env = create_wrapper(env=env)
@@ -431,6 +425,7 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite=overwrite,
             only_successes=only_successes,
             flush_every_n_traj=flush_every_n_traj,
+            flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
@@ -447,6 +442,7 @@ class DataPlaybackWrapper(DataWrapper):
         overwrite: bool = True,
         only_successes: bool = False,
         flush_every_n_traj: int = 10,
+        flush_every_n_steps: int = 0,
         full_scene_file: str | None = None,
         load_room_instances: list[str] | None = None,
         include_robot_control: bool = True,
@@ -464,6 +460,9 @@ class DataPlaybackWrapper(DataWrapper):
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             flush_every_n_traj (int): How often to flush (write) current data to file across episodes
+            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
+                This is useful when collecting very long trajectories that may have a large memory footprint before writing to disk.
+                If this is greater than 0, flush_every_n_traj must be set to 1.
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
@@ -500,10 +499,17 @@ class DataPlaybackWrapper(DataWrapper):
                 # we need to save the current scene file here to avoid errors
                 self.scene_file = env.scene.save(as_dict=True)
 
+        # check flush parameters
+        if flush_every_n_steps > 0:
+            assert flush_every_n_traj == 1, "flush_every_n_traj must be 1 if flush_every_n_steps is set"
+            assert not only_successes, "only_successes must be False if flush_every_n_steps is set, since we need to store partial trajectories regardless of success"
+        self.flush_every_n_steps = flush_every_n_steps
+
         # Store additional variables
         self.current_traj_history = []
         self.n_render_iterations = n_render_iterations
         self.current_episode_step_count = 0
+        self.current_episode_id = None
         self.include_robot_control = include_robot_control
         self.include_contacts = include_contacts
 
@@ -547,7 +553,8 @@ class DataPlaybackWrapper(DataWrapper):
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
         traj_grp = data_grp[f"demo_{episode_id}"]
-
+        self.current_episode_id = episode_id
+        self.current_episode_step_count = 0
         # Grab episode data
         # Skip early if found malformed data
         try:
@@ -584,7 +591,7 @@ class DataPlaybackWrapper(DataWrapper):
                 robot.control_enabled = False
                 # Set all controllers to effort mode with zero gain, this keeps the robot still
                 for controller in robot.controllers.values():
-                    for i, dof in enumerate(controller.dof_idx):
+                    for i, dof in enumerate(ControllerView.get_dof_idx(controller[0]).tolist()):
                         dof_joint = robot.joints[robot.dof_names_ordered[dof]]
                         dof_joint.set_control_type(
                             control_type=ControlType.EFFORT,
@@ -599,7 +606,7 @@ class DataPlaybackWrapper(DataWrapper):
         if record_data:
             # Grab initial observations directly from restored state[0], before any action is applied.
             first_time_load_n_iteration = 10
-            for _ in range(self.n_render_iterations + first_time_load_n_iteration):
+            for _ in range(first_time_load_n_iteration):
                 og.sim.render()
             self.current_obs, init_info = self.env.get_obs()
 
@@ -652,6 +659,8 @@ class DataPlaybackWrapper(DataWrapper):
                     truncated=tr,
                     info=info,
                 )
+                if self.flush_every_n_steps > 0 and i % self.flush_every_n_steps == 0:
+                    self.flush_partial_traj(step_idx=i, total_steps=len(action), step_data=step_data)
                 # append to current trajectory history
                 self.current_traj_history.append(step_data)
 

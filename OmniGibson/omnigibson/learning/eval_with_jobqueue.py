@@ -9,7 +9,6 @@ import threading
 import time
 from inspect import getsourcefile
 from omegaconf import OmegaConf
-from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.obs_utils import (
     create_video_writer,
 )
@@ -159,7 +158,6 @@ def main():
         "model.port=None",
         "test_hidden=true",
     ]
-    register_omegaconf_resolvers()
     # open yaml from task path
     with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda: 0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=overrides)
@@ -207,7 +205,7 @@ def main():
     try:
         # run metric start callbacks
         for metric in evaluator.metrics:
-            metric.start_callback(evaluator.env)
+            metric.reset(evaluator.env)
 
         # Print first step time
         first_step_time = time.time()
@@ -234,7 +232,7 @@ def main():
 
         # run metric end callbacks
         for metric in evaluator.metrics:
-            metric.end_callback(evaluator.env)
+            metric.aggregate(evaluator.env)
 
         end_time = time.time()
         logger.info(f"Evaluation finished at step {evaluator.env._current_step}.")
@@ -247,7 +245,7 @@ def main():
 
         # gather metric results and write to file
         for metric in evaluator.metrics:
-            metrics.update(metric.gather_results())
+            metrics.update(metric._compute_episode_metrics())
         with open(metrics_path / f"{config.task.name}_{idx}.json", "w") as f:
             json.dump(metrics, f)
 
