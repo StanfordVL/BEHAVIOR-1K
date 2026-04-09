@@ -250,8 +250,9 @@ class VisionSensor(BaseSensor):
                         ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i),
                     )
 
-            self._viewport = viewport
+        self._viewport = viewport if should_create_viewport else None
 
+        if self._viewport is not None:
             # Link the camera and viewport together
             self._viewport.viewport_api.set_active_camera(self.prim_path)
 
@@ -261,8 +262,6 @@ class VisionSensor(BaseSensor):
 
             # Set the viewer size (requires taking one render step afterwards)
             self._viewport.viewport_api.set_texture_resolution(resolution)
-        else:
-            self._viewport = None
 
         # Also update relevant camera params from load config
         self.focal_length = self._load_config["focal_length"]
