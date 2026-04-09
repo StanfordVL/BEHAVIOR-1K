@@ -1,4 +1,3 @@
-import contextlib
 import json
 import os
 import shutil
@@ -376,7 +375,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         )
 
         # Now load the objects with their own logic
-        with og.sim.adding_objects():
+        with og.sim.adding_or_removing_objects():
             for obj_name, obj in self._init_objs.items():
                 # Import into the simulator
                 self.add_object(obj)
@@ -654,7 +653,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             register (bool): Whether to register @obj internally in the scene object registry or not, as well as run
                 additional scene-specific logic in addition to the obj being loaded
         """
-        with og.sim.adding_objects():
+        with og.sim.adding_or_removing_objects():
             # Make sure all objects in this scene are uniquely named
             assert (
                 obj.name not in self.object_registry.object_names
