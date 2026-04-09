@@ -1284,9 +1284,13 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # Run super first
         particle = super().add_particle(relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
-        # Refresh particles view
+        # Refresh particles view and flush USD-to-Fabric bridge so the renderer sees the new prim.
+        # CopyPrim creates the prim in USD, but Fabric entries are populated asynchronously during
+        # a render step. Without render(), the physics world-transform write has no Fabric entry to
+        # land in, and the particle stays invisible to the renderer.
         if og.sim.is_playing():
             self.refresh_particles_view()
+            og.sim.render()
 
         return particle
 
@@ -1503,6 +1507,14 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         if self.initialized:
             # Make sure view is refreshed
             self.refresh_particles_view()
+
+            # The USD-to-Fabric bridge is asynchronous: CopyPrim creates prims in USD but the Fabric
+            # entries (required by the renderer) are not populated until a render step processes the
+            # pending USD change events. Without this render call, _physx_fabric_interface.update()
+            # writes physics world transforms to Fabric entries that don't yet exist, so the renderer
+            # never sees the particles. This mirrors the same pattern used for micro particle prototypes
+            # in physx_utils.py.
+            og.sim.render()
 
         # Make sure we update all the velocities
         self.set_particles_velocities(state["lin_velocities"], state["ang_velocities"])
