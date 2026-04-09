@@ -778,14 +778,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 },
                 "bddl": {
                     "version": omnigibson.utils.asset_utils.get_bddl_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_bddl_git_hash(),
                 },
                 "behavior-1k-assets": {
                     "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
                 },
                 "omnigibson-robot-assets": {
                     "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_git_hash(),
                 },
             },
             "metadata": {"task": self._task_metadata},
