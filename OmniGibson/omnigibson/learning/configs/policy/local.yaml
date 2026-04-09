@@ -1,7 +1,0 @@
-# @package _global_
-
-policy_name: local
-
-model:
-  _target_: omnigibson.learning.policies.LocalPolicy
-  action_dim: 23

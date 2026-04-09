@@ -618,6 +618,7 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
         overwrite: bool = True,
         only_successes: bool = False,
         flush_every_n_traj: int = 10,
+        flush_every_n_steps=0,
         full_scene_file: str | None = None,
         load_room_instances: list[str] | None = None,
         include_robot_control: bool = True,
@@ -635,6 +636,9 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             flush_every_n_traj (int): How often to flush (write) current data to file across episodes
+            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
+                This is useful when collecting very long trajectories that may have a large memory footprint before writing to disk.
+                If this is greater than 0, flush_every_n_traj must be set to 1.
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
@@ -643,8 +647,9 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
             compression (None or dict): If specified, the compression arguments to use for the hdf5 file.
         """
-        self.current_traj_grp = None
-        self.traj_dsets = dict()
+        if flush_every_n_steps > 0:
+            self.current_traj_grp = None
+            self.traj_dsets = None
 
         # Run super
         super().__init__(
@@ -655,9 +660,122 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
             overwrite=overwrite,
             only_successes=only_successes,
             flush_every_n_traj=flush_every_n_traj,
+            flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
             compression=compression,
         )
+
+    def flush_partial_traj(self, step_idx: int, total_steps: int, step_data: dict) -> None:
+        """
+        Flush the current trajectory data to the currently allocated HDF5 dataset. This is used when flush_every_n_steps
+        is greater than 0 to incrementally write trajectory data to disk during an episode.
+
+        Args:
+            step_idx (int): The index of the current step in the overall trajectory.
+            total_steps (int): The total number of steps in the full trajectory.
+            step_data (dict): The data for one step, useful for allocating trajectory data.
+        """
+        if step_idx == 0:
+            self.current_traj_grp, self.traj_dsets = self._allocate_traj_to_hdf5(
+                step_data,
+                f"demo_{self.current_episode_id}",
+                total_step=total_steps,
+            )
+        log.info(f"Flushing partial trajectory at step {self.current_episode_step_count}...")
+        assert self.flush_every_n_steps > 0, "flush_every_n_steps must be greater than 0 to flush partial trajectory"
+        assert (
+            len(self.current_traj_history) > 0
+        ), "Expected non-empty trajectory history when flushing partial trajectory"
+        data_length_to_flush = len(self.current_traj_history)
+        # At step 0, we only have observation data, so observation data will only have one more offset than others
+        if self.current_episode_step_count == 0:
+            assert data_length_to_flush == 1
+            for key, dat in self.current_traj_history[0].items():
+                for mod in dat.keys():
+                    self.traj_dsets[key][mod][0] = self.current_traj_history[0][key][mod]
+        else:
+            for key, dat in self.current_traj_history[0].items():
+                if isinstance(dat, dict):
+                    for mod in dat.keys():
+                        obs_data_length = (
+                            data_length_to_flush
+                            if self.current_episode_step_count < total_steps
+                            else data_length_to_flush - 1
+                        )
+                        if obs_data_length > 0:
+                            data_to_write = th.stack(
+                                [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
+                            )
+                            self.traj_dsets[key][mod][
+                                self.current_episode_step_count
+                                - data_length_to_flush
+                                + 1 : self.current_episode_step_count + 1
+                            ] = data_to_write
+                else:
+                    self.traj_dsets[key][
+                        self.current_episode_step_count - data_length_to_flush : self.current_episode_step_count
+                    ] = th.stack([self.current_traj_history[i][key] for i in range(data_length_to_flush)], dim=0)
+        # Reset the current trajectory history
+        self.current_traj_history = []
+
+    def _allocate_traj_to_hdf5(self, step_data, traj_grp_name, total_step: int, nested_keys=("obs",)):
+        """
+        Allocate trajectory data space from @step_data given the number of total steps @total_step.
+
+        Args:
+            step_data (dict): Keyword-mapped set of data for a single sim step
+            traj_grp_name (str): Name of the trajectory group to store
+            total_step (int): Total number of steps in the trajectory
+            nested_keys (list of str): Name of key(s) corresponding to nested data in @step_data. This specific data
+                is assumed to be its own keyword-mapped dictionary of numpy array values, and will be parsed
+                differently from the rest of the data.
+        Returns:
+            Tuple[h5py.Group, dict(str, hdf5.Dataset)]: Generated hdf5 group and datasets to store the trajectory data in the future
+        """
+        log.info(f"Allocating trajectory data for {traj_grp_name} with total steps {total_step}...")
+        traj_dsets = dict()
+        nested_keys = set(nested_keys)
+        for k in nested_keys:
+            traj_dsets[k] = dict()
+        data_grp = self.hdf5_file.require_group("data")
+        traj_grp = data_grp.create_group(traj_grp_name)
+        traj_grp.attrs["num_samples"] = total_step
+
+        for k, dat in step_data.items():
+            if k in nested_keys:
+                obs_grp = traj_grp.create_group(k)
+                for mod, step_mod_data in dat.items():
+                    traj_dsets[k][mod] = obs_grp.create_dataset(
+                        mod,
+                        shape=(total_step, *step_mod_data.shape),
+                        dtype=step_mod_data.numpy().dtype,
+                        **self.compression,
+                        chunks=(1, *step_mod_data.shape),
+                        shuffle=True,
+                    )
+            else:
+                traj_dsets[k] = traj_grp.create_dataset(
+                    k, shape=(total_step, *dat.shape), dtype=dat.numpy().dtype, **self.compression, shuffle=True
+                )
+
+        return traj_grp, traj_dsets
+
+    def flush_current_traj(self):
+        """
+        Flush current trajectory data
+        """
+        super().flush_current_traj()
+        self.traj_dsets = None
+        self.current_episode_id = None
+        self.current_traj_grp = None
+
+    def process_traj_to_dataset(self, traj_data: list[dict]) -> None:
+        if self.flush_every_n_steps == 0:
+            traj_grp_name = f"demo_{self.traj_count}"
+            traj_grp = self._process_traj_to_hdf5(traj_data, traj_grp_name, nested_keys=["obs"])
+            self._postprocess_traj_group(traj_grp)
+        else:
+            self._postprocess_traj_group(self.current_traj_grp)

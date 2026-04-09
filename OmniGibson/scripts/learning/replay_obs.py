@@ -3,6 +3,7 @@ import csv
 import omnigibson as og
 import os
 import time
+import yaml
 from omnigibson.envs import HDF5PlaybackWrapper, LeRobotPlaybackWrapper
 from omnigibson.learning.utils.dataset_utils import update_google_sheet, makedirs_with_mode
 from omnigibson.learning.utils.eval_utils import (
@@ -23,15 +24,13 @@ gm.RENDER_VIEWER_CAMERA = False
 gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
-FLUSH_EVERY_N_STEPS = 500
-
 
 def replay_hdf5_file(
     data_folder: str,
     task_id: int,
     demo_id: int,
-    output_format: str = "hdf5",
-    flush_every_n_steps: int = 500,
+    output_format: str,
+    flush_every_n_steps: int,
 ) -> int:
     """
     Replays a single HDF5 file and saves data to the specified format.
@@ -52,24 +51,28 @@ def replay_hdf5_file(
 
     gm.ENABLE_TRANSITION_RULES = False
 
-    modalities = ["rgb", "depth_linear"]
-
     robot_sensor_config = {
         "VisionSensor": {
-            "modalities": modalities,
             "sensor_kwargs": {
                 "image_height": WRIST_RESOLUTION[0],
                 "image_width": WRIST_RESOLUTION[1],
             },
         },
+        "zed_link:Camera:0": {
+            "sensor_kwargs": {
+                "horizontal_aperture": 40.0,
+                "image_height": HEAD_RESOLUTION[0],
+                "image_width": HEAD_RESOLUTION[1],
+            },
+        },
     }
-
-    task_scene_file_folder = os.path.join(
-        os.path.dirname(os.path.dirname(og.__path__[0])), "joylo", "sampled_task", task_name
-    )
+    with open(f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/available_tasks.yaml", "r") as f:
+        available_tasks = yaml.safe_load(f)
+    scene_model = available_tasks[task_name][0]["scene_model"]
+    task_scene_file_folder = os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_model, "json")
     full_scene_file = None
     for file in os.listdir(task_scene_file_folder):
-        if file.endswith(".json") and "partial_rooms" not in file:
+        if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
             full_scene_file = os.path.join(task_scene_file_folder, file)
     assert full_scene_file is not None, f"No full scene file found in {task_scene_file_folder}"
 
@@ -90,7 +93,7 @@ def replay_hdf5_file(
         raise e
     assert load_room_instances is not None, "load room instance not found!"
 
-    input_path = f"{data_folder}/2025-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5"
+    input_path = f"{data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5"
 
     if output_format == "hdf5":
         output_path = os.path.join(replay_dir, f"episode_{demo_id:08d}.hdf5")
@@ -98,11 +101,10 @@ def replay_hdf5_file(
             input_path=input_path,
             output_path=output_path,
             compression={"compression": "lzf"},
-            robot_obs_modalities=["proprio"],
+            robot_obs_modalities=["proprio", "rgb", "depth_linear"],
             robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
             robot_sensor_config=robot_sensor_config,
-            external_sensors_config=dict(),
-            n_render_iterations=3,
+            n_render_iterations=1,
             flush_every_n_traj=1,
             flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
@@ -111,7 +113,7 @@ def replay_hdf5_file(
             load_room_instances=load_room_instances,
         )
     else:
-        output_path = f"{task_name}_episode_{demo_id:08d}"
+        output_path = f"b1k/{task_name}"
         root_dir = os.path.join(data_folder, "lerobot")
         makedirs_with_mode(root_dir)
         env = LeRobotPlaybackWrapper.create_from_hdf5(
@@ -120,11 +122,10 @@ def replay_hdf5_file(
             root_dir=root_dir,
             robot_type="R1Pro",
             task_name=task_name,
-            robot_obs_modalities=["proprio"],
+            robot_obs_modalities=["proprio", "rgb", "depth_linear"],
             robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
             robot_sensor_config=robot_sensor_config,
-            external_sensors_config=dict(),
-            n_render_iterations=3,
+            n_render_iterations=1,
             flush_every_n_traj=1,
             flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
@@ -133,14 +134,11 @@ def replay_hdf5_file(
             load_room_instances=load_room_instances,
         )
 
-    env.robots[0].sensors["robot_r1:zed_link:Camera:0"].horizontal_aperture = 40.0
-    env.robots[0].sensors["robot_r1:zed_link:Camera:0"].image_height = HEAD_RESOLUTION[0]
-    env.robots[0].sensors["robot_r1:zed_link:Camera:0"].image_width = HEAD_RESOLUTION[1]
     env.load_observation_space()
 
     num_samples = [env.input_hdf5["data"][key].attrs["num_samples"] for key in env.input_hdf5["data"].keys()]
     episode_id = num_samples.index(max(num_samples))
-    log.info(f" >>> Replaying episode {episode_id}")
+    log.info(f" >>> Replaying episode {episode_id} with {num_samples[episode_id]} steps")
 
     env.playback_episode(
         episode_id=episode_id,
@@ -161,9 +159,13 @@ def main():
     parser.add_argument("--task_name", type=str, required=True, help="Task name to process")
     parser.add_argument("--demo_id", type=int, required=True, help="Demo ID to process")
     parser.add_argument(
-        "--output_format", type=str, choices=["hdf5", "lerobot"], default="hdf5", help="Output format: hdf5 or lerobot"
+        "--output_format",
+        type=str,
+        choices=["hdf5", "lerobot"],
+        default="lerobot",
+        help="Output format: hdf5 or lerobot",
     )
-    parser.add_argument("--flush_every_n_steps", type=int, default=500, help="Flush data every N steps")
+    parser.add_argument("--flush_every_n_steps", type=int, default=1000, help="Flush data every N steps")
     parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
     parser.add_argument("--row", type=int, required=False, help="Row number to update")
 
@@ -171,7 +173,7 @@ def main():
     task_id = TASK_NAMES_TO_INDICES[args.task_name]
 
     if not os.path.exists(
-        f"{args.data_folder}/2025-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
+        f"{args.data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
     ):
         if args.data_url:
             from omnigibson.learning.utils.dataset_utils import download_and_extract_data
@@ -191,12 +193,6 @@ def main():
         output_format=args.output_format,
         flush_every_n_steps=args.flush_every_n_steps,
     )
-
-    if args.output_format == "hdf5":
-        try:
-            os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
-        except FileNotFoundError:
-            log.warning(f"File {args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5 not found")
 
     if args.update_sheet:
         try:
