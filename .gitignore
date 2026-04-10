@@ -7,8 +7,7 @@ gha-creds-*.json
 outputs/
 /*.ipynb
 
-# Custom robot assets (local)
-SharpaWave_URDF_XML_USD_SU_SVL_V3.0.3/
+SharpaWave_URDF/
 
 # CUDA installers
 *.deb
