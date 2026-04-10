@@ -217,6 +217,7 @@ class VisionSensor(BaseSensor):
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
         should_create_viewport = viewport_name is not None or gm.RENDER_VIEWER_CAMERA
+        viewport = None
         if should_create_viewport and viewport_name is not None:
             vp_names_to_handles = {vp.name: vp for vp in lazy.omni.kit.viewport.window.get_viewport_window_instances()}
             assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
@@ -250,7 +251,7 @@ class VisionSensor(BaseSensor):
                         ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i),
                     )
 
-        self._viewport = viewport if should_create_viewport else None
+        self._viewport = viewport
 
         if self._viewport is not None:
             # Link the camera and viewport together
@@ -723,7 +724,6 @@ class VisionSensor(BaseSensor):
         if self._viewport is not None:
             width, _ = self._viewport.viewport_api.get_texture_resolution()
             self._viewport.viewport_api.set_texture_resolution((width, height))
-            self._image_width = width
 
         # Also update render product and update all annotators
         for annotator in self._annotators.values():
@@ -762,7 +762,6 @@ class VisionSensor(BaseSensor):
         if self._viewport is not None:
             _, height = self._viewport.viewport_api.get_texture_resolution()
             self._viewport.viewport_api.set_texture_resolution((width, height))
-            self._image_height = height
 
         # Also update render product and update all annotators
         for annotator in self._annotators.values():
@@ -881,7 +880,7 @@ class VisionSensor(BaseSensor):
         Returns:
             str: prim path of the active camera attached to this vision sensor
         """
-        return self.prim_path if self._viewport is None else self._viewport.viewport_api.get_active_camera().pathString
+        return None if self._viewport is None else self._viewport.viewport_api.get_active_camera().pathString
 
     @active_camera_path.setter
     def active_camera_path(self, path):
