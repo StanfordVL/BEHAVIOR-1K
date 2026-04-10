@@ -588,10 +588,11 @@ class VisionSensor(BaseSensor):
             modality (str): Name of the modality to add to the Replicator backend
         """
         if self._annotators.get(modality, None) is None:
-            self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
-                self._RAW_SENSOR_TYPES[modality]
-            )
-            self._annotators[modality].attach([self._render_product])
+            with og.sim.editing_usd():
+                self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
+                    self._RAW_SENSOR_TYPES[modality]
+                )
+                self._annotators[modality].attach([self._render_product])
 
     def _remove_modality_from_backend(self, modality):
         """
@@ -603,7 +604,8 @@ class VisionSensor(BaseSensor):
         if self._annotators.get(modality, None) is not None:
             # Passing an explicit list is bugged -- see omni source code
             # So we only pass in the product directly, which gets post-processed correctly
-            self._annotators[modality].detach(self._render_product)
+            with og.sim.editing_usd():
+                self._annotators[modality].detach(self._render_product)
             self._annotators[modality] = None
 
     def remove(self):

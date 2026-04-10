@@ -1097,24 +1097,20 @@ def _launch_simulator(*args, **kwargs):
                 self._in_sim_lifecycle -= 1
 
         def _refresh_physics_sim_view(self):
-            self._in_sim_lifecycle += 1
-            try:
-                SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
-                IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
+            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+            IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
 
-                stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
-                SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
-                    SimulationManager._backend, stage_id=stage_id
-                )
-                SimulationManager._physics_sim_view.set_subspace_roots("/")
-                SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
-                    "warp", stage_id=stage_id
-                )
-                SimulationManager._simulation_view_created = True
-                SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
-                SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
-            finally:
-                self._in_sim_lifecycle -= 1
+            stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
+            SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
+                SimulationManager._backend, stage_id=stage_id
+            )
+            SimulationManager._physics_sim_view.set_subspace_roots("/")
+            SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
+                "warp", stage_id=stage_id
+            )
+            SimulationManager._simulation_view_created = True
+            SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
+            SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -1146,14 +1142,10 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 read_back (bool): If True, also fetch physics results to USD backings.
             """
-            self._in_sim_lifecycle += 1
-            try:
-                self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
-                if read_back:
-                    self.psi.fetch_results()
-                    self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
-            finally:
-                self._in_sim_lifecycle -= 1
+            self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
+            if read_back:
+                self.psi.fetch_results()
+                self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1228,13 +1220,6 @@ def _launch_simulator(*args, **kwargs):
                         scene.transition_rule_api.step()
 
         def play(self):
-            self._in_sim_lifecycle += 1
-            try:
-                self._play()
-            finally:
-                self._in_sim_lifecycle -= 1
-
-        def _play(self):
             if not self.is_playing():
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
                 was_stopped = self.is_stopped()
@@ -1251,7 +1236,11 @@ def _launch_simulator(*args, **kwargs):
                 channels = ["omni.usd", "omni.physicsschema.plugin", "omni.physx.plugin"]
 
                 with suppress_omni_log(channels=channels):
-                    self._sim_context.play()
+                    self._in_sim_lifecycle += 1
+                    try:
+                        self._sim_context.play()
+                    finally:
+                        self._in_sim_lifecycle -= 1
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
@@ -1294,16 +1283,16 @@ def _launch_simulator(*args, **kwargs):
                 self._sim_context.pause()
 
         def stop(self):
-            self._in_sim_lifecycle += 1
-            try:
-                if not self.is_stopped():
+            if not self.is_stopped():
+                self._in_sim_lifecycle += 1
+                try:
                     self._sim_context.stop()
+                finally:
+                    self._in_sim_lifecycle -= 1
 
-                # Run all callbacks
-                for callback in self._callbacks_on_stop.values():
-                    callback()
-            finally:
-                self._in_sim_lifecycle -= 1
+            # Run all callbacks
+            for callback in self._callbacks_on_stop.values():
+                callback()
 
         @property
         def n_physics_timesteps_per_render(self):
@@ -1321,21 +1310,21 @@ def _launch_simulator(*args, **kwargs):
             """
             Step the simulation at self.get_sim_step_dt() rate
             """
+            render = self._render_on_step
+            if self.stage is None:
+                raise Exception("There is no stage currently opened, init_stage needed before calling this func")
+
+            # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
+            # step() may not step physics
+            if len(self._objects_to_initialize) > 0:
+                self.render()
+
+            # Clear all scenes' updated objects
+            for scene in self.scenes:
+                scene.clear_updated_objects()
+
             self._in_sim_lifecycle += 1
             try:
-                render = self._render_on_step
-                if self.stage is None:
-                    raise Exception("There is no stage currently opened, init_stage needed before calling this func")
-
-                # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
-                # step() may not step physics
-                if len(self._objects_to_initialize) > 0:
-                    self.render()
-
-                # Clear all scenes' updated objects
-                for scene in self.scenes:
-                    scene.clear_updated_objects()
-
                 for _ in range(self._n_steps_per_loop):
                     if render:
                         self._sim_context.step(render=True)
@@ -1344,15 +1333,15 @@ def _launch_simulator(*args, **kwargs):
                         for i in range(self.n_physics_timesteps_per_render):
                             self._sim_context.step(render=False)
                             self._report_step_exceptions()
-
-                # Additionally run non physics things
-                self._non_physics_step()
-
-                # TODO (eric): After stage changes (e.g. pose, texture change), it will take two _sim_context.step(render=True) for
-                #  the result to propagate to the rendering. We could have called _sim_context.render() here but it will introduce
-                #  a big performance regression.
             finally:
                 self._in_sim_lifecycle -= 1
+
+            # Additionally run non physics things
+            self._non_physics_step()
+
+            # TODO (eric): After stage changes (e.g. pose, texture change), it will take two _sim_context.step(render=True) for
+            #  the result to propagate to the rendering. We could have called _sim_context.render() here but it will introduce
+            #  a big performance regression.
 
         def step_physics(self):
             """
@@ -1361,13 +1350,14 @@ def _launch_simulator(*args, **kwargs):
             self._in_sim_lifecycle += 1
             try:
                 self._physics_context._step(current_time=self.current_time)
-                self._report_step_exceptions()
-
-                # Accumulate contact data from this physics step and then flush to cache.
-                # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-                RigidContactAPI.update_contact_cache()
             finally:
                 self._in_sim_lifecycle -= 1
+
+            self._report_step_exceptions()
+
+            # Accumulate contact data from this physics step and then flush to cache.
+            # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
+            RigidContactAPI.update_contact_cache()
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
