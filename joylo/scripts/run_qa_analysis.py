@@ -6,11 +6,15 @@ from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.config_utils import TorchEncoder
 import bddl
 from gello.utils.qa_utils import *
-from gello.utils.b1k_utils import aggregate_episode_validation
 
 
 def get_valid_tasks():
-    return set(activity for activity in os.listdir(os.path.join(bddl.__path__[0], "activity_definitions")))
+    return set(
+        activity
+        for activity in os.listdir(
+            os.path.join(bddl.__path__[0], "activity_definitions")
+        )
+    )
 
 
 def evaluate_qa_metrics(fpath, task):
@@ -26,7 +30,9 @@ def evaluate_qa_metrics(fpath, task):
 
     all_episodes_results = dict()
     for episode_id, all_episode_metrics in all_episodes_metrics.items():
-        success, results = aggregate_episode_validation(task=task, all_episode_metrics=all_episode_metrics)
+        success, results = aggregate_episode_validation(
+            task=task, all_episode_metrics=all_episode_metrics
+        )
         all_episodes_results[episode_id] = {
             "success": success,
             "results": results,
@@ -37,9 +43,16 @@ def evaluate_qa_metrics(fpath, task):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compute Success / Failure based on aggregated QA metrics")
+    parser = argparse.ArgumentParser(
+        description="Compute Success / Failure based on aggregated QA metrics"
+    )
     parser.add_argument("--task", required=True, help="Name of the task to check")
-    parser.add_argument("--files", required=True, nargs="*", help="Individual aggregated episode metric file(s) to process")
+    parser.add_argument(
+        "--files",
+        required=True,
+        nargs="*",
+        help="Individual aggregated episode metric file(s) to process",
+    )
     args = parser.parse_args()
 
     # Process each file

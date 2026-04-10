@@ -22,7 +22,6 @@ parser.add_argument("-c", "--cloth", action="store_true")
 parser.add_argument("-w", "--fluids", action="store_true")
 parser.add_argument("-g", "--gpu_dynamics", action="store_true")
 parser.add_argument("-p", "--macro_particle_system", action="store_true")
-parser.add_argument("-f", "--flatcache", action="store_true")
 parser.add_argument("-d", "--deep-profiling", action="store_true")
 
 PROFILING_FIELDS = ["FPS", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
@@ -45,7 +44,6 @@ def main():
     # gm.ENABLE_HQ_RENDERING = args.fluids  # Temporarily disabled, since it requires >= 60 FPS
     gm.ENABLE_OBJECT_STATES = True
     gm.ENABLE_TRANSITION_RULES = True
-    gm.ENABLE_FLATCACHE = args.flatcache
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
     gm.ENABLE_PROFILING = args.deep_profiling
 

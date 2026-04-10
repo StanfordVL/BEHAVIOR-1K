@@ -24,7 +24,7 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.usd_utils import (
@@ -96,10 +96,6 @@ class ClothPrim(GeomPrim):
     def _post_load(self):
         # run super first
         super()._post_load()
-
-        # Make sure flatcache is not being used -- if so, raise an error, since we lose most of our needed functionality
-        # (such as R/W to specific particle states) when flatcache is enabled
-        assert not gm.ENABLE_FLATCACHE, "Cannot use flatcache with ClothPrim!"
 
         self._mass_api = (
             lazy.pxr.UsdPhysics.MassAPI(self._prim)

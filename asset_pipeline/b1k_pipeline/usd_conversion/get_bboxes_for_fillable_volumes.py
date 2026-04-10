@@ -28,7 +28,6 @@ import fs.path
 gm.HEADLESS = False
 gm.USE_ENCRYPTED_ASSETS = True
 gm.ENABLE_TRANSITION_RULES = False
-gm.ENABLE_FLATCACHE = False
 gm.DATASET_PATH = r"D:\fillable-10-21"
 
 BATCH_SIZE = 100
