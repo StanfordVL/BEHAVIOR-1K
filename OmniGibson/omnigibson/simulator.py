@@ -269,10 +269,6 @@ def _launch_app():
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
 
-    # Additional import for windows
-    if os.name == "nt":
-        lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.window.viewport")
-
     # Default Livestream settings
     if gm.REMOTE_STREAMING:
         app.set_setting("/app/window/drawMouse", True)

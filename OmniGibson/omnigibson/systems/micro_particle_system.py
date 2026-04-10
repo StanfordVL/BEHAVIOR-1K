@@ -489,9 +489,10 @@ class MicroParticleSystem(BaseSystem):
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         self._material.bind(self.system_prim_path)
         # Also apply physics to this material
-        lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
-            og.sim.stage, self.mat_path, **self._pbd_material_kwargs
-        )
+        with og.sim.editing_usd():
+            lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
+                og.sim.stage, self.mat_path, **self._pbd_material_kwargs
+            )
         # Potentially modify the material
         self._customize_particle_material() if self._customize_particle_material is not None else None
 
@@ -1411,7 +1412,8 @@ class FluidSystem(MicroPhysicalParticleSystem):
             if self.is_viscous
             else lazy.omni.physx.scripts.particleUtils.AddPBDMaterialWater
         )
-        apply_mat_physics(p=self._material.prim)
+        with og.sim.editing_usd():
+            apply_mat_physics(p=self._material.prim)
 
         # Compute the overall color of the fluid system
         self._color = self._material.average_diffuse_color

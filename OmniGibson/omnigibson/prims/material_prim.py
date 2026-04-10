@@ -183,16 +183,17 @@ class MaterialPrim(BasePrim):
     def _load(self):
         # We create a new material at the specified path
         mtl_created = []
-        lazy.omni.kit.commands.execute(
-            "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name=self.mdl_name,
-            mtl_name=self.mtl_name,
-            mtl_created_list=mtl_created,
-        )
-        material_path = mtl_created[0]
+        with og.sim.editing_usd():
+            lazy.omni.kit.commands.execute(
+                "CreateAndBindMdlMaterialFromLibrary",
+                mdl_name=self.mdl_name,
+                mtl_name=self.mtl_name,
+                mtl_created_list=mtl_created,
+            )
+            material_path = mtl_created[0]
 
-        # Move prim to desired location
-        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
+            # Move prim to desired location
+            lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
         og.sim.update_handles()
 
         # Return generated material
