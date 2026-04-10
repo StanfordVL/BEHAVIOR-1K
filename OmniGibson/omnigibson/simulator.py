@@ -444,6 +444,7 @@ def _launch_simulator(*args, **kwargs):
 
             # USD edit guard: detects edits outside editing_usd() context
             self._editing_usd = False
+            self._editing_usd_caller = None
             self._in_sim_lifecycle = 0
             self._usd_guard_enabled = False
             self._usd_guard_listener = None
@@ -1577,16 +1578,20 @@ def _launch_simulator(*args, **kwargs):
                     other_prim.visible = False
                 # USD is now synchronized to Fabric
             """
+            caller = traceback.extract_stack(limit=3)[0]
             assert not self._editing_usd, (
-                "Cannot nest editing_usd() contexts. All USD edits for a logical operation "
-                "should be in a single editing_usd() block."
+                f"Cannot nest editing_usd() contexts. All USD edits for a logical operation "
+                f"should be in a single editing_usd() block.\n"
+                f"  Existing context opened at: {self._editing_usd_caller}"
             )
             assert not self.currently_stepping, "Cannot edit USD while simulation is stepping!"
             self._editing_usd = True
+            self._editing_usd_caller = f"{caller.filename}:{caller.lineno} in {caller.name}"
             try:
                 yield
             finally:
                 self._editing_usd = False
+                self._editing_usd_caller = None
                 self.usdrt_stage.SynchronizeToFabric()
 
         def _enable_usd_guard(self):
@@ -1907,9 +1912,6 @@ def _launch_simulator(*args, **kwargs):
 
         def _partial_clear(self):
             """Partial clear clearing all components owned by the Simulator. Rest is completed in og.clear."""
-            # Disable the USD guard during clearing since we're tearing everything down
-            self._disable_usd_guard()
-
             # Stop the physics
             self.stop()
 
@@ -1947,6 +1949,9 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all controller groups so robots re-register on next load
             ControllerView.clear()
+
+            # Disable the USD guard during clearing since we're tearing everything down
+            self._disable_usd_guard()
 
         def close(self):
             """

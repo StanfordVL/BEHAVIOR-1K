@@ -770,15 +770,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # TODO(#2082): Verify if this is still needed.
         # Actually set the local pose now.
+        position = lazy.pxr.Gf.Vec3d(*position.tolist())
+        mesh.set_attribute("xformOp:translate", position)
+        orientation = orientation[[3, 0, 1, 2]].tolist()
+        xform_op = mesh.prim.GetAttribute("xformOp:orient")
+        if xform_op.GetTypeName() == "quatf":
+            rotq = lazy.pxr.Gf.Quatf(*orientation)
+        else:
+            rotq = lazy.pxr.Gf.Quatd(*orientation)
         with og.sim.editing_usd():
-            position = lazy.pxr.Gf.Vec3d(*position.tolist())
-            mesh.set_attribute("xformOp:translate", position)
-            orientation = orientation[[3, 0, 1, 2]].tolist()
-            xform_op = mesh.prim.GetAttribute("xformOp:orient")
-            if xform_op.GetTypeName() == "quatf":
-                rotq = lazy.pxr.Gf.Quatf(*orientation)
-            else:
-                rotq = lazy.pxr.Gf.Quatd(*orientation)
             xform_op.Set(rotq)
 
     def update_visuals(self):

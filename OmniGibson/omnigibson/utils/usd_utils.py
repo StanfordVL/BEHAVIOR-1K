@@ -167,8 +167,8 @@ def create_joint(
         # Get the prim pointed to at this path
         joint_prim = current_stage.GetPrimAtPath(prim_path)
 
-        # Apply joint API interface
-        ensure_usd_api(joint_prim, lazy.pxr.PhysxSchema.PhysxJointAPI)
+    # Apply joint API interface
+    ensure_usd_api(joint_prim, lazy.pxr.PhysxSchema.PhysxJointAPI)
 
     # We need to step rendering once to auto-fill the local pose before overwriting it.
     # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
@@ -206,13 +206,13 @@ def create_joint(
         # Possibly exclude this joint from the articulation
         joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
 
-        # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
-        if stage is None and og.sim.is_playing():
-            with suppress_omni_log(channels=["omni.physx.plugin"]):
-                og.sim.refresh_physics()
+    # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
+    if stage is None and og.sim.is_playing():
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.refresh_physics()
 
-        # Return this joint
-        return joint_prim
+    # Return this joint
+    return joint_prim
 
 
 class RigidContactAPIImpl:
@@ -1010,7 +1010,7 @@ def apply_collision_approximation(prim, mesh_collision_api, approximation_type):
 
 class PoseAPI:
     """
-    This is a singleton class for getting world poses.
+    This is a singleton class for getting world and local (parent-relative) poses from Fabric.
     Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
     After that, if we need to access the pose of a prim without stepping physics,
     this class will refresh the poses by syncing across USD-fabric-PhysX.
@@ -1072,6 +1072,44 @@ class PoseAPI:
         """
 
         return th.tensor(cls._get_world_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
+
+    @classmethod
+    def get_local_pose(cls, prim_path):
+        """
+        Gets pose of the prim with respect to its parent prim's frame (local / parent-relative transform).
+
+        Args:
+            prim_path: the path of the prim object
+
+        Returns:
+            2-tuple:
+                - torch.Tensor: (x,y,z) position in the parent frame
+                - torch.Tensor: (x,y,z,w) quaternion orientation in the parent frame
+        """
+        matrix = cls._get_local_pose_with_scale_from_fabric_hierarchy(prim_path)
+        quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+        position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
+        orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+        return position, orientation
+
+    @classmethod
+    def _get_local_pose_with_scale_from_fabric_hierarchy(cls, prim_path):
+        assert (
+            not og.sim.currently_stepping
+        ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
+
+        cls._refresh()
+
+        return og.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
+
+    @classmethod
+    def get_local_pose_with_scale(cls, prim_path):
+        """
+        Like get_local_pose, but returns the full 4x4 local transform matrix (with scale),
+        for converting points between the prim frame and the parent frame.
+        """
+
+        return th.tensor(cls._get_local_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
 
 
 class BatchControlViewAPIImpl:
@@ -2269,11 +2307,12 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     Returns:
         UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
+    assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
+    create_mesh_prim_with_default_xform(
+        primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage
+    )
+
     with og.sim.editing_usd():
-        assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
-        create_mesh_prim_with_default_xform(
-            primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage
-        )
         mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
         # Modify the points and normals attributes so that total extents is the desired
@@ -2289,7 +2328,7 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
             )
         )
 
-        return triangularize_mesh(mesh)
+    return triangularize_mesh(mesh)
 
 
 def create_usd_stage(usd_path):

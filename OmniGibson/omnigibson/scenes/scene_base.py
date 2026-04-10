@@ -498,29 +498,28 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Clears any internal state before the scene is destroyed
         """
-        with og.sim.editing_usd():
-            # Clears systems so they can be re-initialized.
-            for system in self.active_systems.values():
-                self.clear_system(system_name=system.name)
+        # Clears systems so they can be re-initialized.
+        for system in self.active_systems.values():
+            self.clear_system(system_name=system.name)
 
-            # Remove any vision sensors attached to this scene
-            # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
-            # which will cause segfault during og.clear()
-            scene_prim_path = self.prim_path
-            scene_prim_prefix = f"{scene_prim_path}/"
-            for sensor in tuple(VisionSensor.SENSORS.values()):
-                if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
-                    sensor.remove()
+        # Remove any vision sensors attached to this scene
+        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+        # which will cause segfault during og.clear()
+        scene_prim_path = self.prim_path
+        scene_prim_prefix = f"{scene_prim_path}/"
+        for sensor in tuple(VisionSensor.SENSORS.values()):
+            if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
+                sensor.remove()
 
-            # Remove all of the scene's objects.
-            og.sim.batch_remove_objects(list(self.objects))
+        # Remove all of the scene's objects.
+        og.sim.batch_remove_objects(list(self.objects))
 
-            # Remove the scene prim.
-            self._scene_prim.remove()
+        # Remove the scene prim.
+        self._scene_prim.remove()
 
-            if gm.ENABLE_TRANSITION_RULES:
-                # Clear the transition rule API
-                self._transition_rule_api.clear()
+        if gm.ENABLE_TRANSITION_RULES:
+            # Clear the transition rule API
+            self._transition_rule_api.clear()
 
     def _initialize(self):
         """

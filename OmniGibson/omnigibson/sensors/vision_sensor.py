@@ -615,11 +615,13 @@ class VisionSensor(BaseSensor):
             self.remove_modality(modality)
 
         # Destroy the render product
-        self._render_product.destroy()
+        with og.sim.editing_usd():
+            self._render_product.destroy()
 
         # Remove the viewport if it's not the main viewport
         if self._viewport.name != "Viewport":
-            self._viewport.destroy()
+            with og.sim.editing_usd():
+                self._viewport.destroy()
         else:
             # We're deleting our camera, so set the normal viewport camera to the default /Perspective camera
             self.active_camera_path = "/OmniverseKit_Persp"
