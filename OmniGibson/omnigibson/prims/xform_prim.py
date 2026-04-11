@@ -1,5 +1,6 @@
 import math
 from collections.abc import Iterable
+from functools import cached_property
 from typing import Literal
 
 import torch as th
@@ -66,10 +67,9 @@ class XFormPrim(BasePrim):
         # Pre-created OG objects' prims always have these things set up ahead of time.
         # Note that if this is an instanceable prim, we also don't need write these properties
         # TODO: This still breaks things downstream so we assert here to make sure we have backwards-compatibility with the expected prim types
-        assert (
-            not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy()
-        ), "Support for instanceable prims has not been implemented yet!"
-        if not self._xform_props_pre_loaded and not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy():
+        is_instanceable = self._prim.IsInstanceable() or self._prim.IsInstanceProxy()
+        assert not is_instanceable, "Support for instanceable prims has not been implemented yet!"
+        if not self._xform_props_pre_loaded and not is_instanceable:
             self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
@@ -161,7 +161,7 @@ class XFormPrim(BasePrim):
             else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
         )
 
-    @property
+    @cached_property
     def _binding_api(self):
         # TODO: Do we always need to apply this?
         return (
