@@ -310,20 +310,10 @@ class DatasetObject(USDObject):
             # 1. we use "acceleration" drive type instead of "force" to properly account for link mass
             # 2. we set non-zero damping to simulate dynamic friction:
             #       the friction coefficient only accounts for static friction
-            # Single-pass subtree walk that classifies both prismatic and revolute joints,
-            # instead of running find_all_prim_children_with_type twice (which recursively
-            # walks the entire object subtree per call).
-            prismatic_joints = []
-            revolute_joints = []
-            stack = [self._prim]
-            while stack:
-                prim = stack.pop()
-                type_name = prim.GetTypeName()
-                if "PhysicsPrismaticJoint" in type_name:
-                    prismatic_joints.append(prim)
-                elif "PhysicsRevoluteJoint" in type_name:
-                    revolute_joints.append(prim)
-                stack.extend(prim.GetChildren())
+            from omnigibson.utils.asset_conversion_utils import find_all_prim_children_with_type
+
+            prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
+            revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
             for prismatic_joint in prismatic_joints:
                 prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
                 prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
