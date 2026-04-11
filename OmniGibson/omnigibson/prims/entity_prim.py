@@ -122,8 +122,9 @@ class EntityPrim(XFormPrim):
             # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
             # See omni.kit.context_menu module for reference
             new_path = f"{self.prim_path}/{old_link_prim.GetName()}_cloth"
-            lazy.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
-            lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
+            with og.sim.editing_usd():
+                lazy.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
+                lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
 
         self.update_links()
         self._compute_articulation_tree()

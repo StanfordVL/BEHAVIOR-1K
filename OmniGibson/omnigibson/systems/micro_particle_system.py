@@ -1546,7 +1546,8 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Copy it to the standardized prim path
         prototype_path = f"{self.prim_path}/prototype0"
-        lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
+        with og.sim.editing_usd():
+            lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
         # Wrap it with GeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
