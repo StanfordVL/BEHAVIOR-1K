@@ -201,23 +201,50 @@ class XFormPrim(BasePrim):
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
             position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
+        # If the current pose is not in parent frame, convert to parent frame since that's what we can set.
+        if frame != "parent":
+            world_transform = T.pose2mat((position, orientation))
+            parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(self._prim).GetPath())
+            parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
+
+            local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
+            local_transform[:3, :3] /= th.linalg.norm(
+                local_transform[:3, :3], dim=0
+            )  # unscale local transform's rotation
+
+            # Check that the local transform consists only of a position, scale and rotation
+            product = local_transform[:3, :3] @ local_transform[:3, :3].T
+            assert th.allclose(
+                product, th.diag(th.diag(product)), atol=1e-3
+            ), f"{self._prim.GetPath()} local transform is not orthogonal."
+
+            # Return the local pose
+            position, orientation = T.mat2pose(local_transform)
+
         # Assert validity of the orientation
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
-        # Set and propagate the pose to the Fabric Hierarchy.
-        matrix = og.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(self.prim_path))
-        matrix.SetTranslateOnly(lazy.usdrt.Gf.Vec3d(*position.tolist()))
-        matrix.SetRotateOnly(lazy.usdrt.Gf.Quatd(*orientation[[3, 0, 1, 2]].tolist()))
-        scaling_matrix = lazy.usdrt.Gf.Matrix4d().SetIdentity().SetScale(lazy.usdrt.Gf.Transform(matrix).GetScale())
-        matrix = scaling_matrix * matrix
-        if frame == "parent":
-            og.sim.fabric_hierarchy.set_local_xform(lazy.usdrt.Sdf.Path(self.prim_path), matrix)
+        # Actually set the local pose now.
+        properties = self.prim.GetPropertyNames()
+        position = lazy.pxr.Gf.Vec3d(*position.tolist())
+        if "xformOp:translate" not in properties:
+            logger.error("Translate property needs to be set for {} before setting its position".format(self.name))
+        self.set_attribute("xformOp:translate", position)
+        orientation = orientation[[3, 0, 1, 2]].tolist()
+        if "xformOp:orient" not in properties:
+            logger.error("Orient property needs to be set for {} before setting its orientation".format(self.name))
+        xform_op = self._prim.GetAttribute("xformOp:orient")
+        if xform_op.GetTypeName() == "quatf":
+            rotq = lazy.pxr.Gf.Quatf(*orientation)
         else:
-            og.sim.fabric_hierarchy.set_world_xform(lazy.usdrt.Sdf.Path(self.prim_path), matrix)
-        og.sim.fabric_hierarchy.update_world_xforms()
+            rotq = lazy.pxr.Gf.Quatd(*orientation)
+        with og.sim.editing_usd():
+            xform_op.Set(rotq)
         PoseAPI.invalidate()
+
+        og.sim.fabric_hierarchy.update_world_xforms()
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """

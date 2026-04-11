@@ -34,8 +34,8 @@ def env(request, stopped_env):
         if name not in ("env", "stopped_env", "request"):
             request.getfixturevalue(name)
 
-    og.sim.step()
     og.sim.play()
+    og.sim.step()
     yield stopped_env
 
     og.clear()

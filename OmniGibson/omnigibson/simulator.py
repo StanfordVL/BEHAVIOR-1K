@@ -1310,6 +1310,8 @@ def _launch_simulator(*args, **kwargs):
             """
             Step the simulation at self.get_sim_step_dt() rate
             """
+            assert self.is_playing(), "Simulator must be playing to step"
+
             render = self._render_on_step
             if self.stage is None:
                 raise Exception("There is no stage currently opened, init_stage needed before calling this func")
@@ -1347,6 +1349,8 @@ def _launch_simulator(*args, **kwargs):
             """
             Step the physics a single step.
             """
+            assert self.is_playing(), "Simulator must be playing to step"
+
             self._in_sim_lifecycle += 1
             try:
                 self._physics_context._step(current_time=self.current_time)

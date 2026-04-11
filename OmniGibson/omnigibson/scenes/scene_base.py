@@ -900,19 +900,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             position (th.Tensor): (3,) position of the scene
             orientation (th.Tensor): (4,) orientation of the scene
         """
-        with og.sim.editing_usd():
-            self._scene_prim.set_position_orientation(position=position, orientation=orientation)
-            # Need to update sim here -- this is because downstream setters called immediately may not be respected,
-            # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-            og.sim.refresh_physics()
-            # Update the cached pose and inverse pose
-            pos_ori = self._scene_prim.get_position_orientation()
-            pose = T.pose2mat(pos_ori)
-            self._pose_info = {
-                "pos_ori": pos_ori,
-                "pose": T.pose2mat(pos_ori),
-                "pose_inv": th.linalg.inv_ex(pose).inverse,
-            }
+        self._scene_prim.set_position_orientation(position=position, orientation=orientation)
+        # Need to update sim here -- this is because downstream setters called immediately may not be respected,
+        # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
+        og.sim.refresh_physics()
+        # Update the cached pose and inverse pose
+        pos_ori = self._scene_prim.get_position_orientation()
+        pose = T.pose2mat(pos_ori)
+        self._pose_info = {
+            "pos_ori": pos_ori,
+            "pose": T.pose2mat(pos_ori),
+            "pose_inv": th.linalg.inv_ex(pose).inverse,
+        }
 
     @property
     def prim_path(self):

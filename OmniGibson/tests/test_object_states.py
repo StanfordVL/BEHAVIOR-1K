@@ -391,6 +391,10 @@ def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
 def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dishtowel):
     dishtowel = cookable_dishtowel
 
+    # Not affected by any heat source
+    assert bagel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
+    assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
+
     place_obj_on_floor_plane(microwave)
     place_obj_on_floor_plane(stove, x_offset=1.0)
     place_obj_on_floor_plane(fridge, x_offset=2.0)
@@ -399,6 +403,10 @@ def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dis
     # Set the objects to be far away
     place_obj_on_floor_plane(bagel, x_offset=-0.5)
     place_obj_on_floor_plane(dishtowel, x_offset=-1.0)
+
+    # Not affected by any heat source
+    assert bagel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
+    assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
 
     for _ in range(5):
         og.sim.step()
