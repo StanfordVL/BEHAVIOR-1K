@@ -12,7 +12,7 @@ import tempfile
 import traceback
 from contextlib import nullcontext
 from pathlib import Path
-from cProfile import Profile
+from omnigibson.utils.profiling_utils import Profiler
 
 import torch as th
 
@@ -78,13 +78,11 @@ def with_profiler(name):
         @functools.wraps(fn)
         def wrapper(self, *args, **kwargs):
             profiler = getattr(self, name)
-            if profiler is not None:
-                profiler.enable()
+            profiler.enable()
             try:
                 return fn(self, *args, **kwargs)
             finally:
-                if profiler is not None:
-                    profiler.disable()
+                profiler.disable()
 
         return wrapper
 
@@ -429,9 +427,10 @@ def _launch_simulator(*args, **kwargs):
             self.pre_step_exception = None
             self.post_step_exception = None
 
-            self._pre_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
-            self._post_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
-            self._non_physics_step_profiler = Profile() if gm.ENABLE_PROFILING else None
+            self._step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
+            self._pre_physics_step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
+            self._post_physics_step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
+            self._non_physics_step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
 
             self._floor_plane = None
             self._skybox = None
@@ -1306,6 +1305,7 @@ def _launch_simulator(*args, **kwargs):
             assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
             return int(n_physics_timesteps_per_render)
 
+        @with_profiler(name="_step_profiler")
         def step(self):
             """
             Step the simulation at self.get_sim_step_dt() rate

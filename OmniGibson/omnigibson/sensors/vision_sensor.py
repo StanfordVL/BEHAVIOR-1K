@@ -22,16 +22,6 @@ from omnigibson.utils.vision_utils import Remapper
 log = create_module_logger(module_name=__name__)
 
 
-# Duplicate of simulator's render method, used so that this can be done before simulator is created!
-def render():
-    """
-    Refreshes the Isaac Sim app rendering components including UI elements and view ports..etc.
-    """
-    og.app._carb_settings.set_bool("/app/player/playSimulations", False)
-    og.app.update()
-    og.app._carb_settings.set_bool("/app/player/playSimulations", True)
-
-
 class VisionSensor(BaseSensor):
     """
     Vision sensor that handles a variety of modalities, including:
@@ -219,7 +209,7 @@ class VisionSensor(BaseSensor):
         else:
             viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
             # Take a render step to make sure the viewport is generated before docking it
-            render()
+            og.sim.render()
             # Grab the newly created viewport and dock it to the GUI
             # The first viewport is always the "main" global camera, and any additional cameras are auxiliary views
             # These auxiliary views will be stacked in a single column
@@ -252,7 +242,7 @@ class VisionSensor(BaseSensor):
 
         # Requires 4 render updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
         # Set the viewer size (requires taking one render step afterwards)
         self._viewport.viewport_api.set_texture_resolution(resolution)
@@ -266,7 +256,7 @@ class VisionSensor(BaseSensor):
 
         # Requires 4 render updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
     def _initialize(self):
         # Run super first
@@ -277,7 +267,7 @@ class VisionSensor(BaseSensor):
         # Initialize sensors
         self.initialize_sensors(names=self._modalities)
         for _ in range(4):
-            render()
+            og.sim.render()
 
     def initialize_sensors(self, names):
         """Initializes a raw sensor in the simulation.
@@ -672,7 +662,7 @@ class VisionSensor(BaseSensor):
             self.initialize_sensors(names="camera_params")
             # Requires 4 render updates for camera params annotator to become active
             for _ in range(4):
-                render()
+                og.sim.render()
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
 
@@ -694,7 +684,7 @@ class VisionSensor(BaseSensor):
         """
         self._viewport.visible = visible
         # Requires 1 render update to propagate changes
-        render()
+        og.sim.render()
 
     @property
     def image_height(self):
@@ -729,7 +719,7 @@ class VisionSensor(BaseSensor):
 
         # Requires 4 updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
     @property
     def image_width(self):
@@ -764,7 +754,7 @@ class VisionSensor(BaseSensor):
 
         # Requires 4 updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
     @property
     def clipping_range(self):
@@ -786,7 +776,7 @@ class VisionSensor(BaseSensor):
         # In order for sensor changes to propagate, we must toggle its visibility
         self.visible = False
         # A single update step has to happen here before we toggle visibility for changes to propagate
-        render()
+        og.sim.render()
         self.visible = True
 
     @property
@@ -880,7 +870,7 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_active_camera(path)
         # Requires 6 updates to propagate changes
         for i in range(6):
-            render()
+            og.sim.render()
 
     @property
     def intrinsic_matrix(self):
@@ -966,7 +956,7 @@ class VisionSensor(BaseSensor):
             sensor.remove()
 
         # Render to update
-        render()
+        og.sim.render()
 
         cls.SEMANTIC_REMAPPER = Remapper()
         cls.INSTANCE_REMAPPER = Remapper()
