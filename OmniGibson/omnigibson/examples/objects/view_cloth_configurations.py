@@ -6,7 +6,7 @@ import omnigibson.lazy as lazy
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import KeyboardEventHandler, choose_from_options
 import torch as th
-from omnigibson.utils.bddl_utils import KB
+from omnigibson.utils.bddl_utils import get_knowledge_base
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True
@@ -22,7 +22,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Select a category to load
     available_obj_categories = get_all_object_categories()
     cloth_obj_categories = [
-        category for category in available_obj_categories if "cloth" in KB.get_category(category).synset.abilities
+        category
+        for category in available_obj_categories
+        if "cloth" in get_knowledge_base().get_category(category).synset.abilities
     ]
     obj_category = choose_from_options(
         options=cloth_obj_categories, name="object category", random_selection=random_selection

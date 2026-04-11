@@ -8,7 +8,7 @@ from functools import cached_property
 from typing import Literal
 
 import torch as th
-from omnigibson.utils.bddl_utils import KB
+from omnigibson.utils.bddl_utils import get_knowledge_base
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -162,7 +162,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # TODO: Move this to dataset object? Loads B1K abilities for non-B1K objects.
         if abilities is None:
             abilities = {}
-            kb_category = KB.get_category(category)
+            kb_category = get_knowledge_base().get_category(category)
             if kb_category is not None and kb_category.synset is not None:
                 abilities = kb_category.synset.abilities
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."

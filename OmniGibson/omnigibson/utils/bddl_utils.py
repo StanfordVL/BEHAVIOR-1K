@@ -134,7 +134,7 @@ def is_system_bddl_inst(bddl_inst):
 
 def og_categories_from_bddl_inst(bddl_inst):
     """Get OG categories for a BDDL instance."""
-    synset_obj = KB.get_synset(synset_from_bddl_inst(bddl_inst))
+    synset_obj = get_knowledge_base().get_synset(synset_from_bddl_inst(bddl_inst))
     synset_and_descendants = [synset_obj] + sorted(synset_obj.descendants, key=lambda s: s.name)
     if synset_obj.is_substance:
         return [ps.name for s in synset_and_descendants for ps in s.particle_systems]
@@ -142,12 +142,12 @@ def og_categories_from_bddl_inst(bddl_inst):
 
 
 def is_substance_synset(synset):
-    synset_obj = KB.get_synset(synset)
+    synset_obj = get_knowledge_base().get_synset(synset)
     return synset_obj is not None and synset_obj.is_substance
 
 
 def get_system_name_by_synset(synset):
-    synset_obj = KB.get_synset(synset)
+    synset_obj = get_knowledge_base().get_synset(synset)
     synset_and_descendants = [synset_obj] + sorted(synset_obj.descendants, key=lambda s: s.name)
     systems = [ps.name for s in synset_and_descendants for ps in s.particle_systems]
     assert len(systems) == 1, f"Got zero or multiple systems for {synset}: {systems}"
@@ -264,9 +264,20 @@ def sample_bddl_predicate(predicate_cls, *args, **kwargs):
         return obj.states[state_class].set_value(binary_state, **kwargs)
 
 
-# Shared KnowledgeBase instance for all of OmniGibson
-KB = KnowledgeBase(verbose=False)
-BEHAVIOR_ACTIVITIES = sorted(set(t.name.rsplit("-", 1)[0] for t in KB.all_tasks()))
+# Shared KnowledgeBase instance for all of OmniGibson. Use the getter for lazy access.
+_KB = None
+
+
+def get_knowledge_base():
+    global _KB
+    if _KB is None:
+        _KB = KnowledgeBase(verbose=False)
+
+    return _KB
+
+
+def get_behavior_activities():
+    return sorted(set(t.name.rsplit("-", 1)[0] for t in get_knowledge_base().all_tasks()))
 
 
 def _populate_input_output_objects_systems(og_recipe, input_synsets, output_synsets):
@@ -275,11 +286,13 @@ def _populate_input_output_objects_systems(og_recipe, input_synsets, output_syns
         (input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")
     ):
         for synset, count in synsets.items():
-            assert KB.get_synset(synset).is_leaf, f"Synset {synset} must be a leaf node in the taxonomy!"
+            assert (
+                get_knowledge_base().get_synset(synset).is_leaf
+            ), f"Synset {synset} must be a leaf node in the taxonomy!"
             if is_substance_synset(synset):
                 og_recipe[system_key].append(get_system_name_by_synset(synset))
             else:
-                obj_categories = [c.name for c in KB.get_synset(synset).categories]
+                obj_categories = [c.name for c in get_knowledge_base().get_synset(synset).categories]
                 assert (
                     len(obj_categories) == 1
                 ), f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
@@ -307,13 +320,13 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                 first_synset, second_synset = synset_split
 
             # Assert the first synset is an object because the systems don't have any states.
-            assert KB.get_synset(
-                first_synset
-            ).is_leaf, f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
+            assert (
+                get_knowledge_base().get_synset(first_synset).is_leaf
+            ), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
             assert not is_substance_synset(
                 first_synset
             ), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
-            obj_categories = [c.name for c in KB.get_synset(first_synset).categories]
+            obj_categories = [c.name for c in get_knowledge_base().get_synset(first_synset).categories]
             assert (
                 len(obj_categories) == 1
             ), f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
@@ -327,14 +340,14 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                     ), f"Input/output state type {sc.predicate.__name__} must be a unary state!"
                     og_recipe[states_key][first_obj_category]["unary"].append((state_class, sc.value))
             else:
-                assert KB.get_synset(
-                    second_synset
-                ).is_leaf, f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                assert (
+                    get_knowledge_base().get_synset(second_synset).is_leaf
+                ), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
                 if is_substance_synset(second_synset):
                     second_obj_category = get_system_name_by_synset(second_synset)
                     is_substance = True
                 else:
-                    obj_categories = [c.name for c in KB.get_synset(second_synset).categories]
+                    obj_categories = [c.name for c in get_knowledge_base().get_synset(second_synset).categories]
                     assert (
                         len(obj_categories) == 1
                     ), f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
@@ -367,9 +380,11 @@ def _populate_filter_categories(og_recipe, filter_name, synsets):
     if synsets is not None:
         og_recipe[f"{filter_name}_categories"] = set()
         for synset in synsets:
-            assert KB.get_synset(synset).is_leaf, f"Synset {synset} must be a leaf node in the taxonomy!"
+            assert (
+                get_knowledge_base().get_synset(synset).is_leaf
+            ), f"Synset {synset} must be a leaf node in the taxonomy!"
             assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
-            for category in [c.name for c in KB.get_synset(synset).categories]:
+            for category in [c.name for c in get_knowledge_base().get_synset(synset).categories]:
                 og_recipe[f"{filter_name}_categories"].add(category)
 
 
@@ -432,7 +447,7 @@ def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
     """
     og_washer_rule = dict()
     for solute, solvents in washer_rule.conditions.items():
-        assert KB.get_synset(solute).is_leaf, f"Synset {solute} must be a leaf node in the taxonomy!"
+        assert get_knowledge_base().get_synset(solute).is_leaf, f"Synset {solute} must be a leaf node in the taxonomy!"
         assert is_substance_synset(solute), f"Synset {solute} must be a substance synset!"
         solute_name = get_system_name_by_synset(solute)
         if solvents is None:
@@ -440,7 +455,9 @@ def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
         else:
             solvent_names = []
             for solvent in solvents:
-                assert KB.get_synset(solvent).is_leaf, f"Synset {solvent} must be a leaf node in the taxonomy!"
+                assert (
+                    get_knowledge_base().get_synset(solvent).is_leaf
+                ), f"Synset {solvent} must be a leaf node in the taxonomy!"
                 assert is_substance_synset(solvent), f"Synset {solvent} must be a substance synset!"
                 solvent_name = get_system_name_by_synset(solvent)
                 solvent_names.append(solvent_name)
@@ -608,7 +625,7 @@ class BDDLSampler:
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
                 obj_synset = self._object_instance_to_synset[obj_inst]
-                abilities = KB.get_synset(obj_synset).abilities
+                abilities = get_knowledge_base().get_synset(obj_synset).abilities
                 if "sceneObject" not in abilities:
                     # Invalid room assignment
                     return (
@@ -823,7 +840,7 @@ class BDDLSampler:
 
                 # We allow burners to be used as if they are stoves
                 # No need to safeguard check for subtree_substances because inroom objects will never be substances
-                _so = KB.get_synset(obj_synset)
+                _so = get_knowledge_base().get_synset(obj_synset)
                 categories = [
                     c.name
                     for s in [_so] + sorted(_so.descendants, key=lambda x: x.name)
@@ -833,7 +850,11 @@ class BDDLSampler:
 
                 # Grab all models that fully support all abilities for the corresponding category
                 valid_models = {
-                    cat: set(get_all_object_category_models_with_abilities(cat, KB.get_category(cat).synset.abilities))
+                    cat: set(
+                        get_all_object_category_models_with_abilities(
+                            cat, get_knowledge_base().get_category(cat).synset.abilities
+                        )
+                    )
                     for cat in categories
                 }
                 valid_models = {
@@ -1144,7 +1165,7 @@ class BDDLSampler:
             if is_substance_synset(obj_synset):
                 assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
-                _so = KB.get_synset(obj_synset)
+                _so = get_knowledge_base().get_synset(obj_synset)
                 system_name = [
                     ps.name for s in [_so] + sorted(_so.descendants, key=lambda x: x.name) for ps in s.particle_systems
                 ][0]
@@ -1152,7 +1173,7 @@ class BDDLSampler:
                     None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
                 )
             else:
-                _so = KB.get_synset(obj_synset)
+                _so = get_knowledge_base().get_synset(obj_synset)
                 valid_categories = set(
                     [
                         c.name
@@ -1184,7 +1205,7 @@ class BDDLSampler:
                     model_choices = set(
                         get_all_object_category_models_with_abilities(
                             category=category,
-                            abilities=KB.get_category(category).synset.abilities,
+                            abilities=get_knowledge_base().get_category(category).synset.abilities,
                         )
                     )
                     model_choices = (
@@ -1242,7 +1263,11 @@ class BDDLSampler:
                     name=f"{category}_{len(self._env.scene.objects)}",
                     category=category,
                     model=model,
-                    prim_type=(PrimType.CLOTH if "cloth" in KB.get_synset(obj_synset).abilities else PrimType.RIGID),
+                    prim_type=(
+                        PrimType.CLOTH
+                        if "cloth" in get_knowledge_base().get_synset(obj_synset).abilities
+                        else PrimType.RIGID
+                    ),
                     **obj_kwargs,
                 )
                 num_new_obj += 1

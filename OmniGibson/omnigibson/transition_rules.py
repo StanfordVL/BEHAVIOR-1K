@@ -32,7 +32,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from bddl.transition_rules import CookingRecipe, MachineRecipe, MixingRecipe, SubstanceCookingRecipe
 from omnigibson.utils.bddl_utils import (
-    KB,
+    get_knowledge_base,
     translate_bddl_recipe_to_og_recipe,
     translate_bddl_washer_rule_to_og_washer_rule,
 )
@@ -75,6 +75,9 @@ class TransitionRuleAPI:
     """
 
     def __init__(self, scene):
+        # Recipes and washer conditions come from the knowledge base; load once on first API use (not at import time).
+        import_recipes()
+
         self.scene = scene
 
         # Set of active rules
@@ -2574,9 +2577,16 @@ class CookingSystemRule(CookingRule):
         return False
 
 
+_RECIPES_IMPORTED = False
+
+
 def import_recipes():
+    global _RECIPES_IMPORTED
+    if _RECIPES_IMPORTED:
+        return
+
     # Import all recipes from the shared KnowledgeBase
-    for tr in KB.all_transition_rules():
+    for tr in get_knowledge_base().all_transition_rules():
         if tr.recipe is None:
             continue
         og_recipe = translate_bddl_recipe_to_og_recipe(tr.recipe)
@@ -2595,8 +2605,9 @@ def import_recipes():
             CookingPhysicalParticleRule.add_recipe(**og_recipe)
 
     # Washer rule
-    if KB.washer_rule is not None:
-        WasherRule.register_cleaning_conditions(translate_bddl_washer_rule_to_og_washer_rule(KB.washer_rule))
+    if get_knowledge_base().washer_rule is not None:
+        WasherRule.register_cleaning_conditions(
+            translate_bddl_washer_rule_to_og_washer_rule(get_knowledge_base().washer_rule)
+        )
 
-
-import_recipes()
+    _RECIPES_IMPORTED = True

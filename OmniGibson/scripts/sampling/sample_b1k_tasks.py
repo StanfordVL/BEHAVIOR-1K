@@ -12,7 +12,7 @@ from omnigibson.tasks import BehaviorTask
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import clear as clear_pu
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.bddl_utils import KB
+from omnigibson.utils.bddl_utils import get_knowledge_base
 from utils import (
     ACTIVITY_TO_ROW,
     create_stable_scene_json,
@@ -270,7 +270,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         should_sample, success, reason = True, False, ""
 
         # Skip any with unsupported predicates, but still record the reason why we can't sample
-        task_obj = KB.get_task(f"{activity}-0")
+        task_obj = get_knowledge_base().get_task(f"{activity}-0")
         task_obj._ensure_compiled()
         all_predicates = set(
             get_predicates(task_obj.conditions.parsed_initial_conditions)

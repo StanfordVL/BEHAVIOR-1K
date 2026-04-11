@@ -22,9 +22,9 @@ from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.bddl_utils import (
-    BEHAVIOR_ACTIVITIES,
+    get_behavior_activities,
     BDDLSampler,
-    KB,
+    get_knowledge_base,
     is_system_bddl_inst,
     og_categories_from_bddl_inst,
 )
@@ -90,7 +90,7 @@ class BehaviorTask(BaseTask):
         assert gm.ENABLE_OBJECT_STATES, "Must set gm.ENABLE_OBJECT_STATES=True in order to use BehaviorTask!"
 
         assert activity_name is not None, "Activity name must be specified for BehaviorTask!"
-        assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
+        assert_valid_key(key=activity_name, valid_keys=get_behavior_activities(), name="Behavior Task")
 
         # Make sure to not use presampled robot pose if we're using online object sampling
         assert not (
@@ -299,7 +299,7 @@ class BehaviorTask(BaseTask):
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
-        task_def = KB.get_task(f"{activity_name}-{activity_definition_id}")
+        task_def = get_knowledge_base().get_task(f"{activity_name}-{activity_definition_id}")
 
         # Build scene layout for wildcard expansion and compile
         scene_layout = self._build_scene_layout(env.scene)

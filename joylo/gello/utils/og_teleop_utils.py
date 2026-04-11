@@ -20,7 +20,7 @@ from omnigibson.sensors import VisionSensor
 from omnigibson.objects.usd_object import USDObject
 from gello.robots.sim_robot.og_teleop_cfg import *
 
-from omnigibson.utils.bddl_utils import KB
+from omnigibson.utils.bddl_utils import get_knowledge_base
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -28,7 +28,7 @@ parser.add_argument("--activity", type=str, required=True)
 
 
 def get_task_relevant_room_types(activity_name):
-    task_obj = KB.get_task(f"{activity_name}-0")
+    task_obj = get_knowledge_base().get_task(f"{activity_name}-0")
     task_obj._ensure_compiled()
     init_conds = task_obj.conditions.parsed_initial_conditions
     room_types = set()

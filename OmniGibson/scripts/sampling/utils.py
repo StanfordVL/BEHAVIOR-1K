@@ -303,9 +303,9 @@ def parse_task_mapping_new():
             mapping = json.load(f)
         return mapping
 
-    from omnigibson.utils.bddl_utils import KB
+    from omnigibson.utils.bddl_utils import get_knowledge_base
 
-    tasks = KB.all_tasks()
+    tasks = get_knowledge_base().all_tasks()
     mapping = dict()
     for task in tasks:
         task_name = task.name[:-2]
