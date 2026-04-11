@@ -286,8 +286,6 @@ class MacroParticleSystem(BaseSystem):
         for scale in scales:
             self.add_particle(relative_prim_path=f"{self.relative_prim_path}/particles", scale=scale)
 
-        og.sim.update_handles()
-
         # Set the tfs
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
@@ -1199,12 +1197,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 restitution=m.MACRO_PHYSICAL_RESTITUTION,
             )
 
-        # A new view needs to be created every time once sim is playing, so we add a callback now
-        og.sim.add_callback_on_play(name=f"{self.name}_particles_view", callback=self.refresh_particles_view)
-
-        # If sim is already playing, refresh particles immediately
-        if og.sim.is_playing():
-            self.refresh_particles_view()
+        # Create the particles view.
+        self.update_handles()
 
     def _load_new_particle(self, relative_prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
@@ -1254,13 +1248,12 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._particle_offset = particle_offset
         self._particle_radius = particle_radius
 
-    def refresh_particles_view(self):
+    def update_handles(self):
         """
-        Internal helper method to refresh the particles' rigid body view to grab state
+        Internal helper method to update the particles' rigid body view to grab state
 
-        Should be called every time sim.play() is called
+        Should be called every time sim.play() is called, or after any USD changes have been made.
         """
-        og.sim.refresh_physics()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"
@@ -1282,17 +1275,15 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # Run super first
         super().remove_particle_by_name(name=name)
 
-        # Refresh particles view
-        if og.sim.is_playing():
-            self.refresh_particles_view()
+        # Update the handles
+        og.sim.update_handles()
 
     def add_particle(self, relative_prim_path, scale, idn=None):
         # Run super first
         particle = super().add_particle(relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
-        # Refresh particles view
-        if og.sim.is_playing():
-            self.refresh_particles_view()
+        # Update the handles
+        og.sim.update_handles()
 
         return particle
 
@@ -1505,10 +1496,6 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._sync_particles(n_particles=state["n_particles"])
 
         super()._load_state(state=state)
-
-        if self.initialized:
-            # Make sure view is refreshed
-            self.refresh_particles_view()
 
         # Make sure we update all the velocities
         self.set_particles_velocities(state["lin_velocities"], state["ang_velocities"])

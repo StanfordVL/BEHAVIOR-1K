@@ -39,38 +39,6 @@ m.MIN_PARTICLE_CONTACT_OFFSET = 0.005  # Minimum particle contact offset for phy
 m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = None  # If set, the maximum particle velocity for micro particle systems
 
 
-def set_carb_settings_for_fluid_isosurface():
-    """
-    Sets relevant rendering settings in the carb settings in order to use isosurface effectively
-    """
-    min_frame_rate = 60
-    # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
-    assert (
-        (1 / og.sim.get_rendering_dt()) >= min_frame_rate
-    ), f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing rendering_frequency of env_config to {min_frame_rate}."
-
-    # Settings for Isosurface
-    isregistry = lazy.carb.settings.acquire_settings_interface()
-    # disable grid and lights
-    dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
-    dOptions &= ~(1 << 6 | 1 << 8)
-    isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
-    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)
-    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, min_frame_rate)
-    isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
-    isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
-    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
-    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse", 50000)
-    isregistry.set_float("rtx-defaults/pathtracing/optixDenoiser/blendFactor", 0.09)
-    isregistry.set_int("rtx-defaults/pathtracing/aa/op", 2)
-    isregistry.set_int("rtx-defaults/pathtracing/maxBounces", 32)
-    isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
-    isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
-    isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
-
-
 class PhysxParticleInstancer(BasePrim):
     """
     Simple class that wraps the raw omniverse point instancer prim and provides convenience functions for
@@ -1418,11 +1386,11 @@ class FluidSystem(MicroPhysicalParticleSystem):
         # Compute the overall color of the fluid system
         self._color = self._material.average_diffuse_color
 
-        # Set custom isosurface rendering settings if we are using high-quality rendering
+        # Isosurface carb/RTX settings are applied once in Simulator._set_renderer_settings when HQ rendering is on.
         if gm.ENABLE_HQ_RENDERING:
-            set_carb_settings_for_fluid_isosurface()
-            # We also modify the grid smoothing radius to avoid "blobby" appearances
-            self.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
+            with og.sim.editing_usd():
+                # Modify the grid smoothing radius to avoid "blobby" appearances
+                self.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
     @property
     def is_fluid(self):

@@ -616,29 +616,58 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
-            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
-            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
-            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
-            lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
-            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
-            lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
-            lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 1.0)
-            lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
-            lazy.carb.settings.get_settings().set_bool("/rtx/flow/enabled", True)
+            settings = lazy.carb.settings.get_settings()
+            settings.set_bool("/rtx/reflections/enabled", True)
+            settings.set_bool("/rtx/indirectDiffuse/enabled", True)
+            settings.set_int(
+                "/rtx/post/dlss/execMode", 0 if not gm.ENABLE_HQ_RENDERING else 1
+            )  # "Performance" vs "Realism"
+            settings.set_bool("/rtx/ambientOcclusion/enabled", True)
+            settings.set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            settings.set_int("/rtx/raytracing/showLights", 1)
+            settings.set_float("/rtx/sceneDb/ambientLightIntensity", 1.0)
+            settings.set_bool("/app/renderer/skipMaterialLoading", False)
+            settings.set_bool("/rtx/flow/enabled", True)
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
-            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", True)
-            lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/updateResidualsToUsd", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/outputVelocitiesLocalSpace", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateTransformations", True)
-            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateVelocities", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateForceSensors", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateJointStates", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateResiduals", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/fabricUseGPUInterop", True)
+            settings.set_bool("/physics/updateToUsd", False)
+            settings.set_bool("/physics/updateParticlesToUsd", True)
+            settings.set_bool(
+                "/physics/updateVelocitiesToUsd", gm.ENABLE_HQ_RENDERING
+            )  # Needed for isosurface HQ rendering
+            settings.set_bool("/physics/updateForceSensorsToUsd", False)
+            settings.set_bool("/physics/updateResidualsToUsd", False)
+            settings.set_bool("/physics/outputVelocitiesLocalSpace", False)
+            settings.set_bool("/physics/fabricUpdateTransformations", True)
+            settings.set_bool("/physics/fabricUpdateVelocities", False)
+            settings.set_bool("/physics/fabricUpdateForceSensors", False)
+            settings.set_bool("/physics/fabricUpdateJointStates", False)
+            settings.set_bool("/physics/fabricUpdateResiduals", False)
+            settings.set_bool("/physics/fabricUseGPUInterop", True)
+
+            if gm.ENABLE_HQ_RENDERING:
+                min_frame_rate = 60
+                # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
+                assert (1 / self.get_rendering_dt()) >= min_frame_rate, (
+                    f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing "
+                    f"rendering_frequency of env_config to {min_frame_rate}."
+                )
+
+                # Settings for Isosurface
+                # disable grid and lights
+                dOptions = settings.get_as_int("/persistent/app/viewport/displayOptions")
+                dOptions &= ~(1 << 6 | 1 << 8)
+                settings.set_int("/persistent/app/viewport/displayOptions", dOptions)
+                settings.set_int("/persistent/simulation/minFrameRate", min_frame_rate)
+                settings.set_bool("/rtx-defaults/pathtracing/lightcache/cached/enabled", False)
+                settings.set_bool("/rtx-defaults/pathtracing/cached/enabled", False)
+                settings.set_int("/rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
+                settings.set_int("/rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse", 50000)
+                settings.set_float("/rtx-defaults/pathtracing/optixDenoiser/blendFactor", 0.09)
+                settings.set_int("/rtx-defaults/pathtracing/aa/op", 2)
+                settings.set_int("/rtx-defaults/pathtracing/maxBounces", 32)
+                settings.set_int("/rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
+                settings.set_int("/rtx-defaults/translucency/maxRefractionBounces", 12)
 
         def _validate_dts(self, physics_dt, rendering_dt, sim_step_dt):
             """
@@ -894,13 +923,6 @@ def _launch_simulator(*args, **kwargs):
                 self._post_import_object(obj=obj)
 
             if self.is_playing():
-                # The objects have been added to the USD stage but PhysX hasn't been synchronized yet.
-                # We must flush USD changes to PhysX before updating handles to avoid errors like
-                # "Provided pattern list did not match any rigid bodies".
-                # The order of operations should strictly be:
-                #   1. Flush USD changes to PhysX
-                #   2. Update handles to reinitialize physics view
-                SimulationManager._physx_sim_interface.flush_changes()
                 self.update_handles()
 
         def _post_import_object(self, obj):
@@ -1098,25 +1120,33 @@ def _launch_simulator(*args, **kwargs):
                 self._in_sim_lifecycle -= 1
 
         def _refresh_physics_sim_view(self):
-            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
-            IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
+            self._in_sim_lifecycle += 1
+            try:
+                SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+                IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
 
-            stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
-            SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
-                SimulationManager._backend, stage_id=stage_id
-            )
-            SimulationManager._physics_sim_view.set_subspace_roots("/")
-            SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
-                "warp", stage_id=stage_id
-            )
-            SimulationManager._simulation_view_created = True
-            SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
-            SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
+                stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
+                SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
+                    SimulationManager._backend, stage_id=stage_id
+                )
+                SimulationManager._physics_sim_view.set_subspace_roots("/")
+                SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
+                    "warp", stage_id=stage_id
+                )
+                SimulationManager._simulation_view_created = True
+                SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
+                SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
+            finally:
+                self._in_sim_lifecycle -= 1
 
         def update_handles(self):
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
+
+            # Flush any USD changes to PhysX
+            with self.editing_usd():
+                self.psi.flush_changes()
 
             # Refresh the sim view
             self._refresh_physics_sim_view()
@@ -1130,23 +1160,11 @@ def _launch_simulator(*args, **kwargs):
                             obj.update_handles()
                     for system in scene.active_systems.values():
                         if isinstance(system, MacroPhysicalParticleSystem):
-                            system.refresh_particles_view()
+                            system.update_handles()
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
-
-        def refresh_physics(self, read_back=False):
-            """
-            Synchronizes and evaluates any physics updates that have occurred since the last fetch.
-
-            Args:
-                read_back (bool): If True, also fetch physics results to USD backings.
-            """
-            self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
-            if read_back:
-                self.psi.fetch_results()
-                self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1170,7 +1188,6 @@ def _launch_simulator(*args, **kwargs):
                     # may be added mid-iteration!!
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
-                    self.refresh_physics()
                     scenes_modified = set()
                     for i in range(n_objects_to_initialize):
                         obj = self._objects_to_initialize[i]
