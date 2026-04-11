@@ -1573,6 +1573,7 @@ def _launch_simulator(*args, **kwargs):
             """
             # If the stage is a non-None value that's also not the simulator stage, we don't need to synchronize to Fabric.
             if stage is not None and stage != self.stage:
+                yield
                 return
 
             caller = traceback.extract_stack(limit=3)[0]
