@@ -31,7 +31,7 @@ def test_behavior_task():
             "BehaviorTask instantiated successfully! Ground goal state options:",
             len(env.task.ground_goal_state_options),
         )
-    except Exception as e:
+    except Exception:
         import traceback
 
         traceback.print_exc()
