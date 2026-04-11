@@ -1,5 +1,6 @@
 import argparse
 import contextlib
+import functools
 from importlib.metadata import version
 import inspect
 import json
@@ -50,6 +51,7 @@ def get_key_path():
     return os.path.join(gm.DATA_PATH, "omnigibson.key")
 
 
+@functools.lru_cache(maxsize=1)
 def get_avg_category_specs():
     """
     Load average object specs (dimension and mass) for objects
@@ -170,6 +172,7 @@ def get_model_path(category_name, model_name, dataset_name="behavior-1k-assets")
     return os.path.join(category_path, model_name)
 
 
+@functools.lru_cache(maxsize=2)
 def get_all_system_categories(include_cloth=False):
     """
     Get OmniGibson all system categories
