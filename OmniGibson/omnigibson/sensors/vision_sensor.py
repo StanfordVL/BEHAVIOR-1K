@@ -198,7 +198,8 @@ class VisionSensor(BaseSensor):
         self.SENSORS[self.prim_path] = self
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
-        self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
+        with og.sim.editing_usd():
+            self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
@@ -207,7 +208,8 @@ class VisionSensor(BaseSensor):
             assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
             viewport = vp_names_to_handles[viewport_name]
         else:
-            viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
+            with og.sim.editing_usd():
+                viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
             # Take a render step to make sure the viewport is generated before docking it
             og.sim.render()
             # Grab the newly created viewport and dock it to the GUI

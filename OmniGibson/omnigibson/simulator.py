@@ -441,6 +441,7 @@ def _launch_simulator(*args, **kwargs):
             self._editing_usd = False
             self._editing_usd_caller = None
             self._in_sim_lifecycle = 0
+            self._deferred_usd_guard_error = None
             self._usd_guard_enabled = False
             self._usd_guard_listener = None
 
@@ -1087,6 +1088,7 @@ def _launch_simulator(*args, **kwargs):
         # ---- End proxy properties/methods ----
 
         def render(self):
+            self._check_usd_guard()
             self._in_sim_lifecycle += 1
             try:
                 self._sim_context.render()
@@ -1310,6 +1312,7 @@ def _launch_simulator(*args, **kwargs):
             """
             Step the simulation at self.get_sim_step_dt() rate
             """
+            self._check_usd_guard()
             assert self.is_playing(), "Simulator must be playing to step"
 
             render = self._render_on_step
@@ -1574,6 +1577,7 @@ def _launch_simulator(*args, **kwargs):
                 f"should be in a single editing_usd() block.\n"
                 f"  Existing context opened at: {self._editing_usd_caller}"
             )
+            self._check_usd_guard()
             assert not self.currently_stepping, "Cannot edit USD while simulation is stepping!"
             self._editing_usd = True
             self._editing_usd_caller = f"{caller.filename}:{caller.lineno} in {caller.name}"
@@ -1614,17 +1618,29 @@ def _launch_simulator(*args, **kwargs):
             if not all_paths:
                 return
 
-            stack = "".join(traceback.format_stack()[:-1])
-            paths_str = "\n  ".join(all_paths[:20])
-            if len(all_paths) > 20:
-                paths_str += f"\n  ... and {len(all_paths) - 20} more"
-            raise RuntimeError(
-                f"USD edit detected outside of og.sim.editing_usd() context!\n"
-                f"Changed paths:\n  {paths_str}\n"
-                f"Stack trace:\n{stack}\n"
-                f"All USD edits must be wrapped in a `with og.sim.editing_usd():` block "
-                f"to ensure proper USD-Fabric synchronization."
-            )
+            # We can't raise here — Tf.Notice callbacks run inside C++ dispatch, which catches
+            # Python exceptions and converts them to TF errors without propagating. Instead, store
+            # the violation and raise it later at a point where exceptions propagate normally.
+            if self._deferred_usd_guard_error is None:
+                stack = "".join(traceback.format_stack()[:-1])
+                paths_str = "\n  ".join(all_paths[:20])
+                if len(all_paths) > 20:
+                    paths_str += f"\n  ... and {len(all_paths) - 20} more"
+                self._deferred_usd_guard_error = RuntimeError(
+                    f"USD edit detected outside of og.sim.editing_usd() context!\n"
+                    f"Changed paths:\n  {paths_str}\n"
+                    f"Stack trace:\n{stack}\n"
+                    f"All USD edits must be wrapped in a `with og.sim.editing_usd():` block "
+                    f"to ensure proper USD-Fabric synchronization."
+                )
+                print(self._deferred_usd_guard_error)
+
+        def _check_usd_guard(self):
+            """Raise any deferred USD guard error. Called at points where Python exceptions propagate."""
+            if self._deferred_usd_guard_error is not None:
+                error = self._deferred_usd_guard_error
+                self._deferred_usd_guard_error = None
+                raise error
 
         def add_callback_on_play(self, name, callback):
             """

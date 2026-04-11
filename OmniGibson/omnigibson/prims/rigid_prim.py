@@ -200,9 +200,10 @@ class RigidPrim(XFormPrim):
         _find_geom_prims(self._prim)
 
         # Set default contact/rest offsets on all PhysxCollisionAPIs
-        for api in self._physx_collision_apis:
-            api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
-            api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
+                api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
 
         coms, vols = [], []
         for prim, is_collision in geom_prims:
