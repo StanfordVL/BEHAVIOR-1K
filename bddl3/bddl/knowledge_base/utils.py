@@ -96,15 +96,13 @@ def get_leaf_conditions(cond) -> List:
     else:
         raise ValueError(f"Found unexpected item {cond} in tree.")
 
-
+SYNSET_NAME_REGEX = re.compile(r"^[A-Za-z-_]+\.n\.[0-9]+$")
 def get_synsets(cond):
     def get_synset_from_scope_name(scope_name):
         lemma, n, number = scope_name.split(".")
         number = number.rsplit("_", 1)[0]
         synset = f"{lemma}.{n}.{number}"
-        assert re.fullmatch(
-            r"^[A-Za-z-_]+\.n\.[0-9]+$", synset
-        ), f"Invalid synset name: {synset}"
+        assert SYNSET_NAME_REGEX.fullmatch(synset), f"Invalid synset name: {synset}"
         return synset
 
     return [get_synset_from_scope_name(inp) for inp in cond.inputs]

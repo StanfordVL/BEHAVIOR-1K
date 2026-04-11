@@ -40,4 +40,8 @@ __all__ = [
     "AttachmentPair",
     "SynsetState",
     "KnowledgeBase",
+    "ComplaintType",
+    "Complaint",
+    "PredicateUsage",
+    "CompiledTask"
 ]

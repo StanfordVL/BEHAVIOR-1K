@@ -573,7 +573,7 @@ def create_complaints(kb):
         # Check if the model ID exists
         obj = kb.get_object(complaint_model_id)
         if obj is None:
-            logger.warning(
+            logger.debug(
                 f"Complained object {complaint_model_id} does not exist in the database. Skipping."
             )
             continue
@@ -628,7 +628,7 @@ def build_knowledgebase(verbose=True, load_wordnet=False):
 
 
 def populate_knowledgebase(kb: KnowledgeBase, verbose=True, load_wordnet=False):
-    logger.warning("Loading BDDL knowledge base... This may take a few seconds.")
+    logger.info("Loading BDDL knowledge base... This may take a few seconds.")
     object_taxonomy, object_rename_mapping = preparation(verbose, load_wordnet=load_wordnet)
     create_synsets(kb, object_taxonomy, verbose, load_wordnet=load_wordnet)
     add_particle_system_parameters(kb)

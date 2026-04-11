@@ -19,7 +19,7 @@
         (inroom washer.n.03_1 utility_room) 
         (inroom countertop.n.01_1 utility_room)
         (ontop agent.n.01_1 floor.n.01_1)
-    )\
+    )
     
     (:goal 
         (and 
