@@ -20,36 +20,14 @@ GENERATED_DATA_DIR = BDDL_DIR / "generated_data"
 logger = logging.getLogger(__name__)
 
 
-def _get_shadow_set(obj, field_name):
-    """Get or create a shadow set for O(1) membership checks during population."""
-    if not hasattr(obj, "_shadow_sets"):
-        obj._shadow_sets = {}
-    if field_name not in obj._shadow_sets:
-        # Initialize from existing list contents
-        obj._shadow_sets[field_name] = set(id(x) for x in getattr(obj, field_name))
-    return obj._shadow_sets[field_name]
-
-
-def append_unique(items, item, shadow_set=None):
-    if shadow_set is not None:
-        item_id = id(item)
-        if item_id in shadow_set:
-            return
-        shadow_set.add(item_id)
-        items.append(item)
-    else:
-        if item not in items:
-            items.append(item)
-
-
 def link_many_to_many(lhs, lhs_field, rhs, rhs_field):
-    append_unique(getattr(lhs, lhs_field), rhs, _get_shadow_set(lhs, lhs_field))
-    append_unique(getattr(rhs, rhs_field), lhs, _get_shadow_set(rhs, rhs_field))
+    getattr(lhs, lhs_field).add(rhs)
+    getattr(rhs, rhs_field).add(lhs)
 
 
 def link_many_to_one(child, child_field, parent, parent_field):
     setattr(child, child_field, parent)
-    append_unique(getattr(parent, parent_field), child, _get_shadow_set(parent, parent_field))
+    getattr(parent, parent_field).add(child)
 
 
 def get_or_add(get_fn, add_fn, key):
@@ -424,8 +402,7 @@ def create_tasks(kb, verbose, load_wordnet=False):
                 pred_obj, _ = get_or_add(
                         kb.get_predicate_usage, kb.add_predicate_usage, predicate
                 )
-                if pred_obj not in synset.used_in_predicates:
-                    link_many_to_many(synset, "used_in_predicates", pred_obj, "synsets")
+                link_many_to_many(synset, "used_in_predicates", pred_obj, "synsets")
             link_many_to_many(task, "synsets", synset, "tasks")
 
             # If the synset ever shows up as future or real, check validity
@@ -607,8 +584,8 @@ def create_complaints(kb):
             prompt_additional_info=complaint_additional_info,
             response=complaint_response,
         )
-        append_unique(obj.complaints, complaint_obj)
-        append_unique(complaint_type.complaints, complaint_obj)
+        obj.complaints.add(complaint_obj)
+        complaint_type.complaints.add(complaint_obj)
 
 def nuke_unused_synsets(kb):
     # Make repeated passes until we propagate far enough up

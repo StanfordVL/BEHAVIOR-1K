@@ -66,7 +66,9 @@ def expand_wildcards(raw_bddl_str, scene_layout, kb):
 
                 # Collect all valid categories from synset subtree
                 categories = set()
-                for s in [synset_obj] + synset_obj.descendants:
+                for s in [synset_obj] + sorted(
+                    synset_obj.descendants, key=lambda x: x.name
+                ):
                     if s.is_leaf:
                         for c in s.categories:
                             categories.add(c.name)

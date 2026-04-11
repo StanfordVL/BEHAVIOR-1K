@@ -158,7 +158,13 @@ def main():
             if "substance" in kb.get_synset(trs).abilities:
                 continue
             trs_synset = kb.get_synset(trs)
-            descendants = [c.name for s in [trs_synset] + trs_synset.descendants if s.is_leaf for c in s.categories]
+            descendants = [
+                c.name
+                for s in [trs_synset]
+                + sorted(trs_synset.descendants, key=lambda x: x.name)
+                if s.is_leaf
+                for c in s.categories
+            ]
             trs_fully_complete = sum(
                 fully_complete_objects[cat]
                 for cat in descendants

@@ -19,7 +19,6 @@ from omnigibson import object_states
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
-from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_all_object_category_models_with_abilities,
@@ -136,7 +135,7 @@ def is_system_bddl_inst(bddl_inst):
 def og_categories_from_bddl_inst(bddl_inst):
     """Get OG categories for a BDDL instance."""
     synset_obj = KB.get_synset(synset_from_bddl_inst(bddl_inst))
-    synset_and_descendants = [synset_obj] + synset_obj.descendants
+    synset_and_descendants = [synset_obj] + sorted(synset_obj.descendants, key=lambda s: s.name)
     if synset_obj.is_substance:
         return [ps.name for s in synset_and_descendants for ps in s.particle_systems]
     return [c.name for s in synset_and_descendants if s.is_leaf for c in s.categories]
@@ -149,7 +148,7 @@ def is_substance_synset(synset):
 
 def get_system_name_by_synset(synset):
     synset_obj = KB.get_synset(synset)
-    synset_and_descendants = [synset_obj] + synset_obj.descendants
+    synset_and_descendants = [synset_obj] + sorted(synset_obj.descendants, key=lambda s: s.name)
     systems = [ps.name for s in synset_and_descendants for ps in s.particle_systems]
     assert len(systems) == 1, f"Got zero or multiple systems for {synset}: {systems}"
     return systems[0]
@@ -824,9 +823,10 @@ class BDDLSampler:
 
                 # We allow burners to be used as if they are stoves
                 # No need to safeguard check for subtree_substances because inroom objects will never be substances
+                _so = KB.get_synset(obj_synset)
                 categories = [
                     c.name
-                    for s in [KB.get_synset(obj_synset)] + KB.get_synset(obj_synset).descendants
+                    for s in [_so] + sorted(_so.descendants, key=lambda x: x.name)
                     if s.is_leaf
                     for c in s.categories
                 ]
@@ -1144,19 +1144,19 @@ class BDDLSampler:
             if is_substance_synset(obj_synset):
                 assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
+                _so = KB.get_synset(obj_synset)
                 system_name = [
-                    ps.name
-                    for s in [KB.get_synset(obj_synset)] + KB.get_synset(obj_synset).descendants
-                    for ps in s.particle_systems
+                    ps.name for s in [_so] + sorted(_so.descendants, key=lambda x: x.name) for ps in s.particle_systems
                 ][0]
                 self._object_scope[obj_inst] = (
                     None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
                 )
             else:
+                _so = KB.get_synset(obj_synset)
                 valid_categories = set(
                     [
                         c.name
-                        for s in [KB.get_synset(obj_synset)] + KB.get_synset(obj_synset).descendants
+                        for s in [_so] + sorted(_so.descendants, key=lambda x: x.name)
                         if s.is_leaf
                         for c in s.categories
                     ]
@@ -1235,7 +1235,9 @@ class BDDLSampler:
                     else:
                         return f"Invalid size for object {obj_inst} with model {model} in category {category}: {size}"
 
-                # create the object
+                # Create the object. This is imported here to avoid a circular import.
+                from omnigibson.objects.dataset_object import DatasetObject
+
                 simulator_obj = DatasetObject(
                     name=f"{category}_{len(self._env.scene.objects)}",
                     category=category,

@@ -110,6 +110,8 @@ def _get_required_meta_links_for_abilities(abilities):
 
 @dataclass(eq=False, order=False)
 class Property:
+    __hash__ = object.__hash__
+
     name: str
     parameters: str
     id: str = UUIDField()
@@ -126,8 +128,10 @@ class Property:
 
 @dataclass(eq=False, order=False)
 class MetaLink:
+    __hash__ = object.__hash__
+
     name: str
-    on_objects: List["Object"] = field(default_factory=list)
+    on_objects: Set["Object"] = field(default_factory=set)
 
     class Meta:
         pk = "name"
@@ -135,9 +139,11 @@ class MetaLink:
 
 @dataclass(eq=False, order=False)
 class AttachmentPair:
+    __hash__ = object.__hash__
+
     name: str
-    female_objects: List["Object"] = field(default_factory=list)
-    male_objects: List["Object"] = field(default_factory=list)
+    female_objects: Set["Object"] = field(default_factory=set)
+    male_objects: Set["Object"] = field(default_factory=set)
 
     class Meta:
         pk = "name"
@@ -154,9 +160,11 @@ class AttachmentPair:
 
 @dataclass(eq=False, order=False)
 class PredicateUsage:
+    __hash__ = object.__hash__
+
     name: str
-    synsets: List["Synset"] = field(default_factory=list)
-    tasks: List["Task"] = field(default_factory=list)
+    synsets: Set["Synset"] = field(default_factory=set)
+    tasks: Set["Task"] = field(default_factory=set)
 
     class Meta:
         pk = "name"
@@ -164,9 +172,11 @@ class PredicateUsage:
 
 @dataclass(eq=False, order=False)
 class Scene:
+    __hash__ = object.__hash__
+
     name: str
 
-    rooms: List["Room"] = field(default_factory=list)
+    rooms: Set["Room"] = field(default_factory=set)
 
     @cached_property
     def room_count(self):
@@ -201,6 +211,8 @@ class Scene:
 
 @dataclass(eq=False, order=False)
 class ParticleSystem:
+    __hash__ = object.__hash__
+
     name: str
     parameters: Optional[str] = None
 
@@ -208,7 +220,7 @@ class ParticleSystem:
     synset: Optional["Synset"] = None
 
     # the objects that belong to this particle system as particles
-    particles: List["Object"] = field(default_factory=list)
+    particles: Set["Object"] = field(default_factory=set)
 
     def __str__(self):
         return self.name
@@ -267,13 +279,15 @@ class ParticleSystem:
 
 @dataclass(eq=False, order=False)
 class Category:
+    __hash__ = object.__hash__
+
     name: str
 
     # the synset that the category belongs to
     synset: Optional["Synset"] = None
 
     # objects that belong to this category
-    objects: List["Object"] = field(default_factory=list)
+    objects: Set["Object"] = field(default_factory=set)
 
     def __str__(self):
         return self.name
@@ -305,6 +319,8 @@ class Category:
 
 @dataclass(eq=False, order=False)
 class Object:
+    __hash__ = object.__hash__
+
     name: str
     # providing target
     provider: str = ""
@@ -317,15 +333,15 @@ class Object:
     # the category of the object prior to getting renamed
     original_category_name: str = ""
     # meta links owned by the object
-    meta_links: List["MetaLink"] = field(default_factory=list)
+    meta_links: Set["MetaLink"] = field(default_factory=set)
     # roomobject counts of this object
-    roomobjects: List["RoomObject"] = field(default_factory=list)
+    roomobjects: Set["RoomObject"] = field(default_factory=set)
     # QA complaints for this object
-    complaints: List["Complaint"] = field(default_factory=list)
+    complaints: Set["Complaint"] = field(default_factory=set)
 
     # attachment pairs this object participates in
-    female_attachment_pairs: List["AttachmentPair"] = field(default_factory=list)
-    male_attachment_pairs: List["AttachmentPair"] = field(default_factory=list)
+    female_attachment_pairs: Set["AttachmentPair"] = field(default_factory=set)
+    male_attachment_pairs: Set["AttachmentPair"] = field(default_factory=set)
 
     @property
     def owner(self):
@@ -355,7 +371,7 @@ class Object:
     @cached_property
     def ready(self) -> bool:
         # An object is ready if it has no complaints.
-        return len(list(self.complaints)) == 0
+        return len(self.complaints) == 0
 
     @cached_property
     def state(self):
@@ -402,6 +418,8 @@ class Object:
 
 @dataclass(eq=False, order=False)
 class Synset:
+    __hash__ = object.__hash__
+
     name: str
     # whether the synset is a custom synset or not
     is_custom: bool = field(default=False, repr=False)
@@ -414,23 +432,23 @@ class Synset:
     # whether the synset is ever used as a fillable in any task
     is_used_as_fillable: bool = field(default=False, repr=False)
     # predicates the synset was used in as the first argument
-    used_in_predicates: List["PredicateUsage"] = field(default_factory=list)
+    used_in_predicates: Set["PredicateUsage"] = field(default_factory=set)
     # all it's parents in the synset graph (NOTE: this does not include self)
-    parents: List["Synset"] = field(default_factory=list)
-    children: List["Synset"] = field(default_factory=list)
+    parents: Set["Synset"] = field(default_factory=set)
+    children: Set["Synset"] = field(default_factory=set)
     # all ancestors (NOTE: this does NOT include self)
-    ancestors: List["Synset"] = field(default_factory=list)
-    descendants: List["Synset"] = field(default_factory=list)
+    ancestors: Set["Synset"] = field(default_factory=set)
+    descendants: Set["Synset"] = field(default_factory=set)
 
-    categories: List["Category"] = field(default_factory=list)
-    particle_systems: List["ParticleSystem"] = field(default_factory=list)
-    properties: List["Property"] = field(default_factory=list)
-    tasks: List["Task"] = field(default_factory=list)
-    tasks_using_as_future: List["Task"] = field(default_factory=list)
-    used_by_transition_rules: List["TransitionRule"] = field(default_factory=list)
-    produced_by_transition_rules: List["TransitionRule"] = field(default_factory=list)
-    machine_in_transition_rules: List["TransitionRule"] = field(default_factory=list)
-    roomsynsetrequirements: List["RoomSynsetRequirement"] = field(default_factory=list)
+    categories: Set["Category"] = field(default_factory=set)
+    particle_systems: Set["ParticleSystem"] = field(default_factory=set)
+    properties: Set["Property"] = field(default_factory=set)
+    tasks: Set["Task"] = field(default_factory=set)
+    tasks_using_as_future: Set["Task"] = field(default_factory=set)
+    used_by_transition_rules: Set["TransitionRule"] = field(default_factory=set)
+    produced_by_transition_rules: Set["TransitionRule"] = field(default_factory=set)
+    machine_in_transition_rules: Set["TransitionRule"] = field(default_factory=set)
+    roomsynsetrequirements: Set["RoomSynsetRequirement"] = field(default_factory=set)
 
     class Meta:
         pk = "name"
@@ -853,10 +871,12 @@ class Synset:
 
 @dataclass(eq=False, order=False)
 class TransitionRule:
+    __hash__ = object.__hash__
+
     name: str
-    input_synsets: List["Synset"] = field(default_factory=list)
-    output_synsets: List["Synset"] = field(default_factory=list)
-    machine_synsets: List["Synset"] = field(default_factory=list)
+    input_synsets: Set["Synset"] = field(default_factory=set)
+    output_synsets: Set["Synset"] = field(default_factory=set)
+    machine_synsets: Set["Synset"] = field(default_factory=set)
     recipe: object = field(default=None, repr=False)  # Typed recipe (CookingRecipe, MixingRecipe, etc.) or None
 
     class Meta:
@@ -964,12 +984,14 @@ class CompiledTask:
 
 @dataclass(eq=False, order=False)
 class Task:
+    __hash__ = object.__hash__
+
     name: str
     definition: str = field(default="", repr=False)
-    synsets: List["Synset"] = field(default_factory=list)  # the synsets required by this task
-    future_synsets: List["Synset"] = field(default_factory=list)  # the synsets that show up as future synsets in this task (e.g. don't exist in initial)
-    uses_predicates: List["PredicateUsage"] = field(default_factory=list)
-    room_requirements: List["RoomRequirement"] = field(default_factory=list)
+    synsets: Set["Synset"] = field(default_factory=set)  # the synsets required by this task
+    future_synsets: Set["Synset"] = field(default_factory=set)  # the synsets that show up as future synsets in this task (e.g. don't exist in initial)
+    uses_predicates: Set["PredicateUsage"] = field(default_factory=set)
+    room_requirements: Set["RoomRequirement"] = field(default_factory=set)
 
     class Meta:
         pk = "name"
@@ -1341,11 +1363,13 @@ class Task:
 
 @dataclass(eq=False, order=False)
 class RoomRequirement:
+    __hash__ = object.__hash__
+
     # TODO: make this one of the room types. enum?
     type: str
     id: str = UUIDField()
     task: Optional["Task"] = None
-    roomsynsetrequirements: List["RoomSynsetRequirement"] = field(default_factory=list)
+    roomsynsetrequirements: Set["RoomSynsetRequirement"] = field(default_factory=set)
 
     class Meta:
         pk = "id"
@@ -1355,6 +1379,8 @@ class RoomRequirement:
 
 @dataclass(eq=False, order=False)
 class RoomSynsetRequirement:
+    __hash__ = object.__hash__
+
     id: str = UUIDField()
     room_requirement: Optional["RoomRequirement"] = None
     synset: Optional["Synset"] = None
@@ -1368,6 +1394,8 @@ class RoomSynsetRequirement:
 
 @dataclass(eq=False, order=False)
 class Room:
+    __hash__ = object.__hash__
+
     name: str
     # type of the room
     # TODO: make this one of the room types
@@ -1376,7 +1404,7 @@ class Room:
     # the scene the room belongs to
     scene: Optional["Scene"] = None
     # the room objects in this object
-    roomobjects: List["RoomObject"] = field(default_factory=list)
+    roomobjects: Set["RoomObject"] = field(default_factory=set)
 
     class Meta:
         pk = "id"
@@ -1430,6 +1458,8 @@ class Room:
 
 @dataclass(eq=False, order=False)
 class RoomObject:
+    __hash__ = object.__hash__
+
     id: str = UUIDField()
     # the room that the object belongs to
     room: Optional["Room"] = None
@@ -1452,8 +1482,10 @@ class RoomObject:
 
 @dataclass(eq=False, order=False)
 class ComplaintType:
+    __hash__ = object.__hash__
+
     name: str
-    complaints: List["Complaint"] = field(default_factory=list)
+    complaints: Set["Complaint"] = field(default_factory=set)
 
     class Meta:
         pk = "name"
@@ -1466,6 +1498,8 @@ class ComplaintType:
 
 @dataclass(eq=False, order=False)
 class Complaint:
+    __hash__ = object.__hash__
+
     id: str = UUIDField()
     object: Optional["Object"] = None
     complaint_type: Optional["ComplaintType"] = None
