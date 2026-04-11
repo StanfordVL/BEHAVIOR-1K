@@ -984,8 +984,8 @@ class BatchQAViewer:
         KeyboardEventHandler.reset()
 
     def evaluate_batch(self, batch, category):
-        synset = self.kb.get_category(category).synset.name if self.kb.get_category(category) else None
-        abilities = self.kb.get_synset(synset).abilities if synset else {}
+        synset = self.kb.get_category(category).synset
+        abilities = synset.abilities
 
         # If we're checking joints or metalinks, skip this entire batch is no object has either joints nor metalinks
         if self.annotation_type in {5, 6, 7}:

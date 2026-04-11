@@ -65,16 +65,13 @@ def tqdm_iter(iterable, verbose, *args, **kwargs):
     else:
         return iterable
 
-def debug_print(verbose, *args, **kwargs):
-    if verbose:
-        print(*args, **kwargs)
 
 # =============================== helper functions ===============================
 def preparation(verbose, load_wordnet=False):
     """
     put any preparation work (e.g. sanity check) here
     """
-    debug_print(verbose, "Running preparation work...")
+    logger.debug("Running preparation work...")
 
     if load_wordnet:
         import nltk
@@ -115,7 +112,7 @@ def preparation(verbose, load_wordnet=False):
             len(obj_rename_mapping_duplicate_set) == 0
         ), f"object rename mapping have duplicates: {obj_rename_mapping_duplicate_set}"
 
-    debug_print(verbose, "Finished prep work...")
+    logger.debug("Finished prep work...")
     return object_taxonomy, object_rename_mapping
 
 
@@ -123,15 +120,15 @@ def post_complete_operation():
     """
     put any post completion work (e.g. update stuff) here
     """
-    # debug_print(True, "Running post completion operations...")
-    # self.generate_object_images()
+    # logger.debug("Running post completion operations...")
     # self.nuke_unused_synsets()
+    pass
 
 def create_synsets(kb, object_taxonomy, verbose, load_wordnet=False):
     """
     create synsets with annotations from propagated_annots_canonical.json and hierarchy from output_hierarchy.json
     """
-    debug_print(verbose, "Creating synsets...")
+    logger.debug("Creating synsets...")
 
     if load_wordnet:
         from nltk.corpus import wordnet as wn
@@ -205,7 +202,7 @@ def create_objects(kb, object_rename_mapping, verbose):
     """
     Create objects and map to categories (with object inventory)
     """
-    debug_print(verbose, "Creating objects...")
+    logger.debug("Creating objects...")
     # first get Deletion Queue
     deletion_queue = set()
     with open(GENERATED_DATA_DIR / "deletion_queue.csv", newline="") as csvfile:
@@ -330,7 +327,7 @@ def create_scenes(kb, object_rename_mapping, deletion_queue, verbose):
     create scene objects (which stores the room config)
     scene matching to tasks will be generated later when creating task objects
     """
-    debug_print(verbose, "Creating scenes...")
+    logger.debug("Creating scenes...")
     with open(GENERATED_DATA_DIR / "combined_room_object_list.json", "r") as f:
         planned_scene_dict = json.load(f)["scenes"]
         for scene_name in tqdm_iter(planned_scene_dict, verbose):
@@ -345,20 +342,18 @@ def create_scenes(kb, object_rename_mapping, deletion_queue, verbose):
                     link_many_to_one(room, "scene", scene, "rooms")
                 except ValueError:
                     raise Exception(
-                        f"room {room_name} in {scene.name} (not ready) already exists!"
+                        f"room {room_name} in {scene.name} (not ready) could not be added - maybe it already exists?"
                     )
                 for orig_name, count in planned_scene_dict[scene_name][
                     room_name
                 ].items():
-                    if orig_name.split("-")[1] not in deletion_queue:
-                        object_name = orig_name
-                        orig_id = orig_name.split("-")[1]
+                    orig_id = orig_name.split("-")[1]
+                    if orig_id not in deletion_queue:
                         if orig_id in object_rename_mapping:
                             from_name, to_name = object_rename_mapping[orig_id]
                             assert (
                                 orig_name == from_name or orig_name == to_name
                             ), f"Object {orig_name} is in the rename mapping with the wrong categories {from_name} -> {to_name}."
-                            object_name = to_name
                         obj = kb.get_object(orig_id)
                         assert (
                         obj is not None
@@ -371,7 +366,7 @@ def create_tasks(kb, verbose, load_wordnet=False):
     """
     create tasks and map to synsets
     """
-    debug_print(verbose, "Creating tasks...")
+    logger.debug("Creating tasks...")
     tasks = glob.glob(str(BDDL_DIR / "activity_definitions/*"))
     tasks = [
         (act, inst)
@@ -442,8 +437,10 @@ def create_tasks(kb, verbose, load_wordnet=False):
                 # Assert that it's used as future in initial and as real in goal
                 initial_preds = object_used_predicates(initial_conds, synset_name)
                 if "future" not in initial_preds:
-                    debug_print(verbose, 
-                        f"Synset {synset_name} is not used as future in initial in {task_name}"
+                    logger.debug(
+                        "Synset %s is not used as future in initial in %s",
+                        synset_name,
+                        task_name,
                     )
                 if "real" in initial_preds:
                     raise ValueError(
@@ -452,8 +449,10 @@ def create_tasks(kb, verbose, load_wordnet=False):
 
                 goal_preds = object_used_predicates(goal_conds, synset_name)
                 if "real" not in goal_preds:
-                    debug_print(verbose, 
-                        f"Synset {synset_name} is not used as real in goal in {task_name}"
+                    logger.debug(
+                        "Synset %s is not used as real in goal in %s",
+                        synset_name,
+                        task_name,
                     )
                 if "future" in goal_preds:
                     raise ValueError(

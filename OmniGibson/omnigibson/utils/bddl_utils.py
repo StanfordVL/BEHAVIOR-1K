@@ -136,9 +136,10 @@ def is_system_bddl_inst(bddl_inst):
 def og_categories_from_bddl_inst(bddl_inst):
     """Get OG categories for a BDDL instance."""
     synset_obj = KB.get_synset(synset_from_bddl_inst(bddl_inst))
+    synset_and_descendants = [synset_obj] + synset_obj.descendants
     if synset_obj.is_substance:
-        return [ps.name for s in [synset_obj] + synset_obj.descendants for ps in s.particle_systems]
-    return [c.name for s in [synset_obj] + synset_obj.descendants if s.is_leaf for c in s.categories]
+        return [ps.name for s in synset_and_descendants for ps in s.particle_systems]
+    return [c.name for s in synset_and_descendants if s.is_leaf for c in s.categories]
 
 
 def is_substance_synset(synset):
@@ -148,7 +149,8 @@ def is_substance_synset(synset):
 
 def get_system_name_by_synset(synset):
     synset_obj = KB.get_synset(synset)
-    systems = [ps.name for s in [synset_obj] + synset_obj.descendants for ps in s.particle_systems]
+    synset_and_descendants = [synset_obj] + synset_obj.descendants
+    systems = [ps.name for s in synset_and_descendants for ps in s.particle_systems]
     assert len(systems) == 1, f"Got zero or multiple systems for {synset}: {systems}"
     return systems[0]
 

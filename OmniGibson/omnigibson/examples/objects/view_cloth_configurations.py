@@ -22,11 +22,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Select a category to load
     available_obj_categories = get_all_object_categories()
     cloth_obj_categories = [
-        category
-        for category in available_obj_categories
-        if KB.get_category(category) is not None
-        and KB.get_category(category).synset is not None
-        and "cloth" in KB.get_category(category).synset.abilities
+        category for category in available_obj_categories if "cloth" in KB.get_category(category).synset.abilities
     ]
     obj_category = choose_from_options(
         options=cloth_obj_categories, name="object category", random_selection=random_selection

@@ -26,7 +26,6 @@ from igibson.utils.assets_utils import (
     get_object_models_of_category,
 )
 
-from bddl.knowledge_base import KnowledgeBase
 from b1k_pipeline.utils import PIPELINE_ROOT
 
 skip_file_path = PIPELINE_ROOT / "qa-logs/category-pass-skips.json"

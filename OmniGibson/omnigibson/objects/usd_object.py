@@ -159,6 +159,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._include_default_states = include_default_states
 
         # Load abilities from taxonomy if needed & possible
+        # TODO: Move this to dataset object? Loads B1K abilities for non-B1K objects.
         if abilities is None:
             abilities = {}
             kb_category = KB.get_category(category)
