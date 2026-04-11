@@ -57,23 +57,24 @@ def create_physx_particle_system(
             particle_system.GetGlobalSelfCollisionEnabledAttr().Set(False)
             particle_system.GetNonParticleCollisionEnabledAttr().Set(False)
 
-        if anisotropy:
-            # apply api and use all defaults
-            ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleAnisotropyAPI)
+    if anisotropy:
+        # apply api and use all defaults
+        ani_api = ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleAnisotropyAPI)
 
-        if smoothing:
-            # apply api and use all defaults
-            ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleSmoothingAPI)
+    if smoothing:
+        # apply api and use all defaults
+        ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleSmoothingAPI)
 
-        if isosurface:
-            # apply api and use all defaults
-            ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI)
+    if isosurface:
+        # apply api and use all defaults
+        ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI)
+
+        with og.sim.editing_usd():
             # Make sure we're not casting shadows
             primVarsApi = lazy.pxr.UsdGeom.PrimvarsAPI(particle_system.GetPrim())
             primVarsApi.CreatePrimvar("doNotCastShadows", lazy.pxr.Sdf.ValueTypeNames.Bool).Set(True)
             # tweak anisotropy min, max, and scale to work better with isosurface:
             if anisotropy:
-                ani_api = ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleAnisotropyAPI)
                 ani_api.CreateScaleAttr().Set(5.0)
                 ani_api.CreateMinAttr().Set(1.0)  # avoids gaps in surface
                 ani_api.CreateMaxAttr().Set(2.0)

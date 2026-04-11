@@ -75,10 +75,10 @@ def create_pbr_material(prim_path):
             mtl_name="OmniPBR",
             mtl_created_list=mtl_created,
         )
-    material_path = mtl_created[0]
+        material_path = mtl_created[0]
 
-    # Move prim to desired location
-    lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
+        # Move prim to desired location
+        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
 
     # Return generated material
     return lazy.isaacsim.core.utils.prims.get_prim_at_path(material_path)

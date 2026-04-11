@@ -1548,7 +1548,7 @@ def _launch_simulator(*args, **kwargs):
             self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt, sim_step_dt=sim_step_dt)
 
         @contextlib.contextmanager
-        def editing_usd(self):
+        def editing_usd(self, stage=None):
             """
             Context manager for USD edits with proper Fabric synchronization.
 
@@ -1571,6 +1571,10 @@ def _launch_simulator(*args, **kwargs):
                     other_prim.visible = False
                 # USD is now synchronized to Fabric
             """
+            # If the stage is a non-None value that's also not the simulator stage, we don't need to synchronize to Fabric.
+            if stage is not None and stage != self.stage:
+                return
+
             caller = traceback.extract_stack(limit=3)[0]
             assert not self._editing_usd, (
                 f"Cannot nest editing_usd() contexts. All USD edits for a logical operation "
@@ -1956,7 +1960,7 @@ def _launch_simulator(*args, **kwargs):
             # Clear all controller groups so robots re-register on next load
             ControllerView.clear()
 
-            # Disable the USD guard during clearing since we're tearing everything down
+            # Disable the USD guard - we don't care anymore
             self._disable_usd_guard()
 
         def close(self):

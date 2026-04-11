@@ -143,7 +143,7 @@ def create_joint(
     Returns:
         Usd.Prim: Created joint prim
     """
-    with og.sim.editing_usd():
+    with og.sim.editing_usd(stage=stage):
         current_stage = stage or og.sim.stage
         # Make sure we have valid joint_type
         assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
@@ -177,7 +177,7 @@ def create_joint(
     if stage is None:
         og.sim.render()
 
-    with og.sim.editing_usd():
+    with og.sim.editing_usd(stage=stage):
         if joint_frame_in_parent_frame_pos is not None:
             joint_prim.GetAttribute("physics:localPos0").Set(
                 lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos.tolist())
@@ -2040,7 +2040,7 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
         stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
             use og.sim.stage
     """
-    with og.sim.editing_usd():
+    with og.sim.editing_usd(stage=stage):
         MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
             "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
             "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
@@ -2312,7 +2312,7 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage
     )
 
-    with og.sim.editing_usd():
+    with og.sim.editing_usd(stage=stage):
         mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
         # Modify the points and normals attributes so that total extents is the desired
