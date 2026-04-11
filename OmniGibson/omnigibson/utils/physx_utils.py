@@ -79,7 +79,7 @@ def create_physx_particle_system(
                 ani_api.CreateMinAttr().Set(1.0)  # avoids gaps in surface
                 ani_api.CreateMaxAttr().Set(2.0)
 
-        return particle_system
+    return particle_system
 
 
 def bind_material(prim_path, material_path):
