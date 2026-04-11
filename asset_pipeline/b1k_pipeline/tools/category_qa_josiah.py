@@ -39,7 +39,6 @@ from nltk.corpus import wordnet as wn
 import torch as th
 
 
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 
 PI = th.tensor(th.pi)

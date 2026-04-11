@@ -68,7 +68,7 @@ def test_segmentation_modalities(env, breakfast_table, dishtowel):
     expected_dict = {
         1: "/World/ground_plane/geom",
         2: "/World/scene_0/breakfast_table/base_link/visuals",
-        3: "/World/scene_0/dishtowel/base_link_cloth",
+        3: "/World/scene_0/dishtowel/base_link/visuals",
         4: "/World/scene_0/water/waterInstancer0/prototype0",
         5: "/World/scene_0/white_rice/white_riceInstancer0/prototype0",
         7: "/World/scene_0/breakfast_table/base_link/stainParticle1",
