@@ -283,14 +283,16 @@ class DatasetObject(USDObject):
 
         if self._prim_type == PrimType.RIGID:
             if category_mass is not None:
-                total_volume = sum(link.volume for link in self._links.values())
+                # Compute each link's volume once and reuse below to avoid recomputing
+                link_volumes = {link: link.volume for link in self._links.values()}
+                total_volume = sum(link_volumes.values())
                 for link in self._links.values():
                     # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
                     if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
                         if gm.FORCE_CATEGORY_MASS:
                             # Each link should get the appropriate fraction of the category mass
                             # based on the link volume
-                            link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
+                            link.mass = max(category_mass * (link_volumes[link] / total_volume), 1e-6)
                             link.density = 0.0
                         else:
                             link.mass = 0.0
@@ -308,10 +310,20 @@ class DatasetObject(USDObject):
             # 1. we use "acceleration" drive type instead of "force" to properly account for link mass
             # 2. we set non-zero damping to simulate dynamic friction:
             #       the friction coefficient only accounts for static friction
-            from omnigibson.utils.asset_conversion_utils import find_all_prim_children_with_type
-
-            prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
-            revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
+            # Single-pass subtree walk that classifies both prismatic and revolute joints,
+            # instead of running find_all_prim_children_with_type twice (which recursively
+            # walks the entire object subtree per call).
+            prismatic_joints = []
+            revolute_joints = []
+            stack = [self._prim]
+            while stack:
+                prim = stack.pop()
+                type_name = prim.GetTypeName()
+                if "PhysicsPrismaticJoint" in type_name:
+                    prismatic_joints.append(prim)
+                elif "PhysicsRevoluteJoint" in type_name:
+                    revolute_joints.append(prim)
+                stack.extend(prim.GetChildren())
             for prismatic_joint in prismatic_joints:
                 prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
                 prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
