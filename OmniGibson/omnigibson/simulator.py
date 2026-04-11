@@ -1158,7 +1158,6 @@ def _launch_simulator(*args, **kwargs):
                 ArticulatedObjectViewAPI.update_dof_cache()
 
                 # Async CPU→GPU copies; synchronize before state global_updates read GPU data
-                RigidContactAPI.async_copy_to_gpu()
                 RigidBodyViewAPI.async_copy_to_gpu()
                 ArticulatedObjectViewAPI.async_copy_to_gpu()
                 self.CPU_TO_GPU.synchronize()
@@ -1354,7 +1353,6 @@ def _launch_simulator(*args, **kwargs):
             RigidBodyViewAPI.update_pose_cache()
             ArticulatedObjectViewAPI.update_dof_cache()
 
-            RigidContactAPI.async_copy_to_gpu()
             RigidBodyViewAPI.async_copy_to_gpu()
             ArticulatedObjectViewAPI.async_copy_to_gpu()
             self.CPU_TO_GPU.synchronize()

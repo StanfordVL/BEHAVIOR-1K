@@ -17,7 +17,7 @@ class AABB(TensorizedValueState):
     VALUES shape: (S, O, 6) — [lo_x, lo_y, lo_z, hi_x, hi_y, hi_z]
     """
 
-    # (N_links_aabb_tracked,) int64 — flat index into RigidBodyViewAPI._POSE_MATRICES / LOCAL_POINTS
+    # (N_links_aabb_tracked,) int64 — index into RigidBodyViewAPI's pose data
     PRIM_BODY_IDX = None
 
     # (N_links_aabb_tracked,) int64 — pre-computed s*O + obj_idx for scatter in get_aabb()

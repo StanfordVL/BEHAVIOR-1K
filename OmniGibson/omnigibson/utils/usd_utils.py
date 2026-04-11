@@ -554,10 +554,10 @@ class ArticulatedObjectViewAPIImpl:
         self._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
         self._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(self._VIEW.prim_paths)}
         # Pre-allocate _POSITIONS on GPU; _POSITIONS_CPU holds the latest PhysX output.
-        raw = self._VIEW.get_dof_positions()
-        self._POSITIONS_CPU = raw
-        self._POSITIONS = th.zeros_like(raw, device="cuda")
-        self._POSITIONS.copy_(raw)  # synchronous init so first read is valid
+        positions = self._VIEW.get_dof_positions()
+        self._POSITIONS_CPU = positions
+        self._POSITIONS = th.zeros_like(positions, device="cuda")
+        self._POSITIONS.copy_(positions)  # synchronous init so first read is valid
 
     def update_dof_cache(self):
         """Fetch latest DOF positions from PhysX into CPU staging buffer. Called every step."""
@@ -631,11 +631,11 @@ class RigidContactAPIImpl:
         # Contact matrix tracking contacts that occurred at any point during the last N physics steps
         # (between consecutive update_contact_cache calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
-        self._CONTACT_MATRIX_GPU = dict()  # GPU mirror — written by async_copy_to_gpu()
+        self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
 
         # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
         self._CURRENT_CONTACT_MATRIX = dict()
-        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU mirror — written by async_copy_to_gpu()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
@@ -765,19 +765,21 @@ class RigidContactAPIImpl:
                 )
                 path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
                 self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
-                    [path_to_view_idx[path] for path in row_paths], dtype=th.long
+                    [path_to_view_idx[path] for path in row_paths], dtype=th.long, device="cuda"
                 )
 
                 # Some contact-matrix columns can correspond to kinematic-only links that do not appear
                 # in the rigid-body view. We encode those as -1 and track a validity mask.
                 col_to_rigid_rows = [path_to_view_idx.get(path, -1) for path in col_paths]
-                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(col_to_rigid_rows, dtype=th.long)
+                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
+                    col_to_rigid_rows, dtype=th.long, device="cuda"
+                )
                 self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx] = (
                     self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] >= 0
                 )
                 ii, jj = th.meshgrid(th.arange(len(row_paths)), th.arange(len(col_paths)), indexing="ij")
                 self._INDEX_MATRIX[scene_idx] = th.stack([ii, jj], dim=-1)
-                self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().clone()
+                self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().cuda()
 
                 # Build the new contact matrices. Start from current impulses (captures contacts
                 # for newly added bodies), then overwrite with previously cached values for
@@ -823,6 +825,10 @@ class RigidContactAPIImpl:
                             old_current_matrix[old_row_idxs[:, None], old_col_idxs[None, :]]
                         )
 
+                # Sync GPU mirrors from CPU matrices — carry-over may have updated the CPU tensors above.
+                self._CONTACT_MATRIX_GPU[scene_idx].copy_(self._CONTACT_MATRIX[scene_idx])
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].copy_(self._CURRENT_CONTACT_MATRIX[scene_idx])
+
     def add_contacts_from_physics_step(self):
         """
         Fetches contact impulse matrices and body transforms from the current physics step
@@ -834,9 +840,10 @@ class RigidContactAPIImpl:
 
         for scene_idx in list(self._CONTACT_VIEW.keys()):
             try:
-                # Get the contact impulse and net force matrices for this scene
-                impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
-                net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt())
+                with th.cuda.stream(og.sim.CPU_TO_GPU):
+                    # Get the contact impulse and net force matrices for this scene
+                    impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt()).cuda()
+                    net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt()).cuda()
             except Exception:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
@@ -846,13 +853,15 @@ class RigidContactAPIImpl:
                 continue
 
             # Get the body transforms for this scene
-            transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
+            with th.cuda.stream(og.sim.CPU_TO_GPU):
+                transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms().cuda()
 
-            # Append the data to the pending lists. Note that we have to clone these matrices because
-            # the view actually reuses the buffer.
-            self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
-            self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
-            self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
+            og.sim.CPU_TO_GPU.synchronize()
+
+            # Append the GPU tensors to the pending lists.
+            self._PENDING_IMPULSES[scene_idx].append(impulses)
+            self._PENDING_TRANSFORMS[scene_idx].append(transforms)
+            self._PENDING_NET_FORCES[scene_idx].append(net_forces)
 
     def update_contact_cache(self):
         """
@@ -904,9 +913,11 @@ class RigidContactAPIImpl:
 
             # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
             # data for all the indices where the object is not asleep.
-            body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
+            body_step_indices = th.arange(N, dtype=th.long, device="cuda").unsqueeze(1).expand_as(per_step_awake)
             last_awake_body_step = (
-                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
+                .max(dim=0)
+                .values
             )  # (num_bodies,)
 
             # For each step, compute the rows that are awake
@@ -915,32 +926,39 @@ class RigidContactAPIImpl:
             # For each step, compute the columns that are awake
             col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
             valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
-            per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
+            per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool, device="cuda")  # (N, C)
             per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
             # For each step, compute the pairs that are awake. This is an outer-OR of the row and column awake masks.
             per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
 
             # What is the last step that the pair was awake?
-            pair_step_indices = th.arange(N, dtype=th.long).reshape(N, 1, 1).expand_as(per_step_awake_pairs)
+            pair_step_indices = (
+                th.arange(N, dtype=th.long, device="cuda").reshape(N, 1, 1).expand_as(per_step_awake_pairs)
+            )
             last_awake_pair_step = (
-                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
+                .max(dim=0)
+                .values
             )  # (R, C)
             pair_was_awake = last_awake_pair_step >= 0  # (R, C)
 
             # "Current" contact matrix: impulses from the last awake step per pair.
             # Pairs that were never awake retain their previous value.
+            # All writes go directly to the GPU matrices; CPU mirrors are updated at the end.
             awake_rc = th.where(pair_was_awake)
             awake_pair_steps = last_awake_pair_step[pair_was_awake]
             last_awake_impulses = all_impulses[awake_pair_steps, awake_rc[0], awake_rc[1]]  # (num_awake, 3)
-            self._CURRENT_CONTACT_MATRIX[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
+            self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
 
             # "Recent" contact matrix: any contact across awake steps for awake pairs,
             # or the (now-updated) current contact value for non-awake pairs.
             any_contact_per_step = th.any(all_impulses != 0, dim=-1)  # (N, R, C)
             any_awake_contact = th.any(any_contact_per_step & per_step_awake_pairs, dim=0)  # (R, C)
-            self._CONTACT_MATRIX[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
-            self._CONTACT_MATRIX[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX[scene_idx][~pair_was_awake]
+            self._CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
+            self._CONTACT_MATRIX_GPU[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][
+                ~pair_was_awake
+            ]
 
             # Update body transforms from each body's last awake step
             awake_body_indices = th.where(last_awake_body_step >= 0)[0]
@@ -952,6 +970,15 @@ class RigidContactAPIImpl:
             self._PENDING_IMPULSES[scene_idx] = []
             self._PENDING_TRANSFORMS[scene_idx] = []
             self._PENDING_NET_FORCES[scene_idx] = []
+
+            # Copy updated GPU matrices back to CPU mirrors so is_in_contact()
+            # can read them without a GPU stall.
+            with th.cuda.stream(og.sim.GPU_TO_CPU):
+                self._CONTACT_MATRIX[scene_idx].copy_(self._CONTACT_MATRIX_GPU[scene_idx], non_blocking=True)
+                self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
+                    self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True
+                )
+            og.sim.GPU_TO_CPU.synchronize()
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
@@ -1193,15 +1220,6 @@ class RigidContactAPIImpl:
     def has_contact_view(self, scene_idx):
         """Returns True if a valid contact view has been initialized for @scene_idx."""
         return scene_idx in self._CONTACT_MATRIX
-
-    def async_copy_to_gpu(self):
-        """Issue non-blocking copies of CPU contact matrices → GPU mirrors on CPU_TO_GPU stream."""
-        with th.cuda.stream(og.sim.CPU_TO_GPU):
-            for scene_idx in self._CONTACT_MATRIX:
-                self._CONTACT_MATRIX_GPU[scene_idx].copy_(self._CONTACT_MATRIX[scene_idx], non_blocking=True)
-                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].copy_(
-                    self._CURRENT_CONTACT_MATRIX[scene_idx], non_blocking=True
-                )
 
     def clear(self):
         """
