@@ -639,6 +639,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         relative_dummy_mesh_path = absolute_prim_path_to_scene_relative(self._scene, dummy_mesh_path)
         mesh = GeomPrim(relative_prim_path=relative_dummy_mesh_path, name=f"{self.name}_emitter")
         mesh.load(self._scene)
+        mesh.visible = False
 
         flowEmitter_prim_path = f"{mesh.prim_path}/{emitter_config['name']}"
         flowSimulate_prim_path = f"{mesh.prim_path}/flowSimulate"
