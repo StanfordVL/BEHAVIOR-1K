@@ -696,7 +696,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Args:
             obj (USDObject): Object to remove
         """
-        with og.sim.removing_objects():
+        with og.sim.adding_or_removing_objects():
             # Run any simulation-level callbacks
             og.sim._pre_remove_object(obj)
 
