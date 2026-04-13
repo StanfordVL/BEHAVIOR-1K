@@ -1,5 +1,5 @@
 (define (problem clean_decking-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         board.n.02_1 - board.n.02

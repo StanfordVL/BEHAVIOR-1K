@@ -1,5 +1,5 @@
 (define (problem hanging_shades-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         window_blind.n.01_1 - window_blind.n.01

@@ -1,5 +1,5 @@
 (define (problem unpacking_suitcase-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	sock.n.01_1 sock.n.01_2 - sock.n.01

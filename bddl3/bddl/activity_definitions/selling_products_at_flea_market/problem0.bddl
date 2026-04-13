@@ -1,5 +1,5 @@
 (define (problem selling_products_at_flea_market-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         box__of__chocolates.n.01_1 box__of__chocolates.n.01_2 - box__of__chocolates.n.01

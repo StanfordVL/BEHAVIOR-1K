@@ -1,5 +1,5 @@
 (define (problem clean_your_goal_keeper_gloves-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mud.n.03_1 - mud.n.03

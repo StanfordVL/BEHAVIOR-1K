@@ -1,5 +1,5 @@
 (define (problem make_rose_centerpieces-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         vase.n.01_1 - vase.n.01

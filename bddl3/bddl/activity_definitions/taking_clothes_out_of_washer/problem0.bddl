@@ -1,5 +1,5 @@
 (define (problem taking_clothes_out_of_washer-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         jersey.n.03_1 jersey.n.03_2 - jersey.n.03

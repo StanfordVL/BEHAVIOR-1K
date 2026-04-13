@@ -1,5 +1,5 @@
 (define (problem distributing_event_T_shirts-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         booth.n.01_1 - booth.n.01

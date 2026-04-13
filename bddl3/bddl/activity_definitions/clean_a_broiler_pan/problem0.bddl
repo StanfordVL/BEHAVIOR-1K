@@ -1,5 +1,5 @@
 (define (problem clean_a_broiler_pan-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sponge.n.01_1 - sponge.n.01

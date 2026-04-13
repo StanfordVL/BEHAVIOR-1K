@@ -1,5 +1,5 @@
 (define (problem getting_organized_for_work-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mouse.n.04_1 - mouse.n.04

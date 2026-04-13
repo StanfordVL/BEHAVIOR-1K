@@ -1,5 +1,5 @@
 (define (problem store_coffee_beans_or_ground_coffee-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         coffee_bean.n.01_1 - coffee_bean.n.01

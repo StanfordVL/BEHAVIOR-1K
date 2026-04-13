@@ -1,5 +1,5 @@
 (define (problem clean_copper_wire-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         copper_wire.n.01_1 - copper_wire.n.01

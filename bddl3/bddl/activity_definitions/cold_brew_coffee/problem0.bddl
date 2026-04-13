@@ -1,5 +1,5 @@
 (define (problem cold_brew_coffee-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ground_coffee.n.01_1 - ground_coffee.n.01

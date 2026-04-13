@@ -1,5 +1,5 @@
 (define (problem clean_a_leather_belt-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         belt.n.02_1 - belt.n.02

@@ -1,5 +1,5 @@
 (define (problem fertilize_plants-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pot_plant.n.01_1 pot_plant.n.01_2 pot_plant.n.01_3 - pot_plant.n.01

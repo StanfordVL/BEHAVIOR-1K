@@ -1,5 +1,5 @@
 (define (problem turning_out_all_lights_before_sleep-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         switch.n.01_1 switch.n.01_2 switch.n.01_3 switch.n.01_4 switch.n.01_5 switch.n.01_6 switch.n.01_7 - switch.n.01

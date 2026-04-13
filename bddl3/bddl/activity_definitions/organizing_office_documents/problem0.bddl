@@ -1,5 +1,5 @@
 (define (problem organizing_office_documents-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         legal_document.n.01_1 legal_document.n.01_2 - legal_document.n.01

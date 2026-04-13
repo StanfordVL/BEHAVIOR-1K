@@ -1,5 +1,5 @@
 (define (problem make_iced_chocolate-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ice_cube.n.01_1 ice_cube.n.01_2 - ice_cube.n.01

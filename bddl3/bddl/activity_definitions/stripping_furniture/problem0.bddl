@@ -1,5 +1,5 @@
 (define (problem stripping_furniture-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         newspaper.n.03_1 - newspaper.n.03

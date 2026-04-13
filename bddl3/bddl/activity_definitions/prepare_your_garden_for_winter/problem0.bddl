@@ -1,5 +1,5 @@
 (define (problem prepare_your_garden_for_winter-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
     	lawn.n.01_1 - lawn.n.01

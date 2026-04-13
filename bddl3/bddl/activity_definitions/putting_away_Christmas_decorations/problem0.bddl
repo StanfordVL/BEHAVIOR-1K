@@ -1,5 +1,5 @@
 (define (problem putting_away_Christmas_decorations-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	wreath.n.01_1 wreath.n.01_2 - wreath.n.01

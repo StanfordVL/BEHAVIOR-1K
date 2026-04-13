@@ -1,5 +1,5 @@
 (define (problem hanging_address_numbers-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         address.n.05_1 address.n.05_2 address.n.05_3 - address.n.05

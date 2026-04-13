@@ -1,5 +1,5 @@
 (define (problem adding_fabric_softener-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wrinkle.n.01_1 - wrinkle.n.01

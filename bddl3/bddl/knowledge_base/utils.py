@@ -1,9 +1,8 @@
 import re
-from nltk.corpus import wordnet as wn
 from typing import Tuple, List, Set
 from bddl.activity import get_initial_conditions, get_goal_conditions, get_object_scope
-from bddl.logic_base import UnaryAtomicFormula, BinaryAtomicFormula, Expression
-from bddl.backend_abc import BDDLBackend
+from bddl.predicates import Predicate
+from bddl.logic_base import Expression
 from bddl.parsing import parse_domain
 
 from enum import Enum, auto
@@ -35,21 +34,32 @@ FILLABLE_PREDICATES = {"filled", "contains", "empty"}
 
 
 def canonicalize(s):
+    """Assert that a synset name is already in canonical WordNet form.
+
+    Raises AssertionError if the synset exists in WordNet but under a
+    different canonical name, indicating a data error in the BDDL files.
+    """
+    from nltk.corpus import wordnet as wn
+
     try:
-        return wn.synset(s).name()
-    except:
-        return s
+        canonical = wn.synset(s).name()
+    except Exception:
+        return s  # Not in WordNet (custom synset) -- pass through
+    assert canonical == s, f"Synset '{s}' is not canonical (expected '{canonical}')"
+    return s
 
 
 def wn_synset_exists(synset):
+    from nltk.corpus import wordnet as wn
+
     try:
         wn.synset(synset)
         return True
-    except:
+    except Exception:
         return False
 
 
-*__, domain_predicates = parse_domain("omnigibson")
+*__, domain_predicates = parse_domain("behavior-1k")
 UNARIES = [
     predicate for predicate, inputs in domain_predicates.items() if len(inputs) == 1
 ]
@@ -58,63 +68,13 @@ BINARIES = [
 ]
 
 
-class TrivialUnaryFormula(UnaryAtomicFormula):
-    def _evaluate():
-        return True
-
-    def _sample():
-        return True
-
-
-class TrivialBinaryFormula(BinaryAtomicFormula):
-    def _evaluate():
-        return True
-
-    def _sample():
-        return True
-
-
-def gen_unary_token(predicate_name, generate_ground_options=True):
-    return type(
-        f"{predicate_name}StateUnaryPredicate",
-        (TrivialUnaryFormula,),
-        {"STATE_CLASS": "HowDoesItMatter", "STATE_NAME": predicate_name},
-    )
-
-
-def gen_binary_token(predicate_name, generate_ground_options=True):
-    return type(
-        f"{predicate_name}StateBinaryPredicate",
-        (TrivialBinaryFormula,),
-        {"STATE_CLASS": "HowDoesItMatter", "STATE_NAME": predicate_name},
-    )
-
-
-class TrivialBackend(BDDLBackend):
-    def get_predicate_class(self, predicate_name):
-        if predicate_name in UNARIES:
-            return gen_unary_token(predicate_name)
-        elif predicate_name in BINARIES:
-            return gen_binary_token(predicate_name)
-        else:
-            raise KeyError(predicate_name)
-
-
-class TrivialGenericObject(object):
-    def __init__(self, name):
-        self.name = name
-
-
 def get_initial_and_goal_conditions(conds) -> Tuple[List, List]:
     scope = get_object_scope(conds)
-    # Pretend scope has been filled
-    for name in scope:
-        scope[name] = TrivialGenericObject(name)
     initial_conds = get_initial_conditions(
-        conds, TrivialBackend(), scope, generate_ground_options=False
+        conds, scope, generate_ground_options=False
     )
     goal_conds = get_goal_conditions(
-        conds, TrivialBackend(), scope, generate_ground_options=False
+        conds, scope, generate_ground_options=False
     )
     return initial_conds, goal_conds
 
@@ -122,12 +82,8 @@ def get_initial_and_goal_conditions(conds) -> Tuple[List, List]:
 def get_leaf_conditions(cond) -> List:
     if isinstance(cond, list):
         return [leaf_cond for child in cond for leaf_cond in get_leaf_conditions(child)]
-    # elif isinstance(cond, (UnaryAtomicFormula, BinaryAtomicFormula)):   # This is too slow.
-    if hasattr(cond, "input") or hasattr(cond, "input1"):
-        if cond.children:
-            raise ValueError(f"Found an atomic formula {cond} with children.")
-        else:
-            return [cond]
+    if isinstance(cond, Predicate):
+        return [cond]
     elif isinstance(cond, Expression):
         if not cond.children:
             raise ValueError(f"Found empty expression {cond} in tree.")
@@ -140,26 +96,16 @@ def get_leaf_conditions(cond) -> List:
     else:
         raise ValueError(f"Found unexpected item {cond} in tree.")
 
-
+SYNSET_NAME_REGEX = re.compile(r"^[A-Za-z-_]+\.n\.[0-9]+$")
 def get_synsets(cond):
     def get_synset_from_scope_name(scope_name):
         lemma, n, number = scope_name.split(".")
         number = number.rsplit("_", 1)[0]
         synset = f"{lemma}.{n}.{number}"
-        assert re.fullmatch(
-            r"^[A-Za-z-_]+\.n\.[0-9]+$", synset
-        ), f"Invalid synset name: {synset}"
+        assert SYNSET_NAME_REGEX.fullmatch(synset), f"Invalid synset name: {synset}"
         return synset
 
-    # TODO: Too slow!
-    # assert isinstance(cond, (UnaryAtomicFormula, BinaryAtomicFormula)), "This only works with atomic formulae"
-    if hasattr(cond, "input"):
-        return [get_synset_from_scope_name(cond.input)]
-    else:
-        return [
-            get_synset_from_scope_name(cond.input1),
-            get_synset_from_scope_name(cond.input2),
-        ]
+    return [get_synset_from_scope_name(inp) for inp in cond.inputs]
 
 
 def object_substance_match(cond, synset) -> Tuple[bool, bool]:
@@ -185,7 +131,7 @@ def object_substance_match(cond, synset) -> Tuple[bool, bool]:
     is_used_as_non_substance_in_substance_predicate = any(
         synset == get_synsets(leaf)[0]
         for leaf in leafs
-        if leaf.STATE_NAME in SUBSTANCE_PREDICATES and hasattr(leaf, "input2")
+        if leaf.STATE_NAME in SUBSTANCE_PREDICATES and len(leaf.inputs) == 2
     )
     is_used_as_non_substance = (
         is_used_as_non_substance_in_non_substance_predicate
@@ -228,5 +174,5 @@ def leaf_inroom_conds(raw_cond, synsets: Set[str]) -> List[Tuple[str, str]]:
         if raw_cond[0] == "inroom":
             synset = raw_cond[1].split("?")[-1].rsplit("_", 1)[0]
             assert synset in synsets, f"{synset} not in valid format"
-            ret.append((canonicalize(synset), raw_cond[2]))
+            ret.append((synset, raw_cond[2]))
     return ret

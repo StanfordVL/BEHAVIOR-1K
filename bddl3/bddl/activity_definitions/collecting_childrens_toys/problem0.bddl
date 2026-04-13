@@ -1,5 +1,5 @@
 (define (problem collecting_childrens_toys-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         die.n.01_1 die.n.01_2 - die.n.01

@@ -1,5 +1,5 @@
 (define (problem make_party_favors_from_candy-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cup.n.01_1 cup.n.01_2 - cup.n.01

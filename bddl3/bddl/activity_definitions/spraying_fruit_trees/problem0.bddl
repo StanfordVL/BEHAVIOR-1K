@@ -1,5 +1,5 @@
 (define (problem spraying_fruit_trees-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pesticide.n.01_1 - pesticide.n.01

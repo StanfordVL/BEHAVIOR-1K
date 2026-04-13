@@ -1,5 +1,5 @@
 (define (problem tidying_bathroom-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         hand_towel.n.01_1 hand_towel.n.01_2 - hand_towel.n.01

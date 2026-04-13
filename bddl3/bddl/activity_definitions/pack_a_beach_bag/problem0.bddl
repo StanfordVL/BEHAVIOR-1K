@@ -1,5 +1,5 @@
 (define (problem pack_a_beach_bag-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bottle__of__sunscreen.n.01_1 - bottle__of__sunscreen.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_an_electric_kettle-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	electric_kettle.n.01_1 - electric_kettle.n.01

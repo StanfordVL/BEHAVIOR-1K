@@ -1,5 +1,5 @@
 (define (problem clean_a_toaster-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         adhesive_material.n.01_1 - adhesive_material.n.01

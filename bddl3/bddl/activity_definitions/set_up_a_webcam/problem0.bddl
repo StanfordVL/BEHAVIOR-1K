@@ -1,5 +1,5 @@
 (define (problem set_up_a_webcam-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         monitor.n.04_1 - monitor.n.04

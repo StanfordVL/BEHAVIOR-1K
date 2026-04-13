@@ -1,5 +1,5 @@
 (define (problem cleaning_up_branches_and_twigs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lawn.n.01_1 - lawn.n.01

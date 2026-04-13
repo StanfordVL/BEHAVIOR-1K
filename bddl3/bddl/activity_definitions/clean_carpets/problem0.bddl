@@ -1,5 +1,5 @@
 (define (problem clean_carpets-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rug.n.01_1 - rug.n.01

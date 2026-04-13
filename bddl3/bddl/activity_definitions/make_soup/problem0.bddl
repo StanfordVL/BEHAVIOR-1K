@@ -1,5 +1,5 @@
 (define (problem make_soup-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         chicken_broth.n.01_1 - chicken_broth.n.01

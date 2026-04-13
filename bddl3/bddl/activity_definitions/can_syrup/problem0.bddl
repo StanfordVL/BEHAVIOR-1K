@@ -1,5 +1,5 @@
 (define (problem can_syrup-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lid.n.02_1 lid.n.02_2 lid.n.02_3 - lid.n.02

@@ -38,6 +38,7 @@ from omnigibson.macros import gm, create_module_macros, macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import get_task_instance_path
+from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
@@ -281,8 +282,8 @@ class Evaluator:
         # causes some jitter (maybe for small mass / thin objects?)
         for _ in range(25):
             og.sim.step_physics()
-            for entity in self.env.task.object_scope.values():
-                if not entity.is_system and entity.exists:
+            for inst, entity in self.env.task.object_scope.items():
+                if not is_system_bddl_inst(inst) and entity is not None:
                     entity.keep_still()
 
         self.env.scene.update_initial_file()

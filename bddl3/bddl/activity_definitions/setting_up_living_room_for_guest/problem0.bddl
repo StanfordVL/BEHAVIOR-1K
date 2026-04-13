@@ -1,5 +1,5 @@
 (define (problem setting_up_living_room_for_guest-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	chip.n.04_1 chip.n.04_2 chip.n.04_3 - chip.n.04

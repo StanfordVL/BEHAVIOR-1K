@@ -1,5 +1,5 @@
 (define (problem store_beer-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         beer_bottle.n.01_1 beer_bottle.n.01_2 beer_bottle.n.01_3 beer_bottle.n.01_4 - beer_bottle.n.01

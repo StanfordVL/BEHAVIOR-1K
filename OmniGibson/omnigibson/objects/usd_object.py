@@ -8,7 +8,7 @@ from functools import cached_property
 from typing import Literal
 
 import torch as th
-from bddl.object_taxonomy import ObjectTaxonomy
+from omnigibson.utils.bddl_utils import get_knowledge_base
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -67,8 +67,6 @@ m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]  # (x,y,z) scale of generated steam
 m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1  # scale of steam density relative to its object, range [0, inf)
 m.STEAM_EMITTER_HEIGHT_RATIO = 0.6  # z-height of generated steam relative to its object's native height, range [0, inf)
 m.FIRE_EMITTER_HEIGHT_RATIO = 0.4  # z-height of generated fire relative to its object's native height, range [0, inf)
-
-OBJECT_TAXONOMY = ObjectTaxonomy()
 
 
 # Counter that assigns each flow emitter a unique layer number so emitters don't interfere.
@@ -161,11 +159,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._include_default_states = include_default_states
 
         # Load abilities from taxonomy if needed & possible
+        # TODO: Move this to dataset object? Loads B1K abilities for non-B1K objects.
         if abilities is None:
             abilities = {}
-            taxonomy_class = OBJECT_TAXONOMY.get_synset_from_category(category)
-            if taxonomy_class is not None:
-                abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
+            kb_category = get_knowledge_base().get_category(category)
+            if kb_category is not None and kb_category.synset is not None:
+                abilities = kb_category.synset.abilities
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
         self._abilities = abilities
 

@@ -1,5 +1,5 @@
 (define (problem clean_cabbage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         head_cabbage.n.02_1 - head_cabbage.n.02

@@ -1,5 +1,5 @@
 (define (problem make_fruit_punch-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lemon.n.01_1 - lemon.n.01

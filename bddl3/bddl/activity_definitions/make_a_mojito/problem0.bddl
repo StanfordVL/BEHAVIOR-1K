@@ -1,5 +1,5 @@
 (define (problem make_a_mojito-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         soda_water__bottle.n.01_1 - soda_water__bottle.n.01

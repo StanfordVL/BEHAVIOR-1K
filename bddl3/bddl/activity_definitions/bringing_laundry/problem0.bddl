@@ -1,5 +1,5 @@
 (define (problem bringing_laundry-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         washer.n.03_1 - washer.n.03

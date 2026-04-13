@@ -1,5 +1,5 @@
 (define (problem making_a_snack-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tortilla_chip.n.01_1 tortilla_chip.n.01_11 tortilla_chip.n.01_12 tortilla_chip.n.01_2 tortilla_chip.n.01_3 tortilla_chip.n.01_4 tortilla_chip.n.01_5 tortilla_chip.n.01_6 tortilla_chip.n.01_7 tortilla_chip.n.01_8 tortilla_chip.n.01_9 tortilla_chip.n.01_10 - tortilla_chip.n.01

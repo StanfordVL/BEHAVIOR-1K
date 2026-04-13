@@ -1,5 +1,5 @@
 (define (problem make_a_wiener_schnitzle-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         veal.n.01_1 - veal.n.01

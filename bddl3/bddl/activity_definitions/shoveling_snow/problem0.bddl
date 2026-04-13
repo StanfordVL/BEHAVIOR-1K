@@ -1,5 +1,5 @@
 (define (problem shoveling_snow-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         snow.n.01_1 - snow.n.01

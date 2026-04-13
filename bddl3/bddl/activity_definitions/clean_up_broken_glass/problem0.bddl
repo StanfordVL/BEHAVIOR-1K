@@ -1,5 +1,5 @@
 (define (problem clean_up_broken_glass-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         broken__glass.n.01_1 broken__glass.n.01_2 broken__glass.n.01_3 - broken__glass.n.01

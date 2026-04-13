@@ -1,5 +1,5 @@
 (define (problem cook_kale-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         kale.n.03_1 - kale.n.03
