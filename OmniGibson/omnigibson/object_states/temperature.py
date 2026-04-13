@@ -31,6 +31,7 @@ class Temperature(TensorizedValueState):
                 for s_idx in range(len(cls.IDX_OBJS)):
                     if cls.IDX_OBJS[s_idx][obj_idx] is not None:
                         cls.VALUES[s_idx, obj_idx] = m.DEFAULT_TEMPERATURE
+                        cls.VALUES_CPU[s_idx, obj_idx] = m.DEFAULT_TEMPERATURE
 
     @classmethod
     def update_temperature_from_heatsource_or_sink(cls, objs, temperature, rate):

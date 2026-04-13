@@ -198,11 +198,10 @@ class RigidBodyViewAPIImpl:
     have an independent link count (different object models are supported).
 
     Two categories of links are tracked:
-      - physx_tracked:   links with physics:RigidBodyAPI, included in create_rigid_body_view.
+      - physx_tracked:   rigid body links included in create_rigid_body_view.
                          Poses updated every step from PhysX.
-      - physx_untracked: kinematic-only links without physics:RigidBodyAPI (e.g. objects that
-                         are always static). Poses seeded once at initialize_view() and
-                         refreshed only by invalidate_kinematic().
+      - physx_untracked: kinematic-only articulated objects' links not tracked by physx's rigid body view.
+                         Poses seeded once at initialize_view() and refreshed only by invalidate_kinematic().
 
     Flat index layout in _POSE_MATRICES (N_links_total, 4, 4):
       [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked links across all scenes]
@@ -335,9 +334,8 @@ class RigidBodyViewAPIImpl:
                     if path_idx is None:
                         continue
 
-                    # Collect initial pose for physx_untracked links
-                    # This is only needed once as they don't move
-                    if is_untracked and path_idx >= N_physx_total and abs_path not in prev_path_to_idx:
+                    # Collect poses for physx_untracked links
+                    if is_untracked and path_idx >= N_physx_total:
                         pos, quat_wxyz = link.get_position_orientation()
                         quat_xyzw = th.cat([quat_wxyz[1:], quat_wxyz[:1]])
                         kinematic_poses_to_fill.append((path_idx, th.cat([pos, quat_xyzw])))

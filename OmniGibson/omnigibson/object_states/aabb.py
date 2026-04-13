@@ -112,10 +112,7 @@ class AABB(TensorizedValueState):
                     cls._AABB_LO[s_idx * O + obj_idx] = lo
                     cls._AABB_HI[s_idx * O + obj_idx] = hi
 
-        # Write into values in-place — two slice-writes, no th.cat, no new tensor
-        values[..., :3] = cls._AABB_LO.view(S, O, 3)
-        values[..., 3:] = cls._AABB_HI.view(S, O, 3)
-        return values
+        return th.cat([cls._AABB_LO.view(S, O, 3), cls._AABB_HI.view(S, O, 3)], dim=-1)
 
     def _get_value(self):
         s = self.obj.scene.idx

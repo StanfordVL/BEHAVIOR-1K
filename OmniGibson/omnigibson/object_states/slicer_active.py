@@ -64,8 +64,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
         # Allocate (scene_number, obj_number) tracking tensors; carry-over is not needed for these bookkeeping fields
         # (contact/delay state resets naturally when initialize_view is called after object changes)
-        cls.PREVIOUSLY_TOUCHING = th.zeros((S, N), dtype=th.bool)
-        cls.DELAY_COUNTER = th.zeros((S, N), dtype=th.float32)
+        cls.PREVIOUSLY_TOUCHING = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls.DELAY_COUNTER = th.zeros((S, N), dtype=th.float32, device="cuda")
 
         # Initialize new VALUE slots (not carried over) to True (slicer starts active)
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -73,22 +73,24 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 for s_idx in range(S):
                     if cls.IDX_OBJS[s_idx][obj_idx] is not None:
                         cls.VALUES[s_idx, obj_idx] = True
+                        cls.VALUES_CPU[s_idx, obj_idx] = True
 
     @classmethod
     def _update_values(cls, values):
         # values: (scene_number, obj_number) bool tensor
+        new_values = values.clone()
 
         # If we were touching a sliceable last step, deactivate now
         cls.DELAY_COUNTER[cls.PREVIOUSLY_TOUCHING] = 0
-        values[cls.PREVIOUSLY_TOUCHING] = False
+        new_values[cls.PREVIOUSLY_TOUCHING] = False
 
         # Are we currently touching any sliceables?
         currently_touching_sliceables = cls._currently_touching_sliceables()
 
         # If any values are False, consider reverting back to active
-        if not th.all(values):
-            not_active_not_touching = ~values & ~currently_touching_sliceables
-            not_active_is_touching = ~values & currently_touching_sliceables
+        if not th.all(new_values):
+            not_active_not_touching = ~new_values & ~currently_touching_sliceables
+            not_active_is_touching = ~new_values & currently_touching_sliceables
 
             # Increment cooldown when not active and not touching anything sliceable
             cls.DELAY_COUNTER[not_active_not_touching] += 1
@@ -97,12 +99,12 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             cls.DELAY_COUNTER[not_active_is_touching] = 0
 
             # Re-activate once the cooldown has elapsed
-            values = th.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, values)
+            new_values = th.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, new_values)
 
         # Record current contact state for the next step
         cls.PREVIOUSLY_TOUCHING = currently_touching_sliceables
 
-        return values
+        return new_values
 
     @classmethod
     def _currently_touching_sliceables(cls):

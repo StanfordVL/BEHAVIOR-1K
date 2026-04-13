@@ -42,6 +42,7 @@ class MaxTemperature(TensorizedValueState):
                 for s_idx in range(len(cls.IDX_OBJS)):
                     if cls.IDX_OBJS[s_idx][obj_idx] is not None:
                         cls.VALUES[s_idx, obj_idx] = -float("inf")
+                        cls.VALUES_CPU[s_idx, obj_idx] = -float("inf")
 
     @classmethod
     def _update_values(cls, values):

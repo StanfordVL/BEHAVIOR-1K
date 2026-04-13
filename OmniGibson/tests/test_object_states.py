@@ -48,7 +48,6 @@ from omnigibson.utils.physx_utils import apply_force_at_pos
 from omnigibson.utils.usd_utils import RigidContactAPI
 
 
-@pytest.mark.skip(reason="...")
 def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
     # Lower the mass of the shelf - otherwise, the gravity will create enough torque to break the joint
     bookcase_shelf.root_link.mass = 0.1
