@@ -139,30 +139,30 @@ class TestTask:
         from bddl.knowledge_base.models import CompiledTask
 
         task = kb.get_task("cleaning_up_after_a_meal-0")
-        ct = task.compile()
+        ct = task.compile(scene_layout={})
         assert isinstance(ct, CompiledTask)
         assert ct.task is task
 
     def test_task_check_goal_all_false(self, kb):
-        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile(scene_layout={})
         ok, results = ct.check_goal(lambda cls, *e: False)
         assert ok is False
         assert len(results["unsatisfied"]) > 0
 
     def test_task_check_goal_tracks_satisfied(self, kb):
-        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile(scene_layout={})
         ok, results = ct.check_goal(lambda cls, *e: True)
         assert len(results["satisfied"]) + len(results["unsatisfied"]) == len(ct.goal_conditions)
 
     def test_task_object_scope(self, kb):
-        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile(scene_layout={})
         assert isinstance(ct.object_scope, set)
         assert len(ct.object_scope) > 0
         for name in ct.object_scope:
             assert isinstance(name, str)
 
     def test_task_parsed_objects(self, kb):
-        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile(scene_layout={})
         assert isinstance(ct.parsed_objects, dict)
         for cat, instances in ct.parsed_objects.items():
             assert isinstance(cat, str)
@@ -170,7 +170,7 @@ class TestTask:
             assert all(isinstance(i, str) for i in instances)
 
     def test_task_ground_goal_state_options(self, kb):
-        ct = kb.get_task("cleaning_up_after_a_meal-0").compile()
+        ct = kb.get_task("cleaning_up_after_a_meal-0").compile(scene_layout={})
         assert isinstance(ct.ground_goal_state_options, list)
         assert len(ct.ground_goal_state_options) > 0
 
@@ -410,7 +410,7 @@ class TestTaskGoalEvaluation:
 
     @pytest.fixture()
     def ct(self, kb):
-        return kb.get_task("cleaning_up_after_a_meal-0").compile()
+        return kb.get_task("cleaning_up_after_a_meal-0").compile(scene_layout={})
 
     def test_nothing_satisfied(self, ct):
         ok, results = ct.check_goal(lambda cls, *e: False)
@@ -582,10 +582,13 @@ class TestWildcardExpansion:
         assert "electric_refrigerator.n.01_1" in ct.object_scope
         assert "electric_refrigerator.n.01_2" in ct.object_scope
 
-    def test_expand_wildcards_no_layout(self, kb):
-        """Without scene_layout, wildcards stay as literal names."""
-        ct = kb.get_task("carrying_in_groceries-0").compile()
-        assert "electric_refrigerator.n.01_*" in ct.object_scope
+    def test_parse_base_scope_strips_wildcards(self, kb):
+        """parse_base_scope strips wildcard instances from the scope."""
+        task = kb.get_task("carrying_in_groceries-0")
+        conditions, scope, inroom = task.parse_base_scope()
+        assert "electric_refrigerator.n.01_*" not in scope
+        # The non-wildcard instance should still be present
+        assert "electric_refrigerator.n.01_1" in scope
 
     def test_wildcard_expansion_count(self, kb):
         """More objects in the scene means more expanded instances."""

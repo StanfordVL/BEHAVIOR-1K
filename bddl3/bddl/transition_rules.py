@@ -12,7 +12,7 @@ Recipe types
 - :class:`MixingRecipe` -- Requires a mixing tool (no explicit container).
 - :class:`MachineRecipe` -- Requires a toggleable machine.
 - :class:`SubstanceCookingRecipe` -- Simple substance-to-substance transform.
-- :class:`WasherRule` -- Maps substances to solvent-based removal conditions.
+- :class:`WasherRecipe` -- Maps substances to solvent-based removal conditions.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ class SubstanceCookingRecipe(Recipe):
 # ---------------------------------------------------------------------------
 
 @dataclass
-class WasherRule:
+class WasherRecipe:
     """Defines substance removal conditions for a washing machine.
 
     Attributes:
@@ -270,11 +270,11 @@ def load_washer_rule(json_filename="washer.json"):
     """Load washer substance removal conditions.
 
     Returns:
-        WasherRule | None: Parsed washer rule, or None if file not found.
+        WasherRecipe | None: Parsed washer rule, or None if file not found.
     """
     fpath = _TM_JSON_DIR / json_filename
     if not fpath.exists():
         return None
     with open(fpath, "r") as f:
         conditions = json.load(f)
-    return WasherRule(conditions=conditions)
+    return WasherRecipe(conditions=conditions)

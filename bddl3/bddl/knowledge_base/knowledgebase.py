@@ -41,7 +41,7 @@ class KnowledgeBase:
         self.complaint_types_by_name: Dict[str, Any] = {}
         self.complaints: List[Any] = []
         self.complaints_by_id: Dict[str, Any] = {}
-        self.washer_rule = None  # WasherRule instance, set during population
+        self.washer_rule = None  # WasherRecipe instance, set during population
 
         if populate:
             from bddl.knowledge_base.processing import populate_knowledgebase

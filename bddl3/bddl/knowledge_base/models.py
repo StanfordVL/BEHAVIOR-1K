@@ -981,6 +981,35 @@ class CompiledTask:
 
         return evaluate_state(self.initial_conditions, evaluate_fn)
 
+    @staticmethod
+    def evaluate_conditions(conditions, evaluate_fn):
+        """Evaluate a list of compiled conditions.
+
+        Args:
+            conditions: List of compiled condition nodes to evaluate.
+            evaluate_fn: Callback ``(predicate_cls, *entities) -> bool``.
+
+        Returns:
+            tuple[bool, dict[str, list[int]]]: ``(all_satisfied, results)``.
+        """
+        from bddl.condition_evaluation import evaluate_state
+
+        return evaluate_state(conditions, evaluate_fn)
+
+    @cached_property
+    def natural_language_initial_conditions(self):
+        """Return natural language translations of the initial conditions."""
+        from bddl.activity import get_natural_initial_conditions
+
+        return get_natural_initial_conditions(self.conditions)
+
+    @cached_property
+    def natural_language_goal_conditions(self):
+        """Return natural language translations of the goal conditions."""
+        from bddl.activity import get_natural_goal_conditions
+
+        return get_natural_goal_conditions(self.conditions)
+
 
 @dataclass(eq=False, order=False)
 class Task:
@@ -1000,24 +1029,97 @@ class Task:
     def __str__(self):
         return self.name
 
-    def compile(self, scene_layout=None):
+    @property
+    def has_wildcards(self):
+        """Whether this task's definition contains wildcard instances."""
+        return "*" in self.definition
+
+    def parse_base_scope(self):
+        """Parse the base (non-wildcard) object scope from the raw definition.
+
+        Strips wildcard instance lines and their associated init conditions,
+        then parses the remaining BDDL to extract the base object scope,
+        inroom assignments, and parsed conditions. This is used to select
+        objects before wildcard expansion and compilation.
+
+        Returns:
+            tuple: ``(conditions, object_scope, inroom_assignments)`` where:
+                - conditions: Parsed ``Conditions`` object (base scope only).
+                - object_scope (set[str]): All non-wildcard instance names.
+                - inroom_assignments (dict[str, str]): Instance name to room type
+                  for non-wildcard inroom conditions.
+        """
+        from bddl.activity import Conditions, get_object_scope
+
+        definition = self.definition
+        if self.has_wildcards:
+            definition = self._strip_wildcards(definition)
+
+        activity_name, definition_id = self.name.rsplit("-", 1)
+        conditions = Conditions(
+            activity_name,
+            int(definition_id),
+            "behavior-1k",
+            predefined_problem=definition,
+        )
+
+        object_scope = get_object_scope(conditions)
+
+        # Extract inroom assignments from parsed initial conditions
+        inroom_assignments = {}
+        for cond in conditions.parsed_initial_conditions:
+            if cond[0] == "inroom":
+                inroom_assignments[cond[1]] = cond[2]
+
+        return conditions, object_scope, inroom_assignments
+
+    def _strip_wildcards(self, definition):
+        """Strip wildcard tokens and their associated init conditions from a BDDL definition.
+
+        Wildcard tokens (e.g. ``synset.n.01_*``) appear on object scope lines
+        alongside non-wildcard instances. This strips just the wildcard tokens
+        from scope lines and removes entire init condition lines that reference
+        wildcard instances.
+        """
+        lines = definition.splitlines(keepends=True)
+        cleaned = []
+        for line in lines:
+            if "*" not in line:
+                cleaned.append(line)
+            elif "-" in line and line.strip().split(" - ")[0].strip():
+                # Object scope line: "inst_1 inst_* - synset"
+                # Remove only the wildcard tokens, keep the rest
+                parts = line.strip().split(" - ")
+                instances = [t for t in parts[0].split() if "*" not in t]
+                if instances:
+                    # Preserve original indentation
+                    indent = line[: len(line) - len(line.lstrip())]
+                    cleaned.append(f"{indent}{' '.join(instances)} - {parts[1]}\n")
+                # else: all instances were wildcards, drop the entire line
+            # else: init condition line with wildcard (e.g. "(inroom inst_* room)") — drop it
+        return "".join(cleaned)
+
+    def compile(self, scene_layout):
         """Compile this task for a specific environment.
 
         Returns a :class:`CompiledTask` containing the compiled conditions,
         object scope, and evaluation methods. Multiple compilations can
         coexist for different environments.
 
+        Must be called after object scope selection, when the scene layout
+        (room type -> object counts) is known. For tasks without wildcards
+        the scene_layout is unused but still required for a uniform interface.
+
         Args:
-            scene_layout: Optional dict mapping ``room_type -> {category: count}``.
-                If provided, wildcards are expanded based on how many matching
-                objects exist in each room. If None, the raw definition is
-                compiled as-is.
+            scene_layout: Dict mapping ``room_type -> {category: count}``.
+                Used to expand wildcards. Can be empty ``{}`` if the task
+                has no inroom conditions or no wildcards.
 
         Returns:
             CompiledTask: A compiled task instance ready for evaluation.
         """
         problem = self.definition
-        if scene_layout is not None and "*" in problem:
+        if self.has_wildcards:
             from bddl.wildcard import expand_wildcards
             problem = expand_wildcards(problem, scene_layout, self.knowledgebase)
         return CompiledTask(self, problem)

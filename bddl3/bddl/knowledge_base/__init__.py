@@ -22,6 +22,14 @@ from bddl.knowledge_base.knowledgebase import KnowledgeBase
 
 from bddl.knowledge_base.utils import SynsetState
 
+from bddl.transition_rules import (
+    CookingRecipe,
+    MachineRecipe,
+    MixingRecipe,
+    SubstanceCookingRecipe,
+    WasherRecipe,
+)
+
 __all__ = [
     "Property",
     "MetaLink",
@@ -43,5 +51,10 @@ __all__ = [
     "ComplaintType",
     "Complaint",
     "PredicateUsage",
-    "CompiledTask"
+    "CompiledTask",
+    "CookingRecipe",
+    "MachineRecipe",
+    "MixingRecipe",
+    "SubstanceCookingRecipe",
+    "WasherRecipe",
 ]

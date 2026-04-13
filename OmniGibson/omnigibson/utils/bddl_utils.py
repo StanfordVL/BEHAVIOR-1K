@@ -3,12 +3,9 @@ import re
 from collections import defaultdict
 from copy import deepcopy
 
-import bddl
 import networkx as nx
 import torch as th
 
-
-from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.condition_evaluation import Negation
 from bddl.knowledge_base import KnowledgeBase
 from bddl import predicates as bddl_predicates
@@ -397,7 +394,7 @@ def translate_bddl_recipe_to_og_recipe(recipe):
     Returns:
         dict: OG-format recipe dict ready for ``RecipeRule.add_recipe(**og_recipe)``.
     """
-    from bddl.transition_rules import CookingRecipe, MachineRecipe
+    from bddl.knowledge_base import CookingRecipe, MachineRecipe
 
     # Determine fillable/heatsource synsets from recipe type
     fillable_synsets = None
@@ -436,10 +433,10 @@ def translate_bddl_recipe_to_og_recipe(recipe):
 
 
 def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
-    """Translate a BDDL WasherRule to an OG washer rule dict.
+    """Translate a BDDL WasherRecipe to an OG washer rule dict.
 
     Args:
-        washer_rule (bddl.transition_rules.WasherRule): Parsed washer rule.
+        washer_rule (bddl.knowledge_base.WasherRecipe): Parsed washer recipe.
 
     Returns:
         dict: Maps system name (str) to None (never remove), [] (always remove),
@@ -475,6 +472,7 @@ class BDDLSampler:
         self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, TraversableScene) else None
         self._agent = self._env.robots[0]
 
+        self._compiled_task = None
         self._activity_conditions = activity_conditions
         self._object_scope = object_scope
         self._object_instance_to_synset = {
@@ -500,43 +498,86 @@ class BDDLSampler:
         self._inroom_object_scope_filtered_initial = None  # dict mapping str to sim object or None
         self._attached_objects = defaultdict(set)  # dict mapping str to set of str
 
-    def sample(self, validate_goal=False, sampling_whitelist=None, sampling_blacklist=None):
-        """
-        Run sampling for this BEHAVIOR task
+    def assign_objects(self, sampling_whitelist=None, sampling_blacklist=None):
+        """Assign inroom objects and import sampleable objects into the scene.
+
+        This is phase 1 of sampling: it finds/imports all objects needed by the
+        task without requiring compiled conditions. After this call, the object
+        scope is populated and room instances can be determined for compilation.
 
         Args:
-            validate_goal (bool): Whether the goal should be validated or not
-            sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
-                mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
-                that category. During sampling, if a given synset is found in this whitelist, only the specified
-                models will be used as options
-            sampling_blacklist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
-                mapping category name (e.g.: "breakfast_table") to a list of invalid models that should not be sampled from
-                that category. During sampling, if a given synset is found in this blacklist, all specified
-                models will not be used as options
+            sampling_whitelist (None or dict): Maps synset name to dict of
+                category -> list of valid models.
+            sampling_blacklist (None or dict): Maps synset name to dict of
+                category -> list of invalid models.
 
         Returns:
             2-tuple:
-                - bool: Whether sampling was successful or not
-                - None or str: None if successful, otherwise the associated error message
+                - bool: Whether object assignment was successful
+                - None or str: None if successful, otherwise the error message
         """
-        log.info("Sampling task...")
-        # Store sampling white / blacklists
+        log.info("Assigning objects for task...")
         self._sampling_whitelist = sampling_whitelist
         self._sampling_blacklist = sampling_blacklist
 
-        # Reject scenes with missing non-sampleable objects
-        # Populate object_scope with sampleable objects and the robot
-        accept_scene, feedback = self._prepare_scene_for_sampling()
-        if not accept_scene:
-            return accept_scene, feedback
-        # Sample objects to satisfy initial conditions
+        # Derive future object instances from parsed initial conditions
+        self._future_obj_instances = {
+            cond[1] for cond in self._activity_conditions.parsed_initial_conditions if cond[0] == "future"
+        }
+
+        error_msg = self._parse_inroom_object_room_assignment()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+
+        error_msg = self._parse_attached_states()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+
+        error_msg = self._build_inroom_object_scope()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+
+        error_msg = self._import_sampleable_objects()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+
+        self._object_scope["agent.n.01_1"] = self._agent
+
+        return True, None
+
+    def sample_states(self, compiled_task, validate_goal=False):
+        """Sample object states to satisfy initial (and optionally goal) conditions.
+
+        This is phase 2 of sampling: it requires a compiled task with condition
+        trees. Must be called after :meth:`assign_objects` and after the task
+        has been compiled with the correct scene layout.
+
+        Args:
+            compiled_task: A :class:`CompiledTask` with compiled condition trees.
+            validate_goal (bool): Whether the goal should also be validated.
+
+        Returns:
+            2-tuple:
+                - bool: Whether sampling was successful
+                - None or str: None if successful, otherwise the error message
+        """
+        log.info("Sampling states...")
+        self._compiled_task = compiled_task
+
+        error_msg = self._build_sampling_order()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+
         accept_scene, feedback = self._sample_all_conditions(validate_goal=validate_goal)
         if not accept_scene:
             return accept_scene, feedback
 
         log.info("Sampling succeeded!")
-
         return True, None
 
     def _sample_all_conditions(self, validate_goal=False):
@@ -574,44 +615,6 @@ class BDDLSampler:
                 return False, error_msg
 
             self._env.scene.update_initial_file()
-
-        return True, None
-
-    def _prepare_scene_for_sampling(self):
-        """
-        Runs sanity checks for the current scene for the given BEHAVIOR task
-
-        Returns:
-            2-tuple:
-                - bool: Whether the generated scene activity should be accepted or not
-                - dict: Any feedback from the sampling / initialization process
-        """
-        error_msg = self._parse_inroom_object_room_assignment()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        error_msg = self._parse_attached_states()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        error_msg = self._build_sampling_order()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        error_msg = self._build_inroom_object_scope()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        error_msg = self._import_sampleable_objects()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        self._object_scope["agent.n.01_1"] = self._agent
 
         return True, None
 
@@ -706,7 +709,7 @@ class BDDLSampler:
         # bddl.condition_evaluation.HEAD, each with one child.
         # This child is either a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate or
         # a Negation of a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate
-        for condition in get_initial_conditions(self._activity_conditions, self._object_scope):
+        for condition in self._compiled_task.initial_conditions:
             condition, positive = process_single_condition(condition)
             if condition is None:
                 continue
@@ -773,7 +776,7 @@ class BDDLSampler:
         # Unsampleable obj instances are strictly a superset of future obj instances
         unsampleable_obj_instances = {cond.body[-1] for cond in unsampleable_conditions}
         self._future_obj_instances = {
-            cond.body[0] for cond in unsampleable_conditions if isinstance(cond, bddl.predicates.Future)
+            cond.body[0] for cond in unsampleable_conditions if isinstance(cond, bddl_predicates.Future)
         }
 
         nonparticle_entities = set(self._object_scope.keys()) - self._substance_instances
@@ -1305,10 +1308,7 @@ class BDDLSampler:
         Returns:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
-        activity_goal_conditions = get_goal_conditions(self._activity_conditions, self._object_scope)
-        ground_goal_state_options = get_ground_goal_state_options(
-            self._activity_conditions, self._object_scope, activity_goal_conditions
-        )
+        ground_goal_state_options = self._compiled_task.ground_goal_state_options
         num_options = ground_goal_state_options.size(0)
         ground_goal_state_options = ground_goal_state_options[random.sample(range(num_options), num_options)]
         log.debug(("number of ground_goal_state_options", len(ground_goal_state_options)))

@@ -30,7 +30,7 @@ from omnigibson.object_states import (
 )
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import get_all_object_category_models
-from bddl.transition_rules import CookingRecipe, MachineRecipe, MixingRecipe, SubstanceCookingRecipe
+from bddl.knowledge_base import CookingRecipe, MachineRecipe, MixingRecipe, SubstanceCookingRecipe
 from omnigibson.utils.bddl_utils import (
     get_knowledge_base,
     translate_bddl_recipe_to_og_recipe,

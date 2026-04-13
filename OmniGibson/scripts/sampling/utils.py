@@ -3,14 +3,13 @@ from omnigibson.objects import DatasetObject
 from omnigibson.systems import MicroPhysicalParticleSystem
 from omnigibson.utils.asset_utils import get_dataset_path
 import omnigibson.lazy as lazy
-from bddl.condition_evaluation import evaluate_state
+from bddl.knowledge_base import CompiledTask
 
 # import numpy as np
 import torch as th
 import csv
 import json
 import os
-import bddl
 import gspread
 import getpass
 import copy
@@ -232,7 +231,9 @@ def get_scenes():
 
 
 def get_valid_tasks():
-    return set(activity for activity in os.listdir(os.path.join(bddl.__path__[0], "activity_definitions")))
+    from omnigibson.utils.bddl_utils import get_behavior_activities
+
+    return set(get_behavior_activities())
 
 
 def get_notready_synsets():
@@ -649,7 +650,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                 return False, f"Particle systems do not have consistent state. Specific error: {err_msg}"
 
         # Sanity check initial state
-        valid_init_state, results = evaluate_state(
+        valid_init_state, results = CompiledTask.evaluate_conditions(
             prune_unevaluatable_predicates(task.activity_initial_conditions), task._evaluate_predicate
         )
         if not valid_init_state:

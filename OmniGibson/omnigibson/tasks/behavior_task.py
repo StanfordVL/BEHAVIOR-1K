@@ -4,10 +4,6 @@ from pathlib import Path
 import random
 
 import torch as th
-from bddl.activity import (
-    get_natural_goal_conditions,
-    get_natural_initial_conditions,
-)
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -179,8 +175,7 @@ class BehaviorTask(BaseTask):
 
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
         terminations["predicate"] = PredicateGoal(
-            goal_fcn=lambda: self.activity_goal_conditions,
-            evaluate_fn=self._evaluate_predicate,
+            check_goal_fn=lambda: self.compiled_task.check_goal(self._evaluate_predicate),
         )
 
         return terminations
@@ -259,52 +254,66 @@ class BehaviorTask(BaseTask):
         return dict()
 
     @staticmethod
-    def _build_scene_layout(scene):
-        """Build a scene layout dict for BDDL wildcard expansion.
+    def _build_scene_layout_from_rooms(scene, room_instances):
+        """Build a scene layout dict for BDDL wildcard expansion from specific room instances.
+
+        Args:
+            scene: The scene object.
+            room_instances: Dict mapping room_type -> room_instance_name for the
+                specific room instances that were selected during object scope assignment.
 
         Returns:
-            dict: Maps room_type -> {category: count}. For each room type,
-                reports the maximum number of objects per category across
-                all room instances of that type.
+            dict: Maps room_type -> {category: count} for the selected room instances.
         """
         from collections import Counter
 
-        from omnigibson.scenes.traversable_scene import TraversableScene
-
-        if not isinstance(scene, TraversableScene):
-            return {}
-
         layout = {}
-        for room_inst in scene.seg_map.room_ins_name_to_sem_name:
-            room_type = scene.seg_map.room_ins_name_to_sem_name[room_inst]
-            objs = scene.object_registry("in_rooms", room_inst) or set()
+        for room_type, room_inst in room_instances.items():
+            objs = scene.object_registry("in_rooms", room_inst, default_val=[])
             counts = Counter(obj.category for obj in objs)
-            if room_type not in layout:
-                layout[room_type] = {}
-            for cat, count in counts.items():
-                layout[room_type][cat] = max(layout[room_type].get(cat, 0), count)
+            layout[room_type] = dict(counts)
         return layout
 
     def update_activity(self, env, activity_name, activity_definition_id):
         """
-        Update the active Behavior activity being deployed
+        Update the active Behavior activity being deployed.
+
+        Parses the base (non-wildcard) scope from the task definition. Full
+        compilation is deferred to initialize_activity(), after object scope
+        selection determines which specific room instances will be used for
+        wildcard expansion.
 
         Args:
             env (og.Environment): OmniGibson active environment
             activity_name (None or str): Name of the Behavior Task to instantiate
-            activity_definition_id (int): Specification to load for the desired task. For a given Behavior Task, multiple task
-                specifications can be used (i.e.: differing goal conditions, or "ways" to complete a given task). This
-                ID determines which specification to use
+            activity_definition_id (int): Specification to load for the desired task
         """
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
-        task_def = get_knowledge_base().get_task(f"{activity_name}-{activity_definition_id}")
+        self._task_def = get_knowledge_base().get_task(f"{activity_name}-{activity_definition_id}")
 
-        # Build scene layout for wildcard expansion and compile
-        scene_layout = self._build_scene_layout(env.scene)
-        self.compiled_task = task_def.compile(scene_layout=scene_layout)
+        # Parse base scope (strips wildcards if any, giving us the non-wildcard instances)
+        self._base_conditions, base_scope, self._base_inroom_assignments = self._task_def.parse_base_scope()
+        self.compiled_task = None
 
+        # Set up base object scope (agent first)
+        self.object_scope = {"agent.n.01_1": None}
+        self.object_scope.update({name: None for name in base_scope})
+
+        # Object instance to category mapping (base only for now)
+        self.object_instance_to_category = {
+            obj_inst: obj_cat
+            for obj_cat in self._base_conditions.parsed_objects
+            for obj_inst in self._base_conditions.parsed_objects[obj_cat]
+        }
+
+    def _finalize_compiled_task(self):
+        """Populate derived attributes from the compiled task.
+
+        Called after self.compiled_task is set (either immediately for
+        non-wildcard tasks, or after deferred compilation for wildcard tasks).
+        """
         # Get scope, making sure agent is the first entry
         self.object_scope = {"agent.n.01_1": None}
         self.object_scope.update({name: None for name in self.compiled_task.object_scope})
@@ -327,10 +336,70 @@ class BehaviorTask(BaseTask):
 
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
-        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(
-            self.compiled_task.conditions
-        )
-        self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.compiled_task.conditions)
+        self.activity_natural_language_initial_conditions = self.compiled_task.natural_language_initial_conditions
+        self.activity_natural_language_goal_conditions = self.compiled_task.natural_language_goal_conditions
+
+    def _determine_room_instances(self, env):
+        """Determine which specific room instances to use based on assigned objects.
+
+        For each room type in the task's inroom assignments, finds which room
+        instance the assigned object is actually in. All objects assigned to the
+        same room type should be in the same room instance (ensured by the
+        sampler's room consolidation logic).
+
+        Args:
+            env: The environment with the active scene.
+
+        Returns:
+            dict: Maps room_type (str) -> room_instance_name (str).
+        """
+        room_instances = {}
+        for obj_inst, room_type in self._base_inroom_assignments.items():
+            entity = self.object_scope.get(obj_inst)
+            if entity is None:
+                continue
+            # Find which room instance this object is in
+            if hasattr(entity, "in_rooms") and entity.in_rooms:
+                for room_inst in entity.in_rooms:
+                    inst_room_type = env.scene.seg_map.room_ins_name_to_sem_name.get(room_inst)
+                    if inst_room_type == room_type:
+                        if room_type in room_instances and room_instances[room_type] != room_inst:
+                            log.warning(
+                                f"Multiple room instances for room type '{room_type}': "
+                                f"{room_instances[room_type]} vs {room_inst}. Using {room_instances[room_type]}."
+                            )
+                        else:
+                            room_instances[room_type] = room_inst
+                        break
+        return room_instances
+
+    def _compile_with_rooms(self, env):
+        """Compile the wildcard task using the specific room instances from assigned objects.
+
+        After object scope has been assigned (via cache or sampling), this
+        determines which room instances are being used, counts objects in those
+        rooms, and compiles the task with proper wildcard expansion.
+
+        Args:
+            env: The environment with the active scene.
+        """
+        # Determine which room instances the assigned objects are in
+        room_instances = self._determine_room_instances(env)
+
+        # Build scene layout from those specific rooms
+        scene_layout = self._build_scene_layout_from_rooms(env.scene, room_instances)
+
+        # Compile with the correct scene layout
+        self.compiled_task = self._task_def.compile(scene_layout=scene_layout)
+
+        # Preserve existing object assignments in the new scope
+        old_scope = self.object_scope
+        self._finalize_compiled_task()
+
+        # Re-apply previously assigned objects
+        for inst, entity in old_scope.items():
+            if inst in self.object_scope:
+                self.object_scope[inst] = entity
 
     def get_potential(self, env):
         _, satisfied_predicates = self.compiled_task.check_goal(self._evaluate_predicate)
@@ -343,6 +412,12 @@ class BehaviorTask(BaseTask):
         """
         Initializes the desired activity in the current environment @env
 
+        The flow is:
+        1. Select objects for the base (non-wildcard) scope via sampling or cache.
+        2. Determine which room instances those objects are in.
+        3. Compile the task with the correct scene layout (expanding any wildcards).
+        4. Assign any wildcard-expanded instances.
+
         Args:
             env (Environment): Current active environment instance
 
@@ -351,34 +426,72 @@ class BehaviorTask(BaseTask):
                 - bool: Whether the generated scene activity should be accepted or not
                 - dict: Any feedback from the sampling / initialization process
         """
-        accept_scene = True
-        feedback = None
-
-        # Generate sampler
-        self.sampler = BDDLSampler(
-            env=env,
-            activity_conditions=self.compiled_task.conditions,
-            object_scope=self.object_scope,
-        )
-
-        # Compose future objects
-        self.future_obj_instances = {
-            init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
-        }
-
         if self.online_object_sampling:
-            # Sample online
-            accept_scene, feedback = self.sampler.sample(
+            # Phase 1: assign objects using only parsed conditions (no compilation needed)
+            self.sampler = BDDLSampler(
+                env=env,
+                activity_conditions=self._base_conditions,
+                object_scope=self.object_scope,
+            )
+            accept_scene, feedback = self.sampler.assign_objects(
                 sampling_whitelist=self.sampling_whitelist,
                 sampling_blacklist=self.sampling_blacklist,
             )
             if not accept_scene:
                 return accept_scene, feedback
+
+            # Compile with the correct rooms now that objects are assigned
+            self._compile_with_rooms(env)
+
+            # Phase 2: sample states using compiled conditions
+            accept_scene, feedback = self.sampler.sample_states(self.compiled_task)
+            if not accept_scene:
+                return accept_scene, feedback
+
+            # Assign any wildcard-expanded instances to remaining scene objects
+            self._assign_wildcard_instances(env)
         else:
-            # Load existing scene cache and assign object scope accordingly
+            # Derive future instances from parsed conditions for cache assignment
+            self.future_obj_instances = {
+                cond[1] for cond in self._base_conditions.parsed_initial_conditions if cond[0] == "future"
+            }
+
+            # Assign base scope objects from cache (non-strict: skip instances
+            # not in cache, e.g. wildcard instances that don't exist yet)
+            self.assign_object_scope_with_cache(env, strict=False)
+
+            # Compile with correct rooms now that we know where objects are
+            self._compile_with_rooms(env)
+
+            # Re-assign all objects from cache (scope now includes wildcard instances)
+            self.future_obj_instances = {
+                init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
+            }
             self.assign_object_scope_with_cache(env)
 
-        return accept_scene, feedback
+        return True, None
+
+    def _assign_wildcard_instances(self, env):
+        """Assign wildcard-expanded instances to scene objects in the selected rooms.
+
+        After wildcard compilation, new instances exist in the scope that need
+        to be matched to objects in the scene that weren't part of the base scope.
+
+        Args:
+            env: The environment with the active scene.
+        """
+        for inst in self.object_scope:
+            if self.object_scope[inst] is not None:
+                continue
+            if "agent.n." in inst:
+                continue
+            # Try to find a matching object in the scene
+            categories = set(og_categories_from_bddl_inst(inst))
+            for obj in env.scene.objects:
+                # Check category match and that obj isn't already assigned
+                if obj.category in categories and obj not in self.object_scope.values():
+                    self.object_scope[inst] = obj
+                    break
 
     def get_agent(self, env):
         """
@@ -393,12 +506,15 @@ class BehaviorTask(BaseTask):
         # We assume the relevant agent is the first agent in the scene
         return env.robots[0]
 
-    def assign_object_scope_with_cache(self, env):
+    def assign_object_scope_with_cache(self, env, strict=True):
         """
-        Assigns objects within the current object scope
+        Assigns objects within the current object scope from cached scene metadata.
 
         Args:
             env (Environment): Current active environment instance
+            strict (bool): If True, assert that every non-future instance exists in cache.
+                If False, skip instances not found in cache (used during partial
+                assignment before wildcard compilation).
         """
         # Load task metadata
         inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
@@ -407,11 +523,16 @@ class BehaviorTask(BaseTask):
         for obj_inst in self.object_scope:
             if obj_inst in self.future_obj_instances:
                 entity = None
+            elif obj_inst not in inst_to_name:
+                if strict:
+                    assert False, (
+                        f"BDDL object instance {obj_inst} should exist in cached metadata "
+                        f"from loaded scene, but could not be found!"
+                    )
+                # In non-strict mode, skip instances not found (e.g., future objects
+                # when future_obj_instances isn't fully populated yet)
+                continue
             else:
-                assert obj_inst in inst_to_name, (
-                    f"BDDL object instance {obj_inst} should exist in cached metadata "
-                    f"from loaded scene, but could not be found!"
-                )
                 name = inst_to_name[obj_inst]
                 is_system = name in env.scene.available_systems.keys()
                 # TODO: If we load a robot with a different set of configs, we will not be able to match with the
