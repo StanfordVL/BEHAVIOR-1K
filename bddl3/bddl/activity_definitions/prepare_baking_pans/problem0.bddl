@@ -1,5 +1,5 @@
 (define (problem prepare_baking_pans-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cookie_sheet.n.01_1 cookie_sheet.n.01_2 - cookie_sheet.n.01

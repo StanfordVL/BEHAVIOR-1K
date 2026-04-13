@@ -1,5 +1,5 @@
 (define (problem fixing_mailbox-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	mailbox.n.01_1 - mailbox.n.01

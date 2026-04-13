@@ -1,5 +1,5 @@
 (define (problem opening_windows-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         openable_window.n.01_1 openable_window.n.01_2 - openable_window.n.01

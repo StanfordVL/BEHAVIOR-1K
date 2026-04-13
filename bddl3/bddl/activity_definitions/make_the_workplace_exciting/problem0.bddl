@@ -1,5 +1,5 @@
 (define (problem make_the_workplace_exciting-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         poster.n.01_1 - poster.n.01

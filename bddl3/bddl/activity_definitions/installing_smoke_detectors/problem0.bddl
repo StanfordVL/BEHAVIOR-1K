@@ -1,5 +1,5 @@
 (define (problem installing_smoke_detectors-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wall_nail.n.01_1 wall_nail.n.01_2 - wall_nail.n.01

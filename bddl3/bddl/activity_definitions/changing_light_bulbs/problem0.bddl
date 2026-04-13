@@ -1,5 +1,5 @@
 (define (problem changing_light_bulbs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         table_lamp.n.01_1 table_lamp.n.01_2 - table_lamp.n.01

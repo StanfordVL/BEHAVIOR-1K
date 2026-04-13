@@ -1,5 +1,5 @@
 (define (problem cleaning_camper_or_RV-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         recreational_vehicle.n.01_1 - recreational_vehicle.n.01

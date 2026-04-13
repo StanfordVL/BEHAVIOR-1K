@@ -1,5 +1,5 @@
 (define (problem clean_grease-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	scrub_brush.n.01_1 - scrub_brush.n.01

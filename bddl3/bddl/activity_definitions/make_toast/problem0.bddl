@@ -1,5 +1,5 @@
 (define (problem make_toast-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         toaster.n.02_1 - toaster.n.02

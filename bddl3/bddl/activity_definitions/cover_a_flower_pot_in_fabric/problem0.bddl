@@ -1,5 +1,5 @@
 (define (problem cover_a_flower_pot_in_fabric-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pot.n.04_1 - pot.n.04

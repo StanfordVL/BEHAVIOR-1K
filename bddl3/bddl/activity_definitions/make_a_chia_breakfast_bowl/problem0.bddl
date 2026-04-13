@@ -1,5 +1,5 @@
 (define (problem make_a_chia_breakfast_bowl-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	granola.n.01_1 - granola.n.01

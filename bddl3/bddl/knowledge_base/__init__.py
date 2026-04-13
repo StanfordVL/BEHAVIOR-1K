@@ -1,7 +1,7 @@
 from bddl.knowledge_base.models import (
     Property,
     MetaLink,
-    Predicate,
+    PredicateUsage,
     Scene,
     Category,
     Object,
@@ -9,6 +9,7 @@ from bddl.knowledge_base.models import (
     Synset,
     TransitionRule,
     Task,
+    CompiledTask,
     RoomRequirement,
     RoomSynsetRequirement,
     Room,
@@ -17,13 +18,17 @@ from bddl.knowledge_base.models import (
     ComplaintType,
     Complaint,
 )
+from bddl.knowledge_base.knowledgebase import KnowledgeBase
 
 from bddl.knowledge_base.utils import SynsetState
 
-from bddl.knowledge_base.processing import KnowledgeBaseProcessor
-
-# Load the knowledge base
-KnowledgeBaseProcessor(verbose=False).run()
+from bddl.transition_rules import (
+    CookingRecipe,
+    MachineRecipe,
+    MixingRecipe,
+    SubstanceCookingRecipe,
+    WasherRecipe,
+)
 
 __all__ = [
     "Property",
@@ -42,4 +47,14 @@ __all__ = [
     "RoomObject",
     "AttachmentPair",
     "SynsetState",
+    "KnowledgeBase",
+    "ComplaintType",
+    "Complaint",
+    "PredicateUsage",
+    "CompiledTask",
+    "CookingRecipe",
+    "MachineRecipe",
+    "MixingRecipe",
+    "SubstanceCookingRecipe",
+    "WasherRecipe",
 ]

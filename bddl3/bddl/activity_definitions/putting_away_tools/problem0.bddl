@@ -1,5 +1,5 @@
 (define (problem putting_away_tools-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         screwdriver.n.01_1 screwdriver.n.01_2 - screwdriver.n.01

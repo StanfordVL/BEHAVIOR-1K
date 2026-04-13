@@ -1,5 +1,5 @@
 (define (problem spraying_for_bugs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         insectifuge__atomizer.n.01_1 - insectifuge__atomizer.n.01

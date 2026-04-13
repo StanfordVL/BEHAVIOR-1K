@@ -1,5 +1,5 @@
 (define (problem putting_up_Christmas_decorations_inside-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         christmas_tree.n.05_1 - christmas_tree.n.05

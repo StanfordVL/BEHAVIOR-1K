@@ -1,5 +1,5 @@
 (define (problem unpacking_recreational_vehicle_for_trip-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         recreational_vehicle.n.01_1 - recreational_vehicle.n.01

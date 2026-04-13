@@ -1,5 +1,5 @@
 (define (problem clean_piano_keys-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         piano.n.01_1 - piano.n.01

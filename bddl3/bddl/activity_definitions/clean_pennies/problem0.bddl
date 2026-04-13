@@ -1,5 +1,5 @@
 (define (problem clean_pennies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         penny.n.02_1 - penny.n.02

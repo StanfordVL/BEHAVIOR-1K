@@ -1,5 +1,5 @@
 (define (problem picking_fruit_and_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         shopping_basket.n.01_1 - shopping_basket.n.01

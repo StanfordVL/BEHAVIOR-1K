@@ -1,5 +1,5 @@
 (define (problem preparing_clothes_for_the_next_day-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         coat.n.01_1 - coat.n.01

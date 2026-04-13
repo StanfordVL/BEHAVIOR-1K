@@ -1,5 +1,5 @@
 (define (problem make_homemade_bird_food-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         peanut_butter.n.01_1 - peanut_butter.n.01

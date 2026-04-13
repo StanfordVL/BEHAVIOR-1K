@@ -1,5 +1,5 @@
 (define (problem make_stewed_fruit-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         plum.n.02_1 - plum.n.02

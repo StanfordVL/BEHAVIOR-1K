@@ -1,5 +1,5 @@
 (define (problem clean_dentures-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         denture.n.01_1 - denture.n.01

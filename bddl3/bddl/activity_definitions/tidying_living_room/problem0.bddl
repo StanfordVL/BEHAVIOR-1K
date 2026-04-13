@@ -1,5 +1,5 @@
 (define (problem tidying_living_room-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pot_plant.n.01_1 - pot_plant.n.01

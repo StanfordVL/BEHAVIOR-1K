@@ -1,5 +1,5 @@
 (define (problem cook_pumpkin_seeds-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	pumpkin_seed.n.01_1 - pumpkin_seed.n.01

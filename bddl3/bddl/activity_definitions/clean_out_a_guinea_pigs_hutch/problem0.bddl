@@ -1,5 +1,5 @@
 (define (problem clean_out_a_guinea_pigs_hutch-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         disinfectant.n.01_1 - disinfectant.n.01

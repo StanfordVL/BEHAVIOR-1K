@@ -1,5 +1,5 @@
 (define (problem throwing_out_used_napkins-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         napkin.n.01_1 napkin.n.01_2 - napkin.n.01

@@ -1,5 +1,5 @@
 (define (problem carrying_in_groceries-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         car.n.01_1 - car.n.01

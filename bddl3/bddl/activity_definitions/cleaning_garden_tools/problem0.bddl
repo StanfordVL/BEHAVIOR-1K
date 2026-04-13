@@ -1,5 +1,5 @@
 (define (problem cleaning_garden_tools-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pruner.n.02_1 - pruner.n.02

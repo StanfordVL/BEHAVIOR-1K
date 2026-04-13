@@ -1,5 +1,5 @@
 (define (problem laying_paving_stones-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	paving_stone.n.01_1 paving_stone.n.01_2 paving_stone.n.01_3 - paving_stone.n.01

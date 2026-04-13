@@ -1,5 +1,5 @@
 (define (problem bringing_newspaper_in-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         newspaper.n.03_1 - newspaper.n.03

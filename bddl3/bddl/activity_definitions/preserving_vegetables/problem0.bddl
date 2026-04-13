@@ -1,5 +1,5 @@
 (define (problem preserving_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         stove.n.01_1 - stove.n.01

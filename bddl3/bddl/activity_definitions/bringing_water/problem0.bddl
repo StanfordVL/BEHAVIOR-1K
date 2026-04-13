@@ -1,5 +1,5 @@
 (define (problem bringing_water-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bottle.n.01_1 bottle.n.01_2 - bottle.n.01

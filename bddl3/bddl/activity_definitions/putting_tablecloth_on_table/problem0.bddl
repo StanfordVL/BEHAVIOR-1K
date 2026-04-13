@@ -1,5 +1,5 @@
 (define (problem putting_tablecloth_on_table-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         breakfast_table.n.01_1 - breakfast_table.n.01

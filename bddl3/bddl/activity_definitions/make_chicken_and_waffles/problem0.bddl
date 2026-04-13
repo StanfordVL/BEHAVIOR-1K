@@ -1,5 +1,5 @@
 (define (problem make_chicken_and_waffles-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         chicken.n.01_1 - chicken.n.01

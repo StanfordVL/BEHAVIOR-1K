@@ -1,5 +1,5 @@
 (define (problem store_winter_coats-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         coat.n.01_1 coat.n.01_2 - coat.n.01

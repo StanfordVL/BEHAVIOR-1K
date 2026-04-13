@@ -1,5 +1,5 @@
 (define (problem clean_dog_collars-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dog_collar.n.01_1 - dog_collar.n.01

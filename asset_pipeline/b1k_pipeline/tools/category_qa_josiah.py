@@ -33,7 +33,7 @@ from nltk.corpus import wordnet
 import multiprocessing
 from fs.zipfs import ZipFS
 from PIL import Image
-import bddl.object_taxonomy
+from bddl.knowledge_base import KnowledgeBase
 from pathlib import Path
 from nltk.corpus import wordnet as wn
 import torch as th
@@ -96,7 +96,7 @@ class BatchQAViewer:
             annotation_type in ANNOTATION_TYPE_MAPPING
         ), f"Got invalid annotation_type. Expected one of: {ANNOTATION_TYPE_MAPPING}"
         self.annotation_type = annotation_type
-        self.taxonomy = bddl.object_taxonomy.ObjectTaxonomy()
+        self.kb = KnowledgeBase(populate=True)
         self.record_path = record_path + f"_{self.annotation_type}"
         self.your_id = your_id
         self.total_ids = total_ids
@@ -476,7 +476,7 @@ class BatchQAViewer:
         print(f"\n\n\n\nNow editing object {obj.name.replace('obj_', '')}\n")
 
         # If we're checking joints and the object has none, skip
-        synset = self.taxonomy.get_synset_from_category(category=obj.category)
+        synset = self.kb.get_category(obj.category).synset.name if self.kb.get_category(obj.category) else None
         terminate_early = False
         metalink_types = None
         if self.annotation_type == 5 and obj.n_joints == 0:  # joints checking
@@ -983,8 +983,8 @@ class BatchQAViewer:
         KeyboardEventHandler.reset()
 
     def evaluate_batch(self, batch, category):
-        synset = self.taxonomy.get_synset_from_category(category=category)
-        abilities = self.taxonomy.get_abilities(synset=synset)
+        synset = self.kb.get_category(category).synset
+        abilities = synset.abilities
 
         # If we're checking joints or metalinks, skip this entire batch is no object has either joints nor metalinks
         if self.annotation_type in {5, 6, 7}:
@@ -1185,7 +1185,7 @@ class ObjectComplaintHandler:
     def __init__(self, pipeline_root):
         self.pipeline_root = Path(pipeline_root)
         self.inventory_dict = self._load_inventory()
-        self.taxonomy = bddl.object_taxonomy.ObjectTaxonomy()
+        self.kb = KnowledgeBase(populate=True)
 
     def _load_inventory(self):
         inventory_path = self.pipeline_root / "artifacts/pipeline/object_inventory.json"
@@ -1307,11 +1307,13 @@ class ObjectComplaintHandler:
         return messages
 
     def _get_synset_and_abilities(self, category):
-        synset = self.taxonomy.get_synset_from_category(category)
+        cat = self.kb.get_category(category)
+        synset = cat.synset.name if cat else None
         if synset is None:
-            synset = self.taxonomy.get_synset_from_substance(category)
+            ps = self.kb.get_particle_system(category)
+            synset = ps.synset.name if ps else None
         assert synset is not None, f"Synset not found for category {category}"
-        return synset, self.taxonomy.get_abilities(synset)
+        return synset, self.kb.get_synset(synset).abilities
 
     def _get_synset_and_definition(self, category):
         synset, _ = self._get_synset_and_abilities(category)
@@ -1319,7 +1321,7 @@ class ObjectComplaintHandler:
             s = wn.synset(synset)
             return s.name(), s.definition()
         except:
-            s = wn.synset(self.taxonomy.get_parents(synset)[0])
+            s = wn.synset([p.name for p in self.kb.get_synset(synset).parents][0])
             return (
                 f"{synset} (custom synset)",
                 f"(hypernyms: {s.name()}): {s.definition()}",

@@ -1,5 +1,5 @@
 (define (problem remove_a_broken_light_bulb-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         table_lamp.n.01_1 - table_lamp.n.01

@@ -1,5 +1,5 @@
 (define (problem removing_ice_from_walkways-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ice.n.01_1 ice.n.01_2 ice.n.01_3 ice.n.01_4 ice.n.01_5 ice.n.01_6 ice.n.01_7 ice.n.01_8 ice.n.01_9 - ice.n.01

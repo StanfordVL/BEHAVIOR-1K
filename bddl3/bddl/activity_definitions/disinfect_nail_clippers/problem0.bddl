@@ -1,5 +1,5 @@
 (define (problem disinfect_nail_clippers-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         disinfectant.n.01_1 - disinfectant.n.01

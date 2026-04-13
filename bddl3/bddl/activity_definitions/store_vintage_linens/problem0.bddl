@@ -1,5 +1,5 @@
 (define (problem store_vintage_linens-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	doily.n.01_1 doily.n.01_2 - doily.n.01

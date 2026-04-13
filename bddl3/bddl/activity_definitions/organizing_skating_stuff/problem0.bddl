@@ -1,5 +1,5 @@
 (define (problem organizing_skating_stuff-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ice_skate.n.01_1 ice_skate.n.01_2 - ice_skate.n.01

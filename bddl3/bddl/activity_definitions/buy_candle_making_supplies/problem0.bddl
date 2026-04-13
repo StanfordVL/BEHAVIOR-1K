@@ -1,5 +1,5 @@
 (define (problem buy_candle_making_supplies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         grocery_shelf.n.01_1 - grocery_shelf.n.01

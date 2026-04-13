@@ -1,5 +1,5 @@
 (define (problem installing_a_scanner-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	scanner.n.02_1 - scanner.n.02

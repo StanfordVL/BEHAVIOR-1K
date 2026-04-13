@@ -1,5 +1,5 @@
 (define (problem make_red_beans_and_rice-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         clove.n.03_1 clove.n.03_2 clove.n.03_3 - clove.n.03

@@ -1,5 +1,5 @@
 (define (problem collecting_aluminum_cans-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	can__of__soda.n.01_1 can__of__soda.n.01_2 can__of__soda.n.01_3 can__of__soda.n.01_4 can__of__soda.n.01_5 can__of__soda.n.01_6 - can__of__soda.n.01

@@ -1,5 +1,5 @@
 (define (problem buying_groceries_for_a_feast-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         grocery.n.02_1 grocery.n.02_2 grocery.n.02_3 grocery.n.02_4 grocery.n.02_5 grocery.n.02_6 - grocery.n.02

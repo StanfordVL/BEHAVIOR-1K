@@ -1,5 +1,5 @@
 (define (problem distributing_groceries_at_food_bank-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         carton__of__milk.n.01_1 carton__of__milk.n.01_2 carton__of__milk.n.01_3 carton__of__milk.n.01_4 - carton__of__milk.n.01

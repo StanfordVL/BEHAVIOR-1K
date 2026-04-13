@@ -1,5 +1,5 @@
 (define (problem clean_copper_mugs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mug.n.04_1 mug.n.04_2 - mug.n.04

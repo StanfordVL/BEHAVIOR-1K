@@ -1,5 +1,5 @@
 (define (problem make_dessert_watermelons-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         watermelon.n.02_1 - watermelon.n.02

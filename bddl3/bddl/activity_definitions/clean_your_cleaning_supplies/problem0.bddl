@@ -1,5 +1,5 @@
 (define (problem clean_your_cleaning_supplies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mop_bucket.n.01_1 - mop_bucket.n.01

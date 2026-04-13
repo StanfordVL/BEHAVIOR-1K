@@ -1,5 +1,19 @@
-"""
-This code is lightly adapted from https://github.com/pucrs-automated-planning/pddl-parser
+"""BDDL / PDDL parser and BDDL construction utilities.
+
+Lightly adapted from https://github.com/pucrs-automated-planning/pddl-parser
+
+This module handles the lowest layer of BDDL processing:
+
+* **Tokenization** -- :func:`scan_tokens` converts a ``.bddl`` file (or raw
+  string) into a nested Python list using parenthesis-matching.
+* **Domain parsing** -- :func:`parse_domain` reads a domain file to discover
+  available predicates and their typed parameters.
+* **Problem parsing** -- :func:`parse_problem` reads a problem file to extract
+  declared objects, initial-state literals, and the goal expression.
+* **Natural-language generation** -- :func:`gen_natural_language_conditions`
+  converts parsed conditions into human-readable text.
+* **BDDL construction** -- :func:`construct_bddl_from_parsed` and related
+  helpers serialize parsed structures back into valid ``.bddl`` strings.
 """
 
 import itertools
@@ -16,6 +30,23 @@ from bddl.config import (
 
 
 def scan_tokens(filename=None, string=None):
+    """Tokenize a BDDL file or string into a nested list.
+
+    Strips single-line comments (``; ...``), lowercases everything, and
+    converts parenthesised expressions into nested Python lists.
+
+    Args:
+        filename: Path to a ``.bddl`` file.  Mutually exclusive with *string*.
+        string: Raw BDDL string.  Mutually exclusive with *filename*.
+
+    Returns:
+        list: A single nested list representing the top-level ``(define ...)``
+        expression.
+
+    Raises:
+        ValueError: If neither *filename* nor *string* is provided.
+        Exception: On mismatched parentheses or malformed expressions.
+    """
     if filename is not None:
         with open(filename, "r") as f:
             # Remove single line comments
@@ -49,6 +80,18 @@ def scan_tokens(filename=None, string=None):
 
 
 def parse_domain(domain):
+    """Parse a BDDL domain file.
+
+    Args:
+        domain: Domain name (e.g. ``"behavior-1k"``).  The file
+            ``domain_<domain>.bddl`` is located via
+            :func:`~bddl.config.get_domain_filename`.
+
+    Returns:
+        tuple: ``(domain_name, requirements, types, actions, predicates)``
+        where *predicates* is a ``dict[str, dict[str, str]]`` mapping each
+        predicate name to its typed parameter dict.
+    """
     domain_filename = get_domain_filename(domain)
     tokens = scan_tokens(filename=domain_filename)
     if type(tokens) is list and tokens.pop(0) == "define":
@@ -86,6 +129,15 @@ def parse_domain(domain):
 
 
 def parse_predicates(group):
+    """Parse the ``:predicates`` section of a domain file.
+
+    Args:
+        group: Nested list from :func:`scan_tokens` representing the
+            predicates block.
+
+    Returns:
+        dict[str, dict[str, str]]: ``{predicate_name: {param_name: type}}``.
+    """
     predicates = {}
     for pred in group:
         predicate_name = pred.pop(0)
@@ -109,6 +161,14 @@ def parse_predicates(group):
 
 
 def parse_action(group):
+    """Parse a single ``:action`` block from a domain file.
+
+    Args:
+        group: Nested list representing the action body.
+
+    Returns:
+        Action: Parsed action object.
+    """
     name = group.pop(0)
     if not isinstance(name, str):
         raise Exception("Action without name definition")
@@ -162,6 +222,22 @@ def parse_action(group):
 def parse_problem(
     behavior_activity, activity_definition, domain_name, predefined_problem=None
 ):
+    """Parse a BDDL problem file (activity definition).
+
+    Args:
+        behavior_activity: Activity name.
+        activity_definition: Integer definition index.
+        domain_name: Expected domain name string; the parser asserts the
+            problem file's ``:domain`` directive matches.
+        predefined_problem: If given, a raw BDDL string used instead of
+            loading from the filesystem.
+
+    Returns:
+        tuple: ``(problem_name, objects, initial_state, goal_state)`` where
+        *objects* is ``{category: [instance_names]}``, *initial_state* is a
+        list of ground literals, and *goal_state* is a nested-list goal
+        expression.
+    """
     if predefined_problem is not None:
         tokens = scan_tokens(string=predefined_problem)
     else:
@@ -213,6 +289,7 @@ def parse_problem(
 
 
 def split_predicates(group, pos, neg, name, part):
+    """Split a conjunction of predicates into positive and negative lists."""
     if not isinstance(group, list):
         raise Exception("Error with " + name + part)
     if group[0] == "and":
@@ -230,6 +307,7 @@ def split_predicates(group, pos, neg, name, part):
 
 
 def package_predicates(group, goals, name, part):
+    """Append predicates from a goal expression into the *goals* list."""
     if not isinstance(group, list):
         raise Exception("Error with " + name + part)
     if group[0] == "and":
@@ -241,6 +319,12 @@ def package_predicates(group, goals, name, part):
 
 
 class Action(object):
+    """Representation of a PDDL/BDDL action (largely unused in BEHAVIOR).
+
+    Retained for compatibility with the upstream PDDL parser.  BEHAVIOR
+    activities do not typically define actions in the domain file.
+    """
+
     def __init__(
         self,
         name,
@@ -329,6 +413,19 @@ def flatten_list(li):
 
 
 def gen_natural_language_condition(parsed_condition, indent=0):
+    """Yield a human-readable string for a single parsed BDDL condition.
+
+    Recursively walks the nested-list structure producing indented
+    natural-language text with connectives (``and``, ``or``, ``not``, etc.)
+    translated into prose.
+
+    Args:
+        parsed_condition: A single parsed condition (nested list).
+        indent: Current indentation level for pretty-printing.
+
+    Yields:
+        str: A natural-language rendering of the condition.
+    """
     indent_string = " " * 4 * indent
     # print(parsed_condition)
     term = parsed_condition
@@ -427,6 +524,11 @@ def gen_natural_language_condition(parsed_condition, indent=0):
 
 
 def nlterm(term):
+    """Convert a BDDL term into a more readable natural-language token.
+
+    Strips the ``?`` prefix and WordNet synset notation, keeping only the
+    lemma and optional instance number.
+    """
     natural_term = term.lstrip("?")
     natural_term = natural_term.split(".")[0]
     if "_" in term:
@@ -436,6 +538,14 @@ def nlterm(term):
 
 
 def gen_natural_language_conditions(parsed_conditions):
+    """Convert a list of parsed conditions to natural-language strings.
+
+    Args:
+        parsed_conditions: List of parsed conditions.
+
+    Returns:
+        list[str]: One natural-language string per condition.
+    """
     return [
         "".join(list(gen_natural_language_condition(parsed_condition)))
         for parsed_condition in parsed_conditions
@@ -447,6 +557,10 @@ def add_bddl_whitespace(
     string=None,
     save=True,
 ):
+    """Add indentation-based whitespace to a compact BDDL string.
+
+    Useful for pretty-printing a single-line BDDL expression.
+    """
     if string is not None:
         raw_bddl = string
     elif bddl_file is not None:
@@ -498,6 +612,7 @@ def remove_bddl_whitespace(
     save=True,
     outfile="activity_definitions/parsing_tests/test_app_output_nowhitespace.bddl",
 ):
+    """Strip indentation whitespace from a BDDL string, producing a compact form."""
     if bddl_file is not None:
         with open(bddl_file, "r") as f:
             raw_bddl = f.read()
@@ -539,7 +654,7 @@ def construct_full_bddl(
     )
     bddl = f"""(define\n
                    (problem {behavior_activity}_{activity_definition})\n
-                   (:domain igibson)\n
+                   (:domain behavior-100)\n
                 {object_list}\n
                 {init_state}\n
                 {goal_state}\n
@@ -553,7 +668,7 @@ def construct_bddl_from_parsed(
     parsed_object_list,
     parsed_init_state,
     parsed_goal_state,
-    domain="omnigibson",
+    domain="behavior-1k",
 ):
     object_list = "(:objects\n"
     for object_cat, object_insts in parsed_object_list.items():
@@ -584,6 +699,7 @@ def construct_bddl_from_parsed(
 
 
 def build_goal(goal_expr):
+    """Recursively serialize a parsed goal expression back to BDDL string form."""
     if type(goal_expr[1]) == list:
         return f"({goal_expr[0]} {' '.join([build_goal(subexpr) for subexpr in goal_expr[1:]])})"
     else:
@@ -597,9 +713,9 @@ if __name__ == "__main__":
         refined_bddl = remove_bddl_whitespace()
     if sys.argv[1] == "construct_from_parsed":
         activity = "cleaning_up_after_a_meal"
-        __, objs, init, goal = parse_problem(activity, 0, "igibson")
+        __, objs, init, goal = parse_problem(activity, 0, "behavior-100")
         reconstruction = construct_bddl_from_parsed(
-            activity, 0, objs, init, goal, domain="igibson"
+            activity, 0, objs, init, goal, domain="behavior-100"
         )
         with open(f"activity_definitions/{activity}/problem0.bddl", "r") as f:
             defn_lines = f.read().split("\n")

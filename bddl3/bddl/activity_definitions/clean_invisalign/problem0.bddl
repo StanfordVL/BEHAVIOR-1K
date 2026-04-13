@@ -1,5 +1,5 @@
 (define (problem clean_invisalign-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         retainer.n.03_1 - retainer.n.03

@@ -1,5 +1,5 @@
 (define (problem wash_grapes-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         grape.n.01_1 grape.n.01_2 grape.n.01_3 grape.n.01_4 - grape.n.01

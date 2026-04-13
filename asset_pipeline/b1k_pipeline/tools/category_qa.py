@@ -29,7 +29,7 @@ from omnigibson.macros import gm
 import multiprocessing
 from fs.zipfs import ZipFS
 from PIL import Image
-import bddl.object_taxonomy
+from bddl.knowledge_base import KnowledgeBase
 from pathlib import Path
 from nltk.corpus import wordnet as wn
 import torch as th
@@ -998,7 +998,7 @@ class ObjectComplaintHandler:
     def __init__(self, pipeline_root):
         self.pipeline_root = Path(pipeline_root)
         self.inventory_dict = self._load_inventory()
-        self.taxonomy = bddl.object_taxonomy.ObjectTaxonomy()
+        self.kb = KnowledgeBase(populate=True)
 
     def _load_inventory(self):
         inventory_path = self.pipeline_root / "artifacts/pipeline/object_inventory.json"
@@ -1148,11 +1148,13 @@ class ObjectComplaintHandler:
         return messages
 
     def _get_synset_and_abilities(self, category):
-        synset = self.taxonomy.get_synset_from_category(category)
+        cat = self.kb.get_category(category)
+        synset = cat.synset.name if cat else None
         if synset is None:
-            synset = self.taxonomy.get_synset_from_substance(category)
+            ps = self.kb.get_particle_system(category)
+            synset = ps.synset.name if ps else None
         assert synset is not None, f"Synset not found for category {category}"
-        return synset, self.taxonomy.get_abilities(synset)
+        return synset, self.kb.get_synset(synset).abilities
 
     def _get_synset_and_definition(self, category):
         synset, _ = self._get_synset_and_abilities(category)
@@ -1160,7 +1162,7 @@ class ObjectComplaintHandler:
             s = wn.synset(synset)
             return s.name(), s.definition()
         except:
-            s = wn.synset(self.taxonomy.get_parents(synset)[0])
+            s = wn.synset([p.name for p in self.kb.get_synset(synset).parents][0])
             return (
                 f"{synset} (custom synset)",
                 f"(hypernyms: {s.name()}): {s.definition()}",

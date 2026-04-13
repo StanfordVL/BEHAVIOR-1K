@@ -1,5 +1,5 @@
 (define (problem make_a_sugar_and_coffee_scrub-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	brown_sugar.n.01_1 - brown_sugar.n.01
