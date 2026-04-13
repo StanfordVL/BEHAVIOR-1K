@@ -4,7 +4,6 @@ from typing import Literal
 import torch as th
 
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.usd_utils import PoseAPI
 
 from .rigid_prim import RigidPrim
 
@@ -63,13 +62,10 @@ class RigidKinematicPrim(RigidPrim):
                 Scene frame sets position relative to the scene.
         """
         # Use the XFormPrim implementation directly
-        XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+        super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
         # Invalidate kinematic-only object pose cache when new pose is set
         self.clear_kinematic_only_cache()
-
-        # Invalidate pose API
-        PoseAPI.invalidate()
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """

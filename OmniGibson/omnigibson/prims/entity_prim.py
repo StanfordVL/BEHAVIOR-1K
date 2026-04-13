@@ -418,15 +418,6 @@ class EntityPrim(XFormPrim):
         return self._articulated
 
     @property
-    def articulation_root_path(self):
-        """
-        Returns:
-            None or str: Absolute USD path to the expected prim that represents the articulation root, if it exists. By default,
-                this corresponds to self.prim_path
-        """
-        return self.prim_path if self.n_joints > 0 else None
-
-    @property
     def root_link_name(self):
         """
         Returns:
@@ -1029,45 +1020,22 @@ class EntityPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
-        # If kinematic only, clear cache for the root link
-        if self.kinematic_only:
-            self.root_link.clear_kinematic_only_cache()
-
-        # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
-        if og.sim.is_stopped():
-            return XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
-
-        # Otherwise, we need to set our pose through PhysX.
-        # If we are not articulated, we can use the RigidPrim API.
-        if self._articulation_view is None:
-            return self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
-
-        # Otherwise, we use the articulation view.
-        # If no position or no orientation are given, get the current position and orientation of the object
-        if position is None or orientation is None:
-            current_position, current_orientation = self.get_position_orientation(frame=frame)
-        position = current_position if position is None else position
-        orientation = current_orientation if orientation is None else orientation
-
-        # Convert to th.Tensor if necessary
-        position = th.as_tensor(position, dtype=th.float32)
-        orientation = th.as_tensor(orientation, dtype=th.float32)
-
-        # Convert to from scene-relative to world if necessary
-        if frame == "scene":
-            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
-            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
-
-        # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-
-        # Actually set the pose.
-        with og.sim.editing_usd():
-            self._articulation_view.set_world_poses(
-                positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
-            )
+        # If the simulation isn't running, or the articulation root is the entity prim, we can just
+        # move the entity prim. In this case we want to make sure that the root link does not have
+        # a relative pose to the entity prim.
+        if self.articulation_root_path == self.prim_path or og.sim.is_stopped():
+            this_position, this_orientation = self.get_position_orientation(frame=frame)
+            root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
+            assert th.allclose(
+                this_position, root_link_position, atol=1e-3
+            ), "Position mismatch between entity prim and root link"
+            assert th.allclose(
+                this_orientation, root_link_orientation, atol=1e-3
+            ), "Orientation mismatch between entity prim and root link"
+            XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+        else:
+            # Otherwise, we need to set it directly on the root link.
+            self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
         # Invalidate the pose cache.
         PoseAPI.invalidate()
