@@ -24,39 +24,36 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Baselines (GPU dynamics, flatcache)
+          # Baselines (GPU dynamics)
           - name: baseline-empty
-            args: "-g -f"
+            args: "-g"
             label: "Empty scene"
           - name: baseline-empty-1robot
-            args: "-g -f -r 1"
+            args: "-g -r 1"
             label: "Empty scene + 1 Robot"
           - name: baseline-rs-int
-            args: "-g -f -s Rs_int"
+            args: "-g -s Rs_int"
             label: "Rs_int"
           - name: baseline-rs-int-1robot
-            args: "-g -f -s Rs_int -r 1"
+            args: "-g -s Rs_int -r 1"
             label: "Rs_int + 1 Robot"
           - name: deep-rs-int-1robot
-            args: "-g -f -s Rs_int -r 1 -d"
+            args: "-g -s Rs_int -r 1 -d"
             label: "Rs_int + 1 Robot (deep profile)"
             deep_profile: true
-          # Scenes (flatcache vs non-flatcache)
+          # Scenes
           - name: scene-house
-            args: "-f -r 1 -s house_single_floor"
-            label: "house_single_floor + 1 Robot"
-          - name: scene-house-no-flatcache
             args: "-r 1 -s house_single_floor"
-            label: "house_single_floor + 1 Robot (no flatcache)"
-          # Non-physics features (GPU dynamics, flatcache)
+            label: "house_single_floor + 1 Robot"
+          # Non-physics features (GPU dynamics)
           - name: feature-fluids
-            args: "-g -f -r 1 -w"
+            args: "-g -r 1 -w"
             label: "1 Robot + fluids"
           - name: feature-cloth
             args: "-g -r 1 -c"
             label: "1 Robot + cloth"
           - name: feature-particles
-            args: "-g -f -r 1 -p"
+            args: "-g -r 1 -p"
             label: "1 Robot + macro particles"
 
     defaults:
@@ -148,15 +145,14 @@ jobs:
           import json, os
 
           SCENARIOS = [
-              ("profiling-baseline-empty",            "Empty scene",                          "Baselines (GPU dynamics, flatcache)"),
-              ("profiling-baseline-empty-1robot",     "Empty scene + 1 Robot",                "Baselines (GPU dynamics, flatcache)"),
-              ("profiling-baseline-rs-int",           "Rs_int",                               "Baselines (GPU dynamics, flatcache)"),
-              ("profiling-baseline-rs-int-1robot",    "Rs_int + 1 Robot",                     "Baselines (GPU dynamics, flatcache)"),
+              ("profiling-baseline-empty",            "Empty scene",                          "Baselines (GPU dynamics)"),
+              ("profiling-baseline-empty-1robot",     "Empty scene + 1 Robot",                "Baselines (GPU dynamics)"),
+              ("profiling-baseline-rs-int",           "Rs_int",                               "Baselines (GPU dynamics)"),
+              ("profiling-baseline-rs-int-1robot",    "Rs_int + 1 Robot",                     "Baselines (GPU dynamics)"),
               ("profiling-scene-house",               "house_single_floor + 1 Robot",         "Scenes"),
-              ("profiling-scene-house-no-flatcache",  "house_single_floor + 1 Robot (no FC)", "Scenes"),
-              ("profiling-feature-fluids",            "1 Robot + fluids",                     "Non-physics features (GPU dynamics, flatcache)"),
-              ("profiling-feature-cloth",             "1 Robot + cloth",                      "Non-physics features (GPU dynamics, flatcache)"),
-              ("profiling-feature-particles",         "1 Robot + macro particles",            "Non-physics features (GPU dynamics, flatcache)"),
+              ("profiling-feature-fluids",            "1 Robot + fluids",                     "Non-physics features (GPU dynamics)"),
+              ("profiling-feature-cloth",             "1 Robot + cloth",                      "Non-physics features (GPU dynamics)"),
+              ("profiling-feature-particles",         "1 Robot + macro particles",            "Non-physics features (GPU dynamics)"),
           ]
 
           METRICS = ["FPS", "Loading time", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]

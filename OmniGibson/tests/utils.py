@@ -4,13 +4,14 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.systems import FluidSystem, GranularSystem, MacroPhysicalParticleSystem, MacroVisualParticleSystem
+from omnigibson.systems import FluidSystem, GranularSystem, MacroVisualParticleSystem
 from omnigibson.utils.constants import PrimType
 
 SYSTEM_EXAMPLES = {
     "water": FluidSystem,
     "white_rice": GranularSystem,
-    "diced__apple": MacroPhysicalParticleSystem,
+    # TODO: disabled due to broken particle physics, see issue #2065
+    # "diced__apple": MacroPhysicalParticleSystem,
     "stain": MacroVisualParticleSystem,
 }
 

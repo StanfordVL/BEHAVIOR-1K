@@ -6,6 +6,7 @@ from typing import Optional
 
 class AgentMetric(MetricBase):
     def __init__(self, human_stats: Optional[dict] = None):
+        super().__init__()
         self.initialized = False
         self.human_stats = human_stats
         if human_stats is None:
@@ -17,10 +18,11 @@ class AgentMetric(MetricBase):
                 "right": self.human_stats["right_eef_displacement"],
             }
 
-    def start_callback(self, env):
+    def reset(self, env):
+        self.state[env.scene] = dict()
         self.initialized = False
 
-    def step_callback(self, env):
+    def _compute_step_metrics(self, env, action, obs, reward, terminated, truncated, info):
         robot = env.robots[0]
         self.next_state_cache = {
             "base": {"position": robot.get_position_orientation()[0]},
@@ -45,9 +47,13 @@ class AgentMetric(MetricBase):
 
         self.state_cache = copy.deepcopy(self.next_state_cache)
 
-    def gather_results(self):
+        return self.delta_agent_distance
+
+    def _compute_episode_metrics(self, env, episode_info):
+        # Use the accumulated state from episode_info
+        all_distances = episode_info.get("delta_agent_distance", self.delta_agent_distance)
         results = {
-            "agent_distance": {k: sum(v) for k, v in self.delta_agent_distance.items()},
+            "agent_distance": {k: sum(v) for k, v in all_distances.items()},
         }
         results.update(
             {

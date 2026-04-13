@@ -17,25 +17,18 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-  "dm_control",
   "dynamixel-sdk",
   "hid",
-  "inputs",
   "joycon-python",
   "numpy<2",
   "numpy-quaternion",
   "Pillow",
-  "pybullet",
-  "pygame",
   "pyglm",
-  "PyQt6",
   "pyquaternion",
-  "pure-python-adb",
   "quaternion",
   "termcolor",
   "tyro",
   "zmq",
-  "telemoma~=0.3.0",
 ]
 
 [project.optional-dependencies]

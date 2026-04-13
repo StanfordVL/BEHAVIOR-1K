@@ -371,7 +371,7 @@ def _launch_simulator(*args, **kwargs):
     if not og.app:
         og.app = _launch_app()
 
-    class Simulator(lazy.isaacsim.core.api.SimulationContext, Serializable):
+    class Simulator(Serializable):
         """
         Simulator class for directly interfacing with the physx physics engine.
 
@@ -440,8 +440,8 @@ def _launch_simulator(*args, **kwargs):
             self._last_scene_edge = None
             self._stage_id = None
 
-            # Run super init
-            super().__init__(
+            # Create the SimulationContext instance (composition instead of inheritance)
+            self._sim_context = lazy.isaacsim.core.api.SimulationContext(
                 physics_dt=physics_dt,
                 rendering_dt=rendering_dt,
                 backend="torch",
@@ -450,10 +450,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scenes = []
-            self._physx_interface = lazy.omni.physx.get_physx_interface()
-            self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
-            self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
-            self._physx_fabric_interface = None
             # The callback will be called right *before* the physics step
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
@@ -467,7 +463,7 @@ def _launch_simulator(*args, **kwargs):
                 order=0,
             )
             self._simulation_event_callback = (
-                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
+                self._physics_context._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
                     self._on_simulation_event
                 )
             )
@@ -475,6 +471,7 @@ def _launch_simulator(*args, **kwargs):
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
+            self._deferred_joint_breaks = []
 
             # Counter for objects currently being added or removed (nested adding_objects / removing_objects scopes).
             # We track these to delay certain operations (e.g., callbacks, state updates) until all pending add/remove operations complete.
@@ -589,7 +586,7 @@ def _launch_simulator(*args, **kwargs):
             # default collide with each other, and modify settings for speed optimization
             self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
-            self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
+            self._physics_context.enable_fabric(True)
 
             # Enable GPU dynamics based on whether we need omni particles feature
             if gm.USE_GPU_DYNAMICS:
@@ -619,7 +616,7 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/rtx/flow/enabled", True)
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
-            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", True)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
@@ -789,7 +786,7 @@ def _launch_simulator(*args, **kwargs):
                 sim_step_dt (float, optional): Internal simulation step timestep
                     If None, will default to the current value
             """
-            super().set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+            self._sim_context.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
             current_physics_dt = self.get_physics_dt()
             current_rendering_dt = self.get_rendering_dt()
 
@@ -978,13 +975,66 @@ def _launch_simulator(*args, **kwargs):
             # Update all handles that are now broken because prims have changed
             self.update_handles()
 
-        def _reset_variables(self):
-            """
-            Reset internal variables when a new stage is loaded
-            """
+        # ---- Proxy properties/methods delegating to the SimulationContext instance ----
+        def get_physics_context(self):
+            return self._sim_context.get_physics_context()
+
+        @property
+        def _physics_context(self):
+            return self._sim_context._physics_context
+
+        @property
+        def stage(self):
+            return self._sim_context.stage
+
+        @property
+        def current_time(self):
+            return self._sim_context.current_time
+
+        @property
+        def _initial_physics_dt(self):
+            return self._sim_context._initial_physics_dt
+
+        @property
+        def _initial_rendering_dt(self):
+            return self._sim_context._initial_rendering_dt
+
+        def is_playing(self):
+            return self._sim_context.is_playing()
+
+        def is_stopped(self):
+            return self._sim_context.is_stopped()
+
+        def get_physics_dt(self):
+            return self._sim_context.get_physics_dt()
+
+        def get_rendering_dt(self):
+            return self._sim_context.get_rendering_dt()
+
+        @property
+        def physics_sim_view(self):
+            return self._sim_context.physics_sim_view
+
+        @property
+        def pi(self):
+            return self._physics_context._physx_interface
+
+        @property
+        def psi(self):
+            return self._physics_context._physx_sim_interface
+
+        @property
+        def psqi(self):
+            return lazy.omni.physx.get_physx_scene_query_interface()
+
+        @property
+        def current_time_step_index(self):
+            return self._sim_context.current_time_step_index
+
+        # ---- End proxy properties/methods ----
 
         def render(self):
-            super().render()
+            self._sim_context.render()
             # During rendering, the Fabric API is updated, so we can mark it as clean
             PoseAPI.mark_valid()
 
@@ -992,10 +1042,15 @@ def _launch_simulator(*args, **kwargs):
             SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
             IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
 
+            stage_id = lazy.isaacsim.core.utils.stage.get_current_stage_id()
             SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
-                SimulationManager._backend
+                SimulationManager._backend, stage_id=stage_id
             )
             SimulationManager._physics_sim_view.set_subspace_roots("/")
+            SimulationManager._physics_sim_view__warp = lazy.omni.physics.tensors.create_simulation_view(
+                "warp", stage_id=stage_id
+            )
+            SimulationManager._simulation_view_created = True
             SimulationManager._message_bus.dispatch_event(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
             SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
 
@@ -1032,6 +1087,7 @@ def _launch_simulator(*args, **kwargs):
             self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
             if sync_usd:
                 self.psi.fetch_results()
+            self._sim_context._physx_fabric_interface.update(0, self.current_time)
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1110,7 +1166,6 @@ def _launch_simulator(*args, **kwargs):
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
                 was_stopped = self.is_stopped()
 
-                # Run super first
                 # We suppress warnings from omni.usd because it complains about values set in the native USD
                 # These warnings occur because the native USD file has some type mismatch in the `scale` property,
                 # where the property expects a double but for whatever reason the USD interprets its values as floats
@@ -1120,11 +1175,10 @@ def _launch_simulator(*args, **kwargs):
                 #   ignore this if the scale is close to uniform.
                 # We also need to suppress the following error when flat cache is used:
                 # [omni.physx.plugin] Transformation change on non-root links is not supported.
-                channels = ["omni.usd", "omni.physicsschema.plugin"]
-                if gm.ENABLE_FLATCACHE:
-                    channels.append("omni.physx.plugin")
+                channels = ["omni.usd", "omni.physicsschema.plugin", "omni.physx.plugin"]
+
                 with suppress_omni_log(channels=channels):
-                    super().play()
+                    self._sim_context.play()
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
@@ -1139,7 +1193,7 @@ def _launch_simulator(*args, **kwargs):
                     # sim was stopped. We need to reset them to default_kp and default_kd defined defined in Robot.
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
-                    # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
+                    # operations immediately after playing; e.g.: syncing USD poses when fabric is enabled
                     for scene in self.scenes:
                         for robot in scene.robots:
                             if robot.initialized:
@@ -1164,11 +1218,11 @@ def _launch_simulator(*args, **kwargs):
 
         def pause(self):
             if not self.is_paused():
-                super().pause()
+                self._sim_context.pause()
 
         def stop(self):
             if not self.is_stopped():
-                super().stop()
+                self._sim_context.stop()
 
             # Run all callbacks
             for callback in self._callbacks_on_stop.values():
@@ -1196,7 +1250,7 @@ def _launch_simulator(*args, **kwargs):
 
             # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
             # step() may not step physics
-            if len(self._objects_to_initialize) > 0:
+            if len(self._objects_to_initialize) > 0 or not PoseAPI.VALID:
                 self.render()
 
             # Clear all scenes' updated objects
@@ -1205,18 +1259,18 @@ def _launch_simulator(*args, **kwargs):
 
             for _ in range(self._n_steps_per_loop):
                 if render:
-                    super().step(render=True)
+                    self._sim_context.step(render=True)
                     self._report_step_exceptions()
                 else:
                     for i in range(self.n_physics_timesteps_per_render):
-                        super().step(render=False)
+                        self._sim_context.step(render=False)
                         self._report_step_exceptions()
 
             # Additionally run non physics things
             self._non_physics_step()
 
-            # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
-            #  the result to propagate to the rendering. We could have called super().render() here but it will introduce
+            # TODO (eric): After stage changes (e.g. pose, texture change), it will take two _sim_context.step(render=True) for
+            #  the result to propagate to the rendering. We could have called _sim_context.render() here but it will introduce
             #  a big performance regression.
 
         def step_physics(self):
@@ -1269,6 +1323,16 @@ def _launch_simulator(*args, **kwargs):
 
                 # Record that we are done with the step context.
                 self.currently_stepping = False
+
+                if self._deferred_joint_breaks:
+                    # Copy the current deferred joint breaks and clear the shared list
+                    # before invoking callbacks, so we don't retain stale entries if a
+                    # callback raises an exception.
+                    deferred_breaks = list(self._deferred_joint_breaks)
+                    self._deferred_joint_breaks.clear()
+                    for obj, state_type, joint_path in deferred_breaks:
+                        obj.states[state_type].on_joint_break(joint_path)
+
             except Exception as e:
                 self.currently_stepping = False
                 self.post_step_exception = e
@@ -1319,7 +1383,7 @@ def _launch_simulator(*args, **kwargs):
                         return
                     for state_type in self.object_state_types_on_joint_break:
                         if state_type in obj.states:
-                            obj.states[state_type].on_joint_break(joint_path)
+                            self._deferred_joint_breaks.append((obj, state_type, joint_path))
 
         def is_paused(self):
             """
@@ -1530,30 +1594,6 @@ def _launch_simulator(*args, **kwargs):
             self._callbacks_on_system_clear.pop(name, None)
 
         @property
-        def pi(self):
-            """
-            Returns:
-                PhysX: Physx Interface (pi) for controlling low-level physx engine
-            """
-            return self._physx_interface
-
-        @property
-        def psi(self):
-            """
-            Returns:
-                IPhysxSimulation: Physx Simulation Interface (psi) for controlling low-level physx simulation
-            """
-            return self._physx_simulation_interface
-
-        @property
-        def psqi(self):
-            """
-            Returns:
-                PhysXSceneQuery: Physx Scene Query Interface (psqi) for running low-level scene queries
-            """
-            return self._physx_scene_query_interface
-
-        @property
         def scenes(self):
             """
             Returns:
@@ -1746,7 +1786,7 @@ def _launch_simulator(*args, **kwargs):
             """
             Shuts down the OmniGibson application
             """
-            self._app.shutdown()
+            og.app.shutdown()
 
         @property
         def stage_id(self):
@@ -1811,7 +1851,7 @@ def _launch_simulator(*args, **kwargs):
             # We need to make sure the simulator is playing since joint states only get updated when playing
             assert self.is_playing()
 
-            # Run super
+            # Run Serializable.load_state (which calls _load_state)
             super().load_state(state=state, serialized=serialized)
 
             # Highlight that at the current step, the non-kinematic states are potentially inaccurate because a sim

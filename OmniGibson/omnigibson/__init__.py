@@ -113,8 +113,16 @@ def clear(
         device=sim.device if device is None else device,
     )
 
+    # Stop the viewport menubar USD watcher before teardown. This revokes the TfNotice
+    # listener so that prim deletions during _partial_clear() don't queue deferred
+    # callbacks that later fire on an invalid stage and corrupt CUDA/PhysX state.
+    usd_watcher = lazy.omni.kit.viewport.menubar.core.utils.usd_watch
+    usd_watcher.stop()
+
     # First let the simulator clear everything it owns.
     sim._partial_clear()
+
+    usd_watcher.start()
 
     # Then close the stage and remove pointers to the simulator object.
     assert lazy.isaacsim.core.utils.stage.close_stage()

@@ -7,7 +7,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
@@ -142,9 +141,7 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
-        if not gm.ENABLE_FLATCACHE:
-            # TODO: not sure why this is needed only in USD mode
-            PoseAPI.invalidate()
+        PoseAPI.invalidate()
         # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
@@ -237,20 +234,20 @@ class XFormPrim(BasePrim):
             rotq = lazy.pxr.Gf.Quatd(*orientation)
         xform_op.Set(rotq)
         PoseAPI.invalidate()
-        if gm.ENABLE_FLATCACHE:
-            # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
-            # Ideally we should call usdrt's set local pose directly, but there is no such API.
-            # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
-            xformable_prim = lazy.usdrt.Rt.Xformable(
-                lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
+
+        # TODO(#2082) Verify if this is still needed.
+        # If fabric is on, make sure the USD local pose is synced to the fabric local pose.
+        # Ideally we should call usdrt's set local pose directly, but there is no such API.
+        # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
+        xformable_prim = lazy.usdrt.Rt.Xformable(
+            lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
+        )
+        if xformable_prim.HasWorldXform():
+            logger.warning(
+                "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this. As a fallback, we will clear the world xform and set the local xform from USD."
             )
-            # TODO: This is a temporary workaround, investigate why this happens for macro physical particles.
-            if xformable_prim.HasWorldXform():
-                logger.warning(
-                    "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this. As a fallback, we will clear the world xform and set the local xform from USD."
-                )
-                xformable_prim.ClearWorldXform()
-            xformable_prim.SetLocalXformFromUsd()
+            xformable_prim.ClearWorldXform()
+        xformable_prim.SetLocalXformFromUsd()
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """
@@ -374,7 +371,7 @@ class XFormPrim(BasePrim):
     def aabb(self):
         aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(self.prim_path)
         logger.warning(
-            "Computing AABB of an XFormPrim using the USD context is slow and unreliable, especially when Flatcache is enabled. "
+            "Computing AABB of an XFormPrim using the USD context is slow and unreliable, especially when fabric is enabled. "
             "This is provided as a convenience for USD editing use cases and should generally not be used for physical objects."
         )
         return th.tensor(aabb_min), th.tensor(aabb_max)
@@ -441,6 +438,8 @@ class XFormPrim(BasePrim):
         else:
             scale = th.ones(3, dtype=th.float32) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        # Invalidate PoseAPI
+        PoseAPI.invalidate()
         # Invalidate the cached scale
         self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())

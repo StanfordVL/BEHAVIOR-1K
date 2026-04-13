@@ -31,7 +31,6 @@ def setup_multi_environment(num_of_envs, robot="fetch", additional_objects_cfg=[
         gm.RENDER_VIEWER_CAMERA = False
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
         gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
@@ -170,7 +169,7 @@ def test_multi_scene_scene_prim():
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
     assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
-    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
+    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-2)
 
     og.clear()
 

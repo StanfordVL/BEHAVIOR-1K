@@ -13,7 +13,6 @@ from omnigibson.utils.asset_utils import get_available_behavior_1k_scenes
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.utils.ui_utils import KeyboardEventHandler, choose_from_options
 
-gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
 
