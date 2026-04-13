@@ -1,5 +1,5 @@
 (define (problem make_chicken_curry-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         chicken_breast.n.02_1 chicken_breast.n.02_2 chicken_breast.n.02_3 chicken_breast.n.02_4 - chicken_breast.n.02

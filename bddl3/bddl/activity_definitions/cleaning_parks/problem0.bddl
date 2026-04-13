@@ -1,5 +1,5 @@
 (define (problem cleaning_parks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         water_bottle.n.01_1 water_bottle.n.01_2 water_bottle.n.01_3 - water_bottle.n.01

@@ -1,5 +1,5 @@
 (define (problem cook_peas-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pea.n.01_1 - pea.n.01

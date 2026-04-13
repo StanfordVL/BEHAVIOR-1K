@@ -1,5 +1,5 @@
 (define (problem clean_apples-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         apple.n.01_1 apple.n.01_2 - apple.n.01

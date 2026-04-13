@@ -1,5 +1,5 @@
 (define (problem changing_sheets-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sheet.n.03_1 sheet.n.03_2 - sheet.n.03

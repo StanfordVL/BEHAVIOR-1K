@@ -666,10 +666,12 @@ class TaskRelevantObjectVelocityMetric(MetricBase):
         self, env, action, obs, reward, terminated, truncated, info
     ):
         step_metrics = dict()
+        from omnigibson.systems.system_base import BaseSystem
+
         for name, bddl_inst in env.task.object_scope.items():
             if (
-                bddl_inst.is_system
-                or not bddl_inst.exists
+                isinstance(bddl_inst, BaseSystem)
+                or bddl_inst is None
                 or bddl_inst.fixed_base
                 or "agent" in name
             ):

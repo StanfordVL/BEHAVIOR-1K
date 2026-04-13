@@ -1,4 +1,4 @@
-(define (domain omnigibson)
+(define (domain behavior-1k)
     (:requirements :strips :adl)
     (:predicates 
         (cooked ?obj1)

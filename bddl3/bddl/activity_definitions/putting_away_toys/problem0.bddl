@@ -1,5 +1,5 @@
 (define (problem putting_away_toys-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         toy_figure.n.01_1 toy_figure.n.01_2 toy_figure.n.01_3 toy_figure.n.01_4 toy_figure.n.01_5 toy_figure.n.01_6 toy_figure.n.01_7 toy_figure.n.01_8 - toy_figure.n.01

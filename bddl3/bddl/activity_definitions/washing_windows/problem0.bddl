@@ -1,5 +1,5 @@
 (define (problem washing_windows-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         squeegee.n.01_1 - squeegee.n.01

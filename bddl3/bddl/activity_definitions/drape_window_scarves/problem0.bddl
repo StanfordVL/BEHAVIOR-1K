@@ -1,5 +1,5 @@
 (define (problem drape_window_scarves-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         curtain.n.01_1 - curtain.n.01

@@ -1,5 +1,5 @@
 (define (problem make_pumpkin_pie_spice-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cinnamon.n.03_1 - cinnamon.n.03

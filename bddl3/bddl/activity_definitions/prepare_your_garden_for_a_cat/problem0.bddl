@@ -1,5 +1,5 @@
 (define (problem prepare_your_garden_for_a_cat-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         disinfectant.n.01_1 - disinfectant.n.01

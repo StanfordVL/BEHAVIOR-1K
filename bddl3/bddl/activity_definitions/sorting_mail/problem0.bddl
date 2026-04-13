@@ -1,5 +1,5 @@
 (define (problem sorting_mail-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mail.n.04_1 mail.n.04_2 mail.n.04_3 - mail.n.04

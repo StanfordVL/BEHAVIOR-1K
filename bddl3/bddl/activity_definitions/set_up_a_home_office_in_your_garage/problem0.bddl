@@ -1,5 +1,5 @@
 (define (problem set_up_a_home_office_in_your_garage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         table_lamp.n.01_1 - table_lamp.n.01

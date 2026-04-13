@@ -1,5 +1,5 @@
 (define (problem hoe_weeds-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         weed.n.01_1 weed.n.01_2 weed.n.01_3 weed.n.01_4 weed.n.01_5 - weed.n.01

@@ -1,5 +1,5 @@
 (define (problem cook_kabobs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         kabob.n.01_1 kabob.n.01_2 kabob.n.01_3 kabob.n.01_4 - kabob.n.01

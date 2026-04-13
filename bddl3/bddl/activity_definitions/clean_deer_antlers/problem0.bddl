@@ -1,5 +1,5 @@
 (define (problem clean_deer_antlers-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         antler.n.01_1 - antler.n.01

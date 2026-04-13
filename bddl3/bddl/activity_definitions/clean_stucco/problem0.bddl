@@ -1,5 +1,5 @@
 (define (problem clean_stucco-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mold.n.05_1 - mold.n.05

@@ -1,5 +1,5 @@
 (define (problem clean_outdoor_tiles-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tile.n.01_1 tile.n.01_2 tile.n.01_3 tile.n.01_4 - tile.n.01

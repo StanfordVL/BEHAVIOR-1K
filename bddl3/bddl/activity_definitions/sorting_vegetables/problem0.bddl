@@ -1,5 +1,5 @@
 (define (problem sorting_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mixing_bowl.n.01_1 mixing_bowl.n.01_2 mixing_bowl.n.01_3 - mixing_bowl.n.01

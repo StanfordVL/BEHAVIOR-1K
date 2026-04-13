@@ -1,5 +1,5 @@
 (define (problem clean_a_coffee_maker-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         coffee_maker.n.01_1 - coffee_maker.n.01

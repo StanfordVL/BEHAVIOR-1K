@@ -1,5 +1,5 @@
 (define (problem applying_pesticides-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pesticide__atomizer.n.01_1 - pesticide__atomizer.n.01

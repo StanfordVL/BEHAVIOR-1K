@@ -1,5 +1,5 @@
 (define (problem clean_clams-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         clam.n.03_1 clam.n.03_2 - clam.n.03

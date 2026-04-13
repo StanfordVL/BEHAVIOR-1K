@@ -11,6 +11,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  bddl_tests:
+    name: BDDL Tests
+    runs-on: [self-hosted, linux, gpu]
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install BDDL
+        run: pip install -e .
+        working-directory: ${{ github.workspace }}/bddl3
+
+      - name: Run BDDL tests
+        run: pytest tests/test_knowledgebase.py -v --junitxml=bddl_tests.xml
+        working-directory: ${{ github.workspace }}/bddl3
+
+      - name: Deploy artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-tests-bddl
+          path: bddl3/bddl_tests.xml
+          overwrite: true
+
   check_example_list:
     name: Check Example List Up To Date
     runs-on: [self-hosted, linux, gpu]
@@ -151,7 +177,7 @@ jobs:
   upload_report:
     name: Test Report
     runs-on: ubuntu-latest
-    needs: [check_example_list, run_test]
+    needs: [bddl_tests, check_example_list, run_test]
     if: always()
     permissions:
       pull-requests: write

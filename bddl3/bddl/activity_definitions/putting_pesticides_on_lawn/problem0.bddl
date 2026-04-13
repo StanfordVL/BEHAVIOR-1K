@@ -1,5 +1,5 @@
 (define (problem putting_pesticides_on_lawn-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lawn.n.01_1 - lawn.n.01

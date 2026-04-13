@@ -1,5 +1,5 @@
 (define (problem set_up_a_preschool_classroom-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         blackboard_eraser.n.01_1 - blackboard_eraser.n.01

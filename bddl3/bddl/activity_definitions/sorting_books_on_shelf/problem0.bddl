@@ -1,5 +1,5 @@
 (define (problem sorting_books_on_shelf-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         textbook.n.01_1 textbook.n.01_2 - textbook.n.01

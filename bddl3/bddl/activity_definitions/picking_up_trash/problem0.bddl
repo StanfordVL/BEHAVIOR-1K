@@ -1,5 +1,5 @@
 (define (problem picking_up_trash-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ashcan.n.01_1 - ashcan.n.01

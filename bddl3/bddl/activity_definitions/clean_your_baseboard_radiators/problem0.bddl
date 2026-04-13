@@ -1,5 +1,5 @@
 (define (problem clean_your_baseboard_radiators-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         radiator.n.02_1 radiator.n.02_2 - radiator.n.02

@@ -1,5 +1,5 @@
 (define (problem clean_the_exterior_of_your_garage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sponge.n.01_1 - sponge.n.01

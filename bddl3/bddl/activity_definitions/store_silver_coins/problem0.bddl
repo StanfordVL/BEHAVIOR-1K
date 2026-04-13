@@ -1,5 +1,5 @@
 (define (problem store_silver_coins-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         silver.n.02_1 silver.n.02_2 - silver.n.02

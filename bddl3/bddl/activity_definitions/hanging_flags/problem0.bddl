@@ -1,5 +1,5 @@
 (define (problem hanging_flags-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pole.n.01_1 - pole.n.01

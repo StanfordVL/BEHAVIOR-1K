@@ -1,5 +1,5 @@
 (define (problem making_the_bed-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pillow.n.01_1 - pillow.n.01

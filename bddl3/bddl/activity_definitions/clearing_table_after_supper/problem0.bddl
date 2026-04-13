@@ -1,5 +1,5 @@
 (define (problem clearing_table_after_supper-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         meatball.n.01_1 meatball.n.01_2 meatball.n.01_3 - meatball.n.01

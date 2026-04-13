@@ -1,5 +1,5 @@
 (define (problem organizing_school_stuff-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         marker.n.03_1 - marker.n.03

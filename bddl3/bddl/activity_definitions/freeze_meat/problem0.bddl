@@ -1,5 +1,5 @@
 (define (problem freeze_meat-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01

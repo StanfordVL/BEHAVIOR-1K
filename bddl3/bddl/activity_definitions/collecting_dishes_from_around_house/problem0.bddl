@@ -1,5 +1,5 @@
 (define (problem collecting_dishes_from_around_house-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mug.n.04_1 mug.n.04_2 - mug.n.04

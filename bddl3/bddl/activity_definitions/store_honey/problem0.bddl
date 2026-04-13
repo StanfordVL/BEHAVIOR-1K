@@ -1,5 +1,5 @@
 (define (problem store_honey-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	jar__of__honey.n.01_1 - jar__of__honey.n.01

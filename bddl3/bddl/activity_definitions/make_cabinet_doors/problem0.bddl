@@ -1,5 +1,5 @@
 (define (problem make_cabinet_doors-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cabinet_base.n.01_1 - cabinet_base.n.01

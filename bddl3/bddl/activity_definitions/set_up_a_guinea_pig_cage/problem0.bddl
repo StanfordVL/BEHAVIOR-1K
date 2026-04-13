@@ -1,5 +1,5 @@
 (define (problem set_up_a_guinea_pig_cage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         hutch.n.01_1 - hutch.n.01

@@ -1,5 +1,5 @@
 (define (problem pouring_water_in_a_glass-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	pitcher.n.02_1 - pitcher.n.02

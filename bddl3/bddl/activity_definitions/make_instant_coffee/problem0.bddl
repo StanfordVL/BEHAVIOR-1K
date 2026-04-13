@@ -1,5 +1,5 @@
 (define (problem make_instant_coffee-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         instant_coffee.n.01_1 - instant_coffee.n.01

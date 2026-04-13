@@ -1,5 +1,5 @@
 (define (problem buy_good_chocolate-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cash_register.n.01_1 - cash_register.n.01

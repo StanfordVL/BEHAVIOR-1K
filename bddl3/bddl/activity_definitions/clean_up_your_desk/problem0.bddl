@@ -1,5 +1,5 @@
 (define (problem clean_up_your_desk-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         laptop.n.01_1 - laptop.n.01

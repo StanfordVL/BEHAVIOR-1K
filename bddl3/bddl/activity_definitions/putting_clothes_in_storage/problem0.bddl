@@ -1,5 +1,5 @@
 (define (problem putting_clothes_in_storage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         carton.n.02_1 carton.n.02_2 carton.n.02_3 - carton.n.02

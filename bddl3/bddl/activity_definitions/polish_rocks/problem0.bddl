@@ -1,5 +1,5 @@
 (define (problem polish_rocks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	pebble.n.01_1 - pebble.n.01

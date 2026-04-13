@@ -1,5 +1,5 @@
 (define (problem putting_away_games-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         board_game.n.01_1 board_game.n.01_2 board_game.n.01_3 - board_game.n.01
