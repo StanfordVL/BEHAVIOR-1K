@@ -498,6 +498,11 @@ class BDDLSampler:
         self._inroom_object_scope_filtered_initial = None  # dict mapping str to sim object or None
         self._attached_objects = defaultdict(set)  # dict mapping str to set of str
 
+    def _sample_predicate(self, predicate_cls, *args, **kwargs):
+        """Wrapper around sample_bddl_predicate that resolves string instance names to sim objects."""
+        resolved = [self._object_scope.get(a, a) if isinstance(a, str) else a for a in args]
+        return sample_bddl_predicate(predicate_cls, *resolved, **kwargs)
+
     def assign_objects(self, sampling_whitelist=None, sampling_blacklist=None):
         """Assign inroom objects and import sampleable objects into the scene.
 
@@ -976,7 +981,7 @@ class BDDLSampler:
                                 kwargs["bypass_alignment_checking"] = True
                                 kwargs["check_physics_stability"] = True
                                 kwargs["can_joint_break"] = False
-                            success = condition.sample(sample_bddl_predicate, binary_state=positive, **kwargs)
+                            success = condition.sample(self._sample_predicate, binary_state=positive, **kwargs)
                             log_msg = " ".join(
                                 [
                                     f"{condition_type} kinematic condition sampling",
@@ -1382,7 +1387,7 @@ class BDDLSampler:
                         while True:
                             num_trials = 1
                             for _ in range(num_trials):
-                                success = condition.sample(sample_bddl_predicate, binary_state=positive, **kwargs)
+                                success = condition.sample(self._sample_predicate, binary_state=positive, **kwargs)
                                 log_msg = " ".join(
                                     [
                                         "initial final kinematic condition sampling",
