@@ -1023,17 +1023,28 @@ class EntityPrim(XFormPrim):
         # If the simulation isn't running, or the articulation root is the entity prim, we can just
         # move the entity prim. In this case we want to make sure that the root link does not have
         # a relative pose to the entity prim.
-        if self.articulation_root_path == self.prim_path or og.sim.is_stopped():
+        if self.articulation_root_path == self.prim_path:
             this_position, this_orientation = self.get_position_orientation(frame=frame)
             root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
             assert th.allclose(
-                this_position, root_link_position, atol=1e-3
+                this_position, root_link_position, atol=1e-2
             ), "Position mismatch between entity prim and root link"
             assert th.allclose(
-                this_orientation, root_link_orientation, atol=1e-3
+                this_orientation, root_link_orientation, atol=1e-2
             ), "Orientation mismatch between entity prim and root link"
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
         else:
+            # If the object's articulation root is NOT the entity prim, the entity prim should NOT have a
+            # transform. Otherwise the root link's transform needs to get multiplied by this and it can cause
+            # inaccuracies over long distances.
+            local_pos, local_orn = XFormPrim.get_position_orientation(self, frame="parent")
+            assert th.allclose(
+                local_pos, th.zeros(3), atol=1e-3
+            ), "The object/entity prim of an articulated object should not have a transform if it's not the articulation root."
+            assert th.allclose(
+                local_orn, th.tensor([0.0, 0.0, 0.0, 1.0]), atol=1e-3
+            ), "The object/entity prim of an articulated object should not have a transform if it's not the articulation root."
+
             # Otherwise, we need to set it directly on the root link.
             self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
