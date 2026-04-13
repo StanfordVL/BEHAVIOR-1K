@@ -868,44 +868,46 @@ def _launch_simulator(*args, **kwargs):
             playing = self.is_playing()
 
             if is_outer and playing:
-                state = self.dump_state()
-                objs_before = {scene.idx: set(scene.object_registry.object_names) for scene in self.scenes}
+                # Only dump state if all registered objects are initialized.
+                all_initialized = all(
+                    obj.initialized for scene in self.scenes for obj in scene.objects
+                )
+                if all_initialized:
+                    state = self.dump_state()
+                    objs_before = {scene.idx: set(scene.object_registry.object_names) for scene in self.scenes}
+                else:
+                    state = None
+
+                if SimulationManager._physics_sim_view:
+                    # Invalidate and de-initialize the physics simulation view before any objects are added or removed
+                    SimulationManager._physics_sim_view.invalidate()
+                    SimulationManager._physics_sim_view = None
 
             yield
 
             self._n_adding_removing_objects -= 1
 
             if is_outer and playing:
-                # Detect which objects were added or removed
-                scenes_with_removals = set()
-                any_changed = False
-                for scene in self.scenes:
-                    current_names = set(scene.object_registry.object_names)
-                    removed_names = objs_before[scene.idx] - current_names
-                    added_names = current_names - objs_before[scene.idx]
-                    if removed_names:
-                        scenes_with_removals.add(scene)
-                        obj_registry = state[scene.idx]["registry"]["object_registry"]
-                        for name in removed_names:
-                            obj_registry.pop(name, None)
-                    if removed_names or added_names:
-                        any_changed = True
+                SimulationManager._physx_sim_interface.flush_changes()
+                self.update_handles()
 
-                if any_changed:
-                    # Invalidate the physics simulation view which may have been corrupted
-                    if SimulationManager._physics_sim_view:
-                        SimulationManager._physics_sim_view.invalidate()
-                        SimulationManager._physics_sim_view = None
-
-                    SimulationManager._physx_sim_interface.flush_changes()
-                    self.update_handles()
+                if state is not None:
+                    # Detect which objects were removed and prune them from saved state
+                    scenes_with_removals = set()
+                    for scene in self.scenes:
+                        removed_names = objs_before[scene.idx] - set(scene.object_registry.object_names)
+                        if removed_names:
+                            scenes_with_removals.add(scene)
+                            obj_registry = state[scene.idx]["registry"]["object_registry"]
+                            for name in removed_names:
+                                obj_registry.pop(name, None)
 
                     if scenes_with_removals:
                         if gm.ENABLE_TRANSITION_RULES:
                             for scene in scenes_with_removals:
                                 scene.transition_rule_api.prune_active_rules()
 
-                        self.load_state(state)
+                    self.load_state(state)
 
         def _post_import_object(self, obj):
             """

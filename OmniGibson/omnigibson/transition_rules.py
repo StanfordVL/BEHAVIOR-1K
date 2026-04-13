@@ -191,38 +191,36 @@ class TransitionRuleAPI:
         :param removed_objs: List of USDObject instances to remove from the scene
         """
 
-        with og.sim.adding_or_removing_objects():
-            # Process all transition results
-            if len(removed_objs) > 0:
-                # First remove pre-existing objects
-                for obj in removed_objs:
-                    obj.scene.remove_object(obj)
+        # Process all transition results
+        if len(removed_objs) > 0:
+            # First remove pre-existing objects
+            og.sim.batch_remove_objects(removed_objs)
 
-            # Then add new objects
-            if len(added_obj_attrs) > 0:
-                for added_obj_attr in added_obj_attrs:
-                    new_obj = added_obj_attr.obj
-                    self.scene.add_object(new_obj)
-                    # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
-                    # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
-                    if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
-                        new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
-                    elif isinstance(new_obj, DatasetObject) and (
-                        added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None
-                    ):
-                        new_obj.set_bbox_center_position_orientation(
-                            position=added_obj_attr.bb_pos, orientation=added_obj_attr.bb_orn
-                        )
-                    else:
-                        raise ValueError(
-                            "Expected at least one of pos, orn, bb_pos, or bb_orn to be specified in ObjectAttrs!"
-                        )
-                    # Additionally record any requested states if specified to be updated during the next transition step
-                    if added_obj_attr.states is not None or added_obj_attr.callback is not None:
-                        self.obj_init_info[new_obj] = {
-                            "states": added_obj_attr.states,
-                            "callback": added_obj_attr.callback,
-                        }
+        # Then add new objects
+        if len(added_obj_attrs) > 0:
+            for added_obj_attr in added_obj_attrs:
+                new_obj = added_obj_attr.obj
+                self.scene.add_object(new_obj)
+                # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
+                # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
+                if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
+                    new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
+                elif isinstance(new_obj, DatasetObject) and (
+                    added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None
+                ):
+                    new_obj.set_bbox_center_position_orientation(
+                        position=added_obj_attr.bb_pos, orientation=added_obj_attr.bb_orn
+                    )
+                else:
+                    raise ValueError(
+                        "Expected at least one of pos, orn, bb_pos, or bb_orn to be specified in ObjectAttrs!"
+                    )
+                # Additionally record any requested states if specified to be updated during the next transition step
+                if added_obj_attr.states is not None or added_obj_attr.callback is not None:
+                    self.obj_init_info[new_obj] = {
+                        "states": added_obj_attr.states,
+                        "callback": added_obj_attr.callback,
+                    }
 
     def clear(self):
         """
