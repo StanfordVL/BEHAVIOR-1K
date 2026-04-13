@@ -216,7 +216,7 @@ class VisionSensor(BaseSensor):
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
-        should_create_viewport = viewport_name is not None or gm.RENDER_VIEWER_CAMERA
+        should_create_viewport = viewport_name is not None or not gm.HEADLESS
         viewport = None
         if should_create_viewport and viewport_name is not None:
             vp_names_to_handles = {vp.name: vp for vp in lazy.omni.kit.viewport.window.get_viewport_window_instances()}
@@ -893,7 +893,7 @@ class VisionSensor(BaseSensor):
         if self._viewport is None:
             raise RuntimeError(
                 "Cannot set active_camera_path because this sensor has no viewport. "
-                "Set gm.RENDER_VIEWER_CAMERA=True to enable viewport textures."
+                "Set gm.HEADLESS=False to enable viewport textures."
             )
         self._viewport.viewport_api.set_active_camera(path)
         # Requires 6 updates to propagate changes
