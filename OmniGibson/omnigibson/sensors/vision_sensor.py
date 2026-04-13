@@ -708,16 +708,17 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
-        for annotator in self._annotators.values():
-            annotator.detach([self._render_product.path])
+        with og.sim.editing_usd():
+            for annotator in self._annotators.values():
+                annotator.detach([self._render_product.path])
 
-        self._render_product.destroy()
-        self._render_product = lazy.omni.replicator.core.create.render_product(
-            self.prim_path, (width, height), force_new=True
-        )
+            self._render_product.destroy()
+            self._render_product = lazy.omni.replicator.core.create.render_product(
+                self.prim_path, (width, height), force_new=True
+            )
 
-        for annotator in self._annotators.values():
-            annotator.attach([self._render_product])
+            for annotator in self._annotators.values():
+                annotator.attach([self._render_product])
 
         # Requires 4 updates to propagate changes
         for i in range(4):
@@ -743,16 +744,17 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
-        for annotator in self._annotators.values():
-            annotator.detach([self._render_product.path])
+        with og.sim.editing_usd():
+            for annotator in self._annotators.values():
+                annotator.detach([self._render_product.path])
 
-        self._render_product.destroy()
-        self._render_product = lazy.omni.replicator.core.create.render_product(
-            self.prim_path, (width, height), force_new=True
-        )
+            self._render_product.destroy()
+            self._render_product = lazy.omni.replicator.core.create.render_product(
+                self.prim_path, (width, height), force_new=True
+            )
 
-        for annotator in self._annotators.values():
-            annotator.attach([self._render_product])
+            for annotator in self._annotators.values():
+                annotator.attach([self._render_product])
 
         # Requires 4 updates to propagate changes
         for i in range(4):

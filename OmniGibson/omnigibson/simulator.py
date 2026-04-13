@@ -423,7 +423,10 @@ def _launch_simulator(*args, **kwargs):
             self._viewer_camera = None
             self._camera_mover = None
             self._render_on_step = True
-            self.currently_stepping = False
+            self.currently_stepping = (
+                False  # Whether we are currently in a physics step lifecycle, including pre-and-post-step callbacks.
+            )
+            self.currently_in_isaac_step = False  # Whether we are currently in the Isaac Sim-owned part of the step context (e.g. NOT the callbacks)
             self.pre_step_exception = None
             self.post_step_exception = None
 
@@ -1404,14 +1407,19 @@ def _launch_simulator(*args, **kwargs):
 
                     # Flush the controls from the ControllableObjectViewAPI
                     ControllableObjectViewAPI.flush_control()
+
+                self.currently_in_isaac_step = True
             except Exception as e:
                 self.currently_stepping = False
+                self.currently_in_isaac_step = False
                 self.pre_step_exception = e
                 raise
 
         @with_profiler(name="_post_physics_step_profiler")
         def _on_post_physics_step(self):
             try:
+                self.currently_in_isaac_step = False
+
                 # Only do this if we're not in the warmup phase
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                     # Run the post physics update for backend view
@@ -1419,9 +1427,6 @@ def _launch_simulator(*args, **kwargs):
 
                 # Pull the contact sensor data
                 RigidContactAPI.add_contacts_from_physics_step()
-
-                # Record that we are done with the step context.
-                self.currently_stepping = False
 
                 if self._deferred_joint_breaks:
                     # Copy the current deferred joint breaks and clear the shared list
@@ -1432,7 +1437,10 @@ def _launch_simulator(*args, **kwargs):
                     for obj, state_type, joint_path in deferred_breaks:
                         obj.states[state_type].on_joint_break(joint_path)
 
+                # Record that we are done with the step context.
+                self.currently_stepping = False
             except Exception as e:
+                self.currently_in_isaac_step = False
                 self.currently_stepping = False
                 self.post_step_exception = e
                 raise
@@ -1600,7 +1608,7 @@ def _launch_simulator(*args, **kwargs):
                 f"  Existing context opened at: {self._editing_usd_caller}"
             )
             self._check_usd_guard()
-            assert not self.currently_stepping, "Cannot edit USD while simulation is stepping!"
+            assert not self.currently_in_isaac_step, "Cannot edit USD while simulation is stepping!"
             self._editing_usd = True
             self._editing_usd_caller = f"{caller.filename}:{caller.lineno} in {caller.name}"
             try:
