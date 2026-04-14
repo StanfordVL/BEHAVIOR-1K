@@ -186,6 +186,7 @@ class TransitionRuleAPI:
         :param added_obj_attrs: List of ObjectAttrs instances to add to the scene
         :param removed_objs: List of USDObject instances to remove from the scene
         """
+
         # Process all transition results
         if len(removed_objs) > 0:
             # First remove pre-existing objects
