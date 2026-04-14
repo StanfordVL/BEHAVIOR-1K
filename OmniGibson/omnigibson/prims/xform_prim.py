@@ -144,6 +144,7 @@ class XFormPrim(BasePrim):
                 xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
             xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
+        # This creates its own editing_usd context.
         XFormPrim.set_position_orientation(self, position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
         r1 = T.quat2mat(current_orientation)

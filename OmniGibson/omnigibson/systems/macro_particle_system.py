@@ -1252,7 +1252,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         """
         Internal helper method to update the particles' rigid body view to grab state
 
-        Should be called every time sim.play() is called, or after any USD changes have been made.
+        This is called through og.sim.update_handles when the physx object count etc. changes.
         """
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(

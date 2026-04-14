@@ -35,7 +35,6 @@ def env(request, stopped_env):
             request.getfixturevalue(name)
 
     og.sim.play()
-    og.sim.step()
     yield stopped_env
 
     og.clear()
