@@ -1,4 +1,3 @@
-import math
 from functools import cached_property
 from typing import Literal
 
@@ -1067,30 +1066,7 @@ class EntityPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
-        # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
-        if og.sim.is_stopped():
-            return XFormPrim.get_position_orientation(self, frame=frame, clone=clone)
-
-        # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
-            return self.root_link.get_position_orientation(frame=frame, clone=clone)
-
-        # Otherwise, get the pose from the articulation view and convert to our format
-        positions, orientations = self._articulation_view.get_world_poses(clone=clone)
-        position = positions[0]
-        orientation = orientations[0][[1, 2, 3, 0]]
-
-        # Assert that the orientation is a unit quaternion
-        assert math.isclose(
-            th.norm(orientations).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} orientation {orientations} is not a unit quaternion."
-
-        # If requested, compute the scene-local transform
-        if frame == "scene":
-            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-            position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
-
-        return position, orientation
+        return self.root_link.get_position_orientation(frame=frame, clone=clone)
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property
