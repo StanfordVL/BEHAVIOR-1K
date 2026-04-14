@@ -315,7 +315,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
-            if not self.fixed_base and n_joints > 0:
+            if not self.fixed_base:
                 articulation_root_prim = root_link
             else:
                 articulation_root_prim = default_prim
@@ -633,7 +633,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # as the object moves. We put it under a dummy mesh so as not to force write synchronization to the actual
         # physx-tracked links (required when using Fabric), which causes physics issues
         dummy_mesh_path = f"{link.prim_path}/emitter"
-        lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, dummy_mesh_path)
+        with og.sim.editing_usd():
+            lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, dummy_mesh_path)
         relative_dummy_mesh_path = absolute_prim_path_to_scene_relative(self._scene, dummy_mesh_path)
         mesh = GeomPrim(relative_prim_path=relative_dummy_mesh_path, name=f"{self.name}_emitter")
         mesh.load(self._scene)
@@ -644,90 +645,97 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         flowOffscreen_prim_path = f"{mesh.prim_path}/flowOffscreen"
         flowRender_prim_path = f"{mesh.prim_path}/flowRender"
 
-        # Define prims.
-        stage = og.sim.stage
-        emitter = stage.DefinePrim(flowEmitter_prim_path, emitter_config["type"])
-        simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
-        offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
-        renderer = stage.DefinePrim(flowRender_prim_path, "FlowRender")
-        advection = stage.DefinePrim(flowSimulate_prim_path + "/advection", "FlowAdvectionCombustionParams")
-        smoke = stage.DefinePrim(flowSimulate_prim_path + "/advection/smoke", "FlowAdvectionCombustionParams")
-        vorticity = stage.DefinePrim(flowSimulate_prim_path + "/vorticity", "FlowVorticityParams")
-        rayMarch = stage.DefinePrim(flowRender_prim_path + "/rayMarch", "FlowRayMarchParams")
-        colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
+        # Define prims and set attributes — all USD edits for this emitter.
+        with og.sim.editing_usd():
+            stage = og.sim.stage
+            emitter = stage.DefinePrim(flowEmitter_prim_path, emitter_config["type"])
+            simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
+            offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
+            renderer = stage.DefinePrim(flowRender_prim_path, "FlowRender")
+            advection = stage.DefinePrim(flowSimulate_prim_path + "/advection", "FlowAdvectionCombustionParams")
+            smoke = stage.DefinePrim(flowSimulate_prim_path + "/advection/smoke", "FlowAdvectionCombustionParams")
+            vorticity = stage.DefinePrim(flowSimulate_prim_path + "/vorticity", "FlowVorticityParams")
+            rayMarch = stage.DefinePrim(flowRender_prim_path + "/rayMarch", "FlowRayMarchParams")
+            colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
 
-        self._emitters[emitter_type] = {
-            "emitter": emitter,
-            "mesh": mesh,
-            "link": link,
-            "canonical_pose": mesh.get_position_orientation(),
-        }
+            self._emitters[emitter_type] = {
+                "emitter": emitter,
+                "mesh": mesh,
+                "link": link,
+                "canonical_pose": mesh.get_position_orientation(),
+            }
 
-        global _EMITTER_LAYER_COUNTER
-        layer_number = _EMITTER_LAYER_COUNTER
-        _EMITTER_LAYER_COUNTER += 1
+            global _EMITTER_LAYER_COUNTER
+            layer_number = _EMITTER_LAYER_COUNTER
+            _EMITTER_LAYER_COUNTER += 1
 
-        # Update emitter general settings.
-        emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
-        emitter.CreateAttribute("position", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["position"])
-        emitter.CreateAttribute("fuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["fuel"])
-        emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["coupleRateFuel"]
-        )
-        emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
-        emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
-        emitter.CreateAttribute("physicsVelocityScale", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1.0)
-        emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            1 / og.sim.get_sim_step_dt()
-        )
-        offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["buoyancyPerTemp"]
-        )
-        advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["burnPerTemp"]
-        )
-        advection.CreateAttribute("gravity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["gravity"])
-        vorticity.CreateAttribute("constantMask", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["constantMask"]
-        )
-        rayMarch.CreateAttribute("attenuation", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["attenuation"]
-        )
-
-        # Update emitter unique settings.
-        if emitter_type == EmitterType.FIRE:
-            # Radius is in the absolute world coordinate even though the fire is under the link frame.
-            # In other words, scaling the object doesn't change the fire radius.
-            if fire_at_meta_link:
-                # TODO: get radius of heat_source_link from metadata.
-                radius = 0.05
-            else:
-                bbox_extent_world = self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
-                # Radius is the average x-y half-extent of the object
-                radius = float(th.mean(bbox_extent_world[:2]) / 2.0)
-            emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
-            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
-            smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
-            # Set fire colormap.
-            rgbaPoints = []
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.0154, 0.0177, 0.0154, 0.004902))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(1, 0.1594, 0.0134, 0.8))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(13.53, 2.99, 0.12599, 0.8))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(78, 39, 6.1, 0.7))
-            colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
-        elif emitter_type == EmitterType.STEAM:
-            emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+            # Update emitter general settings.
+            emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
+            emitter.CreateAttribute("position", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
+                emitter_config["position"]
             )
-            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-                bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+            emitter.CreateAttribute("fuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["fuel"])
+            emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["coupleRateFuel"]
             )
+            emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
+            emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
+            emitter.CreateAttribute("physicsVelocityScale", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1.0)
+            emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                1 / og.sim.get_sim_step_dt()
+            )
+            offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["buoyancyPerTemp"]
+            )
+            advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["burnPerTemp"]
+            )
+            advection.CreateAttribute("gravity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
+                emitter_config["gravity"]
+            )
+            vorticity.CreateAttribute("constantMask", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["constantMask"]
+            )
+            rayMarch.CreateAttribute("attenuation", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["attenuation"]
+            )
+
+            # Update emitter unique settings.
+            if emitter_type == EmitterType.FIRE:
+                # Radius is in the absolute world coordinate even though the fire is under the link frame.
+                # In other words, scaling the object doesn't change the fire radius.
+                if fire_at_meta_link:
+                    # TODO: get radius of heat_source_link from metadata.
+                    radius = 0.05
+                else:
+                    bbox_extent_world = (
+                        self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
+                    )
+                    # Radius is the average x-y half-extent of the object
+                    radius = float(th.mean(bbox_extent_world[:2]) / 2.0)
+                emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
+                simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
+                smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
+                # Set fire colormap.
+                rgbaPoints = []
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.0154, 0.0177, 0.0154, 0.004902))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(1, 0.1594, 0.0134, 0.8))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(13.53, 2.99, 0.12599, 0.8))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(78, 39, 6.1, 0.7))
+                colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
+            elif emitter_type == EmitterType.STEAM:
+                emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
+                    tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+                )
+                simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                    bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+                )
 
     def set_emitter_enabled(self, emitter_type, value):
         """
@@ -745,7 +753,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if value:
             self._sync_emitter_mesh_on_usd(emitter_type=emitter_type)
         if value != self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Get():
-            self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Set(value)
+            with og.sim.editing_usd():
+                self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Set(value)
 
     def _sync_emitter_mesh_on_usd(self, emitter_type):
         """
@@ -759,6 +768,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         link_pose = emitter_info["link"].get_position_orientation()
         position, orientation = T.relative_pose_transform(*link_pose, *emitter_info["canonical_pose"])
 
+        # TODO(#2082): Verify if this is still needed.
         # Actually set the local pose now.
         position = lazy.pxr.Gf.Vec3d(*position.tolist())
         mesh.set_attribute("xformOp:translate", position)
@@ -768,7 +778,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             rotq = lazy.pxr.Gf.Quatf(*orientation)
         else:
             rotq = lazy.pxr.Gf.Quatd(*orientation)
-        xform_op.Set(rotq)
+        with og.sim.editing_usd():
+            xform_op.Set(rotq)
 
     def update_visuals(self):
         """
@@ -838,7 +849,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self.kinematic_only or (not has_articulated_joints and not has_fixed_joints):
             # Kinematic only, or non-jointed single body objects
             return None
-        elif not self.fixed_base and has_articulated_joints:
+        elif not self.fixed_base:
             # This is all remaining non-fixed objects
             # This is a bit hacky because omniverse is buggy
             # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a

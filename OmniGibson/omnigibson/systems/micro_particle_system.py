@@ -39,38 +39,6 @@ m.MIN_PARTICLE_CONTACT_OFFSET = 0.005  # Minimum particle contact offset for phy
 m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = None  # If set, the maximum particle velocity for micro particle systems
 
 
-def set_carb_settings_for_fluid_isosurface():
-    """
-    Sets relevant rendering settings in the carb settings in order to use isosurface effectively
-    """
-    min_frame_rate = 60
-    # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
-    assert (
-        (1 / og.sim.get_rendering_dt()) >= min_frame_rate
-    ), f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing rendering_frequency of env_config to {min_frame_rate}."
-
-    # Settings for Isosurface
-    isregistry = lazy.carb.settings.acquire_settings_interface()
-    # disable grid and lights
-    dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
-    dOptions &= ~(1 << 6 | 1 << 8)
-    isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
-    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)
-    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, min_frame_rate)
-    isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
-    isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
-    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
-    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse", 50000)
-    isregistry.set_float("rtx-defaults/pathtracing/optixDenoiser/blendFactor", 0.09)
-    isregistry.set_int("rtx-defaults/pathtracing/aa/op", 2)
-    isregistry.set_int("rtx-defaults/pathtracing/maxBounces", 32)
-    isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
-    isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
-    isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
-
-
 class PhysxParticleInstancer(BasePrim):
     """
     Simple class that wraps the raw omniverse point instancer prim and provides convenience functions for
@@ -489,9 +457,10 @@ class MicroParticleSystem(BaseSystem):
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         self._material.bind(self.system_prim_path)
         # Also apply physics to this material
-        lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
-            og.sim.stage, self.mat_path, **self._pbd_material_kwargs
-        )
+        with og.sim.editing_usd():
+            lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
+                og.sim.stage, self.mat_path, **self._pbd_material_kwargs
+            )
         # Potentially modify the material
         self._customize_particle_material() if self._customize_particle_material is not None else None
 
@@ -1411,16 +1380,17 @@ class FluidSystem(MicroPhysicalParticleSystem):
             if self.is_viscous
             else lazy.omni.physx.scripts.particleUtils.AddPBDMaterialWater
         )
-        apply_mat_physics(p=self._material.prim)
+        with og.sim.editing_usd():
+            apply_mat_physics(p=self._material.prim)
 
         # Compute the overall color of the fluid system
         self._color = self._material.average_diffuse_color
 
-        # Set custom isosurface rendering settings if we are using high-quality rendering
+        # Isosurface carb/RTX settings are applied once in Simulator._set_renderer_settings when HQ rendering is on.
         if gm.ENABLE_HQ_RENDERING:
-            set_carb_settings_for_fluid_isosurface()
-            # We also modify the grid smoothing radius to avoid "blobby" appearances
-            self.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
+            with og.sim.editing_usd():
+                # Modify the grid smoothing radius to avoid "blobby" appearances
+                self.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
     @property
     def is_fluid(self):
@@ -1544,7 +1514,8 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Copy it to the standardized prim path
         prototype_path = f"{self.prim_path}/prototype0"
-        lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
+        with og.sim.editing_usd():
+            lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
         # Wrap it with GeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
@@ -1611,23 +1582,24 @@ class Cloth(MicroParticleSystem):
         Args:
             mesh_prim (Usd.Prim): Mesh prim to clothify
         """
-        # Convert into particle cloth
-        lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
-            stage=og.sim.stage,
-            path=mesh_prim.GetPath(),
-            dynamic_mesh_path=None,
-            particle_system_path=self.system_prim_path,
-            spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
-            spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
-            spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
-            spring_damping=m.CLOTH_DAMPING,
-            self_collision=True,
-            self_collision_filter=True,
-        )
+        with og.sim.editing_usd():
+            # Convert into particle cloth
+            lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
+                stage=og.sim.stage,
+                path=mesh_prim.GetPath(),
+                dynamic_mesh_path=None,
+                particle_system_path=self.system_prim_path,
+                spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
+                spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
+                spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
+                spring_damping=m.CLOTH_DAMPING,
+                self_collision=True,
+                self_collision_filter=True,
+            )
 
-        # Disable welding because it can potentially make thin objects non-manifold
-        auto_particle_cloth_api = lazy.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
-        auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
+            # Disable welding because it can potentially make thin objects non-manifold
+            auto_particle_cloth_api = lazy.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
+            auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
 
     @property
     def _pbd_material_kwargs(self):

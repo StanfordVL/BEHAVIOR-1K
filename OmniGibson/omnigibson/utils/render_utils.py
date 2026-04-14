@@ -2,9 +2,11 @@
 Set of rendering utility functions when working with Omni
 """
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import ensure_usd_api
 
 
 # Create module logger
@@ -66,16 +68,17 @@ def create_pbr_material(prim_path):
     """
     # Use DeepWater omni present for rendering water
     mtl_created = []
-    lazy.omni.kit.commands.execute(
-        "CreateAndBindMdlMaterialFromLibrary",
-        mdl_name="OmniPBR.mdl",
-        mtl_name="OmniPBR",
-        mtl_created_list=mtl_created,
-    )
-    material_path = mtl_created[0]
+    with og.sim.editing_usd():
+        lazy.omni.kit.commands.execute(
+            "CreateAndBindMdlMaterialFromLibrary",
+            mdl_name="OmniPBR.mdl",
+            mtl_name="OmniPBR",
+            mtl_created_list=mtl_created,
+        )
+        material_path = mtl_created[0]
 
-    # Move prim to desired location
-    lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
+        # Move prim to desired location
+        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
 
     # Return generated material
     return lazy.isaacsim.core.utils.prims.get_prim_at_path(material_path)
@@ -100,11 +103,7 @@ def force_pbr_material_for_link(entity_prim, link_name):
         log.warning(f"Could not find visuals prim for link {link_name} of {entity_prim_path}")
         return
 
-    binding_api = (
-        lazy.pxr.UsdShade.MaterialBindingAPI(link_visuals_prim)
-        if link_visuals_prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
-        else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(link_visuals_prim)
-    )
+    binding_api = ensure_usd_api(link_visuals_prim, lazy.pxr.UsdShade.MaterialBindingAPI)
 
     material_path = binding_api.GetDirectBinding().GetMaterialPath().pathString
     if "OmniGlass" in material_path:

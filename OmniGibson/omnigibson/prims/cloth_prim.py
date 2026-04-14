@@ -28,6 +28,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.usd_utils import (
+    ensure_usd_api,
     mesh_prim_to_trimesh_mesh,
     sample_mesh_keypoints,
     delete_or_deactivate_prim,
@@ -97,11 +98,7 @@ class ClothPrim(GeomPrim):
         # run super first
         super()._post_load()
 
-        self._mass_api = (
-            lazy.pxr.UsdPhysics.MassAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI)
-            else lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
-        )
+        self._mass_api = ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
 
         # Possibly set the mass / density
         if "mass" in self._load_config and self._load_config["mass"] is not None:
@@ -272,18 +269,19 @@ class ClothPrim(GeomPrim):
 
         # Update the mesh prim to store the new information. First update the non-configuration-
         # dependent fields
-        face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int).cpu().numpy()
-        self.prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
-        self.prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
-        self.prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
-        if has_uv_mapping:
-            self.prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
+        with og.sim.editing_usd():
+            face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int).cpu().numpy()
+            self.prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
+            self.prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
+            self.prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
+            if has_uv_mapping:
+                self.prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
 
-        # Remove the properties for all configurations
-        for config in CLOTH_CONFIGURATIONS:
-            attr_name = f"points_{config}"
-            if self.prim.HasAttribute(attr_name):
-                self.prim.RemoveProperty(attr_name)
+            # Remove the properties for all configurations
+            for config in CLOTH_CONFIGURATIONS:
+                attr_name = f"points_{config}"
+                if self.prim.HasAttribute(attr_name):
+                    self.prim.RemoveProperty(attr_name)
 
         # Then update the configuration-dependent fields
         self.save_configuration("default", th.tensor(tm.vertices, dtype=th.float32))
@@ -505,12 +503,13 @@ class ClothPrim(GeomPrim):
         assert configuration in CLOTH_CONFIGURATIONS, f"Invalid cloth configuration {configuration}!"
         assert self.prim is not None, "Cannot save configuration for a non-existent prim!"
         attr_name = f"points_{configuration}"
-        points_default_attrib = (
-            self.prim.GetAttribute(attr_name)
-            if self.prim.HasAttribute(attr_name)
-            else self.prim.CreateAttribute(attr_name, lazy.pxr.Sdf.ValueTypeNames.Float3Array)
-        )
-        points_default_attrib.Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(points.cpu().numpy()))
+        with og.sim.editing_usd():
+            points_default_attrib = (
+                self.prim.GetAttribute(attr_name)
+                if self.prim.HasAttribute(attr_name)
+                else self.prim.CreateAttribute(attr_name, lazy.pxr.Sdf.ValueTypeNames.Float3Array)
+            )
+            points_default_attrib.Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(points.cpu().numpy()))
 
     def reset_points_to_configuration(self, configuration: Literal["default", "settled", "folded", "crumpled"]):
         """
@@ -798,8 +797,9 @@ class ClothPrim(GeomPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        # We have to set the mass directly in the cloth prim
-        self._mass_api.GetMassAttr().Set(mass)
+        with og.sim.editing_usd():
+            # We have to set the mass directly in the cloth prim
+            self._mass_api.GetMassAttr().Set(mass)
 
     @property
     def density(self):

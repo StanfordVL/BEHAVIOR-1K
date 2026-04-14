@@ -11,7 +11,7 @@ from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import create_primitive_mesh, create_usd_stage
+from omnigibson.utils.usd_utils import create_primitive_mesh, create_usd_stage, ensure_usd_api
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -144,9 +144,9 @@ class PrimitiveObject(USDObject):
         col_geom = create_primitive_mesh(
             prim_path="/object/base_link/collisions", primitive_type=primitive_type, stage=side_stage
         )
-        lazy.pxr.UsdPhysics.CollisionAPI.Apply(col_geom.GetPrim())
-        lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(col_geom.GetPrim())
-        lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(col_geom.GetPrim())
+        ensure_usd_api(col_geom.GetPrim(), lazy.pxr.UsdPhysics.CollisionAPI)
+        ensure_usd_api(col_geom.GetPrim(), lazy.pxr.UsdPhysics.MeshCollisionAPI)
+        ensure_usd_api(col_geom.GetPrim(), lazy.pxr.PhysxSchema.PhysxCollisionAPI)
 
         side_stage.Save()
         del side_stage
@@ -160,7 +160,8 @@ class PrimitiveObject(USDObject):
         # This is done here rather than in _prepare_to_load() because create_pbr_material
         # and bind_material both go through omni.kit.commands, which operates on the
         # active stage.
-        og.sim.stage.DefinePrim(f"{self.prim_path}/Looks", "Scope")
+        with og.sim.editing_usd():
+            og.sim.stage.DefinePrim(f"{self.prim_path}/Looks", "Scope")
         mat_path = f"{self.prim_path}/Looks/default"
         create_pbr_material(prim_path=mat_path)
         bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
@@ -242,31 +243,32 @@ class PrimitiveObject(USDObject):
             else th.tensor([radius * 2.0, radius * 2.0, self._extents[2]])
         )
         attr_pairs = []
-        for geom in self._vis_geom, self._col_geom:
-            if geom is not None:
-                for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = th.tensor(attr.Get()).double()
-                    attr_pairs.append([attr, vals])
-                geom.GetExtentAttr().Set(
-                    lazy.pxr.Vt.Vec3fArray(
-                        [
-                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
-                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
-                        ]
+        with og.sim.editing_usd():
+            for geom in self._vis_geom, self._col_geom:
+                if geom is not None:
+                    for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
+                        vals = th.tensor(attr.Get()).double()
+                        attr_pairs.append([attr, vals])
+                    geom.GetExtentAttr().Set(
+                        lazy.pxr.Vt.Vec3fArray(
+                            [
+                                lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                                lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                            ]
+                        )
                     )
-                )
 
-        # Calculate how much to scale extents by and then modify the points / normals accordingly
-        scaling_factor = 2.0 * radius / original_extent[0]
-        for attr, vals in attr_pairs:
-            # If this is a sphere, modify all 3 axes
-            if self._primitive_type == "Sphere":
-                vals = vals * scaling_factor
-            # Otherwise, just modify the first two dimensions
-            else:
-                vals[:, :2] = vals[:, :2] * scaling_factor
-            # Set the value
-            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
+            # Calculate how much to scale extents by and then modify the points / normals accordingly
+            scaling_factor = 2.0 * radius / original_extent[0]
+            for attr, vals in attr_pairs:
+                # If this is a sphere, modify all 3 axes
+                if self._primitive_type == "Sphere":
+                    vals = vals * scaling_factor
+                # Otherwise, just modify the first two dimensions
+                else:
+                    vals[:, :2] = vals[:, :2] * scaling_factor
+                # Set the value
+                attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
 
     @property
     def height(self):
@@ -298,21 +300,22 @@ class PrimitiveObject(USDObject):
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
         scaling_factor = height / original_extent[2]
-        for geom in self._vis_geom, self._col_geom:
-            if geom is not None:
-                for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = th.tensor(attr.Get()).double()
-                    # Scale the z axis by the scaling factor
-                    vals[:, 2] = vals[:, 2] * scaling_factor
-                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals.tolist()]))
-                geom.GetExtentAttr().Set(
-                    lazy.pxr.Vt.Vec3fArray(
-                        [
-                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
-                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
-                        ]
+        with og.sim.editing_usd():
+            for geom in self._vis_geom, self._col_geom:
+                if geom is not None:
+                    for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
+                        vals = th.tensor(attr.Get()).double()
+                        # Scale the z axis by the scaling factor
+                        vals[:, 2] = vals[:, 2] * scaling_factor
+                        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals.tolist()]))
+                    geom.GetExtentAttr().Set(
+                        lazy.pxr.Vt.Vec3fArray(
+                            [
+                                lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                                lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                            ]
+                        )
                     )
-                )
 
     @property
     def size(self):
@@ -345,20 +348,21 @@ class PrimitiveObject(USDObject):
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
         scaling_factor = size / original_extent[0]
-        for geom in self._vis_geom, self._col_geom:
-            if geom is not None:
-                for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    # Scale all three axes by the scaling factor
-                    vals = th.tensor(attr.Get()).double() * scaling_factor
-                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
-                geom.GetExtentAttr().Set(
-                    lazy.pxr.Vt.Vec3fArray(
-                        [
-                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
-                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
-                        ]
+        with og.sim.editing_usd():
+            for geom in self._vis_geom, self._col_geom:
+                if geom is not None:
+                    for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
+                        # Scale all three axes by the scaling factor
+                        vals = th.tensor(attr.Get()).double() * scaling_factor
+                        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
+                    geom.GetExtentAttr().Set(
+                        lazy.pxr.Vt.Vec3fArray(
+                            [
+                                lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                                lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                            ]
+                        )
                     )
-                )
 
     def _dump_state(self):
         state = super()._dump_state()

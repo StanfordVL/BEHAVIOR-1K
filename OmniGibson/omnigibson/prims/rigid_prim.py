@@ -18,6 +18,7 @@ from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     apply_collision_approximation,
     check_extent_radius_ratio,
+    ensure_usd_api,
     get_mesh_volume_and_com,
 )
 
@@ -88,12 +89,9 @@ class RigidPrim(XFormPrim):
         super()._post_load()
 
         # Apply rigid body and mass APIs
-        if not self._prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
-            lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI):
-            lazy.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI):
-            lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
+        ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.RigidBodyAPI)
+        ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxRigidBodyAPI)
+        ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
 
         # Check if it's part of an articulation view
         self._belongs_to_articulation = (
@@ -108,12 +106,9 @@ class RigidPrim(XFormPrim):
         )
 
         if not self._visual_only:
-            contact_api = (
-                lazy.pxr.PhysxSchema.PhysxContactReportAPI(self._prim)
-                if self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
-                else lazy.pxr.PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
-            )
-            contact_api.GetThresholdAttr().Set(0.0)
+            contact_api = ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxContactReportAPI)
+            with og.sim.editing_usd():
+                contact_api.GetThresholdAttr().Set(0.0)
 
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
@@ -205,9 +200,10 @@ class RigidPrim(XFormPrim):
         _find_geom_prims(self._prim)
 
         # Set default contact/rest offsets on all PhysxCollisionAPIs
-        for api in self._physx_collision_apis:
-            api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
-            api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
+                api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
 
         coms, vols = [], []
         for prim, is_collision in geom_prims:
@@ -266,15 +262,17 @@ class RigidPrim(XFormPrim):
         """
         Enable collisions for all collision meshes owned by this RigidPrim
         """
-        for collision_api in self._collision_apis:
-            collision_api.GetCollisionEnabledAttr().Set(True)
+        with og.sim.editing_usd():
+            for collision_api in self._collision_apis:
+                collision_api.GetCollisionEnabledAttr().Set(True)
 
     def disable_collisions(self):
         """
         Disable collisions for all collision meshes owned by this RigidPrim
         """
-        for collision_api in self._collision_apis:
-            collision_api.GetCollisionEnabledAttr().Set(False)
+        with og.sim.editing_usd():
+            for collision_api in self._collision_apis:
+                collision_api.GetCollisionEnabledAttr().Set(False)
 
     def set_contact_offset(self, offset):
         """
@@ -284,8 +282,9 @@ class RigidPrim(XFormPrim):
             offset (float): Contact offset of a collision shape. Allowed range [maximum(0, rest_offset), 0].
                             Default value is -inf, means default is picked by simulation based on the shape extent.
         """
-        for api in self._physx_collision_apis:
-            api.GetContactOffsetAttr().Set(offset)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetContactOffsetAttr().Set(offset)
 
     def set_rest_offset(self, offset):
         """
@@ -295,8 +294,9 @@ class RigidPrim(XFormPrim):
             offset (float): Rest offset of a collision shape. Allowed range [-max_float, contact_offset.
                             Default value is -inf, means default is picked by simulation. For rigid bodies its zero.
         """
-        for api in self._physx_collision_apis:
-            api.GetRestOffsetAttr().Set(offset)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetRestOffsetAttr().Set(offset)
 
     def set_torsional_patch_radius(self, radius):
         """
@@ -305,8 +305,9 @@ class RigidPrim(XFormPrim):
         Args:
             radius (float): radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
         """
-        for api in self._physx_collision_apis:
-            api.GetTorsionalPatchRadiusAttr().Set(radius)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetTorsionalPatchRadiusAttr().Set(radius)
 
     def set_min_torsional_patch_radius(self, radius):
         """
@@ -316,8 +317,9 @@ class RigidPrim(XFormPrim):
             radius (float): minimum radius of the contact patch used to apply torsional friction.
                             Allowed range [0, max_float].
         """
-        for api in self._physx_collision_apis:
-            api.GetMinTorsionalPatchRadiusAttr().Set(radius)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetMinTorsionalPatchRadiusAttr().Set(radius)
 
     def set_collision_approximation(self, approximation_type):
         """

@@ -22,16 +22,6 @@ from omnigibson.utils.vision_utils import Remapper
 log = create_module_logger(module_name=__name__)
 
 
-# Duplicate of simulator's render method, used so that this can be done before simulator is created!
-def render():
-    """
-    Refreshes the Isaac Sim app rendering components including UI elements and view ports..etc.
-    """
-    og.app._carb_settings.set_bool("/app/player/playSimulations", False)
-    og.app.update()
-    og.app._carb_settings.set_bool("/app/player/playSimulations", True)
-
-
 class VisionSensor(BaseSensor):
     """
     Vision sensor that handles a variety of modalities, including:
@@ -208,7 +198,8 @@ class VisionSensor(BaseSensor):
         self.SENSORS[self.prim_path] = self
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
-        self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
+        with og.sim.editing_usd():
+            self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
@@ -217,9 +208,10 @@ class VisionSensor(BaseSensor):
             assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
             viewport = vp_names_to_handles[viewport_name]
         else:
-            viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
+            with og.sim.editing_usd():
+                viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
             # Take a render step to make sure the viewport is generated before docking it
-            render()
+            og.sim.render()
             # Grab the newly created viewport and dock it to the GUI
             # The first viewport is always the "main" global camera, and any additional cameras are auxiliary views
             # These auxiliary views will be stacked in a single column
@@ -252,7 +244,7 @@ class VisionSensor(BaseSensor):
 
         # Requires 4 render updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
         # Set the viewer size (requires taking one render step afterwards)
         self._viewport.viewport_api.set_texture_resolution(resolution)
@@ -266,7 +258,7 @@ class VisionSensor(BaseSensor):
 
         # Requires 4 render updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
     def _initialize(self):
         # Run super first
@@ -277,7 +269,7 @@ class VisionSensor(BaseSensor):
         # Initialize sensors
         self.initialize_sensors(names=self._modalities)
         for _ in range(4):
-            render()
+            og.sim.render()
 
     def initialize_sensors(self, names):
         """Initializes a raw sensor in the simulation.
@@ -588,10 +580,11 @@ class VisionSensor(BaseSensor):
             modality (str): Name of the modality to add to the Replicator backend
         """
         if self._annotators.get(modality, None) is None:
-            self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
-                self._RAW_SENSOR_TYPES[modality]
-            )
-            self._annotators[modality].attach([self._render_product])
+            with og.sim.editing_usd():
+                self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
+                    self._RAW_SENSOR_TYPES[modality]
+                )
+                self._annotators[modality].attach([self._render_product])
 
     def _remove_modality_from_backend(self, modality):
         """
@@ -603,7 +596,8 @@ class VisionSensor(BaseSensor):
         if self._annotators.get(modality, None) is not None:
             # Passing an explicit list is bugged -- see omni source code
             # So we only pass in the product directly, which gets post-processed correctly
-            self._annotators[modality].detach(self._render_product)
+            with og.sim.editing_usd():
+                self._annotators[modality].detach(self._render_product)
             self._annotators[modality] = None
 
     def remove(self):
@@ -615,11 +609,13 @@ class VisionSensor(BaseSensor):
             self.remove_modality(modality)
 
         # Destroy the render product
-        self._render_product.destroy()
+        with og.sim.editing_usd():
+            self._render_product.destroy()
 
         # Remove the viewport if it's not the main viewport
         if self._viewport.name != "Viewport":
-            self._viewport.destroy()
+            with og.sim.editing_usd():
+                self._viewport.destroy()
         else:
             # We're deleting our camera, so set the normal viewport camera to the default /Perspective camera
             self.active_camera_path = "/OmniverseKit_Persp"
@@ -668,7 +664,7 @@ class VisionSensor(BaseSensor):
             self.initialize_sensors(names="camera_params")
             # Requires 4 render updates for camera params annotator to become active
             for _ in range(4):
-                render()
+                og.sim.render()
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
 
@@ -690,7 +686,7 @@ class VisionSensor(BaseSensor):
         """
         self._viewport.visible = visible
         # Requires 1 render update to propagate changes
-        render()
+        og.sim.render()
 
     @property
     def image_height(self):
@@ -712,20 +708,21 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
-        for annotator in self._annotators.values():
-            annotator.detach([self._render_product.path])
+        with og.sim.editing_usd():
+            for annotator in self._annotators.values():
+                annotator.detach([self._render_product.path])
 
-        self._render_product.destroy()
-        self._render_product = lazy.omni.replicator.core.create.render_product(
-            self.prim_path, (width, height), force_new=True
-        )
+            self._render_product.destroy()
+            self._render_product = lazy.omni.replicator.core.create.render_product(
+                self.prim_path, (width, height), force_new=True
+            )
 
-        for annotator in self._annotators.values():
-            annotator.attach([self._render_product])
+            for annotator in self._annotators.values():
+                annotator.attach([self._render_product])
 
         # Requires 4 updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
     @property
     def image_width(self):
@@ -747,20 +744,21 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
-        for annotator in self._annotators.values():
-            annotator.detach([self._render_product.path])
+        with og.sim.editing_usd():
+            for annotator in self._annotators.values():
+                annotator.detach([self._render_product.path])
 
-        self._render_product.destroy()
-        self._render_product = lazy.omni.replicator.core.create.render_product(
-            self.prim_path, (width, height), force_new=True
-        )
+            self._render_product.destroy()
+            self._render_product = lazy.omni.replicator.core.create.render_product(
+                self.prim_path, (width, height), force_new=True
+            )
 
-        for annotator in self._annotators.values():
-            annotator.attach([self._render_product])
+            for annotator in self._annotators.values():
+                annotator.attach([self._render_product])
 
         # Requires 4 updates to propagate changes
         for i in range(4):
-            render()
+            og.sim.render()
 
     @property
     def clipping_range(self):
@@ -782,7 +780,7 @@ class VisionSensor(BaseSensor):
         # In order for sensor changes to propagate, we must toggle its visibility
         self.visible = False
         # A single update step has to happen here before we toggle visibility for changes to propagate
-        render()
+        og.sim.render()
         self.visible = True
 
     @property
@@ -876,7 +874,7 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_active_camera(path)
         # Requires 6 updates to propagate changes
         for i in range(6):
-            render()
+            og.sim.render()
 
     @property
     def intrinsic_matrix(self):
@@ -962,7 +960,7 @@ class VisionSensor(BaseSensor):
             sensor.remove()
 
         # Render to update
-        render()
+        og.sim.render()
 
         cls.SEMANTIC_REMAPPER = Remapper()
         cls.INSTANCE_REMAPPER = Remapper()

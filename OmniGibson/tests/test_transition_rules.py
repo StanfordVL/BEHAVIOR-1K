@@ -799,7 +799,8 @@ def test_cooking_object_rule_failure_wrong_container(env, oven, stockpot, bagel_
 
     bagel_dough.set_position_orientation([0, 0, 0.464], [0, 0, 0, 1])
     raw_egg.set_position_orientation([0.02, 0, 0.506], [0, 0, 0, 1])
-    og.sim.step()
+    for _ in range(10):
+        og.sim.step()
     assert bagel_dough.states[Inside].get_value(stockpot)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
 
@@ -866,13 +867,13 @@ def test_cooking_object_rule_failure_unary_states(env, oven, baking_sheet, bagel
     og.sim.step()
 
     baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(5):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[0.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -905,13 +906,13 @@ def test_cooking_object_rule_failure_binary_system_states(env, oven, baking_shee
     og.sim.step()
 
     baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(5):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[0.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)

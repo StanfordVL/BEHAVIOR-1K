@@ -6,7 +6,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.usd_utils import create_usd_stage
+from omnigibson.utils.usd_utils import create_usd_stage, ensure_usd_api
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import assert_valid_key
@@ -131,7 +131,9 @@ class LightObject(USDObject):
         self._light_link.load(self.scene)
 
         # Apply Shaping API and set default cone angle attribute
-        lazy.pxr.UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
+        shaping_api = ensure_usd_api(self._light_link.prim, lazy.pxr.UsdLux.ShapingAPI)
+        with og.sim.editing_usd():
+            shaping_api.GetShapingConeAngleAttr().Set(180.0)
 
         # Optionally set the intensity
         if self._load_config.get("intensity", None) is not None:

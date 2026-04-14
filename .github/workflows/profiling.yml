@@ -85,7 +85,7 @@ jobs:
       - name: Convert deep profile to HTML
         if: matrix.deep_profile
         run: |
-          for prof in load.prof pre_physics_step.prof post_physics_step.prof non_physics_step.prof; do
+          for prof in load.prof step.prof pre_physics_step.prof post_physics_step.prof non_physics_step.prof; do
             python ../.github/scripts/cprofile_to_html.py \
               --profile "$prof" \
               --output "${prof%.prof}.html"
@@ -107,6 +107,8 @@ jobs:
           path: |
             OmniGibson/load.prof
             OmniGibson/load.html
+            OmniGibson/step.prof
+            OmniGibson/step.html
             OmniGibson/pre_physics_step.prof
             OmniGibson/pre_physics_step.html
             OmniGibson/post_physics_step.prof
@@ -242,6 +244,7 @@ jobs:
               f"(artifact prefix: `profiling-deep-`). Includes:"
           )
           lines.append("- `load` — environment loading")
+          lines.append("- `step` — full simulation step")
           lines.append("- `pre_physics_step` — pre-physics step processing")
           lines.append("- `post_physics_step` — post-physics step processing")
           lines.append("- `non_physics_step` — non-physics step processing")

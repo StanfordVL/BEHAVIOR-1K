@@ -5,6 +5,7 @@ import math
 import os
 import time
 
+import psutil
 import torch as th
 
 import omnigibson as og
@@ -12,7 +13,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.object_states import Covered
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.profiling_utils import ProfilingEnv
+from omnigibson.utils.profiling_utils import get_vram_usage
 
 parser = argparse.ArgumentParser()
 
@@ -45,7 +46,7 @@ def main():
     gm.ENABLE_OBJECT_STATES = True
     gm.ENABLE_TRANSITION_RULES = True
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
-    gm.ENABLE_PROFILING = args.deep_profiling
+    gm.ENABLE_DEEP_PROFILING = args.deep_profiling
 
     cfg = {
         "env": {
@@ -141,7 +142,7 @@ def main():
     if args.deep_profiling:
         load_profiler = cProfile.Profile()
         load_profiler.enable()
-    env = ProfilingEnv(configs=cfg)
+    env = og.Environment(configs=cfg)
     table = env.scene.object_registry("name", "table")
     apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
     knifes = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
@@ -160,7 +161,7 @@ def main():
     if args.fluids:
         table.states[Covered].set_value(env.scene.get_system("water"), True)
 
-    output, results = [], []
+    output = []
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
@@ -172,17 +173,47 @@ def main():
         load_profiler.dump_stats("load.prof")
     total_load_time = time.time() - load_start
 
+    # Reset profiler counters so we only measure the benchmark loop
+    og.sim._step_profiler.reset()
+    og.sim._pre_physics_step_profiler.reset()
+    og.sim._post_physics_step_profiler.reset()
+    og.sim._non_physics_step_profiler.reset()
+
     for i in range(300):
         if args.robot:
             action_lo, action_hi = -0.3, 0.3
-            result = env.step(
+            env.step(
                 th.stack(
                     [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
                 ).flatten()
-            )[4]
+            )
         else:
-            result = env.step(None)[4]
-        results.append(result)
+            env.step(None)
+
+    # Compute timing metrics from simulator profilers (convert to ms)
+    n_steps = og.sim._step_profiler.call_count
+    avg_total_ms = og.sim._step_profiler.average_time * 1e3
+    avg_og_ms = (
+        (
+            og.sim._pre_physics_step_profiler.total_time
+            + og.sim._post_physics_step_profiler.total_time
+            + og.sim._non_physics_step_profiler.total_time
+        )
+        / n_steps
+        * 1e3
+    )
+    avg_isaac_ms = avg_total_ms - avg_og_ms
+    memory_usage = psutil.Process(os.getpid()).memory_info().rss / 1024**3
+    vram_usage = get_vram_usage()
+
+    result_values = [avg_total_ms, avg_isaac_ms, avg_og_ms, memory_usage, vram_usage]
+
+    if n_steps % 100 == 0 or n_steps == 300:
+        print(
+            "total time: {:.3f} ms, Isaac time: {:.3f} ms, Non-Isaac time: {:.3f} ms, memory: {:.3f} GB, vram: {:.3f} GB.".format(
+                *result_values
+            )
+        )
 
     field = f"{args.scene}" if args.scene else "Empty scene"
     if args.robot:
@@ -196,14 +227,13 @@ def main():
     output.append(
         {"name": field, "unit": "time (ms)", "value": total_load_time, "extra": ["Loading time", "Loading time"]}
     )
-    results = th.tensor(results)
     for i, title in enumerate(PROFILING_FIELDS):
         unit = "time (ms)" if "time" in title else "GB"
-        value = th.mean(results[:, i])
+        value = result_values[i]
         if title == "FPS":
             value = 1000 / value
             unit = "fps"
-        output.append({"name": field, "unit": unit, "value": value.item(), "extra": [title, title]})
+        output.append({"name": field, "unit": unit, "value": value, "extra": [title, title]})
 
     ret = []
     if os.path.exists("output.json"):
@@ -215,6 +245,7 @@ def main():
 
     # Save the simulation profilers
     if args.deep_profiling:
+        og.sim._step_profiler.dump_stats("step.prof")
         og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
         og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
         og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
