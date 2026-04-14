@@ -194,6 +194,7 @@ def create_and_dock_viewport(parent_window, position, ratio, camera_path):
     """
     with og.sim.editing_usd():
         viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
+    og.sim.render()
 
     dock_window(
         space=lazy.omni.ui.Workspace.get_window(parent_window),
