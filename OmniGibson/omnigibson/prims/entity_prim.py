@@ -1019,9 +1019,8 @@ class EntityPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
-        # If the simulation isn't running, or the articulation root is the entity prim, we can just
-        # move the entity prim. In this case we want to make sure that the root link does not have
-        # a relative pose to the entity prim.
+        # If the articulation root is the entity prim, we can just move the entity prim. In this case
+        # we want to make sure that the root link does not have a relative pose to the entity prim.
         if self.articulation_root_path == self.prim_path:
             this_position, this_orientation = XFormPrim.get_position_orientation(self, frame=frame)
             root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
