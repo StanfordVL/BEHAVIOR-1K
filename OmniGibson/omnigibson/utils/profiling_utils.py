@@ -15,7 +15,7 @@ class Profiler:
     one timing sample. Callers can read cumulative or per-call averages at any time.
 
     Optionally wraps a cProfile.Profile for deep (function-level) profiling when
-    gm.ENABLE_PROFILING is set.
+    gm.ENABLE_DEEP_PROFILING is set.
     """
 
     def __init__(self, deep=False):

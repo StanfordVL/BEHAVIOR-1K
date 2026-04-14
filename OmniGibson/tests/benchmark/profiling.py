@@ -46,7 +46,7 @@ def main():
     gm.ENABLE_OBJECT_STATES = True
     gm.ENABLE_TRANSITION_RULES = True
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
-    gm.ENABLE_PROFILING = args.deep_profiling
+    gm.ENABLE_DEEP_PROFILING = args.deep_profiling
 
     cfg = {
         "env": {

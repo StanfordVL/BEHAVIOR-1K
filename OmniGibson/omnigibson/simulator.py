@@ -430,10 +430,10 @@ def _launch_simulator(*args, **kwargs):
             self.pre_step_exception = None
             self.post_step_exception = None
 
-            self._step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
-            self._pre_physics_step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
-            self._post_physics_step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
-            self._non_physics_step_profiler = Profiler(deep=gm.ENABLE_PROFILING)
+            self._step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
+            self._pre_physics_step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
+            self._post_physics_step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
+            self._non_physics_step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
 
             self._floor_plane = None
             self._skybox = None

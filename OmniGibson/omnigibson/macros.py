@@ -164,7 +164,7 @@ gm.RENDER_VIEWER_CAMERA = True
 gm.DEBUG = os.getenv("OMNIGIBSON_DEBUG", "False").lower() in ("true", "1", "t")
 
 # Whether to enable profiling or not in simulator.py - this causes a slowdown!
-gm.ENABLE_PROFILING = False
+gm.ENABLE_DEEP_PROFILING = False
 
 # Whether to suppress any omni logs upon startup, and prune the following omni logs to error level
 gm.NO_OMNI_LOGS = os.getenv("OMNIGIBSON_NO_OMNI_LOGS", "False").lower() in ("true", "1", "t")
