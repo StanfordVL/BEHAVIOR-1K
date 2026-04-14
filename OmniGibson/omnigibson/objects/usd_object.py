@@ -315,7 +315,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
-            if not self.fixed_base and n_joints > 0:
+            if not self.fixed_base:
                 articulation_root_prim = root_link
             else:
                 articulation_root_prim = default_prim
@@ -849,7 +849,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self.kinematic_only or (not has_articulated_joints and not has_fixed_joints):
             # Kinematic only, or non-jointed single body objects
             return None
-        elif not self.fixed_base and has_articulated_joints:
+        elif not self.fixed_base:
             # This is all remaining non-fixed objects
             # This is a bit hacky because omniverse is buggy
             # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a

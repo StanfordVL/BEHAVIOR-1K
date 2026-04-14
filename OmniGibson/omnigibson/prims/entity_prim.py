@@ -1024,7 +1024,7 @@ class EntityPrim(XFormPrim):
         # move the entity prim. In this case we want to make sure that the root link does not have
         # a relative pose to the entity prim.
         if self.articulation_root_path == self.prim_path:
-            this_position, this_orientation = self.get_position_orientation(frame=frame)
+            this_position, this_orientation = XFormPrim.get_position_orientation(self, frame=frame)
             root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
             assert th.allclose(
                 this_position, root_link_position, atol=1e-2
