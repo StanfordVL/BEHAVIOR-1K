@@ -40,6 +40,7 @@ class SegmentationMap(BaseMap):
         self.room_ins_name_to_ins_id = None
         self.room_ins_id_to_ins_name = None
         self.room_sem_name_to_ins_name = None
+        self.room_ins_name_to_sem_name = None
         self.room_ins_map = None
         self.room_sem_map = None
 
@@ -99,6 +100,9 @@ class SegmentationMap(BaseMap):
         self.room_ins_name_to_ins_id = room_ins_name_to_ins_id
         self.room_ins_id_to_ins_name = {value: key for key, value in room_ins_name_to_ins_id.items()}
         self.room_sem_name_to_ins_name = room_sem_name_to_ins_name
+        self.room_ins_name_to_sem_name = {
+            ins_name: sem_name for sem_name, ins_names in room_sem_name_to_ins_name.items() for ins_name in ins_names
+        }
         self.room_ins_map = img_ins
         self.room_sem_map = img_sem
 

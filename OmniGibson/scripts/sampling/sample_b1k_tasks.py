@@ -271,10 +271,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Skip any with unsupported predicates, but still record the reason why we can't sample
         task_obj = get_knowledge_base().get_task(f"{activity}-0")
-        task_obj._ensure_compiled()
+        conditions, _, _ = task_obj.parse_base_scope()
         all_predicates = set(
-            get_predicates(task_obj.conditions.parsed_initial_conditions)
-            + get_predicates(task_obj.conditions.parsed_goal_conditions)
+            get_predicates(conditions.parsed_initial_conditions) + get_predicates(conditions.parsed_goal_conditions)
         )
         unsupported_predicates = set.intersection(all_predicates, UNSUPPORTED_PREDICATES)
         if len(unsupported_predicates) > 0:
@@ -305,7 +304,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Attempt to sample
         try:
             if should_sample:
-                relevant_rooms = set(get_rooms(task_obj.conditions.parsed_initial_conditions))
+                relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
                 print(f"relevant rooms: {relevant_rooms}")
                 for obj in env.scene.objects:
                     if isinstance(obj, DatasetObject):

@@ -8,8 +8,8 @@ parser.add_argument("--activity", type=str, required=True)
 
 def print_task_custom_list_template(activity_name):
     task = get_knowledge_base().get_task(f"{activity_name}-0")
-    task._ensure_compiled()
-    init_conds = task.conditions.parsed_initial_conditions
+    conditions, _, _ = task.parse_base_scope()
+    init_conds = conditions.parsed_initial_conditions
     synsets = set()
     room_types = set()
     for init_cond in init_conds:
