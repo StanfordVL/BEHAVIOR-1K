@@ -329,6 +329,7 @@ def test_tiago_setter():
     og.clear()
 
     # assert that when the simulator is stopped, the behavior for getter/setter is not affected
+    # TODO: Is it intentional that this is not a Tiago robot but a Fetch one?
     vec_env = setup_multi_environment(2)
     og.sim.stop()
 
