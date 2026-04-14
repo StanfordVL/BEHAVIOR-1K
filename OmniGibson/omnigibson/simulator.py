@@ -870,9 +870,7 @@ def _launch_simulator(*args, **kwargs):
 
             if is_outer and playing:
                 # Only dump state if all registered objects are initialized.
-                all_initialized = all(
-                    obj.initialized for scene in self.scenes for obj in scene.objects
-                )
+                all_initialized = all(obj.initialized for scene in self.scenes for obj in scene.objects)
                 if all_initialized:
                     state = self.dump_state()
                     objs_before = {scene.idx: set(scene.object_registry.object_names) for scene in self.scenes}
