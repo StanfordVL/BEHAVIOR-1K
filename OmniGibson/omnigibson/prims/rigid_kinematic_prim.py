@@ -2,8 +2,7 @@ from typing import Literal
 
 import torch as th
 
-from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import RigidBodyViewAPI
 
 from .rigid_prim import RigidPrim
 
@@ -55,11 +54,9 @@ class RigidKinematicPrim(RigidPrim):
             frame (Literal): The frame in which to set the position and orientation. Defaults to world.
                 Scene frame sets position relative to the scene.
         """
-        # Use the XFormPrim implementation directly
-        XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+        super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
-        # Invalidate pose API
-        PoseAPI.invalidate()
+        RigidBodyViewAPI.invalidate_kinematic(self.links.values())
 
     # The following methods implement the same interface as RigidDynamicPrim, but as no-op
     # versions for kinematic-only prims. This allows code to call these methods on any RigidPrim
