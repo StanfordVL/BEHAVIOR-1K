@@ -797,19 +797,21 @@ class OGRobotServer:
         # If left arrow is toggled from OFF -> ON, toggle flashlight on left eef
         button_left_arrow_state = self._joint_cmd["button_left"].item() != 0.0
         if button_left_arrow_state and not self._button_toggled_state["left"]:
-            if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
-                self.flashlights["left"].MakeVisible()
-            else:
-                self.flashlights["left"].MakeInvisible()
+            with og.sim.editing_usd():
+                if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
+                    self.flashlights["left"].MakeVisible()
+                else:
+                    self.flashlights["left"].MakeInvisible()
         self._button_toggled_state["left"] = button_left_arrow_state
 
         # If right arrow is toggled from OFF -> ON, toggle flashlight on right eef
         button_right_arrow_state = self._joint_cmd["button_right"].item() != 0.0
         if button_right_arrow_state and not self._button_toggled_state["right"]:
-            if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
-                self.flashlights["right"].MakeVisible()
-            else:
-                self.flashlights["right"].MakeInvisible()
+            with og.sim.editing_usd():
+                if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
+                    self.flashlights["right"].MakeVisible()
+                else:
+                    self.flashlights["right"].MakeInvisible()
         self._button_toggled_state["right"] = button_right_arrow_state
 
     def _update_visualization_and_status(self, info):
