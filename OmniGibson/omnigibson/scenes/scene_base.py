@@ -669,6 +669,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 obj.name not in self.object_registry.object_names
             ), f"Object with name {obj.name} already exists in scene!"
 
+            # Invalidate the physics simulation view before loading. Object loading
+            # can corrupt the view, so we preemptively de-initialize it.
+            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+            if og.sim.is_playing() and SimulationManager._physics_sim_view:
+                SimulationManager._physics_sim_view.invalidate()
+                SimulationManager._physics_sim_view = None
+                og.sim._physics_view_invalidated = True
+
             # Load the object.
             obj.load(self)
 
@@ -709,6 +717,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         with og.sim.adding_or_removing_objects():
             # Run any simulation-level callbacks
             og.sim._pre_remove_object(obj)
+
+            # Invalidate the physics simulation view before removal to avoid
+            # GPU dynamics crashes when removing objects in contact.
+            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+            if og.sim.is_playing() and SimulationManager._physics_sim_view:
+                SimulationManager._physics_sim_view.invalidate()
+                SimulationManager._physics_sim_view = None
+                og.sim._physics_view_invalidated = True
 
             # Remove from the appropriate registry if registered.
             # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)

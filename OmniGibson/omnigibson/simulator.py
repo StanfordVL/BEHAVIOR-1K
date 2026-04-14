@@ -476,6 +476,7 @@ def _launch_simulator(*args, **kwargs):
             # Counter for objects currently being added or removed (nested adding_objects / removing_objects scopes).
             # We track these to delay certain operations (e.g., callbacks, state updates) until all pending add/remove operations complete.
             self._n_adding_removing_objects = 0
+            self._physics_view_invalidated = False
 
             # Maps callback name to callback
             self._callbacks_on_play = dict()
@@ -878,18 +879,18 @@ def _launch_simulator(*args, **kwargs):
                 else:
                     state = None
 
-                if SimulationManager._physics_sim_view:
-                    # Invalidate and de-initialize the physics simulation view before any objects are added or removed
-                    SimulationManager._physics_sim_view.invalidate()
-                    SimulationManager._physics_sim_view = None
+                # Track whether the physics view was invalidated during the yield
+                self._physics_view_invalidated = False
 
             yield
 
             self._n_adding_removing_objects -= 1
 
             if is_outer and playing:
-                SimulationManager._physx_sim_interface.flush_changes()
-                self.update_handles()
+                if self._physics_view_invalidated:
+                    # Physics view was invalidated during add/remove
+                    SimulationManager._physx_sim_interface.flush_changes()
+                    self.update_handles()
 
                 if state is not None:
                     # Detect which objects were removed and prune them from saved state
@@ -907,7 +908,7 @@ def _launch_simulator(*args, **kwargs):
                             for scene in scenes_with_removals:
                                 scene.transition_rule_api.prune_active_rules()
 
-                    self.load_state(state)
+                        self.load_state(state)
 
         def _post_import_object(self, obj):
             """
