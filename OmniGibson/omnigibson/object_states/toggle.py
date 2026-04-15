@@ -387,13 +387,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
           6. Color sync             — update visual marker color for flipped objects.
 
         Args:
-            values (th.Tensor): Shape (S, N). Toggle state stored as 0.0/1.0.
-
-        Returns:
-            th.Tensor: Updated values tensor (clone of input with modifications applied).
+            values (th.Tensor): Shape (S, N). Toggle state stored as 0.0/1.0. Mutated in-place.
         """
-        # Single clone — required so the base class can detect changes via new_values != cls.VALUES.
-        new_values = values.clone()
         S = values.shape[0]
 
         # Reset all scratch masks for this step (in-place fill, no allocation).
@@ -410,7 +405,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
         th.logical_not(cls._mask_force_off, out=cls._mask_active)
         # Zero out toggle state for force-off objects (in-place).
-        new_values[cls._mask_force_off] = False
+        values[cls._mask_force_off] = False
         cls._can_toggle_steps[cls._mask_force_off] = 0
 
         # Step 2: contact mask.
@@ -434,7 +429,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         # Step 5: toggle flip.
         th.eq(cls._can_toggle_steps, m.CAN_TOGGLE_STEPS, out=cls._mask_flip)
         cls._mask_flip &= cls._mask_active
-        new_values[cls._mask_flip] = ~new_values[cls._mask_flip]
+        values[cls._mask_flip] = ~values[cls._mask_flip]
 
         # Step 6: sync visual marker colors for flipped objects.
         # Per-object USD color write; unavoidable loop, runs only for the flipped subset.
@@ -442,10 +437,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         for scene_idx in range(S):
             for obj_idx in th.where(cls._mask_flip[scene_idx])[0].tolist():
                 cls.visual_markers[obj_idx].color = (
-                    cls.COLOR_ON if bool(new_values[scene_idx, obj_idx].item()) else cls.COLOR_OFF
+                    cls.COLOR_ON if bool(values[scene_idx, obj_idx].item()) else cls.COLOR_OFF
                 )
-
-        return new_values
 
     def _get_value(self):
         # Return toggle boolean from the (scene_idx, obj_idx, 0) entry of the shared VALUES tensor.

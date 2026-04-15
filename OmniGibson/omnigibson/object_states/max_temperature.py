@@ -49,7 +49,7 @@ class MaxTemperature(TensorizedValueState):
         # Value is max between stored values and current temperature values.
         # Temperature.VALUES is (S, N_temp); cls.TEMPERATURE_IDXS maps MaxTemp N → Temperature N,
         # so Temperature.VALUES[:, cls.TEMPERATURE_IDXS] has shape (S, N_max).
-        return th.maximum(values, Temperature.VALUES[:, cls.TEMPERATURE_IDXS])
+        th.maximum(values, Temperature.VALUES[:, cls.TEMPERATURE_IDXS], out=values)
 
     @classproperty
     def value_name(cls):

@@ -31,6 +31,10 @@ class TensorizedValueState(AbsoluteObjectState):
     # _get_value() always reads from here to avoid GPU stalls for Python callers.
     VALUES_CPU = None
 
+    # GPU tensor mirroring VALUES from the previous step — filled by global_update() before
+    # _update_values() runs, used for change detection instead of per-step clone.
+    PREV_VALUES = None
+
     # Dictionary mapping relative prim path to index in the N dimension of VALUES
     OBJ_IDXS = None
 
@@ -46,6 +50,7 @@ class TensorizedValueState(AbsoluteObjectState):
         # Shape (0, 0, *value_shape) — zero scenes, zero object types; GPU-resident
         cls.VALUES = th.empty(0, dtype=cls.value_type, device="cuda").reshape(0, 0, *cls.value_shape)
         cls.VALUES_CPU = th.empty(0, dtype=cls.value_type).pin_memory().reshape(0, 0, *cls.value_shape)
+        cls.PREV_VALUES = th.empty(0, dtype=cls.value_type, device="cuda").reshape(0, 0, *cls.value_shape)
         cls.OBJ_IDXS = {}  # {relative_prim_path: int}
         cls.IDX_OBJS = []  # list[list[obj|None]]
 
@@ -112,6 +117,10 @@ class TensorizedValueState(AbsoluteObjectState):
                     if cls.IDX_OBJS[s_idx][obj_idx_new] is not None:
                         cls.VALUES[s_idx, obj_idx_new] = prev_values[s_idx, obj_idx_old]
 
+        # PREV_VALUES must match VALUES shape; seed with current values so first global_update()
+        # doesn't fire spurious state_updated() for every object.
+        cls.PREV_VALUES = cls.VALUES.clone()
+
         # Rebuild pinned CPU mirror — synchronous copy so _get_value() is valid before first async copy
         cls.VALUES_CPU = th.zeros(cls.VALUES.shape, dtype=cls.value_type).pin_memory()
         if cls.VALUES.numel() > 0:
@@ -129,12 +138,12 @@ class TensorizedValueState(AbsoluteObjectState):
         if S == 0 or N == 0:
             return
 
-        old_values = cls.VALUES.clone()
+        cls.PREV_VALUES.copy_(cls.VALUES)
         cls._update_values(values=cls.VALUES)
 
         # Compare with previous values, and add any changed objects to the scene-tracked set.
         # changed_mask shape: (S, N) — collapse any trailing value_shape dimensions if present.
-        diff = cls.VALUES != old_values
+        diff = cls.VALUES != cls.PREV_VALUES
         changed_mask = th.any(diff, dim=tuple(range(2, diff.ndim))) if diff.ndim > 2 else diff
         for s_idx in range(S):
             for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
@@ -151,12 +160,10 @@ class TensorizedValueState(AbsoluteObjectState):
     def _update_values(cls, values):
         """
         Updates all internally tracked @values for this object state. Should be implemented by subclass.
+        Mutates @values in-place. Must not return anything.
 
         Args:
             values (th.tensor): Tensorized value array of shape (S, N, *value_shape)
-
-        Returns:
-            th.tensor: Updated tensorized value array of same shape
         """
         raise NotImplementedError
 

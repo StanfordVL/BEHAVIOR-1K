@@ -206,9 +206,6 @@ class RigidBodyViewAPI:
     Flat index layout in _POSE_MATRICES (N_links_total, 4, 4):
       [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked links across all scenes]
 
-    _SCENE_PHYSX_OFFSETS[s] gives the start of scene s's physx_tracked slice in _POSES /
-    the physx_tracked portion of _POSE_MATRICES.
-
     Also stores LOCAL_POINTS / POINTS_MASK for batched AABB computation via get_aabb().
     """
 
@@ -221,7 +218,6 @@ class RigidBodyViewAPI:
 
     # Raw poses from PhysX — flat across all scenes, physx_tracked links only.
     # shape: (N_links_physx_tracked, 7) — [px, py, pz, qx, qy, qz, qw]
-    # N_links_physx_tracked = sum_s(P_physx_s); does NOT grow when untracked links are added.
     _POSES = None
 
     # Cached 4x4 transformation matrices — flat, covers physx_tracked + physx_untracked.
@@ -229,7 +225,7 @@ class RigidBodyViewAPI:
     # physx_untracked slice is appended after all physx_tracked entries and never
     # overwritten by update_pose_cache(); refreshed only by invalidate_kinematic().
     _POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
-    _POSE_MATRICES_CPU = None  # pinned CPU staging buffer — written by update_pose_cache()
+    _POSE_MATRICES_CPU = None  # CPU — written by update_pose_cache()
 
     # Local homogeneous collision points for every rigid link, indexed by flat pose index.
     # shape: (N_links_total, V_max, 4)
@@ -269,9 +265,8 @@ class RigidBodyViewAPI:
             cls.clear()
             return
 
-        # --- Phase A: create per-scene PhysX views, build flat _PATH_TO_IDX, collect poses ---
+        # Create a PhysX view for all scenes, build _PATH_TO_IDX, collect poses
         poses_list = []
-
         # TODO: Verify things still work after merging from main
         # og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
@@ -281,13 +276,10 @@ class RigidBodyViewAPI:
                 cls._IDX_TO_PATH.append(abs_path)
             poses_list.append(cls._RIGID_BODY_VIEW.get_transforms().clone())
 
-        if not poses_list:
-            return
-
         # Add physx_untracked kinematic links and collects collision_boundary_points_local---
         raw_local_points = {}  # {flat_idx: (V, 3) tensor}
 
-        for scene_idx, scene in enumerate(og.sim.scenes):
+        for _, scene in enumerate(og.sim.scenes):
             for obj in scene.objects:
                 is_untracked = obj.kinematic_only and obj.prim_type != PrimType.CLOTH
                 for link in obj.links.values():
@@ -302,9 +294,8 @@ class RigidBodyViewAPI:
                         cls._PATH_TO_IDX[abs_path] = idx
                         cls._IDX_TO_PATH.append(abs_path)
 
-                        pos, quat_wxyz = link.get_position_orientation()
-                        quat_xyzw = th.cat([quat_wxyz[1:], quat_wxyz[:1]])
-                        poses_list.append(th.cat([pos, quat_xyzw]))
+                        pos, quat_xyzw = link.get_position_orientation()
+                        poses_list.append(th.cat([pos, quat_xyzw]).unsqueeze(0))
 
                     # Collect local collision points for AABB
                     # This is require for all registered links
@@ -314,7 +305,6 @@ class RigidBodyViewAPI:
                         raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
 
         cls._POSES = th.cat(poses_list, dim=0)  # (N_links_total, 7), CPU
-
         cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
         cls._POSE_MATRICES = cls._POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
 
@@ -413,8 +403,8 @@ class RigidBodyViewAPI:
 
         # Scatter into per-object AABBs
         idx_exp = link_idx.unsqueeze(1).expand(-1, 3)  # (N, 3)
-        out_values[:, :3].scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_cls=True)
-        out_values[:, 3:].scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_cls=True)
+        out_values[:, :3].scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_self=True)
+        out_values[:, 3:].scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_self=True)
 
     @classmethod
     def invalidate_kinematic(cls, links):
@@ -742,8 +732,8 @@ class RigidContactAPIImpl:
                 # every pair of bodies that already existed before the rebuild.
                 initial_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
                 initial_contacts = th.any(initial_impulses != 0, dim=-1)
-                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
-                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
+                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
+                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
                 self._CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
                 self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
 
@@ -791,12 +781,12 @@ class RigidContactAPIImpl:
                     device="cuda",
                 )
                 self._PENDING_TRANSFORMS[scene_idx] = th.zeros(
-                    n_physics_steps, self._RIGID_BODY_VIEW[scene_idx].num_bodies, 7, device="cuda"
+                    n_physics_steps, self._BODY_TRANSFORMS[scene_idx].shape[0], 7, device="cuda"
                 )
                 self._PENDING_NET_FORCES[scene_idx] = th.zeros(
                     n_physics_steps,
                     self._CONTACT_MATRIX[scene_idx].shape[0],
-                    self._CONTACT_MATRIX[scene_idx].shape[1],
+                    3,
                     device="cuda",
                 )
 
@@ -811,7 +801,8 @@ class RigidContactAPIImpl:
         assert self._PENDING_STEPS < og.sim.n_physics_timesteps_per_render, "Pending steps buffer is full"
 
         with th.cuda.stream(og.sim.CPU_TO_GPU):
-            for scene_idx in list(self._CONTACT_VIEW.keys()):
+            scene_idx_list = list(self._CONTACT_VIEW.keys())
+            for scene_idx in scene_idx_list:
                 try:
                     # Get the contact impulse and net force matrices for this scene
                     self._PENDING_IMPULSES[scene_idx][self._PENDING_STEPS].copy_(
@@ -835,8 +826,10 @@ class RigidContactAPIImpl:
                     self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
                 )
 
+            if len(scene_idx_list) > 0:
+                self._PENDING_STEPS += 1
+
         og.sim.CPU_TO_GPU.synchronize()
-        self._PENDING_STEPS += 1
 
     def update_contact_cache(self):
         """
@@ -848,14 +841,14 @@ class RigidContactAPIImpl:
         transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
         force are also treated as awake.  Contact matrices are only updated from awake steps.
         """
-        n_timesteps_per_render = og.sim.n_physics_timesteps_per_render
-        assert self._PENDING_STEPS == n_timesteps_per_render, "Pending steps buffer is not full"
+        if self._PENDING_STEPS == 0:
+            return
+
         for scene_idx in list(self._CONTACT_VIEW.keys()):
-            # TODO(andi) optimize here
             # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
-            all_impulses = self._PENDING_IMPULSES[scene_idx]
-            all_transforms = self._PENDING_TRANSFORMS[scene_idx]
-            all_net_forces = self._PENDING_NET_FORCES[scene_idx]
+            all_impulses = self._PENDING_IMPULSES[scene_idx][: self._PENDING_STEPS]
+            all_transforms = self._PENDING_TRANSFORMS[scene_idx][: self._PENDING_STEPS]
+            all_net_forces = self._PENDING_NET_FORCES[scene_idx][: self._PENDING_STEPS]
 
             # Get the previous body transforms for the cache
             prev_transforms = self._BODY_TRANSFORMS[scene_idx]
@@ -881,7 +874,7 @@ class RigidContactAPIImpl:
             # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
             # data for all the indices where the object is not asleep.
             body_step_indices = (
-                th.arange(n_timesteps_per_render, dtype=th.long, device="cuda").unsqueeze(1).expand_as(per_step_awake)
+                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda").unsqueeze(1).expand_as(per_step_awake)
             )
             last_awake_body_step = (
                 th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
@@ -896,7 +889,7 @@ class RigidContactAPIImpl:
             col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
             valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
             per_step_col_awake = th.zeros(
-                n_timesteps_per_render, len(col_to_rigid), dtype=th.bool, device="cuda"
+                self._PENDING_STEPS, len(col_to_rigid), dtype=th.bool, device="cuda"
             )  # (N, C)
             per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
@@ -905,8 +898,8 @@ class RigidContactAPIImpl:
 
             # What is the last step that the pair was awake?
             pair_step_indices = (
-                th.arange(n_timesteps_per_render, dtype=th.long, device="cuda")
-                .reshape(n_timesteps_per_render, 1, 1)
+                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda")
+                .reshape(self._PENDING_STEPS, 1, 1)
                 .expand_as(per_step_awake_pairs)
             )
             last_awake_pair_step = (
@@ -2810,7 +2803,10 @@ def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
         return relative_prim_path
 
     # Special case for global floor plane collision prim — already an absolute path
-    if relative_prim_path.endswith("collisionPlane"):
+    if (
+        og.sim.floor_plane is not None
+        and relative_prim_path == og.sim.floor_plane.relative_prim_path + "/collisionPlane"
+    ):
         return relative_prim_path
 
     # Make sure the relative path is actually relative
@@ -2840,7 +2836,10 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
         return absolute_prim_path
 
     # Special case for global floor plane collision prim — not scene-scoped, return unchanged
-    if absolute_prim_path.endswith("collisionPlane"):
+    if (
+        og.sim.floor_plane is not None
+        and absolute_prim_path == og.sim.floor_plane.relative_prim_path + "/collisionPlane"
+    ):
         return absolute_prim_path
 
     assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"

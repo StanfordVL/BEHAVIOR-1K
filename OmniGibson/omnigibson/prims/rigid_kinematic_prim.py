@@ -56,7 +56,7 @@ class RigidKinematicPrim(RigidPrim):
         """
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
-        RigidBodyViewAPI.invalidate_kinematic(self.links.values())
+        RigidBodyViewAPI.invalidate_kinematic([self])
 
     # The following methods implement the same interface as RigidDynamicPrim, but as no-op
     # versions for kinematic-only prims. This allows code to call these methods on any RigidPrim

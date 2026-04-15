@@ -21,8 +21,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states import initialize_tensorized_states
-from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states import AABB
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
@@ -1127,7 +1126,11 @@ def _launch_simulator(*args, **kwargs):
             RigidBodyViewAPI.initialize_view()
             ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
-            initialize_tensorized_states()
+
+            if gm.ENABLE_OBJECT_STATES:
+                for state_type in og.sim.object_state_types_requiring_update:
+                    if issubclass(state_type, TensorizedValueState):
+                        state_type.initialize_view()
 
         def refresh_physics(self, sync_usd=False):
             """
@@ -1141,6 +1144,16 @@ def _launch_simulator(*args, **kwargs):
                 self.psi.fetch_results()
             self._sim_context._physx_fabric_interface.update(0, self.current_time)
 
+        def _update_view_apis(self):
+            """Flush physics caches and sync CPU→GPU. Called after every physics step batch."""
+            RigidContactAPI.update_contact_cache()
+            RigidBodyViewAPI.update_pose_cache()
+            ArticulatedObjectViewAPI.update_dof_cache()
+
+            RigidBodyViewAPI.async_copy_to_gpu()
+            ArticulatedObjectViewAPI.async_copy_to_gpu()
+            self.CPU_TO_GPU.synchronize()
+
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
             """
@@ -1153,14 +1166,7 @@ def _launch_simulator(*args, **kwargs):
             # If we're playing we, also run additional logic
             if self.is_playing():
                 # Update persistent rigid contact and body pose caches from the latest step
-                RigidContactAPI.update_contact_cache()
-                RigidBodyViewAPI.update_pose_cache()
-                ArticulatedObjectViewAPI.update_dof_cache()
-
-                # Async CPU→GPU copies; synchronize before state global_updates read GPU data
-                RigidBodyViewAPI.async_copy_to_gpu()
-                ArticulatedObjectViewAPI.async_copy_to_gpu()
-                self.CPU_TO_GPU.synchronize()
+                self._update_view_apis()
 
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
@@ -1171,7 +1177,6 @@ def _launch_simulator(*args, **kwargs):
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
                     self.refresh_physics()
-                    initialize_tensorized_states()
                     scenes_modified = set()
                     for i in range(n_objects_to_initialize):
                         obj = self._objects_to_initialize[i]
@@ -1349,15 +1354,9 @@ def _launch_simulator(*args, **kwargs):
 
             # Accumulate contact data from this physics step and then flush to cache.
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-            RigidContactAPI.update_contact_cache()
-            RigidBodyViewAPI.update_pose_cache()
-            ArticulatedObjectViewAPI.update_dof_cache()
+            self._update_view_apis()
 
-            RigidBodyViewAPI.async_copy_to_gpu()
-            ArticulatedObjectViewAPI.async_copy_to_gpu()
-            self.CPU_TO_GPU.synchronize()
-
-            # TODO (andi) is this ideal?
+            # TODO (andi) remove this after on_top is tensorized
             # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read
             # up-to-date AABBs without waiting for the next full _non_physics_step.
             if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None and AABB.VALUES.numel() > 0:
@@ -1398,8 +1397,8 @@ def _launch_simulator(*args, **kwargs):
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
 
-                # Pull the contact sensor data
-                RigidContactAPI.add_contacts_from_physics_step()
+                    # Pull the contact sensor data
+                    RigidContactAPI.add_contacts_from_physics_step()
 
                 # Record that we are done with the step context.
                 self.currently_stepping = False

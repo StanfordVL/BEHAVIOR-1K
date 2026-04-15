@@ -247,7 +247,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
         O = values.shape[1]  # number of objects in a scene
 
         if O == 0 or cls.OBJ_IDXES_IN_ARTICULATION_VIEW.numel() == 0:
-            return values.clone()
+            return
 
         # (S, O, max_dof) — indexing _POSITIONS with (S, O) rows tensor
         pos = ArticulatedObjectViewAPI.get_articulation_positions(cls.OBJ_IDXES_IN_ARTICULATION_VIEW)
@@ -267,7 +267,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
         both = cls.BOTH_SIDES.unsqueeze(0)  # (1, O)
         is_open = th.where(both, any_s1 & any_s2, any_s1)  # (S, O)
 
-        return is_open.float()
+        values.copy_(is_open.float())
 
     def _get_value(self):
         s = self.obj.scene.idx
