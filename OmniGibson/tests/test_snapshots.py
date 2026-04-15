@@ -24,6 +24,8 @@ from omnigibson.objects import DatasetObject
 from PIL import Image
 
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
+GOLDEN_DIR = SNAPSHOTS_DIR / "golden"
+ACTUAL_DIR = SNAPSHOTS_DIR / "actual"
 
 # Camera pose used across multiple tests, positioned to view the Rs_int kitchen area.
 _CAM_POS = th.tensor([1.5, -4, 2.25])
@@ -96,12 +98,12 @@ def _capture(camera_pos, camera_orn, modalities):
 
 
 def _check(name, array):
-    """Compare array against stored reference, or save it if SNAPSHOT_UPDATE is set.
+    """Compare array against stored golden reference, or save it if SNAPSHOT_UPDATE is set.
 
-    A companion PNG is always written for visual inspection.
+    On mismatch the actual output is written to snapshots/actual/ for debugging.
     """
-    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = SNAPSHOTS_DIR / f"{name}.npy"
+    GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
+    path = GOLDEN_DIR / f"{name}.npy"
 
     if _update_mode():
         np.save(path, array)
@@ -112,15 +114,23 @@ def _check(name, array):
 
     if not path.exists():
         pytest.fail(
-            f"Missing reference snapshot '{name}': {path}. "
-            "Set SNAPSHOT_UPDATE=1 to generate it and commit the result."
+            f"Missing golden snapshot '{name}': {path}. " "Set SNAPSHOT_UPDATE=1 to generate it and commit the result."
         )
 
     reference = np.load(path)
-    assert array.shape == reference.shape, f"Shape mismatch for '{name}': got {array.shape}, expected {reference.shape}"
-    assert np.array_equal(array, reference), (
-        f"Snapshot mismatch for '{name}'. " "Set SNAPSHOT_UPDATE=1 to regenerate the reference."
-    )
+    shape_match = array.shape == reference.shape
+    pixel_match = shape_match and np.array_equal(array, reference)
+
+    if not pixel_match:
+        ACTUAL_DIR.mkdir(parents=True, exist_ok=True)
+        actual_npy = ACTUAL_DIR / f"{name}.npy"
+        actual_png = ACTUAL_DIR / f"{name}.png"
+        np.save(actual_npy, array)
+        _array_to_png(array, actual_png)
+
+    if not shape_match:
+        pytest.fail(f"Shape mismatch for '{name}': got {array.shape}, expected {reference.shape}")
+    assert pixel_match, f"Snapshot mismatch for '{name}'. Set SNAPSHOT_UPDATE=1 to regenerate the reference."
 
 
 # ---------------------------------------------------------------------------

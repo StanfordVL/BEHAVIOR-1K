@@ -83,6 +83,7 @@ jobs:
           - test_symbolic_primitives
           - test_systems
           - test_transform_utils
+          - test_snapshots
           - test_transition_rules
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
@@ -165,6 +166,14 @@ jobs:
           else
             echo "All tests passed successfully"
           fi
+
+      - name: Deploy snapshot artifacts
+        if: always() && matrix.test_file == 'test_snapshots'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-snapshots
+          path: OmniGibson/tests/snapshots/actual/
+          overwrite: true
 
       - name: Deploy artifact
         if: always()
