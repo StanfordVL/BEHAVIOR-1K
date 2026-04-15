@@ -467,7 +467,10 @@ class BehaviorTask(BaseTask):
             self.future_obj_instances = {
                 init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
             }
-            self.assign_object_scope_with_cache(env)
+            # Use non-strict so that wildcard-expanded instances absent from cache are handled by
+            # _assign_wildcard_instances below rather than raising an assertion error.
+            self.assign_object_scope_with_cache(env, strict=False)
+            self._assign_wildcard_instances(env)
 
         return True, None
 
