@@ -1,10 +1,6 @@
 """
-Deterministic semantic-segmentation snapshot tests.
-
-Each test loads a fixed, fully-specified scene (no random selection, no random
-actions) and compares sensor output against a stored .npy reference.  These
-tests are intentionally decoupled from test_examples.py so that
-non-deterministic examples do not pollute snapshot coverage.
+Deterministic snapshot tests.
+Each test loads a fixed scene and compares sensor output against a stored .npy reference.
 
 To regenerate all snapshots:
     SNAPSHOT_UPDATE=1 OMNIGIBSON_HEADLESS=1 pytest tests/test_snapshots.py
