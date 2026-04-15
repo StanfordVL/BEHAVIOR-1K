@@ -993,7 +993,7 @@ def test_cooking_object_rule_failure_wrong_heat_source(env, stove, baking_sheet,
 
     bagel_dough.set_position_orientation(position=[-0.1, -0.15, 0.84], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[-0.1, -0.15, 0.89], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
