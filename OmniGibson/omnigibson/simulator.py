@@ -1950,7 +1950,7 @@ def _launch_simulator(*args, **kwargs):
             """Partial clear clearing all components owned by the Simulator. Rest is completed in og.clear."""
             # Stop the physics
             self.stop()
-            
+
             # Clean subscribed callbacks
             self._pre_physics_step_callback.unsubscribe()
             self._post_physics_step_callback.unsubscribe()
