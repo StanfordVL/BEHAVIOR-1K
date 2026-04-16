@@ -473,8 +473,14 @@ class BehaviorTask(BaseTask):
             }
             # Use non-strict so that wildcard-expanded instances absent from cache are handled by
             # _assign_wildcard_instances below rather than raising an assertion error.
+            # TODO @wensi-ai: Check object scope again to see if any wildcard objects are recorded. 2026+ tasks do this, 2025 ones don't.
             self.assign_object_scope_with_cache(env, strict=False)
+            # TODO @wensi-ai: Assign objects to remaining wildcard objects. This is a no-op for 2026+ tasks.
             self._assign_wildcard_instances(env)
+            # assert that everything in the object scope that's not a future object is not None
+            for inst, entity in self.object_scope.items():
+                if inst not in self.future_obj_instances and entity is None:
+                    raise ValueError(f"Object instance '{inst}' was not assigned an entity during cache assignment!")
 
         return True, None
 
@@ -513,15 +519,12 @@ class BehaviorTask(BaseTask):
         # We assume the relevant agent is the first agent in the scene
         return env.robots[0]
 
-    def assign_object_scope_with_cache(self, env, strict=True):
+    def assign_object_scope_with_cache(self, env):
         """
         Assigns objects within the current object scope from cached scene metadata.
 
         Args:
             env (Environment): Current active environment instance
-            strict (bool): If True, assert that every non-future instance exists in cache.
-                If False, skip instances not found in cache (used during partial
-                assignment before wildcard compilation).
         """
         # Load task metadata
         inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
@@ -531,12 +534,7 @@ class BehaviorTask(BaseTask):
             if obj_inst in self.future_obj_instances:
                 entity = None
             elif obj_inst not in inst_to_name:
-                if strict:
-                    assert False, (
-                        f"BDDL object instance {obj_inst} should exist in cached metadata "
-                        f"from loaded scene, but could not be found!"
-                    )
-                # In non-strict mode, skip instances not found (e.g., future objects
+                # Skip instances not found (e.g., future objects
                 # when future_obj_instances isn't fully populated yet)
                 continue
             else:
@@ -551,9 +549,6 @@ class BehaviorTask(BaseTask):
                 else:
                     entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = entity
-
-        # Write back to task metadata
-        self.update_bddl_scope_metadata(env)
 
     def update_bddl_scope_metadata(self, env):
         """
