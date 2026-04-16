@@ -1950,8 +1950,11 @@ def _launch_simulator(*args, **kwargs):
             """Partial clear clearing all components owned by the Simulator. Rest is completed in og.clear."""
             # Stop the physics
             self.stop()
-            # Clean subscribed callback
-            self._teardown_internal_subscriptions()
+            
+            # Clean subscribed callbacks
+            self._pre_physics_step_callback.unsubscribe()
+            self._post_physics_step_callback.unsubscribe()
+            self._simulation_event_callback.unsubscribe()
 
             # Clear all scenes
             for scene in self.scenes:
@@ -1990,26 +1993,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Disable the USD guard - we don't care anymore
             self._disable_usd_guard()
-
-        def _teardown_internal_subscriptions(self):
-            """
-            Explicitly tear down PhysX / simulation event subscriptions owned by this simulator.
-            This prevents stale callbacks from surviving across og.clear() cycles.
-            """
-            for callback in (
-                "_pre_physics_step_callback",
-                "_post_physics_step_callback",
-                "_simulation_event_callback",
-            ):
-                subscription = getattr(self, callback, None)
-                if subscription is None:
-                    continue
-                try:
-                    subscription.unsubscribe()
-                except Exception as e:
-                    log.warning("Failed to unsubscribe %s during simulator clear: %s", callback, e)
-                finally:
-                    setattr(self, callback, None)
 
         def close(self):
             """
