@@ -129,19 +129,18 @@ class TensorizedValueState(AbsoluteObjectState):
         if S == 0 or N == 0:
             return
 
-        new_values = cls._update_values(values=cls.VALUES)
+        old_values = cls.VALUES.clone()
+        cls._update_values(values=cls.VALUES)
 
         # Compare with previous values, and add any changed objects to the scene-tracked set.
         # changed_mask shape: (S, N) — collapse any trailing value_shape dimensions if present.
-        diff = new_values != cls.VALUES
+        diff = cls.VALUES != old_values
         changed_mask = th.any(diff, dim=tuple(range(2, diff.ndim))) if diff.ndim > 2 else diff
         for s_idx in range(S):
             for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
                 obj = cls.IDX_OBJS[s_idx][obj_idx]
                 if obj is not None:
                     obj.state_updated()
-
-        cls.VALUES = new_values
 
         # Async GPU → CPU copy on the shared stream; simulator calls GPU_TO_CPU.synchronize()
         # after the Pass 1 loop before any VALUES_CPU reads in Pass 2.

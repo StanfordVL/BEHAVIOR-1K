@@ -218,16 +218,18 @@ class Open(TensorizedValueState, BooleanStateMixin):
             both_sides, relevant_joints, joint_directions = _get_relevant_joints(obj)
             cls.BOTH_SIDES[obj_idx] = both_sides
 
+            # Prepare the thresholds for this object even if we're not going to use both sides.
+            # Later logic will correctly use only the thresholds for the sides that are actually used.
             for joint, direction in zip(relevant_joints, joint_directions):
                 for dof_col in joint.dof_indices:
                     cls.OPENABLE_MASK[obj_idx, dof_col] = True
                     for side, threshold_attr, direction_attr in [
-                        (1, "THRESHOLDS_S1", "DIRECTIONS_S1"),
-                        (-1, "THRESHOLDS_S2", "DIRECTIONS_S2"),
+                        (1, cls.THRESHOLDS_S1, cls.DIRECTIONS_S1),
+                        (-1, cls.THRESHOLDS_S2, cls.DIRECTIONS_S2),
                     ]:
                         threshold, open_end, _ = _compute_joint_threshold(joint, direction * side)
-                        getattr(cls, threshold_attr)[obj_idx, dof_col] = threshold
-                        getattr(cls, direction_attr)[obj_idx, dof_col] = 1.0 if open_end > threshold else -1.0
+                        threshold_attr[obj_idx, dof_col] = threshold
+                        direction_attr[obj_idx, dof_col] = 1.0 if open_end > threshold else -1.0
 
         # Pre-build (S, O) row index into ArticulatedObjectViewAPI._POSITIONS — built once, reused every step
         S = len(cls.IDX_OBJS)

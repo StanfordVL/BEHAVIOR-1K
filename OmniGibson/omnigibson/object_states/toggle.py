@@ -405,17 +405,13 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
         # Step 1: requires_closed guard — vectorized via Open.VALUES.
         # _open_col_idx (N,): column index into Open.VALUES for each toggle object (-1 = no Open state).
-        if cls._requires_closed.any():
-            valid = cls._requires_closed & (cls._open_col_idx >= 0).unsqueeze(0)  # (S, N)
-            if valid.any():
-                safe_idxs = cls._open_col_idx.clamp(min=0)  # (N,) — guard -1 before indexing
-                open_vals = Open.VALUES[:, safe_idxs] > 0.5  # (S, N) bool
-                cls._mask_force_off.copy_(valid & open_vals)
+        open_vals = Open.VALUES[:, cls._open_col_idx[cls._requires_closed]]  # (S, N) bool
+        cls._mask_force_off[cls._requires_closed] = open_vals
 
         th.logical_not(cls._mask_force_off, out=cls._mask_active)
         # Zero out toggle state for force-off objects (in-place).
-        new_values[cls._mask_force_off] = 0.0
-        cls._can_toggle_steps[cls._mask_force_off] = 0.0
+        new_values[cls._mask_force_off] = False
+        cls._can_toggle_steps[cls._mask_force_off] = 0
 
         # Step 2: contact mask.
         # _finger_contact_result was populated in global_update() via is_in_contact_batch.
@@ -433,12 +429,12 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         cls._can_toggle_steps[cls._mask_can_toggle] += 1
         # Reset counter for active objects that cannot toggle.
         active_no_toggle = cls._mask_active & ~cls._mask_can_toggle
-        cls._can_toggle_steps[active_no_toggle] = 0.0
+        cls._can_toggle_steps[active_no_toggle] = 0
 
         # Step 5: toggle flip.
         th.eq(cls._can_toggle_steps, m.CAN_TOGGLE_STEPS, out=cls._mask_flip)
         cls._mask_flip &= cls._mask_active
-        new_values[cls._mask_flip] = 1.0 - values[cls._mask_flip]
+        new_values[cls._mask_flip] = ~new_values[cls._mask_flip]
 
         # Step 6: sync visual marker colors for flipped objects.
         # Per-object USD color write; unavoidable loop, runs only for the flipped subset.
