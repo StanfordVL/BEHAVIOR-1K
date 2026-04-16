@@ -8,10 +8,6 @@ import os
 import torch as th
 import yaml
 from omnigibson.envs import DataPlaybackWrapper
-from omnigibson.learning.utils.dataset_utils import makedirs_with_mode
-from omnigibson.learning.utils.eval_utils import (
-    PROPRIOCEPTION_INDICES,
-)
 from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm
 from omnigibson.utils.config_utils import TorchEncoder
@@ -99,9 +95,6 @@ def replay_hdf5_to_video(
     Returns:
         episode_id: ID of the episode
     """
-
-    # Output to same directory as input
-    data_folder = os.path.dirname(os.path.abspath(input_path))
     # get the hdf5 file name without extension
     input_filename = os.path.splitext(os.path.basename(input_path))[0]
 
@@ -198,7 +191,6 @@ def replay_hdf5_to_video(
         flush_every_n_steps=flush_every_n_steps,
         flush_every_n_traj=1,
         include_robot_control=False,
-        robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
         output_path=input_path, # store outputs in the same folder as the input
         robot_obs_modalities=["rgb"],
         external_sensors_config=external_sensors_config,
@@ -207,6 +199,8 @@ def replay_hdf5_to_video(
         include_contacts=True,
     )
     env = VideoPlaybackWrapper.create_from_hdf5(**kwargs)
+    # add seg_instance_id to robot head camera
+    env.robots[0].sensors["robot:zed_link:Camera:0"].add_modality("seg_instance_id")
     env.load_observation_space()
 
     if run_qa:

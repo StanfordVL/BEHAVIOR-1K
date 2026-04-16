@@ -18,7 +18,6 @@ Example:
 """
 
 import omnigibson.utils.transform_utils as T
-import operator
 import torch as th
 from enum import IntEnum
 from omnigibson.metrics.metric_base import MetricBase
@@ -39,7 +38,7 @@ ACTIVE_QA_METRICS = {
     "prolonged_pause",
     "failed_grasp",
     "task_relevant_obj_vel",
-    # "gripper_in_fov",
+    "gripper_in_fov",
     "head_camera_upright_during_navigation",
 }
 
@@ -1185,7 +1184,7 @@ ALL_QA_METRICS = {
         "cls": FailedGraspMetric,
         "init": None,
         "mode": MetricMode.SOFT,
-        "warning": None,
+        "warning": "Failed grasp detected (gripper closed without holding object). Please make sure these gripper closing behavior is necessary.",
         "task_whitelist": None,
         "task_blacklist": None,
         "validate_kwargs": dict(
