@@ -1,5 +1,5 @@
 (define (problem wash_a_wool_coat-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wool_coat.n.01_1 - wool_coat.n.01

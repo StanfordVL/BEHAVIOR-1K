@@ -1,5 +1,5 @@
 (define (problem collecting_berries-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         blackberry.n.01_1 blackberry.n.01_2 blackberry.n.01_3 - blackberry.n.01

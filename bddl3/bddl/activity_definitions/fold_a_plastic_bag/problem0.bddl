@@ -1,5 +1,5 @@
 (define (problem fold_a_plastic_bag-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         plastic_bag.n.01_1 - plastic_bag.n.01

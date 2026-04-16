@@ -1,5 +1,5 @@
 (define (problem organizing_boxes_in_garage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	carton.n.02_1 carton.n.02_2 - carton.n.02

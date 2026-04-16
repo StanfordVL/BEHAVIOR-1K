@@ -27,9 +27,9 @@ from b1k_pipeline.max.prebake_textures import (
     hash_object,
 )
 
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 
-OBJECT_TAXONOMY = ObjectTaxonomy()
+kb = KnowledgeBase(populate=True)
 
 rt = pymxs.runtime
 
@@ -94,12 +94,12 @@ with open(b1k_pipeline.utils.PIPELINE_ROOT / "metadata/deletion_queue.csv", "r")
 
 
 def get_required_meta_links(category):
-    synset = OBJECT_TAXONOMY.get_synset_from_category(category)
-    if synset is not None:
-        return OBJECT_TAXONOMY.get_required_meta_links_for_synset(synset)
+    cat = kb.get_category(category)
+    if cat is not None:
+        return cat.synset.required_meta_links
 
-    substance_synset = OBJECT_TAXONOMY.get_synset_from_substance(category)
-    if substance_synset is not None:
+    ps = kb.get_particle_system(category)
+    if ps is not None:
         return set()
 
     raise ValueError(f"Category {category} not found in taxonomy.")
@@ -365,17 +365,17 @@ class SanityCheck:
             renamed_category = self.maybe_rename_category(
                 row.name_category, row.name_model_id
             )
-            synset = OBJECT_TAXONOMY.get_synset_from_category(renamed_category)
-            substance_synset = OBJECT_TAXONOMY.get_synset_from_substance(
-                renamed_category
-            )
+            cat_obj = kb.get_category(renamed_category)
+            synset = cat_obj.synset.name if cat_obj else None
+            ps_obj = kb.get_particle_system(renamed_category)
+            substance_synset = ps_obj.synset.name if ps_obj else None
             self.expect(
                 synset is not None or substance_synset is not None,
                 f"Cannot perform cloth/particle checks: category {renamed_category} not found in taxonomy.",
             )
 
             if synset is not None:
-                obj_is_cloth = "cloth" in OBJECT_TAXONOMY.get_abilities(synset)
+                obj_is_cloth = "cloth" in kb.get_synset(synset).abilities
                 if obj_is_cloth:
                     self.validate_cloth(row)
 

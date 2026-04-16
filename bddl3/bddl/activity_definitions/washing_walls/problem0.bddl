@@ -1,5 +1,5 @@
 (define (problem washing_walls-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wall.n.01_1 - wall.n.01

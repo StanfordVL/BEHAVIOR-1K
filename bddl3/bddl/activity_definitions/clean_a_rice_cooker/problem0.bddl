@@ -1,5 +1,5 @@
 (define (problem clean_a_rice_cooker-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rice_cooker.n.01_1 - rice_cooker.n.01

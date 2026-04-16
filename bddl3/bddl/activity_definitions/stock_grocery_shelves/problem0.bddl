@@ -1,5 +1,5 @@
 (define (problem stock_grocery_shelves-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	pack__of__bread.n.01_1 pack__of__bread.n.01_2 - pack__of__bread.n.01

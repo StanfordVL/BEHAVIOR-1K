@@ -1,5 +1,5 @@
 (define (problem clean_cement-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         driveway.n.01_1 - driveway.n.01

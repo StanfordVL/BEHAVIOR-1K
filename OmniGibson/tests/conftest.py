@@ -5,7 +5,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.robots import Robot
-from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod
 
 
 @pytest.fixture
@@ -13,7 +13,6 @@ def stopped_env():
     if og.sim is None:
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
         gm.ENABLE_TRANSITION_RULES = True
 
     env = og.Environment(configs={"scene": {"type": "Scene"}})
@@ -35,7 +34,6 @@ def env(request, stopped_env):
         if name not in ("env", "stopped_env", "request"):
             request.getfixturevalue(name)
 
-    og.sim.step()
     og.sim.play()
     yield stopped_env
 
@@ -77,8 +75,11 @@ def bottom_cabinet(stopped_env):
 
 @pytest.fixture
 def dishtowel(stopped_env):
+    # TODO(#2042): Re-enable cloth behaviors for this object
     obj = DatasetObject(
-        name="dishtowel", category="dishtowel", model="dtfspn", prim_type=PrimType.CLOTH, abilities={"cloth": {}}
+        name="dishtowel",
+        category="dishtowel",
+        model="dtfspn",
     )
     _add_obj(stopped_env, obj)
     return obj
@@ -86,8 +87,11 @@ def dishtowel(stopped_env):
 
 @pytest.fixture
 def carpet(stopped_env):
+    # TODO(#2042): Re-enable cloth behaviors for this object
     obj = DatasetObject(
-        name="carpet", category="carpet", model="ctclvd", prim_type=PrimType.CLOTH, abilities={"cloth": {}}
+        name="carpet",
+        category="carpet",
+        model="ctclvd",
     )
     _add_obj(stopped_env, obj)
     return obj
@@ -114,12 +118,12 @@ def bagel(stopped_env):
 
 @pytest.fixture
 def cookable_dishtowel(stopped_env):
+    # TODO(#2042): Re-enable cloth behaviors for this object
     obj = DatasetObject(
         name="cookable_dishtowel",
         category="dishtowel",
         model="dtfspn",
-        prim_type=PrimType.CLOTH,
-        abilities={"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}, "cloth": {}},
+        abilities={"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}},
     )
     _add_obj(stopped_env, obj)
     return obj

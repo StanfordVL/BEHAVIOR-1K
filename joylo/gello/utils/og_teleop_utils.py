@@ -18,20 +18,19 @@ from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils import transform_utils as T
 from omnigibson.sensors import VisionSensor
 from omnigibson.objects.usd_object import USDObject
-from bddl.activity import Conditions
+from gello.robots.sim_robot.og_teleop_cfg import *
 
-from gello.utils.og_teleop_cfg import *
-from gello import REPO_DIR
+from omnigibson.utils.bddl_utils import get_knowledge_base
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--activity", type=str, required=True)
 
 
 def get_task_relevant_room_types(activity_name):
-    activity_conditions = Conditions(
-        activity_name,
-        0,
-        simulator_name="omnigibson",
-        predefined_problem=None,
-    )
-    init_conds = activity_conditions.parsed_initial_conditions
+    task_obj = get_knowledge_base().get_task(f"{activity_name}-0")
+    task_obj._ensure_compiled()
+    init_conds = task_obj.conditions.parsed_initial_conditions
     room_types = set()
     for init_cond in init_conds:
         if len(init_cond) == 3:
@@ -1259,7 +1258,7 @@ def update_goal_status(
                 current_style.update(
                     {"color": UI_SETTINGS["goal_satisfied_color"]}
                 )  # Green (ABGR)
-                text_labels[idx].set_style(current_style)
+                text_labels[idx].style = current_style
 
         # Update unsatisfied goals - make them red
         for idx in goal_status["unsatisfied"]:
@@ -1268,7 +1267,7 @@ def update_goal_status(
                 current_style.update(
                     {"color": UI_SETTINGS["goal_unsatisfied_color"]}
                 )  # Red (ABGR)
-                text_labels[idx].set_style(current_style)
+                text_labels[idx].style = current_style
 
         # Return the updated status
         return goal_status.copy()

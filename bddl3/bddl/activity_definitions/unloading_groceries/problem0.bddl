@@ -1,5 +1,5 @@
 (define (problem unloading_groceries-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sour_bread.n.01_1 - sour_bread.n.01

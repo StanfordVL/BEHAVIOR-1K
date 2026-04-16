@@ -1,5 +1,5 @@
 (define (problem cook_a_crab-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         steamer.n.02_1 - steamer.n.02

@@ -1,5 +1,5 @@
 (define (problem clean_up_spilled_egg-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         beaten_egg.n.01_1 - beaten_egg.n.01

@@ -1,5 +1,5 @@
 (define (problem make_a_tropical_breakfast-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         yogurt.n.01_1 - yogurt.n.01

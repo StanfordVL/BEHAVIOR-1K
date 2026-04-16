@@ -1,5 +1,5 @@
 (define (problem clearing_food_from_table_into_fridge-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         half__chicken.n.01_1 - half__chicken.n.01 

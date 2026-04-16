@@ -10,6 +10,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.sensors.vision_sensor import VisionSensor
 import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
@@ -501,6 +502,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         for system in self.active_systems.values():
             self.clear_system(system_name=system.name)
 
+        # Remove any vision sensors attached to this scene
+        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+        # which will cause segfault during og.clear()
+        scene_prim_path = self.prim_path
+        scene_prim_prefix = f"{scene_prim_path}/"
+        for sensor in tuple(VisionSensor.SENSORS.values()):
+            if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
+                sensor.remove()
+
         # Remove all of the scene's objects.
         og.sim.batch_remove_objects(list(self.objects))
 
@@ -891,9 +901,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             orientation (th.Tensor): (4,) orientation of the scene
         """
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
-        # Need to update sim here -- this is because downstream setters called immediately may not be respected,
-        # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-        og.sim.refresh_physics()
+
         # Update the cached pose and inverse pose
         pos_ori = self._scene_prim.get_position_orientation()
         pose = T.pose2mat(pos_ori)
@@ -1162,8 +1170,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
-            # We need to propagate these changes or else we get a crash
-            og.sim.refresh_physics(sync_usd=True)
             # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:

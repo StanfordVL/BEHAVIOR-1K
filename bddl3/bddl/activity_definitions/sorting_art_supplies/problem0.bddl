@@ -1,5 +1,5 @@
 (define (problem sorting_art_supplies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sheet.n.02_1 sheet.n.02_2 - sheet.n.02

@@ -1,5 +1,5 @@
 (define (problem organizing_volunteer_materials-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dress.n.01_1 dress.n.01_2 - dress.n.01

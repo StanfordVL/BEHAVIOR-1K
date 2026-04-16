@@ -1,5 +1,5 @@
 (define (problem clean_vases-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         stain.n.01_1 - stain.n.01

@@ -1,5 +1,5 @@
 (define (problem installing_a_trailer_hitch-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pickup.n.01_1 - pickup.n.01

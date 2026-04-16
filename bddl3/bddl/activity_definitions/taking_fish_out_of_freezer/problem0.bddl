@@ -1,5 +1,5 @@
 (define (problem taking_fish_out_of_freezer-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	salmon.n.03_1 salmon.n.03_2 salmon.n.03_3 - salmon.n.03

@@ -1,5 +1,5 @@
 (define (problem place_houseplants_around_your_home-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cactus.n.01_1 cactus.n.01_2 - cactus.n.01

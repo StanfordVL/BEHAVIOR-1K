@@ -1,5 +1,5 @@
 (define (problem clean_a_whiteboard-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	paper_towel.n.01_1 - paper_towel.n.01

@@ -1,5 +1,5 @@
 (define (problem sanding_wood_furniture-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         incision.n.01_1 - incision.n.01

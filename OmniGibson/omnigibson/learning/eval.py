@@ -12,18 +12,17 @@ import torch as th
 import traceback
 from av.container import Container
 from av.stream import Stream
-from gello.robots.sim_robot.og_teleop_utils import (
+from gello.utils.og_teleop_utils import (
     augment_rooms,
     load_available_tasks,
     generate_robot_config,
     get_task_relevant_room_types,
 )
-from gello.robots.sim_robot.og_teleop_cfg import DISABLED_TRANSITION_RULES
+from gello.utils.og_teleop_cfg import DISABLED_TRANSITION_RULES
 from hydra.utils import instantiate
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
-from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
     ROBOT_CAMERA_NAMES,
     PROPRIOCEPTION_INDICES,
@@ -39,6 +38,7 @@ from omnigibson.macros import gm, create_module_macros, macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import get_task_instance_path
+from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
@@ -50,7 +50,6 @@ m.NUM_TRAIN_INSTANCES = 200
 m.NUM_EVAL_INSTANCES = 10
 
 # set global variables to boost performance
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 
@@ -217,7 +216,7 @@ class Evaluator:
                 self.n_success_trials += 1
 
         for metric in self.metrics:
-            metric.step_callback(self.env)
+            metric.step(self.env, self.robot_action, obs, 0.0, terminated, truncated, info)
         return terminated, truncated
 
     @property
@@ -283,8 +282,8 @@ class Evaluator:
         # causes some jitter (maybe for small mass / thin objects?)
         for _ in range(25):
             og.sim.step_physics()
-            for entity in self.env.task.object_scope.values():
-                if not entity.is_system and entity.exists:
+            for inst, entity in self.env.task.object_scope.items():
+                if not is_system_bddl_inst(inst) and entity is not None:
                     entity.keep_still()
 
         self.env.scene.update_initial_file()
@@ -356,7 +355,7 @@ class Evaluator:
         self.obs = self._preprocess_obs(self.env.reset()[0])
         # run metric start callbacks
         for metric in self.metrics:
-            metric.start_callback(self.env)
+            metric.reset(self.env)
         self.policy.reset()
         self.n_success_trials, self.n_trials = 0, 0
 
@@ -386,7 +385,6 @@ class Evaluator:
 
 
 if __name__ == "__main__":
-    register_omegaconf_resolvers()
     # open yaml from task path
     with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda: 0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
@@ -478,14 +476,14 @@ if __name__ == "__main__":
                         logger.info(f"Current step: {evaluator.env._current_step}")
                 # run metric end callbacks
                 for metric in evaluator.metrics:
-                    metric.end_callback(evaluator.env)
+                    metric.aggregate(evaluator.env)
                 logger.info(f"Evaluation finished at step {evaluator.env._current_step}.")
                 logger.info(f"Evaluation exit state: {terminated}, {truncated}")
                 logger.info(f"Total trials: {evaluator.n_trials}")
                 logger.info(f"Total success trials: {evaluator.n_success_trials}")
                 # gather metric results and write to file
                 for metric in evaluator.metrics:
-                    metrics.update(metric.gather_results())
+                    metrics.update(metric._compute_episode_metrics())
                 with open(metrics_path / f"{config.task.name}_{idx}_{epi}.json", "w") as f:
                     json.dump(metrics, f)
                 # reset video writer

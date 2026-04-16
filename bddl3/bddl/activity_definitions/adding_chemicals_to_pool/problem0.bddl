@@ -1,5 +1,5 @@
 (define (problem adding_chemicals_to_pool-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sodium_carbonate__jar.n.01_1 - sodium_carbonate__jar.n.01

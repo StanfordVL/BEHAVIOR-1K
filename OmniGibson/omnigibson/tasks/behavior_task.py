@@ -4,16 +4,6 @@ from pathlib import Path
 import random
 
 import torch as th
-from bddl.activity import (
-    Conditions,
-    evaluate_goal_conditions,
-    get_goal_conditions,
-    get_ground_goal_state_options,
-    get_initial_conditions,
-    get_natural_goal_conditions,
-    get_natural_initial_conditions,
-    get_object_scope,
-)
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -28,11 +18,11 @@ from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.bddl_utils import (
-    BEHAVIOR_ACTIVITIES,
-    BDDLEntity,
+    get_behavior_activities,
     BDDLSampler,
-    OmniGibsonBDDLBackend,
-    get_processed_bddl,
+    get_knowledge_base,
+    is_system_bddl_inst,
+    og_categories_from_bddl_inst,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.config_utils import TorchEncoder
@@ -53,8 +43,6 @@ class BehaviorTask(BaseTask):
             ID determines which specification to use
         activity_instance_id (int): Specific pre-configured instance of a scene to load for this BehaviorTask. This
             will be used only if @online_object_sampling is False.
-        predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
-            load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
         use_presampled_robot_pose (bool): Whether to use presampled robot poses from scene metadata
         randomize_presampled_pose (bool): If True, randomly selects from available presampled poses. If False, always
@@ -84,7 +72,6 @@ class BehaviorTask(BaseTask):
         activity_name=None,
         activity_definition_id=0,
         activity_instance_id=0,
-        predefined_problem=None,
         online_object_sampling=False,
         use_presampled_robot_pose=True,
         randomize_presampled_pose=False,
@@ -98,32 +85,19 @@ class BehaviorTask(BaseTask):
         # Make sure object states are enabled
         assert gm.ENABLE_OBJECT_STATES, "Must set gm.ENABLE_OBJECT_STATES=True in order to use BehaviorTask!"
 
-        # Make sure task name is valid if not specifying a predefined problem
-        if predefined_problem is None:
-            assert (
-                activity_name is not None
-            ), "Activity name must be specified if no predefined_problem is specified for BehaviorTask!"
-            assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
-        else:
-            # Infer activity name
-            activity_name = predefined_problem.split("problem ")[-1].split("-")[0]
+        assert activity_name is not None, "Activity name must be specified for BehaviorTask!"
+        assert_valid_key(key=activity_name, valid_keys=get_behavior_activities(), name="Behavior Task")
 
         # Make sure to not use presampled robot pose if we're using online object sampling
         assert not (
             online_object_sampling and use_presampled_robot_pose
         ), "Cannot use presampled robot pose if online_object_sampling is True!"
 
-        # Initialize relevant variables
-
-        # BDDL
-        self.backend = OmniGibsonBDDLBackend()
-
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
         self.activity_instance_id = activity_instance_id
-        self.predefined_problem = predefined_problem
-        self.activity_conditions = None
+        self.compiled_task = None
         self.activity_initial_conditions = None
         self.activity_goal_conditions = None
         self.ground_goal_state_options = None
@@ -140,7 +114,7 @@ class BehaviorTask(BaseTask):
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
-        self.object_scope = None  # Maps str to BDDLEntity
+        self.object_scope = None  # Maps str to sim object (BaseObject/BaseSystem) or None
         self.object_instance_to_category = None  # Maps str to str
         self.future_obj_instances = None  # set of str
 
@@ -179,11 +153,7 @@ class BehaviorTask(BaseTask):
 
         # Possibly modify the scene to load if we're using online_object_sampling
         scene_instance, scene_file = scene_cfg["scene_instance"], scene_cfg["scene_file"]
-        activity_name = (
-            task_cfg["predefined_problem"].split("problem ")[-1].split("-")[0]
-            if task_cfg.get("predefined_problem", None) is not None
-            else task_cfg["activity_name"]
-        )
+        activity_name = task_cfg["activity_name"]
         if scene_file is None and scene_instance is None and not task_cfg["online_object_sampling"]:
             scene_instance = cls.get_cached_activity_scene_filename(
                 scene_model=scene_cfg.get("scene_model", "Scene"),
@@ -194,12 +164,19 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
+    def _evaluate_predicate(self, predicate_name, *entities):
+        from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
+
+        return evaluate_bddl_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
+
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
         terminations = dict()
 
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
-        terminations["predicate"] = PredicateGoal(goal_fcn=lambda: self.activity_goal_conditions)
+        terminations["predicate"] = PredicateGoal(
+            check_goal_fn=lambda: self.compiled_task.check_goal(self._evaluate_predicate),
+        )
 
         return terminations
 
@@ -220,7 +197,6 @@ class BehaviorTask(BaseTask):
             env=env,
             activity_name=self.activity_name,
             activity_definition_id=self.activity_definition_id,
-            predefined_problem=self.predefined_problem,
         )
 
         # Initialize the current activity
@@ -232,10 +208,10 @@ class BehaviorTask(BaseTask):
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
-            for entity in self.object_scope.values():
-                if entity.synset == "agent":
+            for inst, entity in self.object_scope.items():
+                if "agent.n." in inst:
                     continue
-                if not entity.is_system and entity.exists:
+                if not is_system_bddl_inst(inst) and entity is not None:
                     entity.highlighted = True
 
         # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
@@ -270,88 +246,163 @@ class BehaviorTask(BaseTask):
 
         # Force wake objects
         for obj in self.object_scope.values():
-            if obj.exists and isinstance(obj, DatasetObject):
+            if obj is not None and isinstance(obj, DatasetObject):
                 obj.wake()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
         return dict()
 
-    def update_activity(self, env, activity_name, activity_definition_id, predefined_problem=None):
+    @staticmethod
+    def _build_scene_layout_from_rooms(scene, room_instances):
+        """Build a scene layout dict for BDDL wildcard expansion from specific room instances.
+
+        Args:
+            scene: The scene object.
+            room_instances: Dict mapping room_type -> room_instance_name for the
+                specific room instances that were selected during object scope assignment.
+
+        Returns:
+            dict: Maps room_type -> {category: count} for the selected room instances.
         """
-        Update the active Behavior activity being deployed
+        from collections import Counter
+
+        layout = {}
+        for room_type, room_inst in room_instances.items():
+            objs = scene.object_registry("in_rooms", room_inst, default_val=[])
+            counts = Counter(obj.category for obj in objs)
+            layout[room_type] = dict(counts)
+        return layout
+
+    def update_activity(self, env, activity_name, activity_definition_id):
+        """
+        Update the active Behavior activity being deployed.
+
+        Parses the base (non-wildcard) scope from the task definition. Full
+        compilation is deferred to initialize_activity(), after object scope
+        selection determines which specific room instances will be used for
+        wildcard expansion.
 
         Args:
             env (og.Environment): OmniGibson active environment
             activity_name (None or str): Name of the Behavior Task to instantiate
-            activity_definition_id (int): Specification to load for the desired task. For a given Behavior Task, multiple task
-                specifications can be used (i.e.: differing goal conditions, or "ways" to complete a given task). This
-                ID determines which specification to use
-            predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
-                load. This will automatically override @activity_name and @activity_definition_id.
+            activity_definition_id (int): Specification to load for the desired task
         """
-        # We parse the raw BDDL to be compatible with OmniGibson
-        # This requires converting wildcard-denoted synset instances into explicit synsets
-        # that are compatible with all valid scene objects in the current OG scene
-        if predefined_problem is None:
-            # Process the task
-            predefined_problem = get_processed_bddl(
-                activity_name,
-                activity_definition_id,
-                scene=env.scene,
-            )
-
         # Activity info
         self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
-        self.activity_conditions = Conditions(
-            activity_name,
-            activity_definition_id,
-            simulator_name="omnigibson",
-            predefined_problem=predefined_problem,
-        )
+        self._task_def = get_knowledge_base().get_task(f"{activity_name}-{activity_definition_id}")
 
+        # Parse base scope (strips wildcards if any, giving us the non-wildcard instances)
+        self._base_conditions, base_scope, self._base_inroom_assignments = self._task_def.parse_base_scope()
+        self.compiled_task = None
+
+        # Set up base object scope (agent first)
+        self.object_scope = {"agent.n.01_1": None}
+        self.object_scope.update({name: None for name in base_scope})
+
+        # Object instance to category mapping (base only for now)
+        self.object_instance_to_category = {
+            obj_inst: obj_cat
+            for obj_cat in self._base_conditions.parsed_objects
+            for obj_inst in self._base_conditions.parsed_objects[obj_cat]
+        }
+
+    def _finalize_compiled_task(self):
+        """Populate derived attributes from the compiled task.
+
+        Called after self.compiled_task is set (either immediately for
+        non-wildcard tasks, or after deferred compilation for wildcard tasks).
+        """
         # Get scope, making sure agent is the first entry
         self.object_scope = {"agent.n.01_1": None}
-        self.object_scope.update(get_object_scope(self.activity_conditions))
+        self.object_scope.update({name: None for name in self.compiled_task.object_scope})
 
         # Object info
         self.object_instance_to_category = {
             obj_inst: obj_cat
-            for obj_cat in self.activity_conditions.parsed_objects
-            for obj_inst in self.activity_conditions.parsed_objects[obj_cat]
+            for obj_cat in self.compiled_task.parsed_objects
+            for obj_inst in self.compiled_task.parsed_objects[obj_cat]
         }
 
         # Generate initial and goal conditions
-        self.activity_initial_conditions = get_initial_conditions(
-            self.activity_conditions, self.backend, self.object_scope
-        )
-        self.activity_goal_conditions = get_goal_conditions(self.activity_conditions, self.backend, self.object_scope)
-        self.ground_goal_state_options = get_ground_goal_state_options(
-            self.activity_conditions, self.backend, self.object_scope, self.activity_goal_conditions
-        )
+        self.activity_initial_conditions = self.compiled_task.initial_conditions
+        self.activity_goal_conditions = self.compiled_task.goal_conditions
+        self.ground_goal_state_options = self.compiled_task.ground_goal_state_options
 
         # Demo attributes
-        self.instruction_order = th.arange(len(self.activity_conditions.parsed_goal_conditions))
+        self.instruction_order = th.arange(len(self.compiled_task.conditions.parsed_goal_conditions))
         self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
 
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
-        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
-        self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.activity_conditions)
+        self.activity_natural_language_initial_conditions = self.compiled_task.natural_language_initial_conditions
+        self.activity_natural_language_goal_conditions = self.compiled_task.natural_language_goal_conditions
 
-    def get_potential(self, env):
-        """
-        Compute task-specific potential: distance to the goal
+    def _determine_room_instances(self, env):
+        """Determine which specific room instances to use based on assigned objects.
+
+        For each room type in the task's inroom assignments, finds which room
+        instance the assigned object is actually in. All objects assigned to the
+        same room type should be in the same room instance (ensured by the
+        sampler's room consolidation logic).
 
         Args:
-            env (Environment): Current active environment instance
+            env: The environment with the active scene.
 
         Returns:
-            float: Computed potential
+            dict: Maps room_type (str) -> room_instance_name (str).
         """
-        # Evaluate the first ground goal state option as the potential
-        _, satisfied_predicates = evaluate_goal_conditions(self.ground_goal_state_options[0])
+        room_instances = {}
+        for obj_inst, room_type in self._base_inroom_assignments.items():
+            entity = self.object_scope.get(obj_inst)
+            if entity is None:
+                continue
+            # Find which room instance this object is in
+            if hasattr(entity, "in_rooms") and entity.in_rooms:
+                for room_inst in entity.in_rooms:
+                    inst_room_type = env.scene.seg_map.room_ins_name_to_sem_name.get(room_inst)
+                    if inst_room_type == room_type:
+                        if room_type in room_instances and room_instances[room_type] != room_inst:
+                            log.warning(
+                                f"Multiple room instances for room type '{room_type}': "
+                                f"{room_instances[room_type]} vs {room_inst}. Using {room_instances[room_type]}."
+                            )
+                        else:
+                            room_instances[room_type] = room_inst
+                        break
+        return room_instances
+
+    def _compile_with_rooms(self, env):
+        """Compile the wildcard task using the specific room instances from assigned objects.
+
+        After object scope has been assigned (via cache or sampling), this
+        determines which room instances are being used, counts objects in those
+        rooms, and compiles the task with proper wildcard expansion.
+
+        Args:
+            env: The environment with the active scene.
+        """
+        # Determine which room instances the assigned objects are in
+        room_instances = self._determine_room_instances(env)
+
+        # Build scene layout from those specific rooms
+        scene_layout = self._build_scene_layout_from_rooms(env.scene, room_instances)
+
+        # Compile with the correct scene layout
+        self.compiled_task = self._task_def.compile(scene_layout=scene_layout)
+
+        # Preserve existing object assignments in the new scope
+        old_scope = self.object_scope
+        self._finalize_compiled_task()
+
+        # Re-apply previously assigned objects
+        for inst, entity in old_scope.items():
+            if inst in self.object_scope:
+                self.object_scope[inst] = entity
+
+    def get_potential(self, env):
+        _, satisfied_predicates = self.compiled_task.check_goal(self._evaluate_predicate)
         success_score = len(satisfied_predicates["satisfied"]) / (
             len(satisfied_predicates["satisfied"]) + len(satisfied_predicates["unsatisfied"])
         )
@@ -361,6 +412,12 @@ class BehaviorTask(BaseTask):
         """
         Initializes the desired activity in the current environment @env
 
+        The flow is:
+        1. Select objects for the base (non-wildcard) scope via sampling or cache.
+        2. Determine which room instances those objects are in.
+        3. Compile the task with the correct scene layout (expanding any wildcards).
+        4. Assign any wildcard-expanded instances.
+
         Args:
             env (Environment): Current active environment instance
 
@@ -369,40 +426,72 @@ class BehaviorTask(BaseTask):
                 - bool: Whether the generated scene activity should be accepted or not
                 - dict: Any feedback from the sampling / initialization process
         """
-        accept_scene = True
-        feedback = None
-
-        # Generate sampler
-        self.sampler = BDDLSampler(
-            env=env,
-            activity_conditions=self.activity_conditions,
-            object_scope=self.object_scope,
-            backend=self.backend,
-        )
-
-        # Compose future objects
-        self.future_obj_instances = {
-            init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
-        }
-
         if self.online_object_sampling:
-            # Sample online
-            accept_scene, feedback = self.sampler.sample(
+            # Phase 1: assign objects using only parsed conditions (no compilation needed)
+            self.sampler = BDDLSampler(
+                env=env,
+                activity_conditions=self._base_conditions,
+                object_scope=self.object_scope,
+            )
+            accept_scene, feedback = self.sampler.assign_objects(
                 sampling_whitelist=self.sampling_whitelist,
                 sampling_blacklist=self.sampling_blacklist,
             )
             if not accept_scene:
                 return accept_scene, feedback
+
+            # Compile with the correct rooms now that objects are assigned
+            self._compile_with_rooms(env)
+
+            # Phase 2: sample states using compiled conditions
+            accept_scene, feedback = self.sampler.sample_states(self.compiled_task)
+            if not accept_scene:
+                return accept_scene, feedback
+
+            # Assign any wildcard-expanded instances to remaining scene objects
+            self._assign_wildcard_instances(env)
         else:
-            # Load existing scene cache and assign object scope accordingly
+            # Derive future instances from parsed conditions for cache assignment
+            self.future_obj_instances = {
+                cond[1] for cond in self._base_conditions.parsed_initial_conditions if cond[0] == "future"
+            }
+
+            # Assign base scope objects from cache (non-strict: skip instances
+            # not in cache, e.g. wildcard instances that don't exist yet)
+            self.assign_object_scope_with_cache(env, strict=False)
+
+            # Compile with correct rooms now that we know where objects are
+            self._compile_with_rooms(env)
+
+            # Re-assign all objects from cache (scope now includes wildcard instances)
+            self.future_obj_instances = {
+                init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
+            }
             self.assign_object_scope_with_cache(env)
 
-        # Generate goal condition with the fully populated self.object_scope
-        self.activity_goal_conditions = get_goal_conditions(self.activity_conditions, self.backend, self.object_scope)
-        self.ground_goal_state_options = get_ground_goal_state_options(
-            self.activity_conditions, self.backend, self.object_scope, self.activity_goal_conditions
-        )
-        return accept_scene, feedback
+        return True, None
+
+    def _assign_wildcard_instances(self, env):
+        """Assign wildcard-expanded instances to scene objects in the selected rooms.
+
+        After wildcard compilation, new instances exist in the scope that need
+        to be matched to objects in the scene that weren't part of the base scope.
+
+        Args:
+            env: The environment with the active scene.
+        """
+        for inst in self.object_scope:
+            if self.object_scope[inst] is not None:
+                continue
+            if "agent.n." in inst:
+                continue
+            # Try to find a matching object in the scene
+            categories = set(og_categories_from_bddl_inst(inst))
+            for obj in env.scene.objects:
+                # Check category match and that obj isn't already assigned
+                if obj.category in categories and obj not in self.object_scope.values():
+                    self.object_scope[inst] = obj
+                    break
 
     def get_agent(self, env):
         """
@@ -417,12 +506,15 @@ class BehaviorTask(BaseTask):
         # We assume the relevant agent is the first agent in the scene
         return env.robots[0]
 
-    def assign_object_scope_with_cache(self, env):
+    def assign_object_scope_with_cache(self, env, strict=True):
         """
-        Assigns objects within the current object scope
+        Assigns objects within the current object scope from cached scene metadata.
 
         Args:
             env (Environment): Current active environment instance
+            strict (bool): If True, assert that every non-future instance exists in cache.
+                If False, skip instances not found in cache (used during partial
+                assignment before wildcard compilation).
         """
         # Load task metadata
         inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
@@ -431,11 +523,16 @@ class BehaviorTask(BaseTask):
         for obj_inst in self.object_scope:
             if obj_inst in self.future_obj_instances:
                 entity = None
+            elif obj_inst not in inst_to_name:
+                if strict:
+                    assert False, (
+                        f"BDDL object instance {obj_inst} should exist in cached metadata "
+                        f"from loaded scene, but could not be found!"
+                    )
+                # In non-strict mode, skip instances not found (e.g., future objects
+                # when future_obj_instances isn't fully populated yet)
+                continue
             else:
-                assert obj_inst in inst_to_name, (
-                    f"BDDL object instance {obj_inst} should exist in cached metadata "
-                    f"from loaded scene, but could not be found!"
-                )
                 name = inst_to_name[obj_inst]
                 is_system = name in env.scene.available_systems.keys()
                 # TODO: If we load a robot with a different set of configs, we will not be able to match with the
@@ -446,10 +543,7 @@ class BehaviorTask(BaseTask):
                     entity = env.robots[idx]
                 else:
                     entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
-            self.object_scope[obj_inst] = BDDLEntity(
-                bddl_inst=obj_inst,
-                entity=entity,
-            )
+            self.object_scope[obj_inst] = entity
 
         # Write back to task metadata
         self.update_bddl_scope_metadata(env)
@@ -461,20 +555,32 @@ class BehaviorTask(BaseTask):
         Args:
             env (Environment): The environment containing the scene to update
         """
+
+        def _get_name(inst, entity):
+            if is_system_bddl_inst(inst):
+                return og_categories_from_bddl_inst(inst)[0]
+            return entity.name
+
         env.scene.write_task_metadata(
-            key="inst_to_name", data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists}
+            key="inst_to_name",
+            data={inst: _get_name(inst, entity) for inst, entity in self.object_scope.items() if entity is not None},
         )
 
     def _get_obs(self, env):
         low_dim_obs = dict()
 
+        # Collect non-system objects with their instance keys and existence status
+        obj_entries = []
+        for inst, obj in self.object_scope.items():
+            if not is_system_bddl_inst(inst):
+                obj_entries.append((inst, obj, obj is not None))
+
         # Batch rpy calculations for much better efficiency
-        objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(
             th.stack(
                 [
                     obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0])
-                    for obj, obj_exist in objs_exist.items()
+                    for _, obj, obj_exist in obj_entries
                 ]
             )
         )
@@ -484,27 +590,25 @@ class BehaviorTask(BaseTask):
         # Always add agent info first
         agent = self.get_agent(env=env)
 
-        for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
-            objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin
+        for (inst, obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
+            obj_entries, objs_rpy, objs_rpy_cos, objs_rpy_sin
         ):
-            # TODO: May need to update checking here to USDObject?
-            # TODO: How to handle systems as part of obs?
             if obj_exist:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = obj.states[Pose].get_value()[0]
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = obj_rpy_cos
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = obj_rpy_sin
+                low_dim_obs[f"{inst}_real"] = th.tensor([1.0])
+                low_dim_obs[f"{inst}_pos"] = obj.states[Pose].get_value()[0]
+                low_dim_obs[f"{inst}_ori_cos"] = obj_rpy_cos
+                low_dim_obs[f"{inst}_ori_sin"] = obj_rpy_sin
                 if obj.name != agent.name:
                     for arm in agent.arm_names:
-                        grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
-                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
+                        grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj)
+                        low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
             else:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = th.zeros(1)
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = th.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = th.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = th.zeros(3)
+                low_dim_obs[f"{inst}_real"] = th.zeros(1)
+                low_dim_obs[f"{inst}_pos"] = th.zeros(3)
+                low_dim_obs[f"{inst}_ori_cos"] = th.zeros(3)
+                low_dim_obs[f"{inst}_ori_sin"] = th.zeros(3)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.zeros(1)
+                    low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.zeros(1)
 
         return low_dim_obs, dict()
 
@@ -525,11 +629,13 @@ class BehaviorTask(BaseTask):
         Args:
             obj (USDObject): Newly imported object
         """
-        # Iterate over all entities, and if they don't exist, check if any category matches @obj's category, and set it
-        # if it does, and immediately return
         for inst, entity in self.object_scope.items():
-            if not entity.exists and not entity.is_system and obj.category in set(entity.og_categories):
-                entity.set_entity(entity=obj)
+            if (
+                entity is None
+                and not is_system_bddl_inst(inst)
+                and obj.category in set(og_categories_from_bddl_inst(inst))
+            ):
+                self.object_scope[inst] = obj
                 return
 
     def _update_bddl_scope_from_removed_obj(self, obj):
@@ -540,11 +646,9 @@ class BehaviorTask(BaseTask):
         Args:
             obj (USDObject): Newly removed object
         """
-        # Iterate over all entities, and if they exist, check if any name matches @obj's name, and remove it
-        # if it does, and immediately return
-        for entity in self.object_scope.values():
-            if entity.exists and not entity.is_system and obj.name == entity.name:
-                entity.clear_entity()
+        for inst, entity in self.object_scope.items():
+            if entity is not None and not is_system_bddl_inst(inst) and obj.name == entity.name:
+                self.object_scope[inst] = None
                 return
 
     def _update_bddl_scope_from_system_init(self, system):
@@ -555,10 +659,9 @@ class BehaviorTask(BaseTask):
         Args:
             system (BaseSystem): Newly initialized system
         """
-        # Iterate over all entities, and potentially match the system to the scope
         for inst, entity in self.object_scope.items():
-            if not entity.exists and entity.is_system and entity.og_categories[0] == system.name:
-                entity.set_entity(entity=system)
+            if entity is None and is_system_bddl_inst(inst) and og_categories_from_bddl_inst(inst)[0] == system.name:
+                self.object_scope[inst] = system
                 return
 
     def _update_bddl_scope_from_system_clear(self, system):
@@ -569,10 +672,9 @@ class BehaviorTask(BaseTask):
         Args:
             system (BaseSystem): Newly cleared system
         """
-        # Iterate over all entities, and potentially remove the matched system from the scope
         for inst, entity in self.object_scope.items():
-            if entity.exists and entity.is_system and system.name == entity.name:
-                entity.clear_entity()
+            if entity is not None and is_system_bddl_inst(inst) and system.name == entity.name:
+                self.object_scope[inst] = None
                 return
 
     def show_instruction(self):
@@ -601,7 +703,7 @@ class BehaviorTask(BaseTask):
         Increment the instruction
         """
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(
-            self.activity_conditions.parsed_goal_conditions
+            self.compiled_task.conditions.parsed_goal_conditions
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 
@@ -643,9 +745,9 @@ class BehaviorTask(BaseTask):
         # Save based on whether we're only storing task-relevant object scope states or not
         if task_relevant_only:
             task_relevant_state_dict = {
-                bddl_name: bddl_inst.dump_state(serialized=False)
-                for bddl_name, bddl_inst in env.task.object_scope.items()
-                if bddl_inst.exists
+                bddl_name: bddl_obj.dump_state(serialized=False)
+                for bddl_name, bddl_obj in env.task.object_scope.items()
+                if bddl_obj is not None
             }
             Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
             with open(path, "w+") as f:

@@ -1,5 +1,5 @@
 (define (problem staining_wood_furniture-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ink.n.01_1 - ink.n.01

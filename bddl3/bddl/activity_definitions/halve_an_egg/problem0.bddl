@@ -1,5 +1,5 @@
 (define (problem halve_an_egg-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         carving_knife.n.01_1 - carving_knife.n.01

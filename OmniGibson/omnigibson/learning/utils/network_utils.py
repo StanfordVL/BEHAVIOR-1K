@@ -8,16 +8,17 @@ import http
 import logging
 import msgpack
 import numpy as np
+import requests
 import time
 import torch as th
 import traceback
+import websockets
 import websockets.asyncio.server as _server
 import websockets.sync.client
-import websockets
-import requests
 from copy import deepcopy
 from omnigibson.macros import gm
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,13 +36,24 @@ class WebsocketClientPolicy:
     def __init__(
         self,
         host: str = "0.0.0.0",
-        port: Optional[int] = None,
+        port: int = 8000,
+        scheme: str = "ws",
         api_key: Optional[str] = None,
         allow_reconnect: bool = False,
     ) -> None:
-        self._uri = f"wss://{host}" if int(port) == 443 else f"ws://{host}"
-        if port is not None:
-            self._uri += f":{port}"
+        """
+        Initializes the websocket client policy.
+
+        Args:
+            host (str): Hostname of the websocket server to connect to.
+            port (int): Port of the websocket server to connect to. Defaults to 8000.
+            scheme (str): WebSocket scheme to use. Either "wss" (secure) or "ws" (insecure). Defaults to "ws".
+            api_key (str, optional): API key to include in the Authorization header when connecting to the websocket server, if required.
+            allow_reconnect (bool): Whether to allow automatic reconnection if the websocket connection is lost.
+                If False, the client will raise an error if the connection is lost.
+                If True, the client will attempt to reconnect indefinitely with a delay between attempts.
+        """
+        self._uri = f"{scheme}://{host}:{port}"
         self._packer = Packer()
         self._api_key = api_key
         self._ws, self._server_metadata = None, None
@@ -51,14 +63,11 @@ class WebsocketClientPolicy:
         return self._server_metadata
 
     def _wait_for_server(self) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
-        # TODO [Wensi]: use URL parser instead of this
-        # Extract host and port for health check
-        host_port = self._uri.replace("ws://", "").replace("wss://", "")
-        if ":" in host_port:
-            host, port = host_port.split(":")
-            health_url = f"https://{host}:{port}/healthz" if int(port) == 443 else f"http://{host}:{port}/healthz"
-        else:
-            health_url = f"http://{host_port}/healthz"
+        parsed = urlparse(self._uri)
+        host = parsed.hostname
+        port = parsed.port
+        http_scheme = "https" if parsed.scheme == "wss" else "http"
+        health_url = f"{http_scheme}://{host}:{port}/healthz"
 
         # First, wait for the health check to pass
         while True:
@@ -69,7 +78,7 @@ class WebsocketClientPolicy:
                     break
             except Exception:
                 pass
-            logger.info(f"Health check failed, waiting for server at {health_url}...")
+            logger.info(f"Health check failed, waiting for server at {http_scheme}://{host}:{port}...")
             time.sleep(5)
 
         # Now attempt websocket connection (rest of the code remains the same)
@@ -96,32 +105,33 @@ class WebsocketClientPolicy:
             self._ws, self._server_metadata = self._wait_for_server()
 
         data = self._packer.pack(obs)
-        while True:
+        max_retries = 2
+        response = None
+
+        for attempt in range(max_retries + 1):
             try:
                 self._ws.send(data)
                 response = self._ws.recv()
-                break
-            except websockets.exceptions.ConnectionClosedError:
-                if self._allow_reconnect:
-                    logger.warning("Connection to server lost, attempting to reconnect...")
+                if isinstance(response, str):
+                    raise RuntimeError(f"Error in inference server:\n{response}")
+
+                action_dict = unpackb(response)
+                if "action" not in action_dict:
+                    if attempt < max_retries:
+                        logger.warning(
+                            f"Server response missing 'action' key, retrying ({attempt + 1}/{max_retries})..."
+                        )
+                        continue
+                    raise RuntimeError(f"Server response missing 'action' key: {action_dict}")
+                action = th.from_numpy(deepcopy(action_dict["action"])).to(th.float32)
+                return action
+
+            except websockets.exceptions.ConnectionClosedError as e:
+                if self._allow_reconnect and attempt < max_retries:
+                    logger.warning(f"Connection lost, reconnecting (attempt {attempt + 1}/{max_retries})...")
                     self._ws, self._server_metadata = self._wait_for_server()
                     continue
-                raise
-        if isinstance(response, str):
-            # we're expecting bytes; if the server sends a string, it's an error.
-            raise RuntimeError(f"Error in inference server:\n{response}")
-        action_dict = unpackb(response)
-        try:
-            action_np = deepcopy(action_dict["action"])
-        except KeyError:
-            # We try getting action one more time before raising error
-            logger.warning("No action received from server, retrying one more time...")
-            self._ws.send(data)
-            response = self._ws.recv()
-            action_dict = unpackb(response)
-            action_np = deepcopy(action_dict["action"])
-        action = th.from_numpy(action_np).to(th.float32)
-        return action
+                raise RuntimeError(f"Websocket connection error: {e}")
 
     def reset(self) -> None:
         if self._ws is None:
@@ -229,7 +239,7 @@ def _health_check(connection, request) -> Optional[Any]:
 
 
 """
-Adds NumPy array support to msgpack.
+Adds NumPy array and PyTorch tensor support to msgpack.
 
 msgpack is good for (de)serializing data over a network for multiple reasons:
 - msgpack is secure (as opposed to pickle/dill/etc which allow for arbitrary code execution)
@@ -239,16 +249,27 @@ msgpack is good for (de)serializing data over a network for multiple reasons:
 - msgpack is fast and efficient (as opposed to readable formats like JSON/YAML/etc); I found that msgpack was ~4x faster
     than pickle for serializing large arrays using the below strategy
 
+This module supports serializing both NumPy arrays and PyTorch tensors. PyTorch tensors are converted to
+NumPy arrays (zero-copy when possible) before serialization. On deserialization, arrays are returned as NumPy arrays.
+
 The code below is adapted from https://github.com/lebedov/msgpack-numpy. The reason not to use that library directly is
 that it falls back to pickle for object arrays.
 """
 
 
-def pack_array(obj):
-    if (isinstance(obj, (np.ndarray, np.generic))) and obj.dtype.kind in ("V", "O", "c"):
-        raise ValueError(f"Unsupported dtype: {obj.dtype}")
+def pack_data(obj):
+    if isinstance(obj, th.Tensor):
+        data = obj.detach().cpu().numpy()
+        return {
+            b"__ndarray__": True,
+            b"data": data.tobytes(),
+            b"dtype": data.dtype.str,
+            b"shape": data.shape,
+        }
 
     if isinstance(obj, np.ndarray):
+        if obj.dtype.kind in ("V", "O", "c"):
+            raise ValueError(f"Unsupported dtype: {obj.dtype}")
         return {
             b"__ndarray__": True,
             b"data": obj.tobytes(),
@@ -266,7 +287,7 @@ def pack_array(obj):
     return obj
 
 
-def unpack_array(obj):
+def unpack_data(obj):
     if b"__ndarray__" in obj:
         return np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"]), shape=obj[b"shape"])
 
@@ -276,8 +297,8 @@ def unpack_array(obj):
     return obj
 
 
-Packer = functools.partial(msgpack.Packer, default=pack_array)
-packb = functools.partial(msgpack.packb, default=pack_array)
+Packer = functools.partial(msgpack.Packer, default=pack_data)
+packb = functools.partial(msgpack.packb, default=pack_data)
 
-Unpacker = functools.partial(msgpack.Unpacker, object_hook=unpack_array)
-unpackb = functools.partial(msgpack.unpackb, object_hook=unpack_array)
+Unpacker = functools.partial(msgpack.Unpacker, object_hook=unpack_data)
+unpackb = functools.partial(msgpack.unpackb, object_hook=unpack_data)

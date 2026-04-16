@@ -1,5 +1,5 @@
 (define (problem make_a_lunch_box-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	club_sandwich.n.01_1 - club_sandwich.n.01

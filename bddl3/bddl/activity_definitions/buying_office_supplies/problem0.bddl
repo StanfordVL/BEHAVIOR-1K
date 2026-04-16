@@ -1,5 +1,5 @@
 (define (problem buying_office_supplies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         checkout.n.03_1 - checkout.n.03

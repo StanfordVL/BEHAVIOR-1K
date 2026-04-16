@@ -1,5 +1,5 @@
 (define (problem cook_brussels_sprouts-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         brussels_sprouts.n.01_1 brussels_sprouts.n.01_2 brussels_sprouts.n.01_3 brussels_sprouts.n.01_4 brussels_sprouts.n.01_5 brussels_sprouts.n.01_6 brussels_sprouts.n.01_7 brussels_sprouts.n.01_8 - brussels_sprouts.n.01

@@ -1,5 +1,5 @@
 (define (problem buy_fish-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	salmon.n.03_1 - salmon.n.03

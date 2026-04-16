@@ -1,5 +1,5 @@
 (define (problem bottling_wine-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bucket.n.01_1 - bucket.n.01

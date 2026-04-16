@@ -1,5 +1,5 @@
 (define (problem clean_a_garden_sprayer-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lawn.n.01_1 - lawn.n.01

@@ -1,5 +1,5 @@
 (define (problem hang_a_bike_on_the_wall-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bicycle.n.01_1 - bicycle.n.01

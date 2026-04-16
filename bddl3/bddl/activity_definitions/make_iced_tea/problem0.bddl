@@ -1,5 +1,5 @@
 (define (problem make_iced_tea-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tea_bag.n.01_1 - tea_bag.n.01

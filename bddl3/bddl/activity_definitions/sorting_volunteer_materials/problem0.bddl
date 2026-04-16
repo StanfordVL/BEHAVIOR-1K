@@ -1,5 +1,5 @@
 (define (problem sorting_volunteer_materials-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         packing_box.n.02_1 packing_box.n.02_2 packing_box.n.02_3 - packing_box.n.02

@@ -5,7 +5,6 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.usd_utils import PoseAPI
 
 from .rigid_prim import RigidPrim
 
@@ -53,7 +52,8 @@ class RigidDynamicPrim(RigidPrim):
         from omnigibson.utils.deprecated_utils import RigidPrimView
 
         # set reset_xform_properties to False for load time
-        self._rigid_prim_view = RigidPrimView(self.prim_path, reset_xform_properties=False)
+        with og.sim.editing_usd():
+            self._rigid_prim_view = RigidPrimView(self.prim_path, reset_xform_properties=False)
 
         # Run super method to handle common functionality
         super()._post_load()
@@ -81,7 +81,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
-        self._rigid_prim_view.set_linear_velocities(velocity[None, :])
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
     def get_linear_velocity(self, clone=True):
         """
@@ -100,7 +101,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
-        self._rigid_prim_view.set_angular_velocities(velocity[None, :])
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
     def get_angular_velocity(self, clone=True):
         """
@@ -111,41 +113,6 @@ class RigidDynamicPrim(RigidPrim):
             th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
         return self._rigid_prim_view.get_angular_velocities(clone=clone)[0]
-
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
-        """
-        Set the position and orientation of the dynamic rigid body.
-
-        Args:
-            position (None or 3-array): The position to set the object to. If None, the position is not changed.
-            orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (Literal): The frame in which to set the position and orientation. Defaults to world.
-                Scene frame sets position relative to the scene.
-        """
-        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
-
-        # If no position or no orientation are given, get the current position and orientation of the object
-        if position is None or orientation is None:
-            current_position, current_orientation = self.get_position_orientation(frame=frame)
-        position = current_position if position is None else position
-        orientation = current_orientation if orientation is None else orientation
-
-        # Convert to th.Tensor if necessary
-        position = th.as_tensor(position, dtype=th.float32)
-        orientation = th.as_tensor(orientation, dtype=th.float32)
-
-        # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-
-        # Convert to from scene-relative to world if necessary
-        if frame == "scene":
-            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
-            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
-
-        self._rigid_prim_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
-        PoseAPI.invalidate()
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
@@ -196,7 +163,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             com (th.Tensor): (x,y,z) position of link CoM in the link frame
         """
-        self._rigid_prim_view.set_coms(positions=com.reshape(1, 1, 3))
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_coms(positions=com.reshape(1, 1, 3))
 
     @property
     def mass(self):
@@ -218,7 +186,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        self._rigid_prim_view.set_masses(th.tensor([mass]))
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_masses(th.tensor([mass]))
 
     @property
     def density(self):
@@ -245,7 +214,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        self._rigid_prim_view.set_densities(th.tensor([density]))
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_densities(th.tensor([density]))
 
     @property
     def is_asleep(self):
@@ -259,13 +229,15 @@ class RigidDynamicPrim(RigidPrim):
         """
         Enables gravity for this rigid body
         """
-        self._rigid_prim_view.enable_gravities()
+        with og.sim.editing_usd():
+            self._rigid_prim_view.enable_gravities()
 
     def disable_gravity(self):
         """
         Disables gravity for this rigid body
         """
-        self._rigid_prim_view.disable_gravities()
+        with og.sim.editing_usd():
+            self._rigid_prim_view.disable_gravities()
 
     def wake(self):
         """

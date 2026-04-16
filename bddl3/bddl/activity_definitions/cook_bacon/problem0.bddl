@@ -1,5 +1,5 @@
 (define (problem cook_bacon-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bacon.n.01_1 bacon.n.01_2 bacon.n.01_3 bacon.n.01_4 bacon.n.01_5 bacon.n.01_6 - bacon.n.01

@@ -1,5 +1,5 @@
 (define (problem hanging_up_bedsheets-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         clothesline.n.01_1 - clothesline.n.01

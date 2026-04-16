@@ -1,5 +1,5 @@
 (define (problem toast_buns-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bap.n.01_1 bap.n.01_2 bap.n.01_3 bap.n.01_4 - bap.n.01

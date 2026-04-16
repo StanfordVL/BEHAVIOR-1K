@@ -1,5 +1,5 @@
 (define (problem serving_food_at_a_homeless_shelter-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         salad.n.01_1 salad.n.01_2 - salad.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_place_mats-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	place_mat.n.01_1 place_mat.n.01_2 place_mat.n.01_3 place_mat.n.01_4 - place_mat.n.01

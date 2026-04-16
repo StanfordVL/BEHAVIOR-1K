@@ -1,5 +1,5 @@
 (define (problem turning_on_the_hot_tub-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         hot_tub.n.02_1 - hot_tub.n.02

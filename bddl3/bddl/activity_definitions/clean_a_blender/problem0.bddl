@@ -1,5 +1,5 @@
 (define (problem clean_a_blender-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         blender.n.01_1 - blender.n.01

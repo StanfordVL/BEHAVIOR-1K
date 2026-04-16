@@ -1,5 +1,5 @@
 (define (problem lube_a_bicycle_chain-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lubricant.n.01_1 - lubricant.n.01

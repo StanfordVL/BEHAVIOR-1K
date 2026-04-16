@@ -1,5 +1,5 @@
 (define (problem clean_clear_plastic-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sodium_carbonate__jar.n.01_1 - sodium_carbonate__jar.n.01

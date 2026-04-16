@@ -1,5 +1,5 @@
 (define (problem hanging_up_curtains-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         curtain.n.01_1 - curtain.n.01

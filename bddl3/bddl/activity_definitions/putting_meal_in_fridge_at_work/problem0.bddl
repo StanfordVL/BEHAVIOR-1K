@@ -1,5 +1,5 @@
 (define (problem putting_meal_in_fridge_at_work-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         electric_refrigerator.n.01_1 - electric_refrigerator.n.01

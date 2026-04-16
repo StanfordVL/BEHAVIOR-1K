@@ -1,5 +1,5 @@
 (define (problem putting_on_tags_car-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         license_plate.n.01_1 - license_plate.n.01

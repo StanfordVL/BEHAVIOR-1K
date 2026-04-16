@@ -1,5 +1,5 @@
 (define (problem preparing_food_for_adult-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         whiskey.n.01_1 - whiskey.n.01

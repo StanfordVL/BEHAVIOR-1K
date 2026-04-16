@@ -1,5 +1,5 @@
 (define (problem putting_out_condiments-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wicker_basket.n.01_1 wicker_basket.n.01_2 - wicker_basket.n.01

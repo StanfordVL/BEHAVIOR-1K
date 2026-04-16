@@ -1,5 +1,5 @@
 (define (problem cook_spinach-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         saucepan.n.01_1 - saucepan.n.01

@@ -1,5 +1,5 @@
 (define (problem decorating_outside_for_parties-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         balloon.n.01_1 balloon.n.01_2 balloon.n.01_3 balloon.n.01_4 - balloon.n.01

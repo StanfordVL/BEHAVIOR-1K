@@ -1,5 +1,5 @@
 (define (problem freeze_lasagna-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lasagna.n.01_1 lasagna.n.01_2 - lasagna.n.01

@@ -1,5 +1,5 @@
 (define (problem putting_meal_on_plate-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	porkchop.n.01_1 porkchop.n.01_2 - porkchop.n.01

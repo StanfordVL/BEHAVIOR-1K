@@ -1,5 +1,5 @@
 (define (problem bringing_in_wood-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         plywood.n.01_1 plywood.n.01_2 plywood.n.01_3 - plywood.n.01

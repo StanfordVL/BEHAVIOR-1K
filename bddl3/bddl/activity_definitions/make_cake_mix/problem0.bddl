@@ -1,5 +1,5 @@
 (define (problem make_cake_mix-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         flour.n.01_1 - flour.n.01

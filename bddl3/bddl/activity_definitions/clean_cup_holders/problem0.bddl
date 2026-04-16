@@ -1,5 +1,5 @@
 (define (problem clean_cup_holders-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01

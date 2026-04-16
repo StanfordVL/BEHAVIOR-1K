@@ -445,6 +445,7 @@ def test_mixing_rule_failure_recipe_systems(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -492,6 +493,7 @@ def test_mixing_rule_failure_nonrecipe_systems(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -535,6 +537,7 @@ def test_mixing_rule_success(env, bowl, tablespoon):
     tablespoon.set_position_orientation(
         position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
+    og.sim.step()
     tablespoon.keep_still()
     tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     for _ in range(3):
@@ -796,7 +799,8 @@ def test_cooking_object_rule_failure_wrong_container(env, oven, stockpot, bagel_
 
     bagel_dough.set_position_orientation([0, 0, 0.464], [0, 0, 0, 1])
     raw_egg.set_position_orientation([0.02, 0, 0.506], [0, 0, 0, 1])
-    og.sim.step()
+    for _ in range(10):
+        og.sim.step()
     assert bagel_dough.states[Inside].get_value(stockpot)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
 
@@ -863,13 +867,13 @@ def test_cooking_object_rule_failure_unary_states(env, oven, baking_sheet, bagel
     og.sim.step()
 
     baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(5):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[0.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -902,13 +906,13 @@ def test_cooking_object_rule_failure_binary_system_states(env, oven, baking_shee
     og.sim.step()
 
     baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(5):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[0.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -989,7 +993,7 @@ def test_cooking_object_rule_failure_wrong_heat_source(env, stove, baking_sheet,
 
     bagel_dough.set_position_orientation(position=[-0.1, -0.15, 0.84], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[-0.1, -0.15, 0.89], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -1386,8 +1390,8 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states(
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.50], orientation=[0, 0, 0, 1])
-    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.45], orientation=[0, 0, 0, 1])
     flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
     granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
     vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))
@@ -1456,8 +1460,8 @@ def test_single_toggleable_machine_rule_output_object_success(env, electric_mixe
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.50], orientation=[0, 0, 0, 1])
-    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.45], orientation=[0, 0, 0, 1])
     flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
     granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
     vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))

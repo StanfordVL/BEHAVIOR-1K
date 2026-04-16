@@ -4,6 +4,7 @@ import random
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -230,7 +231,8 @@ class DatasetObject(USDObject):
                 for child_child_prim in child_prim.GetChildren():
                     recursive_light_update(child_child_prim)
 
-            recursive_light_update(self._prim)
+            with og.sim.editing_usd():
+                recursive_light_update(self._prim)
 
         # Set the joint frictions based on joint type
         for joint in self._joints.values():
@@ -256,24 +258,13 @@ class DatasetObject(USDObject):
         return super()._get_preapply_scale(default_prim)
 
     def _post_load(self):
-        # If manual bounding box is specified, scale based on ratio between that and the native bbox
-        if self._load_config["bounding_box"] is not None:
-            scale = th.ones(3)
-            valid_idxes = self.native_bbox > 1e-4
-            scale[valid_idxes] = (
-                th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
-            )
-        elif self._load_config["scale"] is not None:
-            scale = self._load_config["scale"]
-            scale = scale if th.is_tensor(scale) else th.tensor(scale, dtype=th.float32)
-        else:
-            scale = th.ones(3)
-
-        # Assert that the scale does not have too small dimensions
-        assert th.all(th.abs(scale) > 1e-4), f"Scale of {self.name} is too small: {scale}"
-
-        # Set this scale in the load config -- it will automatically scale the object during self.initialize()
-        self._load_config["scale"] = scale
+        # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
+        # If neither was provided, default to ones(3) (no scaling).
+        if self._load_config.get("scale", None) is None:
+            self._load_config["scale"] = th.ones(3)
+        assert th.all(
+            th.abs(self._load_config["scale"]) > 1e-4
+        ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
         # Run super last
         super()._post_load()
 
@@ -323,18 +314,19 @@ class DatasetObject(USDObject):
 
             prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
             revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
-            for prismatic_joint in prismatic_joints:
-                prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
-                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
-                prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
-            for revolute_joint in revolute_joints:
-                revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
-                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
-                revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
+            with og.sim.editing_usd():
+                for prismatic_joint in prismatic_joints:
+                    prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
+                    prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
+                    prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
+                for revolute_joint in revolute_joints:
+                    revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
+                    revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
+                    revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
 
         elif self._prim_type == PrimType.CLOTH:
             if category_mass is not None:

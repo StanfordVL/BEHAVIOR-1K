@@ -1,5 +1,5 @@
 (define (problem clean_your_rusty_garden_tools-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rust.n.01_1 - rust.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_white_wall_tires-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mud.n.03_1 - mud.n.03

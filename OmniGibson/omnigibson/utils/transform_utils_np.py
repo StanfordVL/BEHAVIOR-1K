@@ -166,7 +166,7 @@ def quat_multiply(quaternion1, quaternion0):
     return _quat_multiply(quaternion1, quaternion0)
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _quat_multiply(quaternion1, quaternion0):
     """
     Return multiplication of two quaternions (q1 * q0).
@@ -309,7 +309,7 @@ def quat_slerp(quat0, quat1, fraction, shortestpath=True):
     return q0
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def random_quaternion(num_quaternions=1):
     """
     Generate random rotation quaternions, uniformly distributed over SO(3).
@@ -374,7 +374,7 @@ def quat2mat(quaternion):
     return _quat2mat(quaternion)
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _quat2mat(quaternion):
     """
     Convert quaternions into rotation matrices.
@@ -430,7 +430,7 @@ def mat2quat(rmat):
     return R.from_matrix(rmat).as_quat()
 
 
-@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True, cache=True)
 def _norm_2d_final_dim(mat):
     n_elements = mat.shape[0]
     out = np.zeros(n_elements, dtype=np.float32)
@@ -440,7 +440,7 @@ def _norm_2d_final_dim(mat):
     return out
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def mat2quat_batch(rmat):
     """
     Converts given rotation matrix to quaternion.
@@ -694,7 +694,7 @@ def mat2euler(rmat):
     return R.from_matrix(M).as_euler("xyz")
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def pose2mat(pose):
     """
     Converts pose to homogeneous matrix.
@@ -767,7 +767,7 @@ def pose_inv(pose_mat):
     return _pose_inv(pose_mat)
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _pose_inv(pose_mat):
     """
     Computes the inverse of a homogeneous matrix corresponding to the pose of some
@@ -1297,7 +1297,7 @@ def integer_spiral_coordinates(n):
     return int(x), int(y)
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def transform_points(points, matrix, translate=True):
     """
     Returns points rotated by a homogeneous
@@ -1345,7 +1345,7 @@ def quaternions_close(q1, q2, atol=1e-3):
     return np.allclose(q1, q2, atol=atol) or np.allclose(q1, -q2, atol=atol)
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def orientation_error(desired, current):
     """
     This function calculates a 3-dimensional orientation error vector for use in the
