@@ -185,7 +185,8 @@ def create_and_dock_viewport(parent_window, position, ratio, camera_path):
     Returns:
         The created viewport window
     """
-    viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
+    with og.sim.editing_usd():
+        viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
     og.sim.render()
 
     dock_window(
@@ -196,7 +197,8 @@ def create_and_dock_viewport(parent_window, position, ratio, camera_path):
     )
     og.sim.render()
 
-    viewport.viewport_api.set_active_camera(camera_path)
+    with og.sim.editing_usd():
+        viewport.viewport_api.set_active_camera(camera_path)
     og.sim.render()
 
     return viewport
@@ -285,32 +287,34 @@ def setup_cameras(robot, external_sensors, resolution, config):
             "right", f"{robot.arm_names[1]}_eef_link"
         )
 
-        for wrist_link in (left_wrist_link, right_wrist_link):
-            camera_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
-                prim_path=f"{robot.links[wrist_link].prim_path}/Camera"
-            )
-            if config.wrist_camera_pos is not None:
-                camera_prim.GetAttribute("xformOp:translate").Set(
-                    lazy.pxr.Gf.Vec3d(*config.wrist_camera_pos.tolist())
+        with og.sim.editing_usd():
+            for wrist_link in (left_wrist_link, right_wrist_link):
+                camera_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
+                    prim_path=f"{robot.links[wrist_link].prim_path}/Camera"
                 )
-            if config.wrist_camera_ori is not None:
-                camera_prim.GetAttribute("xformOp:orient").Set(
-                    lazy.pxr.Gf.Quatd(*config.wrist_camera_ori[[3, 0, 1, 2]].tolist())
-                )
+                if config.wrist_camera_pos is not None:
+                    camera_prim.GetAttribute("xformOp:translate").Set(
+                        lazy.pxr.Gf.Vec3d(*config.wrist_camera_pos.tolist())
+                    )
+                if config.wrist_camera_ori is not None:
+                    camera_prim.GetAttribute("xformOp:orient").Set(
+                        lazy.pxr.Gf.Quatd(*config.wrist_camera_ori[[3, 0, 1, 2]].tolist())
+                    )
 
     # Adjust head camera offset if configured
     if config.head_camera_pos is not None or config.head_camera_ori is not None:
         head_camera_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
             prim_path=eyes_cam_prim_path
         )
-        if config.head_camera_pos is not None:
-            head_camera_prim.GetAttribute("xformOp:translate").Set(
-                lazy.pxr.Gf.Vec3d(*config.head_camera_pos.tolist())
-            )
-        if config.head_camera_ori is not None:
-            head_camera_prim.GetAttribute("xformOp:orient").Set(
-                lazy.pxr.Gf.Quatd(*config.head_camera_ori[[3, 0, 1, 2]].tolist())
-            )
+        with og.sim.editing_usd():
+            if config.head_camera_pos is not None:
+                head_camera_prim.GetAttribute("xformOp:translate").Set(
+                    lazy.pxr.Gf.Vec3d(*config.head_camera_pos.tolist())
+                )
+            if config.head_camera_ori is not None:
+                head_camera_prim.GetAttribute("xformOp:orient").Set(
+                    lazy.pxr.Gf.Quatd(*config.head_camera_ori[[3, 0, 1, 2]].tolist())
+                )
 
     camera_paths = [
         eyes_cam_prim_path,
@@ -319,22 +323,24 @@ def setup_cameras(robot, external_sensors, resolution, config):
 
     # Lock camera attributes
     LOCK_CAMERA_ATTR = "omni:kit:cameraLock"
-    for cam_path in camera_paths:
-        cam_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(cam_path)
-        cam_prim.GetAttribute("horizontalAperture").Set(40.0)
+    with og.sim.editing_usd():
+        for cam_path in camera_paths:
+            cam_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(cam_path)
+            cam_prim.GetAttribute("horizontalAperture").Set(40.0)
 
-        # Lock attributes afterwards as well to avoid external modification
-        if cam_prim.HasAttribute(LOCK_CAMERA_ATTR):
-            attr = cam_prim.GetAttribute(LOCK_CAMERA_ATTR)
-        else:
-            attr = cam_prim.CreateAttribute(
-                LOCK_CAMERA_ATTR, lazy.pxr.Sdf.ValueTypeNames.Bool
-            )
-        attr.Set(True)
+            # Lock attributes afterwards as well to avoid external modification
+            if cam_prim.HasAttribute(LOCK_CAMERA_ATTR):
+                attr = cam_prim.GetAttribute(LOCK_CAMERA_ATTR)
+            else:
+                attr = cam_prim.CreateAttribute(
+                    LOCK_CAMERA_ATTR, lazy.pxr.Sdf.ValueTypeNames.Bool
+                )
+            attr.Set(True)
 
     # Disable all render products to save on speed
-    for sensor in VisionSensor.SENSORS.values():
-        sensor.render_product.hydra_texture.set_updates_enabled(False)
+    with og.sim.editing_usd():
+        for sensor in VisionSensor.SENSORS.values():
+            sensor.render_product.hydra_texture.set_updates_enabled(False)
 
     return camera_paths, viewports
 
@@ -656,23 +662,24 @@ def setup_flashlights(robot):
     """
     flashlights = {}
 
-    for arm in robot.arm_names:
-        light_prim = getattr(lazy.pxr.UsdLux, "SphereLight").Define(
-            og.sim.stage, f"{robot.links[f'{arm}_eef_link'].prim_path}/flashlight"
-        )
-        light_prim.GetRadiusAttr().Set(0.01)
-        light_prim.GetIntensityAttr().Set(FLASHLIGHT_INTENSITY)
-        light_prim.LightAPI().GetNormalizeAttr().Set(True)
+    with og.sim.editing_usd():
+        for arm in robot.arm_names:
+            light_prim = getattr(lazy.pxr.UsdLux, "SphereLight").Define(
+                og.sim.stage, f"{robot.links[f'{arm}_eef_link'].prim_path}/flashlight"
+            )
+            light_prim.GetRadiusAttr().Set(0.01)
+            light_prim.GetIntensityAttr().Set(FLASHLIGHT_INTENSITY)
+            light_prim.LightAPI().GetNormalizeAttr().Set(True)
 
-        light_prim.ClearXformOpOrder()
-        translate_op = light_prim.AddTranslateOp()
-        translate_op.Set(lazy.pxr.Gf.Vec3d(-0.01, 0, -0.05))
-        light_prim.SetXformOpOrder([translate_op])
+            light_prim.ClearXformOpOrder()
+            translate_op = light_prim.AddTranslateOp()
+            translate_op.Set(lazy.pxr.Gf.Vec3d(-0.01, 0, -0.05))
+            light_prim.SetXformOpOrder([translate_op])
 
-        # Start with flashlight off
-        light_prim.GetVisibilityAttr().Set("invisible")
+            # Start with flashlight off
+            light_prim.GetVisibilityAttr().Set("invisible")
 
-        flashlights[arm] = light_prim
+            flashlights[arm] = light_prim
 
     return flashlights
 

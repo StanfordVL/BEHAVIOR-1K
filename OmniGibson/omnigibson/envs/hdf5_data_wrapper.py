@@ -457,9 +457,11 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
                 lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
 
             # Disable mouse grabbing since we're only using the UI passively
-            lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
+            # These settings trigger PhysX UI callbacks that write to the USD root layer
+            with og.sim.editing_usd():
+                lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
+                lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
+                lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
