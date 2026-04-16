@@ -380,15 +380,14 @@ class RigidBodyViewAPI:
         return cls._PATH_TO_IDX.get(abs_prim_path)
 
     @classmethod
-    def get_aabb(cls, prim_body_idx, link_idx, out_lo, out_hi):
+    def get_aabb(cls, prim_body_idx, link_idx, out_values):
         """
         Compute per-link world-space AABB mins/maxes and scatter into per-object scratch buffers.
 
         Args:
             prim_body_idx (th.Tensor): (N,) int64 — flat indices into _POSE_MATRICES / LOCAL_POINTS
             link_idx (th.Tensor):      (N,) int64 — pre-computed s*O + obj_idx for each link
-            out_lo (th.Tensor):            (S*O, 3) — caller pre-fills with +inf, written in-place
-            hi (th.Tensor):            (S*O, 3) — caller pre-fills with -inf, written in-place
+            out_values (th.Tensor):    (S*O, 6) — caller pre-fills with +/-inf, written in-place
         """
         poses = cls._POSE_MATRICES[prim_body_idx]  # (N, 4, 4)
         local_pts = cls.LOCAL_POINTS[prim_body_idx]  # (N, V, 4)
@@ -403,14 +402,19 @@ class RigidBodyViewAPI:
         world_pts_min[~mask] = float("inf")
         world_pts_max[~mask] = float("-inf")
 
+        # For links that don't have any collision geometry, add a point at their local origin
+        objects_missing_points = ~th.any(mask, dim=1)  # (N,)
+        world_pts_min[objects_missing_points, 0, :] = poses[objects_missing_points, :3, 3]
+        world_pts_max[objects_missing_points, 0, :] = poses[objects_missing_points, :3, 3]
+
         # Compute per-link AABBs
         min_p = world_pts_min.min(dim=1).values  # (N, 3)
         max_p = world_pts_max.max(dim=1).values  # (N, 3)
 
         # Scatter into per-object AABBs
         idx_exp = link_idx.unsqueeze(1).expand(-1, 3)  # (N, 3)
-        out_lo.scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_cls=True)
-        out_hi.scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_cls=True)
+        out_values[:, :3].scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_cls=True)
+        out_values[:, 3:].scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_cls=True)
 
     @classmethod
     def invalidate_kinematic(cls, links):

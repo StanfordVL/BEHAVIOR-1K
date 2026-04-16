@@ -26,10 +26,6 @@ class AABB(TensorizedValueState):
     # list[int] — O indices of cloth objects (per-object fallback)
     CLOTH_OBJ_IDXS = None
 
-    # (S*O, 3) scratch buffers — pre-allocated in initialize_view(), reused each step via fill_()
-    _AABB_LO = None
-    _AABB_HI = None
-
     @classproperty
     def value_shape(cls):
         return (6,)
@@ -53,8 +49,6 @@ class AABB(TensorizedValueState):
             cls.PRIM_BODY_IDX = th.zeros((0,), dtype=th.long, device="cuda")
             cls.LINK_IDX = th.zeros((0,), dtype=th.long, device="cuda")
             cls.CLOTH_OBJ_IDXS = []
-            cls._AABB_LO = th.zeros((0, 3), device="cuda")
-            cls._AABB_HI = th.zeros((0, 3), device="cuda")
             return
 
         prim_body_idx = []
@@ -80,28 +74,25 @@ class AABB(TensorizedValueState):
         cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long, device="cuda")
         cls.LINK_IDX = th.tensor(link_idx, dtype=th.long, device="cuda")
 
-        # Pre-allocated scratch buffers — reused each step via fill_(), never recreated
-        cls._AABB_LO = th.full((S * O, 3), float("inf"), device="cuda")
-        cls._AABB_HI = th.full((S * O, 3), float("-inf"), device="cuda")
-
         # Initialize new VALUE slots for objects that just appeared
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
             if rel_path not in prev_rel_paths:
                 for s_idx in range(S):
                     if cls.IDX_OBJS[s_idx][obj_idx] is not None:
-                        cls.VALUES[s_idx, obj_idx] = 0.0  # will be correct after first _update_values
+                        cls.VALUES[s_idx, obj_idx] = th.nan
 
     @classmethod
     def _update_values(cls, values):
         S = values.shape[0]
         O = values.shape[1]
 
-        cls._AABB_LO.fill_(float("inf"))
-        cls._AABB_HI.fill_(float("-inf"))
+        # Fill with infinite values for the lower bound and -infinite values for the upper bound
+        values.fill_(float("inf"))
+        values[:, :, 3:] = float("-inf")
 
         # Batched AABB for all rigid links (physx_tracked + physx_untracked kinematic)
         if cls.PRIM_BODY_IDX is not None and cls.PRIM_BODY_IDX.numel() > 0:
-            RigidBodyViewAPI.get_aabb(cls.PRIM_BODY_IDX, cls.LINK_IDX, cls._AABB_LO, cls._AABB_HI)
+            RigidBodyViewAPI.get_aabb(cls.PRIM_BODY_IDX, cls.LINK_IDX, values.view(S * O, 6))
 
         # Cloth fallback — per-object, uses existing obj.aabb
         for obj_idx in cls.CLOTH_OBJ_IDXS:
@@ -109,10 +100,8 @@ class AABB(TensorizedValueState):
                 obj = s_row[obj_idx]
                 if obj is not None:
                     lo, hi = obj.aabb
-                    cls._AABB_LO[s_idx * O + obj_idx] = lo
-                    cls._AABB_HI[s_idx * O + obj_idx] = hi
-
-        return th.cat([cls._AABB_LO.view(S, O, 3), cls._AABB_HI.view(S, O, 3)], dim=-1)
+                    values[s_idx, obj_idx, :3] = lo
+                    values[s_idx, obj_idx, 3:] = hi
 
     def _get_value(self):
         s = self.obj.scene.idx
