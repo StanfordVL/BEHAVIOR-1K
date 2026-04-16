@@ -1,5 +1,5 @@
 (define (problem wash_a_bra-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         brassiere.n.01_1 - brassiere.n.01

@@ -1,5 +1,5 @@
 (define (problem make_an_iced_espresso-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         espresso.n.01_1 - espresso.n.01

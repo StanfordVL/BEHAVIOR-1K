@@ -1,5 +1,5 @@
 (define (problem make_cinnamon_sugar-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cinnamon.n.03_1 - cinnamon.n.03

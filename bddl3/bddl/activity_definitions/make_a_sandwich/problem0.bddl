@@ -1,5 +1,5 @@
 (define (problem make_a_sandwich-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         jelly.n.02_1 - jelly.n.02

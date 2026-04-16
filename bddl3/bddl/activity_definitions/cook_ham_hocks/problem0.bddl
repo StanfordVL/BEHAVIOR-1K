@@ -1,5 +1,5 @@
 (define (problem cook_ham_hocks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         stockpot.n.01_1 - stockpot.n.01

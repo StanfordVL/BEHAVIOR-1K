@@ -1,5 +1,5 @@
 (define (problem packing_meal_for_delivery-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         hamburger.n.01_1 hamburger.n.01_2 hamburger.n.01_3 hamburger.n.01_4 - hamburger.n.01

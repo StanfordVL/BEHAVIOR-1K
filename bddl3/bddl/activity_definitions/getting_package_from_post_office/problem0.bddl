@@ -1,5 +1,5 @@
 (define (problem getting_package_from_post_office-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         keyboard.n.01_1 - keyboard.n.01

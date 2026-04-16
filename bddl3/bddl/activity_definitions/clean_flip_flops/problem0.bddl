@@ -1,5 +1,5 @@
 (define (problem clean_flip_flops-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sandal.n.01_1 sandal.n.01_2 - sandal.n.01

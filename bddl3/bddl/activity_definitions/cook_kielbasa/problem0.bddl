@@ -1,5 +1,5 @@
 (define (problem cook_kielbasa-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         frying_pan.n.01_1 - frying_pan.n.01

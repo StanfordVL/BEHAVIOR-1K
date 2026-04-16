@@ -1,5 +1,5 @@
 (define (problem cook_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01

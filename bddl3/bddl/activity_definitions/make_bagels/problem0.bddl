@@ -1,5 +1,5 @@
 (define (problem make_bagels-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         flour.n.01_1 - flour.n.01

@@ -1,11 +1,11 @@
 import csv
 import json
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 import tqdm
 
 from b1k_pipeline.utils import get_targets, PipelineFS, PIPELINE_ROOT
 
-OBJECT_TAXONOMY = ObjectTaxonomy()
+kb = KnowledgeBase(populate=True)
 
 RENAME_DICT = {}
 with open(PIPELINE_ROOT / "metadata/object_renames.csv", "r") as f:
@@ -116,9 +116,10 @@ def main():
 
                 # Get the properties of the object
                 cat = RENAME_DICT[obj] if obj in RENAME_DICT else obj.split("-")[0]
-                syn = OBJECT_TAXONOMY.get_synset_from_category(cat)
+                cat_obj = kb.get_category(cat)
+                syn = cat_obj.synset.name if cat_obj else None
                 assert syn, f"Could not find synset for object {obj}"
-                abilities = OBJECT_TAXONOMY.get_abilities(syn)
+                abilities = kb.get_synset(syn).abilities
 
                 if cat not in fully_complete_objects:
                     fully_complete_objects[cat] = 0
@@ -154,9 +155,16 @@ def main():
         print("Task-required synsets that have no fully-complete objects:")
         trs_missing = {}
         for trs in sorted(TASK_REQUIRED_SYNSETS):
-            if "substance" in OBJECT_TAXONOMY.get_abilities(trs):
+            if "substance" in kb.get_synset(trs).abilities:
                 continue
-            descendants = OBJECT_TAXONOMY.get_subtree_categories(trs)
+            trs_synset = kb.get_synset(trs)
+            descendants = [
+                c.name
+                for s in [trs_synset]
+                + sorted(trs_synset.descendants, key=lambda x: x.name)
+                if s.is_leaf
+                for c in s.categories
+            ]
             trs_fully_complete = sum(
                 fully_complete_objects[cat]
                 for cat in descendants
@@ -164,7 +172,7 @@ def main():
             )
             if trs_fully_complete == 0:
                 needed_abilities = sorted(
-                    set(OBJECT_TAXONOMY.get_abilities(trs).keys())
+                    set(kb.get_synset(trs).abilities.keys())
                     & META_REQUIRING_ABILITIES
                 )
                 print(f" - {trs}: {', '.join(needed_abilities)}")

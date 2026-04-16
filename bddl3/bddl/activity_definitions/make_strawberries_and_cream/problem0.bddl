@@ -1,5 +1,5 @@
 (define (problem make_strawberries_and_cream-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	bowl.n.01_1 - bowl.n.01

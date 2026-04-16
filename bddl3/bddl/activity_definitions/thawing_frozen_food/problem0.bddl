@@ -1,5 +1,5 @@
 (define (problem thawing_frozen_food-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	date.n.08_1 - date.n.08

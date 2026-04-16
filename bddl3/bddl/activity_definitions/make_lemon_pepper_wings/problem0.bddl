@@ -1,5 +1,5 @@
 (define (problem make_lemon_pepper_wings-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         melted__butter.n.01_1 - melted__butter.n.01

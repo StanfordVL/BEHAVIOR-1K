@@ -1,5 +1,5 @@
 (define (problem storing_food-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	box__of__oatmeal.n.01_1 box__of__oatmeal.n.01_2 - box__of__oatmeal.n.01

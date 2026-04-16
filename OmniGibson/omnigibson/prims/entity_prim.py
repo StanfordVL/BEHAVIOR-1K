@@ -1,4 +1,3 @@
-import math
 from functools import cached_property
 from typing import Literal
 
@@ -122,8 +121,9 @@ class EntityPrim(XFormPrim):
             # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
             # See omni.kit.context_menu module for reference
             new_path = f"{self.prim_path}/{old_link_prim.GetName()}_cloth"
-            lazy.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
-            lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
+            with og.sim.editing_usd():
+                lazy.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
+                lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
 
         self.update_links()
         self._compute_articulation_tree()
@@ -133,7 +133,8 @@ class EntityPrim(XFormPrim):
             # Import now to avoid too-eager load of Omni classes due to inheritance
             from omnigibson.utils.deprecated_utils import ArticulationView
 
-            self._articulation_view_direct = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
+            with og.sim.editing_usd():
+                self._articulation_view_direct = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -416,15 +417,6 @@ class EntityPrim(XFormPrim):
         return self._articulated
 
     @property
-    def articulation_root_path(self):
-        """
-        Returns:
-            None or str: Absolute USD path to the expected prim that represents the articulation root, if it exists. By default,
-                this corresponds to self.prim_path
-        """
-        return self.prim_path if self.n_joints > 0 else None
-
-    @property
     def root_link_name(self):
         """
         Returns:
@@ -681,9 +673,11 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         if drive:
-            self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
         else:
-            self._articulation_view.set_joint_positions(positions, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_positions(positions, joint_indices=indices)
             PoseAPI.invalidate()
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
@@ -712,9 +706,11 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         if drive:
-            self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
         else:
-            self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
+            with og.sim.editing_usd():
+                self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
 
     def set_joint_efforts(self, efforts, indices=None, normalized=False):
         """
@@ -738,7 +734,8 @@ class EntityPrim(XFormPrim):
             efforts = self._denormalize_efforts(efforts=efforts, indices=indices)
 
         # Set the DOF states
-        self._articulation_view.set_joint_efforts(efforts, joint_indices=indices)
+        with og.sim.editing_usd():
+            self._articulation_view.set_joint_efforts(efforts, joint_indices=indices)
 
     def _normalize_positions(self, positions, indices=None):
         """
@@ -1022,44 +1019,32 @@ class EntityPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
-        # If kinematic only, clear cache for the root link
-        if self.kinematic_only:
-            self.root_link.clear_kinematic_only_cache()
+        # If the articulation root is the entity prim, we can just move the entity prim. In this case
+        # we want to make sure that the root link does not have a relative pose to the entity prim.
+        if self.articulation_root_path == self.prim_path:
+            this_position, this_orientation = XFormPrim.get_position_orientation(self, frame=frame)
+            root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
+            assert th.allclose(
+                this_position, root_link_position, atol=1e-2
+            ), "Position mismatch between entity prim and root link"
+            assert th.allclose(
+                this_orientation, root_link_orientation, atol=1e-2
+            ), "Orientation mismatch between entity prim and root link"
+            XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+        else:
+            # If the object's articulation root is NOT the entity prim, the entity prim should NOT have a
+            # transform. Otherwise the root link's transform needs to get multiplied by this and it can cause
+            # inaccuracies over long distances.
+            local_pos, local_orn = XFormPrim.get_position_orientation(self, frame="parent")
+            assert th.allclose(
+                local_pos, th.zeros(3), atol=1e-3
+            ), "The object/entity prim of an articulated object should not have a transform if it's not the articulation root."
+            assert th.allclose(
+                local_orn, th.tensor([0.0, 0.0, 0.0, 1.0]), atol=1e-3
+            ), "The object/entity prim of an articulated object should not have a transform if it's not the articulation root."
 
-        # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
-        if og.sim.is_stopped():
-            return XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
-
-        # Otherwise, we need to set our pose through PhysX.
-        # If we are not articulated, we can use the RigidPrim API.
-        if self._articulation_view is None:
-            return self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
-
-        # Otherwise, we use the articulation view.
-        # If no position or no orientation are given, get the current position and orientation of the object
-        if position is None or orientation is None:
-            current_position, current_orientation = self.get_position_orientation(frame=frame)
-        position = current_position if position is None else position
-        orientation = current_orientation if orientation is None else orientation
-
-        # Convert to th.Tensor if necessary
-        position = th.as_tensor(position, dtype=th.float32)
-        orientation = th.as_tensor(orientation, dtype=th.float32)
-
-        # Convert to from scene-relative to world if necessary
-        if frame == "scene":
-            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
-            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
-
-        # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-
-        # Actually set the pose.
-        self._articulation_view.set_world_poses(
-            positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
-        )
+            # Otherwise, we need to set it directly on the root link.
+            self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
         # Invalidate the pose cache.
         PoseAPI.invalidate()
@@ -1080,30 +1065,7 @@ class EntityPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
-        # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
-        if og.sim.is_stopped():
-            return XFormPrim.get_position_orientation(self, frame=frame, clone=clone)
-
-        # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
-            return self.root_link.get_position_orientation(frame=frame, clone=clone)
-
-        # Otherwise, get the pose from the articulation view and convert to our format
-        positions, orientations = self._articulation_view.get_world_poses(clone=clone)
-        position = positions[0]
-        orientation = orientations[0][[1, 2, 3, 0]]
-
-        # Assert that the orientation is a unit quaternion
-        assert math.isclose(
-            th.norm(orientations).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} orientation {orientations} is not a unit quaternion."
-
-        # If requested, compute the scene-local transform
-        if frame == "scene":
-            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-            position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
-
-        return position, orientation
+        return self.root_link.get_position_orientation(frame=frame, clone=clone)
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property
@@ -1261,9 +1223,10 @@ class EntityPrim(XFormPrim):
             count (int): How many position iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.isaacsim.core.utils.prims.set_prim_property(
-                self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count
-            )
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.prims.set_prim_property(
+                    self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count
+                )
         else:
             for link in self._links.values():
                 link.solver_position_iteration_count = count
@@ -1291,9 +1254,10 @@ class EntityPrim(XFormPrim):
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.isaacsim.core.utils.prims.set_prim_property(
-                self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count
-            )
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.prims.set_prim_property(
+                    self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count
+                )
         else:
             for link in self._links.values():
                 link.solver_velocity_iteration_count = count
@@ -1369,9 +1333,10 @@ class EntityPrim(XFormPrim):
             threshold (float): Sleeping threshold
         """
         if self.articulated:
-            lazy.isaacsim.core.utils.prims.set_prim_property(
-                self.articulation_root_path, "physxArticulation:sleepThreshold", threshold
-            )
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.prims.set_prim_property(
+                    self.articulation_root_path, "physxArticulation:sleepThreshold", threshold
+                )
         else:
             for link in self._links.values():
                 link.sleep_threshold = threshold

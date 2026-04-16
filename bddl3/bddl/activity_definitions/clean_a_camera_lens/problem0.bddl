@@ -1,5 +1,5 @@
 (define (problem clean_a_camera_lens-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         digital_camera.n.01_1 - digital_camera.n.01

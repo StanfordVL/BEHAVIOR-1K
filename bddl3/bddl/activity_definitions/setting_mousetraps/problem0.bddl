@@ -1,5 +1,5 @@
 (define (problem setting_mousetraps-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	mousetrap.n.01_1 mousetrap.n.01_2 mousetrap.n.01_3 mousetrap.n.01_4 - mousetrap.n.01

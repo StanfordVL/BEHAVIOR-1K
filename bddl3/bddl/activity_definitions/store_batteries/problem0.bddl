@@ -1,5 +1,5 @@
 (define (problem store_batteries-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         battery.n.02_1 battery.n.02_2 - battery.n.02

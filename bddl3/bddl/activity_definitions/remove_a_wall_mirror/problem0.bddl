@@ -1,5 +1,5 @@
 (define (problem remove_a_wall_mirror-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mirror.n.01_1 - mirror.n.01

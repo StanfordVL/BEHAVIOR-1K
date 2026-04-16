@@ -1,5 +1,5 @@
 (define (problem sorting_clothes-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         trouser.n.01_1 trouser.n.01_2 - trouser.n.01

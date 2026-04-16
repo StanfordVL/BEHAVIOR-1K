@@ -1,5 +1,5 @@
 (define (problem putting_up_shelves-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	bookcase_back.n.01_1 - bookcase_back.n.01

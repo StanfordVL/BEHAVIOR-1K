@@ -1,5 +1,5 @@
 (define (problem clean_a_faucet-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         detergent.n.02_1 - detergent.n.02

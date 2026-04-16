@@ -1,5 +1,5 @@
 (define (problem cook_snap_peas-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cheese_sauce.n.01_1 - cheese_sauce.n.01

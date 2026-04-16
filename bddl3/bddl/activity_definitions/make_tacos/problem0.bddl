@@ -1,5 +1,5 @@
 (define (problem make_tacos-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tortilla.n.01_1 tortilla.n.01_2 tortilla.n.01_3 - tortilla.n.01

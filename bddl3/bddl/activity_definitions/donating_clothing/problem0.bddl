@@ -1,5 +1,5 @@
 (define (problem donating_clothing-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sweater.n.01_1 - sweater.n.01

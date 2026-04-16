@@ -158,7 +158,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             )
         else:
             # Infer radius from mesh if not specified as an input
-            lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
             self.scale = vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim

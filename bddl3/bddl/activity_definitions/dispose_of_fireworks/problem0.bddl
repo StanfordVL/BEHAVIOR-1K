@@ -1,5 +1,5 @@
 (define (problem dispose_of_fireworks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         firework.n.01_1 firework.n.01_2 firework.n.01_3 firework.n.01_4 - firework.n.01

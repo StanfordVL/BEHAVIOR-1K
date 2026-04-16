@@ -1,5 +1,5 @@
 (define (problem wash_your_rings-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ring.n.08_1 ring.n.08_2 - ring.n.08

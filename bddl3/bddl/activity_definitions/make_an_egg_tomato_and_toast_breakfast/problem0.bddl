@@ -1,5 +1,5 @@
 (define (problem make_an_egg_tomato_and_toast_breakfast-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	plate.n.04_1 - plate.n.04

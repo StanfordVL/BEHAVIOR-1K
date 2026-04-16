@@ -1,5 +1,5 @@
 (define (problem sweeping_porch-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ashcan.n.01_1 ashcan.n.01_2 - ashcan.n.01

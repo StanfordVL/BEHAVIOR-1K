@@ -12,7 +12,7 @@ from omnigibson.tasks import BehaviorTask
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import clear as clear_pu
 from omnigibson.utils.constants import PrimType
-from bddl.activity import Conditions
+from omnigibson.utils.bddl_utils import get_knowledge_base
 from utils import (
     ACTIVITY_TO_ROW,
     create_stable_scene_json,
@@ -270,9 +270,11 @@ def main(random_selection=False, headless=False, short_exec=False):
         should_sample, success, reason = True, False, ""
 
         # Skip any with unsupported predicates, but still record the reason why we can't sample
-        conditions = Conditions(activity, 0, simulator_name="omnigibson")
+        task_obj = get_knowledge_base().get_task(f"{activity}-0")
+        task_obj._ensure_compiled()
         all_predicates = set(
-            get_predicates(conditions.parsed_initial_conditions) + get_predicates(conditions.parsed_goal_conditions)
+            get_predicates(task_obj.conditions.parsed_initial_conditions)
+            + get_predicates(task_obj.conditions.parsed_goal_conditions)
         )
         unsupported_predicates = set.intersection(all_predicates, UNSUPPORTED_PREDICATES)
         if len(unsupported_predicates) > 0:
@@ -303,7 +305,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Attempt to sample
         try:
             if should_sample:
-                relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
+                relevant_rooms = set(get_rooms(task_obj.conditions.parsed_initial_conditions))
                 print(f"relevant rooms: {relevant_rooms}")
                 for obj in env.scene.objects:
                     if isinstance(obj, DatasetObject):

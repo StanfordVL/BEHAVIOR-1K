@@ -155,6 +155,8 @@ def shutdown(due_to_signal=False):
         # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
         # Manually call cleanup for now.
         cleanup()
+        if sim is not None:
+            sim._disable_usd_guard()
         app.close()
     else:
         # Otherwise, we do the cleanup here.

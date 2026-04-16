@@ -1,5 +1,5 @@
 (define (problem bringing_paper_to_recycling-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         paper.n.01_1 paper.n.01_2 paper.n.01_3 - paper.n.01

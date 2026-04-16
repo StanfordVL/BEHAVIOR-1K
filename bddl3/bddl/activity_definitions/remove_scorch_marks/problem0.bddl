@@ -1,5 +1,5 @@
 (define (problem remove_scorch_marks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         emery_paper.n.01_1 - emery_paper.n.01

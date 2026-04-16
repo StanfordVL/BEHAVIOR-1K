@@ -1,5 +1,5 @@
 (define (problem clean_a_gravestone-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         water.n.06_1 - water.n.06

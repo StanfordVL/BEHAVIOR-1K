@@ -1,5 +1,5 @@
 (define (problem store_a_kayak-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         kayak.n.01_1 - kayak.n.01

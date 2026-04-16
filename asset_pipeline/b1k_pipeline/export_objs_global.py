@@ -27,7 +27,7 @@ from b1k_pipeline.utils import (
     save_mesh,
 )
 
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 
 logger = logging.getLogger("trimesh")
 logger.setLevel(logging.ERROR)
@@ -67,11 +67,13 @@ LOG_SURFACE_AREA_RANGE = (-6, 4)
 LOG_TEXTURE_RANGE = (4, 11)
 
 
-def get_required_meta_links(object_taxonomy, category):
-    synset = object_taxonomy.get_synset_from_category_or_substance(category)
+def get_required_meta_links(kb, category):
+    cat = kb.get_category(category)
+    ps = kb.get_particle_system(category)
+    synset = cat.synset if cat else (ps.synset if ps else None)
     if synset is None:
         raise ValueError(f"Category {category} not found in taxonomy.")
-    return object_taxonomy.get_required_meta_links_for_synset(synset)
+    return synset.required_meta_links
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -855,7 +857,7 @@ def process_object(root_node, target, relevant_nodes, requried_meta_types, outpu
             json.dump(out_metadata, f, cls=NumpyEncoder)
 
 
-def process_target(target, objects_path, object_taxonomy, model_whitelist, dask_client):
+def process_target(target, objects_path, kb, model_whitelist, dask_client):
     object_futures = {}
 
     # Build the mesh tree using our mesh tree library. The scene code also uses this system.
@@ -894,7 +896,7 @@ def process_target(target, objects_path, object_taxonomy, model_whitelist, dask_
                 root_node,
                 target,
                 relevant_nodes,
-                get_required_meta_links(object_taxonomy, obj_cat),
+                get_required_meta_links(kb, obj_cat),
                 output_dirname_abs,
             )
         ] = str(root_node)
@@ -903,7 +905,7 @@ def process_target(target, objects_path, object_taxonomy, model_whitelist, dask_
 
 
 def main():
-    object_taxonomy = ObjectTaxonomy()
+    kb = KnowledgeBase(populate=True)
 
     # If this variable is set, we will only export the models in this list. This is useful for quickly
     # iterating on scenes (usdify otherwise takes 8+ hours). If this list is empty, we will export all models.
@@ -952,7 +954,7 @@ def main():
         for target in tqdm.tqdm(targets, desc="Processing targets to queue objects"):
             obj_futures.update(
                 process_target(
-                    target, objects_dir, object_taxonomy, model_whitelist, dask_client
+                    target, objects_dir, kb, model_whitelist, dask_client
                 )
             )
 

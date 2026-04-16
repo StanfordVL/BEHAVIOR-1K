@@ -1,5 +1,5 @@
 (define (problem installing_a_fax_machine-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	facsimile.n.02_1 - facsimile.n.02

@@ -1,5 +1,5 @@
 (define (problem taking_trash_outside-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bag__of__rubbish.n.01_1 bag__of__rubbish.n.01_2 - bag__of__rubbish.n.01

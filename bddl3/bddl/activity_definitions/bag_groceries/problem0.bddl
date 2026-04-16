@@ -1,5 +1,5 @@
 (define (problem bag_groceries-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	sack.n.01_1 sack.n.01_2 - sack.n.01

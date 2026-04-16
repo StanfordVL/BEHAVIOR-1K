@@ -1,5 +1,5 @@
 (define (problem moving_boxes_to_storage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         storage_container.n.01_1 storage_container.n.01_2 - storage_container.n.01

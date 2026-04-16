@@ -1,5 +1,5 @@
 (define (problem prepare_and_cook_prawns-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         stove.n.01_1 - stove.n.01

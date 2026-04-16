@@ -1,5 +1,5 @@
 (define (problem wash_lettuce-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         colander.n.01_1 - colander.n.01

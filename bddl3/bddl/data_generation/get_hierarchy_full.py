@@ -32,7 +32,7 @@ SYN_PROP_PARAM_FN = (
 )
 
 
-def add_igibson_objects(node, synset_to_cat, synset_to_substance):
+def add_objects(node, synset_to_cat, synset_to_substance):
     """
     Go through the hierarchy and add the words associated with the synsets as attributes.
     """
@@ -43,7 +43,7 @@ def add_igibson_objects(node, synset_to_cat, synset_to_substance):
 
     if "children" in node:
         for child_node in node["children"]:
-            add_igibson_objects(child_node, synset_to_cat, synset_to_substance)
+            add_objects(child_node, synset_to_cat, synset_to_substance)
 
 
 def add_path(path, hierarchy):
@@ -136,7 +136,7 @@ def get_hierarchy(syn_prop_dict):
         ):
             synset_to_cat[rec["synset"]].remove(rec["substance"])
 
-    add_igibson_objects(hierarchy, synset_to_cat, synset_to_substance)
+    add_objects(hierarchy, synset_to_cat, synset_to_substance)
 
     with open(HIERARCHY_OUTPUT_FN, "w") as f:
         json.dump(hierarchy, f, indent=2)

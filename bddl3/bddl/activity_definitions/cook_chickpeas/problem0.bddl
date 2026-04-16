@@ -1,5 +1,5 @@
 (define (problem cook_chickpeas-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         chickpea.n.03_1 - chickpea.n.03

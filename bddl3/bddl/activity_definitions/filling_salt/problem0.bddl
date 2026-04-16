@@ -1,5 +1,5 @@
 (define (problem filling_salt-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         funnel.n.02_1 - funnel.n.02

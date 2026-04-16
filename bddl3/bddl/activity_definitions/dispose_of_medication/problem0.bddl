@@ -1,5 +1,5 @@
 (define (problem dispose_of_medication-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pill.n.02_1 - pill.n.02

@@ -1,5 +1,5 @@
 (define (problem turn_off_a_normal_school_calculator-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         calculator.n.02_1 - calculator.n.02

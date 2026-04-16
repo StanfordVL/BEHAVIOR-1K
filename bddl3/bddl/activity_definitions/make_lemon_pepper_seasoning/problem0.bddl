@@ -1,5 +1,5 @@
 (define (problem make_lemon_pepper_seasoning-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         black_pepper.n.02_1 - black_pepper.n.02

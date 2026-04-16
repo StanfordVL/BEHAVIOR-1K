@@ -1,5 +1,5 @@
 (define (problem setup_a_bar_for_a_cocktail_party-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bottle__of__vodka.n.01_1 - bottle__of__vodka.n.01

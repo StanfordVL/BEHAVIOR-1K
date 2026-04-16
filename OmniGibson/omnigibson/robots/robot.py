@@ -500,10 +500,11 @@ class Robot(USDObject, GymObservable):
             )
             position, orientation = self.get_position_orientation()
             # Set the world-to-base fixed joint to be at the robot's current pose
-            self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-            self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-            )
+            with og.sim.editing_usd():
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+                )
 
         force_sphere = (
             self.is_holonomic_base
@@ -882,15 +883,6 @@ class Robot(USDObject, GymObservable):
         """
         return self._last_action
 
-    def _base_set_position_orientation(
-        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
-    ):
-        # Run super first
-        super().set_position_orientation(position, orientation, frame)
-
-        # Clear the controllable view's backend since state has changed
-        ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
-
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
     ):
@@ -898,9 +890,16 @@ class Robot(USDObject, GymObservable):
         Sets robot's pose with respect to the specified frame
         ...
         """
-        if self.is_holonomic_base:
-            assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
+        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
+        # Store the original EEF poses for restoring AG later.
+        if self.is_manipulation:
+            original_poses = {}
+            for arm in self.arm_names:
+                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
+
+        # Move the robot. We need to do different stuff if it's a holonomic base.
+        if self.is_holonomic_base:
             # If no position or no orientation are given, get the current position and orientation of the object
             if position is None or orientation is None:
                 current_position, current_orientation = self.get_position_orientation(frame=frame)
@@ -930,25 +929,24 @@ class Robot(USDObject, GymObservable):
 
             # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
             else:
-                # Call the super() method to move the robot frame first
-                self._base_set_position_orientation(position, orientation, frame)
+                # Call the super() method to move the robot frame first. Note that we use world frame since we have done
+                # the conversion to world frame already in the code block before this conditional.
+                super().set_position_orientation(position, orientation, frame="world")
                 # Move the joint frame for the world_base_joint
                 if self._world_base_fixed_joint_prim is not None:
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                        lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-                    )
-            return
+                    with og.sim.editing_usd():
+                        self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+                        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                            lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+                        )
+        else:
+            super().set_position_orientation(position, orientation, frame)
 
+        # Clear the controllable view's backend since state has changed
+        ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
+
+        # Now for each hand, if it was holding an AG object, teleport it.
         if self.is_manipulation:
-            # Store the original EEF poses.
-            original_poses = {}
-            for arm in self.arm_names:
-                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
-
-            self._base_set_position_orientation(position, orientation, frame)
-
-            # Now for each hand, if it was holding an AG object, teleport it.
             for arm in self.arm_names:
                 if self._ag_obj_in_hand[arm] is not None:
                     original_eef_pose = T.pose2mat(original_poses[arm])
@@ -959,8 +957,6 @@ class Robot(USDObject, GymObservable):
                     # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
                     new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                     self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
-            return
-        self._base_set_position_orientation(position, orientation, frame)
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         # Call super first
@@ -3711,7 +3707,7 @@ class Robot(USDObject, GymObservable):
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
-        Gets tiago's pose with respect to the specified frame.
+        Gets the robot's pose with respect to the specified frame.
 
         Args:
             frame (Literal): frame to get the pose with respect to. Default to world.

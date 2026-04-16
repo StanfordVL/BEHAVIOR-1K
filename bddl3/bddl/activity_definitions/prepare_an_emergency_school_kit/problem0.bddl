@@ -1,5 +1,5 @@
 (define (problem prepare_an_emergency_school_kit-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	backpack.n.01_1 - backpack.n.01

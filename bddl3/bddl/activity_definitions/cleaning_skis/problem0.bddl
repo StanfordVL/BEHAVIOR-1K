@@ -1,5 +1,5 @@
 (define (problem cleaning_skis-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	ski.n.01_1 ski.n.01_2 - ski.n.01

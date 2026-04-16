@@ -1,5 +1,5 @@
 (define (problem passing_out_drinks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         beer.n.01_1 - beer.n.01

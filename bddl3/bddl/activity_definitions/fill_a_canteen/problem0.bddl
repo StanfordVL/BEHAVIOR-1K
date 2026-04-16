@@ -1,5 +1,5 @@
 (define (problem fill_a_canteen-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         canteen.n.01_1 - canteen.n.01

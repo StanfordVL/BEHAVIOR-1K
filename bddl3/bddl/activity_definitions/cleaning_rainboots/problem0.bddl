@@ -1,5 +1,5 @@
 (define (problem cleaning_rainboots-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rubber_boot.n.01_1 rubber_boot.n.01_2 - rubber_boot.n.01

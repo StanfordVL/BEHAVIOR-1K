@@ -1,5 +1,5 @@
 (define (problem folding_sheets-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sheet.n.03_1 sheet.n.03_2 sheet.n.03_3 sheet.n.03_4 - sheet.n.03

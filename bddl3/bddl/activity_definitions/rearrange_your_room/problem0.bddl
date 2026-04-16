@@ -1,5 +1,5 @@
 (define (problem rearrange_your_room-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mattress.n.01_1 - mattress.n.01

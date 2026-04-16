@@ -1,5 +1,5 @@
 (define (problem putting_dirty_dishes_in_sink-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         breadcrumb.n.01_1 - breadcrumb.n.01

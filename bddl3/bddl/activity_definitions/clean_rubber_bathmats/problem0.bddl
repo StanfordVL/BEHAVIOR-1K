@@ -1,5 +1,5 @@
 (define (problem clean_rubber_bathmats-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mat.n.01_1 - mat.n.01

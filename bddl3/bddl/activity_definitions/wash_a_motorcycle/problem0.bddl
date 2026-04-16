@@ -1,5 +1,5 @@
 (define (problem wash_a_motorcycle-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rail_fence.n.01_1 - rail_fence.n.01

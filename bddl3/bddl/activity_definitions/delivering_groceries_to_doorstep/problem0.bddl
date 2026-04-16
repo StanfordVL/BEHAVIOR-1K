@@ -1,5 +1,5 @@
 (define (problem delivering_groceries_to_doorstep-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bread_slice.n.01_1 - bread_slice.n.01
