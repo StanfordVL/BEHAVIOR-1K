@@ -30,9 +30,9 @@ log = create_module_logger(module_name=__name__)
 
 # The latest version of the dataset that should be downloaded
 BEHAVIOR_1K_ASSET_VERSION = "3.7.2rc1"
-OMNIGIBSON_ROBOT_ASSETS_VERSION = "3.8.0"
+OMNIGIBSON_ROBOT_ASSETS_VERSION = "3.8.2"
 # The minimum compatible version of the dataset that should be used.
-MINIMUM_ROBOT_ASSETS_VERSION = "3.8.0"
+MINIMUM_ROBOT_ASSETS_VERSION = "3.8.2"
 
 
 def is_dot_file(p):
