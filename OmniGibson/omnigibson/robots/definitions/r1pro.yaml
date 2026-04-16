@@ -44,7 +44,7 @@ manipulation:
   n_arms: 2
   arm_names: ["left", "right"]
   arm_link_names:
-    left: ["left_arm_link1", "left_arm_link2", "left_arm_link3", "left_arm_link4", "left_arm_link5", "left_arm_link6", "left_arm_link7", "left_arm_link8", "left_arm_link9", "left_arm_link10", "left_arm_link11", "left_arm_link12", "left_arm_link13", "left_arm_link14", "left_arm_link15", "left_arm_link16", "left_arm_link17"]
+    left: ["left_arm_link1", "left_arm_link2", "left_arm_link3", "left_arm_link4", "left_arm_link5", "left_arm_link6", "left_arm_link7"]
     right: ["right_arm_link1", "right_arm_link2", "right_arm_link3", "right_arm_link4", "right_arm_link5", "right_arm_link6", "right_arm_link7"]
   arm_joint_names:
     left: ["left_arm_joint1", "left_arm_joint2", "left_arm_joint3", "left_arm_joint4", "left_arm_joint5", "left_arm_joint6", "left_arm_joint7"]

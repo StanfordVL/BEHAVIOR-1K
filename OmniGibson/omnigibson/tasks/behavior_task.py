@@ -231,12 +231,14 @@ class BehaviorTask(BaseTask):
             presampled_poses = env.scene.get_task_metadata(key="robot_poses")
             # make all lowercase
             presampled_poses = {k.lower(): v for k, v in presampled_poses.items()}
-            assert (
-                robot.model in presampled_poses
-            ), f"{robot.model} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
-
-            # Select pose based on randomize_presampled_pose flag
-            available_poses = presampled_poses[robot.model]
+            # use generic "robot" key if it exists, otherwise look for model-specific key
+            if "robot" in presampled_poses:
+                available_poses = presampled_poses["robot"]
+            elif robot.model in presampled_poses:
+                print("No generic presampled robot pose found, using robot-specific pose.")
+                available_poses = presampled_poses[robot.model]
+            else:
+                raise KeyError(f"No generic or model-specific presampled robot pose found for {robot.model}!")
             if self.randomize_presampled_pose:
                 robot_pose = random.choice(available_poses)
             else:
@@ -361,7 +363,7 @@ class BehaviorTask(BaseTask):
             # Find which room instance this object is in
             if hasattr(entity, "in_rooms") and entity.in_rooms:
                 for room_inst in entity.in_rooms:
-                    inst_room_type = env.scene.seg_map.room_ins_name_to_sem_name.get(room_inst)
+                    inst_room_type = room_inst.rsplit("_", 1)[0]  # Get room type by removing instance number suffix
                     if inst_room_type == room_type:
                         if room_type in room_instances and room_instances[room_type] != room_inst:
                             log.warning(
@@ -426,13 +428,15 @@ class BehaviorTask(BaseTask):
                 - bool: Whether the generated scene activity should be accepted or not
                 - dict: Any feedback from the sampling / initialization process
         """
+        # Create sampler unconditionally - needed for both online and offline sampling modes
+        self.sampler = BDDLSampler(
+            env=env,
+            activity_conditions=self._base_conditions,
+            object_scope=self.object_scope,
+        )
+
         if self.online_object_sampling:
             # Phase 1: assign objects using only parsed conditions (no compilation needed)
-            self.sampler = BDDLSampler(
-                env=env,
-                activity_conditions=self._base_conditions,
-                object_scope=self.object_scope,
-            )
             accept_scene, feedback = self.sampler.assign_objects(
                 sampling_whitelist=self.sampling_whitelist,
                 sampling_blacklist=self.sampling_blacklist,
@@ -467,7 +471,10 @@ class BehaviorTask(BaseTask):
             self.future_obj_instances = {
                 init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
             }
-            self.assign_object_scope_with_cache(env)
+            # Use non-strict so that wildcard-expanded instances absent from cache are handled by
+            # _assign_wildcard_instances below rather than raising an assertion error.
+            self.assign_object_scope_with_cache(env, strict=False)
+            self._assign_wildcard_instances(env)
 
         return True, None
 

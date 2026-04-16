@@ -186,9 +186,10 @@ class VisionSensor(BaseSensor):
     def _load(self):
         # Define a new camera prim at the current stage
         # Note that we can't use og.sim.stage here because the vision sensors get loaded first
-        return lazy.pxr.UsdGeom.Camera.Define(
-            lazy.isaacsim.core.utils.stage.get_current_stage(), self.prim_path
-        ).GetPrim()
+        with og.sim.editing_usd():
+            return lazy.pxr.UsdGeom.Camera.Define(
+                lazy.isaacsim.core.utils.stage.get_current_stage(), self.prim_path
+            ).GetPrim()
 
     def _post_load(self):
         # run super first

@@ -5,7 +5,6 @@ import argparse
 import omnigibson as og
 from omnigibson.macros import gm, macros
 import json
-import traceback
 from omnigibson.objects import DatasetObject
 from omnigibson.object_states import Contains
 from omnigibson.tasks import BehaviorTask
@@ -13,63 +12,57 @@ from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import clear as clear_pu
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.bddl_utils import get_knowledge_base
+from omnigibson.utils.ui_utils import create_module_logger
 from utils import (
-    ACTIVITY_TO_ROW,
     create_stable_scene_json,
-    validate_scene_can_be_sampled,
-    get_scene_compatible_activities,
-    get_unsuccessful_activities,
     get_rooms,
     get_predicates,
     get_valid_tasks,
     hide_all_lights,
-    parse_task_mapping_new,
     UNSUPPORTED_PREDICATES,
-    USER,
     validate_task,
-    worksheet,
 )
 import numpy as np
-import random
 
-with open("task_custom_lists.json", "r") as f:
+log = create_module_logger(module_name="sample_b1k_tasks")
+log.setLevel(logging.INFO)
+
+
+# task_custom_lists.json always takes precedence.
+task_custom_list_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "task_custom_lists.json")
+assert os.path.exists(task_custom_list_path), f"task_custom_lists.json not found: {task_custom_list_path}"
+with open(task_custom_list_path, "r") as f:
     TASK_CUSTOM_LISTS = json.load(f)
 
-# TODO:
-# 1. Set boundingCube approximation earlier (maybe right after importing the scene objects). Otherwise after loading the robot, we will elapse one physics step
-# 2. Enable transition rule and refresh all rules before online validation
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--scene_model", type=str, default=None, help="Scene model to sample tasks in")
 parser.add_argument(
-    "--activities",
+    "-t",
+    "--activity",
     type=str,
-    default=None,
-    help="Activity/ie(s) to be sampled, if specified. This should be a comma-delimited list of desired activities. Otherwise, will try to sample all tasks in this scene",
+    required=True,
+    help="Activity to be sampled",
 )
+parser.add_argument("-s", "--scene_model", type=str, required=True, help="Scene model to sample tasks in")
 parser.add_argument(
+    "-r",
     "--room_types",
     type=str,
     default=None,
     help="room types to be loaded, if specified. This should be a comma-delimited list of desired room types. Otherwise, will try to load all room types in this scene",
 )
 parser.add_argument(
-    "--start_at", type=str, default=None, help="If specified, activity to start at, ignoring all previous"
-)
-parser.add_argument(
-    "--thread_id", type=str, default=None, help="If specified, ID to assign to the thread when tracking in_progress"
-)
-parser.add_argument("--randomize", action="store_true", help="If set, will randomize order of activities.")
-parser.add_argument(
-    "--overwrite_existing",
+    "-w",
+    "--overwrite",
     action="store_true",
     help="If set, will overwrite any existing tasks that are found. Otherwise, will skip.",
 )
 parser.add_argument(
-    "--offline", action="store_true", help="If set, will sample offline, and will not sync / check with google sheets"
-)
-parser.add_argument(
-    "--ignore_in_progress", action="store_true", help="If set and --offline is False, will in progress flag"
+    "-o",
+    "--output_dir",
+    type=str,
+    default=None,
+    help="Output directory for sampled tasks (default: gm.DATA_PATH/2026-challenge-task-instances)",
 )
 
 # gm.HEADLESS = False
@@ -89,47 +82,8 @@ logging.getLogger().setLevel(logging.INFO)
 def main(random_selection=False, headless=False, short_exec=False):
     args = parser.parse_args()
 
-    # Parse arguments based on whether values are specified in os.environ
-    # Priority is:
-    # 1. command-line args
-    # 2. environment level variables
-
-    if args.activities is None and os.environ.get("SAMPLING_ACTIVITIES"):
-        args.activities = os.environ["SAMPLING_ACTIVITIES"]
-    args.scene_model = [i for i in TASK_CUSTOM_LISTS[args.activities[0]].keys() if i != "room_types"][0]
-
-    if args.start_at is None and os.environ.get("SAMPLING_START_AT"):
-        args.start_at = os.environ["SAMPLING_START_AT"]
-    if args.thread_id is None:
-        # This checks for both "" and non-existent key
-        args.thread_id = os.environ["SAMPLING_THREAD_ID"] if os.environ.get("SAMPLING_THREAD_ID") else "1"
-    if not args.randomize:
-        args.randomize = os.environ.get("SAMPLING_RANDOMIZE") in {"1", "true", "True"}
-    if not args.overwrite_existing:
-        args.overwrite_existing = os.environ.get("SAMPLING_OVERWRITE_EXISTING") in {"1", "true", "True"}
-    if not args.ignore_in_progress:
-        args.ignore_in_progress = os.environ.get("SAMPLING_IGNORE_IN_PROGRESS") in {"1", "true", "True"}
-
-    # Make sure scene can be sampled by current user
-    scene_row = None if args.offline else validate_scene_can_be_sampled(scene=args.scene_model)
-
-    if not args.offline and not args.randomize:
-        completed = worksheet.get(f"W{scene_row}")
-        if completed and completed[0] and str(completed[0][0]) == "1":
-            # If completed is set, then immediately return
-            print(f"\nScene {args.scene_model} already completed sampling, terminating immediately!\n")
-            return
-
-        # Potentially update start_at based on current task observed
-        # Current task is either an empty list [] or a filled list [['<ACTIVITY>']]
-        current_task = worksheet.get(f"Y{scene_row}")
-        if not args.randomize and args.start_at is None and current_task and current_task[0]:
-            args.start_at = current_task[0][0]
-            # Also clear the in_progress bar in case this is from a failed run
-            worksheet.update_acell(f"B{ACTIVITY_TO_ROW[args.start_at]}", "")
-
-        # Set the thread id for the given scene
-        worksheet.update_acell(f"X{scene_row}", args.thread_id)
+    if args.output_dir is None:
+        args.output_dir = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", args.scene_model, "json")
 
     # If we want to create a stable scene config, do that now
     default_scene_fpath = os.path.join(
@@ -167,28 +121,23 @@ def main(random_selection=False, headless=False, short_exec=False):
         ],
     }
 
+    activity = args.activity
+
+    # Check if activity is valid
+    valid_tasks = get_valid_tasks()
+    if activity not in valid_tasks:
+        log.error(f"Activity {activity} not in valid tasks!")
+        return
+
+    log.info(f"Sampling activity: {activity}...")
+
     # Currently our sampling script always samples partial rooms so we specify there to delineate between full
     # scene templates
     task_suffix = "partial_rooms"
     if args.room_types is not None:
         cfg["scene"]["load_room_types"] = args.room_types.split(",")
     else:
-        activities = args.activities.split(",")
-        assert len(activities) == 1
-        cfg["scene"]["load_room_types"] = TASK_CUSTOM_LISTS[activities[0]]["room_types"]
-
-    valid_tasks = get_valid_tasks()
-    # mapping = parse_task_mapping(fpath=TASK_INFO_FPATH)
-    mapping = parse_task_mapping_new()
-    activities = (
-        get_scene_compatible_activities(scene_model=args.scene_model, mapping=mapping)
-        if args.activities is None
-        else args.activities.split(",")
-    )
-
-    # if we're not offline, only keep the failure cases
-    if not args.offline:
-        activities = list(set(activities).intersection(get_unsuccessful_activities()))
+        cfg["scene"]["load_room_types"] = TASK_CUSTOM_LISTS[activity]["room_types"]
 
     # Create the environment
     # Attempt to sample the activity
@@ -218,283 +167,178 @@ def main(random_selection=False, headless=False, short_exec=False):
     env.task_config["type"] = "BehaviorTask"
     env.task_config["online_object_sampling"] = True
 
-    should_start = args.start_at is None
-    if args.randomize:
-        random.shuffle(activities)
+    should_sample, success, reason = True, False, ""
+
+    # Skip any with unsupported predicates, but still record the reason why we can't sample
+    task_obj = get_knowledge_base().get_task(f"{activity}-0")
+    conditions, object_scope, inroom_assignments = task_obj.parse_base_scope()
+    all_predicates = set(
+        get_predicates(conditions.parsed_initial_conditions) + get_predicates(conditions.parsed_goal_conditions)
+    )
+    unsupported_predicates = set.intersection(all_predicates, UNSUPPORTED_PREDICATES)
+    if len(unsupported_predicates) > 0:
+        should_sample = False
+        reason = f"Unsupported predicate(s): {unsupported_predicates}"
+
+    env.task_config["activity_name"] = activity
+    if activity in TASK_CUSTOM_LISTS and args.scene_model in TASK_CUSTOM_LISTS[activity]:
+        whitelist = TASK_CUSTOM_LISTS[activity][args.scene_model]["whitelist"]
+        blacklist = TASK_CUSTOM_LISTS[activity][args.scene_model]["blacklist"]
     else:
-        activities = sorted(activities)
-    for activity in activities:
-        print(f"Checking activity: {activity}...")
-        if not should_start:
-            if args.start_at == activity:
-                should_start = True
-            else:
-                continue
+        whitelist, blacklist = None, None
+    env.task_config["sampling_whitelist"] = whitelist
+    env.task_config["sampling_blacklist"] = blacklist
+    log.info(f"white_list: {whitelist}")
+    log.info(f"black_list: {blacklist}")
+    assert whitelist is not None, "whitelist should not be None for manual sampling"
+    BehaviorTask.get_cached_activity_scene_filename(
+        scene_model=args.scene_model,
+        activity_name=activity,
+        activity_definition_id=0,
+        activity_instance_id=0,
+    )
 
-        # Don't sample any invalid activities
-        if activity not in valid_tasks:
-            continue
+    # Make sure sim is stopped
+    assert og.sim.is_stopped()
 
-        if not args.offline:
-            if activity not in ACTIVITY_TO_ROW:
-                continue
+    # Attempt to sample
+    if should_sample:
+        relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
+        log.info(f"relevant rooms: {relevant_rooms}")
+        for obj in env.scene.objects:
+            if isinstance(obj, DatasetObject):
+                obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
+                active = len(relevant_rooms.intersection(obj_rooms)) > 0 or obj.category in {"floors", "walls"}
+                obj.visual_only = not active
+                obj.visible = active
 
-            # Get info from spreadsheet
-            row = ACTIVITY_TO_ROW[activity]
-
-            in_progress, success, validated, scene_id, user, reason, exception, misc = worksheet.get(f"B{row}:I{row}")[
-                0
-            ]
-
-            # If we manually do not want to sample the task (DO NOT SAMPLE == "DNS", skip)
-            if success.lower() == "dns":
-                continue
-
-            # Only sample stuff which is fixed
-            # if "fixed" not in misc.lower():
-            #     continue
-
-            # If we've already sampled successfully (success is populated with a 1) and we don't want to overwrite the
-            # existing sampling result, skip
-            if success != "" and int(success) == 1 and not args.overwrite_existing:
-                continue
-
-            # If another thread is already in the process of sampling, skip
-            if not args.ignore_in_progress and in_progress not in {None, ""}:
-                continue
-
-            # Reserve this task by marking in_progress = 1
-            worksheet.update_acell(f"B{row}", args.thread_id)
-            worksheet.update_acell(f"Y{scene_row}", activity)
-
-        should_sample, success, reason = True, False, ""
-
-        # Skip any with unsupported predicates, but still record the reason why we can't sample
-        task_obj = get_knowledge_base().get_task(f"{activity}-0")
-        task_obj._ensure_compiled()
-        all_predicates = set(
-            get_predicates(task_obj.conditions.parsed_initial_conditions)
-            + get_predicates(task_obj.conditions.parsed_goal_conditions)
-        )
-        unsupported_predicates = set.intersection(all_predicates, UNSUPPORTED_PREDICATES)
-        if len(unsupported_predicates) > 0:
-            should_sample = False
-            reason = f"Unsupported predicate(s): {unsupported_predicates}"
-
-        env.task_config["activity_name"] = activity
-        if activity in TASK_CUSTOM_LISTS and args.scene_model in TASK_CUSTOM_LISTS[activity]:
-            whitelist = TASK_CUSTOM_LISTS[activity][args.scene_model]["whitelist"]
-            blacklist = TASK_CUSTOM_LISTS[activity][args.scene_model]["blacklist"]
-        else:
-            whitelist, blacklist = None, None
-        env.task_config["sampling_whitelist"] = whitelist
-        env.task_config["sampling_blacklist"] = blacklist
-        print("white_list", whitelist)
-        print("black_list", blacklist)
-        assert whitelist is not None, "whitelist should not be None for manual sampling"
-        BehaviorTask.get_cached_activity_scene_filename(
-            scene_model=args.scene_model,
-            activity_name=activity,
-            activity_definition_id=0,
-            activity_instance_id=0,
-        )
-
-        # Make sure sim is stopped
+        og.log.info(f"Sampling task: {activity}")
+        original_task_cfg = env.task_config
+        original_task_cfg["use_presampled_robot_pose"] = False
+        env._load_task(original_task_cfg)
         assert og.sim.is_stopped()
 
-        # Attempt to sample
-        try:
-            if should_sample:
-                relevant_rooms = set(get_rooms(task_obj.conditions.parsed_initial_conditions))
-                print(f"relevant rooms: {relevant_rooms}")
-                for obj in env.scene.objects:
-                    if isinstance(obj, DatasetObject):
-                        obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
-                        active = len(relevant_rooms.intersection(obj_rooms)) > 0 or obj.category in {"floors", "walls"}
-                        obj.visual_only = not active
-                        obj.visible = active
+        success, feedback = env.task.feedback is None, env.task.feedback
 
-                og.log.info(f"Sampling task: {activity}")
-                original_task_cfg = env.task_config
-                original_task_cfg["use_presampled_robot_pose"] = False
-                env._load_task(original_task_cfg)
-                assert og.sim.is_stopped()
+        if not success:
+            raise ValueError(f"Initial task feedback not None: {feedback}")
 
-                success, feedback = env.task.feedback is None, env.task.feedback
+        # Set masses of all task-relevant objects to be very high
+        # This is to avoid particles from causing instabilities
+        # Don't use this on cloth since these may be unstable at high masses
+        for obj in env.scene.objects[n_scene_objects:]:
+            if obj.prim_type != PrimType.CLOTH and Contains in obj.states:
+                obj.root_link.mass = max(1.0, obj.root_link.mass)
 
-                if success:
-                    # Set masses of all task-relevant objects to be very high
-                    # This is to avoid particles from causing instabilities
-                    # Don't use this on cloth since these may be unstable at high masses
-                    for obj in env.scene.objects[n_scene_objects:]:
-                        if obj.prim_type != PrimType.CLOTH and Contains in obj.states:
-                            obj.root_link.mass = max(1.0, obj.root_link.mass)
+        # Sampling success
+        og.sim.play()
+        # This will actually reset the objects to their sample poses
+        env.task.reset(env)
 
-                    # Sampling success
-                    og.sim.play()
-                    # This will actually reset the objects to their sample poses
-                    env.task.reset(env)
+        for i in range(300):
+            og.sim.step()
 
-                    for i in range(300):
-                        og.sim.step()
+        # Remove any particles that fell out of the world
+        for system in env.scene.active_systems.values():
+            if system.n_particles > 0:
+                particle_positions, _ = system.get_particles_position_orientation()
+                remove_idxs = np.where(particle_positions[:, -1] < -1.0)[0]
+                if len(remove_idxs) > 0:
+                    system.remove_particles(remove_idxs)
 
-                    # Remove any particles that fell out of the world
-                    for system in env.scene.active_systems.values():
-                        if system.n_particles > 0:
-                            particle_positions, _ = system.get_particles_position_orientation()
-                            remove_idxs = np.where(particle_positions[:, -1] < -1.0)[0]
-                            if len(remove_idxs) > 0:
-                                system.remove_particles(remove_idxs)
+        # Make sure objects are settled
+        for _ in range(10):
+            og.sim.step()
 
-                    # Make sure objects are settled
-                    for _ in range(10):
-                        og.sim.step()
+        task_final_state = env.scene.dump_state()
+        task_scene_dict = {"state": task_final_state}
+        # from IPython import embed; print("validate_task"); embed()
+        for obj in env.task.object_scope.values():
+            if isinstance(obj, DatasetObject):
+                obj.wake()
+        assert validate_task(env.task, task_scene_dict, default_scene_dict)
+        # BREAKPOINT: Validation failed - inspect the task state to understand why
+        # At this breakpoint, you can:
+        # - Run: for _ in range(1000): og.sim.render()
+        # - Move the camera around to inspect objects and their states
+        # - Check env.task for task details
+        # - Examine feedback variable for the validation error message
 
-                    task_final_state = env.scene.dump_state()
-                    task_scene_dict = {"state": task_final_state}
-                    # from IPython import embed; print("validate_task"); embed()
-                    for obj in env.task.object_scope.values():
-                        if isinstance(obj, DatasetObject):
-                            obj.wake()
-                    validated, error_msg = validate_task(env.task, task_scene_dict, default_scene_dict)
-                    if not validated:
-                        success = False
-                        feedback = error_msg
-                        print("validation failed")
-                        print(f"REASON: {feedback}")
-                        # BREAKPOINT: Validation failed - inspect the task state to understand why
-                        # At this breakpoint, you can:
-                        # - Run: for _ in range(1000): og.sim.render()
-                        # - Move the camera around to inspect objects and their states
-                        # - Check env.task for task details
-                        # - Examine feedback variable for the validation error message
-                        breakpoint()
+        env.scene.load_state(task_final_state)
+        env.scene.update_initial_file()
+        log.info("\n\nsampling succeed! Please continue to save task and scene reload...\n\n")
+        # BREAKPOINT: Sampling succeeded - inspect the final task state before saving
+        # At this breakpoint, you can:
+        # - Run: for _ in range(1000): og.sim.render()
+        # - Move the camera around to visually verify the sampled task looks correct
+        # After inspection, continue to save the task to disk
+        breakpoint()
+        save_dir = os.path.join(args.output_dir, activity)
+        os.makedirs(save_dir, exist_ok=True)
+        env.task.save_task(
+            env=env,
+            save_dir=save_dir,
+            override=args.overwrite,
+            task_relevant_only=False,
+            suffix=task_suffix,
+        )
+        og.sim.stop()
 
-                if success:
-                    env.scene.load_state(task_final_state)
-                    env.scene.update_initial_file()
-                    print("sampling succeed")
-                    # BREAKPOINT: Sampling succeeded - inspect the final task state before saving
-                    # At this breakpoint, you can:
-                    # - Run: for _ in range(1000): og.sim.render()
-                    # - Move the camera around to visually verify the sampled task looks correct
-                    # After inspection, continue to save the task to disk
-                    breakpoint()
-                    env.task.save_task(env=env, override=True, task_relevant_only=False, suffix=task_suffix)
-                    og.log.info(f"\n\nSampling success: {activity}\n\n")
-                    reason = ""
-                else:
-                    reason = feedback
-                    og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
-                    # BREAKPOINT: Sampling failed - inspect to understand what went wrong
-                    # At this breakpoint, you can:
-                    # - Run: for _ in range(1000): og.sim.render()
-                    # - Move the camera to see the current state of the scene
-                    # - Check the feedback/reason variable to see why sampling failed
-                    # - Inspect env.task.object_scope to see what objects were sampled
-                    # - Debug object placement or constraint satisfaction issues
-                    breakpoint()
-                og.sim.stop()
-            else:
-                og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
+    assert og.sim.is_stopped()
 
-            assert og.sim.is_stopped()
+    # Clear task callbacks if sampled
+    if should_sample:
+        callback_name = f"{activity}_refresh"
+        og.sim.remove_callback_on_add_obj(name=callback_name)
+        og.sim.remove_callback_on_remove_obj(name=callback_name)
+        og.sim.remove_callback_on_system_init(name=callback_name)
+        og.sim.remove_callback_on_system_clear(name=callback_name)
 
-            # Write to google sheets
-            if not args.offline:
-                # Check if another thread succeeded already
-                already_succeeded = worksheet.get(f"C{row}")
-                if not (already_succeeded and already_succeeded[0] and str(already_succeeded[0][0]) == "1"):
-                    cell_list = worksheet.range(f"B{row}:H{row}")
-                    for cell, val in zip(cell_list, ("", int(success), "", args.scene_model, USER, reason, "")):
-                        cell.value = val
-                    worksheet.update_cells(cell_list)
+        # Remove all the additionally added objects
+        objs_to_remove = tuple(env.scene.objects[n_scene_objects:])
+        og.sim.batch_remove_objects(objs_to_remove)
 
-            # Clear task callbacks if sampled
-            if should_sample:
-                callback_name = f"{activity}_refresh"
-                og.sim.remove_callback_on_add_obj(name=callback_name)
-                og.sim.remove_callback_on_remove_obj(name=callback_name)
-                og.sim.remove_callback_on_system_init(name=callback_name)
-                og.sim.remove_callback_on_system_clear(name=callback_name)
+        # Clear all systems
+        for system in env.scene.active_systems.values():
+            env.scene.clear_system(system_name=system.name)
+        clear_pu()
+        og.sim.play()
+        og.sim.step()
 
-                # Remove all the additionally added objects
-                objs_to_remove = tuple(env.scene.objects[n_scene_objects:])
-                og.sim.batch_remove_objects(objs_to_remove)
+        # Update the scene initial state to the original state
+        env.scene.update_initial_file(scene_initial_file)
 
-                # Clear all systems
-                for system in env.scene.active_systems.values():
-                    env.scene.clear_system(system_name=system.name)
-                clear_pu()
-                og.sim.step()
+        # Stop sim, clear simulator
+        og.sim.stop()
+        og.clear()
 
-                # Update the scene initial state to the original state
-                env.scene.update_initial_file(scene_initial_file)
+    # env = create_env_with_stable_objects(cfg)
+    # Make sure transition rules are loaded properly
+    with gm.unlocked():
+        gm.ENABLE_TRANSITION_RULES = True
+        env = og.Environment(configs=copy.deepcopy(cfg))
+        gm.ENABLE_TRANSITION_RULES = False
 
-        except Exception as e:
-            traceback_str = f"{traceback.format_exc()}"
-            og.log.error(traceback_str)
-            og.log.error(f"\n\nCaught exception sampling activity {activity} in scene {args.scene_model}:\n\n{e}\n\n")
+    if gm.HEADLESS:
+        hide_all_lights()
 
-            print("exception")
-            # BREAKPOINT: Exception occurred during sampling - debug the error
-            # At this breakpoint, you can:
-            # - Inspect the exception 'e' and traceback_str for error details
-            # - Run: for _ in range(1000): og.sim.render() (if simulation is still valid)
-            # - Check env state and task configuration that led to the exception
-            # - Examine which part of the sampling process failed
-            breakpoint()
+    # After we load the robot, we do self.scene.reset() (one physics step) and then self.scene.update_initial_file().
+    # We need to set all velocities to zero after this. Otherwise, the visual only objects will drift.
+    for obj in env.scene.objects:
+        obj.keep_still()
+    env.scene.update_initial_file()
 
-            if not args.offline:
-                # Check if another thread succeeded already
-                already_succeeded = worksheet.get(f"C{row}")
-                if not (already_succeeded and already_succeeded[0] and str(already_succeeded[0][0]) == "1"):
-                    # Clear the in_progress reservation and note the exception
-                    cell_list = worksheet.range(f"B{row}:H{row}")
-                    for cell, val in zip(cell_list, ("", 0, "", args.scene_model, USER, reason, traceback_str)):
-                        cell.value = val
-                    worksheet.update_cells(cell_list)
+    # Store the initial state -- this is the safeguard to reset to!
+    scene_initial_file = copy.deepcopy(env.scene._initial_file)
+    og.sim.stop()
 
-            try:
-                # Stop sim, clear simulator, and re-create environment
-                og.sim.stop()
-                og.clear()
-            except AttributeError as e:
-                # This is the "GetPath" error that happens sporatically. It's benign, so we ignore it
-                pass
+    n_scene_objects = len(env.scene.objects)
 
-            # env = create_env_with_stable_objects(cfg)
-            # Make sure transition rules are loaded properly
-            with gm.unlocked():
-                gm.ENABLE_TRANSITION_RULES = True
-                env = og.Environment(configs=copy.deepcopy(cfg))
-                gm.ENABLE_TRANSITION_RULES = False
+    # Set environment configuration after environment is loaded, because we will load the task
+    env.task_config["type"] = "BehaviorTask"
+    env.task_config["online_object_sampling"] = True
 
-            if gm.HEADLESS:
-                hide_all_lights()
-
-            # After we load the robot, we do self.scene.reset() (one physics step) and then self.scene.update_initial_file().
-            # We need to set all velocities to zero after this. Otherwise, the visual only objects will drift.
-            for obj in env.scene.objects:
-                obj.keep_still()
-            env.scene.update_initial_file()
-
-            # Store the initial state -- this is the safeguard to reset to!
-            scene_initial_file = copy.deepcopy(env.scene._initial_file)
-            og.sim.stop()
-
-            n_scene_objects = len(env.scene.objects)
-
-            # Set environment configuration after environment is loaded, because we will load the task
-            env.task_config["type"] = "BehaviorTask"
-            env.task_config["online_object_sampling"] = True
-
-    print("Successful shutdown!")
-
-    if not args.offline:
-        # Record when we successfully complete all the activities
-        worksheet.update_acell(f"W{scene_row}", 1)
-        worksheet.update_acell(f"Y{scene_row}", "")
+    log.info(f"Finished sampling activity: {activity} with success: {success} and reason: {reason}")
 
 
 if __name__ == "__main__":

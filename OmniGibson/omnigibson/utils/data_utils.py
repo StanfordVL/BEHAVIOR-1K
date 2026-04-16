@@ -60,11 +60,15 @@ def merge_scene_files(scene_a, scene_b, keep_robot_from="b"):
     robots_b = {}
 
     for obj_name, obj in scene_a["objects_info"]["init_info"].items():
-        if obj["class_name"] in REGISTERED_ROBOTS:
+        if obj["class_name"].lower() in REGISTERED_ROBOTS or obj["class_name"] == "Robot":
+            # change class_name to "Robot" for compatibility
+            obj["class_name"] = "Robot"
             robots_a[obj_name] = obj
 
     for obj_name, obj in scene_b["objects_info"]["init_info"].items():
-        if obj["class_name"] in REGISTERED_ROBOTS:
+        if obj["class_name"].lower() in REGISTERED_ROBOTS or obj["class_name"] == "Robot":
+            # change class_name to "Robot" for compatibility
+            obj["class_name"] = "Robot"
             robots_b[obj_name] = obj
 
     # Merge non-robot objects from both scenes
@@ -183,7 +187,7 @@ def validate_merged_scene(scene, require_robot=True):
     if require_robot:
         robot_count = 0
         for obj in scene["objects_info"]["init_info"].values():
-            if obj["class_name"].lower() in REGISTERED_ROBOTS:
+            if obj["class_name"] == "Robot":
                 robot_count += 1
 
         assert robot_count == 1, f"Scene must have exactly one robot, found {robot_count}"
