@@ -30,15 +30,8 @@ parser.add_argument("--activity", type=str, required=True)
 
 def get_task_relevant_room_types(activity_name):
     task_obj = get_knowledge_base().get_task(f"{activity_name}-0")
-    task_obj._ensure_compiled()
-    init_conds = task_obj.conditions.parsed_initial_conditions
-    room_types = set()
-    for init_cond in init_conds:
-        if len(init_cond) == 3:
-            if "inroom" == init_cond[0]:
-                room_types.add(init_cond[2])
-
-    return list(room_types)
+    _, _, inroom_assignments = task_obj.parse_base_scope()
+    return list(set(inroom_assignments.values()))
 
 
 def augment_rooms(relevant_rooms, scene_model, task_name):
