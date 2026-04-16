@@ -18,7 +18,8 @@ from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils import transform_utils as T
 from omnigibson.sensors import VisionSensor
 from omnigibson.objects.usd_object import USDObject
-from gello.robots.sim_robot.og_teleop_cfg import *
+from gello.utils.og_teleop_cfg import *
+from gello import REPO_DIR
 
 from omnigibson.utils.bddl_utils import get_knowledge_base
 import argparse
