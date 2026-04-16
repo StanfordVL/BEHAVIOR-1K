@@ -29,8 +29,8 @@ if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
 log = create_module_logger(module_name=__name__)
 
 # The latest version of the dataset that should be downloaded
-BEHAVIOR_1K_DATASET_VERSION = "3.7.2rc1"
-OMNIGIBOSN_ROBOT_ASSETS_VERSION = "3.8.0"
+BEHAVIOR_1K_ASSET_VERSION = "3.7.2rc1"
+OMNIGIBSON_ROBOT_ASSETS_VERSION = "3.8.0"
 # The minimum compatible version of the dataset that should be used.
 MINIMUM_ROBOT_ASSETS_VERSION = "3.8.0"
 
@@ -426,9 +426,9 @@ def download_and_unpack_zipped_dataset(dataset_name):
     tempdir = tempfile.mkdtemp()
     real_target = get_dataset_path(dataset_name)
     if dataset_name == "behavior-1k-assets":
-        online_filename = f"behavior-1k-assets-{BEHAVIOR_1K_DATASET_VERSION}.zip"
+        online_filename = f"behavior-1k-assets-{BEHAVIOR_1K_ASSET_VERSION}.zip"
     elif dataset_name == "omnigibson-robot-assets":
-        online_filename = f"omnigibson-robot-assets-{OMNIGIBOSN_ROBOT_ASSETS_VERSION}.zip"
+        online_filename = f"omnigibson-robot-assets-{OMNIGIBSON_ROBOT_ASSETS_VERSION}.zip"
     else:
         online_filename = f"{dataset_name}.zip"
     local_path = hf_hub_download(
@@ -442,7 +442,7 @@ def download_and_unpack_zipped_dataset(dataset_name):
     shutil.rmtree(tempdir)
 
 
-def ensure_omnigibosn_robot_assets_version():
+def ensure_omnigibson_robot_assets_version():
     current_version = get_omnigibson_robot_asset_version()
     if current_version is None or Version(current_version) < Version(MINIMUM_ROBOT_ASSETS_VERSION):
         raise RuntimeError(
@@ -590,12 +590,6 @@ def download_behavior_1k_assets(accept_license=False):
 def download_2025_challenge_task_instances():
     if not os.path.exists(get_dataset_path("2025-challenge-task-instances")):
         download_and_unpack_zipped_dataset("2025-challenge-task-instances")
-    # cd and git pull
-    subprocess.run(
-        ["git", "-C", get_dataset_path("2025-challenge-task-instances"), "pull"],
-        shell=False,
-        check=True,
-    )
     print("2025 BEHAVIOR Challenge Tasks Instances updated.")
 
 
