@@ -2628,7 +2628,7 @@ def _compute_relative_poses_torch(
     return rel_poses
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
     tfs = np.zeros((n_links, 4, 4), dtype=np.float32)
     # base vel is the final -1 index
