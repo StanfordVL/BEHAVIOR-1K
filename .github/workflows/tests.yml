@@ -26,7 +26,7 @@ jobs:
         working-directory: ${{ github.workspace }}/bddl3
 
       - name: Run BDDL tests
-        run: pytest tests/test_knowledgebase.py -v --junitxml=bddl_tests.xml
+        run: pytest tests/test_knowledgebase.py -v --junitxml=bddl_tests.xml -o junit_family=xunit1
         working-directory: ${{ github.workspace }}/bddl3
 
       - name: Deploy artifact
@@ -142,6 +142,7 @@ jobs:
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
           ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
           --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          -o junit_family=xunit1
         continue-on-error: true
         timeout-minutes: 30
 
@@ -196,6 +197,15 @@ jobs:
         with:
           path: test-results
           merge-multiple: true
+      - name: Upload test results to Trunk
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: trunk-io/analytics-uploader@v1
+        with:
+          junit-paths: test-results/**/*.xml
+          org-slug: stanfordvl-behavior
+          token: ${{ secrets.TRUNK_API_TOKEN }}
+
       - name: Convert JUnit XML to CTRF
         run: npx --yes junit-to-ctrf "test-results/**/test_*.xml" -o ctrf-report.json
 
