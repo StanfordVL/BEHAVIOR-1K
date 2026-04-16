@@ -545,8 +545,12 @@ class BehaviorTask(BaseTask):
                     entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = entity
 
-        # Write back to task metadata
-        self.update_bddl_scope_metadata(env)
+        # Only write back to task metadata in strict mode (full assignment).
+        # In non-strict mode (partial assignment before wildcard compilation),
+        # writing back would overwrite the cached inst_to_name with only the
+        # base-scope entries, losing wildcard instance mappings.
+        if strict:
+            self.update_bddl_scope_metadata(env)
 
     def update_bddl_scope_metadata(self, env):
         """
