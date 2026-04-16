@@ -1987,7 +1987,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all controller groups so robots re-register on next load
             ControllerView.clear()
-            
+
             # Disable the USD guard - we don't care anymore
             self._disable_usd_guard()
 
@@ -2010,7 +2010,7 @@ def _launch_simulator(*args, **kwargs):
                     log.warning("Failed to unsubscribe %s during simulator clear: %s", callback, e)
                 finally:
                     setattr(self, callback, None)
-            
+
         def close(self):
             """
             Shuts down the OmniGibson application
