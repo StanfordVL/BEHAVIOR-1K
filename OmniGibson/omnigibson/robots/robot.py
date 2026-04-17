@@ -1233,7 +1233,8 @@ class Robot(USDObject, GymObservable):
     def _refresh_rigid_contact_view(self):
         """
         (Re)creates this robot's rigid contact view, which provides per-contact force/position data
-        between any rigid body in the scene (rows) and this robot's finger links (columns).
+        between dynamic rigid bodies in the scene (rows) and this robot's finger links (columns).
+        Kinematic and static bodies are not included as rows by Isaac's RigidContactView.
 
         Only manipulation robots own a view — any other robot simply clears its state.
         """
@@ -1252,12 +1253,12 @@ class Robot(USDObject, GymObservable):
             self._rigid_contact_view_col_path_to_idx = {}
             return
 
-        # Rows are all rigid bodies in the robot's scene; columns are the robot's fingers.
+        # Rows are dynamic rigid bodies in the robot's scene; columns are the robot's fingers.
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self._rigid_contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
                 pattern=f"/World/scene_{self.scene.idx}/*/*",
                 filter_patterns=finger_paths,
-                max_contact_data_count=len(finger_paths) * 128,
+                max_contact_data_count=len(finger_paths) * 8,
             )
 
         row_paths = list(self._rigid_contact_view.sensor_paths)
@@ -1286,7 +1287,7 @@ class Robot(USDObject, GymObservable):
             return None
 
         forces, points, normals, separations, contact_counts, start_indices = self._rigid_contact_view.get_contact_data(
-            dt=1.0
+            dt=og.sim.get_physics_dt()
         )
 
         for finger_link in self.finger_links[arm]:
