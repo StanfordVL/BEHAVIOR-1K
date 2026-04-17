@@ -18,7 +18,6 @@ Example:
 """
 
 import omnigibson.utils.transform_utils as T
-import operator
 import torch as th
 from enum import IntEnum
 from omnigibson.metrics.metric_base import MetricBase
@@ -26,11 +25,12 @@ from omnigibson.tasks import BehaviorTask
 from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.utils.constants import GROUND_CATEGORIES
 from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.controllers import ControllerView
 
 from gello.utils.og_teleop_utils import GHOST_APPEAR_THRESHOLD
 
 
-COMMON_QA_METRICS = {
+ACTIVE_QA_METRICS = {
     "motion",
     "collision",
     "task_success",
@@ -401,17 +401,14 @@ class GhostHandAppearanceMetric(MetricBase):
         if valid:
             for robot in env.robots:
                 for arm in robot.arm_names:
-                    gripper_controller = robot.controllers[f"gripper_{arm}"]
-                    is_1d = gripper_controller.command_dim == 1
+                    gripper_group_key = robot.controllers[f"gripper_{arm}"][0]
+                    is_1d = ControllerView.get_command_dim(gripper_group_key) == 1
+                    command_input_limits = ControllerView.get_command_input_limits(
+                        gripper_group_key
+                    )
                     is_normalized = (
-                        th.all(
-                            cb.to_torch(gripper_controller.command_input_limits[0])
-                            == -1.0
-                        ).item()
-                        and th.all(
-                            cb.to_torch(gripper_controller.command_input_limits[1])
-                            == 1.0
-                        ).item()
+                        th.all(cb.to_torch(command_input_limits[0]) == -1.0).item()
+                        and th.all(cb.to_torch(command_input_limits[1]) == 1.0).item()
                     )
                     valid = is_1d and is_normalized
                     if not valid:
@@ -426,7 +423,6 @@ class GhostHandAppearanceMetric(MetricBase):
         step_metrics = dict()
         for i, robot in enumerate(env.robots):
             robot_qpos = robot.get_joint_positions(normalized=False)
-            gripper_action_idxs = robot.gripper_action_idx
             for arm in robot.arm_names:
                 active = (
                     th.max(
@@ -437,7 +433,8 @@ class GhostHandAppearanceMetric(MetricBase):
                     ).item()
                     > GHOST_APPEAR_THRESHOLD
                 )
-                gripper_controller = robot.controllers[f"gripper_{arm}"]
+                gripper_group_key = robot.controllers[f"gripper_{arm}"][0]
+                gripper_ci = robot.controllers[f"gripper_{arm}"][1]
                 step_metrics[f"robot{i}::arm_{arm}::active"] = active
                 if self.color_arms:
                     if robot.name not in self.robot_arm_colors:
@@ -455,10 +452,8 @@ class GhostHandAppearanceMetric(MetricBase):
                             for vm in link.visual_meshes.values():
                                 vm.material.diffuse_color_constant = color
                         self.robot_arm_colors[robot.name][arm] = active
-                op = operator.lt if gripper_controller._inverted else operator.ge
-                step_metrics[f"robot{i}::arm_{arm}::open_cmd"] = th.all(
-                    op(action[gripper_action_idxs[arm]], 0.0)
-                ).item()
+                is_grasping = ControllerView.is_grasping(gripper_group_key, gripper_ci)
+                step_metrics[f"robot{i}::arm_{arm}::open_cmd"] = not is_grasping
         return step_metrics
 
     def _compute_episode_metrics(self, env, episode_info):
@@ -735,17 +730,14 @@ class FieldOfViewMetric(MetricBase):
         if valid:
             for robot in env.robots:
                 for arm in robot.arm_names:
-                    gripper_controller = robot.controllers[f"gripper_{arm}"]
-                    is_1d = gripper_controller.command_dim == 1
+                    gripper_group_key = robot.controllers[f"gripper_{arm}"][0]
+                    is_1d = ControllerView.get_command_dim(gripper_group_key) == 1
+                    command_input_limits = ControllerView.get_command_input_limits(
+                        gripper_group_key
+                    )
                     is_normalized = (
-                        th.all(
-                            cb.to_torch(gripper_controller.command_input_limits[0])
-                            == -1.0
-                        ).item()
-                        and th.all(
-                            cb.to_torch(gripper_controller.command_input_limits[1])
-                            == 1.0
-                        ).item()
+                        th.all(cb.to_torch(command_input_limits[0]) == -1.0).item()
+                        and th.all(cb.to_torch(command_input_limits[1]) == 1.0).item()
                     )
                     valid = is_1d and is_normalized
                     if not valid:
@@ -771,17 +763,15 @@ class FieldOfViewMetric(MetricBase):
         for i, robot in enumerate(env.robots):
             _, info = self.head_camera.get_obs()
             links_in_fov = set(info["seg_instance_id"].values())
-            gripper_action_idxs = robot.gripper_action_idx
             for arm in robot.arm_names:
-                gripper_controller = robot.controllers[f"gripper_{arm}"]
-                op = operator.lt if gripper_controller._inverted else operator.ge
+                gripper_group_key = robot.controllers[f"gripper_{arm}"][0]
+                gripper_ci = robot.controllers[f"gripper_{arm}"][1]
                 gripper_in_fov = (
                     len(links_in_fov.intersection(self.gripper_link_paths[arm])) > 0
                 )
 
-                step_metrics[f"robot{i}::arm_{arm}::open_cmd"] = th.all(
-                    op(action[gripper_action_idxs[arm]], 0.0)
-                ).item()
+                is_grasping = ControllerView.is_grasping(gripper_group_key, gripper_ci)
+                step_metrics[f"robot{i}::arm_{arm}::open_cmd"] = not is_grasping
                 step_metrics[f"robot{i}::arm_{arm}::gripper_in_fov"] = gripper_in_fov
         return step_metrics
 
@@ -1090,33 +1080,33 @@ def create_collision_metric(
     return col_metric
 
 
+# Dictionary of all available QA metrics with their configuration.
+#
+# Each key corresponds to a metric name, and the value is a dictionary with:
+#     - cls: The metric class.
+#     - init: Optional factory function for metric initialization.
+#     - mode: MetricMode enum (DISABLED, SOFT, or HARD) for validation enforcement.
+#     - warning: Optional warning message for SOFT mode failures.
+#     - task_whitelist: List of tasks where this metric applies (None = all).
+#     - task_blacklist: List of tasks where this metric is excluded (None = none).
+#     - validate_kwargs: Default validation thresholds for this metric.
+#
+# The available metrics are:
+#     - motion: Joint velocity, acceleration, and jerk limits.
+#     - collision: Robot self and environment collision detection.
+#     - task_success: Whether the episode completed successfully.
+#     - ghost_hand_appearance: VR ghost hand tracking issues.
+#     - prolonged_pause: Extended periods without robot motion.
+#     - failed_grasp: Gripper closes without successful grasp.
+#     - task_relevant_obj_vel: Object velocity limits during episodes.
+#     - gripper_in_fov: Gripper visibility in camera field of view.
+#     - head_camera_upright_during_navigation: Camera tilt during navigation.
+#
+# Example:
+#     >>> motion_config = ALL_QA_METRICS["motion"]
+#     >>> print(motion_config["mode"])  # MetricMode.HARD
+
 ALL_QA_METRICS = {
-    """Dictionary of all available QA metrics with their configuration.
-
-    Each key corresponds to a metric name, and the value is a dictionary with:
-        - cls: The metric class.
-        - init: Optional factory function for metric initialization.
-        - mode: MetricMode enum (DISABLED, SOFT, or HARD) for validation enforcement.
-        - warning: Optional warning message for SOFT mode failures.
-        - task_whitelist: List of tasks where this metric applies (None = all).
-        - task_blacklist: List of tasks where this metric is excluded (None = none).
-        - validate_kwargs: Default validation thresholds for this metric.
-
-    The available metrics are:
-        - motion: Joint velocity, acceleration, and jerk limits.
-        - collision: Robot self and environment collision detection.
-        - task_success: Whether the episode completed successfully.
-        - ghost_hand_appearance: VR ghost hand tracking issues.
-        - prolonged_pause: Extended periods without robot motion.
-        - failed_grasp: Gripper closes without successful grasp.
-        - task_relevant_obj_vel: Object velocity limits during episodes.
-        - gripper_in_fov: Gripper visibility in camera field of view.
-        - head_camera_upright_during_navigation: Camera tilt during navigation.
-
-    Example:
-        >>> motion_config = ALL_QA_METRICS["motion"]
-        >>> print(motion_config["mode"])  # MetricMode.HARD
-    """
     "motion": {
         "cls": MotionMetric,
         "init": None,
@@ -1194,7 +1184,7 @@ ALL_QA_METRICS = {
         "cls": FailedGraspMetric,
         "init": None,
         "mode": MetricMode.SOFT,
-        "warning": None,
+        "warning": "Failed grasp detected (gripper closed without holding object). Please make sure these gripper closing behaviors are necessary.",
         "task_whitelist": None,
         "task_blacklist": None,
         "validate_kwargs": dict(

@@ -784,10 +784,10 @@ class OGRobotServer:
                         entity.particle_object.material.disable_highlight()
         self._button_toggled_state["a"] = button_a_state
 
-        # If capture is toggled from OFF -> ON, breakpoint
+        # If capture is toggled from OFF -> ON, save and stop
         if self._joint_cmd["button_capture"].item() != 0.0:
             if not self._in_cooldown:
-                breakpoint()
+                self.stop()
 
         # If home is toggled from OFF -> ON, reset env
         if self._joint_cmd["button_home"].item() != 0.0:
@@ -797,19 +797,21 @@ class OGRobotServer:
         # If left arrow is toggled from OFF -> ON, toggle flashlight on left eef
         button_left_arrow_state = self._joint_cmd["button_left"].item() != 0.0
         if button_left_arrow_state and not self._button_toggled_state["left"]:
-            if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
-                self.flashlights["left"].MakeVisible()
-            else:
-                self.flashlights["left"].MakeInvisible()
+            with og.sim.editing_usd():
+                if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
+                    self.flashlights["left"].MakeVisible()
+                else:
+                    self.flashlights["left"].MakeInvisible()
         self._button_toggled_state["left"] = button_left_arrow_state
 
         # If right arrow is toggled from OFF -> ON, toggle flashlight on right eef
         button_right_arrow_state = self._joint_cmd["button_right"].item() != 0.0
         if button_right_arrow_state and not self._button_toggled_state["right"]:
-            if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
-                self.flashlights["right"].MakeVisible()
-            else:
-                self.flashlights["right"].MakeInvisible()
+            with og.sim.editing_usd():
+                if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
+                    self.flashlights["right"].MakeVisible()
+                else:
+                    self.flashlights["right"].MakeInvisible()
         self._button_toggled_state["right"] = button_right_arrow_state
 
     def _update_visualization_and_status(self, info):
@@ -1058,10 +1060,10 @@ class OGRobotServer:
                 activity_definition_id=self.env.task.activity_definition_id,
                 activity_instance_id=self.instance_id,
             )
-            tro_file_path = os.path.join(
-                get_task_instance_path(scene_model),
-                f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
-            )
+            tro_file_path = os.path.join(get_task_instance_path(
+                scene_model,
+                f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
+            ))
             # check if tro_file_path exists, if not, then presumbaly we are done
             if not os.path.exists(tro_file_path):
                 print(
@@ -1079,12 +1081,16 @@ class OGRobotServer:
                     presampled_robot_poses = {
                         k.lower(): v for k, v in presampled_robot_poses.items()
                     }
+                    if "robot" in presampled_robot_poses:
+                        robot_pose = presampled_robot_poses["robot"][0]
+                    elif self.robot.model in presampled_robot_poses:
+                        print("No generic presampled robot pose found, using robot-specific pose.")
+                        robot_pose = presampled_robot_poses[self.robot.model][0]
+                    else:
+                        raise KeyError(f"No generic or model-specific presampled robot pose found for {self.robot.model}!")
                     # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
                     # for orientation
-                    robot_pos = presampled_robot_poses[self.robot.model][0]["position"]
-                    robot_quat = presampled_robot_poses[self.robot.model][0][
-                        "orientation"
-                    ]
+                    robot_pos, robot_quat = robot_pose["position"], robot_pose["orientation"]
                     self.robot.set_position_orientation(robot_pos, robot_quat)
                     # Write robot poses to scene metadata
                     self.env.scene.write_task_metadata(key=tro_key, data=tro_state)

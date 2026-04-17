@@ -39,7 +39,7 @@ def replay_hdf5_file(
         data_folder: data folder
         task_id: ID of the task to replay
         demo_id: ID of the demo to replay
-        output_format: Output format, either "hdf5" or "lerobot"
+        output_format: Output format, "hdf5" or "lerobot"
         flush_every_n_steps: Number of steps to flush the data after
 
     Returns:
@@ -95,44 +95,40 @@ def replay_hdf5_file(
 
     input_path = f"{data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5"
 
+    common_kwargs = dict(
+        input_path=input_path,
+        full_scene_file=full_scene_file,
+        load_room_instances=load_room_instances,
+        robot_sensor_config=robot_sensor_config,
+        n_render_iterations=1,
+        flush_every_n_steps=flush_every_n_steps,
+        flush_every_n_traj=1,
+        include_robot_control=False,
+        robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
+        robot_obs_modalities=["proprio", "rgb", "depth_linear"],
+        include_contacts=False,
+    )
+
     if output_format == "hdf5":
         output_path = os.path.join(replay_dir, f"episode_{demo_id:08d}.hdf5")
-        env = HDF5PlaybackWrapper.create_from_hdf5(
-            input_path=input_path,
+        kwargs = dict(
+            **common_kwargs,
             output_path=output_path,
             compression={"compression": "lzf"},
-            robot_obs_modalities=["proprio", "rgb", "depth_linear"],
-            robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
-            robot_sensor_config=robot_sensor_config,
-            n_render_iterations=1,
-            flush_every_n_traj=1,
-            flush_every_n_steps=flush_every_n_steps,
-            full_scene_file=full_scene_file,
-            include_robot_control=False,
-            include_contacts=False,
-            load_room_instances=load_room_instances,
         )
+        env = HDF5PlaybackWrapper.create_from_hdf5(**kwargs)
     else:
         output_path = f"b1k/{task_name}"
         root_dir = os.path.join(data_folder, "lerobot")
         makedirs_with_mode(root_dir)
-        env = LeRobotPlaybackWrapper.create_from_hdf5(
-            input_path=input_path,
+        kwargs = dict(
+            **common_kwargs,
             output_path=output_path,
             root_dir=root_dir,
             robot_type="R1Pro",
             task_name=task_name,
-            robot_obs_modalities=["proprio", "rgb", "depth_linear"],
-            robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
-            robot_sensor_config=robot_sensor_config,
-            n_render_iterations=1,
-            flush_every_n_traj=1,
-            flush_every_n_steps=flush_every_n_steps,
-            full_scene_file=full_scene_file,
-            include_robot_control=False,
-            include_contacts=False,
-            load_room_instances=load_room_instances,
         )
+        env = LeRobotPlaybackWrapper.create_from_hdf5(**kwargs)
 
     env.load_observation_space()
 
@@ -140,10 +136,7 @@ def replay_hdf5_file(
     episode_id = num_samples.index(max(num_samples))
     log.info(f" >>> Replaying episode {episode_id} with {num_samples[episode_id]} steps")
 
-    env.playback_episode(
-        episode_id=episode_id,
-        record_data=True,
-    )
+    env.playback_episode(episode_id=episode_id, record_data=True)
 
     log.info("Playback complete. Saving data...")
     env.save_data()
@@ -162,8 +155,8 @@ def main():
         "--output_format",
         type=str,
         choices=["hdf5", "lerobot"],
-        default="lerobot",
-        help="Output format: hdf5 or lerobot",
+        default="hdf5",
+        help="Output format: hdf5, lerobot",
     )
     parser.add_argument("--flush_every_n_steps", type=int, default=1000, help="Flush data every N steps")
     parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
