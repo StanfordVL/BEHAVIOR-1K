@@ -32,7 +32,8 @@ def print_task_custom_list_template(activity_name):
             "__TODO__SCENE__": {
                 "whitelist": {
                     synset: {
-                        cat.name: ["__TODO__MODEL__"] for cat in get_knowledge_base().get_synset(synset).categories
+                        cat.name: {"__TODO__MODEL__": None}
+                        for cat in get_knowledge_base().get_synset(synset).categories
                     }
                     for synset in synsets
                 },
