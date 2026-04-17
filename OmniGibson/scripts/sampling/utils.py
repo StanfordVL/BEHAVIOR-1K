@@ -1,168 +1,23 @@
-import omnigibson as og
-from omnigibson.objects import DatasetObject
-from omnigibson.systems import MicroPhysicalParticleSystem
-from omnigibson.utils.asset_utils import get_dataset_path
-import omnigibson.lazy as lazy
-from bddl.knowledge_base import CompiledTask
-
-# import numpy as np
 import torch as th
 import csv
 import json
 import os
-import gspread
-import getpass
 import copy
-import time
-from omnigibson.macros import gm, macros
+import omnigibson as og
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from bddl.knowledge_base import CompiledTask
+from omnigibson.objects import DatasetObject
+from omnigibson.systems import MicroPhysicalParticleSystem
+from omnigibson.utils.asset_utils import get_dataset_path
+from omnigibson.macros import gm, macros
 
-"""
-1. gcloud auth login
-2. gcloud auth application-default login
-3. gcloud config set project lucid-inquiry-205018
-4. gcloud iam service-accounts create cremebrule
-5. gcloud iam service-accounts keys create key.json --iam-account=cremebrule@lucid-inquiry-205018.iam.gserviceaccount.com
-6. mv key.json /home/cremebrule/.config/gcloud/key.json
-"""
 
 folder_path = os.path.dirname(os.path.abspath(__file__))
 
-SAMPLING_SHEET_KEY = "1Vt5s3JrFZ6_iCkfzZr0eb9SBt2Pkzx3xxzb4wtjEaDI"
-CREDENTIALS = os.environ.get("CREDENTIALS_FPATH", os.path.join(folder_path, "key.json"))
-WORKSHEET = "GTC2024 - 8dd81c"
-
-if os.path.exists(CREDENTIALS):
-    USER = getpass.getuser()
-
-    for _ in range(120):
-        try:
-            client = gspread.service_account(filename=CREDENTIALS)
-            worksheet = client.open_by_key(SAMPLING_SHEET_KEY).worksheet(WORKSHEET)
-            break
-        except:
-            time.sleep(1.0)
-
-    class RetryWrapper:
-        def __init__(self, obj, retries=120, delay=1.0):
-            self.obj = obj
-            self.retries = retries
-            self.delay = delay
-
-        def __getattr__(self, attr):
-            orig_attr = getattr(self.obj, attr)
-
-            def wrapped(*args, **kwargs):
-                for _ in range(self.retries):
-                    try:
-                        result = orig_attr(*args, **kwargs)
-                        return result
-                    except Exception as e:
-                        print(f"Exception caught: {e}")
-                        time.sleep(self.delay)
-                raise Exception(f"Failed after {self.retries} retries")
-
-            return wrapped
-
-    worksheet = RetryWrapper(worksheet)
-
-    ACTIVITY_TO_ROW = {activity: i + 2 for i, activity in enumerate(worksheet.col_values(1)[1:])}
-else:
-    USER = None
-    worksheet = None
-    ACTIVITY_TO_ROW = None
-
 SCENE_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Scenes.csv")
-TASK_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Tasks.csv")
-SYNSET_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Synsets.csv")
-
 
 UNSUPPORTED_PREDICATES = {"broken", "assembled"}
-
-
-# CAREFUL!! Only run this ONCE before starting sampling!!!
-def write_activities_to_spreadsheet():
-    valid_tasks_sorted = sorted(get_valid_tasks())
-    n_tasks = len(valid_tasks_sorted)
-    cell_list = worksheet.range(f"A{2}:A{2 + n_tasks - 1}")
-    for cell, task in zip(cell_list, valid_tasks_sorted):
-        cell.value = task
-    worksheet.update_cells(cell_list)
-
-
-# CAREFUL!! Only run this ONCE before starting sampling!!!
-def write_scenes_to_spreadsheet():
-    # Get scenes
-    scenes_sorted = get_scenes()
-    n_scenes = len(scenes_sorted)
-    cell_list = worksheet.range(f"R{2}:R{2 + n_scenes - 1}")
-    for cell, scene in zip(cell_list, scenes_sorted):
-        cell.value = scene
-    worksheet.update_cells(cell_list)
-
-
-def get_successful_activities():
-    n_tasks = len(ACTIVITY_TO_ROW)
-    cell_list = worksheet.range(f"A{2}:C{2 + n_tasks - 1}")
-    successful_activities = set()
-    for activity, status in zip(cell_list[::3], cell_list[2::3]):
-        if ".bddl" in activity.value or str(status.value) == "1":
-            successful_activities.add(activity.value)
-
-    return successful_activities
-
-
-def get_successful_activities_to_scenes():
-    n_tasks = len(ACTIVITY_TO_ROW)
-    cell_list = worksheet.range(f"A{2}:E{2 + n_tasks - 1}")
-    activity_to_scene = {}
-    for activity, status, scene in zip(cell_list[::5], cell_list[2::5], cell_list[4::5]):
-        if ".bddl" not in activity.value and str(status.value) == "1":
-            activity_to_scene[activity.value] = scene.value
-    return activity_to_scene
-
-
-def get_unsuccessful_activities():
-    return sorted(set(ACTIVITY_TO_ROW.keys()) - get_successful_activities())
-
-
-def get_worksheet_scene_row(scene_model):
-    scenes_sorted = get_scenes()
-
-    # Fill in this value to reserve it
-    idx = scenes_sorted.index(scene_model)
-    scene_row = 2 + idx
-
-    return scene_row
-
-
-def validate_scene_can_be_sampled(scene):
-    scenes_sorted = get_scenes()
-    n_scenes = len(scenes_sorted)
-
-    # Sanity check scene -- only scenes are allowed that whose user field is either:
-    # (a) blank or (b) filled with USER
-    # scene_user_list = worksheet.range(f"R{2}:S{2 + n_scenes - 1}")
-    def get_user(val):
-        return None if (len(val) == 1 or val[1] == "") else val[1]
-
-    scene_user_mapping = {val[0]: get_user(val) for val in worksheet.get(f"T{2}:U{2 + n_scenes - 1}")}
-
-    # Make sure scene is valid
-    assert scene in scene_user_mapping, f"Got invalid scene name to sample: {scene}"
-
-    # Assert user is None or is USER, else False
-    scene_user = scene_user_mapping[scene]
-    assert (
-        scene_user is None or scene_user == USER
-    ), f"Cannot sample scene {scene} with user {USER}! Scene already has user: {scene_user}."
-
-    # Fill in this value to reserve it
-    idx = scenes_sorted.index(scene)
-    scene_row = 2 + idx
-    worksheet.update_acell(f"U{scene_row}", USER)
-
-    return scene_row
 
 
 def prune_unevaluatable_predicates(init_conditions):
@@ -236,21 +91,6 @@ def get_valid_tasks():
     return set(get_behavior_activities())
 
 
-def get_notready_synsets():
-    return set()
-    notready_synsets = set()
-    with open(SYNSET_INFO_FPATH) as csvfile:
-        reader = csv.reader(csvfile, delimiter=",", quotechar='"')
-        for i, row in enumerate(reader):
-            if i == 0:
-                continue
-            synset, status = row[:2]
-            if status == "Not Ready":
-                notready_synsets.add(synset)
-
-    return notready_synsets
-
-
 def get_all_lights(prim):
     prims = []
     for child in prim.GetChildren():
@@ -266,36 +106,6 @@ def hide_all_lights():
     for light in lights:
         imageable = lazy.pxr.UsdGeom.Imageable(light)
         imageable.MakeInvisible()
-
-
-def parse_task_mapping(fpath):
-    mapping = dict()
-    rows = []
-    with open(fpath) as csvfile:
-        reader = csv.reader(csvfile, delimiter=",", quotechar='"')
-        for row in reader:
-            rows.append(row)
-
-    notready_synsets = get_notready_synsets()
-
-    for row in rows[1:]:
-        activity_name = row[0].split("-")[0]
-
-        # Skip any that is missing a synset
-        required_synsets = set(list(entry.strip() for entry in row[1].split(","))[:-1])
-        if len(notready_synsets.intersection(required_synsets)) > 0:
-            continue
-
-        # Write matched ready scenes
-        ready_scenes = set(list(entry.strip() for entry in row[2].split(","))[:-1])
-
-        # There's always a leading whitespace
-        if len(ready_scenes) == 0:
-            continue
-
-        mapping[activity_name] = ready_scenes
-
-    return mapping
 
 
 def parse_task_mapping_new():
@@ -320,20 +130,6 @@ def parse_task_mapping_new():
     return mapping
 
 
-def get_dns_activities():
-    n_tasks = len(get_valid_tasks())
-    return {
-        val[0]
-        for val in worksheet.get(f"A{2}:C{2 + n_tasks - 1}")
-        if val[-1] is not None and str(val[-1]).lower() == "dns"
-    }
-
-
-def get_non_misc_activities():
-    n_tasks = len(get_valid_tasks())
-    return {val[0] for val in worksheet.get(f"A{2}:I{2 + n_tasks - 1}") if val[-1] == "-"}
-
-
 def get_scene_compatible_activities(scene_model, mapping):
     return [activity for activity, scenes in mapping.items() if scene_model in scenes]
 
@@ -344,26 +140,29 @@ def _validate_object_state_stability(obj_name, obj_dict, strict=False):
     joint_vel_threshold = 0.01 if strict else 1.0
     # Check close to zero root link velocity
     for key, atol in zip(("lin_vel", "ang_vel"), (lin_vel_threshold, ang_vel_threshold)):
-        val = obj_dict["root_link"].get(key, 0.0)
-        if not th.all(th.isclose(th.tensor(val), th.tensor(0.0), atol=atol, rtol=0.0)).item():
-            return False, f"{obj_name} root link {key} is not close to 0: {val}"
+        val = obj_dict["root_link"].get(key, th.tensor(0.0))
+        if not isinstance(val, th.Tensor):
+            val = th.tensor(val)
+        if not th.all(th.isclose(val, th.tensor(0.0), atol=atol, rtol=0.0)).item():
+            raise ValueError(f"{obj_name} root link {key} is not close to 0: {val}")
 
     # Check close to zero joint velocities
     if "joint_vel" in obj_dict.keys():
         val = obj_dict["joint_vel"]
-        if not th.all(th.isclose(th.tensor(val), th.tensor(0.0), atol=joint_vel_threshold, rtol=0.0)).item():
-            return False, f"{obj_name} joint velocity is not close to 0: {val}"
+        if not isinstance(val, th.Tensor):
+            val = th.tensor(val)
+        if not th.all(th.isclose(val, th.tensor(0.0), atol=joint_vel_threshold, rtol=0.0)).item():
+            raise ValueError(f"{obj_name} joint velocity is not close to 0: {val}")
 
     # If all passes, return True
-    return True, None
+    return True
 
 
-def create_stable_scene_json(scene_model, record_feedback=False):
+def create_stable_scene_json(scene_model):
     cfg = {
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": scene_model,
-            # "load_object_categories": ["floors"],
         },
     }
 
@@ -371,12 +170,9 @@ def create_stable_scene_json(scene_model, record_feedback=False):
     macros.prims.entity_prim.DEFAULT_SLEEP_THRESHOLD = 0.0
 
     # Create the environment
-    # env = create_env_with_stable_objects(cfg)
     env = og.Environment(configs=copy.deepcopy(cfg))
 
     # Take a few steps to let objects settle, then update the scene initial state
-    # This is to prevent nonzero velocities from causing objects to fall through the floor when we disable them
-    # if they're not relevant for a given task
     for _ in range(300):
         og.sim.step()
 
@@ -394,12 +190,6 @@ def create_stable_scene_json(scene_model, record_feedback=False):
         print("Creating stable scene failed! Invalid messages:")
         for msg in invalid_msgs:
             print(msg)
-
-        # record this feedback if requested
-        if record_feedback:
-            feedback = "\n".join(invalid_msgs)
-            scene_row = get_worksheet_scene_row(scene_model=scene_model)
-            worksheet.update_acell(f"AA{scene_row}", feedback)
         raise ValueError("Scene is not stable!")
 
     for obj in env.scene.objects:
@@ -412,11 +202,6 @@ def create_stable_scene_json(scene_model, record_feedback=False):
     )
     og.sim.save(json_paths=[path])
 
-    # record this feedback if requested
-    if record_feedback:
-        scene_row = get_worksheet_scene_row(scene_model=scene_model)
-        worksheet.update_acell(f"Z{scene_row}", 1)
-
     og.sim.stop()
     og.clear()
 
@@ -424,7 +209,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
 def validate_task(task, task_scene_dict, default_scene_dict):
     assert og.sim.is_playing()
 
-    conditions = task.activity_conditions
+    conditions = task._base_conditions
     relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
     active_obj_names = set()
     for obj in og.sim.scenes[0].objects:
@@ -444,6 +229,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
             if not check_vel and "vel" in key:
                 continue
             obj_val = obj_dict["root_link"][key]
+            val = th.tensor(val) if not isinstance(val, th.Tensor) else val
+            obj_val = th.tensor(obj_val) if not isinstance(obj_val, th.Tensor) else obj_val
             atol = 1.0 if "vel" in key else 0.05
             # # TODO: Update ori value to be larger tolerance
             # tol = 0.15 if "ori" in key else 0.05
@@ -451,33 +238,31 @@ def validate_task(task, task_scene_dict, default_scene_dict):
             if "particle" in key:
                 # Only check particle position
                 if "position" in key:
-                    particle_positions = th.tensor(val)
-                    current_particle_positions = th.tensor(obj_val)
-                    pos_min, pos_max = th.min(particle_positions, dim=0), th.max(particle_positions, dim=0)
+                    pos_min, pos_max = th.min(val, dim=0), th.max(val, dim=0)
                     curr_pos_min, curr_pos_max = (
-                        th.min(current_particle_positions, dim=0),
-                        th.max(current_particle_positions, dim=0),
+                        th.min(obj_val, dim=0),
+                        th.max(obj_val, dim=0),
                     )
                     for name, pos, curr_pos in zip(("min", "max"), (pos_min, pos_max), (curr_pos_min, curr_pos_max)):
                         if not th.all(th.isclose(pos, curr_pos, atol=0.05)).item():
-                            return (
-                                False,
-                                f"Got mismatch in cloth {obj_name} particle positions range: {name} min {pos_min} max {pos_max} vs. min {curr_pos_min} max {curr_pos_max}",
+                            raise ValueError(
+                                f"Got mismatch in cloth {obj_name} particle positions range: {name} min {pos_min} max {pos_max} vs. min {curr_pos_min} max {curr_pos_max}"
                             )
                 else:
                     continue
             else:
                 if key == "ori":
-                    val = th.tensor(val) if not isinstance(val, th.Tensor) else val
-                    obj_val = th.tensor(obj_val) if not isinstance(obj_val, th.Tensor) else obj_val
-                    # Grab the axis angle representation to compute magnitude difference
-                    obj_val = th.norm(T.quat2axisangle(T.quat_distance(val, obj_val)))
-                    val = 0.0
-                if not th.all(th.isclose(th.tensor(val), th.tensor(obj_val), atol=atol, rtol=0.0)).item():
-                    return (
-                        False,
-                        f"{obj_name} root link mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}",
-                    )
+                    if not th.all(
+                        th.isclose(T.quat_distance(val, obj_val), th.tensor([0.0, 0.0, 0.0, 1.0]), atol=atol)
+                    ).item():
+                        raise ValueError(
+                            f"{obj_name} root link mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}"
+                        )
+                else:
+                    if not th.all(th.isclose(val, obj_val, atol=atol, rtol=0.0)).item():
+                        raise ValueError(
+                            f"{obj_name} root link mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}"
+                        )
 
         # Check any non-robot joint values
         # This is because the controller can cause the robot to drift over time
@@ -488,28 +273,24 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                     val = default_obj_dict[f"joint_{key}"]
                     obj_val = obj_dict[f"joint_{key}"]
                     atol = 1.0 if key == "vel" else 0.05
-                    if not th.all(th.isclose(th.tensor(val), th.tensor(obj_val), atol=atol, rtol=0.0)).item():
-                        return (
-                            False,
-                            f"{obj_name} joint mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}",
+                    if not isinstance(val, th.Tensor):
+                        val = th.tensor(val)
+                    if not isinstance(obj_val, th.Tensor):
+                        obj_val = th.tensor(obj_val)
+                    if not th.all(th.isclose(val, obj_val, atol=atol, rtol=0.0)).item():
+                        raise ValueError(
+                            f"{obj_name} joint mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}"
                         )
 
         # If all passes, return True
-        return True, None
+        return True
 
     task_state_t0 = og.sim.dump_state(serialized=False)[0]
     if "registry" in task_state_t0:
         task_state_t0 = task_state_t0["registry"]
     for obj_name, obj_info in task_scene_dict["state"]["registry"]["object_registry"].items():
         current_obj_info = task_state_t0["object_registry"][obj_name]
-        valid_obj, err_msg = _validate_identical_object_kinematic_state(
-            obj_name, obj_info, current_obj_info, check_vel=True
-        )
-        if not valid_obj:
-            return (
-                False,
-                f"Failed validation step 1: Task scene json and loaded task environment do not have similar kinematic states. Specific error: {err_msg}",
-            )
+        _validate_identical_object_kinematic_state(obj_name, obj_info, current_obj_info, check_vel=True)
 
     # We should never use this after
     task_scene_dict = None
@@ -527,23 +308,11 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         if obj_name not in task_state_t0["object_registry"]:
             continue
         obj_info = task_state_t0["object_registry"][obj_name]
-        valid_obj, err_msg = _validate_identical_object_kinematic_state(
-            obj_name, default_obj_info, obj_info, check_vel=True
-        )
-        if not valid_obj:
-            return (
-                False,
-                f"Failed validation step 2: stable scene state and task scene state do not have similar kinematic states for non-task-relevant objects. Specific error: {err_msg}",
-            )
+        _validate_identical_object_kinematic_state(obj_name, default_obj_info, obj_info, check_vel=True)
 
     # Sanity check for zero velocities for all objects
     for obj_name, obj_info in task_state_t0["object_registry"].items():
-        valid_obj, err_msg = _validate_object_state_stability(obj_name, obj_info, strict=False)
-        if not valid_obj:
-            return (
-                False,
-                f"Failed validation step 2: task scene state does not have close to zero velocities. Specific error: {err_msg}",
-            )
+        _validate_object_state_stability(obj_name, obj_info, strict=False)
 
     # Need to enable transition rules before running step 3 and 4
     original_transition_rule_flag = gm.ENABLE_TRANSITION_RULES
@@ -575,9 +344,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                     ).all()
                 )
             ) or (not is_micro_physical and system_state[n_particles_key] != current_system_state[n_particles_key]):
-                return (
-                    False,
-                    f"Got inconsistent number of system {system_name} particles: {system_state[n_particles_key]} vs. {current_system_state[n_particles_key]}",
+                raise ValueError(
+                    f"Got inconsistent number of system {system_name} particles: {system_state[n_particles_key]} vs. {current_system_state[n_particles_key]}"
                 )
 
             # Validate that no particles went flying -- maximum ranges of positions should be roughly close
@@ -609,27 +377,22 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                 )
                 for name, pos, curr_pos in zip(("min", "max"), (pos_min, pos_max), (curr_pos_min, curr_pos_max)):
                     if not th.all(th.isclose(pos, curr_pos, atol=0.05)).item():
-                        return (
-                            False,
-                            f"Got mismatch in system {system_name} particle positions range: {name} {pos} vs. {curr_pos}",
+                        raise ValueError(
+                            f"Got mismatch in system {system_name} particle positions range: {name} {pos} vs. {curr_pos}"
                         )
 
-            return True, None
+            return True
 
         # Sanity check consistent objects
         task_objects = {obj_name for obj_name in task_state["object_registry"].keys()}
         curr_objects = {obj_name for obj_name in current_state["object_registry"].keys()}
         mismatched_objs = set.union(task_objects, curr_objects) - set.intersection(task_objects, curr_objects)
         if len(mismatched_objs) > 0:
-            return False, f"Got mismatch in active objects: {mismatched_objs}"
+            raise ValueError(f"Got mismatch in active objects: {mismatched_objs}")
 
         for obj_name, obj_info in task_state["object_registry"].items():
             current_obj_info = current_state["object_registry"][obj_name]
-            valid_obj, err_msg = _validate_identical_object_kinematic_state(
-                obj_name, obj_info, current_obj_info, check_vel=True
-            )
-            if not valid_obj:
-                return False, f"task state and current state do not have similar kinematic states: {err_msg}"
+            _validate_identical_object_kinematic_state(obj_name, obj_info, current_obj_info, check_vel=True)
 
         # Sanity check consistent particle systems
         task_systems = {system_name for system_name in task_state["system_registry"].keys() if system_name != "cloth"}
@@ -638,34 +401,28 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         }
         mismatched_systems = set.union(task_systems, curr_systems) - set.intersection(task_systems, curr_systems)
         if len(mismatched_systems) > 0:
-            return False, f"Got mismatch in active systems: {mismatched_systems}"
+            raise ValueError(f"Got mismatch in active systems: {mismatched_systems}")
 
         for system_name in task_systems:
             system_state = task_state["system_registry"][system_name]
             curr_system_state = current_state["system_registry"][system_name]
-            valid_system, err_msg = _validate_particle_system_consistency(
+            _validate_particle_system_consistency(
                 system_name, system_state, curr_system_state, check_particle_positions=check_particle_positions
             )
-            if not valid_system:
-                return False, f"Particle systems do not have consistent state. Specific error: {err_msg}"
 
         # Sanity check initial state
         valid_init_state, results = CompiledTask.evaluate_conditions(
             prune_unevaluatable_predicates(task.activity_initial_conditions), task._evaluate_predicate
         )
         if not valid_init_state:
-            return False, f"BDDL Task init conditions were invalid. Results: {results}"
+            raise ValueError(f"BDDL Task init conditions were invalid. Results: {results}")
 
-        return True, None
+        return True
 
     # Sanity check scene
-    valid_scene, err_msg = _validate_scene_stability(
+    _validate_scene_stability(
         task=task, task_state=task_state_t0, current_state=task_state_t1, check_particle_positions=True
     )
-    if not valid_scene:
-        with gm.unlocked():
-            gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
-        return False, f"Failed verification step 3: {err_msg}"
 
     # 4. Validate longer-term stability -- take N=10 timesteps, and make sure all object positions and velocities
     #       are still stable (positions don't drift too much, and velocities are close to 0), as well as verifying
@@ -682,14 +439,10 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     task_state_t11 = og.sim.dump_state(serialized=False)[0]
     if "registry" in task_state_t11:
         task_state_t11 = task_state_t11["registry"]
-    valid_scene, err_msg = _validate_scene_stability(
+    _validate_scene_stability(
         task=task, task_state=task_state_t0, current_state=task_state_t11, check_particle_positions=False
     )
-    if not valid_scene:
-        with gm.unlocked():
-            gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
-        return False, f"Failed verification step 4: {err_msg}"
     with gm.unlocked():
         gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
 
-    return True, None
+    return True
