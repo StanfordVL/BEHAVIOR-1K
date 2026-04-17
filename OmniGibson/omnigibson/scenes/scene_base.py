@@ -788,7 +788,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     "git_hash": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_git_hash(),
                 },
             },
-            "metadata": self._task_metadata,
+            "metadata": {"task": self._task_metadata},
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),
             "objects_info": self.get_objects_info(),
@@ -832,8 +832,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         state = recursively_convert_to_torch(scene_info["state"])
 
         # Recover metadata
-        for key, data in scene_info.get("metadata", dict()).items():
-            self.write_task_metadata(key=key, data=data)
+        if "metadata" in scene_info:
+            metadata = scene_info["metadata"]
+            task_metadata = metadata["task"] if "task" in metadata else metadata
+            for key, data in task_metadata.items():
+                self.write_task_metadata(key=key, data=data)
 
         # Make sure the class type is the same
         if self.__class__.__name__ != init_info["class_name"]:

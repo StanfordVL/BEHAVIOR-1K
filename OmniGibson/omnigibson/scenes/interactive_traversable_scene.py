@@ -119,7 +119,7 @@ class InteractiveTraversableScene(TraversableScene):
             return os.path.join(self.scene_dir, "json", f"{fname}.json")
         else:
             # Load specific instance from task instance directory
-            return os.path.join(self.task_dir, "json", f"{scene_instance}.json")
+            return os.path.join(get_task_instance_path(scene_model, scene_instance))
 
     def filter_rooms_and_object_categories(
         self, load_object_categories, not_load_object_categories, load_room_types, load_room_instances
@@ -209,14 +209,6 @@ class InteractiveTraversableScene(TraversableScene):
 
         # We only load this model if all the above conditions are met
         return (not_blacklisted and whitelisted and valid_room and agent_ok) or is_building_structure
-
-    @property
-    def task_dir(self):
-        """
-        Returns:
-            str: Path to task directory. This requires B1K challenge dataset to be downloaded
-        """
-        return get_task_instance_path(self.scene_model)
 
     @property
     def seg_map(self):

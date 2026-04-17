@@ -447,19 +447,20 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         # toggling these settings to be True -> False -> True
         # Only setting it to True once will actually freeze the GUI for some reason!
         if not gm.HEADLESS:
-            # Async rendering does not work in VR mode
-            if not self.use_vr:
-                lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
-                lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
-                lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", False)
-                lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", False)
-                lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
-                lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+            with og.sim.editing_usd():
+                # Async rendering does not work in VR mode
+                if not self.use_vr:
+                    lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+                    lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+                    lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", False)
+                    lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", False)
+                    lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+                    lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
 
-            # Disable mouse grabbing since we're only using the UI passively
-            lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
+                # Disable mouse grabbing since we're only using the UI passively
+                lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
+                lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
+                lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient

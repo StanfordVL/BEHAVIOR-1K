@@ -231,12 +231,14 @@ class BehaviorTask(BaseTask):
             presampled_poses = env.scene.get_task_metadata(key="robot_poses")
             # make all lowercase
             presampled_poses = {k.lower(): v for k, v in presampled_poses.items()}
-            assert (
-                robot.model in presampled_poses
-            ), f"{robot.model} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
-
-            # Select pose based on randomize_presampled_pose flag
-            available_poses = presampled_poses[robot.model]
+            # use generic "robot" key if it exists, otherwise look for model-specific key
+            if "robot" in presampled_poses:
+                available_poses = presampled_poses["robot"]
+            elif robot.model in presampled_poses:
+                print("No generic presampled robot pose found, using robot-specific pose.")
+                available_poses = presampled_poses[robot.model]
+            else:
+                raise KeyError(f"No generic or model-specific presampled robot pose found for {robot.model}!")
             if self.randomize_presampled_pose:
                 robot_pose = random.choice(available_poses)
             else:
@@ -361,7 +363,7 @@ class BehaviorTask(BaseTask):
             # Find which room instance this object is in
             if hasattr(entity, "in_rooms") and entity.in_rooms:
                 for room_inst in entity.in_rooms:
-                    inst_room_type = env.scene.seg_map.room_ins_name_to_sem_name.get(room_inst)
+                    inst_room_type = room_inst.rsplit("_", 1)[0]  # Get room type by removing instance number suffix
                     if inst_room_type == room_type:
                         if room_type in room_instances and room_instances[room_type] != room_inst:
                             log.warning(
@@ -426,13 +428,15 @@ class BehaviorTask(BaseTask):
                 - bool: Whether the generated scene activity should be accepted or not
                 - dict: Any feedback from the sampling / initialization process
         """
+        # Create sampler unconditionally - needed for both online and offline sampling modes
+        self.sampler = BDDLSampler(
+            env=env,
+            activity_conditions=self._base_conditions,
+            object_scope=self.object_scope,
+        )
+
         if self.online_object_sampling:
             # Phase 1: assign objects using only parsed conditions (no compilation needed)
-            self.sampler = BDDLSampler(
-                env=env,
-                activity_conditions=self._base_conditions,
-                object_scope=self.object_scope,
-            )
             accept_scene, feedback = self.sampler.assign_objects(
                 sampling_whitelist=self.sampling_whitelist,
                 sampling_blacklist=self.sampling_blacklist,
@@ -458,7 +462,7 @@ class BehaviorTask(BaseTask):
 
             # Assign base scope objects from cache (non-strict: skip instances
             # not in cache, e.g. wildcard instances that don't exist yet)
-            self.assign_object_scope_with_cache(env, strict=False)
+            self.assign_object_scope_with_cache(env)
 
             # Compile with correct rooms now that we know where objects are
             self._compile_with_rooms(env)
@@ -467,7 +471,16 @@ class BehaviorTask(BaseTask):
             self.future_obj_instances = {
                 init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
             }
+            # Use non-strict so that wildcard-expanded instances absent from cache are handled by
+            # _assign_wildcard_instances below rather than raising an assertion error.
+            # TODO @wensi-ai: Check object scope again to see if any wildcard objects are recorded. 2026+ tasks do this, 2025 ones don't.
             self.assign_object_scope_with_cache(env)
+            # TODO @wensi-ai: Assign objects to remaining wildcard objects. This is a no-op for 2026+ tasks.
+            self._assign_wildcard_instances(env)
+            # assert that everything in the object scope that's not a future object is not None
+            for inst, entity in self.object_scope.items():
+                if inst not in self.future_obj_instances and entity is None:
+                    raise ValueError(f"Object instance '{inst}' was not assigned an entity during cache assignment!")
 
         return True, None
 
@@ -506,15 +519,12 @@ class BehaviorTask(BaseTask):
         # We assume the relevant agent is the first agent in the scene
         return env.robots[0]
 
-    def assign_object_scope_with_cache(self, env, strict=True):
+    def assign_object_scope_with_cache(self, env):
         """
         Assigns objects within the current object scope from cached scene metadata.
 
         Args:
             env (Environment): Current active environment instance
-            strict (bool): If True, assert that every non-future instance exists in cache.
-                If False, skip instances not found in cache (used during partial
-                assignment before wildcard compilation).
         """
         # Load task metadata
         inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
@@ -524,12 +534,7 @@ class BehaviorTask(BaseTask):
             if obj_inst in self.future_obj_instances:
                 entity = None
             elif obj_inst not in inst_to_name:
-                if strict:
-                    assert False, (
-                        f"BDDL object instance {obj_inst} should exist in cached metadata "
-                        f"from loaded scene, but could not be found!"
-                    )
-                # In non-strict mode, skip instances not found (e.g., future objects
+                # Skip instances not found (e.g., future objects
                 # when future_obj_instances isn't fully populated yet)
                 continue
             else:
@@ -544,9 +549,6 @@ class BehaviorTask(BaseTask):
                 else:
                     entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = entity
-
-        # Write back to task metadata
-        self.update_bddl_scope_metadata(env)
 
     def update_bddl_scope_metadata(self, env):
         """
