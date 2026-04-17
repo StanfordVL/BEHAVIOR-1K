@@ -1062,7 +1062,7 @@ class OGRobotServer:
             )
             tro_file_path = os.path.join(get_task_instance_path(
                 scene_model,
-                f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
+                f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
             ))
             # check if tro_file_path exists, if not, then presumbaly we are done
             if not os.path.exists(tro_file_path):

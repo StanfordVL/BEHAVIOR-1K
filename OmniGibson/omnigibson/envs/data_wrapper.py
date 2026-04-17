@@ -599,7 +599,7 @@ class DataPlaybackWrapper(DataWrapper):
             record_data (bool): Whether to record data during playback or not
             video_keys (dict): Optional dictionary of video keys to record during playback. If provided, will recreate
                 video writers at the start of playback (useful if they were flushed after a previous episode)
-                It shoule be a dict mapping from obs keys to the desired output video file name.
+                It should be a dict mapping from obs keys to the desired output video file name.
         """
 
         # Recreate video writers if video_keys are provided

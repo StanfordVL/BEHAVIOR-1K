@@ -156,7 +156,7 @@ def main():
         type=str,
         choices=["hdf5", "lerobot"],
         default="hdf5",
-        help="Output format: hdf5, lerobot, or video",
+        help="Output format: hdf5, lerobot",
     )
     parser.add_argument("--flush_every_n_steps", type=int, default=1000, help="Flush data every N steps")
     parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")

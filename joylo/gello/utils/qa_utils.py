@@ -1184,7 +1184,7 @@ ALL_QA_METRICS = {
         "cls": FailedGraspMetric,
         "init": None,
         "mode": MetricMode.SOFT,
-        "warning": "Failed grasp detected (gripper closed without holding object). Please make sure these gripper closing behavior is necessary.",
+        "warning": "Failed grasp detected (gripper closed without holding object). Please make sure these gripper closing behaviors are necessary.",
         "task_whitelist": None,
         "task_blacklist": None,
         "validate_kwargs": dict(

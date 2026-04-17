@@ -160,24 +160,24 @@ def replay_hdf5_to_video(
     if run_qa:
         additional_wrapper_configs.append({"type": "MetricsWrapper"})
 
-        external_sensors_config = [
-            {
-                "sensor_type": "VisionSensor",
-                "name": "external_sensor0",
-                "relative_prim_path": f"/controllable__r1pro__robot/base_link/external_sensor0",
-                "modalities": ["rgb"],
-                "sensor_kwargs": {
-                    "image_height": OBS_CAMERA_RESOLUTION * 2,
-                    "image_width": OBS_CAMERA_RESOLUTION * 3,
-                    "horizontal_aperture": 40.0,
-                },
-                "position": th.tensor([-0.4, 0, 2.0], dtype=th.float32),
-                "orientation": th.tensor(
-                    [0.2706, -0.2706, -0.6533, 0.6533], dtype=th.float32
-                ),
-                "pose_frame": "parent",
-            }
-        ]
+    external_sensors_config = [
+        {
+            "sensor_type": "VisionSensor",
+            "name": "external_sensor0",
+            "relative_prim_path": f"/controllable__r1pro__robot/base_link/external_sensor0",
+            "modalities": ["rgb"],
+            "sensor_kwargs": {
+                "image_height": OBS_CAMERA_RESOLUTION * 2,
+                "image_width": OBS_CAMERA_RESOLUTION * 3,
+                "horizontal_aperture": 40.0,
+            },
+            "position": th.tensor([-0.4, 0, 2.0], dtype=th.float32),
+            "orientation": th.tensor(
+                [0.2706, -0.2706, -0.6533, 0.6533], dtype=th.float32
+            ),
+            "pose_frame": "parent",
+        }
+    ]
 
     video_keys = {"aggregated": f"{input_filename}_video"}
 

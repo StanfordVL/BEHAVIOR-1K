@@ -834,9 +834,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Recover metadata
         if "metadata" in scene_info:
             metadata = scene_info["metadata"]
-            if "task" in metadata:
-                for key, data in metadata["task"].items():
-                    self.write_task_metadata(key=key, data=data)
+            task_metadata = metadata["task"] if "task" in metadata else metadata
+            for key, data in task_metadata.items():
+                self.write_task_metadata(key=key, data=data)
 
         # Make sure the class type is the same
         if self.__class__.__name__ != init_info["class_name"]:

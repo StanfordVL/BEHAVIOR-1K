@@ -263,7 +263,7 @@ class Evaluator:
             tro_file_path = os.path.join(
                 get_task_instance_path(
                     scene_model,
-                    f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
+                    f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
                 )
             )
         with open(tro_file_path, "r") as f:

@@ -28,7 +28,7 @@ parser.add_argument(
     "--output_dir",
     type=str,
     default=None,
-    help="Output directory for sampled tasks (default: outputs/ in script directory)",
+    help="Output directory for sampled tasks (default: gm.DATA_PATH/2026-challenge-task-instances)",
 )
 # Constants
 MAX_ATTEMPTS = 10

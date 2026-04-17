@@ -462,7 +462,7 @@ class BehaviorTask(BaseTask):
 
             # Assign base scope objects from cache (non-strict: skip instances
             # not in cache, e.g. wildcard instances that don't exist yet)
-            self.assign_object_scope_with_cache(env, strict=False)
+            self.assign_object_scope_with_cache(env)
 
             # Compile with correct rooms now that we know where objects are
             self._compile_with_rooms(env)
@@ -474,7 +474,7 @@ class BehaviorTask(BaseTask):
             # Use non-strict so that wildcard-expanded instances absent from cache are handled by
             # _assign_wildcard_instances below rather than raising an assertion error.
             # TODO @wensi-ai: Check object scope again to see if any wildcard objects are recorded. 2026+ tasks do this, 2025 ones don't.
-            self.assign_object_scope_with_cache(env, strict=False)
+            self.assign_object_scope_with_cache(env)
             # TODO @wensi-ai: Assign objects to remaining wildcard objects. This is a no-op for 2026+ tasks.
             self._assign_wildcard_instances(env)
             # assert that everything in the object scope that's not a future object is not None
