@@ -33,7 +33,7 @@ parser.add_argument(
 parser.add_argument(
     "--end_idx",
     type=int,
-    default=1,
+    default=300,
     help="Instance ID to end (inclusive)",
 )
 parser.add_argument(

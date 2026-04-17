@@ -4,7 +4,7 @@
 Generate fresh instances of existing tasks with randomized elements for variety and robustness testing.
 
 **Example: Sampling a pick up trash task, task name = picking_up_trash**
-0. Clone the following repo into `gm.DATA_PATH`: https://github.com/wensi-ai/2026-challenge-task-instances 
+0. Clone `2026-challenge-task-instances` into `gm.DATA_PATH`: https://github.com/wensi-ai/2026-challenge-task-instances 
 
 1. Enter the sampling directory,
 ```sh
@@ -111,7 +111,7 @@ python /BEHAVIOR-1K/joylo/scripts/launch_og.py --task-name TASK_NAME --recording
 python /BEHAVIOR-1K/joylo/scripts/run_joylo.py
 ```
 
-Try to complete the task. and then run the replay script to generate the video and qa result json file;
+Try to complete the task by running the replay script to generate the video and qa result json file;
 
 ```sh
 python /BEHAVIOR-1K/joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
