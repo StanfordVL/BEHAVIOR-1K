@@ -93,7 +93,7 @@ After this command, you should see another file generated under `datasets/2026-c
 
 5. Randomly generate 300 instances for your task
 ```sh
-python multiply_b1k_tasks.py --partial_save -t TASK_NAME -s SCENE_NAME 
+python multiply_b1k_tasks.py --partial_save --start-idx 1 --end-idx 300 -t TASK_NAME -s SCENE_NAME 
 ```
 After this step, you should see a folder named house_double_floor_lower_task_picking_up_trash_instances appeared under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`, in which there are files with name like house_double_floor_lower_task_picking_up_trash_0_(index)_template-tro_state.json.
 
