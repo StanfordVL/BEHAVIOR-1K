@@ -80,7 +80,7 @@ NOTE: Copy into `2026-challenge-task-instances`, not the one in `2025-challenge-
 3. Sample task related objects
 
 ```sh
-python -m pdb sample_b1k_tasks.py -t TASK_NAME -s SCENE_NAME
+python sample_b1k_tasks.py -t TASK_NAME -s SCENE_NAME
 ```
 After this command, you should see 1 file generated under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`, with name like house_double_floor_lower_task_picking_up_trash_0_0_template-partial_rooms.json.
 
