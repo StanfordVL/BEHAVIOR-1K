@@ -4,6 +4,7 @@ Tests for assisted-grasping (AG) state serialization.
 Covers:
   - dict roundtrip  (dump_state / load_state)
   - tensor roundtrip (dump_state serialized=True / load_state serialized=True)
+  - single-arm grasps (left and right tested individually) and both-arms grasps
   - backwards compatibility: tensors that predate AG serialization (no magic sentinel) load cleanly
   - expected-value check: AG block in serialized tensor matches known hand-crafted params
 """
@@ -19,34 +20,46 @@ gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_TRANSITION_RULES = False
 
+# Deterministic frame params — different per arm so an accidental swap would be detectable.
+_LEFT_FRAME = {
+    "parent_frame_pos": th.tensor([0.1, 0.0, 0.0]),
+    "parent_frame_orn": th.tensor([0.0, 0.0, 0.0, 1.0]),
+    "child_frame_pos": th.tensor([0.0, 0.0, 0.05]),
+    "child_frame_orn": th.tensor([0.0, 0.0, 0.0, 1.0]),
+    "joint_type": "FixedJoint",
+}
+_RIGHT_FRAME = {
+    "parent_frame_pos": th.tensor([0.2, 0.0, 0.0]),
+    "parent_frame_orn": th.tensor([0.0, 0.0, 0.0, 1.0]),
+    "child_frame_pos": th.tensor([0.0, 0.0, 0.07]),
+    "child_frame_orn": th.tensor([0.0, 0.0, 0.0, 1.0]),
+    "joint_type": "FixedJoint",
+}
+
+# Per-block element count in the serialized tensor: magic + arm_idx + payload
+_AG_BLOCK_LEN = 2 + _AG_STATE_SIZE
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _force_ag_grasp(robot, target_obj):
-    """
-    Directly create an AG joint with deterministic, hand-crafted constraint params.
-    Returns (arm_name, constraint_params) — constraint_params still holds the live object ref.
-    """
-    arm = robot.arm_names[0]
+def _force_ag_grasp(robot, arm, target_obj, frame_params):
+    """Create an AG joint on `arm` with deterministic hand-crafted params."""
     target_link_name = sorted(target_obj.links.keys())[0]
     constraint_params = {
         "target_obj": target_obj,
         "target_link_name": target_link_name,
-        "parent_frame_pos": th.tensor([0.1, 0.0, 0.0]),
-        "parent_frame_orn": th.tensor([0.0, 0.0, 0.0, 1.0]),
-        "child_frame_pos": th.tensor([0.0, 0.0, 0.05]),
-        "child_frame_orn": th.tensor([0.0, 0.0, 0.0, 1.0]),
-        "joint_type": "FixedJoint",
+        **frame_params,
     }
     robot._create_assisted_grasp_joint(arm, constraint_params)
-    return arm, constraint_params
+    return constraint_params
 
 
 def _assert_ag_restored(robot, arm, original_params, target_obj):
     restored = robot._ag_obj_constraint_params[arm]
-    assert restored is not None, "AG constraint was not restored"
+    assert restored is not None, f"AG constraint was not restored on arm {arm}"
     assert restored["target_obj"] is target_obj
     assert restored["target_link_name"] == original_params["target_link_name"]
     assert th.allclose(restored["parent_frame_pos"], original_params["parent_frame_pos"], atol=1e-5)
@@ -54,6 +67,16 @@ def _assert_ag_restored(robot, arm, original_params, target_obj):
     assert th.allclose(restored["child_frame_pos"], original_params["child_frame_pos"], atol=1e-5)
     assert th.allclose(restored["child_frame_orn"], original_params["child_frame_orn"], atol=1e-5)
     assert restored["joint_type"] == original_params["joint_type"]
+
+
+def _release_and_flush(robot, *arms):
+    for arm in arms:
+        robot.release_grasp_immediately(arm=arm)
+        assert robot._ag_obj_constraint_params[arm] is None
+    # Step to flush the prim deletion and rebuild physics handles; without this,
+    # SynchronizeToFabric() in editing_usd.__exit__ fires USD notices while the
+    # guard is inactive and leaves a deferred error that breaks the next load_state.
+    og.sim.step()
 
 
 # ---------------------------------------------------------------------------
@@ -69,24 +92,35 @@ def test_ag_dict_no_grasp(env, assisted_robot):
         assert assisted_robot._ag_obj_constraint_params[arm] is None
 
 
-def test_ag_dict_with_grasp(env, assisted_robot, apple):
-    """Active grasp: dump/load fully restores the AG constraint."""
-    arm, original_params = _force_ag_grasp(assisted_robot, apple)
+@pytest.mark.parametrize("arm_name,frame_params", [("left", _LEFT_FRAME), ("right", _RIGHT_FRAME)])
+def test_ag_dict_single_arm(env, assisted_robot, apple, arm_name, frame_params):
+    """dict roundtrip for a single-arm grasp, tested individually for each arm."""
+    params = _force_ag_grasp(assisted_robot, arm_name, apple, frame_params)
 
     state = og.sim.dump_state()
-    assisted_robot.release_grasp_immediately(arm=arm)
-    assert assisted_robot._ag_obj_constraint_params[arm] is None
-    # Step to flush the prim deletion and rebuild physics handles; without this,
-    # SynchronizeToFabric() in editing_usd.__exit__ fires USD notices while the
-    # guard is inactive and leaves a deferred error that breaks the next load_state.
-    og.sim.step()
+    _release_and_flush(assisted_robot, arm_name)
 
     og.sim.load_state(state)
-    _assert_ag_restored(assisted_robot, arm, original_params, apple)
+    _assert_ag_restored(assisted_robot, arm_name, params, apple)
+    other_arm = "right" if arm_name == "left" else "left"
+    assert assisted_robot._ag_obj_constraint_params[other_arm] is None
+
+
+def test_ag_dict_both_arms(env, assisted_robot, apple, bowl):
+    """dict roundtrip with both arms grasping different objects."""
+    left_params = _force_ag_grasp(assisted_robot, "left", apple, _LEFT_FRAME)
+    right_params = _force_ag_grasp(assisted_robot, "right", bowl, _RIGHT_FRAME)
+
+    state = og.sim.dump_state()
+    _release_and_flush(assisted_robot, "left", "right")
+
+    og.sim.load_state(state)
+    _assert_ag_restored(assisted_robot, "left", left_params, apple)
+    _assert_ag_restored(assisted_robot, "right", right_params, bowl)
 
 
 # ---------------------------------------------------------------------------
-# Tensor-path roundtrip tests  (serialized=True)
+# Tensor-path roundtrip tests (serialized=True)
 # ---------------------------------------------------------------------------
 
 
@@ -98,17 +132,31 @@ def test_ag_tensor_no_grasp(env, assisted_robot):
         assert assisted_robot._ag_obj_constraint_params[arm] is None
 
 
-def test_ag_tensor_with_grasp(env, assisted_robot, apple):
-    """Active grasp: serialized dump/load fully restores the AG constraint."""
-    arm, original_params = _force_ag_grasp(assisted_robot, apple)
+@pytest.mark.parametrize("arm_name,frame_params", [("left", _LEFT_FRAME), ("right", _RIGHT_FRAME)])
+def test_ag_tensor_single_arm(env, assisted_robot, apple, arm_name, frame_params):
+    """Tensor roundtrip for a single-arm grasp, tested individually for each arm."""
+    params = _force_ag_grasp(assisted_robot, arm_name, apple, frame_params)
 
     state = og.sim.dump_state(serialized=True)
-    assisted_robot.release_grasp_immediately(arm=arm)
-    assert assisted_robot._ag_obj_constraint_params[arm] is None
-    og.sim.step()  # flush prim deletion; see test_ag_dict_with_grasp for explanation
+    _release_and_flush(assisted_robot, arm_name)
 
     og.sim.load_state(state, serialized=True)
-    _assert_ag_restored(assisted_robot, arm, original_params, apple)
+    _assert_ag_restored(assisted_robot, arm_name, params, apple)
+    other_arm = "right" if arm_name == "left" else "left"
+    assert assisted_robot._ag_obj_constraint_params[other_arm] is None
+
+
+def test_ag_tensor_both_arms(env, assisted_robot, apple, bowl):
+    """Tensor roundtrip with both arms grasping different objects."""
+    left_params = _force_ag_grasp(assisted_robot, "left", apple, _LEFT_FRAME)
+    right_params = _force_ag_grasp(assisted_robot, "right", bowl, _RIGHT_FRAME)
+
+    state = og.sim.dump_state(serialized=True)
+    _release_and_flush(assisted_robot, "left", "right")
+
+    og.sim.load_state(state, serialized=True)
+    _assert_ag_restored(assisted_robot, "left", left_params, apple)
+    _assert_ag_restored(assisted_robot, "right", right_params, bowl)
 
 
 # ---------------------------------------------------------------------------
@@ -118,42 +166,99 @@ def test_ag_tensor_with_grasp(env, assisted_robot, apple):
 
 def test_ag_tensor_backwards_compat(env, assisted_robot, apple):
     """
-    A tensor that predates AG serialization (magic sentinel absent) deserializes
-    cleanly with no grasp restored, without corrupting the byte count.
+    A tensor that predates AG serialization (no magic sentinel) deserializes cleanly
+    with no grasp restored and no under/over-read.
 
-    We simulate an old recording by serializing with a grasp active, then
-    stripping the AG block (magic + per-arm data) from the robot's portion of
-    the tensor, and re-running deserialize directly.
+    We simulate an old recording by serializing with a grasp active, then stripping
+    the AG block at the tail, and re-running deserialize directly.
     """
-    arm, _ = _force_ag_grasp(assisted_robot, apple)
+    _force_ag_grasp(assisted_robot, "left", apple, _LEFT_FRAME)
 
     robot_state = assisted_robot._dump_state()
     full_tensor = assisted_robot.serialize(robot_state)
 
-    # Locate and remove the AG tail: magic (1) + n_arms * _AG_STATE_SIZE
-    n_ag = 1 + _AG_STATE_SIZE * len(assisted_robot.arm_names)
-    assert full_tensor[-n_ag].item() == _AG_MAGIC, "Expected AG magic at tail of serialized robot state"
-    old_tensor = full_tensor[:-n_ag]
+    # One grasping arm = one block = magic + arm_idx + _AG_STATE_SIZE payload
+    assert full_tensor[-_AG_BLOCK_LEN].item() == _AG_MAGIC, "Expected AG magic at tail of serialized state"
+    old_tensor = full_tensor[:-_AG_BLOCK_LEN]
 
     state_dict, idx = assisted_robot.deserialize(old_tensor)
 
-    # All bytes consumed (no under/over-read)
     assert idx == len(old_tensor), f"deserialize consumed {idx} of {len(old_tensor)} elements"
-    # No grasp restored
     assert state_dict.get("ag_obj_constraint_params", {}) == {}
 
 
 # ---------------------------------------------------------------------------
-# Multi-env roundtrip tests  (two different robot models)
+# Expected-value checks for the serialized AG block layout
 # ---------------------------------------------------------------------------
 
 
-def _run_ag_roundtrip(robot_model, target_obj_name="apple"):
+def test_ag_serialized_block_right_arm_only(env, assisted_robot, apple):
     """
-    Spin up a fresh env with the given robot in assisted mode, force a grasp,
-    and verify dict + tensor roundtrips both restore it correctly.
-    Called inline (not as a fixture) so each invocation gets a clean sim.
+    A right-arm-only grasp produces exactly one block whose arm_idx == 1.
+    This validates that arm_idx sits immediately after _AG_MAGIC and that no
+    zero-padding is emitted for the non-grasping (left) arm.
     """
+    _force_ag_grasp(assisted_robot, "right", apple, _RIGHT_FRAME)
+    serialized = assisted_robot.serialize(assisted_robot._dump_state())
+
+    ag_block = serialized[-_AG_BLOCK_LEN:]
+    expected = th.tensor(
+        [
+            _AG_MAGIC,
+            1.0,  # arm_idx — "right" is index 1 in r1pro's arm_names
+            float(apple.uuid),
+            0.0,  # link_idx (first sorted link)
+            0.2,
+            0.0,
+            0.0,  # parent_frame_pos
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # parent_frame_orn
+            0.0,
+            0.0,
+            0.07,  # child_frame_pos
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # child_frame_orn
+            0.0,  # joint_type: FixedJoint
+        ]
+    )
+    assert th.allclose(
+        ag_block, expected, atol=1e-6
+    ), f"AG block mismatch.\n  actual:   {ag_block.tolist()}\n  expected: {expected.tolist()}"
+
+
+def test_ag_serialized_block_both_arms_layout(env, assisted_robot, apple, bowl):
+    """
+    Both-arms grasp emits two sequential magic-prefixed blocks in arm_names order
+    (r1pro: left then right), each containing the correct arm_idx and uuid.
+    """
+    _force_ag_grasp(assisted_robot, "left", apple, _LEFT_FRAME)
+    _force_ag_grasp(assisted_robot, "right", bowl, _RIGHT_FRAME)
+    serialized = assisted_robot.serialize(assisted_robot._dump_state())
+
+    blocks = serialized[-2 * _AG_BLOCK_LEN :]
+
+    # Left block
+    assert blocks[0].item() == _AG_MAGIC
+    assert blocks[1].item() == 0.0  # arm_idx for "left"
+    assert blocks[2].item() == float(apple.uuid)
+
+    # Right block
+    assert blocks[_AG_BLOCK_LEN].item() == _AG_MAGIC
+    assert blocks[_AG_BLOCK_LEN + 1].item() == 1.0  # arm_idx for "right"
+    assert blocks[_AG_BLOCK_LEN + 2].item() == float(bowl.uuid)
+
+
+# ---------------------------------------------------------------------------
+# Multi-env cross-model sanity check
+# ---------------------------------------------------------------------------
+
+
+def _run_ag_roundtrip(robot_model):
+    """Spin up a fresh env with the given robot and verify dict+tensor roundtrip."""
     og.clear()
 
     config = {
@@ -170,7 +275,7 @@ def _run_ag_roundtrip(robot_model, target_obj_name="apple"):
         "objects": [
             {
                 "type": "DatasetObject",
-                "name": target_obj_name,
+                "name": "apple",
                 "category": "apple",
                 "model": "agveuv",
                 "position": [152, 150, 100],
@@ -182,80 +287,29 @@ def _run_ag_roundtrip(robot_model, target_obj_name="apple"):
     og.sim.step()
 
     robot = env.robots[0]
-    obj = env.scene.object_registry("name", target_obj_name)
-    arm, original_params = _force_ag_grasp(robot, obj)
+    obj = env.scene.object_registry("name", "apple")
+    arm = robot.arm_names[0]
+    params = _force_ag_grasp(robot, arm, obj, _LEFT_FRAME)
 
-    # Dict roundtrip
     state = og.sim.dump_state()
     robot.release_grasp_immediately(arm=arm)
     og.sim.step()
     og.sim.load_state(state)
-    _assert_ag_restored(robot, arm, original_params, obj)
+    _assert_ag_restored(robot, arm, params, obj)
 
-    # Tensor roundtrip
     robot.release_grasp_immediately(arm=arm)
     og.sim.step()
-    robot._create_assisted_grasp_joint(arm, {**original_params, "target_obj": obj})
+    robot._create_assisted_grasp_joint(arm, {**params, "target_obj": obj})
     state_t = og.sim.dump_state(serialized=True)
     robot.release_grasp_immediately(arm=arm)
     og.sim.step()
     og.sim.load_state(state_t, serialized=True)
-    _assert_ag_restored(robot, arm, original_params, obj)
+    _assert_ag_restored(robot, arm, params, obj)
 
     og.clear()
 
 
 @pytest.mark.parametrize("robot_model", ["fetch", "franka"])
 def test_ag_roundtrip_multi_env(robot_model):
-    """AG state roundtrips correctly across different robot models."""
+    """AG state roundtrips correctly across different single-arm robot models."""
     _run_ag_roundtrip(robot_model)
-
-
-# ---------------------------------------------------------------------------
-# Expected-value check for the serialized AG block
-# ---------------------------------------------------------------------------
-
-
-def test_ag_serialized_block(env, assisted_robot, apple):
-    """
-    The AG block in the serialized tensor matches expected values built from
-    the same hand-crafted params used in _force_ag_grasp.  All values are
-    deterministic: frame params are literal constants, UUID is derived from
-    the object name, link index is 0 (first sorted link).
-    """
-    _force_ag_grasp(assisted_robot, apple)
-    robot_state = assisted_robot._dump_state()
-    serialized = assisted_robot.serialize(robot_state)
-
-    # Extract the AG tail: magic sentinel (1) + n_arms * _AG_STATE_SIZE
-    n_ag = 1 + _AG_STATE_SIZE * len(assisted_robot.arm_names)
-    ag_block = serialized[-n_ag:]
-
-    expected = th.tensor(
-        [
-            _AG_MAGIC,
-            # arm 0 — matches the params in _force_ag_grasp
-            1.0,  # has_grasp
-            float(apple.uuid),  # obj_uuid  (deterministic hash of name "apple")
-            0.0,  # link_idx  (sorted index 0 = first link alphabetically)
-            0.1,
-            0.0,
-            0.0,  # parent_frame_pos
-            0.0,
-            0.0,
-            0.0,
-            1.0,  # parent_frame_orn
-            0.0,
-            0.0,
-            0.05,  # child_frame_pos
-            0.0,
-            0.0,
-            0.0,
-            1.0,  # child_frame_orn
-            0.0,  # joint_type: FixedJoint
-        ]
-    )
-
-    assert th.allclose(
-        ag_block, expected, atol=1e-6
-    ), f"AG block mismatch.\n  actual:   {ag_block.tolist()}\n  expected: {expected.tolist()}"

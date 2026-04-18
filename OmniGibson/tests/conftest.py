@@ -59,8 +59,8 @@ def robot(stopped_env):
 @pytest.fixture
 def assisted_robot(stopped_env):
     obj = Robot(
-        name="fetch",
-        model="fetch",
+        name="r1pro",
+        model="r1pro",
         grasping_mode="assisted",
         obs_modalities=[],
         position=[150, 150, 100],
