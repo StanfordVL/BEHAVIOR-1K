@@ -1,5 +1,5 @@
 (define (problem make_oatmeal-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         salt.n.02_1 - salt.n.02

@@ -1,5 +1,5 @@
 (define (problem removing_lint_from_dryer-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lint.n.01_1 - lint.n.01

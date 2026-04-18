@@ -3,6 +3,7 @@ from functools import cached_property
 from scipy.spatial import Delaunay
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.geometry_utils import (
     check_points_in_cone,
@@ -308,20 +309,21 @@ class GeomPrim(XFormPrim):
             weaker_than_descendants (bool, optional): True if the material shouldn't override the descendants
                                                       materials, otherwise False. Defaults to False.
         """
-        if weaker_than_descendants:
-            self._binding_api.Bind(
-                physics_material.material,
-                bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants,
-                materialPurpose="physics",
-            )
-        else:
-            self._binding_api.Bind(
-                physics_material.material,
-                bindingStrength=lazy.pxr.UsdShade.Tokens.strongerThanDescendants,
-                materialPurpose="physics",
-            )
+        binding_api = self._binding_api
+        with og.sim.editing_usd():
+            if weaker_than_descendants:
+                binding_api.Bind(
+                    physics_material.material,
+                    bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants,
+                    materialPurpose="physics",
+                )
+            else:
+                binding_api.Bind(
+                    physics_material.material,
+                    bindingStrength=lazy.pxr.UsdShade.Tokens.strongerThanDescendants,
+                    materialPurpose="physics",
+                )
         self._applied_physics_material = physics_material
-        return
 
     def get_applied_physics_material(self):
         """

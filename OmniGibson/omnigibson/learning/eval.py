@@ -38,6 +38,7 @@ from omnigibson.macros import gm, create_module_macros, macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import get_task_instance_path
+from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
@@ -260,17 +261,27 @@ class Evaluator:
             )
         else:
             tro_file_path = os.path.join(
-                get_task_instance_path(scene_model),
-                f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
+                get_task_instance_path(
+                    scene_model,
+                    f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
+                )
             )
         with open(tro_file_path, "r") as f:
             tro_state = recursively_convert_to_torch(json.load(f))
         for tro_key, tro_state in tro_state.items():
             if tro_key == "robot_poses":
                 presampled_robot_poses = tro_state
-                robot_pos = presampled_robot_poses[self.robot.model][0]["position"]
-                robot_quat = presampled_robot_poses[self.robot.model][0]["orientation"]
-                self.robot.set_position_orientation(robot_pos, robot_quat)
+                # make all lowercase
+                presampled_robot_poses = {k.lower(): v for k, v in presampled_robot_poses.items()}
+                # use generic "robot" key if it exists, otherwise look for model-specific key
+                if "robot" in presampled_robot_poses:
+                    available_poses = presampled_robot_poses["robot"]
+                elif self.robot.model in presampled_robot_poses:
+                    print("No generic presampled robot pose found, using robot-specific pose.")
+                    available_poses = presampled_robot_poses[self.robot.model]
+                else:
+                    raise KeyError(f"No generic or model-specific presampled robot pose found for {self.robot.model}!")
+                self.robot.set_position_orientation(available_poses[0]["position"], available_poses[0]["orientation"])
                 # Write robot poses to scene metadata
                 self.env.scene.write_task_metadata(key=tro_key, data=tro_state)
             else:
@@ -281,8 +292,8 @@ class Evaluator:
         # causes some jitter (maybe for small mass / thin objects?)
         for _ in range(25):
             og.sim.step_physics()
-            for entity in self.env.task.object_scope.values():
-                if not entity.is_system and entity.exists:
+            for inst, entity in self.env.task.object_scope.items():
+                if not is_system_bddl_inst(inst) and entity is not None:
                     entity.keep_still()
 
         self.env.scene.update_initial_file()

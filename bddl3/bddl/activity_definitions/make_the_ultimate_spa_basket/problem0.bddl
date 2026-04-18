@@ -1,5 +1,5 @@
 (define (problem make_the_ultimate_spa_basket-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wicker_basket.n.01_1 - wicker_basket.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_gas_logs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         log.n.01_1 log.n.01_2 - log.n.01

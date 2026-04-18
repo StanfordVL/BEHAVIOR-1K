@@ -1,5 +1,5 @@
 (define (problem clean_green_beans-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         green_bean.n.01_1 green_bean.n.01_2 green_bean.n.01_3 green_bean.n.01_4 - green_bean.n.01

@@ -1,5 +1,5 @@
 (define (problem laying_out_snacks_at_work-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	chip.n.04_1 - chip.n.04

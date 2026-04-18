@@ -1,5 +1,5 @@
 (define (problem setup_a_trampoline-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         trampoline_top.n.01_1 - trampoline_top.n.01

@@ -1,5 +1,5 @@
 (define (problem make_a_christmas_gift_box-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wrapping_paper.n.01_1 - wrapping_paper.n.01

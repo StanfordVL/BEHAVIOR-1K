@@ -34,7 +34,6 @@ def main():
         "activity_name": "picking_up_trash",
         "activity_definition_id": 0,
         "activity_instance_id": 0,
-        "predefined_problem": None,
         "online_object_sampling": False,
     }
 

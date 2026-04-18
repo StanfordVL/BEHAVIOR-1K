@@ -1,5 +1,5 @@
 (define (problem taking_clothes_out_of_the_dryer-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         hamper.n.02_1 - hamper.n.02

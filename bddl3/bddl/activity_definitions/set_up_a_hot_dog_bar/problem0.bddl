@@ -1,5 +1,5 @@
 (define (problem set_up_a_hot_dog_bar-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tongs.n.01_1 tongs.n.01_2 - tongs.n.01

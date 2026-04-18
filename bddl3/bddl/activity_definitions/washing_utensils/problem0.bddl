@@ -1,5 +1,5 @@
 (define (problem washing_utensils-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         teaspoon.n.02_1 teaspoon.n.02_2 teaspoon.n.02_3 - teaspoon.n.02

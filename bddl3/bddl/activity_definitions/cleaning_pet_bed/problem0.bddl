@@ -1,5 +1,5 @@
 (define (problem cleaning_pet_bed-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pet_bed.n.01_1 - pet_bed.n.01

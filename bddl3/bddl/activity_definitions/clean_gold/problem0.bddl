@@ -1,5 +1,5 @@
 (define (problem clean_gold-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bracelet.n.02_1 - bracelet.n.02 

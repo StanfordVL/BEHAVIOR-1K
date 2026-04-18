@@ -1,5 +1,5 @@
 (define (problem cook_mustard_greens-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mustard.n.03_1 mustard.n.03_2 mustard.n.03_3 - mustard.n.03

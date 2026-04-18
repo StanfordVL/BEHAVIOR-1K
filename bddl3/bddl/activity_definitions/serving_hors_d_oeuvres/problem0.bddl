@@ -1,5 +1,5 @@
 (define (problem serving_hors_d_oeuvres-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cabinet.n.01_1 - cabinet.n.01

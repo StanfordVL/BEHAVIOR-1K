@@ -1,5 +1,5 @@
 (define (problem clean_a_crab-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tupperware.n.01_1 - tupperware.n.01

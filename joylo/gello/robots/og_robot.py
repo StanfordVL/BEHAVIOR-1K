@@ -230,9 +230,11 @@ class OGRobotServer:
 
             # Enable CCD for all task-relevant objects
             if isinstance(self.env.task, BehaviorTask):
+                from omnigibson.systems.system_base import BaseSystem
+
                 for bddl_obj in self.env.task.object_scope.values():
-                    if not bddl_obj.is_system and bddl_obj.exists:
-                        for link in bddl_obj.wrapped_obj.links.values():
+                    if bddl_obj is not None and not isinstance(bddl_obj, BaseSystem):
+                        for link in bddl_obj.links.values():
                             link.ccd_enabled = True
             # Postprocessing robot and objects
             for obj in self.env.scene.objects:
@@ -335,11 +337,7 @@ class OGRobotServer:
             }
 
             # Get task-relevant objects
-            task_objects = [
-                bddl_obj.wrapped_obj
-                for bddl_obj in self.env.task.object_scope.values()
-                if bddl_obj.wrapped_obj is not None and bddl_obj.exists
-            ]
+            task_objects = [obj for obj in self.env.task.object_scope.values() if obj is not None]
 
             self.task_relevant_objects = [
                 obj
@@ -348,7 +346,7 @@ class OGRobotServer:
                 and obj.category != "agent"
                 and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES
             ]
-
+            
             # Setup object beacons
             self.object_beacons = utils.setup_object_beacons(
                 self.task_relevant_objects, self.env.scene
@@ -746,11 +744,7 @@ class OGRobotServer:
         if button_a_state and not self._button_toggled_state["a"]:
             for obj in self.task_irrelevant_objects:
                 obj.visible = not obj.visible
-            task_objects = [
-                bddl_obj.wrapped_obj
-                for bddl_obj in self.env.task.object_scope.values()
-                if bddl_obj.wrapped_obj is not None and bddl_obj.exists
-            ]
+            task_objects = [obj for obj in self.env.task.object_scope.values() if obj is not None]
             current_task_relevant_objects = [
                 obj
                 for obj in task_objects
@@ -758,54 +752,42 @@ class OGRobotServer:
                 and obj.category != "agent"
                 and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES
             ]
-            should_highlight = not any(
-                self.object_beacons[key].visible
-                for key in current_task_relevant_objects
-                if key in self.object_beacons
-            )
+            should_highlight = not any(self.object_beacons[key].visible for key in current_task_relevant_objects if key in self.object_beacons)
             for entity in self.env.task.object_scope.values():
-                entity_obj = entity.wrapped_obj
-                entity_unwrapped = entity.unwrapped
+                if entity is None:
+                    continue
 
                 # Handle objects
-                if entity_obj in current_task_relevant_objects:
-                    obj = entity_obj
-                    obj.highlighted = not obj.highlighted
-                    if obj in self.object_beacons:
-                        beacon = self.object_beacons[obj]
+                if entity in current_task_relevant_objects:
+                    entity.highlighted = not entity.highlighted
+                    if entity in self.object_beacons:
+                        beacon = self.object_beacons[entity]
                         beacon.set_position_orientation(
-                            position=obj.aabb_center
-                            + th.tensor([0, 0, BEACON_LENGTH / 2.0]),
+                            position=entity.aabb_center + th.tensor([0, 0, BEACON_LENGTH / 2.0]),
                             orientation=T.euler2quat(th.tensor([0, 0, 0])),
                             frame="world",
                         )
                         beacon.visible = not beacon.visible
-                    if obj.fixed_base and obj.articulated:
-                        for name, link in obj.links.items():
-                            if not "meta" in name and link != obj.root_link:
-                                link.visible = not obj.highlighted
+                    if entity.fixed_base and entity.articulated:
+                        for name, link in entity.links.items():
+                            if "meta" not in name and link != entity.root_link:
+                                link.visible = not entity.highlighted
                     for vis_list in self.task_visualizers.values():
                         for vis in vis_list:
-                            vis.visible = obj.highlighted
+                            vis.visible = entity.highlighted
 
                 # Handle visual particle systems - infer action from beacon visibility
-                elif (
-                    isinstance(entity_unwrapped, MacroVisualParticleSystem)
-                    and entity_unwrapped.initialized
-                ):
+                elif isinstance(entity, MacroVisualParticleSystem) and entity.initialized:
                     if should_highlight:
-                        entity_unwrapped.particle_object.material.enable_highlight(
-                            highlight_color=[1.0, 0.1, 0.92],
-                            highlight_intensity=10000.0,
-                        )
+                        entity.particle_object.material.enable_highlight(highlight_color=[1.0, 0.1, 0.92], highlight_intensity=10000.0)
                     else:
-                        entity_unwrapped.particle_object.material.disable_highlight()
+                        entity.particle_object.material.disable_highlight()
         self._button_toggled_state["a"] = button_a_state
 
-        # If capture is toggled from OFF -> ON, breakpoint
+        # If capture is toggled from OFF -> ON, save and stop
         if self._joint_cmd["button_capture"].item() != 0.0:
             if not self._in_cooldown:
-                breakpoint()
+                self.stop()
 
         # If home is toggled from OFF -> ON, reset env
         if self._joint_cmd["button_home"].item() != 0.0:
@@ -815,19 +797,21 @@ class OGRobotServer:
         # If left arrow is toggled from OFF -> ON, toggle flashlight on left eef
         button_left_arrow_state = self._joint_cmd["button_left"].item() != 0.0
         if button_left_arrow_state and not self._button_toggled_state["left"]:
-            if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
-                self.flashlights["left"].MakeVisible()
-            else:
-                self.flashlights["left"].MakeInvisible()
+            with og.sim.editing_usd():
+                if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
+                    self.flashlights["left"].MakeVisible()
+                else:
+                    self.flashlights["left"].MakeInvisible()
         self._button_toggled_state["left"] = button_left_arrow_state
 
         # If right arrow is toggled from OFF -> ON, toggle flashlight on right eef
         button_right_arrow_state = self._joint_cmd["button_right"].item() != 0.0
         if button_right_arrow_state and not self._button_toggled_state["right"]:
-            if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
-                self.flashlights["right"].MakeVisible()
-            else:
-                self.flashlights["right"].MakeInvisible()
+            with og.sim.editing_usd():
+                if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
+                    self.flashlights["right"].MakeVisible()
+                else:
+                    self.flashlights["right"].MakeInvisible()
         self._button_toggled_state["right"] = button_right_arrow_state
 
     def _update_visualization_and_status(self, info):
@@ -1076,10 +1060,10 @@ class OGRobotServer:
                 activity_definition_id=self.env.task.activity_definition_id,
                 activity_instance_id=self.instance_id,
             )
-            tro_file_path = os.path.join(
-                get_task_instance_path(scene_model),
-                f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
-            )
+            tro_file_path = os.path.join(get_task_instance_path(
+                scene_model,
+                f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
+            ))
             # check if tro_file_path exists, if not, then presumbaly we are done
             if not os.path.exists(tro_file_path):
                 print(
@@ -1097,12 +1081,16 @@ class OGRobotServer:
                     presampled_robot_poses = {
                         k.lower(): v for k, v in presampled_robot_poses.items()
                     }
+                    if "robot" in presampled_robot_poses:
+                        robot_pose = presampled_robot_poses["robot"][0]
+                    elif self.robot.model in presampled_robot_poses:
+                        print("No generic presampled robot pose found, using robot-specific pose.")
+                        robot_pose = presampled_robot_poses[self.robot.model][0]
+                    else:
+                        raise KeyError(f"No generic or model-specific presampled robot pose found for {self.robot.model}!")
                     # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
                     # for orientation
-                    robot_pos = presampled_robot_poses[self.robot.model][0]["position"]
-                    robot_quat = presampled_robot_poses[self.robot.model][0][
-                        "orientation"
-                    ]
+                    robot_pos, robot_quat = robot_pose["position"], robot_pose["orientation"]
                     self.robot.set_position_orientation(robot_pos, robot_quat)
                     # Write robot poses to scene metadata
                     self.env.scene.write_task_metadata(key=tro_key, data=tro_state)
@@ -1117,7 +1105,7 @@ class OGRobotServer:
             for _ in range(25):
                 og.sim.step_physics()
                 for entity in self.env.task.object_scope.values():
-                    if not entity.is_system and entity.exists:
+                    if entity is not None and not isinstance(entity, BaseSystem):
                         entity.keep_still()
             self.env.scene.update_initial_file()
             print(

@@ -1,5 +1,5 @@
 (define (problem cook_beef_and_onions-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         steak.n.01_1 - steak.n.01

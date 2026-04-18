@@ -123,7 +123,8 @@ class BaseSystem(Serializable):
         self._scene = scene
         self.initialized = True
 
-        og.sim.stage.DefinePrim(self.prim_path, "Scope")
+        with og.sim.editing_usd():
+            og.sim.stage.DefinePrim(self.prim_path, "Scope")
 
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             scene.transition_rule_api.refresh_all_rules()

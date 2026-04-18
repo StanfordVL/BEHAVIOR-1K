@@ -1,5 +1,5 @@
 (define (problem clean_and_disinfect_ice_trays-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tray.n.01_1 tray.n.01_2 - tray.n.01

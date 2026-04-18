@@ -1,5 +1,5 @@
 (define (problem putting_dishes_away_after_cleaning-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	plate.n.04_1 plate.n.04_2 plate.n.04_3 plate.n.04_4 plate.n.04_5 plate.n.04_6 plate.n.04_7 plate.n.04_8 - plate.n.04

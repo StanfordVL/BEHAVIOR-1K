@@ -1,5 +1,5 @@
 (define (problem prepare_a_filling_breakfast-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         table_knife.n.01_1 - table_knife.n.01

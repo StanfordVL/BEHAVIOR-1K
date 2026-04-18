@@ -1,5 +1,5 @@
 (define (problem mailing_letters-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         envelope.n.01_1 envelope.n.01_2 envelope.n.01_3 - envelope.n.01

@@ -1,5 +1,5 @@
 (define (problem make_a_strawberry_slushie-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         strawberry.n.01_1 strawberry.n.01_2 strawberry.n.01_3 - strawberry.n.01

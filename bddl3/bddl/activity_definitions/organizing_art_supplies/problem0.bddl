@@ -1,5 +1,5 @@
 (define (problem organizing_art_supplies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	pencil.n.01_1 - pencil.n.01

@@ -1,5 +1,5 @@
 (define (problem prepare_a_hanging_basket-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	pottable__marigold.n.01_1 pottable__marigold.n.01_2 pottable__marigold.n.01_3 - pottable__marigold.n.01

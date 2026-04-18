@@ -1,5 +1,5 @@
 (define (problem turning_on_radio-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	radio_receiver.n.01_1 - radio_receiver.n.01

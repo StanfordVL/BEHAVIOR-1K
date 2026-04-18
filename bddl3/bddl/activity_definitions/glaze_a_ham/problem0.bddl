@@ -1,5 +1,5 @@
 (define (problem glaze_a_ham-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         maple_syrup.n.01_1 - maple_syrup.n.01

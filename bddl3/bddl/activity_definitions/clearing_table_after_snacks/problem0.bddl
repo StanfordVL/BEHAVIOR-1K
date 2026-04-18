@@ -1,5 +1,5 @@
 (define (problem clearing_table_after_snacks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         half__apple.n.01_1 half__apple.n.01_2 - half__apple.n.01

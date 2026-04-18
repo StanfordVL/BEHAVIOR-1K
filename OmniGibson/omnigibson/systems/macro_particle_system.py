@@ -13,6 +13,7 @@ from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bi
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
+    ensure_usd_api,
     scene_relative_prim_path_to_absolute,
     setup_collision_apis,
 )
@@ -63,7 +64,8 @@ class MacroParticleSystem(BaseSystem):
         self._particle_counter = 0
 
         # Create the system prim -- this is merely a scope prim
-        og.sim.stage.DefinePrim(f"/World/scene_{scene.idx}/{self.name}", "Scope")
+        with og.sim.editing_usd():
+            og.sim.stage.DefinePrim(f"/World/scene_{scene.idx}/{self.name}", "Scope")
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = self._create_particle_template()
@@ -284,8 +286,6 @@ class MacroParticleSystem(BaseSystem):
         for scale in scales:
             self.add_particle(relative_prim_path=f"{self.relative_prim_path}/particles", scale=scale)
 
-        og.sim.update_handles()
-
         # Set the tfs
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
@@ -455,11 +455,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
         if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
-            lazy.omni.kit.commands.execute(
-                "CopyPrim",
-                path_from=self.particle_object.prim_path,
-                path_to=prim_path,
-            )
+            with og.sim.editing_usd():
+                lazy.omni.kit.commands.execute(
+                    "CopyPrim",
+                    path_from=self.particle_object.prim_path,
+                    path_to=prim_path,
+                )
             prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             add_semantic_label(prim=prim, label=self.name)
         result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
@@ -1184,39 +1185,38 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         super().initialize(scene)
 
         # Create the particles head prim -- this is merely a scope prim
-        og.sim.stage.DefinePrim(f"{self.prim_path}/particles", "Scope")
+        with og.sim.editing_usd():
+            og.sim.stage.DefinePrim(f"{self.prim_path}/particles", "Scope")
 
-        # Physics material to apply to the particles
-        self.particle_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(
-            prim_path=f"{self.prim_path}/material",
-            name=f"{self.name}_physics_material",
-            static_friction=m.MACRO_PHYSICAL_STATIC_FRICTION,
-            dynamic_friction=m.MACRO_PHYSICAL_DYNAMIC_FRICTION,
-            restitution=m.MACRO_PHYSICAL_RESTITUTION,
-        )
+            # Physics material to apply to the particles
+            self.particle_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(
+                prim_path=f"{self.prim_path}/material",
+                name=f"{self.name}_physics_material",
+                static_friction=m.MACRO_PHYSICAL_STATIC_FRICTION,
+                dynamic_friction=m.MACRO_PHYSICAL_DYNAMIC_FRICTION,
+                restitution=m.MACRO_PHYSICAL_RESTITUTION,
+            )
 
-        # A new view needs to be created every time once sim is playing, so we add a callback now
-        og.sim.add_callback_on_play(name=f"{self.name}_particles_view", callback=self.refresh_particles_view)
-
-        # If sim is already playing, refresh particles immediately
-        if og.sim.is_playing():
-            self.refresh_particles_view()
+        # Create the particles view.
+        self.update_handles()
 
     def _load_new_particle(self, relative_prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
         if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
-            lazy.omni.kit.commands.execute(
-                "CopyPrim",
-                path_from=self.particle_object.prim_path,
-                path_to=prim_path,
-            )
+            with og.sim.editing_usd():
+                lazy.omni.kit.commands.execute(
+                    "CopyPrim",
+                    path_from=self.particle_object.prim_path,
+                    path_to=prim_path,
+                )
             # Apply RigidBodyAPI to it so it is subject to physics
             prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
-            lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
-            mass_api = lazy.pxr.UsdPhysics.MassAPI.Apply(prim)
-            mass_api.GetDensityAttr().Set(self.particle_density)
+            ensure_usd_api(prim, lazy.pxr.UsdPhysics.RigidBodyAPI)
+            mass_api = ensure_usd_api(prim, lazy.pxr.UsdPhysics.MassAPI)
+            with og.sim.editing_usd():
+                mass_api.GetDensityAttr().Set(self.particle_density)
             add_semantic_label(prim=prim, label=self.name)
         result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
@@ -1248,13 +1248,12 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._particle_offset = particle_offset
         self._particle_radius = particle_radius
 
-    def refresh_particles_view(self):
+    def update_handles(self):
         """
-        Internal helper method to refresh the particles' rigid body view to grab state
+        Internal helper method to update the particles' rigid body view to grab state
 
-        Should be called every time sim.play() is called
+        This is called through og.sim.update_handles when the physx object count etc. changes.
         """
-        og.sim.refresh_physics()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"
@@ -1276,17 +1275,15 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # Run super first
         super().remove_particle_by_name(name=name)
 
-        # Refresh particles view
-        if og.sim.is_playing():
-            self.refresh_particles_view()
+        # Update the handles
+        og.sim.update_handles()
 
     def add_particle(self, relative_prim_path, scale, idn=None):
         # Run super first
         particle = super().add_particle(relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
-        # Refresh particles view
-        if og.sim.is_playing():
-            self.refresh_particles_view()
+        # Update the handles
+        og.sim.update_handles()
 
         return particle
 
@@ -1499,10 +1496,6 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._sync_particles(n_particles=state["n_particles"])
 
         super()._load_state(state=state)
-
-        if self.initialized:
-            # Make sure view is refreshed
-            self.refresh_particles_view()
 
         # Make sure we update all the velocities
         self.set_particles_velocities(state["lin_velocities"], state["ang_velocities"])

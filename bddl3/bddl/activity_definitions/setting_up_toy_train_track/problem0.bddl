@@ -1,5 +1,5 @@
 (define (problem setting_up_toy_train_track-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         train_set.n.01_1 - train_set.n.01

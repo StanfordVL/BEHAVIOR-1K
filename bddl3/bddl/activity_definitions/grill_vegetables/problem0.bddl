@@ -1,5 +1,5 @@
 (define (problem grill_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bowl.n.01_1 bowl.n.01_2 - bowl.n.01

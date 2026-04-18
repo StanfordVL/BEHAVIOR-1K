@@ -1,5 +1,5 @@
 (define (problem packing_fishing_gear_into_car-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         car.n.01_1 - car.n.01

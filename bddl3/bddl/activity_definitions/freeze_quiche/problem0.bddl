@@ -1,5 +1,5 @@
 (define (problem freeze_quiche-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         quiche.n.02_1 quiche.n.02_2 - quiche.n.02

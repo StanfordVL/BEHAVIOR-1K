@@ -1,5 +1,5 @@
 (define (problem collecting_dishes_from_restaurant_tables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         wineglass.n.01_1 wineglass.n.01_2 - wineglass.n.01

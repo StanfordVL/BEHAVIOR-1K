@@ -27,10 +27,10 @@ from bddl.knowledge_base import (
     AttachmentPair,
     ComplaintType,
     ParticleSystem,
+    KnowledgeBase,
 )
 
 # Import necessary components from existing code
-from knowledgebase.profile_utils import get_profile_badge_svg, get_profile_plot_png
 from knowledgebase.filters import status_color, status_color_transition_rule
 
 MODELS = [
@@ -44,6 +44,19 @@ MODELS = [
     Task,
     TransitionRule,
 ]
+
+# Module-level knowledge base accessor functions, mapping model classes to KB methods
+_KB_LIST_METHODS = {
+    AttachmentPair: "all_attachment_pairs",
+    Category: "all_categories",
+    ComplaintType: "all_complaint_types",
+    Object: "all_objects",
+    ParticleSystem: "all_particle_systems",
+    Scene: "all_scenes",
+    Synset: "all_synsets",
+    Task: "all_tasks",
+    TransitionRule: "all_transition_rules",
+}
 
 # Global variables for site generation
 OUTPUT_DIR = Path("build")
@@ -79,8 +92,6 @@ def register_routes():
     # Special routes
     ROUTES["challenge_tasks"] = "/knowledgebase/challenge_tasks/index.html"
     ROUTES["searchable_items_list"] = "/knowledgebase/searchable_items.json"
-    ROUTES["profile_badge_view"] = "/knowledgebase/profile/badge.svg"
-    ROUTES["profile_plot_view"] = "/knowledgebase/profile/plot.png"
 
 
 def url_for(endpoint: str, **kwargs) -> str:
@@ -131,49 +142,50 @@ def setup_jinja_env() -> Environment:
     return env
 
 
-def get_index_context() -> dict:
+def get_index_context(kb: KnowledgeBase) -> dict:
     """Get context for index page."""
     from bddl.knowledge_base import SynsetState
+
+    challenge_tasks = Task.view_challenge(kb)
+    all_tasks = kb.all_tasks()
+    all_synsets = kb.all_synsets()
+    all_objects = kb.all_objects()
 
     context = {
         "task_metadata": {
             "challenge_ready": sum(
-                [
-                    1
-                    for task in Task.view_challenge()
-                    if task.synset_state == SynsetState.MATCHED
-                    and task.scene_state == SynsetState.MATCHED
-                ]
+                1
+                for task in challenge_tasks
+                if task.synset_state == SynsetState.MATCHED
+                and task.scene_state == SynsetState.MATCHED
             ),
             "total_ready": sum(
-                [
-                    1
-                    for task in Task.all_objects()
-                    if task.synset_state == SynsetState.MATCHED
-                    and task.scene_state == SynsetState.MATCHED
-                ]
+                1
+                for task in all_tasks
+                if task.synset_state == SynsetState.MATCHED
+                and task.scene_state == SynsetState.MATCHED
             ),
-            "challenge": len(list(Task.view_challenge())),
-            "total": len(list(Task.all_objects())),
+            "challenge": len(challenge_tasks),
+            "total": len(all_tasks),
         },
         "synset_metadata": {
-            "leaf": sum(1 for x in Synset.all_objects() if len(x.children) == 0),
-            "total": sum(1 for x in Synset.all_objects()),
+            "leaf": sum(1 for x in all_synsets if len(x.children) == 0),
+            "total": len(all_synsets),
         },
         "object_metadata": {
             "ready": sum(
-                1 for x in Object.all_objects() if x.state == SynsetState.MATCHED
+                1 for x in all_objects if x.state == SynsetState.MATCHED
             ),
             "planned": sum(
-                1 for x in Object.all_objects() if x.state == SynsetState.PLANNED
+                1 for x in all_objects if x.state == SynsetState.PLANNED
             ),
-            "total": sum(1 for x in Object.all_objects()),
-            "categories": sum(1 for x in Category.all_objects()),
-            "particle_systems": sum(1 for x in ParticleSystem.all_objects()),
+            "total": len(all_objects),
+            "categories": len(kb.all_categories()),
+            "particle_systems": len(kb.all_particle_systems()),
         },
         "scene_metadata": {
-            "challenge": len(list(Scene.view_challenge())),
-            "total": len(list(Scene.all_objects())),
+            "challenge": len(Scene.view_challenge(kb)),
+            "total": len(kb.all_scenes()),
         },
         "error_views": ERROR_VIEWS,
     }
@@ -181,18 +193,18 @@ def get_index_context() -> dict:
     return context
 
 
-def get_challenge_tasks_context() -> dict:
+def get_challenge_tasks_context(kb: KnowledgeBase) -> dict:
     """Get context for challenge tasks page."""
-    return {"task_list": Task.view_challenge(), "view": {"model": Task}}
+    return {"task_list": Task.view_challenge(kb), "view": {"model": Task}}
 
 
-def collect_model_pages(model, pages_to_generate):
+def collect_model_pages(model, pages_to_generate, kb: KnowledgeBase):
     """Collect all pages for a given model."""
     model_snake = snake_case(model.__name__)
     model_plural = pluralize(model_snake)
 
     # Get all objects
-    objects = model.all_objects()
+    objects = getattr(kb, _KB_LIST_METHODS[model])()
 
     # List page
     list_context = {f"{model_snake}_list": objects, "view": {"model": model}}
@@ -217,7 +229,7 @@ def collect_model_pages(model, pages_to_generate):
         )
 
 
-def collect_custom_views(pages_to_generate):
+def collect_custom_views(pages_to_generate, kb: KnowledgeBase):
     """Collect custom view pages."""
     global ERROR_VIEWS
     error_views = []
@@ -232,7 +244,7 @@ def collect_custom_views(pages_to_generate):
                 view_name = name.replace("view_", "")
 
                 # Get objects from the view method
-                objects = method()
+                objects = method(kb)
 
                 # Create context
                 context = {
@@ -266,24 +278,24 @@ def collect_custom_views(pages_to_generate):
     ERROR_VIEWS = error_views
 
 
-def collect_pages():
+def collect_pages(kb: KnowledgeBase):
     """Collect all pages that need to be generated."""
     pages_to_generate = []
 
     # Index page
-    pages_to_generate.append(("index", "index.html", get_index_context()))
+    pages_to_generate.append(("index", "index.html", get_index_context(kb)))
 
     # Generate pages for each model
     for model in MODELS:
-        collect_model_pages(model, pages_to_generate)
+        collect_model_pages(model, pages_to_generate, kb)
 
     # Challenge tasks page
     pages_to_generate.append(
-        ("challenge_tasks", "task_list.html", get_challenge_tasks_context())
+        ("challenge_tasks", "task_list.html", get_challenge_tasks_context(kb))
     )
 
     # Custom views (error views)
-    collect_custom_views(pages_to_generate)
+    collect_custom_views(pages_to_generate, kb)
 
     return pages_to_generate
 
@@ -335,7 +347,7 @@ async def write_file_async(rel_path: str, content: str | bytes):
     return str(output_path)
 
 
-def generate_searchable_items() -> Tuple[str, str]:
+def generate_searchable_items(kb: KnowledgeBase) -> Tuple[str, str]:
     """Generate searchable items JSON."""
     items = []
 
@@ -344,7 +356,7 @@ def generate_searchable_items() -> Tuple[str, str]:
         model_plural = pluralize(model_snake)
         pk = model.Meta.pk
 
-        for obj in model.all_objects():
+        for obj in getattr(kb, _KB_LIST_METHODS[model])():
             pk_value = getattr(obj, pk)
             items.append(
                 {
@@ -356,28 +368,6 @@ def generate_searchable_items() -> Tuple[str, str]:
 
     return "knowledgebase/searchable_items.json", json.dumps(items, indent=2)
 
-
-def generate_profile_assets():
-    """Generate profile badge and plot."""
-    assets = []
-
-    # Generate badge
-    try:
-        badge_svg = get_profile_badge_svg()
-        if badge_svg:
-            assets.append(("knowledgebase/profile/badge.svg", badge_svg))
-    except Exception as e:
-        print(f"Warning: Could not generate profile badge: {e}")
-
-    # Generate plot
-    try:
-        plot_png = get_profile_plot_png()
-        if plot_png:
-            assets.append(("knowledgebase/profile/plot.png", plot_png))
-    except Exception as e:
-        print(f"Warning: Could not generate profile plot: {e}")
-
-    return assets
 
 
 def write_file(rel_path: str, content: str | bytes):
@@ -396,9 +386,10 @@ def write_file(rel_path: str, content: str | bytes):
 async def generate_site_async():
     """Generate the entire static site asynchronously."""
     # Setup
+    kb = KnowledgeBase(load_wordnet=True)
     register_routes()
     env = setup_jinja_env()
-    pages_to_generate = collect_pages()
+    pages_to_generate = collect_pages(kb)
 
     print(f"Generating static site with {len(pages_to_generate)} pages...")
 
@@ -429,14 +420,9 @@ async def generate_site_async():
     pbar.close()
 
     # Generate searchable items JSON
-    rel_path, content = generate_searchable_items()
+    rel_path, content = generate_searchable_items(kb)
     file_path = write_file(rel_path, content)
     generated_files.append(file_path)
-
-    # Generate profile assets
-    for rel_path, content in generate_profile_assets():
-        file_path = write_file(rel_path, content)
-        generated_files.append(file_path)
 
     print(f"✓ Generated {len(generated_files)} files in {OUTPUT_DIR}")
     return generated_files

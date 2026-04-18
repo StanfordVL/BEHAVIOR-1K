@@ -1,5 +1,5 @@
 (define (problem clean_your_house_after_a_wild_party-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04

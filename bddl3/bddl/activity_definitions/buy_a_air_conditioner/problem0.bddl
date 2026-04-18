@@ -1,5 +1,5 @@
 (define (problem buy_a_air_conditioner-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         money.n.01_1 - money.n.01

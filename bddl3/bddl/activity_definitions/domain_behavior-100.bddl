@@ -1,4 +1,4 @@
-(define (domain igibson)
+(define (domain behavior-100)
     (:requirements :strips :adl)
     (:predicates 
         (inside ?obj1 ?obj2)

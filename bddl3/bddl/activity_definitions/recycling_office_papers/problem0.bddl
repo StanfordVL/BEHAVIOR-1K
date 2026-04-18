@@ -1,5 +1,5 @@
 (define (problem recycling_office_papers-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         recycling_bin.n.01_1 - recycling_bin.n.01

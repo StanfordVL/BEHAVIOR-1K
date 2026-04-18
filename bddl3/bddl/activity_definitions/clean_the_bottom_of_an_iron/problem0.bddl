@@ -1,5 +1,5 @@
 (define (problem clean_the_bottom_of_an_iron-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tarnish.n.02_1 - tarnish.n.02

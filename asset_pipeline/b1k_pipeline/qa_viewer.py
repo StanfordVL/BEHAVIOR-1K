@@ -27,7 +27,7 @@ from igibson.utils.assets_utils import (
     get_object_models_of_category,
 )
 
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 from b1k_pipeline.utils import PIPELINE_ROOT
 
 
@@ -217,16 +217,17 @@ def user_complained_softbody(simulator_obj):
 def user_complained_properties(simulator_obj):
     BAD_PROPERTIES = {"breakable", "timeSetable", "perishable", "screwable"}
 
-    taxonomy = ObjectTaxonomy()
-    synset = taxonomy.get_class_name_from_igibson_category(simulator_obj.category)
+    kb = KnowledgeBase(populate=True)
+    cat_obj = kb.get_category(simulator_obj.category)
+    synset = cat_obj.synset.name if cat_obj else None
     try:
-        abilities = taxonomy.get_abilities(synset)
+        abilities = kb.get_synset(synset).abilities if synset else {}
     except:
         abilities = []
         print("synset not in taxonomy")
 
     all_abilities = sorted(
-        {a for s in taxonomy.taxonomy.nodes for a in taxonomy.get_abilities(s).keys()}
+        {a for s in kb.all_synsets() for a in s.abilities.keys()}
         - BAD_PROPERTIES
     )
     message = "Confirm object properties:\n"

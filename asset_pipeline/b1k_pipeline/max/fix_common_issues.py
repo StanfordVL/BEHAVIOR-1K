@@ -39,9 +39,9 @@ RENDER_PRESET_FILENAME = str(
     (b1k_pipeline.utils.PIPELINE_ROOT / "render_presets" / "objrender.rps").absolute()
 )
 
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 
-OBJECT_TAXONOMY = ObjectTaxonomy()
+kb = KnowledgeBase(populate=True)
 
 
 def get_approved_room_types():

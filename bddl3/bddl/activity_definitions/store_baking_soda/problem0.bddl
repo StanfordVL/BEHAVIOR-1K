@@ -1,5 +1,5 @@
 (define (problem store_baking_soda-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         box__of__baking_soda.n.01_1 box__of__baking_soda.n.01_2 - box__of__baking_soda.n.01

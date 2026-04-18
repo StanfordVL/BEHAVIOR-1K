@@ -1,5 +1,5 @@
 (define (problem cook_turkey_drumsticks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         turkey_leg.n.01_1 turkey_leg.n.01_2 - turkey_leg.n.01

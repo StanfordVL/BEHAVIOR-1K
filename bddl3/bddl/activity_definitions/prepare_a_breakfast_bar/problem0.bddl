@@ -1,5 +1,5 @@
 (define (problem prepare_a_breakfast_bar-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tray.n.01_1 tray.n.01_2 tray.n.01_3 tray.n.01_4 - tray.n.01

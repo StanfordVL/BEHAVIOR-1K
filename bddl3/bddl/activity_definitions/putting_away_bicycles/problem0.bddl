@@ -1,5 +1,5 @@
 (define (problem putting_away_bicycles-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
     	bicycle.n.01_1 bicycle.n.01_2 - bicycle.n.01

@@ -1,5 +1,5 @@
 (define (problem buy_a_good_avocado-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         avocado.n.01_1 - avocado.n.01

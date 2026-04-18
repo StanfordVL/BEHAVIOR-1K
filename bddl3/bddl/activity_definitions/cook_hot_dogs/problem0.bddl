@@ -1,5 +1,5 @@
 (define (problem cook_hot_dogs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         microwave.n.02_1 - microwave.n.02

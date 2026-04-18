@@ -186,7 +186,7 @@ python joylo/scripts/run_joylo.py
 - **Fast Base Motion Mode:** Activate by pressing down on the left joystick while moving it
 - **Object Visibility Toggle:** Press `A` button on the right JoyCon to toggle between hiding non-relevant objects and showing all objects
 - **JoyCon Connection Stability:** We have noticed that sometimes the JoyCon could disconnect randomly during data collection. A team member has reported that putting the Bluetooth dongle onto USB 2.0 is more stable than USB 3.0. We will look further into this issue.
-- **Available Tasks:** Listed in `datasets/2025-challenge-task-instances/metadata/available_tasks.yaml`
+- **Available Tasks:** Listed in `datasets/2026-challenge-task-instances/metadata/available_tasks.yaml`
 
 ---
 

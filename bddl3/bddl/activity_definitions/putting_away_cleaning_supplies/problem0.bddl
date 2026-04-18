@@ -1,5 +1,5 @@
 (define (problem putting_away_cleaning_supplies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sack.n.01_1 - sack.n.01

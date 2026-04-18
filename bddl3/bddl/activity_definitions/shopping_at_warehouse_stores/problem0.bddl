@@ -1,5 +1,5 @@
 (define (problem shopping_at_warehouse_stores-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	box__of__corn_flakes.n.01_1 - box__of__corn_flakes.n.01

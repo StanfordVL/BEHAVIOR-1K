@@ -1,5 +1,5 @@
 (define (problem stash_snacks_in_your_room-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	chip.n.04_1 chip.n.04_2 - chip.n.04

@@ -1,5 +1,5 @@
 (define (problem cook_sweet_potatoes-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         yam.n.03_1 yam.n.03_2 - yam.n.03

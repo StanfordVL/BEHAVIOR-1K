@@ -27,7 +27,7 @@ from omnigibson.utils.asset_conversion_utils import (
     import_obj_metadata,
     convert_urdf_to_usd,
 )
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 
 if __name__ == "__main__":
     og.launch()
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         device=og.sim.device,
     )
 
-    ot = ObjectTaxonomy()
+    kb = KnowledgeBase(populate=True)
 
     dataset_root = str(pathlib.Path(sys.argv[1]))
     batch = sys.argv[2:]
@@ -72,11 +72,13 @@ if __name__ == "__main__":
         )
         print("Done importing metadata")
 
-        obj_synset = ot.get_synset_from_category_or_substance(obj_category)
+        cat = kb.get_category(obj_category)
+        ps = kb.get_particle_system(obj_category)
+        obj_synset = cat.synset if cat else (ps.synset if ps else None)
         assert (
             obj_synset is not None
         ), f"Could not find synset for category {obj_category}"
-        if "cloth" in ot.get_abilities(obj_synset):
+        if "cloth" in obj_synset.abilities:
             og.clear(**clear_kwargs)
             empty_scene = Scene()
             og.sim.import_scene(empty_scene)
