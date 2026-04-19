@@ -1043,8 +1043,30 @@ class EntityPrim(XFormPrim):
                 local_orn, th.tensor([0.0, 0.0, 0.0, 1.0]), atol=1e-3
             ), "The object/entity prim of an articulated object should not have a transform if it's not the articulation root."
 
-            # Otherwise, we need to set it directly on the root link.
-            self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
+            # We must move every rigid body in the articulation by the same rigid delta, not just the root.
+            # Otherwise, non-root bodies (e.g. meta links fixed-jointed to the root) stay at their USD
+            # defaults, and when sim.play() creates the articulation from independently-read USD body
+            # poses, the joint constraints are violated and the solver can explode. Moving all links by
+            # the same delta preserves every pairwise relative pose, so joint states are unchanged.
+            if position is None or orientation is None:
+                curr_pos, curr_orn = self.get_position_orientation(frame=frame)
+                position = curr_pos if position is None else position
+                orientation = curr_orn if orientation is None else orientation
+            position = th.as_tensor(position, dtype=th.float32)
+            orientation = th.as_tensor(orientation, dtype=th.float32)
+
+            # new_root_orn = delta_q · old_root_orn  →  delta_q = new_root_orn · conj(old_root_orn)
+            # new_root_pos = delta_pos + R(delta_q) · old_root_pos
+            old_root_pos, old_root_orn = self.root_link.get_position_orientation(frame=frame)
+            delta_q = T.quat_multiply(orientation, T.quat_conjugate(old_root_orn))
+            delta_r = T.quat2mat(delta_q)
+            delta_pos = position - delta_r @ old_root_pos
+
+            for link in self._links.values():
+                old_link_pos, old_link_orn = link.get_position_orientation(frame=frame)
+                new_link_pos = delta_pos + delta_r @ old_link_pos
+                new_link_orn = T.quat_multiply(delta_q, old_link_orn)
+                link.set_position_orientation(position=new_link_pos, orientation=new_link_orn, frame=frame)
 
         # Invalidate the pose cache.
         PoseAPI.invalidate()
