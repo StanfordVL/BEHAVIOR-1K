@@ -23,6 +23,7 @@ parser.add_argument(
     required=True,
     help="Activity to be sampled",
 )
+parser.add_argument("-s", "--scene_model", type=str, default=None, required=True, help="Scene model to sample tasks in")
 parser.add_argument(
     "-o",
     "--output_dir",
@@ -268,10 +269,12 @@ def main():
     args = parser.parse_args()
 
     if args.output_dir is None:
-        args.output_dir = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances")
+        args.output_dir = os.path.join(
+            gm.DATA_PATH, "2026-challenge-task-instances", "scenes", args.scene_model, "json"
+        )
 
     # Find tasks in output_dir
-    tasks = find_given_tasks(Path(args.output_dir) / Path(args.activity), [args.activity])
+    tasks = find_given_tasks(Path(args.output_dir), [args.activity])
 
     print(f"Found {len(tasks)} tasks with instance directories")
 

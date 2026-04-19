@@ -30,8 +30,14 @@ def print_task_custom_list_template(activity_name):
         activity_name: {
             "room_types": list(room_types),
             "__TODO__SCENE__": {
-                synset: {cat.name: ["__TODO__MODEL__"] for cat in get_knowledge_base().get_synset(synset).categories}
-                for synset in synsets
+                "whitelist": {
+                    synset: {
+                        cat.name: {"__TODO__MODEL__": None}
+                        for cat in get_knowledge_base().get_synset(synset).categories
+                    }
+                    for synset in synsets
+                },
+                "blacklist": {},
             },
         }
     }

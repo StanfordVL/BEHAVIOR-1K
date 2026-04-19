@@ -143,7 +143,7 @@ def replay_hdf5_to_video(
     load_room_instances = None
     try:
         with open(
-            f"{gm.DATA_PATH}/2026-challenge-task-instances/metadata/B100_task_misc.csv",
+            f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv",
             newline="",
             encoding="utf-8",
         ) as f:

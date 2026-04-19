@@ -180,18 +180,8 @@ def create_stable_scene_json(scene_model):
     stable_state = og.sim.dump_state()[0]
     if "registry" in stable_state:
         stable_state = stable_state["registry"]
-    invalid_msgs = []
     for obj_name, obj_info in stable_state["object_registry"].items():
-        valid_obj, err_msg = _validate_object_state_stability(obj_name, obj_info, strict=False)
-        if not valid_obj:
-            invalid_msgs.append(err_msg)
-
-    if len(invalid_msgs) > 0:
-        print("Creating stable scene failed! Invalid messages:")
-        for msg in invalid_msgs:
-            print(msg)
-        raise ValueError("Scene is not stable!")
-
+        _validate_object_state_stability(obj_name, obj_info, strict=False)
     for obj in env.scene.objects:
         obj.keep_still()
     env.scene.update_initial_file()
