@@ -133,11 +133,23 @@ jobs:
       - name: Install OmniGibson
         run: pip install -e .[dev,primitives,eval] --no-build-isolation
 
+      - name: Install Trunk Analytics CLI
+        run: |
+          curl -fsSLO https://trunk.io/releases/trunk-analytics-cli
+          chmod +x trunk-analytics-cli
+          sudo mv trunk-analytics-cli /usr/local/bin/
+
       - name: Print env
         run: printenv
 
       - name: Run tests
+        id: run_tests
         run: >
+          trunk-analytics-cli test
+          --org-url-slug=stanfordvl-behavior
+          --token=${{ secrets.TRUNK_API_TOKEN }}
+          --junit-paths=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          --
           pytest -s tests/${{ matrix.test_file }}.py
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
           ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
@@ -161,11 +173,11 @@ jobs:
           EOF
             echo "Error: XML file not found, probably due to segfault or timeout"
             exit 1
-          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$xml"; then
-            echo "Error: Test failures or errors found"
+          elif [ "${{ steps.run_tests.outcome }}" == "failure" ]; then
+            echo "Error: Non-quarantined test failures detected by Trunk"
             exit 1
           else
-            echo "All tests passed successfully"
+            echo "All tests passed or failures were quarantined"
           fi
 
       - name: Deploy snapshot artifacts
