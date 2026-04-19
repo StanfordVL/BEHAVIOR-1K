@@ -29,7 +29,9 @@ log.setLevel(logging.INFO)
 
 
 # task_custom_lists.json always takes precedence.
-task_custom_list_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "task_custom_lists.json")
+task_custom_list_path = os.path.join(
+    gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "task_custom_lists.json"
+)
 assert os.path.exists(task_custom_list_path), f"task_custom_lists.json not found: {task_custom_list_path}"
 with open(task_custom_list_path, "r") as f:
     TASK_CUSTOM_LISTS = json.load(f)
@@ -83,7 +85,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     args = parser.parse_args()
 
     if args.output_dir is None:
-        args.output_dir = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", args.scene_model, "json")
+        args.output_dir = os.path.join(
+            gm.DATA_PATH, "2026-challenge-task-instances", "scenes", args.scene_model, "json"
+        )
 
     # If we want to create a stable scene config, do that now
     default_scene_fpath = os.path.join(
@@ -273,7 +277,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # - Move the camera around to visually verify the sampled task looks correct
         # After inspection, continue to save the task to disk
         breakpoint()
-        save_dir = os.path.join(args.output_dir, activity)
+        save_dir = os.path.join(args.output_dir)
         os.makedirs(save_dir, exist_ok=True)
         env.task.save_task(
             env=env,
