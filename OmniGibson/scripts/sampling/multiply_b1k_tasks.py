@@ -33,7 +33,7 @@ parser.add_argument(
 parser.add_argument(
     "--end_idx",
     type=int,
-    default=10,
+    default=300,
     help="Instance ID to end (inclusive)",
 )
 parser.add_argument(
@@ -49,7 +49,9 @@ parser.add_argument(
     help="Output directory for sampled tasks (default: gm.DATA_PATH/2026-challenge-task-instances/<activity>)",
 )
 
-task_custom_list_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "task_custom_lists.json")
+task_custom_list_path = os.path.join(
+    gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "task_custom_lists.json"
+)
 assert os.path.exists(task_custom_list_path), f"task_custom_lists.json not found: {task_custom_list_path}"
 with open(task_custom_list_path, "r") as f:
     TASK_CUSTOM_LISTS = json.load(f)
@@ -70,7 +72,9 @@ def main():
     args = parser.parse_args()
 
     if args.output_dir is None:
-        args.output_dir = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", args.scene_model, "json")
+        args.output_dir = os.path.join(
+            gm.DATA_PATH, "2026-challenge-task-instances", "scenes", args.scene_model, "json"
+        )
 
     task_scene_file = os.path.join(args.output_dir, f"{args.scene_model}_task_{args.activity}_0_0_template.json")
     assert os.path.exists(task_scene_file), "Did not find task scene template json at expected path: {}".format(

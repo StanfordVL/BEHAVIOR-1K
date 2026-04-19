@@ -35,7 +35,9 @@ def main():
     args = parser.parse_args()
 
     if args.output_dir is None:
-        args.output_dir = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", args.scene_model, "json")
+        args.output_dir = os.path.join(
+            gm.DATA_PATH, "2026-challenge-task-instances", "scenes", args.scene_model, "json"
+        )
 
     task_name = BehaviorTask.get_cached_activity_scene_filename(
         scene_model=args.scene_model,
@@ -44,7 +46,7 @@ def main():
         activity_instance_id=0,
     )
 
-    sampled_scene_partial_json = os.path.join(args.output_dir, args.activity, f"{task_name}-partial_rooms.json")
+    sampled_scene_partial_json = os.path.join(args.output_dir, f"{task_name}-partial_rooms.json")
     full_scene_json_dir = os.path.join(get_dataset_path("behavior-1k-assets"), f"scenes/{args.scene_model}/json")
     full_scene_full_json = os.path.join(full_scene_json_dir, f"{args.scene_model}_stable.json")
 
