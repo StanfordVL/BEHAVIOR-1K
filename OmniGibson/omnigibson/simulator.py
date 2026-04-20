@@ -921,14 +921,17 @@ def _launch_simulator(*args, **kwargs):
                 SimulationManager._physics_sim_view.invalidate()
                 SimulationManager._physics_sim_view = None
 
-            yield
+            try:
+                yield
 
-            # Run all post-processing on all newly added objects
-            for obj in objs:
-                self._post_import_object(obj=obj)
-
-            if self.is_playing():
-                self.update_handles()
+                # Run all post-processing on all newly added objects
+                for obj in objs:
+                    self._post_import_object(obj=obj)
+            finally:
+                # We want to make sure we revalidate the views here even if the object addition
+                # fails, because the pre-yield invalidation above leaves things in a broken state.
+                if self.is_playing():
+                    self.update_handles()
 
         def _post_import_object(self, obj):
             """
