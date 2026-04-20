@@ -439,14 +439,13 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         for sensor in VisionSensor.SENSORS.values():
             sensor.render_product.hydra_texture.set_updates_enabled(False)
 
-        # Set the main viewport camera path
-        og.sim.viewer_camera.active_camera_path = viewport_camera_path
-
         # Use asynchronous rendering for faster performance
         # We have to do a super hacky workaround to avoid the GUI freezing, which is
         # toggling these settings to be True -> False -> True
         # Only setting it to True once will actually freeze the GUI for some reason!
         if not gm.HEADLESS:
+            # Set the main viewport camera path
+            og.sim.viewer_camera.active_camera_path = viewport_camera_path
             with og.sim.editing_usd():
                 # Async rendering does not work in VR mode
                 if not self.use_vr:
