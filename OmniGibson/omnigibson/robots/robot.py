@@ -93,6 +93,14 @@ AG_MODES = {
 }
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
+# Sentinel written before each grasping-arm block in the serialized state tensor. Should be:
+#   - Larger than the max UUID (10^8 - 1 = 99,999,999) to avoid false positives on UUID values
+#   - Exactly representable in float32
+# Old recordings that predate AG serialization will not contain this value, so the block is skipped.
+_AG_MAGIC = 1e8 + 123456
+# Floats of payload per grasping arm (after the magic + arm_idx): [obj_uuid, link_idx, parent_pos(3), parent_orn(4), child_pos(3), child_orn(4), joint_type]
+_AG_STATE_SIZE = 17
+
 
 class Robot(USDObject, GymObservable):
     def __init__(
@@ -1115,10 +1123,38 @@ class Robot(USDObject, GymObservable):
                 group_parts.append(ControllerView.serialize(group_key, controller_idx, controller_state))
         if group_parts:
             state_flat = th.cat([state_flat] + group_parts)
-        if self.is_manipulation:
-            # No additional serialization needed if we're using physical grasping
-            if self.grasping_mode == "physical":
-                return state_flat
+
+        if self.is_manipulation and self.grasping_mode != "physical":
+            ag_params = state.get("ag_obj_constraint_params", {})
+            # One block per grasping arm, each prefixed with the magic sentinel and arm_idx.
+            # Non-grasping arms are omitted entirely, and old recordings that predate AG
+            # serialization simply have no trailing magic — deserialize() skips cleanly.
+            ag_parts = []
+            for arm_idx, arm in enumerate(self.arm_names):
+                arm_params = ag_params.get(arm)
+                if arm_params is None:
+                    continue
+                target_obj = self.scene.object_registry("name", arm_params["target_obj"])
+                link_names = sorted(target_obj.links.keys())
+                link_idx = link_names.index(arm_params["target_link_name"])
+                ag_parts.append(
+                    th.tensor(
+                        [
+                            _AG_MAGIC,
+                            float(arm_idx),
+                            float(target_obj.uuid),
+                            float(link_idx),
+                            *arm_params["parent_frame_pos"].tolist(),
+                            *arm_params["parent_frame_orn"].tolist(),
+                            *arm_params["child_frame_pos"].tolist(),
+                            *arm_params["child_frame_orn"].tolist(),
+                            float(arm_params["joint_type"] == "SphericalJoint"),
+                        ]
+                    )
+                )
+            if ag_parts:
+                state_flat = th.cat([state_flat] + ag_parts)
+
         return state_flat
 
     def deserialize(self, state):
@@ -1132,10 +1168,33 @@ class Robot(USDObject, GymObservable):
             idx += n
         state_dict["controller_groups"] = group_states
 
-        if self.is_manipulation:
-            # No additional deserialization needed if we're using physical grasping
-            if self.grasping_mode == "physical":
-                return state_dict, idx
+        if self.is_manipulation and self.grasping_mode != "physical":
+            state_dict["ag_obj_constraint_params"] = {}
+            # One block per grasping arm, each starting with the magic sentinel followed by
+            # arm_idx and the constraint payload. Old recordings that predate AG serialization
+            # lack the sentinel entirely, so this loop is safely skipped for them.
+            while idx < len(state) and state[idx].item() == _AG_MAGIC:
+                idx += 1
+                arm_idx = int(state[idx].item())
+                idx += 1
+                arm = self.arm_names[arm_idx]
+                arm_data = state[idx : idx + _AG_STATE_SIZE]
+                idx += _AG_STATE_SIZE
+                obj_uuid = int(arm_data[0].item())
+                link_idx = int(arm_data[1].item())
+                target_obj = self.scene.object_registry("uuid", obj_uuid)
+                assert target_obj is not None, f"Object with UUID {obj_uuid} not found in scene registry"
+                link_name = sorted(target_obj.links.keys())[link_idx]
+                state_dict["ag_obj_constraint_params"][arm] = {
+                    "target_obj": target_obj.name,
+                    "target_link_name": link_name,
+                    "parent_frame_pos": arm_data[2:5].clone(),
+                    "parent_frame_orn": arm_data[5:9].clone(),
+                    "child_frame_pos": arm_data[9:12].clone(),
+                    "child_frame_orn": arm_data[12:16].clone(),
+                    "joint_type": "SphericalJoint" if bool(arm_data[16].item()) else "FixedJoint",
+                }
+
         return state_dict, idx
 
     def _initialize(self):
