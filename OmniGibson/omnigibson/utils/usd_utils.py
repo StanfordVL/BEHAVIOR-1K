@@ -2454,7 +2454,10 @@ def delete_or_deactivate_prim(prim_path):
                 assert attr.ClearDefault()
             lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
-        return True
+    # Update handles to handle the change in the stage
+    og.sim.update_handles()
+
+    return True
 
 
 def activate_prim_and_children(prim_path):

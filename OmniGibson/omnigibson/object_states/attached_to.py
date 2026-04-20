@@ -414,9 +414,6 @@ class AttachedTo(
             # Remove the attachment joint prim from the stage
             delete_or_deactivate_prim(self.attachment_joint_prim_path)
 
-            # Update handles to handle the change in the articulation tree
-            og.sim.update_handles()
-
             # Remove child reference from the parent object
             self.parent.states[AttachedTo].children[self.parent_link.body_name] = None
 
