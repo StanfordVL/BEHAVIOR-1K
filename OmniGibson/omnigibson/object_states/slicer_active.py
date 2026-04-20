@@ -24,17 +24,18 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # th.tensor (scene_number, obj_number): Keep track of whether we touched a sliceable in the previous timestep
     PREVIOUSLY_TOUCHING = None
 
+    # S = number of scenes
+    # O = number of objects that have SlicerActive state
     # R_s = number of contact-matrix rows (links on the "who is touching" side) for scene s
     # C_s = number of contact-matrix columns (links on the "what are they touching" side) for scene s
 
-    # list[Tensor(N, R_s) | None] — row mask per slicer object per scene; GPU
+    # list[Tensor(O, R_s) | None] — row mask per slicer object per scene; len(list) = S; GPU
     _slicer_contact_query_masks = None
 
-    # list[Tensor(1, C_s) | None] — col mask for all sliceable links per scene; GPU
-    # shape (1, C_s) so it broadcasts against (N, C_s) inside is_in_contact_batch
+    # list[Tensor(1, C_s) | None] — col mask for all sliceable links per scene; len(list) = S; GPU
     _sliceable_contact_col_mask = None
 
-    # (S, N) bool — scratch buffer filled each step by _currently_touching_sliceables(); GPU
+    # (S, O) bool — scratch buffer filled each step by _currently_touching_sliceables(); GPU
     _currently_touching = None
 
     @classmethod
@@ -62,12 +63,12 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super().initialize_view()
 
         S = len(cls.IDX_OBJS)
-        N = len(cls.OBJ_IDXS)
+        O = len(cls.OBJ_IDXS)
 
         # Allocate (scene_number, obj_number) tracking tensors; carry-over is not needed for these bookkeeping fields
         # (contact/delay state resets naturally when initialize_view is called after object changes)
-        cls.PREVIOUSLY_TOUCHING = th.zeros((S, N), dtype=th.bool, device="cuda")
-        cls.DELAY_COUNTER = th.zeros((S, N), dtype=th.float32, device="cuda")
+        cls.PREVIOUSLY_TOUCHING = th.zeros((S, O), dtype=th.bool, device="cuda")
+        cls.DELAY_COUNTER = th.zeros((S, O), dtype=th.float32, device="cuda")
 
         # Initialize new VALUE slots (not carried over) to True (slicer starts active)
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -76,7 +77,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 cls.VALUES_CPU[:, obj_idx] = True
 
         # Pre-allocate scratch buffer for _currently_touching_sliceables(); same shape as PREVIOUSLY_TOUCHING
-        cls._currently_touching = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls._currently_touching = th.zeros((S, O), dtype=th.bool, device="cuda")
 
         # Build per-scene contact masks for batch contact queries
         cls._slicer_contact_query_masks = []
@@ -94,19 +95,19 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 cls._sliceable_contact_col_mask.append(None)
                 continue
 
-            # Col mask (1, C_s) for all sliceable links — shared across all N slicer queries
+            # Col mask (1, C_s) for all sliceable links — shared across all O slicer queries
             sliceable_paths = [link.prim_path for obj in sliceable_objs for link in obj.links.values()]
             sliceable_col = RigidContactAPI.get_contact_col_mask(scene_idx, sliceable_paths)  # (C_s,) CPU
             cls._sliceable_contact_col_mask.append(sliceable_col.unsqueeze(0).cuda())  # (1, C_s) GPU
 
-            # Row masks (N, R_s). N slicer object form N querys
+            # Row masks (O, R_s). N slicer object form N querys
             slicer_masks = [
                 RigidContactAPI.get_contact_row_mask(
                     scene_idx, [link.prim_path for link in cls.IDX_OBJS[scene_idx][obj_idx].links.values()]
                 )
-                for obj_idx in range(N)
+                for obj_idx in range(O)
             ]  # list of (R_s,) CPU bool
-            cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (N, R_s) GPU
+            cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (O, R_s) GPU
 
     @classmethod
     def _update_values(cls, values):
@@ -134,20 +135,20 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
     @classmethod
     def _currently_touching_sliceables(cls):
-        """Fills cls._currently_touching (S, N) bool tensor in-place."""
+        """Fills cls._currently_touching (S, O) bool tensor in-place."""
         cls._currently_touching.fill_(False)
         for scene_idx in range(len(og.sim.scenes)):
-            query_masks = cls._slicer_contact_query_masks[scene_idx]  # (N, R_s) GPU | None
+            query_masks = cls._slicer_contact_query_masks[scene_idx]  # (O, R_s) GPU | None
             with_mask = cls._sliceable_contact_col_mask[scene_idx]  # (1, C_s) GPU | None
             if query_masks is None or with_mask is None:
                 continue
             cls._currently_touching[scene_idx] = RigidContactAPI.is_in_contact_batch(
                 scene_idx=scene_idx,
-                query_masks=query_masks,  # (N, R_s)
-                with_masks=with_mask,  # (1, C_s) — broadcasts to (N, C_s) inside the call
+                query_masks=query_masks,  # (O, R_s)
+                with_masks=with_mask,  # (1, C_s) — broadcasts to (O, C_s) inside the call
                 ignore_masks=None,
                 current_only=False,
-            )  # (N,) bool
+            )  # (O,) bool
 
     @classproperty
     def value_name(cls):
@@ -168,10 +169,10 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # For this state, we simply store its value.
     def _dump_state(self):
         state = super()._dump_state()
-        s = self.obj.scene.idx
+        scene_idx = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[s, obj_idx])
-        state["delay_counter"] = int(self.DELAY_COUNTER[s, obj_idx])
+        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[scene_idx, obj_idx])
+        state["delay_counter"] = int(self.DELAY_COUNTER[scene_idx, obj_idx])
         return state
 
     def _load_state(self, state):

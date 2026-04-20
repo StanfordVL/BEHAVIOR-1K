@@ -23,187 +23,127 @@ m.CAN_TOGGLE_STEPS = 5
 
 class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
     """
-    Boolean state representing whether a button-like object has been toggled on.
-
-    Tensorized storage
-    ------------------
-    Inherits TensorizedValueState. All per-object mutable values are stored in class-level
-    tensors (same (scene_idx, obj_idx) coordinate as VALUES):
-
-        VALUES          (S, N) float32       — toggle on/off stored as 0.0/1.0
-        _can_toggle_steps (S, N) float32    — robot hand-in-marker step counter (not in VALUES)
-        _requires_closed  (S, N) bool       — construction-time constant
-
-    The contact masks below are pre-built once in initialize_view() and reused every step:
-
-        _finger_contact_query_mask  (S, 1, R)  — True for robot finger rows in the contact matrix
-        _obj_contact_with_mask      (S, N, C)  — True for each toggle object's col mask
-
-    Per-step scratch masks
-    ----------------------
-    Named (S, N) bool tensors allocated in initialize_view(); reused in-place every step to
-    avoid per-call allocations:
-        _mask_force_off, _mask_active, _mask_in_contact, _mask_can_toggle, _mask_flip
-
-    Per-instance state:
-        self.scale      — temporary constructor arg; used during _initialize() to populate
-                          cls.scales[obj_idx], not accessed at runtime
+    Boolean state representing whether an object has been toggled on.
     """
 
-    # th.Tensor (S, N) float32: robot hand-in-marker step counter per (scene, object).
-    # Separate from VALUES so get_value() only returns the toggle bool.
-    _can_toggle_steps = None
+    # S = number of scenes
+    # O = number of toggable objects
 
-    # th.Tensor (S, N) bool: whether each tracked object requires Open state to be False
-    # before it can be toggled. Construction-time constant.
+    # th.Tensor (S, O) int
+    _robots_can_toggle_steps = None
+
+    # th.Tensor (S, O) bool: whether each toggable object requires to be closed to be toggled
     _requires_closed = None
 
-    # (N,) long: index into Open.VALUES columns for each toggle object (-1 if no Open state).
-    # Built once in initialize_view(); used to vectorize the requires_closed guard.
-    _open_col_idx = None
+    # (O,) long: Open.VALUES column index per toggle object; 0 for objects without requires_closed (masked out by _requires_closed).
+    _open_state_idx = None
 
-    # list[GeomPrim]: visual toggle-button markers, one per tracked object type (N index).
-    # Populated during _initialize(); used in _check_overlap and color updates.
+    # list[list[GeomPrim]]: visual toggle-button markers, one per tracked object. Shape (S, O).
+    # Used in _check_overlap and color updates.
     visual_markers = None
 
-    # list[float | th.Tensor]: per-object marker scale (N index).
-    # Populated during _initialize(); used in _check_overlap for sphere radius.
-    scales = None
+    # Contact masks
+    # R_s = number of contact-matrix rows (links on the "who is touching" side) for scene s
+    # C_s = number of contact-matrix columns (links on the "what are they touching" side) for scene s
+    _finger_query_mask = None  # list[Tensor(1, R_s) | None] — finger row mask per scene
+    _toggable_objs_with_mask = None  #  list[Tensor(O, C_s) | None] — toggle-object col masks per scene
 
-    # Pre-computed contact masks built in initialize_view(); reused every step.
-    _finger_contact_query_mask = None  # list[Tensor(1, R_s) | None] — finger row mask per scene
-    _obj_contact_with_mask = None  #  list[Tensor(N, C_s) | None] — toggle-object col masks per scene
+    # list[list of links of manipulation robots in scene s], len = S
+    _finger_links = []
 
-    # (S, N) bool tensor: result of is_in_contact_batch from previous global_update call.
-    # Written by global_update(), read by _update_values().
-    _finger_contact_result = None
-
-    # Scratch masks, helper for calculate update: (S, N) bool, allocated in initialize_view().
-    _mask_force_off = None
-    _mask_active = None
-    _mask_in_contact = None
+    # Scratch masks, helper for calculate update, (S, O) bool
+    _mask_objects_near_finger = None
+    _mask_untoggable_open_objs = None
     _mask_can_toggle = None
-    _mask_flip = None
 
-    # Class-level color constants: defined once, reused every flip and _set_value call.
-    # Avoids allocating new th.tensor([...]) on every color update.
     COLOR_ON = th.tensor([0, 1.0, 0])  # green  — toggle is on
     COLOR_OFF = th.tensor([1.0, 0, 0])  # red    — toggle is off
 
     @classproperty
     def value_type(cls):
-        # float32; toggle_state is 0.0/1.0 (bool semantics)
-        return th.float32
+        return th.bool
 
     @classproperty
     def value_name(cls):
-        # Used by the parent's _dump_state / _load_state for the raw tensor column.
         return "toggle"
 
     @classmethod
     def global_initialize(cls):
-        """
-        Initialize all class-level state for ToggledOn. Called once at simulator start
-        and on each clear/reset. Allocates VALUES (via super) and all auxiliary structures.
-        """
-        # Allocate VALUES, OBJ_IDXS, IDX_OBJS, STATE_SIZE
         super().global_initialize()
 
-        cls._can_toggle_steps = None
+        cls._robots_can_toggle_steps = None
         cls._requires_closed = None
-        cls._open_col_idx = None
+        cls._open_state_idx = None
         cls.visual_markers = []
-        cls.scales = []
-        cls._finger_contact_query_mask = None
-        cls._obj_contact_with_mask = None
-        cls._finger_contact_result = None
-        cls._mask_force_off = None
-        cls._mask_active = None
-        cls._mask_in_contact = None
+
+        cls._finger_links = []
+        cls._finger_query_mask = None
+        cls._toggable_objs_with_mask = None
+
+        cls._mask_objects_near_finger = None
+        cls._mask_untoggable_open_objs = None
         cls._mask_can_toggle = None
-        cls._mask_flip = None
 
     @classmethod
     def initialize_view(cls):
         """
         Rebuild all class-level tensors after scene changes.
-
-        Carries over VALUES and _can_toggle_steps for objects that still exist.
-        Rebuilds _requires_closed, contact masks, visual_markers list, and scratch masks.
         """
-        # Snapshot all per-object state before super() resets OBJ_IDXS and calls global_initialize()
-        # (global_initialize sets visual_markers=[], which is falsy — must snapshot before that)
+        # Snapshot existing states
         prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
-        prev_steps = cls._can_toggle_steps.clone() if cls._can_toggle_steps is not None else None
-        prev_markers = list(cls.visual_markers) if cls.visual_markers is not None else []
-        prev_scales = list(cls.scales) if cls.scales is not None else []
+        prev_steps = cls._robots_can_toggle_steps.clone() if cls._robots_can_toggle_steps is not None else None
 
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for toggle bool)
         super().initialize_view()
 
-        S, N = len(cls.IDX_OBJS), len(cls.OBJ_IDXS)
+        S, O = len(cls.IDX_OBJS), len(cls.OBJ_IDXS)
 
         # Carry over _can_toggle_steps for surviving objects
-        cls._can_toggle_steps = th.zeros((S, N), dtype=th.float32, device="cuda")
+        cls._robots_can_toggle_steps = th.zeros((S, O), dtype=th.float32, device="cuda")
         if prev_steps is not None:
             for relative_prim_path, obj_idx_old in prev_obj_idxs.items():
                 if relative_prim_path not in cls.OBJ_IDXS:
                     continue
-                obj_idx_new = cls.OBJ_IDXS[relative_prim_path]
+                obj_idx = cls.OBJ_IDXS[relative_prim_path]
                 for scene_idx in range(min(prev_steps.shape[0], S)):
-                    cls._can_toggle_steps[scene_idx, obj_idx_new] = prev_steps[scene_idx, obj_idx_old]
+                    cls._robots_can_toggle_steps[scene_idx, obj_idx] = prev_steps[scene_idx, obj_idx_old]
 
-        # Build _requires_closed: (S, N) — read _requires_closed_init directly to avoid
-        # going through the property before the tensor is fully populated.
-        cls._requires_closed = th.zeros((S, N), dtype=th.bool, device="cuda")
-        for scene_idx, s_row in enumerate(cls.IDX_OBJS):
-            for obj_idx, obj in enumerate(s_row):
-                if obj is not None:
-                    cls._requires_closed[scene_idx, obj_idx] = obj.states[ToggledOn]._requires_closed_init
+        # Build _requires_closed: (S, O)
+        cls._requires_closed = th.zeros((S, O), dtype=th.bool, device="cuda")
+        for scene_idx, scene in enumerate(cls.IDX_OBJS):
+            for obj_idx, toggle_obj in enumerate(scene):
+                cls._requires_closed[scene_idx, obj_idx] = toggle_obj.states[ToggledOn]._requires_closed_individual
 
-        # Build _open_col_idx: (N,) long — maps each toggle-object N-index to its column in
-        # Open.VALUES.  -1 for objects that have no Open state.
-        # Uses scene-0 objects as representative (all scenes share the same object types).
-        cls._open_col_idx = th.full((N,), -1, dtype=th.long, device="cuda")
-        for obj_idx, obj in enumerate(cls.IDX_OBJS[0] if cls.IDX_OBJS else []):
-            if obj is not None and Open in obj.states:
-                open_idx = Open.OBJ_IDXS.get(obj.relative_prim_path, -1)
-                cls._open_col_idx[obj_idx] = open_idx
+        # Build _open_state_idx: (O,) long — Open.VALUES column index per toggle object.
+        # Only filled for objects that have requires_closed in any scene because they are guaranteed to have Open state.
+        _requires_closed_objects = cls._requires_closed.any(dim=0)  # (O,) bool
+        cls._open_state_idx = th.zeros(O, dtype=th.long, device="cuda")
+        for obj_idx in _requires_closed_objects.nonzero(as_tuple=True)[0].tolist():
+            toggle_obj = cls.IDX_OBJS[0][obj_idx]
+            assert Open in toggle_obj.states, "Can only require openable object to be closed."
+            cls._open_state_idx[obj_idx] = Open.OBJ_IDXS[toggle_obj.relative_prim_path]
 
-        # Rebuild visual_markers and scales lists indexed by N
-        # Carry over existing markers/scales for surviving objects; new slots stay None
-        cls.visual_markers = [None] * N
-        cls.scales = [None] * N
-        for relative_prim_path, obj_idx_new in cls.OBJ_IDXS.items():
-            obj_idx_old = prev_obj_idxs.get(relative_prim_path)
-            if obj_idx_old is not None and obj_idx_old < len(prev_markers):
-                cls.visual_markers[obj_idx_new] = prev_markers[obj_idx_old]
-                cls.scales[obj_idx_new] = prev_scales[obj_idx_old]
+        # Build visual_markers: point to each instance's self.marker set during _initialize().
+        cls.visual_markers = [[None] * O for _ in range(S)]
+        for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
+            for obj_idx, toggle_obj in enumerate(scene_row):
+                state = toggle_obj.states[ToggledOn]
+                cls.visual_markers[scene_idx][obj_idx] = state.marker
 
-        if S == 0 or N == 0:
+        if S == 0 or O == 0:
             # No objects — allocate empty lists/tensors and return early
-            cls._finger_contact_query_mask = []
-            cls._obj_contact_with_mask = []
-            cls._finger_contact_result = th.zeros((0, 0), dtype=th.bool, device="cuda")
-            cls._mask_force_off = th.zeros((0, 0), dtype=th.bool, device="cuda")
-            cls._mask_active = th.zeros((0, 0), dtype=th.bool, device="cuda")
-            cls._mask_in_contact = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls._finger_query_mask = []
+            cls._toggable_objs_with_mask = []
+            cls._mask_objects_near_finger = th.zeros((0, 0), dtype=th.bool, device="cuda")
+            cls._mask_untoggable_open_objs = th.zeros((0, 0), dtype=th.bool, device="cuda")
             cls._mask_can_toggle = th.zeros((0, 0), dtype=th.bool, device="cuda")
-            cls._mask_flip = th.zeros((0, 0), dtype=th.bool, device="cuda")
             return
 
-        # Build per-scene contact masks
-        #     broadcasting against (N, C_s) in is_in_contact_batch gives one result per object.
-        cls._finger_contact_query_mask = []
-        cls._obj_contact_with_mask = []
+        # Loop over scenes to build contact query and with masks to help detect whether finger contacting any togglable objects
+        cls._finger_query_mask = []
+        cls._toggable_objs_with_mask = []
 
         for scene_idx, scene in enumerate(og.sim.scenes):
-            # Early return if this scene doesn't have contact view
-            if not RigidContactAPI.has_contact_view(scene_idx):
-                cls._finger_contact_query_mask.append(None)
-                cls._obj_contact_with_mask.append(None)
-                continue
-
             finger_links = [
                 link
                 for robot in scene.robots
@@ -211,47 +151,43 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 for links in robot.finger_links.values()
                 for link in links
             ]
-            # Early return if this scene doesn't have robot fingers
+            cls._finger_links.append(finger_links)
             if not finger_links:
-                cls._finger_contact_query_mask.append(None)
-                cls._obj_contact_with_mask.append(None)
+                cls._finger_query_mask.append(None)
+                cls._toggable_objs_with_mask.append(None)
                 continue
 
-            # Build finger mask, shape (1, R_s) — GPU to match GPU contact matrix in is_in_contact_batch
+            # Build finger query mask
             row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,) CPU
-            cls._finger_contact_query_mask.append(row_mask.unsqueeze(0).cuda())  # (1, R_s) GPU
+            cls._finger_query_mask.append(row_mask.unsqueeze(0).cuda())  # (1, R_s) GPU
 
-            # Build toggle-able object mask, shape (N, C_s) — GPU
-            cls._obj_contact_with_mask.append(
+            # Build toggle-able object with mask, shape (O, C_s) — GPU
+            cls._toggable_objs_with_mask.append(
                 th.stack(
                     [
                         RigidContactAPI.get_contact_col_mask(
                             scene_idx, list(cls.IDX_OBJS[scene_idx][obj_idx].links.values())
                         )
-                        for obj_idx in range(N)
+                        for obj_idx in range(O)
                     ]
                 ).cuda()
             )
 
         # Allocate per-step scratch masks — GPU for computation; contact query masks stay CPU
-        cls._finger_contact_result = th.zeros((S, N), dtype=th.bool, device="cuda")
-        cls._mask_force_off = th.zeros((S, N), dtype=th.bool, device="cuda")
-        cls._mask_active = th.zeros((S, N), dtype=th.bool, device="cuda")
-        cls._mask_in_contact = th.zeros((S, N), dtype=th.bool, device="cuda")
-        cls._mask_can_toggle = th.zeros((S, N), dtype=th.bool, device="cuda")
-        cls._mask_flip = th.zeros((S, N), dtype=th.bool, device="cuda")
+        cls._mask_objects_near_finger = th.zeros((S, O), dtype=th.bool, device="cuda")
+        cls._mask_untoggable_open_objs = th.zeros((S, O), dtype=th.bool, device="cuda")
+        cls._mask_can_toggle = th.zeros((S, O), dtype=th.bool, device="cuda")
 
     def __init__(self, obj, scale=None, requires_closed=False):
-        # self.scale is a temporary instance variable used only during _initialize() to
-        # resolve the final marker scale and store it in cls.scales[obj_idx].
-        # It is not accessed after initialization.
         self.scale = scale
 
         if requires_closed:
             assert Open in obj.states, f"ToggledOn requires_closed=True but {obj.name} has no Open state."
 
-        # Store requires_closed as instance attribute; written into class tensor by initialize_view()
-        self._requires_closed_init = requires_closed
+        # Only used for being written into class tensor by initialize_view()
+        self._requires_closed_individual = requires_closed
+
+        self.marker = None  # init as None, will be filled in initialize()
 
         super().__init__(obj)
 
@@ -294,76 +230,38 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         deps.add(Open)
         return deps
 
-    @classmethod
-    def global_update(cls):
-        """
-        Step 1 — Batch contact check. Query which toggle objects are touched by robot fingers using is_in_contact_batch.
-        Step 2 — Tensorized value update
-        """
-        if not cls._finger_contact_query_mask:
-            return
-
-        # Step 1 - per-scene contact check; results collected into _finger_contact_result (S, N).
-        # query_masks (1, R_s) broadcasts against with_masks (N, C_s) inside is_in_contact_batch,
-        # so the call returns (N,) bool — one entry per toggle object.
-        cls._finger_contact_result.fill_(False)
-        for scene_idx, (finger, object) in enumerate(zip(cls._finger_contact_query_mask, cls._obj_contact_with_mask)):
-            if finger is None:
-                continue
-            result = RigidContactAPI.is_in_contact_batch(
-                scene_idx=scene_idx,
-                query_masks=finger,  # (1, R_s)
-                with_masks=object,  # (N, C_s)
-                ignore_masks=None,
-                current_only=False,
-            )  # (N,) bool
-            cls._finger_contact_result[scene_idx].copy_(result)
-
-        # Step 2 - batch value update (calls _update_values, then fires state_updated)
-        super().global_update()
-
     @classproperty
     def meta_link_types(cls):
         return [m.TOGGLE_META_LINK_TYPE]
 
     @classmethod
-    def _check_overlap(cls, s_idx, obj_idx):
+    def _check_overlap(cls, scene_idx, obj_idx):
         """
         Check whether any robot finger overlaps the toggle-button marker sphere for the object
         at class-level index (s_idx, obj_idx).
 
         Args:
             s_idx (int): Scene index.
-            obj_idx (int): Object type index into cls.IDX_OBJS / cls.visual_markers / cls.scales.
+            obj_idx (int): Object type index into cls.IDX_OBJS / cls.visual_markers.
 
         Returns:
             bool: True if a robot finger overlaps the marker sphere.
         """
         valid_hit = False
-
-        # Collect all robot finger prim paths across all robots in the scene
-        scene = og.sim.scenes[s_idx]
-        all_finger_paths = {
-            link.prim_path
-            for robot in scene.robots
-            if robot.is_manipulation
-            for finger_links in robot.finger_links.values()
-            for link in finger_links
-        }
+        finger_prim_paths = {link.prim_path for link in cls._finger_links[scene_idx]}
 
         def overlap_callback(hit):
             nonlocal valid_hit
-            valid_hit = hit.rigid_body in all_finger_paths
+            valid_hit = hit.rigid_body in finger_prim_paths
             # Continue traversal only if we don't have a valid hit yet
             return not valid_hit
 
-        marker = cls.visual_markers[obj_idx]
-        scale = cls.scales[obj_idx]
+        marker = cls.visual_markers[scene_idx][obj_idx]
         # TODO: This is a temporary fix for flatcache before we properly implement trigger volumes
         if marker is None:
             return False
         og.sim.psqi.overlap_sphere(
-            radius=th.min(marker.extent * scale).item(),
+            radius=th.min(marker.extent * marker.scale).item(),
             pos=marker.get_position_orientation()[0].tolist(),
             reportFn=overlap_callback,
         )
@@ -374,71 +272,65 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         """
         Vectorized per-step update for all tracked ToggledOn instances across all scenes.
 
-        Uses pre-allocated named scratch masks (_mask_force_off, _mask_active, etc.) to avoid
-        per-call allocations. Contact result (_finger_contact_result) was already computed by
-        global_update() before this method is called.
-
-        Logic:
-          1. requires_closed guard  — force off objects that must be closed but are open.
-          2. Contact mask           — which active objects have a finger nearby (from is_in_contact_batch).
-          3. Overlap check          — of those, which truly overlap the marker sphere.
-          4. Counter update         — increment for can_toggle, reset for active & ~can_toggle.
-          5. Toggle flip            — flip state for objects whose counter hit CAN_TOGGLE_STEPS.
-          6. Color sync             — update visual marker color for flipped objects.
+        Steps:
+        - For objects that are open yet required to be closed to toggle on, VALUE = False, robot_can_toggle_step = 0
+        - Find what toggable objects have a finger nearby. For those who have, check fingers truly overlap the button mesh.
+        - Increment robot_can_toggle_steps for objects that can be toggled.
+        - Set VALUES to be True for whose robot_can_toggle_steps == m.CAN_TOGGLE_STEPS.
 
         Args:
-            values (th.Tensor): Shape (S, N). Toggle state stored as 0.0/1.0. Mutated in-place.
+            values (th.Tensor): Shape (S, O). Toggle state stored as 0.0/1.0. Mutated in-place.
         """
         S = values.shape[0]
 
-        # Reset all scratch masks for this step (in-place fill, no allocation).
-        cls._mask_force_off.fill_(False)
-        cls._mask_active.fill_(False)
-        cls._mask_in_contact.fill_(False)
-        cls._mask_can_toggle.fill_(False)
-        cls._mask_flip.fill_(False)
+        # Get what toggable objects have a finger nearby
+        cls._mask_objects_near_finger.fill_(False)
+        for scene_idx, (query_mask, with_mask) in enumerate(zip(cls._finger_query_mask, cls._toggable_objs_with_mask)):
+            if query_mask is None or with_mask is None:
+                continue
+            result = RigidContactAPI.is_in_contact_batch(
+                scene_idx=scene_idx,
+                query_masks=query_mask,  # (1, R_s)
+                with_masks=with_mask,  # (O, C_s)
+                ignore_masks=None,
+                current_only=False,
+            )  # (N,) bool
+            cls._mask_objects_near_finger[scene_idx].copy_(result)
 
-        # Step 1: requires_closed guard — vectorized via Open.VALUES.
-        # _open_col_idx (N,): column index into Open.VALUES for each toggle object (-1 = no Open state).
-        open_vals = Open.VALUES[:, cls._open_col_idx[cls._requires_closed]]  # (S, N) bool
-        cls._mask_force_off[cls._requires_closed] = open_vals
+        # For objects that are open yet required to be closed to toggle on, set VALUE = False and robot_can_toggle_step = 0
+        cls._mask_untoggable_open_objs.fill_(False)
+        if Open.VALUES.numel() > 0:
+            cls._mask_untoggable_open_objs.copy_(cls._requires_closed & Open.VALUES[:, cls._open_state_idx])
+        values[cls._mask_untoggable_open_objs] = False
+        cls._robots_can_toggle_steps[cls._mask_untoggable_open_objs] = 0
 
-        th.logical_not(cls._mask_force_off, out=cls._mask_active)
-        # Zero out toggle state for force-off objects (in-place).
-        values[cls._mask_force_off] = False
-        cls._can_toggle_steps[cls._mask_force_off] = 0
-
-        # Step 2: contact mask.
-        # _finger_contact_result was populated in global_update() via is_in_contact_batch.
-        cls._mask_in_contact.copy_(cls._finger_contact_result)
-        # Only active objects proceed to overlap check.
-        cls._mask_in_contact &= cls._mask_active
-
-        # Step 3: overlap check (unavoidable per-object; only for in-contact subset).
+        # Find what toggable objects have a finger nearby. For those who have, check fingers truly overlap the button mesh.
+        th.logical_and(cls._mask_objects_near_finger, ~cls._mask_untoggable_open_objs, out=cls._mask_can_toggle)
         for scene_idx in range(S):
-            for obj_idx in th.where(cls._mask_in_contact[scene_idx])[0].tolist():
-                cls._mask_can_toggle[scene_idx, obj_idx] = cls._check_overlap(scene_idx, obj_idx)
+            for obj_idx in th.where(cls._mask_can_toggle[scene_idx])[0].tolist():
+                cls._mask_can_toggle[scene_idx, obj_idx] &= cls._check_overlap(scene_idx, obj_idx)
 
-        # Step 4: step counter update.
-        # Increment counter for can_toggle objects (can_toggle ⊆ in_contact ⊆ active).
-        cls._can_toggle_steps[cls._mask_can_toggle] += 1
-        # Reset counter for active objects that cannot toggle.
-        active_no_toggle = cls._mask_active & ~cls._mask_can_toggle
-        cls._can_toggle_steps[active_no_toggle] = 0
+        # Update robot_can_toggle_steps
+        cls._robots_can_toggle_steps[cls._mask_can_toggle] += 1
+        cls._robots_can_toggle_steps[~cls._mask_can_toggle] = 0
 
-        # Step 5: toggle flip.
-        th.eq(cls._can_toggle_steps, m.CAN_TOGGLE_STEPS, out=cls._mask_flip)
-        cls._mask_flip &= cls._mask_active
-        values[cls._mask_flip] = ~values[cls._mask_flip]
+        # Set VALUES to be True for whose robot_can_toggle_steps == m.CAN_TOGGLE_STEPS.
+        th.eq(cls._robots_can_toggle_steps, m.CAN_TOGGLE_STEPS, out=cls._mask_can_toggle)
 
-        # Step 6: sync visual marker colors for flipped objects.
-        # Per-object USD color write; unavoidable loop, runs only for the flipped subset.
-        # Uses class-level COLOR_ON / COLOR_OFF constants — no per-flip tensor allocation.
-        for scene_idx in range(S):
-            for obj_idx in th.where(cls._mask_flip[scene_idx])[0].tolist():
-                cls.visual_markers[obj_idx].color = (
-                    cls.COLOR_ON if bool(values[scene_idx, obj_idx].item()) else cls.COLOR_OFF
-                )
+        # Flip values and reset steps
+        th.logical_xor(values, cls._mask_can_toggle, out=values)
+
+    @classmethod
+    def post_update(cls):
+        """Sync visual marker colors for changed objects."""
+        diff = cls.VALUES_CPU != cls.PREV_VALUES
+        changed_mask = th.any(diff, dim=tuple(range(2, diff.ndim))) if diff.ndim > 2 else diff
+        for s_idx in range(cls.VALUES_CPU.shape[0]):
+            for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
+                obj = cls.IDX_OBJS[s_idx][obj_idx]
+                obj.state_updated()
+                marker = cls.visual_markers[s_idx][obj_idx]
+                marker.color = cls.COLOR_ON if bool(cls.VALUES_CPU[s_idx, obj_idx].item()) else cls.COLOR_OFF
 
     def _get_value(self):
         # Return toggle boolean from the (scene_idx, obj_idx, 0) entry of the shared VALUES tensor.
@@ -464,10 +356,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         self.VALUES[s, obj_idx] = 1.0 if new_value else 0.0
-        # _set_value is possible to be called before _initialize() so maker might not be initialized yet
-        marker = type(self).visual_markers[obj_idx]
-        if marker is not None:
-            marker.color = type(self).COLOR_ON if new_value else type(self).COLOR_OFF
+        if self.marker is not None:
+            self.marker.color = type(self).COLOR_ON if new_value else type(self).COLOR_OFF
         return True
 
     def _initialize(self):
@@ -502,19 +392,12 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
         # Create the visual geom instance referencing the generated mesh prim
         relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)
-        marker = GeomPrim(relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker")
-        marker.load(self.obj.scene)
-        marker.scale = self.scale
-        marker.initialize()
-        marker.visible = True
-
-        # Store marker and resolved scale in the class-level lists at this object's N index.
-        # Both are accessed by _check_overlap() and _update_values() at the class level.
-        obj_idx = self.OBJ_IDXS.get(self.obj.relative_prim_path)
-        assert obj_idx is not None
-        type(self).visual_markers[obj_idx] = marker
-        type(self).scales[obj_idx] = self.scale
-        marker.color = type(self).COLOR_OFF
+        self.marker = GeomPrim(relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker")
+        self.marker.load(self.obj.scene)
+        self.marker.scale = self.scale
+        self.marker.initialize()
+        self.marker.visible = True
+        self.marker.color = type(self).COLOR_OFF
 
     @staticmethod
     def get_texture_change_params():
@@ -534,7 +417,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         return dict(
             value=bool(self.VALUES[s, obj_idx].item()),
-            hand_in_marker_steps=int(self._can_toggle_steps[s, obj_idx].item()),
+            hand_in_marker_steps=int(self._robots_can_toggle_steps[s, obj_idx].item()),
         )
 
     def _load_state(self, state):
@@ -543,7 +426,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         # Restore step counter directly into the tensor.
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        type(self)._can_toggle_steps[s, obj_idx] = float(state["hand_in_marker_steps"])
+        type(self)._robots_can_toggle_steps[s, obj_idx] = float(state["hand_in_marker_steps"])
 
     def serialize(self, state):
         # [toggle_state, can_toggle_steps] as float32

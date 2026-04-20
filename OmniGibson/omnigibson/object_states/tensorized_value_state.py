@@ -31,8 +31,7 @@ class TensorizedValueState(AbsoluteObjectState):
     # _get_value() always reads from here to avoid GPU stalls for Python callers.
     VALUES_CPU = None
 
-    # GPU tensor mirroring VALUES from the previous step — filled by global_update() before
-    # _update_values() runs, used for change detection instead of per-step clone.
+    # CPU tensor to store VALUES_CPU from the previous step — used for change detection.
     PREV_VALUES = None
 
     # Dictionary mapping relative prim path to index in the N dimension of VALUES
@@ -50,7 +49,7 @@ class TensorizedValueState(AbsoluteObjectState):
         # Shape (0, 0, *value_shape) — zero scenes, zero object types; GPU-resident
         cls.VALUES = th.empty(0, dtype=cls.value_type, device="cuda").reshape(0, 0, *cls.value_shape)
         cls.VALUES_CPU = th.empty(0, dtype=cls.value_type).pin_memory().reshape(0, 0, *cls.value_shape)
-        cls.PREV_VALUES = th.empty(0, dtype=cls.value_type, device="cuda").reshape(0, 0, *cls.value_shape)
+        cls.PREV_VALUES = th.empty(0, dtype=cls.value_type).reshape(0, 0, *cls.value_shape)
         cls.OBJ_IDXS = {}  # {relative_prim_path: int}
         cls.IDX_OBJS = []  # list[list[obj|None]]
 
@@ -71,6 +70,9 @@ class TensorizedValueState(AbsoluteObjectState):
         # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)
         prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
         prev_values = cls.VALUES.clone() if cls.VALUES is not None and cls.VALUES.numel() > 0 else None
+
+        # Check that every scene has the same number of objects,
+        # and the same object at the same relative prim path has same state settings.
 
         # Reset
         cls.global_initialize()
@@ -117,20 +119,20 @@ class TensorizedValueState(AbsoluteObjectState):
                     if cls.IDX_OBJS[s_idx][obj_idx_new] is not None:
                         cls.VALUES[s_idx, obj_idx_new] = prev_values[s_idx, obj_idx_old]
 
-        # PREV_VALUES must match VALUES shape; seed with current values so first global_update()
-        # doesn't fire spurious state_updated() for every object.
-        cls.PREV_VALUES = cls.VALUES.clone()
-
         # Rebuild pinned CPU mirror — synchronous copy so _get_value() is valid before first async copy
         cls.VALUES_CPU = th.zeros(cls.VALUES.shape, dtype=cls.value_type).pin_memory()
         if cls.VALUES.numel() > 0:
             cls.VALUES_CPU.copy_(cls.VALUES)
 
+        # PREV_VALUES mirrors VALUES_CPU on CPU; seed so first post_update() fires no spurious state_updated().
+        cls.PREV_VALUES = cls.VALUES_CPU.clone()
+
     @classmethod
     def global_update(cls):
         """
-        Globally update all values. Calls _update_values(), detects changed entries, and fires
-        state_updated() for affected objects. Skips if there are no tracked objects.
+        Globally update all values via _update_values() and async-copy to VALUES_CPU.
+        Change detection and post_update() are called separately by the simulator after synchronize().
+        Skips if there are no tracked objects.
         """
         if cls.VALUES is None or cls.VALUES.numel() == 0:
             return
@@ -138,23 +140,27 @@ class TensorizedValueState(AbsoluteObjectState):
         if S == 0 or N == 0:
             return
 
-        cls.PREV_VALUES.copy_(cls.VALUES)
+        cls.PREV_VALUES.copy_(cls.VALUES_CPU)
         cls._update_values(values=cls.VALUES)
+        cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
 
-        # Compare with previous values, and add any changed objects to the scene-tracked set.
-        # changed_mask shape: (S, N) — collapse any trailing value_shape dimensions if present.
-        diff = cls.VALUES != cls.PREV_VALUES
+    @classmethod
+    def post_update(cls):
+        """
+        Called by the simulator after th.cuda.synchronize(). Compares VALUES_CPU with PREV_VALUES
+        (both CPU) to detect changes, fires state_updated() for affected objects, then updates PREV_VALUES.
+        """
+        if cls.VALUES_CPU is None or cls.VALUES_CPU.numel() == 0:
+            return
+        S = cls.VALUES_CPU.shape[0]
+
+        diff = cls.VALUES_CPU != cls.PREV_VALUES
         changed_mask = th.any(diff, dim=tuple(range(2, diff.ndim))) if diff.ndim > 2 else diff
         for s_idx in range(S):
             for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
                 obj = cls.IDX_OBJS[s_idx][obj_idx]
                 if obj is not None:
                     obj.state_updated()
-
-        # Async GPU → CPU copy on the shared stream; simulator calls GPU_TO_CPU.synchronize()
-        # after the Pass 1 loop before any VALUES_CPU reads in Pass 2.
-        with th.cuda.stream(og.sim.GPU_TO_CPU):
-            cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
 
     @classmethod
     def _update_values(cls, values):

@@ -26,6 +26,10 @@ class AABB(TensorizedValueState):
     # list[int] — O indices of cloth objects (per-object fallback)
     CLOTH_OBJ_IDXS = None
 
+    # (S, O) bool CPU — True where cached AABB may be stale since last global_update()
+    # Often caused by sample_kinematics()
+    STALE = None
+
     @classproperty
     def value_shape(cls):
         return (6,)
@@ -49,6 +53,7 @@ class AABB(TensorizedValueState):
             cls.PRIM_BODY_IDX = th.zeros((0,), dtype=th.long, device="cuda")
             cls.LINK_IDX = th.zeros((0,), dtype=th.long, device="cuda")
             cls.CLOTH_OBJ_IDXS = []
+            cls.STALE = th.zeros((0, 0), dtype=th.bool)
             return
 
         prim_body_idx = []
@@ -73,6 +78,7 @@ class AABB(TensorizedValueState):
 
         cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long, device="cuda")
         cls.LINK_IDX = th.tensor(link_idx, dtype=th.long, device="cuda")
+        cls.STALE = th.zeros((S, O), dtype=th.bool)
 
         # Initialize new VALUE slots for objects that just appeared
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -103,9 +109,23 @@ class AABB(TensorizedValueState):
                     values[s_idx, obj_idx, :3] = lo
                     values[s_idx, obj_idx, 3:] = hi
 
+    @classmethod
+    def mark_stale(cls, obj):
+        """Mark obj's cached AABB as stale; _get_value() will recompute fresh until next global_update()."""
+        if obj.relative_prim_path not in cls.OBJ_IDXS:
+            return
+        cls.STALE[obj.scene.idx, cls.OBJ_IDXS[obj.relative_prim_path]] = True
+
+    @classmethod
+    def post_update(cls):
+        super().post_update()
+        cls.STALE.fill_(False)
+
     def _get_value(self):
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+        if self.STALE[s, obj_idx].item():
+            return self.obj.aabb  # fresh recompute via EntityPrim property
         v = self.VALUES_CPU[s, obj_idx]  # (6,) — CPU mirror, no GPU stall
         return v[:3], v[3:]  # (lo, hi) — matches EntityPrim.aabb return type
 

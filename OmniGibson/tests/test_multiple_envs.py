@@ -483,3 +483,62 @@ def test_behavior_setter():
     got_world_pos, got_world_ori = robot.get_position_orientation()
     assert not th.allclose(got_world_pos, new_world_pos, atol=1e-3)
     assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+
+
+@pytest.mark.skip(reason="investigate further after PR #2127 got merged")
+def test_objects_with_different_joints_open_state():
+    import copy
+
+    if og.sim is not None:
+        og.sim.stop()
+
+    gm.RENDER_VIEWER_CAMERA = False
+    gm.ENABLE_OBJECT_STATES = True
+    gm.USE_GPU_DYNAMICS = True
+    gm.ENABLE_TRANSITION_RULES = False
+
+    base_cfg = {
+        "scene": {"type": "Scene"},
+        "robots": [],
+        "objects": [],
+    }
+
+    # Scene 0: bottom_cabinet_no_top model with 1 openable joint
+    # Scene 1: bottom_cabinet_no_top model with 2 openable joints
+    # Both use name="cabinet" so they share the same obj_idx in Open.OBJ_IDXS
+    cfg_0 = copy.deepcopy(base_cfg)
+    cfg_0["objects"] = [
+        {"type": "DatasetObject", "name": "cabinet", "category": "bottom_cabinet_no_top", "model": "ufhpbn"}
+    ]
+    cfg_1 = copy.deepcopy(base_cfg)
+    cfg_1["objects"] = [
+        {"type": "DatasetObject", "name": "cabinet", "category": "bottom_cabinet_no_top", "model": "gjrero"}
+    ]
+
+    env_0 = og.Environment(configs=cfg_0, in_vec_env=True)
+    env_1 = og.Environment(configs=cfg_1, in_vec_env=True)
+    og.sim.play()
+    env_0.post_play_load()
+    env_1.post_play_load()
+
+    S = 2
+    O = len(object_states.Open.OBJ_IDXS)  # 1 — one object type ("cabinet")
+    max_dof = object_states.Open.OPENABLE_MASK.shape[2]
+
+    assert object_states.Open.OPENABLE_MASK.shape == (S, O, max_dof)
+    assert object_states.Open.THRESHOLDS_S1.shape == (S, O, max_dof)
+    assert object_states.Open.BOTH_SIDES.shape == (S, O)
+
+    obj_idx = object_states.Open.OBJ_IDXS["cabinet"]
+    n_joints_s0 = int(object_states.Open.OPENABLE_MASK[0, obj_idx].sum().item())
+    n_joints_s1 = int(object_states.Open.OPENABLE_MASK[1, obj_idx].sum().item())
+    assert n_joints_s0 != n_joints_s1, f"Expected different joint counts across scenes, got {n_joints_s0} in both"
+
+    # Open state get/set must work independently per scene
+    cabinet_0 = env_0.scene.object_registry("name", "cabinet")
+    cabinet_1 = env_1.scene.object_registry("name", "cabinet")
+    cabinet_0.states[object_states.Open].set_value(True)
+    cabinet_1.states[object_states.Open].set_value(False)
+    og.sim.step()
+    assert cabinet_0.states[object_states.Open].get_value() is True
+    assert cabinet_1.states[object_states.Open].get_value() is False

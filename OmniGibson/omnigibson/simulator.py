@@ -21,7 +21,6 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states import AABB
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
@@ -478,11 +477,6 @@ def _launch_simulator(*args, **kwargs):
                 backend="torch",
                 device=device,
             )
-
-            # CUDA stream for async GPU→CPU copies of TensorizedValueState.VALUES
-            self.GPU_TO_CPU = th.cuda.Stream()
-            # CUDA stream for async CPU→GPU copies of PhysX-sourced data (poses, DOF, contacts)
-            self.CPU_TO_GPU = th.cuda.Stream()
 
             # Store other references to variables that will be initialized later
             self._scenes = []
@@ -1224,7 +1218,7 @@ def _launch_simulator(*args, **kwargs):
 
             RigidBodyViewAPI.async_copy_to_gpu()
             ArticulatedObjectViewAPI.async_copy_to_gpu()
-            self.CPU_TO_GPU.synchronize()
+            th.cuda.synchronize()
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1279,9 +1273,12 @@ def _launch_simulator(*args, **kwargs):
                         if issubclass(state_type, TensorizedValueState):
                             state_type.global_update()
 
-                    # Sync all async GPU→CPU copies issued inside each global_update().
-                    # UpdateStateMixin states read VALUES_CPU in Pass 2, so sync must complete first.
-                    self.GPU_TO_CPU.synchronize()
+                    th.cuda.synchronize()
+
+                    # TensorizedValueState post_updates (CPU change detection + state_updated())
+                    for state_type in self.object_state_types_requiring_update:
+                        if issubclass(state_type, TensorizedValueState):
+                            state_type.post_update()
 
                     # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
                     for state_type in self.object_state_types_requiring_update:
@@ -1450,12 +1447,12 @@ def _launch_simulator(*args, **kwargs):
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
             self._update_view_apis()
 
-            # TODO (andi) remove this after on_top is tensorized
+            # TODO (andi) remove this???
             # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read
             # up-to-date AABBs without waiting for the next full _non_physics_step.
-            if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None and AABB.VALUES.numel() > 0:
-                AABB.global_update()  # issues async copy on GPU_TO_CPU inside global_update()
-                self.GPU_TO_CPU.synchronize()  # wait before caller reads VALUES_CPU
+            # if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None and AABB.VALUES.numel() > 0:
+            #     AABB.global_update()  # issues async copy on GPU_TO_CPU inside global_update()
+            #     th.cuda.synchronize()  # wait before caller reads VALUES_CPU
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
@@ -2022,10 +2019,10 @@ def _launch_simulator(*args, **kwargs):
             # Stop the physics
             self.stop()
 
-            # # Clean subscribed callbacks
-            # self._pre_physics_step_callback.unsubscribe()
-            # self._post_physics_step_callback.unsubscribe()
-            # self._simulation_event_callback.unsubscribe()
+            # Clean subscribed callbacks
+            self._pre_physics_step_callback.unsubscribe()
+            self._post_physics_step_callback.unsubscribe()
+            self._simulation_event_callback.unsubscribe()
 
             # Clear all scenes
             for scene in self.scenes:

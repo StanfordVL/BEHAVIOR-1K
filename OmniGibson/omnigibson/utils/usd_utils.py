@@ -287,7 +287,7 @@ class RigidBodyViewAPI:
 
         # Create a PhysX view for all scenes, build _PATH_TO_IDX, collect poses
         poses_list = []
-        # TODO: Verify things still work after merging from main
+        # TODO andi: Verify things still work after merging from main
         # og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             cls._RIGID_BODY_VIEW = og.sim.physics_sim_view.create_rigid_body_view(pattern="/World/scene_*/*/*")
@@ -304,12 +304,11 @@ class RigidBodyViewAPI:
                 is_untracked = obj.kinematic_only and obj.prim_type != PrimType.CLOTH
                 for link in obj.links.values():
                     abs_path = link.prim_path
-                    assert is_untracked == (
-                        abs_path not in cls._PATH_TO_IDX
-                    ), "Kinematic-only links should not be registered in the physics view!"
 
-                    # Register articulated kinematic-only objects' links
-                    if is_untracked:
+                    # Kinematic objects' child links (e.g. fillable meta links) may be dynamic
+                    # and already tracked by PhysX even though the parent is kinematic_only=True.
+                    # Only manually register links that PhysX did not track.
+                    if is_untracked and abs_path not in cls._PATH_TO_IDX:
                         idx = len(cls._PATH_TO_IDX)
                         cls._PATH_TO_IDX[abs_path] = idx
                         cls._IDX_TO_PATH.append(abs_path)
@@ -317,12 +316,12 @@ class RigidBodyViewAPI:
                         pos, quat_xyzw = link.get_position_orientation()
                         poses_list.append(th.cat([pos, quat_xyzw]).unsqueeze(0))
 
-                    # Collect local collision points for AABB
-                    # This is require for all registered links
-                    pts = link.collision_boundary_points_local  # (V, 3) or None
-                    if pts is not None:
-                        scale = link.get_world_scale()
-                        raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
+                    # Collect local collision points for AABB (for all registered links)
+                    if abs_path in cls._PATH_TO_IDX:
+                        pts = link.collision_boundary_points_local  # (V, 3) or None
+                        if pts is not None:
+                            scale = link.get_world_scale()
+                            raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
 
         cls._POSES = th.cat(poses_list, dim=0)  # (N_links_total, 7), CPU
         cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
@@ -374,7 +373,8 @@ class RigidBodyViewAPI:
         """
         pos = poses[:, :3]  # (N, 3)
         quat_xyzw = poses[:, 3:]  # (N, 4) — PhysX returns wxyz, T.pose2mat expects xyzw
-        return TT.pose2mat((pos, quat_xyzw))  # (N, 4, 4)
+        result = TT.pose2mat((pos, quat_xyzw))
+        return result.unsqueeze(0) if result.ndim == 2 else result  # shape is (N, 4, 4)
 
     @classmethod
     def get_flat_idx(cls, abs_prim_path):
@@ -443,18 +443,19 @@ class RigidBodyViewAPI:
         for link in links:
             idx = cls._PATH_TO_IDX[link.prim_path]
             pos, quat_xyzw = link.get_position_orientation()
-            cls._POSES[idx][:3] = pos
+            cls._POSES[idx][:3] = pos  # _POSES[idx]: (7,)
             cls._POSES[idx][3:] = quat_xyzw
-            cls._POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls._POSES[idx])
-            cls._POSE_MATRICES[idx] = cls._POSE_MATRICES_CPU[idx].cuda()
+            # unsqueeze(0): (7,) -> (1, 7) so _poses_to_matrices gets its expected (N, 7) input;
+            # [0]: (1, 4, 4) -> (4, 4) to match _POSE_MATRICES_CPU[idx] slot
+            cls._POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls._POSES[idx].unsqueeze(0))[0]
+            cls._POSE_MATRICES[idx] = cls._POSE_MATRICES_CPU[idx].cuda()  # (4, 4), GPU
 
     @classmethod
     def async_copy_to_gpu(cls):
-        """Issue non-blocking bulk copy of _POSE_MATRICES_CPU → _POSE_MATRICES on CPU_TO_GPU stream."""
+        """Issue non-blocking bulk copy of _POSE_MATRICES_CPU → _POSE_MATRICES."""
         if cls._POSE_MATRICES_CPU is None:
             return
-        with th.cuda.stream(og.sim.CPU_TO_GPU):
-            cls._POSE_MATRICES.copy_(cls._POSE_MATRICES_CPU, non_blocking=True)
+        cls._POSE_MATRICES.copy_(cls._POSE_MATRICES_CPU, non_blocking=True)
 
     @classmethod
     def clear(cls):
@@ -545,11 +546,10 @@ class ArticulatedObjectViewAPI:
 
     @classmethod
     def async_copy_to_gpu(cls):
-        """Issue non-blocking copy of _POSITIONS_CPU → _POSITIONS on CPU_TO_GPU stream."""
+        """Issue non-blocking copy of _POSITIONS_CPU → _POSITIONS."""
         if cls._POSITIONS_CPU is None:
             return
-        with th.cuda.stream(og.sim.CPU_TO_GPU):
-            cls._POSITIONS.copy_(cls._POSITIONS_CPU, non_blocking=True)
+        cls._POSITIONS.copy_(cls._POSITIONS_CPU, non_blocking=True)
 
     @classmethod
     def clear(cls):
@@ -819,36 +819,35 @@ class RigidContactAPIImpl:
         assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
         assert self._PENDING_STEPS < og.sim.n_physics_timesteps_per_render, "Pending steps buffer is full"
 
-        with th.cuda.stream(og.sim.CPU_TO_GPU):
-            scene_idx_list = list(self._CONTACT_VIEW.keys())
-            for scene_idx in scene_idx_list:
-                try:
-                    # Get the contact impulse and net force matrices for this scene
-                    self._PENDING_IMPULSES[scene_idx][self._PENDING_STEPS].copy_(
-                        self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt()),
-                        non_blocking=True,
-                    )
-                    self._PENDING_NET_FORCES[scene_idx][self._PENDING_STEPS].copy_(
-                        self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt()),
-                        non_blocking=True,
-                    )
-                except Exception:
-                    log.warning(
-                        "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
-                        "This is expected if the physics sim view is not yet initialized, e.g. you are loading "
-                        "a scene for the first time."
-                    )
-                    continue
-
-                # Get the body transforms for this scene
-                self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
-                    self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
+        scene_idx_list = list(self._CONTACT_VIEW.keys())
+        for scene_idx in scene_idx_list:
+            try:
+                # Get the contact impulse and net force matrices for this scene
+                self._PENDING_IMPULSES[scene_idx][self._PENDING_STEPS].copy_(
+                    self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt()),
+                    non_blocking=True,
                 )
+                self._PENDING_NET_FORCES[scene_idx][self._PENDING_STEPS].copy_(
+                    self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt()),
+                    non_blocking=True,
+                )
+            except Exception:
+                log.warning(
+                    "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
+                    "This is expected if the physics sim view is not yet initialized, e.g. you are loading "
+                    "a scene for the first time."
+                )
+                continue
+
+            # Get the body transforms for this scene
+            self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
+                self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
+            )
 
             if len(scene_idx_list) > 0:
                 self._PENDING_STEPS += 1
 
-        og.sim.CPU_TO_GPU.synchronize()
+        th.cuda.synchronize()
 
     def update_contact_cache(self):
         """
@@ -956,12 +955,11 @@ class RigidContactAPIImpl:
 
             # Copy updated GPU matrices back to CPU mirrors so is_in_contact()
             # can read them without a GPU stall.
-            with th.cuda.stream(og.sim.GPU_TO_CPU):
-                self._CONTACT_MATRIX[scene_idx].copy_(self._CONTACT_MATRIX_GPU[scene_idx], non_blocking=True)
-                self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
-                    self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True
-                )
-            og.sim.GPU_TO_CPU.synchronize()
+            # This will be synced in simulator._update_view_apis()
+            self._CONTACT_MATRIX[scene_idx].copy_(self._CONTACT_MATRIX_GPU[scene_idx], non_blocking=True)
+            self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True
+            )
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
