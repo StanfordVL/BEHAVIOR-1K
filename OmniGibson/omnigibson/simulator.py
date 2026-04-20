@@ -923,15 +923,15 @@ def _launch_simulator(*args, **kwargs):
 
             try:
                 yield
-
-                # Run all post-processing on all newly added objects
-                for obj in objs:
-                    self._post_import_object(obj=obj)
             finally:
                 # We want to make sure we revalidate the views here even if the object addition
                 # fails, because the pre-yield invalidation above leaves things in a broken state.
                 if self.is_playing():
                     self.update_handles()
+
+            # Run all post-processing on all newly added objects
+            for obj in objs:
+                self._post_import_object(obj=obj)
 
         def _post_import_object(self, obj):
             """
@@ -1000,13 +1000,15 @@ def _launch_simulator(*args, **kwargs):
                         obj_registry.pop(obj.name)
 
             # Run the main method
-            yield
+            try:
+                yield
+            finally:
+                # Update all handles that are now broken because objects have changed
+                if playing:
+                    self.update_handles()
 
             # Run post-processing required if we were playing
             if playing:
-                # Update all handles that are now broken because objects have changed
-                self.update_handles()
-
                 if gm.ENABLE_TRANSITION_RULES:
                     # Prune the transition rules that are currently active
                     for scene in scenes_modified:
