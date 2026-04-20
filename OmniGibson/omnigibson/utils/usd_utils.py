@@ -846,8 +846,9 @@ class RigidContactAPIImpl:
                 self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
             )
 
-            if len(scene_idx_list) > 0:
-                self._PENDING_STEPS += 1
+        # Increment once per physics step
+        if scene_idx_list:
+            self._PENDING_STEPS += 1
 
         th.cuda.synchronize()
 
@@ -952,9 +953,6 @@ class RigidContactAPIImpl:
                 last_awake_body_step[awake_body_indices], awake_body_indices
             ]
 
-            # Clear pending data for this scene
-            self._PENDING_STEPS = 0
-
             # Copy updated GPU matrices back to CPU mirrors so is_in_contact()
             # can read them without a GPU stall.
             # This will be synced in simulator._update_view_apis()
@@ -962,6 +960,9 @@ class RigidContactAPIImpl:
             self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
                 self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True
             )
+
+        # Clear pending step counter once after all scenes are processed
+        self._PENDING_STEPS = 0
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """

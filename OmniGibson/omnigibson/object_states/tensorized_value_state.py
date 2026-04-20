@@ -117,12 +117,9 @@ class TensorizedValueState(AbsoluteObjectState):
         if len(cls.IDX_OBJS) > 1:
             for rel_path, obj_idx in cls.OBJ_IDXS.items():
                 missing = [s for s in range(len(cls.IDX_OBJS)) if cls.IDX_OBJS[s][obj_idx] is None]
-                if missing:
-                    log.warning(
-                        f"{cls.__name__}: '{rel_path}' has this state in some scenes but not all "
-                        f"(missing in scene indices {missing}). Global updates will skip those slots."
-                    )
-
+                assert (
+                    len(missing) != 0
+                ), f"{cls.__name__}: '{rel_path}' has this state in some scenes but not all. (missing in scene indices {missing}). Global updates will skip those slots."
         # Carry over values for surviving objects (same relative path present before and after)
         if prev_values is not None and cls.VALUES.numel() > 0:
             for rel_path, obj_idx_old in prev_obj_idxs.items():
@@ -173,8 +170,7 @@ class TensorizedValueState(AbsoluteObjectState):
         for s_idx in range(S):
             for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
                 obj = cls.IDX_OBJS[s_idx][obj_idx]
-                if obj is not None:
-                    obj.state_updated()
+                obj.state_updated()
 
     @classmethod
     def _update_values(cls, values):

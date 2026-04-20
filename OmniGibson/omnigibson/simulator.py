@@ -483,6 +483,8 @@ def _launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scenes = []
+            # Whether sim is currently in the middle of loading scenes
+            self._is_loading_scene = False
             # The callback will be called right *before* the physics step
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
@@ -1264,45 +1266,47 @@ def _launch_simulator(*args, **kwargs):
                         for scene in scenes_modified:
                             scene.transition_rule_api.refresh_all_rules()
 
-                # Update any system-related state
-                for scene in self.scenes:
-                    for system in scene.active_systems.values():
-                        system.update()
-
-                # Propagate states if the feature is enabled
-                if gm.ENABLE_OBJECT_STATES:
-                    # TensorizedValueState global_updates (GPU computation)
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedValueState):
-                            state_type.global_update()
-
-                    th.cuda.synchronize()
-
-                    # TensorizedValueState post_updates (CPU change detection + state_updated())
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedValueState):
-                            state_type.post_update()
-
-                    # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, UpdateStateMixin):
-                            for scene in self.scenes:
-                                for obj in scene.get_objects_with_state(state_type):
-                                    # Update the state (object should already be initialized since
-                                    # this step will only occur after objects are initialized and sim
-                                    # is playing
-                                    obj.states[state_type].update()
-
+                # Only run the update when sim is not in the middle of scene loading
+                if not self._is_loading_scene:
+                    # Update any system-related state
                     for scene in self.scenes:
-                        for obj in scene.objects:
-                            # Only update visuals for objects that have been initialized so far
-                            if obj.initialized:
-                                obj.update_visuals()
+                        for system in scene.active_systems.values():
+                            system.update()
 
-                # Possibly run transition rule step
-                if gm.ENABLE_TRANSITION_RULES:
-                    for scene in self.scenes:
-                        scene.transition_rule_api.step()
+                    # Propagate states if the feature is enabled
+                    if gm.ENABLE_OBJECT_STATES:
+                        # TensorizedValueState global_updates (GPU computation)
+                        for state_type in self.object_state_types_requiring_update:
+                            if issubclass(state_type, TensorizedValueState):
+                                state_type.global_update()
+
+                        th.cuda.synchronize()
+
+                        # TensorizedValueState post_updates (CPU change detection + state_updated())
+                        for state_type in self.object_state_types_requiring_update:
+                            if issubclass(state_type, TensorizedValueState):
+                                state_type.post_update()
+
+                        # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
+                        for state_type in self.object_state_types_requiring_update:
+                            if issubclass(state_type, UpdateStateMixin):
+                                for scene in self.scenes:
+                                    for obj in scene.get_objects_with_state(state_type):
+                                        # Update the state (object should already be initialized since
+                                        # this step will only occur after objects are initialized and sim
+                                        # is playing
+                                        obj.states[state_type].update()
+
+                        for scene in self.scenes:
+                            for obj in scene.objects:
+                                # Only update visuals for objects that have been initialized so far
+                                if obj.initialized:
+                                    obj.update_visuals()
+
+                    # Possibly run transition rule step
+                    if gm.ENABLE_TRANSITION_RULES:
+                        for scene in self.scenes:
+                            scene.transition_rule_api.step()
 
         def play(self):
             if not self.is_playing():
