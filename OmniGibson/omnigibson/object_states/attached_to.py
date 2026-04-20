@@ -301,7 +301,10 @@ class AttachedTo(
         """
         if joint_type is None:
             joint_type = m.DEFAULT_JOINT_TYPE
-        assert joint_type in {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}, f"Unsupported joint type {joint_type}"
+        assert joint_type in {
+            JointType.JOINT_FIXED,
+            JointType.JOINT_SPHERICAL,
+        }, f"Unsupported joint type {joint_type}"
 
         # Set pose for self.obj so that child_link and parent_link align (6dof alignment for FixedJoint and 3dof alignment for SphericalJoint)
         parent_pos, parent_quat = parent_link.get_position_orientation()

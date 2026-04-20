@@ -11,7 +11,7 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import PoseAPI, ensure_usd_api
 
 # Create module logger
 logger = create_module_logger(module_name=__name__)
@@ -55,7 +55,8 @@ class XFormPrim(BasePrim):
         )
 
     def _load(self):
-        return og.sim.stage.DefinePrim(self.prim_path, "Xform")
+        with og.sim.editing_usd():
+            return og.sim.stage.DefinePrim(self.prim_path, "Xform")
 
     def _post_load(self):
         # run super first
@@ -113,37 +114,38 @@ class XFormPrim(BasePrim):
         ]
         prop_names = self.prim.GetPropertyNames()
         xformable = lazy.pxr.UsdGeom.Xformable(self.prim)
-        xformable.ClearXformOpOrder()
-        # TODO: wont be able to delete props for non root links on articulated objects
-        for prop_name in prop_names:
-            if prop_name in properties_to_remove:
-                self.prim.RemoveProperty(prop_name)
-        if "xformOp:scale" not in prop_names:
-            xform_op_scale = xformable.AddXformOp(
-                lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
-            )
-            xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
-        else:
-            xform_op_scale = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:scale"))
 
-        if "xformOp:translate" not in prop_names:
-            xform_op_translate = xformable.AddXformOp(
-                lazy.pxr.UsdGeom.XformOp.TypeTranslate, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
-            )
-        else:
-            xform_op_translate = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:translate"))
+        with og.sim.editing_usd():
+            xformable.ClearXformOpOrder()
+            # TODO: wont be able to delete props for non root links on articulated objects
+            for prop_name in prop_names:
+                if prop_name in properties_to_remove:
+                    self.prim.RemoveProperty(prop_name)
+            if "xformOp:scale" not in prop_names:
+                xform_op_scale = xformable.AddXformOp(
+                    lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+                )
+                xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
+            else:
+                xform_op_scale = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:scale"))
 
-        if "xformOp:orient" not in prop_names:
-            xform_op_rot = xformable.AddXformOp(
-                lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
-            )
-        else:
-            xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
-        xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
+            if "xformOp:translate" not in prop_names:
+                xform_op_translate = xformable.AddXformOp(
+                    lazy.pxr.UsdGeom.XformOp.TypeTranslate, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+                )
+            else:
+                xform_op_translate = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:translate"))
 
-        PoseAPI.invalidate()
-        # TODO: This is the line that causes Transformation Change on... errors. Fix it.
-        self.set_position_orientation(position=current_position, orientation=current_orientation)
+            if "xformOp:orient" not in prop_names:
+                xform_op_rot = xformable.AddXformOp(
+                    lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+                )
+            else:
+                xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
+            xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
+
+        # This creates its own editing_usd context.
+        XFormPrim.set_position_orientation(self, position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
         r1 = T.quat2mat(current_orientation)
         r2 = T.quat2mat(new_orientation)
@@ -155,20 +157,11 @@ class XFormPrim(BasePrim):
 
     @property
     def _collision_filter_api(self):
-        return (
-            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
-            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
-        )
+        return ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.FilteredPairsAPI)
 
     @property
     def _binding_api(self):
-        # TODO: Do we always need to apply this?
-        return (
-            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
-            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
-        )
+        return ensure_usd_api(self.prim, lazy.pxr.UsdShade.MaterialBindingAPI)
 
     def has_material(self):
         """
@@ -211,7 +204,23 @@ class XFormPrim(BasePrim):
 
         # If the current pose is not in parent frame, convert to parent frame since that's what we can set.
         if frame != "parent":
-            position, orientation = PoseAPI.convert_world_pose_to_local(self._prim, position, orientation)
+            world_transform = T.pose2mat((position, orientation))
+            parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(self._prim).GetPath())
+            parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
+
+            local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
+            local_transform[:3, :3] /= th.linalg.norm(
+                local_transform[:3, :3], dim=0
+            )  # unscale local transform's rotation
+
+            # Check that the local transform consists only of a position, scale and rotation
+            product = local_transform[:3, :3] @ local_transform[:3, :3].T
+            assert th.allclose(
+                product, th.diag(th.diag(product)), atol=1e-3
+            ), f"{self._prim.GetPath()} local transform is not orthogonal."
+
+            # Return the local pose
+            position, orientation = T.mat2pose(local_transform)
 
         # Assert validity of the orientation
         assert math.isclose(
@@ -232,22 +241,11 @@ class XFormPrim(BasePrim):
             rotq = lazy.pxr.Gf.Quatf(*orientation)
         else:
             rotq = lazy.pxr.Gf.Quatd(*orientation)
-        xform_op.Set(rotq)
+        with og.sim.editing_usd():
+            xform_op.Set(rotq)
         PoseAPI.invalidate()
 
-        # TODO(#2082) Verify if this is still needed.
-        # If fabric is on, make sure the USD local pose is synced to the fabric local pose.
-        # Ideally we should call usdrt's set local pose directly, but there is no such API.
-        # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
-        xformable_prim = lazy.usdrt.Rt.Xformable(
-            lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
-        )
-        if xformable_prim.HasWorldXform():
-            logger.warning(
-                "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this. As a fallback, we will clear the world xform and set the local xform from USD."
-            )
-            xformable_prim.ClearWorldXform()
-        xformable_prim.SetLocalXformFromUsd()
+        og.sim.fabric_hierarchy.update_world_xforms()
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """
@@ -271,8 +269,7 @@ class XFormPrim(BasePrim):
             assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
             return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
         else:
-            position, orientation = lazy.isaacsim.core.utils.xforms.get_local_pose(self.prim_path)
-            return th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation[[1, 2, 3, 0]], dtype=th.float32)
+            return PoseAPI.get_local_pose(self.prim_path)
 
     def set_position(self, position):
         """
@@ -464,9 +461,12 @@ class XFormPrim(BasePrim):
         Args:
             material (MaterialPrim): Material to bind to this prim
         """
-        self._binding_api.Bind(
-            lazy.pxr.UsdShade.Material(material.prim), bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants
-        )
+        binding_api = self._binding_api
+        with og.sim.editing_usd():
+            binding_api.Bind(
+                lazy.pxr.UsdShade.Material(material.prim),
+                bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants,
+            )
         self._material = material
 
     def add_filtered_collision_pair(self, prim):
@@ -476,9 +476,12 @@ class XFormPrim(BasePrim):
         Args:
             prim (XFormPrim): Another prim to filter collisions with
         """
-        # Add to both this prim's and the other prim's filtered pair
-        self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self.prim_path)
+        self_api = self._collision_filter_api
+        other_api = prim._collision_filter_api
+        with og.sim.editing_usd():
+            # Add to both this prim's and the other prim's filtered pair
+            self_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
+            other_api.GetFilteredPairsRel().AddTarget(self.prim_path)
 
     def remove_filtered_collision_pair(self, prim):
         """
@@ -487,9 +490,11 @@ class XFormPrim(BasePrim):
         Args:
             prim (XFormPrim): Another prim to remove filter collisions with
         """
-        # Add to both this prim's and the other prim's filtered pair
-        self._collision_filter_api.GetFilteredPairsRel().RemoveTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
+        self_api = self._collision_filter_api
+        other_api = prim._collision_filter_api
+        with og.sim.editing_usd():
+            self_api.GetFilteredPairsRel().RemoveTarget(prim.prim_path)
+            other_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
         pos, ori = self.get_position_orientation()

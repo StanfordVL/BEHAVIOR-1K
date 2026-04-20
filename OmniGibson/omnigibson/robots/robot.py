@@ -93,6 +93,14 @@ AG_MODES = {
 }
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
+# Sentinel written before each grasping-arm block in the serialized state tensor. Should be:
+#   - Larger than the max UUID (10^8 - 1 = 99,999,999) to avoid false positives on UUID values
+#   - Exactly representable in float32
+# Old recordings that predate AG serialization will not contain this value, so the block is skipped.
+_AG_MAGIC = 1e8 + 123456
+# Floats of payload per grasping arm (after the magic + arm_idx): [obj_uuid, link_idx, parent_pos(3), parent_orn(4), child_pos(3), child_orn(4), joint_type]
+_AG_STATE_SIZE = 17
+
 
 class Robot(USDObject, GymObservable):
     def __init__(
@@ -500,10 +508,11 @@ class Robot(USDObject, GymObservable):
             )
             position, orientation = self.get_position_orientation()
             # Set the world-to-base fixed joint to be at the robot's current pose
-            self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-            self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-            )
+            with og.sim.editing_usd():
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+                )
 
         force_sphere = (
             self.is_holonomic_base
@@ -882,15 +891,6 @@ class Robot(USDObject, GymObservable):
         """
         return self._last_action
 
-    def _base_set_position_orientation(
-        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
-    ):
-        # Run super first
-        super().set_position_orientation(position, orientation, frame)
-
-        # Clear the controllable view's backend since state has changed
-        ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
-
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
     ):
@@ -898,9 +898,16 @@ class Robot(USDObject, GymObservable):
         Sets robot's pose with respect to the specified frame
         ...
         """
-        if self.is_holonomic_base:
-            assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
+        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
+        # Store the original EEF poses for restoring AG later.
+        if self.is_manipulation:
+            original_poses = {}
+            for arm in self.arm_names:
+                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
+
+        # Move the robot. We need to do different stuff if it's a holonomic base.
+        if self.is_holonomic_base:
             # If no position or no orientation are given, get the current position and orientation of the object
             if position is None or orientation is None:
                 current_position, current_orientation = self.get_position_orientation(frame=frame)
@@ -930,25 +937,24 @@ class Robot(USDObject, GymObservable):
 
             # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
             else:
-                # Call the super() method to move the robot frame first
-                self._base_set_position_orientation(position, orientation, frame)
+                # Call the super() method to move the robot frame first. Note that we use world frame since we have done
+                # the conversion to world frame already in the code block before this conditional.
+                super().set_position_orientation(position, orientation, frame="world")
                 # Move the joint frame for the world_base_joint
                 if self._world_base_fixed_joint_prim is not None:
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                        lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-                    )
-            return
+                    with og.sim.editing_usd():
+                        self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+                        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                            lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+                        )
+        else:
+            super().set_position_orientation(position, orientation, frame)
 
+        # Clear the controllable view's backend since state has changed
+        ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
+
+        # Now for each hand, if it was holding an AG object, teleport it.
         if self.is_manipulation:
-            # Store the original EEF poses.
-            original_poses = {}
-            for arm in self.arm_names:
-                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
-
-            self._base_set_position_orientation(position, orientation, frame)
-
-            # Now for each hand, if it was holding an AG object, teleport it.
             for arm in self.arm_names:
                 if self._ag_obj_in_hand[arm] is not None:
                     original_eef_pose = T.pose2mat(original_poses[arm])
@@ -959,8 +965,6 @@ class Robot(USDObject, GymObservable):
                     # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
                     new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                     self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
-            return
-        self._base_set_position_orientation(position, orientation, frame)
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         # Call super first
@@ -1119,10 +1123,38 @@ class Robot(USDObject, GymObservable):
                 group_parts.append(ControllerView.serialize(group_key, controller_idx, controller_state))
         if group_parts:
             state_flat = th.cat([state_flat] + group_parts)
-        if self.is_manipulation:
-            # No additional serialization needed if we're using physical grasping
-            if self.grasping_mode == "physical":
-                return state_flat
+
+        if self.is_manipulation and self.grasping_mode != "physical":
+            ag_params = state.get("ag_obj_constraint_params", {})
+            # One block per grasping arm, each prefixed with the magic sentinel and arm_idx.
+            # Non-grasping arms are omitted entirely, and old recordings that predate AG
+            # serialization simply have no trailing magic — deserialize() skips cleanly.
+            ag_parts = []
+            for arm_idx, arm in enumerate(self.arm_names):
+                arm_params = ag_params.get(arm)
+                if arm_params is None:
+                    continue
+                target_obj = self.scene.object_registry("name", arm_params["target_obj"])
+                link_names = sorted(target_obj.links.keys())
+                link_idx = link_names.index(arm_params["target_link_name"])
+                ag_parts.append(
+                    th.tensor(
+                        [
+                            _AG_MAGIC,
+                            float(arm_idx),
+                            float(target_obj.uuid),
+                            float(link_idx),
+                            *arm_params["parent_frame_pos"].tolist(),
+                            *arm_params["parent_frame_orn"].tolist(),
+                            *arm_params["child_frame_pos"].tolist(),
+                            *arm_params["child_frame_orn"].tolist(),
+                            float(arm_params["joint_type"] == "SphericalJoint"),
+                        ]
+                    )
+                )
+            if ag_parts:
+                state_flat = th.cat([state_flat] + ag_parts)
+
         return state_flat
 
     def deserialize(self, state):
@@ -1136,10 +1168,33 @@ class Robot(USDObject, GymObservable):
             idx += n
         state_dict["controller_groups"] = group_states
 
-        if self.is_manipulation:
-            # No additional deserialization needed if we're using physical grasping
-            if self.grasping_mode == "physical":
-                return state_dict, idx
+        if self.is_manipulation and self.grasping_mode != "physical":
+            state_dict["ag_obj_constraint_params"] = {}
+            # One block per grasping arm, each starting with the magic sentinel followed by
+            # arm_idx and the constraint payload. Old recordings that predate AG serialization
+            # lack the sentinel entirely, so this loop is safely skipped for them.
+            while idx < len(state) and state[idx].item() == _AG_MAGIC:
+                idx += 1
+                arm_idx = int(state[idx].item())
+                idx += 1
+                arm = self.arm_names[arm_idx]
+                arm_data = state[idx : idx + _AG_STATE_SIZE]
+                idx += _AG_STATE_SIZE
+                obj_uuid = int(arm_data[0].item())
+                link_idx = int(arm_data[1].item())
+                target_obj = self.scene.object_registry("uuid", obj_uuid)
+                assert target_obj is not None, f"Object with UUID {obj_uuid} not found in scene registry"
+                link_name = sorted(target_obj.links.keys())[link_idx]
+                state_dict["ag_obj_constraint_params"][arm] = {
+                    "target_obj": target_obj.name,
+                    "target_link_name": link_name,
+                    "parent_frame_pos": arm_data[2:5].clone(),
+                    "parent_frame_orn": arm_data[5:9].clone(),
+                    "child_frame_pos": arm_data[9:12].clone(),
+                    "child_frame_orn": arm_data[12:16].clone(),
+                    "joint_type": "SphericalJoint" if bool(arm_data[16].item()) else "FixedJoint",
+                }
+
         return state_dict, idx
 
     def _initialize(self):
@@ -3711,7 +3766,7 @@ class Robot(USDObject, GymObservable):
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
-        Gets tiago's pose with respect to the specified frame.
+        Gets the robot's pose with respect to the specified frame.
 
         Args:
             frame (Literal): frame to get the pose with respect to. Default to world.

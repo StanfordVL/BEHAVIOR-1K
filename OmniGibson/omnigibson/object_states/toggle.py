@@ -496,7 +496,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
             create_primitive_mesh(prim_path=mesh_prim_path, primitive_type="Sphere", extents=1.0)
         else:
             # Infer radius from mesh if not specified as an input
-            lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
             self.scale = vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim

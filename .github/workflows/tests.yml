@@ -26,7 +26,7 @@ jobs:
         working-directory: ${{ github.workspace }}/bddl3
 
       - name: Run BDDL tests
-        run: pytest tests/test_knowledgebase.py -v --junitxml=bddl_tests.xml
+        run: pytest tests/test_knowledgebase.py -v --junitxml=bddl_tests.xml -o junit_family=xunit1
         working-directory: ${{ github.workspace }}/bddl3
 
       - name: Deploy artifact
@@ -83,6 +83,7 @@ jobs:
           - test_symbolic_primitives
           - test_systems
           - test_transform_utils
+          - test_snapshots
           - test_transition_rules
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
@@ -141,6 +142,7 @@ jobs:
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
           ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
           --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          -o junit_family=xunit1
         continue-on-error: true
         timeout-minutes: 30
 
@@ -166,6 +168,14 @@ jobs:
             echo "All tests passed successfully"
           fi
 
+      - name: Deploy snapshot artifacts
+        if: always() && matrix.test_file == 'test_snapshots'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-snapshots
+          path: OmniGibson/tests/snapshots/actual/
+          overwrite: true
+
       - name: Deploy artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -182,11 +192,23 @@ jobs:
     permissions:
       pull-requests: write
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
       - name: Pull reports
         uses: actions/download-artifact@v4
         with:
           path: test-results
           merge-multiple: true
+      - name: Upload test results to Trunk
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: trunk-io/analytics-uploader@v1
+        with:
+          junit-paths: test-results/**/*.xml
+          org-slug: stanfordvl-behavior
+          token: ${{ secrets.TRUNK_API_TOKEN }}
+
       - name: Convert JUnit XML to CTRF
         run: npx --yes junit-to-ctrf "test-results/**/test_*.xml" -o ctrf-report.json
 
@@ -199,8 +221,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fail if any tests failed
+      - name: Fail if any tests failed or were cancelled
         run: |
+          if [[ "${{ needs.run_test.result }}" == "cancelled" || "${{ needs.bddl_tests.result }}" == "cancelled" || "${{ needs.check_example_list.result }}" == "cancelled" ]]; then
+            echo "One or more test jobs were cancelled"
+            exit 1
+          fi
           if grep -rqE 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' test-results/; then
             echo "Test failures or errors found"
             exit 1

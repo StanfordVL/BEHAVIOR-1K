@@ -423,6 +423,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             self.projection_mesh.scale = self._projection_mesh_params["extents"]
 
             # Make sure the object updates its meshes, and assert that there's only a single visual mesh
+            # TODO: This is a bad idea. It creates orphaned prims when the mesh lists get overwritten. Why do we need this?
             self.link.update_meshes()
             assert (
                 len(self.link.visual_meshes) == 1
@@ -465,15 +466,16 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Define direction indicator if requested
             if m.USE_PARTICLE_APPLIER_DIRECTION_INDICATOR:
                 indicator_mesh_path = f"{mesh_prim_path}_direction_indicator"
-                indicator_mesh_prim = (
-                    getattr(lazy.pxr.UsdGeom, self._projection_mesh_params["type"])
-                    .Define(og.sim.stage, indicator_mesh_path)
-                    .GetPrim()
-                )
-                property_names = set(indicator_mesh_prim.GetPropertyNames())
-                for shape_attr, default_val in shape_defaults.items():
-                    if shape_attr in property_names:
-                        indicator_mesh_prim.GetAttribute(shape_attr).Set(default_val)
+                with og.sim.editing_usd():
+                    indicator_mesh_prim = (
+                        getattr(lazy.pxr.UsdGeom, self._projection_mesh_params["type"])
+                        .Define(og.sim.stage, indicator_mesh_path)
+                        .GetPrim()
+                    )
+                    property_names = set(indicator_mesh_prim.GetPropertyNames())
+                    for shape_attr, default_val in shape_defaults.items():
+                        if shape_attr in property_names:
+                            indicator_mesh_prim.GetAttribute(shape_attr).Set(default_val)
                 indicator_mesh = GeomPrim(
                     relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, indicator_mesh_path),
                     name=f"{name_prefix}_projection_mesh_direction_indicator",

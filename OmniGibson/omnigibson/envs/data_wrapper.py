@@ -1,6 +1,8 @@
 import h5py
+import numpy as np
 import json
 import logging
+import os
 import torch as th
 from typing import Any
 
@@ -8,6 +10,7 @@ import omnigibson as og
 from omnigibson.controllers import ControllerView, ControlType
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
+from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm, macros
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.data_utils import merge_scene_files
@@ -513,6 +516,9 @@ class DataPlaybackWrapper(DataWrapper):
         self.include_robot_control = include_robot_control
         self.include_contacts = include_contacts
 
+        self.video_writers = []
+        self.video_output_dir = os.path.dirname(output_path)
+
         # Run super
         super().__init__(
             env=env,
@@ -522,6 +528,43 @@ class DataPlaybackWrapper(DataWrapper):
             flush_every_n_traj=flush_every_n_traj,
             **kwargs,
         )
+
+    def _create_video_writers(self, video_keys):
+        """Create video writers for each video key."""
+        for key in video_keys:
+            shape = self.env.observation_space[key].shape
+            fpath = os.path.join(self.video_output_dir, f"{video_keys[key]}.mp4")
+            container, stream = create_video_writer(fpath=fpath, resolution=(shape[0], shape[1]), rate=self.fps)
+            self.video_writers.append((container, stream, key))
+
+    def _extract_frame_from_obs(self, obs: dict, key: str):
+        """Extract a single video frame from observation dict given a key."""
+        current = obs[key]
+        if len(current.shape) == 4:
+            current = current[-1]
+        if current.shape[-1] == 4:
+            current = current[..., :3]
+        elif current.shape[-1] == 1:
+            current = current[..., 0]
+        return current.numpy()
+
+    def _write_video_frames(self):
+        """Write current observation to all video writers."""
+        if not self.video_writers:
+            return
+        for container, stream, key in self.video_writers:
+            frame = self._extract_frame_from_obs(self.current_obs, key)
+            if frame is not None:
+                obs = frame[np.newaxis, ...]  # (H, W, C) -> (1, H, W, C)
+                write_video(obs, (container, stream), mode="rgb")
+
+    def _flush_video_writers(self):
+        """Flush and close all video writers."""
+        for container, stream, _ in self.video_writers:
+            for packet in stream.encode():
+                container.mux(packet)
+            container.close()
+        self.video_writers = []
 
     def _parse_step_data(
         self,
@@ -541,7 +584,12 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id: int, record_data: bool = True) -> None:
+    def playback_episode(
+        self,
+        episode_id: int,
+        record_data: bool = True,
+        video_keys: dict = None,
+    ) -> None:
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -549,7 +597,16 @@ class DataPlaybackWrapper(DataWrapper):
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
             record_data (bool): Whether to record data during playback or not
+            video_keys (dict): Optional dictionary of video keys to record during playback. If provided, will recreate
+                video writers at the start of playback (useful if they were flushed after a previous episode)
+                It should be a dict mapping from obs keys to the desired output video file name.
         """
+
+        # Recreate video writers if video_keys are provided
+        if video_keys:
+            self._flush_video_writers()  # Clear any existing writers first
+            self._create_video_writers(video_keys)
+
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
         traj_grp = data_grp[f"demo_{episode_id}"]
@@ -649,6 +706,10 @@ class DataPlaybackWrapper(DataWrapper):
                         )
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
+            # Write videos if video_writers are configured
+            if self.video_writers:
+                self._write_video_frames()
+
             # If recording, record data
             if record_data:
                 step_data = self._parse_step_data(
@@ -669,6 +730,9 @@ class DataPlaybackWrapper(DataWrapper):
 
         if record_data:
             self.flush_current_traj()
+
+        if self.video_writers:
+            self._flush_video_writers()
 
     def playback_dataset(self, record_data: bool = False) -> None:
         """

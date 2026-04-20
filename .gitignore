@@ -6,3 +6,6 @@ gha-creds-*.json
 # training
 outputs/
 /*.ipynb
+
+__pycache__/
+.codex

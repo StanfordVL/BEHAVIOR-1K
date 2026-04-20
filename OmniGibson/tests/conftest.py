@@ -34,7 +34,6 @@ def env(request, stopped_env):
         if name not in ("env", "stopped_env", "request"):
             request.getfixturevalue(name)
 
-    og.sim.step()
     og.sim.play()
     yield stopped_env
 
@@ -50,6 +49,20 @@ def robot(stopped_env):
         name="fetch",
         model="fetch",
         obs_modalities="rgb",
+        position=[150, 150, 100],
+        orientation=[0, 0, 0, 1],
+    )
+    stopped_env.scene.add_object(obj)
+    return obj
+
+
+@pytest.fixture
+def assisted_robot(stopped_env):
+    obj = Robot(
+        name="r1pro",
+        model="r1pro",
+        grasping_mode="assisted",
+        obs_modalities=[],
         position=[150, 150, 100],
         orientation=[0, 0, 0, 1],
     )

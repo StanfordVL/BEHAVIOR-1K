@@ -788,7 +788,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     "git_hash": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_git_hash(),
                 },
             },
-            "metadata": self._task_metadata,
+            "metadata": {"task": self._task_metadata},
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),
             "objects_info": self.get_objects_info(),
@@ -832,8 +832,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         state = recursively_convert_to_torch(scene_info["state"])
 
         # Recover metadata
-        for key, data in scene_info.get("metadata", dict()).items():
-            self.write_task_metadata(key=key, data=data)
+        if "metadata" in scene_info:
+            metadata = scene_info["metadata"]
+            task_metadata = metadata["task"] if "task" in metadata else metadata
+            for key, data in task_metadata.items():
+                self.write_task_metadata(key=key, data=data)
 
         # Make sure the class type is the same
         if self.__class__.__name__ != init_info["class_name"]:
@@ -901,9 +904,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             orientation (th.Tensor): (4,) orientation of the scene
         """
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
-        # Need to update sim here -- this is because downstream setters called immediately may not be respected,
-        # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-        og.sim.refresh_physics()
+
         # Update the cached pose and inverse pose
         pos_ori = self._scene_prim.get_position_orientation()
         pose = T.pose2mat(pos_ori)
@@ -1172,8 +1173,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
-            # We need to propagate these changes or else we get a crash
-            og.sim.refresh_physics(sync_usd=True)
             # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
