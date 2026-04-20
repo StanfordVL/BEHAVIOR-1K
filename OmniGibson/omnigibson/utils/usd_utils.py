@@ -2415,6 +2415,11 @@ def delete_or_deactivate_prim(prim_path):
     """
     Attept to delete or deactivate the prim defined at @prim_path.
 
+    Note that the removal of prims usually has an impact on the PhysX state and needs to be followed
+    by a call to og.sim.update_handles() to update tensor views etc. - we do not do here to avoid
+    performance overhead when lots of prims are removed at once in clear() etc. and instead we
+    delegate this to the caller.
+
     Args:
         prim_path (str): Path defining which prim should be deleted or deactivated
 
@@ -2453,9 +2458,6 @@ def delete_or_deactivate_prim(prim_path):
             for attr in prim.GetAttributes():
                 assert attr.ClearDefault()
             lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
-
-    # Update handles to handle the change in the stage
-    og.sim.update_handles()
 
     return True
 

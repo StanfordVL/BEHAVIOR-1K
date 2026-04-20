@@ -1946,6 +1946,7 @@ class Robot(USDObject, GymObservable):
 
         # Remove joint and filtered collision restraints
         delete_or_deactivate_prim(self._ag_obj_constraints[arm].GetPath().pathString)
+        og.sim.update_handles()
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = None
         self._ag_release_counter[arm] = 0
