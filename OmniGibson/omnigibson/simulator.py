@@ -29,7 +29,7 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
-from omnigibson.utils.asset_utils import get_dataset_path
+from omnigibson.utils.asset_utils import ensure_omnigibson_robot_assets_version, get_dataset_path
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
@@ -162,6 +162,9 @@ class SuppressLogsUntilError:
 
 def _launch_app():
     log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
+
+    # ensure that the omnigibson robot assets are up to date
+    ensure_omnigibson_robot_assets_version()
 
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
