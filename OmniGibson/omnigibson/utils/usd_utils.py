@@ -441,7 +441,9 @@ class RigidBodyViewAPI:
         if cls._POSE_MATRICES is None:
             return
         for link in links:
-            idx = cls._PATH_TO_IDX[link.prim_path]
+            idx = cls._PATH_TO_IDX.get(link.prim_path)
+            if idx is None:
+                continue  # not registered (e.g. particle templates not in scene.objects)
             pos, quat_xyzw = link.get_position_orientation()
             cls._POSES[idx][:3] = pos  # _POSES[idx]: (7,)
             cls._POSES[idx][3:] = quat_xyzw

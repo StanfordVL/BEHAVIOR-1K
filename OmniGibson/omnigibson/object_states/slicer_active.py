@@ -90,7 +90,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 continue
 
             sliceable_objs = scene.object_registry("abilities", "sliceable", [])
-            if not sliceable_objs:
+            # If there's no sliceable objects or slicer, append None
+            if not sliceable_objs or O == 0:
                 cls._slicer_contact_query_masks.append(None)
                 cls._sliceable_contact_col_mask.append(None)
                 continue
