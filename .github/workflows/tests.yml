@@ -221,8 +221,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fail if any tests failed
+      - name: Fail if any tests failed or were cancelled
         run: |
+          if [[ "${{ needs.run_test.result }}" == "cancelled" || "${{ needs.bddl_tests.result }}" == "cancelled" || "${{ needs.check_example_list.result }}" == "cancelled" ]]; then
+            echo "One or more test jobs were cancelled"
+            exit 1
+          fi
           if grep -rqE 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' test-results/; then
             echo "Test failures or errors found"
             exit 1

@@ -316,9 +316,11 @@ class BehaviorTask(BaseTask):
         Called after self.compiled_task is set (either immediately for
         non-wildcard tasks, or after deferred compilation for wildcard tasks).
         """
-        # Get scope, making sure agent is the first entry
-        self.object_scope = {"agent.n.01_1": None}
-        self.object_scope.update({name: None for name in self.compiled_task.object_scope})
+        existing = dict(self.object_scope)
+        self.object_scope.clear()
+        self.object_scope["agent.n.01_1"] = existing.get("agent.n.01_1")
+        for name in self.compiled_task.object_scope:
+            self.object_scope[name] = existing.get(name)
 
         # Object info
         self.object_instance_to_category = {

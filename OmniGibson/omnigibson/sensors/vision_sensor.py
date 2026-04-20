@@ -4,6 +4,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.macros import gm
 from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.systems.system_base import get_all_system_names
 from omnigibson.utils.constants import (
@@ -55,7 +56,7 @@ class VisionSensor(BaseSensor):
         horizontal_aperture (float): Horizontal aperture to set
         clipping_range (2-tuple): (min, max) viewing range of this vision sensor
         viewport_name (None or str): If specified, will link this camera to the specified viewport, overriding its
-            current camera. Otherwise, creates a new viewport
+            current camera. Otherwise, creates a new viewport if not in headless mode and links this camera to it.
     """
 
     ALL_MODALITIES = (
@@ -137,6 +138,8 @@ class VisionSensor(BaseSensor):
         self._viewport = None  # Viewport from which to grab data
         self._annotators = None
         self._render_product = None
+        self._image_height = image_height  # used when viewport is not created
+        self._image_width = image_width  # used when viewport is not created
 
         self._RAW_SENSOR_TYPES = dict(
             rgb="rgb",
@@ -199,16 +202,19 @@ class VisionSensor(BaseSensor):
         self.SENSORS[self.prim_path] = self
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
+        self._image_width, self._image_height = resolution
         with og.sim.editing_usd():
             self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
-        if viewport_name is not None:
+        should_create_viewport = viewport_name is not None or not gm.HEADLESS
+        viewport = None
+        if should_create_viewport and viewport_name is not None:
             vp_names_to_handles = {vp.name: vp for vp in lazy.omni.kit.viewport.window.get_viewport_window_instances()}
             assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
             viewport = vp_names_to_handles[viewport_name]
-        else:
+        elif should_create_viewport:
             with og.sim.editing_usd():
                 viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
             # Take a render step to make sure the viewport is generated before docking it
@@ -239,16 +245,16 @@ class VisionSensor(BaseSensor):
                     )
 
         self._viewport = viewport
+        if self._viewport is not None:
+            # Link the camera and viewport together
+            self._viewport.viewport_api.set_active_camera(self.prim_path)
 
-        # Link the camera and viewport together
-        self._viewport.viewport_api.set_active_camera(self.prim_path)
+            # Requires 4 render updates to propagate changes
+            for i in range(4):
+                og.sim.render()
 
-        # Requires 4 render updates to propagate changes
-        for i in range(4):
-            og.sim.render()
-
-        # Set the viewer size (requires taking one render step afterwards)
-        self._viewport.viewport_api.set_texture_resolution(resolution)
+            # Set the viewer size (requires taking one render step afterwards)
+            self._viewport.viewport_api.set_texture_resolution(resolution)
 
         # Also update relevant camera params from load config
         self.focal_length = self._load_config["focal_length"]
@@ -613,13 +619,14 @@ class VisionSensor(BaseSensor):
         with og.sim.editing_usd():
             self._render_product.destroy()
 
-        # Remove the viewport if it's not the main viewport
-        if self._viewport.name != "Viewport":
-            with og.sim.editing_usd():
+        # Remove the viewport if it exists.
+        if self._viewport is not None:
+            # Remove the viewport if it's not the main viewport
+            if self._viewport.name != "Viewport":
                 self._viewport.destroy()
-        else:
-            # We're deleting our camera, so set the normal viewport camera to the default /Perspective camera
-            self.active_camera_path = "/OmniverseKit_Persp"
+            else:
+                # We're deleting our camera, so set the normal viewport camera to the default /Perspective camera
+                self.active_camera_path = "/OmniverseKit_Persp"
 
         # Run super
         super().remove()
@@ -675,7 +682,7 @@ class VisionSensor(BaseSensor):
         Returns:
             bool: Whether the viewer is visible or not
         """
-        return self._viewport.visible
+        return False if self._viewport is None else self._viewport.visible
 
     @viewer_visibility.setter
     def viewer_visibility(self, visible):
@@ -685,6 +692,8 @@ class VisionSensor(BaseSensor):
         Args:
             visible (bool): Whether the viewer should be visible or not
         """
+        if self._viewport is None:
+            return
         self._viewport.visible = visible
         # Requires 1 render update to propagate changes
         og.sim.render()
@@ -695,7 +704,7 @@ class VisionSensor(BaseSensor):
         Returns:
             int: Image height of this sensor, in pixels
         """
-        return self._viewport.viewport_api.get_texture_resolution()[1]
+        return self._image_height if self._viewport is None else self._viewport.viewport_api.get_texture_resolution()[1]
 
     @image_height.setter
     def image_height(self, height):
@@ -705,8 +714,11 @@ class VisionSensor(BaseSensor):
         Args:
             height (int): Image height of this sensor, in pixels
         """
-        width, _ = self._viewport.viewport_api.get_texture_resolution()
-        self._viewport.viewport_api.set_texture_resolution((width, height))
+        self._image_height = height
+        width = self._image_width
+        if self._viewport is not None:
+            width, _ = self._viewport.viewport_api.get_texture_resolution()
+            self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
         with og.sim.editing_usd():
@@ -731,7 +743,7 @@ class VisionSensor(BaseSensor):
         Returns:
             int: Image width of this sensor, in pixels
         """
-        return self._viewport.viewport_api.get_texture_resolution()[0]
+        return self._image_width if self._viewport is None else self._viewport.viewport_api.get_texture_resolution()[0]
 
     @image_width.setter
     def image_width(self, width):
@@ -741,8 +753,11 @@ class VisionSensor(BaseSensor):
         Args:
             width (int): Image width of this sensor, in pixels
         """
-        _, height = self._viewport.viewport_api.get_texture_resolution()
-        self._viewport.viewport_api.set_texture_resolution((width, height))
+        self._image_width = width
+        height = self._image_height
+        if self._viewport is not None:
+            _, height = self._viewport.viewport_api.get_texture_resolution()
+            self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
         with og.sim.editing_usd():
@@ -862,7 +877,7 @@ class VisionSensor(BaseSensor):
         Returns:
             str: prim path of the active camera attached to this vision sensor
         """
-        return self._viewport.viewport_api.get_active_camera().pathString
+        return None if self._viewport is None else self._viewport.viewport_api.get_active_camera().pathString
 
     @active_camera_path.setter
     def active_camera_path(self, path):
@@ -872,6 +887,11 @@ class VisionSensor(BaseSensor):
         Args:
             path (str): Prim path to the camera that will be attached to this vision sensor
         """
+        if self._viewport is None:
+            raise RuntimeError(
+                "Cannot set active_camera_path because this sensor has no viewport. "
+                "Set gm.HEADLESS=False to enable viewport textures."
+            )
         self._viewport.viewport_api.set_active_camera(path)
         # Requires 6 updates to propagate changes
         for i in range(6):
