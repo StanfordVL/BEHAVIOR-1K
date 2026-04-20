@@ -1014,6 +1014,10 @@ class EntityPrim(XFormPrim):
                 this_orientation, root_link_orientation, atol=1e-2
             ), "Orientation mismatch between entity prim and root link"
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+            if self.kinematic_only:
+                for link in self._links.values():
+                    if isinstance(link, RigidKinematicPrim):
+                        link.clear_kinematic_only_cache()
         else:
             # Otherwise, we simply move the object in PhysX and force it to update Fabric, too.
             if self.articulated:
