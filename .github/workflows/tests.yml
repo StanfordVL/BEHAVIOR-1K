@@ -135,7 +135,8 @@ jobs:
 
       - name: Install Trunk Analytics CLI
         run: |
-          curl -fsSLO https://trunk.io/releases/trunk-analytics-cli
+          curl -fL --retry 3 \
+            "https://github.com/trunk-io/analytics-cli/releases/latest/download/trunk-analytics-cli-x86_64-unknown-linux.tar.gz" | tar -xz
           chmod +x trunk-analytics-cli
           sudo mv trunk-analytics-cli /usr/local/bin/
 
