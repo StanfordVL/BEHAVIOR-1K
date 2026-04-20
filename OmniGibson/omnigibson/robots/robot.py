@@ -213,8 +213,9 @@ class Robot(USDObject, GymObservable):
         """
         self.model = model
         # Read and validate robot definition YAML file using OmegaConf
-        definition_dir = os.path.dirname(__file__)
-        definition_path = os.path.join(definition_dir, "definitions", self.model + ".yaml")
+        definition_path = os.path.join(
+            get_dataset_path("omnigibson-robot-assets"), "models", self.model, self.model + ".yaml"
+        )
         yaml_definition = OmegaConf.load(definition_path)
         schema = OmegaConf.structured(RobotDefinition)
         merged_definition = OmegaConf.merge(schema, yaml_definition)
