@@ -153,13 +153,13 @@
           {% endfor %}
         </td>
         <td>
-          {% for task in synset.tasks[:10] %}
+          {% for task in (synset.tasks | list)[:10] %}
             <a href="{{ url_for('task_detail', name=task.name) }}">{{ task.name }}, </a>
           {% endfor %}
           {% if synset.tasks|length > 10 %}...{% endif %}
         </td>
         <td>
-          {% for category in synset.categories[:10] %}
+          {% for category in (synset.categories | list)[:10] %}
             <a href="{{ url_for('category_detail', name=category.name) }}">{{ category.name }}, </a>
           {% endfor %}
           {% if synset.categories|length > 10 %}...{% endif %}
