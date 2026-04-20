@@ -3446,7 +3446,7 @@ class Robot(USDObject, GymObservable):
         """
 
         # Find out where the joint should go in the local frame of both the robot and the target object
-        # Note that we can't use scaled transforms here because those are only available through PoseAPI
+        # Note that we can't use scaled transforms here because those are only available through Fabric getters
         # which cannot be refreshed during a physics step. We instead use the unscaled position and orientation
         # and divide by the scale of the robot and target object to get the local frame position and orientation.
         joint_frame_orn = th.tensor([0, 0, 0, 1.0])

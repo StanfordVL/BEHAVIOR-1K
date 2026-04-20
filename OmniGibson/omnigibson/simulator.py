@@ -47,7 +47,6 @@ from omnigibson.utils.vision_utils import add_semantic_label
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
-    PoseAPI,
     RigidContactAPI,
 )
 from omnigibson.utils.usd_utils import clear as clear_usd_utils
@@ -1117,8 +1116,6 @@ def _launch_simulator(*args, **kwargs):
             self._in_sim_lifecycle += 1
             try:
                 self._sim_context.render()
-                # During rendering, the Fabric API is updated, so we can mark it as clean
-                PoseAPI.mark_valid()
             finally:
                 self._in_sim_lifecycle -= 1
 
@@ -1141,6 +1138,12 @@ def _launch_simulator(*args, **kwargs):
                 SimulationManager._message_bus.dispatch_event(IsaacEvents.PHYSICS_READY.value, payload={})
             finally:
                 self._in_sim_lifecycle -= 1
+
+        def sync_physx_to_fabric(self):
+            # We don't want to sync PhysX to Fabric during a physics step, as it is quite slow!
+            assert not self.currently_stepping, "Cannot refresh poses during a physics step!"
+
+            self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -1391,9 +1394,6 @@ def _launch_simulator(*args, **kwargs):
             try:
                 # Make it possible to identify that we are currently within a step
                 self.currently_stepping = True
-
-                # Invalidate various APIs so that any reads from them will be updated
-                PoseAPI.invalidate()
 
                 # Only do this if we're not in the warmup phase
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
