@@ -15,7 +15,6 @@ from pathlib import Path
 from urllib.request import urlretrieve
 import zipfile
 
-import bddl
 from huggingface_hub import hf_hub_download
 from cryptography.fernet import Fernet
 
@@ -28,6 +27,12 @@ if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# The latest version of the dataset that should be downloaded
+BEHAVIOR_1K_ASSET_VERSION = "3.7.2rc1"
+OMNIGIBSON_ROBOT_ASSETS_VERSION = "3.8.2"
+# The minimum compatible version of the dataset that should be used.
+MINIMUM_ROBOT_ASSETS_VERSION = "3.8.2"
 
 
 def is_dot_file(p):
@@ -337,22 +342,6 @@ def get_attachment_meta_links(category, model):
         return attachment_meta_links
 
 
-def get_omnigibson_robot_asset_git_hash():
-    """
-    Returns:
-        str: OmniGibson asset commit hash
-    """
-    try:
-        git_hash = subprocess.check_output(
-            ["git", "-C", get_dataset_path("omnigibson-robot-assets"), "rev-parse", "HEAD"],
-            shell=False,
-            stderr=subprocess.DEVNULL,
-        )
-        return git_hash.decode("utf-8").strip()
-    except subprocess.CalledProcessError:
-        return None
-
-
 def get_omnigibson_robot_asset_version():
     """
     Returns:
@@ -380,20 +369,6 @@ def get_omnigibson_git_hash():
 
 def get_omnigibson_version():
     return og.__version__
-
-
-def get_bddl_git_hash():
-    """
-    Returns:
-        str: bddl asset commit hash
-    """
-    try:
-        git_hash = subprocess.check_output(
-            ["git", "-C", Path(bddl.__file__).parent, "rev-parse", "HEAD"], shell=False, stderr=subprocess.DEVNULL
-        )
-        return git_hash.decode("utf-8").strip()
-    except subprocess.CalledProcessError:
-        return None
 
 
 def get_bddl_version():
@@ -448,16 +423,14 @@ def get_texture_file(mesh_file):
 
 
 def download_and_unpack_zipped_dataset(dataset_name):
-    # The current version of the dataset that should be downloaded
-    BEHAVIOR_1K_DATASET_VERSION = "3.7.2rc1"
-
     tempdir = tempfile.mkdtemp()
     real_target = get_dataset_path(dataset_name)
-    online_filename = (
-        f"behavior-1k-assets-{BEHAVIOR_1K_DATASET_VERSION}.zip"
-        if dataset_name == "behavior-1k-assets"
-        else f"{dataset_name}.zip"
-    )
+    if dataset_name == "behavior-1k-assets":
+        online_filename = f"behavior-1k-assets-{BEHAVIOR_1K_ASSET_VERSION}.zip"
+    elif dataset_name == "omnigibson-robot-assets":
+        online_filename = f"omnigibson-robot-assets-{OMNIGIBSON_ROBOT_ASSETS_VERSION}.zip"
+    else:
+        online_filename = f"{dataset_name}.zip"
     local_path = hf_hub_download(
         repo_id="behavior-1k/zipped-datasets",
         filename=online_filename,
@@ -469,14 +442,40 @@ def download_and_unpack_zipped_dataset(dataset_name):
     shutil.rmtree(tempdir)
 
 
-def download_omnigibson_robot_assets():
+def ensure_omnigibson_robot_assets_version():
+    current_version = get_omnigibson_robot_asset_version()
+    if current_version is None or Version(current_version) < Version(MINIMUM_ROBOT_ASSETS_VERSION):
+        raise RuntimeError(
+            f"OmniGibson robot assets version {current_version} is older than the minimum compatible version "
+            f"{MINIMUM_ROBOT_ASSETS_VERSION}. Please run `python -m omnigibson.utils.asset_utils --update_omnigibson_robot_assets` to remove the existing installation and redownload."
+        )
+
+
+def download_omnigibson_robot_assets(upgrade: bool = False):
     """
-    Download OmniGibson assets
+    Download OmniGibson robot assets
+
+    Args:
+        upgrade (bool): If True, remove existing installation and redownload if no version or older version
     """
-    if os.path.exists(get_dataset_path("omnigibson-robot-assets")):
-        print("Assets already downloaded.")
+    dataset_path = get_dataset_path("omnigibson-robot-assets")
+    current_version = get_omnigibson_robot_asset_version()
+    needs_upgrade = current_version is None or Version(current_version) < Version(MINIMUM_ROBOT_ASSETS_VERSION)
+    upgraded = False
+    if os.path.exists(dataset_path):
+        if upgrade and needs_upgrade:
+            print(f"Removing existing omnigibson-robot-assets (version: {current_version}) to upgrade...")
+            shutil.rmtree(dataset_path)
+            download_and_unpack_zipped_dataset("omnigibson-robot-assets")
+            upgraded = True
+        else:
+            print(f"OmniGibson robot assets already downloaded (version: {current_version}).")
     else:
         download_and_unpack_zipped_dataset("omnigibson-robot-assets")
+        upgraded = True
+    if upgraded:
+        new_version = get_omnigibson_robot_asset_version()
+        print(f"Successfully downloaded OmniGibson robot assets version {new_version}.")
 
 
 def print_user_agreement():
@@ -589,16 +588,9 @@ def download_behavior_1k_assets(accept_license=False):
 
 
 def download_2025_challenge_task_instances():
-    if os.path.exists(get_dataset_path("2025-challenge-task-instances")):
-        # cd and git pull
-        subprocess.run(
-            ["git", "-C", get_dataset_path("2025-challenge-task-instances"), "pull"],
-            shell=False,
-            check=True,
-        )
-        print("2025 BEHAVIOR Challenge Tasks Instances updated.")
-    else:
+    if not os.path.exists(get_dataset_path("2025-challenge-task-instances")):
         download_and_unpack_zipped_dataset("2025-challenge-task-instances")
+    print("2025 BEHAVIOR Challenge Tasks Instances updated.")
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):
@@ -647,6 +639,7 @@ def decrypted(encrypted_filename):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--download_omnigibson_robot_assets", action="store_true", help="download assets file")
+    parser.add_argument("--update_omnigibson_robot_assets", action="store_true", help="update assets file")
     parser.add_argument("--download_behavior_1k_assets", action="store_true", help="download BEHAVIOR-1K Dataset")
     parser.add_argument(
         "--download_2025_challenge_task_instances",
@@ -658,6 +651,8 @@ if __name__ == "__main__":
 
     if args.download_omnigibson_robot_assets:
         download_omnigibson_robot_assets()
+    if args.update_omnigibson_robot_assets:
+        download_omnigibson_robot_assets(upgrade=True)
     if args.download_behavior_1k_assets:
         download_behavior_1k_assets(accept_license=args.accept_license)
     if args.download_2025_challenge_task_instances:
