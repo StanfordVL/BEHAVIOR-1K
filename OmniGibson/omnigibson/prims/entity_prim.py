@@ -1,4 +1,5 @@
 from functools import cached_property
+import math
 from typing import Literal
 
 import networkx as nx
@@ -1025,6 +1026,18 @@ class EntityPrim(XFormPrim):
                 # Convert to th.Tensor if necessary
                 position = th.as_tensor(position, dtype=th.float32)
                 orientation = th.as_tensor(orientation, dtype=th.float32)
+
+                # Assert validity of the orientation
+                assert math.isclose(
+                    th.norm(orientation).item(), 1, abs_tol=1e-3
+                ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+
+                # Convert to from scene-relative to world if necessary
+                if frame == "scene":
+                    assert (
+                        self.scene is not None
+                    ), "cannot set position and orientation relative to scene without a scene"
+                    position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
                 # Check that the articulation view is valid and can write directly to PhysX
                 assert (
