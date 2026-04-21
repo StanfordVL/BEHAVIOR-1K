@@ -1,4 +1,5 @@
 from functools import cached_property
+import math
 from typing import Literal
 
 import networkx as nx
@@ -15,7 +16,7 @@ from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.render_utils import force_pbr_material_for_link
-from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative, count_joints
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -56,9 +57,8 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._materials = None
         self._visual_only = None
-        self._articulated = None
         self._articulation_tree = None
-        self._articulation_view_direct = None
+        self._articulation_view = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
         self._prim_type = (
@@ -129,12 +129,12 @@ class EntityPrim(XFormPrim):
         self._compute_articulation_tree()
 
         # Prepare the articulation view.
-        if self.n_joints > 0:
+        if self.articulated:
             # Import now to avoid too-eager load of Omni classes due to inheritance
             from omnigibson.utils.deprecated_utils import ArticulationView
 
             with og.sim.editing_usd():
-                self._articulation_view_direct = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
+                self._articulation_view = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -175,9 +175,6 @@ class EntityPrim(XFormPrim):
                         material_paths.add(mat_path)
 
         self._materials = materials
-
-        # Cache weather we are articulated or not
-        self._articulated = self.articulation_root_path is not None
 
     def remove(self):
         # First remove all joints
@@ -299,7 +296,7 @@ class EntityPrim(XFormPrim):
                             relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, joint_path),
                             name=f"{self._name}:joint_{joint_name}",
                             load_config={"driven": self.is_driven},
-                            articulation_view=self._articulation_view_direct,
+                            articulation_view=self._articulation_view,
                         )
                         joint.load(self.scene)
                         joint.initialize()
@@ -385,19 +382,6 @@ class EntityPrim(XFormPrim):
         return False
 
     @property
-    def _articulation_view(self):
-        if self._articulation_view_direct is None:
-            return None
-
-        # Validate that the articulation view is initialized and that if physics is running, the
-        # view is valid.
-        if og.sim.is_playing() and self.initialized:
-            if not self._articulation_view_direct.is_physics_handle_valid():
-                og.sim.update_handles()
-
-        return self._articulation_view_direct
-
-    @property
     def prim_type(self):
         """
         Returns:
@@ -411,10 +395,7 @@ class EntityPrim(XFormPrim):
         Returns:
              bool: Whether this prim is articulated or not
         """
-        # Note that this is not equivalent to self.n_joints > 0 because articulation root path is
-        # overridden by the object classes
-        assert self._articulated is not None, "Articulation state not initialized!"
-        return self._articulated
+        return self.articulation_root_path is not None
 
     @property
     def root_link_name(self):
@@ -678,7 +659,7 @@ class EntityPrim(XFormPrim):
         else:
             with og.sim.editing_usd():
                 self._articulation_view.set_joint_positions(positions, joint_indices=indices)
-            PoseAPI.invalidate()
+            og.sim.sync_physx_to_fabric()
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
@@ -854,8 +835,8 @@ class EntityPrim(XFormPrim):
         assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
 
         # Reinitialize the articulation view
-        if self._articulation_view_direct is not None:
-            self._articulation_view_direct.initialize(og.sim.physics_sim_view)
+        if self._articulation_view is not None:
+            self._articulation_view.initialize(og.sim.physics_sim_view)
 
         # Update all links and joints as well
         for link in self._links.values():
@@ -1019,9 +1000,11 @@ class EntityPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
-        # If the articulation root is the entity prim, we can just move the entity prim. In this case
-        # we want to make sure that the root link does not have a relative pose to the entity prim.
-        if self.articulation_root_path == self.prim_path:
+        # If the simulation is stopped, we can just move the entity prim directly. This is appropriate because
+        # it's the only numerically stable way to move the root link and all of the child links together.
+        # It does create a dual path for places where the transform might end up being set, but is a necessary evil.
+        # In this case, we also want to make sure that the root link does not have a relative pose to the entity prim.
+        if og.sim.is_stopped():
             this_position, this_orientation = XFormPrim.get_position_orientation(self, frame=frame)
             root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
             assert th.allclose(
@@ -1031,23 +1014,45 @@ class EntityPrim(XFormPrim):
                 this_orientation, root_link_orientation, atol=1e-2
             ), "Orientation mismatch between entity prim and root link"
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+            if self.kinematic_only:
+                for link in self._links.values():
+                    if isinstance(link, RigidKinematicPrim):
+                        link.clear_kinematic_only_cache()
         else:
-            # If the object's articulation root is NOT the entity prim, the entity prim should NOT have a
-            # transform. Otherwise the root link's transform needs to get multiplied by this and it can cause
-            # inaccuracies over long distances.
-            local_pos, local_orn = XFormPrim.get_position_orientation(self, frame="parent")
-            assert th.allclose(
-                local_pos, th.zeros(3), atol=1e-3
-            ), "The object/entity prim of an articulated object should not have a transform if it's not the articulation root."
-            assert th.allclose(
-                local_orn, th.tensor([0.0, 0.0, 0.0, 1.0]), atol=1e-3
-            ), "The object/entity prim of an articulated object should not have a transform if it's not the articulation root."
+            # Otherwise, we simply move the object in PhysX and force it to update Fabric, too.
+            if self.articulated:
+                # If no position or no orientation are given, get the current position and orientation of the object
+                if position is None or orientation is None:
+                    current_position, current_orientation = self.get_position_orientation(frame=frame)
+                position = current_position if position is None else position
+                orientation = current_orientation if orientation is None else orientation
 
-            # Otherwise, we need to set it directly on the root link.
-            self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
+                # Convert to th.Tensor if necessary
+                position = th.as_tensor(position, dtype=th.float32)
+                orientation = th.as_tensor(orientation, dtype=th.float32)
 
-        # Invalidate the pose cache.
-        PoseAPI.invalidate()
+                # Assert validity of the orientation
+                assert math.isclose(
+                    th.norm(orientation).item(), 1, abs_tol=1e-3
+                ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+
+                # Convert to from scene-relative to world if necessary
+                if frame == "scene":
+                    assert (
+                        self.scene is not None
+                    ), "cannot set position and orientation relative to scene without a scene"
+                    position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
+
+                # Check that the articulation view is valid and can write directly to PhysX
+                assert (
+                    self._articulation_view.is_physics_handle_valid()
+                ), "Unexpected: articulation view is not valid while simulation is playing."
+                self._articulation_view.set_world_poses(
+                    positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
+                )
+                og.sim.sync_physx_to_fabric()
+            else:
+                self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """

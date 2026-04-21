@@ -8,7 +8,7 @@ from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import get_world_pose_with_scale
 from omnigibson.object_states.robot_related_states import ObjectsInFOVOfRobot
 from omnigibson.utils.constants import semantic_class_name_to_id
 
@@ -88,7 +88,7 @@ def test_camera_pose():
     new_camera_world_pose = vision_sensor.get_position_orientation()
     camera_parent_prim = lazy.isaacsim.core.utils.prims.get_prim_parent(vision_sensor.prim)
     camera_parent_path = str(camera_parent_prim.GetPath())
-    camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
+    camera_parent_world_transform = get_world_pose_with_scale(camera_parent_path)
     expected_new_camera_world_pos, expected_new_camera_world_ori = mat2pose(
         camera_parent_world_transform
         @ pose2mat((th.tensor([10, 10, 10], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)))
@@ -111,7 +111,7 @@ def test_camera_pose():
 
     # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
     camera_parent_prim.scale = th.tensor([2.0, 2.0, 2.0])
-    camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
+    camera_parent_world_transform = get_world_pose_with_scale(camera_parent_path)
     camera_local_pose = vision_sensor.get_position_orientation(frame="parent")
     expected_mat = camera_parent_world_transform @ pose2mat(camera_local_pose)
     expected_mat[:3, :3] = expected_mat[:3, :3] / th.norm(expected_mat[:3, :3], dim=0, keepdim=True)
