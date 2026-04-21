@@ -101,7 +101,9 @@ python OmniGibson/scripts/sampling/extract_task_information.py
 
 ### Step 7: Update Task Misc
 
-Put a new entry in `2026-challenge-task-instances/metadata/B100_task_misc.csv`
+Put a new entry in `2026-challenge-task-instances/metadata/B100_task_misc.csv`. Take a look at the floor plan, and put in the task relevant rooms in the entry. Think of it as "what are the minimal set of rooms that is required for the robot to complete the task?"
+
+Note that the rooms should include not only the rooms that contains the robot and TROs, but also those that connects them in between (e.g. corridors),  so that the robot can actually complete the task. 
 
 
 ### Step 8: Verify Task Viability
