@@ -794,7 +794,8 @@ def test_cooking_object_rule_failure_wrong_container(env, oven, stockpot, bagel_
 
     # This fails the recipe because it requires the baking sheet to be inside the oven, not the stockpot
     stockpot.set_position_orientation([0, 0, 0.487], [0, 0, 0, 1])
-    og.sim.step()
+    for _ in range(10):
+        og.sim.step()
     assert stockpot.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation([0, 0, 0.464], [0, 0, 0, 1])

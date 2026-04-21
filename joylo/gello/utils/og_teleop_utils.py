@@ -765,12 +765,13 @@ def setup_task_instruction_ui(task_name, env, instance_id=None):
                             line,
                             alignment=lazy.omni.ui.Alignment.LEFT_CENTER,
                             style={
-                                "color": UI_SETTINGS[
-                                    "goal_unsatisfied_color"
-                                ],  # Red color (ABGR)
+                                "color": UI_SETTINGS["goal_unsatisfied_color"],
                                 "font_size": UI_SETTINGS["font_size"],
                                 "margin": 0,
                                 "padding": 0,
+                                ":selected": {
+                                    "color": UI_SETTINGS["goal_satisfied_color"],
+                                },
                             },
                         )
                         text_labels.append(label)
@@ -1256,23 +1257,13 @@ def update_goal_status(
     ) or set(goal_status["unsatisfied"]) != set(prev_goal_status["unsatisfied"])
 
     if status_changed:
-        # Update satisfied goals - make them green
         for idx in goal_status["satisfied"]:
             if 0 <= idx < len(text_labels):
-                current_style = text_labels[idx].style
-                current_style.update(
-                    {"color": UI_SETTINGS["goal_satisfied_color"]}
-                )  # Green (ABGR)
-                text_labels[idx].style = current_style
+                text_labels[idx].selected = True
 
-        # Update unsatisfied goals - make them red
         for idx in goal_status["unsatisfied"]:
             if 0 <= idx < len(text_labels):
-                current_style = text_labels[idx].style
-                current_style.update(
-                    {"color": UI_SETTINGS["goal_unsatisfied_color"]}
-                )  # Red (ABGR)
-                text_labels[idx].style = current_style
+                text_labels[idx].selected = False
 
         # Return the updated status
         return goal_status.copy()
