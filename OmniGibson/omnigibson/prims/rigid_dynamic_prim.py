@@ -114,6 +114,49 @@ class RigidDynamicPrim(RigidPrim):
         """
         return self._rigid_prim_view.get_angular_velocities(clone=clone)[0]
 
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
+        """
+        Set the position and orientation of the dynamic rigid body.
+
+        Args:
+            position (None or 3-array): The position to set the object to. If None, the position is not changed.
+            orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world.
+                Scene frame sets position relative to the scene.
+        """
+        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
+
+        # If the simulation is stopped, we can just use the XFormPrim implementation directly. This is slower than
+        # the PhysX-based implementation, but the PhysX implementation is not available when the simulation is stopped.
+        if og.sim.is_stopped():
+            return super().set_position_orientation(position=position, orientation=orientation, frame=frame)
+
+        # If no position or no orientation are given, get the current position and orientation of the object
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else position
+        orientation = current_orientation if orientation is None else orientation
+
+        # Convert to th.Tensor if necessary
+        position = th.as_tensor(position, dtype=th.float32)
+        orientation = th.as_tensor(orientation, dtype=th.float32)
+
+        # Assert validity of the orientation
+        assert math.isclose(
+            th.norm(orientation).item(), 1, abs_tol=1e-3
+        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+
+        # Convert to from scene-relative to world if necessary
+        if frame == "scene":
+            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
+            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
+
+        assert (
+            self._rigid_prim_view.is_physics_handle_valid()
+        ), "Unexpected: rigid prim view is not valid while simulation is playing."
+        self._rigid_prim_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
+        og.sim.sync_physx_to_fabric()
+
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
         Gets prim's pose with respect to the specified frame.

@@ -11,7 +11,7 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI, ensure_usd_api
+from omnigibson.utils.usd_utils import get_world_pose_with_scale, get_world_pose, get_local_pose, ensure_usd_api
 
 # Create module logger
 logger = create_module_logger(module_name=__name__)
@@ -206,7 +206,7 @@ class XFormPrim(BasePrim):
         if frame != "parent":
             world_transform = T.pose2mat((position, orientation))
             parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(self._prim).GetPath())
-            parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
+            parent_world_transform = get_world_pose_with_scale(parent_path)
 
             local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
             local_transform[:3, :3] /= th.linalg.norm(
@@ -243,7 +243,6 @@ class XFormPrim(BasePrim):
             rotq = lazy.pxr.Gf.Quatd(*orientation)
         with og.sim.editing_usd():
             xform_op.Set(rotq)
-        PoseAPI.invalidate()
 
         og.sim.fabric_hierarchy.update_world_xforms()
 
@@ -264,12 +263,12 @@ class XFormPrim(BasePrim):
         """
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         if frame == "world":
-            return PoseAPI.get_world_pose(self.prim_path)
+            return get_world_pose(self.prim_path)
         elif frame == "scene":
             assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-            return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
+            return self.scene.convert_world_pose_to_scene_relative(*get_world_pose(self.prim_path))
         else:
-            return PoseAPI.get_local_pose(self.prim_path)
+            return get_local_pose(self.prim_path)
 
     def set_position(self, position):
         """
@@ -400,7 +399,7 @@ class XFormPrim(BasePrim):
         """
         Returns the scaled transform of this prim.
         """
-        return PoseAPI.get_world_pose_with_scale(self.prim_path)
+        return get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
         return T.transform_points(points, self.scaled_transform)
@@ -435,8 +434,6 @@ class XFormPrim(BasePrim):
         else:
             scale = th.ones(3, dtype=th.float32) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
-        # Invalidate PoseAPI
-        PoseAPI.invalidate()
         # Invalidate the cached scale
         self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())
