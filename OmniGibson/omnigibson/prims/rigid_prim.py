@@ -401,7 +401,7 @@ class RigidPrim(XFormPrim):
         # Also set the internal value
         self._visual_only = val
 
-    @property
+    @cached_property
     def volume(self):
         """
         Note: Currently it doesn't support Capsule type yet

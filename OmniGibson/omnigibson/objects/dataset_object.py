@@ -285,16 +285,14 @@ class DatasetObject(USDObject):
 
         if self._prim_type == PrimType.RIGID:
             if category_mass is not None:
-                # Compute each link's volume once and reuse below to avoid recomputing
-                link_volumes = {link: link.volume for link in self._links.values()}
-                total_volume = sum(link_volumes.values())
+                total_volume = sum(link.volume for link in self._links.values())
                 for link in self._links.values():
                     # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
                     if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
                         if gm.FORCE_CATEGORY_MASS:
                             # Each link should get the appropriate fraction of the category mass
                             # based on the link volume
-                            link.mass = max(category_mass * (link_volumes[link] / total_volume), 1e-6)
+                            link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
                             link.density = 0.0
                         else:
                             link.mass = 0.0
