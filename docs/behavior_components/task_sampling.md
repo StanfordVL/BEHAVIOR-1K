@@ -1,25 +1,26 @@
-
-### Sampling New Task Instances
+# :material-chart-scatter-plot: **Task Sampling**
 
 Generate fresh instances of existing tasks with randomized elements for variety and robustness testing.
 
-**Example: Sampling a pick up trash task, task name = picking_up_trash**
-0. Clone `2026-challenge-task-instances` into `gm.DATA_PATH`: https://github.com/wensi-ai/2026-challenge-task-instances 
+## Getting Started
 
-1. Enter the sampling directory,
-```sh
-cd YOUR_PATH_TO_BEHAVIOR/BEHAVIOR-1K/OmniGibson/scripts/sampling
+Clone `2026-challenge-task-instances` into `gm.DATA_PATH`:
+
+```bash
+git clone https://github.com/wensi-ai/2026-challenge-task-instances
 ```
 
-2. Review the BDDL definition for your task to understand what objects and conditions are involved:
+## Sampling Workflow
 
-```
-bddl3/bddl/activity_definitions/TASK_NAME/problem0.bddl
-```
 
-3. Generate and write the task custom list entry for your task:
-```sh
-python autogenerate_task_custom_list_template.py -t TASK_NAME 
+### Step 1: Review BDDL and Generate the JSON Template
+
+Pick a task,review the bddl definition under `bddl3/bddl/activity_definitions/TASK_NAME/problem_0.bddl`. Make sure the defintion is reasonable. In particular watch out for wildcard expansions. 
+
+Then, generate a JSON template for your task:
+
+```bash
+python OmniGibson/scripts/sampling/autogenerate_task_custom_list_template.py -t TASK_NAME
 ```
 
 The script will interactively prompt you to:
@@ -28,6 +29,7 @@ The script will interactively prompt you to:
 - **Models**: for each required synset and category, choose one or more model IDs from those available on disk. A link to the synset page on the BEHAVIOR Knowledgebase (e.g. https://behavior.stanford.edu/knowledgebase/synsets/ashcan.n.01.html) is printed alongside each prompt to help you browse available models.
 
 The script writes the completed entry directly to `datasets/2026-challenge-task-instances/metadata/task_custom_lists.json`. The result looks like:
+
 ```json
 "picking_up_trash": {
     "room_types": [
@@ -55,41 +57,108 @@ The script writes the completed entry directly to `datasets/2026-challenge-task-
 ```
 
 
-4. Sample task related objects
+### Step 2: Sample Task-Related Objects (TRO)
 
-```sh
-python sample_b1k_tasks.py -t TASK_NAME
+```bash
+python OmniGibson/scripts/sampling/sample_b1k_tasks.py -t TASK_NAME
 ```
+
+It is highly recommended to run this command with `-m pdb`, so it will stop at the error during sampling and you can debug interactively to see what's wrong. 
+
 The scene is read automatically from `task_custom_lists.json`. After this command, you should see 2 files generated under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`: `house_double_floor_lower_task_picking_up_trash_0_0_template-partial_rooms.json` (intermediate) and `house_double_floor_lower_task_picking_up_trash_0_0_template.json` (postprocessed, with full scene objects merged in).
 
-5. Randomly generate 300 instances for your task
-```sh
-python multiply_b1k_tasks.py --partial_save --start_idx 1 --end_idx 300 -t TASK_NAME
-```
-After this step, you should see a folder named house_double_floor_lower_task_picking_up_trash_instances appeared under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`, in which there are files with name like house_double_floor_lower_task_picking_up_trash_0_(index)_template-tro_state.json.
+### Step 3: Postprocess Sampled JSON
 
-6. Presample poses for all supported robots
-```sh
-python sample_robot_pose.py -t TASK_NAME
+Add static scene objects to the generated file:
+
+```bash
+python OmniGibson/scripts/sampling/postprocess_sampled_task.py -t TASK_NAME
 ```
 
-7. To verify whether your sampling is successful, specify your task name in OmniGibson/omnigibson/configs/r1pro_behavior.yaml and run 
-```sh
-python /BEHAVIOR-1K/joylo/scripts/launch_og.py --task-name TASK_NAME --recording-path HDF_PATH
+After this command, another file is generated under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`: `house_double_floor_lower_task_picking_up_trash_0_0_template.json`.
+
+### Step 4: Generate Instances
+
+Randomly generate 1 instances for your task:
+
+```bash
+python OmniGibson/scripts/sampling/multiply_b1k_tasks.py --partial_save --start_idx 1 --end_idx 1 -t TASK_NAME
 ```
 
-```sh
-python /BEHAVIOR-1K/joylo/scripts/run_joylo.py
+After this step, a folder named `house_double_floor_lower_task_picking_up_trash_instances` appears under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`, containing files named like `house_double_floor_lower_task_picking_up_trash_0_1_template-tro_state.json`.
+
+### Step 5: Presample Robot Poses
+
+```bash
+python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME
 ```
 
-Try to complete the task by running the replay script to generate the video and qa result json file;
+### Step 6: Register New Task
 
-```sh
-python /BEHAVIOR-1K/joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
+```bash
+python OmniGibson/scripts/sampling/extract_task_information.py
 ```
 
-8. Finishing up
+### Step 7: Update Task Misc
 
-Share the generated mp4 file to @wensi-ai for review. 
+Put a new entry in `2026-challenge-task-instances/metadata/B100_task_misc.csv`
 
-After the task design is finalized, submit a PR to 2026-challenge-task-instances (be careful for merge conflicts!) and tag @wensi-ai for review. 
+
+### Step 8: Verify Task Viability
+
+Prepare the joylo device, and run the following commands:
+
+```bash
+python joylo/scripts/launch_og.py --task-name TASK_NAME --recording-path HDF_PATH
+```
+
+```bash
+python joylo/scripts/run_joylo.py
+```
+
+You should be able to complete the task without major bottlenecks. Watch out for any issues during teleoperation. Here are some examples:
+
+    - Cannot complete the task (e.g. not able to navigate to a room because of narrow corridor)
+    - Major artifacts / bad appearances in the scenes or objects 
+    - The task requires a lot of effort to complete (e.g. need to pick something up from a very high cabinet).
+    - The tasks induces unavoidable collisions between robot and the environment to complete (e.g. robot can't pick up food from the oven without colliding with the door)
+    - Other unreasonable behavior during teleoperation (e.g. )
+
+If the following happens, either redo the previous sampling steps while fixing bugs, or discard the task and restart with another task. 
+
+After teleoperation succeeds, you should see a `hdf5` file at `HDF_PATH`. Run the following replay script, which will generate the video and QA result JSON file:
+
+```bash
+python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
+```
+
+Share the generated MP4 file with the team for review.
+
+
+### Step 9: Generate the rest of the 300 instances
+
+Run the multiply script again, this time with index 2 to 300, and then sample robot poses, then update task yaml:
+
+```bash
+python OmniGibson/scripts/sampling/multiply_b1k_tasks.py --partial_save --start_idx 2 --end_idx 300 -t TASK_NAME -s SCENE_NAME
+```
+
+```bash
+python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME -s SCENE_NAME
+```
+
+```bash
+python OmniGibson/scripts/sampling/extract_task_information.py
+```
+
+### Step 10: Prepare all files and submit PR
+
+After the task design is finalized, create a seperate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
+
+    - two seed instance json files: `0_0_template.json`, `0_0_template-partial_rooms.json`
+    - 300 task intance files under 
+    - updated `task_custom_list.json` and `available_tasks.yaml`
+
+Watch out for merge conflicts from main, which will most likely happen on `task_custom_list.json` and `available_tasks.yaml`. 
+
+Submit a PR and tag the team for review.
