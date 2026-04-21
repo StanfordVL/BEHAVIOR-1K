@@ -1,21 +1,10 @@
 import os
 import json
-import math
 import yaml
 import re
+import torch as th
+import omnigibson.utils.transform_utils as T
 from constants import DATASET_2026_PATH
-
-
-def euler_to_quat(euler):
-    """Convert XYZ euler angles (radians) to [x, y, z, w] quaternion."""
-    cx, cy, cz = math.cos(euler[0] / 2), math.cos(euler[1] / 2), math.cos(euler[2] / 2)
-    sx, sy, sz = math.sin(euler[0] / 2), math.sin(euler[1] / 2), math.sin(euler[2] / 2)
-    return [
-        sx * cy * cz + cx * sy * sz,
-        cx * sy * cz - sx * cy * sz,
-        cx * cy * sz + sx * sy * cz,
-        cx * cy * cz - sx * sy * sz,
-    ]
 
 
 def main():
@@ -97,7 +86,7 @@ def main():
                 root_pos = obj_state["root_link"]["pos"]
                 base_joints = obj_state["joint_pos"]
                 robot_start_position = [root_pos[i] + base_joints[i] for i in range(3)]
-                robot_start_orientation = euler_to_quat(base_joints[3:6])
+                robot_start_orientation = T.euler2quat(th.tensor(base_joints[3:6])).tolist()
                 tasks_data[task_name][0] = {
                     "scene_model": scene_model,
                     "robot_start_position": robot_start_position,
