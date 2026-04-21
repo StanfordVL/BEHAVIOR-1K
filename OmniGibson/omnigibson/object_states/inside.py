@@ -18,12 +18,34 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         return deps
 
     def _set_value(self, other, new_value, reset_before_sampling=False):
+        """
+        Set the Inside state for this object with respect to another object (container).
+
+        This samples a random position inside the container's fillable volume, places the object,
+        lets it settle via physics, and verifies it's still inside.
+
+        The sampling strategy uses a two-phase approach:
+        1. First half of attempts: Sample from inset AABB (container bounds minus object extent).
+           This ensures the sampled position is at the object's centroid, not near the edges,
+           which makes it more likely to fit inside.
+        2. Second half of attempts: Sample from full container AABB. This is a fallback for
+           cases where the object is too large to fit entirely within the inset bounds.
+
+        Args:
+            other: The container object to place this object inside.
+            new_value: True to set Inside state (only True is supported).
+            reset_before_sampling: If True, reset this object before sampling.
+
+        Returns:
+            True if successfully placed inside, False otherwise.
+        """
         if not new_value:
             raise NotImplementedError("Inside does not support set_value(False)")
 
         if other.prim_type == PrimType.CLOTH:
             raise ValueError("Cannot set an object inside a cloth object.")
 
+        # Find the container's fillable meta link (fillable or openfillable)
         container_link = None
         for link in other.links.values():
             if link.is_meta_link and link.meta_link_type in macros.object_states.contains.CONTAINER_META_LINK_TYPES:
@@ -32,66 +54,86 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
 
         assert container_link is not None, f"Container object {other.name} must have a fillable meta link"
 
+        # Save simulator state for restoration on failed attempts
         state = og.sim.dump_state(serialized=False)
 
         if reset_before_sampling:
             self.obj.reset()
 
+        # Get container's fillable volume bounds in world frame
         aabb_low, aabb_high = container_link.visual_aabb
+        # Get the object extent to compute inset bounds
+        obj_extent = self.obj.aabb_extent
 
+        # Inset the container AABB by half the object extent in each dimension.
+        # This ensures the sampled position (used as object centroid) won't place
+        # any part of the object outside the container bounds.
+        inset_aabb_low = aabb_low + obj_extent / 2.0
+        inset_aabb_high = aabb_high - obj_extent / 2.0
+
+        # First half of low-level attempts use inset bounds, second half use full bounds
+        half_attempts = os_m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS // 2
+
+        # High-level loop: Each iteration samples orientation fresh and restores state on failure
         for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
-            pos = None
+            # Sample orientation if the object supports random orientations, otherwise use default
             orientation = (
                 self.obj.sample_orientation()
                 if (hasattr(self.obj, "orientations") and self.obj.orientations is not None)
                 else th.tensor([0, 0, 0, 1.0])
             )
 
-            self.obj.set_position_orientation(position=th.tensor([100, 100, 10]), orientation=orientation)
-            self.obj.keep_still()
-            og.sim.step_physics()
+            # Low-level loop: Try multiple sampled positions per orientation
+            for attempt_idx in range(os_m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS):
+                # First half: use inset bounds (smarter sampling)
+                # Second half: use full bounds (fallback for large objects)
+                # Also fallback if inset bounds are invalid (object too large for container)
+                if attempt_idx < half_attempts and th.all(inset_aabb_low < inset_aabb_high):
+                    pos = inset_aabb_low + th.rand(3) * (inset_aabb_high - inset_aabb_low)
+                else:
+                    pos = aabb_low + th.rand(3) * (aabb_high - aabb_low)
 
-            for _ in range(os_m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS):
-                pos = aabb_low + th.rand(3) * (aabb_high - aabb_low)
-
+                # Rejection sampling #1: Verify the sampled point is actually inside the container volume
                 if not container_link.check_points_in_volume(pos.unsqueeze(0)).item():
                     continue
 
-                pos[2] += 0.05  # Add a small offset to ensure the object is above the bottom of the container
+                # Add small z-offset to avoid spawning inside the container floor
+                pos[2] += 0.01
                 self.obj.set_position_orientation(position=pos, orientation=orientation)
                 self.obj.keep_still()
 
+                # Rejection sampling #2: Check for collision after placement
+                # Step until contact is made or max steps reached (0.5 seconds of sim time)
                 n_steps_max = int(0.5 / og.sim.get_physics_dt())
-                i = 0
+                step_idx = 0
                 while (
                     not RigidContactAPI.is_in_contact(
                         scene_idx=self.obj.scene.idx,
                         query_set=[self.obj],
                         with_set=None,
                         ignore_set=None,
-                        current_only=False,
+                        current_only=True,
                     )
-                    and i < n_steps_max
+                    and step_idx < n_steps_max
                 ):
                     og.sim.step_physics()
-                    i += 1
+                    step_idx += 1
                 self.obj.keep_still()
                 other.keep_still()
 
-                for i in range(5):
+                # Step a few more times to let velocity stabilize
+                for _ in range(5):
                     og.sim.step_physics()
-                i = 0
-                while th.norm(self.obj.get_linear_velocity()) > 1e-3 and i < n_steps_max:
+                settle_step_idx = 0
+                while th.norm(self.obj.get_linear_velocity()) > 1e-3 and settle_step_idx < n_steps_max:
                     og.sim.step_physics()
-                    i += 1
+                    settle_step_idx += 1
 
-                og.sim.render()
-
+                # Rejection sampling #3: Verify object is still inside after settling
                 if self.get_value(other):
                     return True
 
-                break
-
+            # Restore simulator state for next high-level attempt
             og.sim.load_state(state, serialized=False)
 
         return False
