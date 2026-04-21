@@ -24,6 +24,7 @@ from utils import (
     get_scene_model,
 )
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from postprocess_sampled_task import postprocess_task
 import numpy as np
 
 log = create_module_logger(module_name="sample_b1k_tasks")
@@ -283,6 +284,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             task_relevant_only=False,
             suffix=task_suffix,
         )
+        postprocess_task(save_dir, scene_model, activity, overwrite=args.overwrite)
         og.sim.stop()
 
     assert og.sim.is_stopped()
