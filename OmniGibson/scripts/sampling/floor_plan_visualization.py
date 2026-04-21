@@ -6,7 +6,7 @@ and obstacles (furniture, fixtures) are visible against the room colors.
 
 Run as a script:
 
-    python -m omnigibson.examples.scenes.floor_plan_visualization \\
+    python scripts/sampling/floor_plan_visualization.py \\
         --scene house_single_floor --output house_single_floor_floorplan.png
 """
 
