@@ -623,7 +623,8 @@ class VisionSensor(BaseSensor):
         if self._viewport is not None:
             # Remove the viewport if it's not the main viewport
             if self._viewport.name != "Viewport":
-                self._viewport.destroy()
+                with og.sim.editing_usd():
+                    self._viewport.destroy()
             else:
                 # We're deleting our camera, so set the normal viewport camera to the default /Perspective camera
                 self.active_camera_path = "/OmniverseKit_Persp"
