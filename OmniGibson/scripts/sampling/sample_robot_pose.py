@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, List
 from omnigibson.macros import gm
 from omnigibson.objects.primitive_object import PrimitiveObject
+from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from utils import get_scene_model
 from omnigibson.object_states import OnTop
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
@@ -23,7 +25,6 @@ parser.add_argument(
     required=True,
     help="Activity to be sampled",
 )
-parser.add_argument("-s", "--scene_model", type=str, default=None, required=True, help="Scene model to sample tasks in")
 parser.add_argument(
     "-o",
     "--output_dir",
@@ -268,10 +269,12 @@ def main():
     """
     args = parser.parse_args()
 
+    with open(TASK_CUSTOM_LIST_PATH) as f:
+        task_custom_lists = json.load(f)
+    scene_model = get_scene_model(task_custom_lists[args.activity])
+
     if args.output_dir is None:
-        args.output_dir = os.path.join(
-            gm.DATA_PATH, "2026-challenge-task-instances", "scenes", args.scene_model, "json"
-        )
+        args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
 
     # Find tasks in output_dir
     tasks = find_given_tasks(Path(args.output_dir), [args.activity])
