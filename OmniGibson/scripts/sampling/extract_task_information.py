@@ -1,7 +1,6 @@
 import os
 import json
 import yaml
-import re
 import torch as th
 import omnigibson.utils.transform_utils as T
 from constants import DATASET_2026_PATH
@@ -13,7 +12,7 @@ def main():
     # Create a new empty dictionary to store tasks
     tasks_data = {}
 
-    # Traverse scenes/<scene_model>/json/<task_instances_dir>/
+    # Traverse scenes/<scene_model>/json
     for scene_model in os.listdir(scenes_dir):
         json_dir = os.path.join(scenes_dir, scene_model, "json")
         if not os.path.isdir(json_dir):
@@ -31,51 +30,6 @@ def main():
                 continue
             task_name = task_instances_dir[len(prefix) : -len(suffix)]
 
-            # Get all template JSON files (ending with _template-tro_state.json)
-            json_files = [f for f in os.listdir(task_path) if f.endswith("_template-tro_state.json")]
-
-            if not json_files:
-                print(f"No JSON files found in task directory: {task_instances_dir}")
-                continue
-
-            if task_name not in tasks_data:
-                tasks_data[task_name] = {}
-
-            for json_file in json_files:
-                json_file_path = os.path.join(task_path, json_file)
-
-                with open(json_file_path, "r") as f:
-                    json_content = json.load(f)
-
-                # Filename format: {scene_model}_task_{task_name}_0_{instance}_template-tro_state.json
-                filename_pattern = (
-                    rf"{re.escape(scene_model)}_task_{re.escape(task_name)}_0_(\d+)_template-tro_state\.json"
-                )
-                match = re.match(filename_pattern, json_file)
-                if not match:
-                    print(f"Could not extract instance number from filename: {json_file}")
-                    continue
-                instance_number = int(match.group(1))
-
-                # Extract robot pose from robot_poses key
-                robot_pose = json_content["robot_poses"]["robot"][0]
-                robot_start_position = robot_pose["position"]
-                robot_start_orientation = robot_pose["orientation"]
-
-                tasks_data[task_name][instance_number] = {
-                    "scene_model": scene_model,
-                    "robot_start_position": robot_start_position,
-                    "robot_start_orientation": robot_start_orientation,
-                }
-
-                print(f"Processed file: {json_file} from directory: {task_instances_dir}")
-                print(f"  Task: {task_name}")
-                print(f"  Instance: {instance_number}")
-                print(f"  Scene model: {scene_model}")
-                print(f"  Robot start position: {robot_start_position}")
-                print(f"  Robot start orientation: {robot_start_orientation}")
-                print("-" * 50)
-
             # Instance 0 lives in the parent json/ folder as _0_0_template.json (old format, no robot_poses key)
             template_file = os.path.join(json_dir, f"{scene_model}_task_{task_name}_0_0_template.json")
             if os.path.exists(template_file):
@@ -87,10 +41,12 @@ def main():
                 base_joints = obj_state["joint_pos"]
                 robot_start_position = [root_pos[i] + base_joints[i] for i in range(3)]
                 robot_start_orientation = T.euler2quat(th.tensor(base_joints[3:6])).tolist()
-                tasks_data[task_name][0] = {
-                    "scene_model": scene_model,
-                    "robot_start_position": robot_start_position,
-                    "robot_start_orientation": robot_start_orientation,
+                tasks_data[task_name] = {
+                    0: {
+                        "scene_model": scene_model,
+                        "robot_start_position": robot_start_position,
+                        "robot_start_orientation": robot_start_orientation,
+                    }
                 }
                 print(f"Processed instance 0 from: {os.path.basename(template_file)}")
                 print(f"  Robot start position: {robot_start_position}")

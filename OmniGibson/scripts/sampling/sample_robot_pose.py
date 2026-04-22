@@ -9,6 +9,7 @@ from typing import Dict, List
 from omnigibson.macros import gm
 from omnigibson.objects.primitive_object import PrimitiveObject
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from gello.utils.og_teleop_utils import generate_robot_config
 from utils import get_scene_model
 from omnigibson.object_states import OnTop
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
@@ -141,25 +142,6 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
     return robot_poses
 
 
-def generate_robot_configs():
-    """
-    Generate robot configurations with default R1Pro.
-
-    Returns:
-        List containing R1Pro robot config
-    """
-    return [
-        {
-            "type": "R1Pro",
-            "name": "robot",
-            "obs_modalities": [],
-            "default_reset_mode": "tuck",
-            "position": [50.0, 0, 10.0],
-            "orientation": [0.0, 0.0, 0.0, 1.0],
-        }
-    ]
-
-
 def process_task(task_info: Dict):
     """
     Process a single task: sample cylinder pose and update all files.
@@ -203,7 +185,10 @@ def process_task(task_info: Dict):
             "include_obs": False,
             "use_presampled_robot_pose": False,
         },
-        "robots": generate_robot_configs(),
+        "robots": generate_robot_config(
+            robot_type="r1pro",
+            robot_name="robot",
+        ),
     }
     # Create environment once for this task
     env = og.Environment(configs=cfg)

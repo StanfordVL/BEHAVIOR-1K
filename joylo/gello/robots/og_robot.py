@@ -52,9 +52,6 @@ class OGRobotServer:
             ]  # Regardless of whether we have multiple instances, we always load the seed instance by default; we will handle randomization for different instances during reset
             # Case 1: Both task name and instance id are provided; this is for formal data collection with domain randomization
             if instance_id is not None:
-                assert task_name in VALIDATED_TASKS, (
-                    f"Task {task_name} is not in the list of validated tasks: {VALIDATED_TASKS}"
-                )
                 # Initialize instance ID, decrementing by 1 to ensure proper increment during the first reset
                 self.instance_id = instance_id - 1
             # Case 2: Only task name is provided; this is for task validation and testing with the seed instance

@@ -751,7 +751,7 @@ class BehaviorTask(BaseTask):
             task_relevant_state_dict = {
                 bddl_name: bddl_obj.dump_state(serialized=False)
                 for bddl_name, bddl_obj in env.task.object_scope.items()
-                if bddl_obj is not None
+                if bddl_obj is not None and "agent" not in bddl_name
             }
             Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
             with open(path, "w+") as f:

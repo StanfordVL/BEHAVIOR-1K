@@ -37,59 +37,6 @@ TASK_SPECIFIC_EXTRA_ROOMS = {
     },
 }
 
-VALIDATED_TASKS = [
-    "picking_up_trash",  # difficulty: 2
-    "putting_away_Halloween_decorations",  # difficulty: 3
-    "cleaning_up_plates_and_food",  # difficulty: 3.5
-    "setting_mousetraps",  # difficulty: 2
-    "hiding_Easter_eggs",  # difficulty: 2
-    "set_up_a_coffee_station_in_your_kitchen",  # difficulty: 3
-    "putting_dishes_away_after_cleaning",  # difficulty: 3
-    "preparing_lunch_box",  # difficulty: 3
-    "loading_the_car",  # difficulty: 3.5
-    "carrying_in_groceries",  # difficulty: 3.5
-    "turning_on_radio",  # difficulty: 1
-    "picking_up_toys",  # difficulty: 3.5
-    "can_meat",  # difficulty: 3.5
-    "rearranging_kitchen_furniture",  # difficulty: 3
-    "putting_up_Christmas_decorations_inside",  # difficulty: 2
-    "bringing_in_wood",  # difficulty: 1.5
-    "moving_boxes_to_storage",  # difficulty: 1.5
-    "bringing_water",  # difficulty: 1.5
-    "tidying_bedroom",  # difficulty: 2
-    "outfit_a_basic_toolbox",  # difficulty: 2,
-    "sorting_vegetables",
-    "collecting_childrens_toys",
-    "putting_shoes_on_rack",
-    "boxing_books_up_for_storage",
-    "storing_food",
-    "clearing_food_from_table_into_fridge",
-    "assembling_gift_baskets",
-    "sorting_household_items",
-    "getting_organized_for_work",
-    "clean_up_your_desk",
-    "setting_the_fire",
-    "clean_boxing_gloves",
-    "wash_a_baseball_cap",
-    "wash_dog_toys",
-    "hanging_pictures",
-    "attach_a_camera_to_a_tripod",
-    "clean_a_patio",
-    "clean_a_trumpet",
-    "spraying_for_bugs",
-    "spraying_fruit_trees",
-    "make_microwave_popcorn",
-    "cook_cabbage",
-    "make_pizza",
-    "chop_an_onion",
-    "slicing_vegetables",
-    "chopping_wood",
-    "canning_food",
-    "cook_hot_dogs",
-    "cook_bacon",
-    "freeze_pies",
-]
-
 
 # Viewing mode configuration
 class ViewingMode(str, Enum):

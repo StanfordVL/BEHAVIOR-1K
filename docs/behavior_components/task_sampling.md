@@ -67,17 +67,7 @@ It is highly recommended to run this command with `-m pdb`, so it will stop at t
 
 The scene is read automatically from `task_custom_lists.json`. After this command, you should see 2 files generated under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`: `house_double_floor_lower_task_picking_up_trash_0_0_template-partial_rooms.json` (intermediate) and `house_double_floor_lower_task_picking_up_trash_0_0_template.json` (postprocessed, with full scene objects merged in).
 
-### Step 3: Postprocess Sampled JSON
-
-Add static scene objects to the generated file:
-
-```bash
-python OmniGibson/scripts/sampling/postprocess_sampled_task.py -t TASK_NAME
-```
-
-After this command, another file is generated under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`: `house_double_floor_lower_task_picking_up_trash_0_0_template.json`.
-
-### Step 4: Generate Instances
+### Step 3: Generate Instances
 
 Randomly generate 1 instances for your task:
 
@@ -87,26 +77,33 @@ python OmniGibson/scripts/sampling/multiply_b1k_tasks.py --partial_save --start_
 
 After this step, a folder named `house_double_floor_lower_task_picking_up_trash_instances` appears under `datasets/2026-challenge-task-instances/scenes/SCENE_NAME/json`, containing files named like `house_double_floor_lower_task_picking_up_trash_0_1_template-tro_state.json`.
 
-### Step 5: Presample Robot Poses
+### Step 4: Presample Robot Poses
 
 ```bash
 python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME
 ```
 
-### Step 6: Register New Task
+### Step 5: Register New Task
 
 ```bash
 python OmniGibson/scripts/sampling/extract_task_information.py
 ```
 
-### Step 7: Update Task Misc
+### Step 6: Update Task Misc
 
-Put a new entry in `2026-challenge-task-instances/metadata/B100_task_misc.csv`. Take a look at the floor plan, and put in the task relevant rooms in the entry. Think of it as "what are the minimal set of rooms that is required for the robot to complete the task?"
+Assign an ID to the task (also update the google sheet!), then put a new entry in `2026-challenge-task-instances/metadata/B100_task_misc.csv`. Take a look at the floor plan, and put in the task relevant rooms in the entry. Think of it as "what are the minimal set of rooms that is required for the robot to complete the task as if it's in a fully-loaded scene?"
 
-Note that the rooms should include not only the rooms that contains the robot and TROs, but also those that connects them in between (e.g. corridors),  so that the robot can actually complete the task. 
+Note that the rooms should include not only the rooms that contains the robot and TROs, but also those that connects them in between (e.g. corridors), as well as any room that could be in sight of the robot. Take house single floor as an example, for a task that only requires kitchen_0, we will need to load in the following 7 rooms:
+    - corridor_0
+    - dining_room_0
+    - entryway_0
+    - garden_0
+    - kitchen_0
+    - living_room_0
+    - living_room_1 
 
 
-### Step 8: Verify Task Viability
+### Step 7: Verify Task Viability
 
 Prepare the joylo device, and run the following commands:
 
@@ -121,23 +118,25 @@ python joylo/scripts/run_joylo.py
 You should be able to complete the task without major bottlenecks. Watch out for any issues during teleoperation. Here are some examples:
 
     - Cannot complete the task (e.g. not able to navigate to a room because of narrow corridor)
-    - Major artifacts / bad appearances in the scenes or objects 
+    - Major artifacts / bad appearances in the scenes or objects. 
     - The task requires a lot of effort to complete (e.g. need to pick something up from a very high cabinet).
     - The tasks induces unavoidable collisions between robot and the environment to complete (e.g. robot can't pick up food from the oven without colliding with the door)
-    - Other unreasonable behavior during teleoperation (e.g. )
+    - Other unreasonable behavior during teleoperation (e.g. object is too heavy to pickup, door is very hard to open, etc.)
 
-If the following happens, either redo the previous sampling steps while fixing bugs, or discard the task and restart with another task. 
+If any of the above happens, either redo the previous sampling steps while fixing bugs, or if it's unfixable, discard the task and restart with another task. 
 
 After teleoperation succeeds, you should see a `hdf5` file at `HDF_PATH`. Run the following replay script, which will generate the video and QA result JSON file:
 
 ```bash
-python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
+OMNIGIBSON_HEADLESS=1 python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
 ```
 
-Share the generated MP4 file with the team for review.
+Check the QA json file output is reasonable. (It would be great if QA test passes - if not you should still try to minimize the QA errors, and also check all the QA complaints make sense). Also check mp4 to make sure the replay visual looks reasonable. For example, you shouldn't see a whole in the ground, which might indicates you forgot to put one room in the task misc csv. 
+
+If all outputs seems reasonable, share the generated MP4 file with the team for review.
 
 
-### Step 9: Generate the rest of the 300 instances
+### Step 8: Generate the rest of the 300 instances
 
 Run the multiply script again, this time with index 2 to 300, and then sample robot poses, then update task yaml:
 
@@ -146,14 +145,14 @@ python OmniGibson/scripts/sampling/multiply_b1k_tasks.py --partial_save --start_
 ```
 
 ```bash
-python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME -s SCENE_NAME
+python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME
 ```
 
 ```bash
 python OmniGibson/scripts/sampling/extract_task_information.py
 ```
 
-### Step 10: Prepare all files and submit PR
+### Step 9: Prepare all files and submit PR
 
 After the task design is finalized, create a seperate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
 

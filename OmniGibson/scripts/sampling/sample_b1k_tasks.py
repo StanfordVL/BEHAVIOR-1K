@@ -8,13 +8,11 @@ import json
 from omnigibson.objects import DatasetObject
 from omnigibson.object_states import Contains
 from omnigibson.tasks import BehaviorTask
-from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import clear as clear_pu
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.bddl_utils import get_knowledge_base
 from omnigibson.utils.ui_utils import create_module_logger
 from utils import (
-    create_stable_scene_json,
     get_rooms,
     get_predicates,
     get_valid_tasks,
@@ -89,12 +87,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
 
     # If we want to create a stable scene config, do that now
-    default_scene_fpath = os.path.join(
-        get_dataset_path("behavior-1k-assets"), "scenes", scene_model, "json", f"{scene_model}_stable.json"
-    )
-    if not os.path.exists(default_scene_fpath):
-        create_stable_scene_json(scene_model=scene_model)
-
+    default_scene_fpath = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json", f"{scene_model}_stable.json")
     # Get the default scene instance
     assert os.path.exists(default_scene_fpath), "Did not find default stable scene json!"
     with open(default_scene_fpath, "r") as f:
@@ -112,13 +105,12 @@ def main(random_selection=False, headless=False, short_exec=False):
             "scene_file": default_scene_fpath,
             "scene_model": scene_model,
             "seg_map_resolution": 0.1,
-            # "load_object_categories": ["floors"],
         },
         "robots": [
             {
                 "type": "R1Pro",
                 "obs_modalities": [],
-                "default_reset_mode": "untuck",
+                "default_reset_mode": "tuck",
                 "position": np.ones(3) * -50.0,
             },
         ],

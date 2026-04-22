@@ -4,7 +4,6 @@ import omnigibson as og
 from omnigibson.macros import gm, macros
 import json
 from omnigibson.objects import DatasetObject
-from omnigibson.utils.asset_utils import get_dataset_path
 import numpy as np
 from utils import validate_task, get_scene_model
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
@@ -95,7 +94,7 @@ def main():
             {
                 "type": "R1Pro",
                 "obs_modalities": [],
-                "default_reset_mode": "untuck",
+                "default_reset_mode": "tuck",
                 "position": np.ones(3) * -50.0,
             },
         ],
@@ -113,9 +112,7 @@ def main():
     save_dir = os.path.join(args.output_dir, f"{env.task.scene_name}_task_{args.activity}_instances")
 
     # If we want to create a stable scene config, do that now
-    default_scene_fpath = os.path.join(
-        get_dataset_path("behavior-1k-assets"), "scenes", scene_model, "json", f"{scene_model}_stable.json"
-    )
+    default_scene_fpath = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json", f"{scene_model}_stable.json")
     # Get the default scene instance
     assert os.path.exists(default_scene_fpath), "Did not find default stable scene json!"
     with open(default_scene_fpath, "r") as f:

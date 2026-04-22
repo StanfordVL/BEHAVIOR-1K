@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.tasks import BehaviorTask
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
@@ -39,9 +38,7 @@ def postprocess_task(output_dir, scene_model, activity_name, overwrite=False):
         activity_instance_id=0,
     )
     sampled_scene_partial_json = os.path.join(output_dir, f"{task_name}-partial_rooms.json")
-    full_scene_full_json = os.path.join(
-        get_dataset_path("behavior-1k-assets"), "scenes", scene_model, "json", f"{scene_model}_stable.json"
-    )
+    full_scene_full_json = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json", f"{scene_model}_stable.json")
     with open(full_scene_full_json, "r") as f:
         scene_a = json.load(f)
     with open(sampled_scene_partial_json, "r") as f:
