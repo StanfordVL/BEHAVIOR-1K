@@ -129,21 +129,28 @@ def replay_hdf5_to_video(
     ) as f:
         available_tasks.update(yaml.safe_load(f))
     scene_model = available_tasks[task_name][0]["scene_model"]
-    task_scene_file_folder = os.path.join(
-        gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_model, "json"
-    )
     full_scene_file = None
-    for file in os.listdir(task_scene_file_folder):
-        if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
-            full_scene_file = os.path.join(task_scene_file_folder, file)
-    assert full_scene_file is not None, (
-        f"No full scene file found in {task_scene_file_folder}"
-    )
+    for year in ("2026", "2025"):
+        task_scene_file_folder = os.path.join(
+            gm.DATA_PATH, f"{year}-challenge-task-instances", "scenes", scene_model, "json"
+        )
+        if not os.path.isdir(task_scene_file_folder):
+            continue
+        for file in os.listdir(task_scene_file_folder):
+            if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
+                full_scene_file = os.path.join(task_scene_file_folder, file)
+                break
+        if full_scene_file is not None:
+            break
+    if full_scene_file is None:
+        raise FileNotFoundError(
+            f"No full scene file found for task '{task_name}' in either 2026 or 2025 scene directories"
+        )
 
     load_room_instances = None
     try:
         with open(
-            f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv",
+            f"{gm.DATA_PATH}/2026-challenge-task-instances/metadata/B100_task_misc.csv",
             newline="",
             encoding="utf-8",
         ) as f:

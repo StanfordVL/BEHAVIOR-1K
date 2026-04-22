@@ -8,20 +8,21 @@ import json
 from omnigibson.objects import DatasetObject
 from omnigibson.object_states import Contains
 from omnigibson.tasks import BehaviorTask
-from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import clear as clear_pu
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.bddl_utils import get_knowledge_base
 from omnigibson.utils.ui_utils import create_module_logger
 from utils import (
-    create_stable_scene_json,
     get_rooms,
     get_predicates,
     get_valid_tasks,
     hide_all_lights,
     UNSUPPORTED_PREDICATES,
     validate_task,
+    get_scene_model,
 )
+from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from postprocess_sampled_task import postprocess_task
 import numpy as np
 
 log = create_module_logger(module_name="sample_b1k_tasks")
@@ -29,11 +30,8 @@ log.setLevel(logging.INFO)
 
 
 # task_custom_lists.json always takes precedence.
-task_custom_list_path = os.path.join(
-    gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "task_custom_lists.json"
-)
-assert os.path.exists(task_custom_list_path), f"task_custom_lists.json not found: {task_custom_list_path}"
-with open(task_custom_list_path, "r") as f:
+assert os.path.exists(TASK_CUSTOM_LIST_PATH), f"task_custom_lists.json not found: {TASK_CUSTOM_LIST_PATH}"
+with open(TASK_CUSTOM_LIST_PATH, "r") as f:
     TASK_CUSTOM_LISTS = json.load(f)
 
 
@@ -45,7 +43,6 @@ parser.add_argument(
     required=True,
     help="Activity to be sampled",
 )
-parser.add_argument("-s", "--scene_model", type=str, required=True, help="Scene model to sample tasks in")
 parser.add_argument(
     "-r",
     "--room_types",
@@ -84,18 +81,13 @@ logging.getLogger().setLevel(logging.INFO)
 def main(random_selection=False, headless=False, short_exec=False):
     args = parser.parse_args()
 
+    scene_model = get_scene_model(TASK_CUSTOM_LISTS[args.activity])
+
     if args.output_dir is None:
-        args.output_dir = os.path.join(
-            gm.DATA_PATH, "2026-challenge-task-instances", "scenes", args.scene_model, "json"
-        )
+        args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
 
     # If we want to create a stable scene config, do that now
-    default_scene_fpath = os.path.join(
-        get_dataset_path("behavior-1k-assets"), "scenes", args.scene_model, "json", f"{args.scene_model}_stable.json"
-    )
-    if not os.path.exists(default_scene_fpath):
-        create_stable_scene_json(scene_model=args.scene_model)
-
+    default_scene_fpath = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json", f"{scene_model}_stable.json")
     # Get the default scene instance
     assert os.path.exists(default_scene_fpath), "Did not find default stable scene json!"
     with open(default_scene_fpath, "r") as f:
@@ -111,15 +103,14 @@ def main(random_selection=False, headless=False, short_exec=False):
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_file": default_scene_fpath,
-            "scene_model": args.scene_model,
+            "scene_model": scene_model,
             "seg_map_resolution": 0.1,
-            # "load_object_categories": ["floors"],
         },
         "robots": [
             {
                 "type": "R1Pro",
                 "obs_modalities": [],
-                "default_reset_mode": "untuck",
+                "default_reset_mode": "tuck",
                 "position": np.ones(3) * -50.0,
             },
         ],
@@ -185,9 +176,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         reason = f"Unsupported predicate(s): {unsupported_predicates}"
 
     env.task_config["activity_name"] = activity
-    if activity in TASK_CUSTOM_LISTS and args.scene_model in TASK_CUSTOM_LISTS[activity]:
-        whitelist = TASK_CUSTOM_LISTS[activity][args.scene_model]["whitelist"]
-        blacklist = TASK_CUSTOM_LISTS[activity][args.scene_model]["blacklist"]
+    if activity in TASK_CUSTOM_LISTS and scene_model in TASK_CUSTOM_LISTS[activity]:
+        whitelist = TASK_CUSTOM_LISTS[activity][scene_model]["whitelist"]
+        blacklist = TASK_CUSTOM_LISTS[activity][scene_model]["blacklist"]
     else:
         whitelist, blacklist = None, None
     env.task_config["sampling_whitelist"] = whitelist
@@ -196,7 +187,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     log.info(f"black_list: {blacklist}")
     assert whitelist is not None, "whitelist should not be None for manual sampling"
     BehaviorTask.get_cached_activity_scene_filename(
-        scene_model=args.scene_model,
+        scene_model=scene_model,
         activity_name=activity,
         activity_definition_id=0,
         activity_instance_id=0,
@@ -221,7 +212,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         original_task_cfg["use_presampled_robot_pose"] = False
         env._load_task(original_task_cfg)
         assert og.sim.is_stopped()
-
         success, feedback = env.task.feedback is None, env.task.feedback
 
         if not success:
@@ -286,6 +276,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             task_relevant_only=False,
             suffix=task_suffix,
         )
+        postprocess_task(save_dir, scene_model, activity, overwrite=args.overwrite)
         og.sim.stop()
 
     assert og.sim.is_stopped()
