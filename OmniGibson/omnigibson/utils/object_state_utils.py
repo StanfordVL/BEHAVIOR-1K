@@ -264,6 +264,7 @@ def sample_kinematics(
 
             if AABB in objA.states:
                 AABB.mark_stale(objA)
+            break
         else:
             og.sim.load_state(state)
 

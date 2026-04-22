@@ -227,8 +227,9 @@ class TensorizedValueState(AbsoluteObjectState):
         # This is merely the class state size
         return self.STATE_SIZE
 
-    # For this state, we simply store its value.
     def _dump_state(self):
+        if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
+            return {self.value_name: th.zeros(self.value_shape, dtype=self.value_type)}
         return {self.value_name: self._get_value()}
 
     def _load_state(self, state):

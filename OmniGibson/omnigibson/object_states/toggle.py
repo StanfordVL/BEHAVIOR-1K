@@ -419,8 +419,9 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         # Two floats: toggle_state + robot_can_toggle_steps. Same as the pre-tensorized value.
         return 2
 
-    # For this state, we store the toggle value and the robot_can_toggle_steps counter.
     def _dump_state(self):
+        if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
+            return dict(value=False, hand_in_marker_steps=0)
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         return dict(

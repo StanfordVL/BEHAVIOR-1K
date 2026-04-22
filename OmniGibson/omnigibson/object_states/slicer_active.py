@@ -184,8 +184,9 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Add additional 2 to keep track of previously touching and delay counter
         return size + 2
 
-    # For this state, we simply store its value.
     def _dump_state(self):
+        if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
+            return dict(value=True, previously_touching=False, delay_counter=0)
         state = super()._dump_state()
         scene_idx = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]

@@ -132,8 +132,12 @@ class AABB(TensorizedValueState):
     def _dump_state(self):
         # Return the raw flat (6,) VALUES_CPU row so serialize() receives a CPU tensor
         s = self.obj.scene.idx
-        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        return {self.value_name: self.VALUES_CPU[s, obj_idx].clone()}
+        if self.obj.relative_prim_path in self.OBJ_IDXS:
+            obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+            return {self.value_name: self.VALUES_CPU[s, obj_idx].clone()}
+        else:
+            # obj not initialized yet. return a empty (6,) tensor
+            return {self.value_name: th.zeros(self.value_shape)}
 
     def _load_state(self, state):
         # AABB is fully derived from pose; it will be recomputed on the next step.

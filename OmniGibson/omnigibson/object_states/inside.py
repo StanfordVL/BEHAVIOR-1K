@@ -155,6 +155,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 continue
 
             # Rejection sampling #3: Verify object is still inside after settling
+            AABB.mark_stale(self.obj)
             if self.get_value(other):
                 return True
 

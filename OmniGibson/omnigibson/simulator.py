@@ -1462,13 +1462,6 @@ def _launch_simulator(*args, **kwargs):
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
             self._update_view_apis()
 
-            # TODO (andi) remove this???
-            # Keep AABB VALUES fresh so callers (e.g. Inside._set_value after sample_kinematics) can read
-            # up-to-date AABBs without waiting for the next full _non_physics_step.
-            # if gm.ENABLE_OBJECT_STATES and AABB.VALUES is not None and AABB.VALUES.numel() > 0:
-            #     AABB.global_update()  # issues async copy on GPU_TO_CPU inside global_update()
-            #     th.cuda.synchronize()  # wait before caller reads VALUES_CPU
-
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
             try:
