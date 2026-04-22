@@ -221,7 +221,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
         for scene_idx, scene in enumerate(cls.IDX_OBJS):
             for obj_idx in range(O):
                 obj = scene[obj_idx]
-                if obj.joints is None:
+                if obj is None or obj.joints is None:
                     continue  # obj not initialized yet
                 both_sides, relevant_joints, joint_directions = _get_relevant_joints(obj)
                 cls.BOTH_SIDES[scene_idx, obj_idx] = both_sides
@@ -241,6 +241,8 @@ class Open(TensorizedValueState, BooleanStateMixin):
         for _, obj_idx in cls.OBJ_IDXS.items():
             for scene_idx, scene in enumerate(cls.IDX_OBJS):
                 obj = scene[obj_idx]
+                if obj is None:
+                    continue
                 row = ArticulatedObjectViewAPI.get_view_row(obj.articulation_root_path)
                 cls.OBJ_IDXES_IN_ARTICULATION_VIEW[scene_idx, obj_idx] = row
 

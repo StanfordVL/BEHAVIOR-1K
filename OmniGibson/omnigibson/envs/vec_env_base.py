@@ -11,11 +11,16 @@ class VectorEnvironment:
         if og.sim is not None:
             og.sim.stop()
 
+        if isinstance(config, list):
+            assert len(config) == num_envs, f"config list length ({len(config)}) must match num_envs ({num_envs})"
+            configs = config
+        else:
+            configs = [copy.deepcopy(config) for _ in range(num_envs)]
+
         # First we create the environments. We can't let DummyVecEnv do this for us because of the play call
         # needing to happen before spaces are available for it to read things from.
         self.envs = [
-            og.Environment(configs=copy.deepcopy(config), in_vec_env=True)
-            for _ in trange(num_envs, desc="Loading environments")
+            og.Environment(configs=configs[i], in_vec_env=True) for i in trange(num_envs, desc="Loading environments")
         ]
 
         # Play, and finish loading all the envs

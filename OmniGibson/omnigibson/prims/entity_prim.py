@@ -16,7 +16,7 @@ from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.render_utils import force_pbr_material_for_link
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints
+from omnigibson.utils.usd_utils import RigidBodyViewAPI, absolute_prim_path_to_scene_relative, count_joints
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -1015,9 +1015,9 @@ class EntityPrim(XFormPrim):
             ), "Orientation mismatch between entity prim and root link"
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
             if self.kinematic_only:
-                for link in self._links.values():
-                    if isinstance(link, RigidKinematicPrim):
-                        link.clear_kinematic_only_cache()
+                RigidBodyViewAPI.invalidate_kinematic(
+                    [link for link in self._links.values() if isinstance(link, RigidKinematicPrim)]
+                )
         else:
             # Otherwise, we simply move the object in PhysX and force it to update Fabric, too.
             if self.articulated:

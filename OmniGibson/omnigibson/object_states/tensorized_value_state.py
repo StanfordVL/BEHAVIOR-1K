@@ -127,7 +127,7 @@ class TensorizedValueState(AbsoluteObjectState):
                     continue
                 obj_idx_new = cls.OBJ_IDXS[rel_path]
                 for s_idx in range(min(prev_values.shape[0], len(cls.IDX_OBJS))):
-                    if cls.IDX_OBJS[s_idx][obj_idx_new] is not None:
+                    if cls.IDX_OBJS[s_idx][obj_idx_new] is not None:  # Only retain initialized obj's value
                         cls.VALUES[s_idx, obj_idx_new] = prev_values[s_idx, obj_idx_old]
 
         # Rebuild pinned CPU mirror — synchronous copy so _get_value() is valid before first async copy
@@ -207,13 +207,9 @@ class TensorizedValueState(AbsoluteObjectState):
         """
         raise NotImplementedError
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, obj):
         # Run super first; registration in OBJ_IDXS / IDX_OBJS / VALUES is done by initialize_view()
-        super().__init__(*args, **kwargs)
-
-    def remove(self):
-        # No-op for tensor cleanup — initialize_view() will rebuild from scratch on next call
-        pass
+        super().__init__(obj)
 
     def _get_value(self):
         # Read from the pinned CPU mirror — no GPU stall for Python callers

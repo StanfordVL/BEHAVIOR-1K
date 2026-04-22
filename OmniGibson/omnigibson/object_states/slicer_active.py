@@ -59,16 +59,30 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Snapshot which relative paths existed before the rebuild
         prev_rel_paths = set(cls.OBJ_IDXS.keys()) if cls.OBJ_IDXS is not None else set()
 
+        # Snapshot tracking tensors before rebuild so survivors can be carried over
+        prev_previously_touching = cls.PREVIOUSLY_TOUCHING.clone() if cls.PREVIOUSLY_TOUCHING is not None else None
+        prev_delay_counter = cls.DELAY_COUNTER.clone() if cls.DELAY_COUNTER is not None else None
+        prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
+
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
         super().initialize_view()
 
         S = len(cls.IDX_OBJS)
         O = len(cls.OBJ_IDXS)
 
-        # Allocate (scene_number, obj_number) tracking tensors; carry-over is not needed for these bookkeeping fields
-        # (contact/delay state resets naturally when initialize_view is called after object changes)
+        # Allocate fresh tracking tensors; carry over values for surviving slicers so that
+        # PREVIOUSLY_TOUCHING=True set during a slicing step is not lost when initialize_view()
+        # is called again on the next step (e.g. when new objects are initialized).
         cls.PREVIOUSLY_TOUCHING = th.zeros((S, O), dtype=th.bool, device="cuda")
         cls.DELAY_COUNTER = th.zeros((S, O), dtype=th.float32, device="cuda")
+        if prev_previously_touching is not None and prev_previously_touching.numel() > 0:
+            for rel_path, obj_idx_new in cls.OBJ_IDXS.items():
+                if rel_path not in prev_obj_idxs:
+                    continue
+                obj_idx_old = prev_obj_idxs[rel_path]
+                n_scenes = min(prev_previously_touching.shape[0], S)
+                cls.PREVIOUSLY_TOUCHING[:n_scenes, obj_idx_new] = prev_previously_touching[:n_scenes, obj_idx_old]
+                cls.DELAY_COUNTER[:n_scenes, obj_idx_new] = prev_delay_counter[:n_scenes, obj_idx_old]
 
         # Initialize new VALUE slots (not carried over) to True (slicer starts active)
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -102,13 +116,16 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             cls._sliceable_contact_col_mask.append(sliceable_col.unsqueeze(0).cuda())  # (1, C_s) GPU
 
             # Row masks (O, R_s). N slicer object form N querys
-            slicer_masks = [
-                RigidContactAPI.get_contact_row_mask(
-                    scene_idx, [link.prim_path for link in cls.IDX_OBJS[scene_idx][obj_idx].links.values()]
-                )
-                for obj_idx in range(O)
-            ]  # list of (R_s,) CPU bool
-            cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (O, R_s) GPU
+            if cls.IDX_OBJS[scene_idx][obj_idx] is not None:
+                slicer_masks = [
+                    RigidContactAPI.get_contact_row_mask(
+                        scene_idx, [link.prim_path for link in cls.IDX_OBJS[scene_idx][obj_idx].links.values()]
+                    )
+                    for obj_idx in range(O)
+                ]  # list of (R_s,) CPU bool
+                cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (O, R_s) GPU
+            else:
+                cls._slicer_contact_query_masks.append(None)
 
     @classmethod
     def _update_values(cls, values):

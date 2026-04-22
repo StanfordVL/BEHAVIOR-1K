@@ -112,7 +112,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         cls._requires_closed = th.zeros((S, O), dtype=th.bool, device="cuda")
         for scene_idx, scene in enumerate(cls.IDX_OBJS):
             for obj_idx, toggle_obj in enumerate(scene):
-                cls._requires_closed[scene_idx, obj_idx] = toggle_obj.states[ToggledOn]._requires_closed_individual
+                if toggle_obj is not None:
+                    cls._requires_closed[scene_idx, obj_idx] = toggle_obj.states[ToggledOn]._requires_closed_individual
 
         # Build _open_state_idx: (O,) long — Open.VALUES column index per toggle object.
         # Only filled for objects that have requires_closed in any scene because they are guaranteed to have Open state.
@@ -120,6 +121,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         cls._open_state_idx = th.zeros(O, dtype=th.long, device="cuda")
         for obj_idx in _requires_closed_objects.nonzero(as_tuple=True)[0].tolist():
             toggle_obj = cls.IDX_OBJS[0][obj_idx]
+            if toggle_obj is None:
+                continue
             assert Open in toggle_obj.states, "Can only require openable object to be closed."
             cls._open_state_idx[obj_idx] = Open.OBJ_IDXS[toggle_obj.relative_prim_path]
 
@@ -127,6 +130,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         cls.visual_markers = [[None] * O for _ in range(S)]
         for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
             for obj_idx, toggle_obj in enumerate(scene_row):
+                if toggle_obj is None:
+                    continue
                 state = toggle_obj.states[ToggledOn]
                 cls.visual_markers[scene_idx][obj_idx] = state.marker
 
@@ -161,17 +166,20 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
             row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,) CPU
             cls._finger_query_mask.append(row_mask.unsqueeze(0).cuda())  # (1, R_s) GPU
 
-            # Build toggle-able object with mask, shape (O, C_s) — GPU
-            cls._toggable_objs_with_mask.append(
-                th.stack(
-                    [
-                        RigidContactAPI.get_contact_col_mask(
-                            scene_idx, list(cls.IDX_OBJS[scene_idx][obj_idx].links.values())
-                        )
-                        for obj_idx in range(O)
-                    ]
-                ).cuda()
-            )
+            # Build toggle-able object with mask
+            if cls.IDX_OBJS[scene_idx][obj_idx] is not None:
+                cls._toggable_objs_with_mask.append(
+                    th.stack(
+                        [
+                            RigidContactAPI.get_contact_col_mask(
+                                scene_idx, list(cls.IDX_OBJS[scene_idx][obj_idx].links.values())
+                            )
+                        ]
+                    ).cuda()
+                )
+            else:
+                # obj not finished initialization yet
+                cls._toggable_objs_with_mask.append(None)
 
         # Allocate per-step scratch masks — GPU for computation; contact query masks stay CPU
         cls._mask_objects_near_finger = th.zeros((S, O), dtype=th.bool, device="cuda")

@@ -1,6 +1,5 @@
 import torch as th
 
-import omnigibson as og
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
@@ -59,11 +58,10 @@ class AABB(TensorizedValueState):
         prim_body_idx = []
         link_idx = []
 
-        for scene_idx, scene in enumerate(og.sim.scenes):
-            for obj in scene.objects:
-                obj_i = cls.OBJ_IDXS.get(obj.relative_prim_path)
-                if obj_i is None:
-                    continue  # not tracked by AABB (robots, etc.)
+        for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
+            for obj_index, obj in enumerate(scene_row):
+                if obj is None:
+                    continue
                 for link in obj.links.values():
                     flat_idx = RigidBodyViewAPI.get_flat_idx(link.prim_path)
                     if flat_idx is None:
@@ -71,7 +69,7 @@ class AABB(TensorizedValueState):
                     if not RigidBodyViewAPI.POINTS_MASK[flat_idx].any():
                         continue  # no collision geometry for this link
                     prim_body_idx.append(flat_idx)
-                    link_idx.append(scene_idx * O + obj_i)
+                    link_idx.append(scene_idx * O + obj_index)
 
         covered_obj_idxs = {li % O for li in link_idx}
         cls.CLOTH_OBJ_IDXS = [i for i in range(O) if i not in covered_obj_idxs]
@@ -104,10 +102,9 @@ class AABB(TensorizedValueState):
         for obj_idx in cls.CLOTH_OBJ_IDXS:
             for s_idx, s_row in enumerate(cls.IDX_OBJS):
                 obj = s_row[obj_idx]
-                if obj is not None:
-                    lo, hi = obj.aabb
-                    values[s_idx, obj_idx, :3] = lo
-                    values[s_idx, obj_idx, 3:] = hi
+                lo, hi = obj.aabb
+                values[s_idx, obj_idx, :3] = lo
+                values[s_idx, obj_idx, 3:] = hi
 
     @classmethod
     def mark_stale(cls, obj):

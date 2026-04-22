@@ -485,60 +485,69 @@ def test_behavior_setter():
     assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
 
 
-@pytest.mark.skip(reason="investigate further after PR #2127 got merged")
 def test_objects_with_different_joints_open_state():
+    # ufhpbn: 1 openable joint, fmelap: 2 openable joints
+    # Both named "cabinet" so they share the same obj_idx in Open.OBJ_IDXS
+    base_cfg = {
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["floors", "walls"],
+        },
+        "robots": [{"model": "fetch", "obs_modalities": []}],
+    }
     import copy
+
+    cfg_0 = copy.deepcopy(base_cfg)
+    cfg_0["objects"] = [
+        {
+            "type": "DatasetObject",
+            "name": "cabinet",
+            "category": "bottom_cabinet_no_top",
+            "model": "ufhpbn",
+            "position": [3.0, 0.0, 0.5],
+        }
+    ]
+    cfg_1 = copy.deepcopy(base_cfg)
+    cfg_1["objects"] = [
+        {
+            "type": "DatasetObject",
+            "name": "cabinet",
+            "category": "bottom_cabinet_no_top",
+            "model": "fmelap",
+            "position": [3.0, 0.0, 0.5],
+        }
+    ]
 
     if og.sim is not None:
         og.sim.stop()
 
-    gm.RENDER_VIEWER_CAMERA = False
-    gm.ENABLE_OBJECT_STATES = True
-    gm.USE_GPU_DYNAMICS = True
-    gm.ENABLE_TRANSITION_RULES = False
+    vec_env = og.VectorEnvironment(2, [cfg_0, cfg_1])
 
-    base_cfg = {
-        "scene": {"type": "Scene"},
-        "robots": [],
-        "objects": [],
-    }
+    cabinet_0 = vec_env.envs[0].scene.object_registry("name", "cabinet")
+    cabinet_1 = vec_env.envs[1].scene.object_registry("name", "cabinet")
+    assert cabinet_0 is not None
+    assert cabinet_1 is not None
 
-    # Scene 0: bottom_cabinet_no_top model with 1 openable joint
-    # Scene 1: bottom_cabinet_no_top model with 2 openable joints
-    # Both use name="cabinet" so they share the same obj_idx in Open.OBJ_IDXS
-    cfg_0 = copy.deepcopy(base_cfg)
-    cfg_0["objects"] = [
-        {"type": "DatasetObject", "name": "cabinet", "category": "bottom_cabinet_no_top", "model": "ufhpbn"}
-    ]
-    cfg_1 = copy.deepcopy(base_cfg)
-    cfg_1["objects"] = [
-        {"type": "DatasetObject", "name": "cabinet", "category": "bottom_cabinet_no_top", "model": "gjrero"}
-    ]
-
-    env_0 = og.Environment(configs=cfg_0, in_vec_env=True)
-    env_1 = og.Environment(configs=cfg_1, in_vec_env=True)
-    og.sim.play()
-    env_0.post_play_load()
-    env_1.post_play_load()
-
-    S = 2
-    O = len(object_states.Open.OBJ_IDXS)  # 1 — one object type ("cabinet")
-    max_dof = object_states.Open.OPENABLE_MASK.shape[2]
-
-    assert object_states.Open.OPENABLE_MASK.shape == (S, O, max_dof)
-    assert object_states.Open.THRESHOLDS_S1.shape == (S, O, max_dof)
-    assert object_states.Open.BOTH_SIDES.shape == (S, O)
-
-    obj_idx = object_states.Open.OBJ_IDXS["cabinet"]
+    obj_idx = object_states.Open.OBJ_IDXS[cabinet_0.relative_prim_path]
     n_joints_s0 = int(object_states.Open.OPENABLE_MASK[0, obj_idx].sum().item())
     n_joints_s1 = int(object_states.Open.OPENABLE_MASK[1, obj_idx].sum().item())
-    assert n_joints_s0 != n_joints_s1, f"Expected different joint counts across scenes, got {n_joints_s0} in both"
+    assert n_joints_s0 != n_joints_s1, f"Expected different joint counts, got {n_joints_s0} in both scenes"
 
-    # Open state get/set must work independently per scene
-    cabinet_0 = env_0.scene.object_registry("name", "cabinet")
-    cabinet_1 = env_1.scene.object_registry("name", "cabinet")
+    # Open cabinet_0, close cabinet_1 — they're controlled independently
     cabinet_0.states[object_states.Open].set_value(True)
     cabinet_1.states[object_states.Open].set_value(False)
-    og.sim.step()
+    for _ in range(5):
+        og.sim.step()
     assert cabinet_0.states[object_states.Open].get_value() is True
     assert cabinet_1.states[object_states.Open].get_value() is False
+
+    # Flip: close cabinet_0, open cabinet_1
+    cabinet_0.states[object_states.Open].set_value(False)
+    cabinet_1.states[object_states.Open].set_value(True)
+    for _ in range(5):
+        og.sim.step()
+    assert cabinet_0.states[object_states.Open].get_value() is False
+    assert cabinet_1.states[object_states.Open].get_value() is True
+
+    og.clear()
