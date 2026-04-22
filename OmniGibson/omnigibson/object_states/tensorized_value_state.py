@@ -113,13 +113,6 @@ class TensorizedValueState(AbsoluteObjectState):
 
                 cls.IDX_OBJS[scene_idx][cls.OBJ_IDXS[rel_path]] = obj
 
-        # Verify that each obj's relative_prim_path with this state should appear in every scene.
-        if len(cls.IDX_OBJS) > 1:
-            for rel_path, obj_idx in cls.OBJ_IDXS.items():
-                missing = [s for s in range(len(cls.IDX_OBJS)) if cls.IDX_OBJS[s][obj_idx] is None]
-                assert (
-                    len(missing) != 0
-                ), f"{cls.__name__}: '{rel_path}' has this state in some scenes but not all. (missing in scene indices {missing}). Global updates will skip those slots."
         # Carry over values for surviving objects (same relative path present before and after)
         if prev_values is not None and cls.VALUES.numel() > 0:
             for rel_path, obj_idx_old in prev_obj_idxs.items():
