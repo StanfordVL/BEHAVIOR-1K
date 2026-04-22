@@ -209,6 +209,9 @@ def replay_hdf5_to_video(
     # add seg_instance_id to robot head camera
     env.robots[0].sensors["robot:zed_link:Camera:0"].add_modality("seg_instance_id")
     env.load_observation_space()
+    # Optionally set robot base mass to 250kg to match data collection
+    if env.robots[0].model in ("r1", "r1pro"):
+        env.robots[0].base_footprint_link.mass = 250.0
 
     if run_qa:
         metric_kwargs = dict(
@@ -294,6 +297,7 @@ def main():
     )
     parser.add_argument("input", type=str, help="Path to the HDF5 file")
     parser.add_argument(
+        "-t",
         "--task",
         type=str,
         required=True,
