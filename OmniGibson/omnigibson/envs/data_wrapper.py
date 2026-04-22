@@ -673,6 +673,8 @@ class DataPlaybackWrapper(DataWrapper):
             self.current_traj_history[-1]["obs"] = self._process_obs(self.current_obs, init_info)
 
         for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
+            if i % 1000 == 0:
+                log.info(f"Playing back episode {episode_id}, step {i}/{len(action)}")
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
