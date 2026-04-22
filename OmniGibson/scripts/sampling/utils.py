@@ -20,6 +20,11 @@ SCENE_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Scenes.csv")
 UNSUPPORTED_PREDICATES = {"broken", "assembled"}
 
 
+def get_scene_model(activity_entry):
+    """Return the scene model name from a task_custom_lists activity entry."""
+    return next(k for k in activity_entry if k != "room_types")
+
+
 def prune_unevaluatable_predicates(init_conditions):
     pruned_conditions = []
     for condition in init_conditions:
@@ -358,8 +363,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                         dim=0,
                     )
                 else:
-                    particle_positions = th.tensor(system_state["positions"])
-                    current_particle_positions = th.tensor(current_system_state["positions"])
+                    particle_positions = system_state["positions"].detach().clone()
+                    current_particle_positions = current_system_state["positions"].detach().clone()
                 pos_min, pos_max = th.min(particle_positions, dim=0).values, th.max(particle_positions, dim=0).values
                 curr_pos_min, curr_pos_max = (
                     th.min(current_particle_positions, dim=0).values,

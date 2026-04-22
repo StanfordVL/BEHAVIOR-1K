@@ -4,9 +4,9 @@ import omnigibson as og
 from omnigibson.macros import gm, macros
 import json
 from omnigibson.objects import DatasetObject
-from omnigibson.utils.asset_utils import get_dataset_path
 import numpy as np
-from utils import validate_task
+from utils import validate_task, get_scene_model
+from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -17,7 +17,6 @@ parser.add_argument(
     required=True,
     help="Activity to be sampled.",
 )
-parser.add_argument("-s", "--scene_model", type=str, default=None, required=True, help="Scene model to sample tasks in")
 parser.add_argument(
     "--seed",
     type=int,
@@ -49,11 +48,8 @@ parser.add_argument(
     help="Output directory for sampled tasks (default: gm.DATA_PATH/2026-challenge-task-instances/<activity>)",
 )
 
-task_custom_list_path = os.path.join(
-    gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "task_custom_lists.json"
-)
-assert os.path.exists(task_custom_list_path), f"task_custom_lists.json not found: {task_custom_list_path}"
-with open(task_custom_list_path, "r") as f:
+assert os.path.exists(TASK_CUSTOM_LIST_PATH), f"task_custom_lists.json not found: {TASK_CUSTOM_LIST_PATH}"
+with open(TASK_CUSTOM_LIST_PATH, "r") as f:
     TASK_CUSTOM_LISTS = json.load(f)
 
 gm.HEADLESS = False
@@ -71,12 +67,12 @@ macros.utils.object_state_utils.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 5
 def main():
     args = parser.parse_args()
 
-    if args.output_dir is None:
-        args.output_dir = os.path.join(
-            gm.DATA_PATH, "2026-challenge-task-instances", "scenes", args.scene_model, "json"
-        )
+    scene_model = get_scene_model(TASK_CUSTOM_LISTS[args.activity])
 
-    task_scene_file = os.path.join(args.output_dir, f"{args.scene_model}_task_{args.activity}_0_0_template.json")
+    if args.output_dir is None:
+        args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
+
+    task_scene_file = os.path.join(args.output_dir, f"{scene_model}_task_{args.activity}_0_0_template.json")
     assert os.path.exists(task_scene_file), "Did not find task scene template json at expected path: {}".format(
         task_scene_file
     )
@@ -89,7 +85,7 @@ def main():
         },
         "scene": {
             "type": "InteractiveTraversableScene",
-            "scene_model": args.scene_model,
+            "scene_model": scene_model,
             "scene_file": task_scene_file,
             "seg_map_resolution": 0.1,
             "load_room_types": TASK_CUSTOM_LISTS[args.activity]["room_types"],
@@ -98,7 +94,7 @@ def main():
             {
                 "type": "R1Pro",
                 "obs_modalities": [],
-                "default_reset_mode": "untuck",
+                "default_reset_mode": "tuck",
                 "position": np.ones(3) * -50.0,
             },
         ],
@@ -116,9 +112,7 @@ def main():
     save_dir = os.path.join(args.output_dir, f"{env.task.scene_name}_task_{args.activity}_instances")
 
     # If we want to create a stable scene config, do that now
-    default_scene_fpath = os.path.join(
-        get_dataset_path("behavior-1k-assets"), "scenes", args.scene_model, "json", f"{args.scene_model}_stable.json"
-    )
+    default_scene_fpath = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json", f"{scene_model}_stable.json")
     # Get the default scene instance
     assert os.path.exists(default_scene_fpath), "Did not find default stable scene json!"
     with open(default_scene_fpath, "r") as f:

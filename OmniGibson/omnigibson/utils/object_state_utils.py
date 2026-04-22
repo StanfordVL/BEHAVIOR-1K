@@ -307,9 +307,6 @@ def sample_kinematics(
             og.sim.step_physics()
             i += 1
 
-        # Render at the end
-        og.sim.render()
-
     return success
 
 

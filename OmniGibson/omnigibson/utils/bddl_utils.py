@@ -1385,7 +1385,7 @@ class BDDLSampler:
                             kwargs["can_joint_break"] = False
 
                         while True:
-                            num_trials = 1
+                            num_trials = 3
                             for _ in range(num_trials):
                                 success = condition.sample(self._sample_predicate, binary_state=positive, **kwargs)
                                 log_msg = " ".join(
