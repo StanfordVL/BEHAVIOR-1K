@@ -120,7 +120,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 idx_in_open_object_dim = Open.OBJ_IDXS[toggle_obj.relative_prim_path]
                 open_values_object_dim_size = Open.VALUES.shape[1]
                 requires_closed_obj_idxes_in_open_values.append(
-                    idx_in_open_object_dim * open_values_object_dim_size + scene_idx * O + obj_idx
+                    scene_idx * open_values_object_dim_size + idx_in_open_object_dim
                 )
         cls._requires_closed_obj_idxes_in_open_values = th.tensor(
             requires_closed_obj_idxes_in_open_values, dtype=th.long, device="cuda"
@@ -309,15 +309,15 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         requires_closed_obj_open_values = flattened_open_values[cls._requires_closed_obj_idxes_in_open_values]
 
         # Get the indices of the objects that are open yet required to be closed to toggle on
-        requires_closed_obj_idxes_that_are_open = cls._requires_closed_obj_idxes_in_open_values[
+        requires_closed_obj_idxes_that_are_open = cls._requires_closed_obj_idxes_in_this_values[
             requires_closed_obj_open_values
         ]
 
         # Set the values of the objects that are open yet required to be closed to toggle on to False and reset the robot_can_toggle_steps to 0
         # and also set the mask_can_toggle to False for these objects - they cannot be toggled on this step either!
         flattened_this_values[requires_closed_obj_idxes_that_are_open] = False
-        cls._robots_can_toggle_steps[requires_closed_obj_idxes_that_are_open] = 0
-        cls._mask_can_toggle[requires_closed_obj_idxes_that_are_open] = False
+        cls._robots_can_toggle_steps.view(-1)[requires_closed_obj_idxes_that_are_open] = 0
+        cls._mask_can_toggle.view(-1)[requires_closed_obj_idxes_that_are_open] = False
 
         # Find what toggleable objects have a finger nearby. For those who have, check fingers truly overlap the button mesh.
         for scene_idx in range(S):
