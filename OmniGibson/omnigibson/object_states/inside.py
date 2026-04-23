@@ -125,17 +125,6 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             else:
                 pos = aabb_low + th.rand(3) * (aabb_high - aabb_low)
 
-            # check if the sampled position is in a reachable area of the traversability map, if applicable
-            if use_trav_map:
-                if not is_pose_reachable_for_predicate(
-                    pos=pos,
-                    objB=other,
-                    predicate="inside",
-                    reachability_context=reachability_context,
-                ):
-                    og.sim.load_state(state, serialized=False)
-                    continue
-
             # Rejection sampling #1: Verify the sampled point is actually inside the container volume
             if not container_link.check_points_in_volume(pos.unsqueeze(0)).item():
                 og.sim.load_state(state, serialized=False)
@@ -184,8 +173,18 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 og.sim.load_state(state, serialized=False)
                 continue
 
-            # Rejection sampling #3: Verify object is still inside after settling
+            # Rejection sampling #3: Verify object is still inside after settling and within reach if using trav map
             if self.get_value(other):
+                if use_trav_map:
+                    settled_pos, _ = self.obj.get_position_orientation()
+                    if not is_pose_reachable_for_predicate(
+                        pos=settled_pos,
+                        objB=other,
+                        predicate="inside",
+                        reachability_context=reachability_context,
+                    ):
+                        og.sim.load_state(state, serialized=False)
+                        continue
                 return True
 
         # Reset the simulator state to the initial state
