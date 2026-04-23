@@ -28,7 +28,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         deps.update({AABB})
         return deps
 
-    def _set_value(self, other, new_value, reset_before_sampling=False):
+    def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
         """
         Set the Inside state for this object with respect to another object (container).
 
@@ -46,7 +46,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             other: The container object to place this object inside.
             new_value: True to set Inside state (only True is supported).
             reset_before_sampling: If True, reset this object before sampling.
-
+            use_trav_map: Whether to use traversability-based reachability checks.
         Returns:
             True if successfully placed inside, False otherwise.
         """
@@ -89,12 +89,6 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         # so to make the same numbr of attempts as the original implementation, we just multiply
         # the two sampling parameters.
         total_attempts = os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS * os_m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
-
-        use_trav_map = True
-        from omnigibson.scenes.traversable_scene import TraversableScene
-
-        if not isinstance(other.scene, TraversableScene):
-            use_trav_map = False
 
         if use_trav_map:
             reachability_context = get_reachability_sampling_context(
