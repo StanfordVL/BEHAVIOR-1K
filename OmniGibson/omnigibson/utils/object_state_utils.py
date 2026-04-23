@@ -1,7 +1,7 @@
-import math
-
-import torch as th
 import cv2
+import math
+import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -20,6 +20,9 @@ log = create_module_logger(module_name=__name__)
 
 m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 10
+m.ARM_LENGTH_XY = 0.8
+m.EEF_Z_MAX = 1.7
+m.EEF_Z_MIN = 0.3
 m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict(
     {
         "bimodal_stdev_fraction": 1e-6,
@@ -151,13 +154,9 @@ def sample_kinematics(
         robot = objB.scene.robots[0] if len(objB.scene.robots) > 0 else None
         eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=robot)
 
-        # Hardcoding R1 robot arm length for now
-        arm_length_xy = 0.8
-        eef_z_max = 1.7
-        eef_z_min = 0.3
-        arm_length_pixel = int(math.ceil(arm_length_xy / trav_map.map_resolution))
+        arm_length_pixel = int(math.ceil(m.ARM_LENGTH_XY / trav_map.map_resolution))
         reachability_map = th.tensor(
-            cv2.dilate(trav_map_floor_map.cpu().numpy(), th.ones((arm_length_pixel, arm_length_pixel)).cpu().numpy())
+            cv2.dilate(trav_map_floor_map.cpu().numpy(), np.ones((arm_length_pixel, arm_length_pixel)))
         )
 
     # Attempt sampling
@@ -226,10 +225,10 @@ def sample_kinematics(
 
             if use_trav_map and not isinstance(objA, Robot):
                 xy_map = trav_map.world_to_map(pos[:2])
-                if pos[2] > eef_z_max:
+                if pos[2] > m.EEF_Z_MAX:
                     # We need to check if the sampled position is above the maximum z of the arm
                     pos = None
-                elif pos[2] < eef_z_min and predicate == "inside" and objB.fixed_base:
+                elif pos[2] < m.EEF_Z_MIN and predicate == "inside" and objB.fixed_base:
                     # If sampling inside an object, we need to check if the sampled position is above the minimum z of the arm
                     pos = None
                 elif predicate == "onTop" and objB.category in GROUND_CATEGORIES:

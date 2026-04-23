@@ -1,3 +1,6 @@
+import cv2
+import math
+import numpy as np
 import torch as th
 
 import omnigibson as og
@@ -5,8 +8,7 @@ from omnigibson.macros import macros, create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.object_state_utils import m as os_m
+from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import RigidContactAPI
 import omnigibson.utils.transform_utils as T
 
@@ -84,7 +86,27 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         # Calculate the total attempt count. Here we don't have a sense of high/low-level attempts,
         # so to make the same numbr of attempts as the original implementation, we just multiply
         # the two sampling parameters.
-        total_attempts = os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS * os_m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
+        total_attempts = (
+            macros.utils.object_state_utils.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS
+            * macros.utils.object_state_utils.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
+        )
+
+        use_trav_map = True
+        from omnigibson.scenes.traversable_scene import TraversableScene
+
+        if not isinstance(other.scene, TraversableScene):
+            use_trav_map = False
+
+        if use_trav_map:
+            trav_map = other.scene.trav_map
+            trav_map_floor_map = trav_map.floor_map[0]
+
+            # Hardcoding R1 robot arm length for now
+            arm_length_pixel = int(math.ceil(macros.utils.object_state_utils.ARM_LENGTH_XY / trav_map.map_resolution))
+            reachability_map = th.tensor(
+                cv2.dilate(trav_map_floor_map.cpu().numpy(), np.ones((arm_length_pixel, arm_length_pixel)))
+            )
+            has_prismatic_joint = any(j.joint_type == JointType.JOINT_PRISMATIC for j in other.joints.values())
 
         for attempt_idx in range(total_attempts):
             # Sample orientation if the object supports random orientations, otherwise use default
@@ -105,6 +127,19 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 pos = inset_aabb_low + th.rand(3) * (inset_aabb_high - inset_aabb_low)
             else:
                 pos = aabb_low + th.rand(3) * (aabb_high - aabb_low)
+
+            # check if the sampled position is in a reachable area of the traversability map, if applicable
+            if use_trav_map:
+                xy_map = trav_map.world_to_map(pos[:2])
+                if pos[2] > macros.utils.object_state_utils.EEF_Z_MAX:
+                    og.sim.load_state(state, serialized=False)
+                    continue
+                if pos[2] < macros.utils.object_state_utils.EEF_Z_MIN and other.fixed_base:
+                    og.sim.load_state(state, serialized=False)
+                    continue
+                if not has_prismatic_joint and reachability_map[xy_map[0], xy_map[1]] != 255:
+                    og.sim.load_state(state, serialized=False)
+                    continue
 
             # Rejection sampling #1: Verify the sampled point is actually inside the container volume
             if not container_link.check_points_in_volume(pos.unsqueeze(0)).item():
