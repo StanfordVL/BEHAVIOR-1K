@@ -1,7 +1,7 @@
-import math
-
-import torch as th
 import cv2
+import math
+import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -20,6 +20,9 @@ log = create_module_logger(module_name=__name__)
 
 m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 10
+m.ARM_LENGTH_XY = 0.8
+m.EEF_Z_MAX = 1.7
+m.EEF_Z_MIN = 0.3
 m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict(
     {
         "bimodal_stdev_fraction": 1e-6,
@@ -92,6 +95,97 @@ def sample_cuboid_for_predicate(predicate, on_obj, bbox_extent):
         )
 
 
+def get_reachability_sampling_context(objB, predicate, use_trav_map=True, warn_on_scene_mismatch=False):
+    """
+    Builds cached traversability / reachability data used for kinematic sampling checks.
+
+    Args:
+        objB (StatefulObject): Reference object used for sampling.
+        predicate (str): Predicate being sampled, e.g. "inside", "onTop", "under".
+        use_trav_map (bool): Whether to enable traversability-based reachability checks.
+        warn_on_scene_mismatch (bool): Whether to log a warning if objB.scene is not traversable.
+
+    Returns:
+        dict or None: Context dict if traversability checks are enabled, else None.
+    """
+    if not use_trav_map:
+        return None
+
+    from omnigibson.scenes.traversable_scene import TraversableScene
+
+    if not isinstance(objB.scene, TraversableScene):
+        if warn_on_scene_mismatch:
+            log.warning(
+                f"Using trav_map=True requires objB.scene to be a TraversableScene, but got {type(objB.scene)} instead."
+            )
+        return None
+
+    trav_map = objB.scene.trav_map
+    trav_map_floor_map = trav_map.floor_map[0]
+    arm_length_pixel = int(math.ceil(m.ARM_LENGTH_XY / trav_map.map_resolution))
+    reachability_map = th.tensor(
+        cv2.dilate(trav_map_floor_map.cpu().numpy(), np.ones((arm_length_pixel, arm_length_pixel)))
+    )
+    has_prismatic_joint = any(j.joint_type == JointType.JOINT_PRISMATIC for j in objB.joints.values())
+
+    eroded_trav_map = None
+    if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
+        robot = objB.scene.robots[0] if len(objB.scene.robots) > 0 else None
+        eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=robot)
+
+    return {
+        "trav_map": trav_map,
+        "reachability_map": reachability_map,
+        "has_prismatic_joint": has_prismatic_joint,
+        "eroded_trav_map": eroded_trav_map,
+    }
+
+
+def is_pose_reachable_for_predicate(pos, objB, predicate, reachability_context):
+    """
+    Checks whether sampled pose @pos satisfies robot-reachability constraints.
+
+    Args:
+        pos (Array[float]): Candidate world-frame position (x, y, z).
+        objB (StatefulObject): Reference object used for sampling.
+        predicate (str): Predicate being sampled, e.g. "inside", "onTop", "under".
+        reachability_context (dict or None): Context returned by get_reachability_sampling_context.
+
+    Returns:
+        bool: True if sampled pose passes reachability checks.
+    """
+    if reachability_context is None:
+        return True
+
+    trav_map = reachability_context["trav_map"]
+    reachability_map = reachability_context["reachability_map"]
+    has_prismatic_joint = reachability_context["has_prismatic_joint"]
+    eroded_trav_map = reachability_context["eroded_trav_map"]
+
+    xy_map = trav_map.world_to_map(pos[:2])
+    map_x, map_y = int(xy_map[0]), int(xy_map[1])
+    if pos[2] > m.EEF_Z_MAX:
+        # Sampled position is above the maximum z of the arm
+        return False
+    if pos[2] < m.EEF_Z_MIN and predicate == "inside" and objB.fixed_base:
+        # Sampling inside fixed-base object, position is below the minimum z of the arm
+        return False
+    if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
+        # Sampling onTop of ground category, sampled position should be traversable
+        map_h, map_w = eroded_trav_map.shape
+        if map_x < 0 or map_x >= map_h or map_y < 0 or map_y >= map_w:
+            return False
+        return eroded_trav_map[map_x, map_y] == 255
+    if not has_prismatic_joint:
+        # Sampling around object with no prismatic joints, sampled position should be reachable
+        map_h, map_w = reachability_map.shape
+        if map_x < 0 or map_x >= map_h or map_y < 0 or map_y >= map_w:
+            return False
+        return reachability_map[map_x, map_y] == 255
+
+    return True
+
+
 def sample_kinematics(
     predicate,
     objA,
@@ -121,14 +215,13 @@ def sample_kinematics(
     Returns:
         bool: True if successfully sampled, else False
     """
-    if use_trav_map:
-        from omnigibson.scenes.traversable_scene import TraversableScene
-
-        if not isinstance(objB.scene, TraversableScene):
-            log.warning(
-                f"Using trav_map=True requires objB.scene to be a TraversableScene, but got {type(objB.scene)} instead."
-            )
-            use_trav_map = False
+    reachability_context = get_reachability_sampling_context(
+        objB=objB,
+        predicate=predicate,
+        use_trav_map=use_trav_map,
+        warn_on_scene_mismatch=True,
+    )
+    use_trav_map = reachability_context is not None
     if max_trials is None:
         max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
     assert (
@@ -144,21 +237,6 @@ def sample_kinematics(
 
     # Save the state of the simulator
     state = og.sim.dump_state()
-
-    if use_trav_map:
-        trav_map = objB.scene.trav_map
-        trav_map_floor_map = trav_map.floor_map[0]
-        robot = objB.scene.robots[0] if len(objB.scene.robots) > 0 else None
-        eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=robot)
-
-        # Hardcoding R1 robot arm length for now
-        arm_length_xy = 0.8
-        eef_z_max = 1.7
-        eef_z_min = 0.3
-        arm_length_pixel = int(math.ceil(arm_length_xy / trav_map.map_resolution))
-        reachability_map = th.tensor(
-            cv2.dilate(trav_map_floor_map.cpu().numpy(), th.ones((arm_length_pixel, arm_length_pixel)).cpu().numpy())
-        )
 
     # Attempt sampling
     def _is_in_contact():
@@ -225,25 +303,13 @@ def sample_kinematics(
             from omnigibson.robots.robot import Robot
 
             if use_trav_map and not isinstance(objA, Robot):
-                xy_map = trav_map.world_to_map(pos[:2])
-                if pos[2] > eef_z_max:
-                    # We need to check if the sampled position is above the maximum z of the arm
+                if not is_pose_reachable_for_predicate(
+                    pos=pos,
+                    objB=objB,
+                    predicate=predicate,
+                    reachability_context=reachability_context,
+                ):
                     pos = None
-                elif pos[2] < eef_z_min and predicate == "inside" and objB.fixed_base:
-                    # If sampling inside an object, we need to check if the sampled position is above the minimum z of the arm
-                    pos = None
-                elif predicate == "onTop" and objB.category in GROUND_CATEGORIES:
-                    # If sampling onTop an objB of ground category, we need to check if
-                    # the sampled position of objA is traversable
-                    if eroded_trav_map[xy_map[0], xy_map[1]] != 255:
-                        pos = None
-                else:
-                    has_prismatic_joint = any(j.joint_type == JointType.JOINT_PRISMATIC for j in objB.joints.values())
-                    if not has_prismatic_joint:
-                        # If sampling onTop/inside/under an objB with no prismatic joints, we need to check if
-                        # the sampled position of objA is reachable
-                        if reachability_map[xy_map[0], xy_map[1]] != 255:
-                            pos = None
         success = False
         if pos is None:
             success = False

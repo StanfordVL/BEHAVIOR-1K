@@ -6,7 +6,11 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.object_state_utils import m as os_m
+from omnigibson.utils.object_state_utils import (
+    m as os_m,
+    get_reachability_sampling_context,
+    is_pose_reachable_for_predicate,
+)
 from omnigibson.utils.usd_utils import RigidContactAPI
 import omnigibson.utils.transform_utils as T
 
@@ -24,7 +28,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         deps.update({AABB})
         return deps
 
-    def _set_value(self, other, new_value, reset_before_sampling=False):
+    def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
         """
         Set the Inside state for this object with respect to another object (container).
 
@@ -42,7 +46,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             other: The container object to place this object inside.
             new_value: True to set Inside state (only True is supported).
             reset_before_sampling: If True, reset this object before sampling.
-
+            use_trav_map: Whether to use traversability-based reachability checks.
         Returns:
             True if successfully placed inside, False otherwise.
         """
@@ -85,6 +89,15 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         # so to make the same numbr of attempts as the original implementation, we just multiply
         # the two sampling parameters.
         total_attempts = os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS * os_m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
+
+        if use_trav_map:
+            reachability_context = get_reachability_sampling_context(
+                objB=other,
+                predicate="inside",
+                use_trav_map=use_trav_map,
+                warn_on_scene_mismatch=False,
+            )
+            use_trav_map = reachability_context is not None
 
         for attempt_idx in range(total_attempts):
             # Sample orientation if the object supports random orientations, otherwise use default
@@ -154,8 +167,18 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 og.sim.load_state(state, serialized=False)
                 continue
 
-            # Rejection sampling #3: Verify object is still inside after settling
+            # Rejection sampling #3: Verify object is still inside after settling and within reach if using trav map
             if self.get_value(other):
+                if use_trav_map:
+                    settled_pos, _ = self.obj.get_position_orientation()
+                    if not is_pose_reachable_for_predicate(
+                        pos=settled_pos,
+                        objB=other,
+                        predicate="inside",
+                        reachability_context=reachability_context,
+                    ):
+                        og.sim.load_state(state, serialized=False)
+                        continue
                 return True
 
         # Reset the simulator state to the initial state
