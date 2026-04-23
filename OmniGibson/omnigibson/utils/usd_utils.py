@@ -275,6 +275,10 @@ class RigidBodyViewAPI:
         """
         assert og.sim.is_playing(), "Cannot create rigid body view while sim is not playing!"
 
+        # Snapshot existing kinematic-link poses ton reuse them below
+        prev_path_to_idx = dict(cls._PATH_TO_IDX)  # snapshot before clear()
+        prev_poses = cls._POSES  # None on very first call; CPU tensor otherwise
+
         # Reset
         cls.clear()
 
@@ -291,8 +295,7 @@ class RigidBodyViewAPI:
 
         # Create a PhysX view for all scenes, build _PATH_TO_IDX, collect poses
         poses_list = []
-        # TODO andi: Verify things still work after merging from main
-        # og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             cls._RIGID_BODY_VIEW = og.sim.physics_sim_view.create_rigid_body_view(pattern="/World/scene_*/*/*")
             for abs_path in list(cls._RIGID_BODY_VIEW.prim_paths):
@@ -300,7 +303,7 @@ class RigidBodyViewAPI:
                 cls._IDX_TO_PATH.append(abs_path)
             poses_list.append(cls._RIGID_BODY_VIEW.get_transforms().clone())
 
-        # Add physx_untracked kinematic links and collects collision_boundary_points_local
+        # Add physx_untracked kinematic links and collect collision_boundary_points_local
         raw_local_points = {}  # {flat_idx: (V, 3) tensor}
 
         for _, scene in enumerate(og.sim.scenes):
@@ -317,8 +320,18 @@ class RigidBodyViewAPI:
                         cls._PATH_TO_IDX[abs_path] = idx
                         cls._IDX_TO_PATH.append(abs_path)
 
-                        pos, quat_xyzw = link.get_position_orientation()
-                        poses_list.append(th.cat([pos, quat_xyzw]).unsqueeze(0))
+                        if abs_path in prev_path_to_idx and prev_poses is not None:
+                            # Reuse the cached pose
+                            pose = prev_poses[prev_path_to_idx[abs_path]].unsqueeze(0)
+                        elif og.sim.currently_stepping:
+                            # New kinematic link appearing mid-step, cannot read Fabric.
+                            # Use zero placeholder.
+                            # Corrected by the next out-of-step initialize_view() or update_handles().
+                            pose = th.zeros(1, 7)
+                        else:
+                            pos, quat_xyzw = link.get_position_orientation()
+                            pose = th.cat([pos, quat_xyzw]).unsqueeze(0)
+                        poses_list.append(pose)
 
                     # Collect local collision points for AABB (for all registered links)
                     if abs_path in cls._PATH_TO_IDX:
