@@ -24,6 +24,7 @@ m.CONTAINER_ORIENTATION_CHANGE_THRESHOLD = th.deg2rad(th.tensor([10.0])).item() 
 m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_TRANSLATION = 1e-2  # 1cm
 m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_ROTATION = math.radians(1)  # 1 degree
 
+
 class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
@@ -190,8 +191,11 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 joint_thresholds = th.where(
                     other.get_joint_dof_types(),
                     m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_ROTATION,
-                    m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_TRANSLATION)
-                container_joint_positions_delta = th.abs(container_joint_positions_final - container_joint_positions_initial)
+                    m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_TRANSLATION,
+                )
+                container_joint_positions_delta = th.abs(
+                    container_joint_positions_final - container_joint_positions_initial
+                )
                 if th.any(container_joint_positions_delta > joint_thresholds):
                     og.sim.load_state(state, serialized=False)
                     continue
