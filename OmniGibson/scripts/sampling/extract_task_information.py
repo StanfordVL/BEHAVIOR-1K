@@ -1,98 +1,62 @@
 import os
 import json
 import yaml
-import re
 import torch as th
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
+from constants import DATASET_2026_PATH
 
 
 def main():
-    # Get the task instances directory
-    task_instances_dir = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances")
-
-    # Get all subdirectories in the task instances directory
-    task_dirs = [
-        d
-        for d in os.listdir(task_instances_dir)
-        if os.path.isdir(os.path.join(task_instances_dir, d)) and d != "metadata"
-    ]
+    scenes_dir = os.path.join(DATASET_2026_PATH, "scenes")
 
     # Create a new empty dictionary to store tasks
     tasks_data = {}
 
-    # Process each task directory
-    for task_dir in task_dirs:
-        task_name = task_dir  # The directory name is the task name
-        task_path = os.path.join(task_instances_dir, task_dir)
-
-        # Get all JSON files in the task directory, excluding those with a dash '-' in their name (partial/aggregate)
-        json_files = [f for f in os.listdir(task_path) if f.endswith(".json") and "-" not in f]
-
-        if not json_files:
-            print(f"No JSON files found in task directory: {task_dir}")
+    # Traverse scenes/<scene_model>/json
+    for scene_model in os.listdir(scenes_dir):
+        json_dir = os.path.join(scenes_dir, scene_model, "json")
+        if not os.path.isdir(json_dir):
             continue
 
-        # Initialize the task entry in tasks_data if it doesn't exist
-        if task_name not in tasks_data:
-            tasks_data[task_name] = {}
-
-        # Process each JSON file in the task directory
-        for json_file in json_files:
-            json_file_path = os.path.join(task_path, json_file)
-
-            # Read JSON content
-            with open(json_file_path, "r") as f:
-                json_content = json.load(f)
-
-            # Extract scene_model
-            scene_model = json_content["init_info"]["args"]["scene_model"]
-
-            # Extract instance number from filename using regex
-            # Filename format: {scene_model}_task_{task_name}_0_{instance}_template.json
-            filename_pattern = rf"{scene_model}_task_{task_name}_0_(\d+)_template.json"
-            match = re.match(filename_pattern, json_file)
-            if match:
-                instance_number = int(match.group(1))
-            else:
-                print(f"Could not extract instance number from filename: {json_file}")
+        for task_instances_dir in os.listdir(json_dir):
+            task_path = os.path.join(json_dir, task_instances_dir)
+            if not os.path.isdir(task_path):
                 continue
 
-            # Extract robot information
-            robot_name = json_content["metadata"]["task"]["inst_to_name"]["agent.n.01_1"]
-            robot_root_link_position = json_content["state"]["registry"]["object_registry"][robot_name]["root_link"][
-                "pos"
-            ]
-            robot_base_link_position = json_content["state"]["registry"]["object_registry"][robot_name]["joint_pos"][:3]
+            # Dir name format: {scene_model}_task_{task_name}_instances
+            prefix = f"{scene_model}_task_"
+            suffix = "_instances"
+            if not (task_instances_dir.startswith(prefix) and task_instances_dir.endswith(suffix)):
+                continue
+            task_name = task_instances_dir[len(prefix) : -len(suffix)]
 
-            # Calculate robot_start_position
-            robot_start_position = [
-                robot_root_link_position[0] + robot_base_link_position[0],
-                robot_root_link_position[1] + robot_base_link_position[1],
-                robot_root_link_position[2] + robot_base_link_position[2],
-            ]
-
-            # Calculate robot_start_orientation
-            robot_joint_orientation = json_content["state"]["registry"]["object_registry"][robot_name]["joint_pos"][3:6]
-            robot_start_orientation = T.euler2quat(th.tensor(robot_joint_orientation)).tolist()
-
-            # Add instance to tasks_data
-            tasks_data[task_name][instance_number] = {
-                "scene_model": scene_model,
-                "robot_start_position": robot_start_position,
-                "robot_start_orientation": robot_start_orientation,
-            }
-
-            print(f"Processed file: {json_file} from directory: {task_dir}")
-            print(f"  Task: {task_name}")
-            print(f"  Instance: {instance_number}")
-            print(f"  Scene model: {scene_model}")
-            print(f"  Robot start position: {robot_start_position}")
-            print(f"  Robot start orientation: {robot_start_orientation}")
-            print("-" * 50)
+            # Instance 0 lives in the parent json/ folder as _0_0_template.json (old format, no robot_poses key)
+            template_file = os.path.join(json_dir, f"{scene_model}_task_{task_name}_0_0_template.json")
+            if os.path.exists(template_file):
+                with open(template_file, "r") as f:
+                    tmpl = json.load(f)
+                robot_name = tmpl["metadata"]["task"]["inst_to_name"]["agent.n.01_1"]
+                obj_state = tmpl["state"]["registry"]["object_registry"][robot_name]
+                root_pos = obj_state["root_link"]["pos"]
+                base_joints = obj_state["joint_pos"]
+                robot_start_position = [root_pos[i] + base_joints[i] for i in range(3)]
+                robot_start_orientation = T.euler2quat(th.tensor(base_joints[3:6])).tolist()
+                tasks_data[task_name] = {
+                    0: {
+                        "scene_model": scene_model,
+                        "robot_start_position": robot_start_position,
+                        "robot_start_orientation": robot_start_orientation,
+                    }
+                }
+                print(f"Processed instance 0 from: {os.path.basename(template_file)}")
+                print(f"  Robot start position: {robot_start_position}")
+                print(f"  Robot start orientation: {robot_start_orientation}")
+                print("-" * 50)
+            else:
+                print(f"Warning: no instance 0 template found for {task_name} in {scene_model}")
 
     # Write the data to the YAML file (completely overwriting it)
-    yaml_file = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "available_tasks.yaml")
+    yaml_file = os.path.join(DATASET_2026_PATH, "metadata", "available_tasks.yaml")
     with open(yaml_file, "w") as f:
         yaml.dump(tasks_data, f, default_flow_style=False)
 

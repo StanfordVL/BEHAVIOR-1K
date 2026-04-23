@@ -977,6 +977,7 @@ class BDDLSampler:
                             # Reset if we're sampling a kinematic state
                             if condition.STATE_NAME in {"inside", "ontop", "under"}:
                                 kwargs["reset_before_sampling"] = True
+                                kwargs["use_trav_map"] = True
                             elif condition.STATE_NAME in {"attached"}:
                                 kwargs["bypass_alignment_checking"] = True
                                 kwargs["check_physics_stability"] = True
@@ -1379,13 +1380,14 @@ class BDDLSampler:
                         # Reset if we're sampling a kinematic state
                         if condition.STATE_NAME in {"inside", "ontop", "under"}:
                             kwargs["reset_before_sampling"] = True
+                            kwargs["use_trav_map"] = True
                         elif condition.STATE_NAME in {"attached"}:
                             kwargs["bypass_alignment_checking"] = True
                             kwargs["check_physics_stability"] = True
                             kwargs["can_joint_break"] = False
 
                         while True:
-                            num_trials = 1
+                            num_trials = 3
                             for _ in range(num_trials):
                                 success = condition.sample(self._sample_predicate, binary_state=positive, **kwargs)
                                 log_msg = " ".join(

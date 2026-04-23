@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Dict, List
 from omnigibson.macros import gm
 from omnigibson.objects.primitive_object import PrimitiveObject
+from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from gello.utils.og_teleop_utils import generate_robot_config
+from utils import get_scene_model
 from omnigibson.object_states import OnTop
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
@@ -139,25 +142,6 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
     return robot_poses
 
 
-def generate_robot_configs():
-    """
-    Generate robot configurations with default R1Pro.
-
-    Returns:
-        List containing R1Pro robot config
-    """
-    return [
-        {
-            "type": "R1Pro",
-            "name": "robot",
-            "obs_modalities": [],
-            "default_reset_mode": "tuck",
-            "position": [50.0, 0, 10.0],
-            "orientation": [0.0, 0.0, 0.0, 1.0],
-        }
-    ]
-
-
 def process_task(task_info: Dict):
     """
     Process a single task: sample cylinder pose and update all files.
@@ -201,7 +185,10 @@ def process_task(task_info: Dict):
             "include_obs": False,
             "use_presampled_robot_pose": False,
         },
-        "robots": generate_robot_configs(),
+        "robots": generate_robot_config(
+            robot_type="r1pro",
+            robot_name="robot",
+        ),
     }
     # Create environment once for this task
     env = og.Environment(configs=cfg)
@@ -254,11 +241,8 @@ def process_task(task_info: Dict):
         with open(tro_file, "w") as f:
             json.dump(tro_data, f, indent=4)
 
-    # Clean up environment
-    og.clear()
-
-    print(f"  Updated template, partial template, and {len(task_info['tro_files'])} TRO files")
     print(f"  Added pose for: {list(template_robot_poses.keys())}")
+    print(f"  Updated template, partial template, and {len(task_info['tro_files'])} TRO files")
 
 
 def main():
@@ -267,11 +251,15 @@ def main():
     """
     args = parser.parse_args()
 
+    with open(TASK_CUSTOM_LIST_PATH) as f:
+        task_custom_lists = json.load(f)
+    scene_model = get_scene_model(task_custom_lists[args.activity])
+
     if args.output_dir is None:
-        args.output_dir = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances")
+        args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
 
     # Find tasks in output_dir
-    tasks = find_given_tasks(Path(args.output_dir) / Path(args.activity), [args.activity])
+    tasks = find_given_tasks(Path(args.output_dir), [args.activity])
 
     print(f"Found {len(tasks)} tasks with instance directories")
 
@@ -279,6 +267,8 @@ def main():
     for i, task_info in enumerate(tasks):
         print(f"\n[{i + 1}/{len(tasks)}] ", end="")
         process_task(task_info)
+        if i < len(tasks) - 1:
+            og.clear()
 
     og.shutdown()
 

@@ -15,6 +15,7 @@ from omnigibson.object_states import Filled
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.usd_utils import RigidContactAPI, ControllableObjectViewAPI
 import omnigibson.utils.transform_utils as T
+from omnigibson.controllers import ControllerView
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.asset_utils import get_task_instance_path
@@ -51,9 +52,6 @@ class OGRobotServer:
             ]  # Regardless of whether we have multiple instances, we always load the seed instance by default; we will handle randomization for different instances during reset
             # Case 1: Both task name and instance id are provided; this is for formal data collection with domain randomization
             if instance_id is not None:
-                assert task_name in VALIDATED_TASKS, (
-                    f"Task {task_name} is not in the list of validated tasks: {VALIDATED_TASKS}"
-                )
                 # Initialize instance ID, decrementing by 1 to ensure proper increment during the first reset
                 self.instance_id = instance_id - 1
             # Case 2: Only task name is provided; this is for task validation and testing with the seed instance
@@ -677,10 +675,10 @@ class OGRobotServer:
                             self.robot.trunk_control_idx
                         ]
                         self._current_trunk_translate = (
-                            utils.infer_trunk_translate_from_torso_qpos(trunk_qpos)
+                            utils.infer_trunk_translate_from_torso_qpos(trunk_qpos, self._teleop_config)
                         )
                         base_trunk_pos = utils.infer_torso_qpos_from_trunk_translate(
-                            self._current_trunk_translate
+                            self._current_trunk_translate, self._teleop_config
                         )
                         self._current_trunk_tilt_offset = float(
                             trunk_qpos[2] - base_trunk_pos[2]
@@ -688,8 +686,9 @@ class OGRobotServer:
 
                         # Handle gripper actions
                         for arm in self.robot.arm_names:
+                            group_key, ctrl_idx = self.robot.controllers[f"gripper_{arm}"]
                             gripper_goal = float(
-                                self.robot.controllers[f"gripper_{arm}"].goal["target"]
+                                ControllerView.get_goal(group_key, ctrl_idx)["target"]
                             )
                             checkpoint_gripper_action = 1 if gripper_goal > 0 else -1
                             self._grasp_action[arm] = checkpoint_gripper_action

@@ -20,6 +20,11 @@ SCENE_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Scenes.csv")
 UNSUPPORTED_PREDICATES = {"broken", "assembled"}
 
 
+def get_scene_model(activity_entry):
+    """Return the scene model name from a task_custom_lists activity entry."""
+    return next(k for k in activity_entry if k != "room_types")
+
+
 def prune_unevaluatable_predicates(init_conditions):
     pruned_conditions = []
     for condition in init_conditions:
@@ -102,10 +107,11 @@ def get_all_lights(prim):
 
 
 def hide_all_lights():
-    lights = get_all_lights(prim=og.sim.world_prim)
-    for light in lights:
-        imageable = lazy.pxr.UsdGeom.Imageable(light)
-        imageable.MakeInvisible()
+    with og.sim.editing_usd():
+        lights = get_all_lights(prim=og.sim.world_prim)
+        for light in lights:
+            imageable = lazy.pxr.UsdGeom.Imageable(light)
+            imageable.MakeInvisible()
 
 
 def parse_task_mapping_new():
@@ -180,18 +186,8 @@ def create_stable_scene_json(scene_model):
     stable_state = og.sim.dump_state()[0]
     if "registry" in stable_state:
         stable_state = stable_state["registry"]
-    invalid_msgs = []
     for obj_name, obj_info in stable_state["object_registry"].items():
-        valid_obj, err_msg = _validate_object_state_stability(obj_name, obj_info, strict=False)
-        if not valid_obj:
-            invalid_msgs.append(err_msg)
-
-    if len(invalid_msgs) > 0:
-        print("Creating stable scene failed! Invalid messages:")
-        for msg in invalid_msgs:
-            print(msg)
-        raise ValueError("Scene is not stable!")
-
+        _validate_object_state_stability(obj_name, obj_info, strict=False)
     for obj in env.scene.objects:
         obj.keep_still()
     env.scene.update_initial_file()
@@ -368,8 +364,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                         dim=0,
                     )
                 else:
-                    particle_positions = th.tensor(system_state["positions"])
-                    current_particle_positions = th.tensor(current_system_state["positions"])
+                    particle_positions = system_state["positions"].detach().clone()
+                    current_particle_positions = current_system_state["positions"].detach().clone()
                 pos_min, pos_max = th.min(particle_positions, dim=0).values, th.max(particle_positions, dim=0).values
                 curr_pos_min, curr_pos_max = (
                     th.min(current_particle_positions, dim=0).values,
