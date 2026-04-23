@@ -869,7 +869,7 @@ class EntityPrim(XFormPrim):
 
     def get_joint_dof_types(self):
         """Returns the degree-of-freedom type for each joint. True for rotation, False for translation."""
-        return self._articulation_view.get_dof_types() == 0
+        return th.as_tensor([x == 0 for x in self._articulation_view.get_dof_types()])
 
     def get_joint_velocities(self, normalized=False):
         """
