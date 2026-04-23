@@ -46,6 +46,20 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         2. Second half of attempts: Sample from full container AABB. This is a fallback for
            cases where the object is too large to fit entirely within the inset bounds.
 
+        Each candidate pose passes through several rejection-sampling stages:
+        1. The sampled point must lie inside the container's fillable volume.
+        2. After placement and a single physics step, the object must not already be
+           intersecting anything (catches interpenetration with container walls).
+        3. The object must come into contact with something after placement and half a second of
+           physics steps.
+        4. After settling, the container's root pose must not have moved
+           beyond CONTAINER_POSITION_CHANGE_THRESHOLD / CONTAINER_ORIENTATION_CHANGE_THRESHOLD.
+        5. The container's articulated joints must not have moved beyond the per-DOF-type
+           CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_{TRANSLATION,ROTATION} thresholds
+           (catches cases where the placed object swings a door/lid or pushes a drawer).
+        6. The object must still register as Inside the container after settling, and
+           reachable via the traversability map if use_trav_map is enabled.
+
         Args:
             other: The container object to place this object inside.
             new_value: True to set Inside state (only True is supported).
@@ -133,10 +147,11 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             pos[2] += 0.01
             self.obj.set_position_orientation(position=pos, orientation=orientation)
             self.obj.keep_still()
-            # step physics once to ensure the object is registered in the contact API
+            # Step physics once so the contact buffer gets populated for the newly-placed object
             og.sim.step_physics()
 
-            # Rejection sampling #2: Reject if the object is already intersecting anything immediately after placement
+            # Rejection sampling #2: Reject if the object is already intersecting anything
+            # immediately after placement (e.g. interpenetration with a container wall).
             if RigidContactAPI.is_in_contact(
                 scene_idx=self.obj.scene.idx,
                 query_set=[self.obj],
@@ -147,22 +162,23 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 og.sim.load_state(state, serialized=False)
                 continue
 
-            # Rejection sampling #3: Check for collision after placement
-            # Step until contact is made or max steps reached (0.5 seconds of sim time)
+            # Rejection sampling #3: step until contact is made or max steps reached
+            # (0.5 seconds of sim time) to let the object settle onto a resting surface.
+            # If it can't get into contact by then, we reject the placement.
             n_steps_max = int(0.5 / og.sim.get_physics_dt())
-            step_idx = 0
-            while (
-                not RigidContactAPI.is_in_contact(
+            for _ in range(n_steps_max):
+                og.sim.step_physics()
+                if RigidContactAPI.is_in_contact(
                     scene_idx=self.obj.scene.idx,
                     query_set=[self.obj],
                     with_set=None,
                     ignore_set=None,
                     current_only=True,
-                )
-                and step_idx < n_steps_max
-            ):
-                og.sim.step_physics()
-                step_idx += 1
+                ):
+                    break
+            else:
+                og.sim.load_state(state, serialized=False)
+                continue
             self.obj.keep_still()
             other.keep_still()
 
@@ -174,7 +190,8 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 og.sim.step_physics()
                 settle_step_idx += 1
 
-            # Check that the container object has not moved more than the thresholds
+            # Rejection sampling #4: Reject if the container's root pose drifted past the
+            # position/orientation thresholds (i.e. the placed object pushed the container).
             container_pos, container_orn = other.get_position_orientation()
             position_difference = th.norm(container_pos - container_pos_initial)
             orientation_difference = T.get_orientation_diff_in_radian(container_orn, container_orn_initial)
@@ -185,7 +202,9 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 og.sim.load_state(state, serialized=False)
                 continue
 
-            # Check that the container object's articulated joints have not changed.
+            # Rejection sampling #5: Reject if any of the container's articulated joints moved
+            # past the per-DOF-type delta thresholds (e.g. placed object swung a lid or pushed
+            # a drawer). Thresholds are applied separately for rotational and translational DOFs.
             if container_joint_positions_initial is not None:
                 container_joint_positions_final = other.get_joint_positions()
                 joint_thresholds = th.where(
@@ -200,7 +219,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                     og.sim.load_state(state, serialized=False)
                     continue
 
-            # Rejection sampling #4: Verify object is still inside after settling and within reach if using trav map
+            # Rejection sampling #6: Verify object is still inside after settling and within reach if using trav map
             if self.get_value(other):
                 if use_trav_map:
                     settled_pos, _ = self.obj.get_position_orientation()
