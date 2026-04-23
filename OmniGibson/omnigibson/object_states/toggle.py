@@ -167,20 +167,22 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
             row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,) CPU
             cls._finger_query_mask.append(row_mask.unsqueeze(0).cuda())  # (1, R_s) GPU
 
-            # Build toggle-able object with mask
-            if cls.IDX_OBJS[scene_idx][obj_idx] is not None:
-                cls._toggable_objs_with_mask.append(
-                    th.stack(
-                        [
-                            RigidContactAPI.get_contact_col_mask(
-                                scene_idx, list(cls.IDX_OBJS[scene_idx][obj_idx].links.values())
-                            )
-                        ]
-                    ).cuda()
+            # Build toggle-able object with mask — shape (O, C_s)
+            toggleable_obj_with_mask = []
+            any_uninitialized = False
+            for obj_idx in range(O):
+                if cls.IDX_OBJS[scene_idx][obj_idx] is None:
+                    any_uninitialized = True
+                    break
+                toggleable_obj_with_mask.append(
+                    RigidContactAPI.get_contact_col_mask(
+                        scene_idx, list(cls.IDX_OBJS[scene_idx][obj_idx].links.values())
+                    )
                 )
-            else:
-                # obj not finished initialization yet
+            if any_uninitialized:
                 cls._toggable_objs_with_mask.append(None)
+            else:
+                cls._toggable_objs_with_mask.append(th.stack(toggleable_obj_with_mask).cuda())
 
         # Allocate per-step scratch masks — GPU for computation; contact query masks stay CPU
         cls._mask_can_toggle = th.zeros((S, O), dtype=th.bool, device="cuda")

@@ -115,17 +115,22 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             sliceable_col = RigidContactAPI.get_contact_col_mask(scene_idx, sliceable_paths)  # (C_s,) CPU
             cls._sliceable_contact_col_mask.append(sliceable_col.unsqueeze(0).cuda())  # (1, C_s) GPU
 
-            # Row masks (O, R_s). N slicer object form N querys
-            if cls.IDX_OBJS[scene_idx][obj_idx] is not None:
-                slicer_masks = [
+            # Row masks (O, R_s). N slicer objects form N queries
+            slicer_masks = []
+            any_uninitialized = False
+            for obj_idx in range(O):
+                if cls.IDX_OBJS[scene_idx][obj_idx] is None:
+                    any_uninitialized = True
+                    break
+                slicer_masks.append(
                     RigidContactAPI.get_contact_row_mask(
                         scene_idx, [link.prim_path for link in cls.IDX_OBJS[scene_idx][obj_idx].links.values()]
                     )
-                    for obj_idx in range(O)
-                ]  # list of (R_s,) CPU bool
-                cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (O, R_s) GPU
-            else:
+                )  # (R_s,) CPU bool
+            if any_uninitialized:
                 cls._slicer_contact_query_masks.append(None)
+            else:
+                cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (O, R_s) GPU
 
     @classmethod
     def _update_values(cls, values):
