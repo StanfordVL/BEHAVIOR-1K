@@ -1,9 +1,10 @@
+import math
+
 import torch as th
 
 import omnigibson as og
 from omnigibson.macros import macros, create_module_macros
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.joint_state import Joint
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
@@ -20,7 +21,8 @@ m = create_module_macros(module_path=__file__)
 
 m.CONTAINER_POSITION_CHANGE_THRESHOLD = 0.05  # 5cm
 m.CONTAINER_ORIENTATION_CHANGE_THRESHOLD = th.deg2rad(th.tensor([10.0])).item()  # 10 degrees
-
+m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_TRANSLATION = 1e-2  # 1cm
+m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_ROTATION = math.radians(1)  # 1 degree
 
 class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
     @classmethod
@@ -59,8 +61,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
 
         # Save the initial position and orientation of the container
         container_pos_initial, container_orn_initial = other.get_position_orientation()
-        other_joint_positions_initial = other.states[Joint].get_value() if other.n_joints > 0 else None
-        other_joint_positions_t = og.sim.current_time_step_index if other_joint_positions_initial is not None else None
+        container_joint_positions_initial = other.get_joint_positions() if other.n_joints > 0 else None
 
         # Find the container's fillable meta link (fillable or openfillable)
         container_link = None
@@ -184,14 +185,16 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 continue
 
             # Check that the container object's articulated joints have not changed.
-            if other_joint_positions_initial is not None and other.states[Joint].has_changed(
-                get_value_args=(),
-                value=other_joint_positions_initial,
-                info={},
-                t=other_joint_positions_t,
-            ):
-                og.sim.load_state(state, serialized=False)
-                continue
+            if container_joint_positions_initial is not None:
+                container_joint_positions_final = other.get_joint_positions()
+                joint_thresholds = th.where(
+                    other.get_joint_dof_types(),
+                    m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_ROTATION,
+                    m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_TRANSLATION)
+                container_joint_positions_delta = th.abs(container_joint_positions_final - container_joint_positions_initial)
+                if th.any(container_joint_positions_delta > joint_thresholds):
+                    og.sim.load_state(state, serialized=False)
+                    continue
 
             # Rejection sampling #4: Verify object is still inside after settling and within reach if using trav map
             if self.get_value(other):

@@ -867,6 +867,10 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
 
+    def get_joint_dof_types(self):
+        """Returns the degree-of-freedom type for each joint. True for rotation, False for translation."""
+        return self._articulation_view.get_dof_types() == 0
+
     def get_joint_velocities(self, normalized=False):
         """
         Grabs this entity's joint velocities
