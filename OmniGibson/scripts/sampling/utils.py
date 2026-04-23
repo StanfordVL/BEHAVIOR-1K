@@ -107,10 +107,11 @@ def get_all_lights(prim):
 
 
 def hide_all_lights():
-    lights = get_all_lights(prim=og.sim.world_prim)
-    for light in lights:
-        imageable = lazy.pxr.UsdGeom.Imageable(light)
-        imageable.MakeInvisible()
+    with og.sim.editing_usd():
+        lights = get_all_lights(prim=og.sim.world_prim)
+        for light in lights:
+            imageable = lazy.pxr.UsdGeom.Imageable(light)
+            imageable.MakeInvisible()
 
 
 def parse_task_mapping_new():
