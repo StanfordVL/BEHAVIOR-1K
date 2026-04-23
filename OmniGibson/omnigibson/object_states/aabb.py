@@ -61,15 +61,18 @@ class AABB(TensorizedValueState):
         if S == 0 or O == 0:
             cls.PRIM_BODY_IDX = th.zeros((0,), dtype=th.long, device="cuda")
             cls.LINK_IDX = th.zeros((0,), dtype=th.long, device="cuda")
-            cls.CLOTH_OBJ_IDXS = {}
+            cls.BASE_LINK_BODY_IDX = th.zeros((0,), dtype=th.long, device="cuda")
+            cls.BASE_LINK_VALUES_IDX = th.zeros((0,), dtype=th.long, device="cuda")
+            cls.CLOTH_OBJ_IDXS = set()
             cls.STALE = th.zeros((0, 0), dtype=th.bool)
             return
 
         prim_body_idx = []
         link_idx = []
-
         base_link_body_idx = []
         base_link_values_idx = []
+        cls.CLOTH_OBJ_IDXS = set()
+
         for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
             for obj_index, obj in enumerate(scene_row):
                 if obj is None:
@@ -79,7 +82,7 @@ class AABB(TensorizedValueState):
                     continue
 
                 # Add the base link to the base link indices
-                this_base_link_body_idx = RigidBodyViewAPI.get_flat_idx(obj.base_link.prim_path)
+                this_base_link_body_idx = RigidBodyViewAPI.get_flat_idx(obj.root_link.prim_path)
                 assert this_base_link_body_idx is not None, "Base link not in RigidBodyViewAPI"
                 base_link_body_idx.append(this_base_link_body_idx)
                 base_link_values_idx.append(scene_idx * O + obj_index)
@@ -95,6 +98,8 @@ class AABB(TensorizedValueState):
 
         cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long, device="cuda")
         cls.LINK_IDX = th.tensor(link_idx, dtype=th.long, device="cuda")
+        cls.BASE_LINK_BODY_IDX = th.tensor(base_link_body_idx, dtype=th.long, device="cuda")
+        cls.BASE_LINK_VALUES_IDX = th.tensor(base_link_values_idx, dtype=th.long, device="cuda")
         cls.STALE = th.zeros((S, O), dtype=th.bool)
 
         # Initialize new VALUE slots for objects that just appeared
@@ -127,14 +132,15 @@ class AABB(TensorizedValueState):
                 values[s_idx, obj_idx, :3] = lo
                 values[s_idx, obj_idx, 3:] = hi
 
-        # Any AABBs that still contain infinities should instead be replaced with the object base prim's
-        # position and orientation.
-        still_infinity = th.isinf(values_flat_view).any(dim=1)  # (S * O,)
-        infinity_body_idxs = cls.BASE_LINK_BODY_IDX[still_infinity]  # (S * O_infinite_objects,)
-        infinity_object_idxs = cls.BASE_LINK_VALUES_IDX[still_infinity]  # (S * O_infinite_objects,)
-        base_link_poses = RigidBodyViewAPI._POSES[infinity_body_idxs]  # (S * O_infinite_objects, 7)
-        values_flat_view[infinity_object_idxs, :3] = base_link_poses[:, :3]
-        values_flat_view[infinity_object_idxs, 3:] = base_link_poses[:, 3:]
+        # Any rigid-object AABBs that still contain infinities (no collision geometry) fall back
+        # to a point AABB at the root link's position.
+        if cls.BASE_LINK_VALUES_IDX is not None and cls.BASE_LINK_VALUES_IDX.numel() > 0:
+            still_infinity_rigid = th.isinf(values_flat_view[cls.BASE_LINK_VALUES_IDX]).any(dim=1)  # (N_rigid,)
+            infinity_body_idxs = cls.BASE_LINK_BODY_IDX[still_infinity_rigid]
+            infinity_object_idxs = cls.BASE_LINK_VALUES_IDX[still_infinity_rigid]
+            base_link_pos = RigidBodyViewAPI._POSES_GPU[infinity_body_idxs, :3]  # (N_no_geom, 3)
+            values_flat_view[infinity_object_idxs, :3] = base_link_pos
+            values_flat_view[infinity_object_idxs, 3:] = base_link_pos  # hi = lo = position
 
     @classmethod
     def mark_stale(cls, obj):

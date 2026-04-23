@@ -241,7 +241,8 @@ class RigidBodyViewAPI:
 
     # Position + quaternion pose of all links in the scene, indexed by flat index.
     # shape: (N_links_total, 7) — [px, py, pz, qx, qy, qz, qw]
-    _POSES = None
+    _POSES = None  # CPU — written by update_pose_cache() / invalidate_kinematic()
+    _POSES_GPU = None  # GPU — written by async_copy_to_gpu()
 
     # Cached 4x4 transformation matrices — flat, covers physx_tracked + physx_untracked.
     # shape: (N_links_total, 4, 4)
@@ -326,7 +327,8 @@ class RigidBodyViewAPI:
                             scale = link.get_world_scale()
                             raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
 
-        cls._POSES = th.cat(poses_list, dim=0)  # (N_links_total, 7), CPU
+        cls._POSES = th.cat(poses_list, dim=0).pin_memory()  # (N_links_total, 7), CPU
+        cls._POSES_GPU = cls._POSES.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
         cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
         cls._POSE_MATRICES = cls._POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
 
@@ -447,6 +449,7 @@ class RigidBodyViewAPI:
             pos, quat_xyzw = link.get_position_orientation()
             cls._POSES[idx][:3] = pos  # _POSES[idx]: (7,)
             cls._POSES[idx][3:] = quat_xyzw
+            cls._POSES_GPU[idx] = cls._POSES[idx].cuda()
             # unsqueeze(0): (7,) -> (1, 7) so _poses_to_matrices gets its expected (N, 7) input;
             # [0]: (1, 4, 4) -> (4, 4) to match _POSE_MATRICES_CPU[idx] slot
             cls._POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls._POSES[idx].unsqueeze(0))[0]
@@ -454,9 +457,10 @@ class RigidBodyViewAPI:
 
     @classmethod
     def async_copy_to_gpu(cls):
-        """Issue non-blocking bulk copy of _POSE_MATRICES_CPU → _POSE_MATRICES."""
+        """Issue non-blocking bulk copy of _POSES/_POSE_MATRICES CPU → GPU."""
         if cls._POSE_MATRICES_CPU is None:
             return
+        cls._POSES_GPU.copy_(cls._POSES, non_blocking=True)
         cls._POSE_MATRICES.copy_(cls._POSE_MATRICES_CPU, non_blocking=True)
 
     @classmethod
@@ -466,6 +470,7 @@ class RigidBodyViewAPI:
         cls._PATH_TO_IDX = {}
         cls._IDX_TO_PATH = []
         cls._POSES = None
+        cls._POSES_GPU = None
         cls._POSE_MATRICES = None
         cls._POSE_MATRICES_CPU = None
         cls.LOCAL_POINTS = None
