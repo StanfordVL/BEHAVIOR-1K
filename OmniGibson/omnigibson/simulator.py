@@ -548,9 +548,6 @@ def _launch_simulator(*args, **kwargs):
                     orientation=th.tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
 
-            # Acquire contact sensor interface
-            self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()
-
             # Enable the USD edit guard - from now on, any USD edits outside editing_usd() will crash
             self._enable_usd_guard()
 
@@ -2049,14 +2046,6 @@ def _launch_simulator(*args, **kwargs):
                 float: Rendering timestep
             """
             return self._initial_rendering_dt
-
-        @property
-        def contact_sensor(self):
-            """
-            Returns:
-                ContactSensor: Contact sensor object
-            """
-            return self._contact_sensor
 
         def _dump_state(self):
             # Default state is from the scene
