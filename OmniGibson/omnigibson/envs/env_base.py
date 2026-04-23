@@ -410,6 +410,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load the scene and robot specified in the config file.
         """
+        # TODO(vector): Remove this after moving onto vectorized environment
         og.sim._is_loading_scene = True
 
         # This environment is not loaded
@@ -425,6 +426,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_task()
         self._load_external_sensors()
 
+        # TODO(vector): Remove this after moving onto vectorized environment
         og.sim._is_loading_scene = False
 
     def post_play_load(self):

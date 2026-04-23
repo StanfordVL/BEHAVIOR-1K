@@ -27,16 +27,15 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
     """
 
     # S = number of scenes
-    # O = number of toggable objects
+    # O = number of toggleable objects
 
     # th.Tensor (S, O) int
     _robots_can_toggle_steps = None
 
-    # th.Tensor (S, O) bool: whether each toggable object requires to be closed to be toggled
-    _requires_closed = None
-
-    # (O,) long: Open.VALUES column index per toggle object; 0 for objects without requires_closed (masked out by _requires_closed).
-    _open_state_idx = None
+    # (O_requires_closed,) int64
+    # These are indices into flattened views of Open.VALUES and ToggledOn.VALUES.
+    _requires_closed_obj_idxes_in_open_values = None
+    _requires_closed_obj_idxes_in_this_values = None
 
     # list[list[GeomPrim]]: visual toggle-button markers, one per tracked object. Shape (S, O).
     # Used in _check_overlap and color updates.
@@ -52,8 +51,6 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
     _finger_links = []
 
     # Scratch masks, helper for calculate update, (S, O) bool
-    _mask_objects_near_finger = None
-    _mask_untoggable_open_objs = None
     _mask_can_toggle = None
 
     COLOR_ON = th.tensor([0, 1.0, 0])  # green  — toggle is on
@@ -72,16 +69,14 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         super().global_initialize()
 
         cls._robots_can_toggle_steps = None
-        cls._requires_closed = None
-        cls._open_state_idx = None
+        cls._requires_closed_obj_idxes_in_open_values = None
+        cls._requires_closed_obj_idxes_in_this_values = None
         cls.visual_markers = []
 
         cls._finger_links = []
         cls._finger_query_mask = None
         cls._toggable_objs_with_mask = None
 
-        cls._mask_objects_near_finger = None
-        cls._mask_untoggable_open_objs = None
         cls._mask_can_toggle = None
 
     @classmethod
@@ -108,23 +103,31 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 for scene_idx in range(min(prev_steps.shape[0], S)):
                     cls._robots_can_toggle_steps[scene_idx, obj_idx] = prev_steps[scene_idx, obj_idx_old]
 
-        # Build _requires_closed: (S, O)
-        cls._requires_closed = th.zeros((S, O), dtype=th.bool, device="cuda")
+        # Build indices for requires_closed logic.
+        requires_closed_obj_idxes_in_open_values = []
+        requires_closed_obj_idxes_in_this_values = []
         for scene_idx, scene in enumerate(cls.IDX_OBJS):
             for obj_idx, toggle_obj in enumerate(scene):
-                if toggle_obj is not None:
-                    cls._requires_closed[scene_idx, obj_idx] = toggle_obj.states[ToggledOn]._requires_closed_individual
+                if toggle_obj is None:
+                    continue
 
-        # Build _open_state_idx: (O,) long — Open.VALUES column index per toggle object.
-        # Only filled for objects that have requires_closed in any scene because they are guaranteed to have Open state.
-        _requires_closed_objects = cls._requires_closed.any(dim=0)  # (O,) bool
-        cls._open_state_idx = th.zeros(O, dtype=th.long, device="cuda")
-        for obj_idx in _requires_closed_objects.nonzero(as_tuple=True)[0].tolist():
-            toggle_obj = cls.IDX_OBJS[0][obj_idx]
-            if toggle_obj is None:
-                continue
-            assert Open in toggle_obj.states, "Can only require openable object to be closed."
-            cls._open_state_idx[obj_idx] = Open.OBJ_IDXS[toggle_obj.relative_prim_path]
+                if not toggle_obj.states[ToggledOn].requires_closed:
+                    continue
+
+                # Compute the index of this object in the flattened view of this state's VALUES.
+                requires_closed_obj_idxes_in_this_values.append(scene_idx * O + obj_idx)
+                # Compute the index of this object in the flattened view of Open.VALUES.
+                idx_in_open_object_dim = Open.OBJ_IDXS[toggle_obj.relative_prim_path]
+                open_values_object_dim_size = Open.VALUES.shape[1]
+                requires_closed_obj_idxes_in_open_values.append(
+                    idx_in_open_object_dim * open_values_object_dim_size + scene_idx * O + obj_idx
+                )
+        cls._requires_closed_obj_idxes_in_open_values = th.tensor(
+            requires_closed_obj_idxes_in_open_values, dtype=th.long, device="cuda"
+        )
+        cls._requires_closed_obj_idxes_in_this_values = th.tensor(
+            requires_closed_obj_idxes_in_this_values, dtype=th.long, device="cuda"
+        )
 
         # Build visual_markers: point to each instance's self.marker set during _initialize().
         cls.visual_markers = [[None] * O for _ in range(S)]
@@ -139,12 +142,10 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
             # No objects — allocate empty lists/tensors and return early
             cls._finger_query_mask = []
             cls._toggable_objs_with_mask = []
-            cls._mask_objects_near_finger = th.zeros((0, 0), dtype=th.bool, device="cuda")
-            cls._mask_untoggable_open_objs = th.zeros((0, 0), dtype=th.bool, device="cuda")
             cls._mask_can_toggle = th.zeros((0, 0), dtype=th.bool, device="cuda")
             return
 
-        # Loop over scenes to build contact query and with masks to help detect whether finger contacting any togglable objects
+        # Loop over scenes to build contact query_masks and with_masks to help detect whether finger contacting any togglable objects
         cls._finger_query_mask = []
         cls._toggable_objs_with_mask = []
 
@@ -182,8 +183,6 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 cls._toggable_objs_with_mask.append(None)
 
         # Allocate per-step scratch masks — GPU for computation; contact query masks stay CPU
-        cls._mask_objects_near_finger = th.zeros((S, O), dtype=th.bool, device="cuda")
-        cls._mask_untoggable_open_objs = th.zeros((S, O), dtype=th.bool, device="cuda")
         cls._mask_can_toggle = th.zeros((S, O), dtype=th.bool, device="cuda")
 
     def __init__(self, obj, scale=None, requires_closed=False):
@@ -201,10 +200,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
     @property
     def requires_closed(self):
-        """Read-only bool view into the class-level _requires_closed tensor for this object."""
-        s = self.obj.scene.idx
-        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        return bool(type(self)._requires_closed[s, obj_idx].item())
+        return self._requires_closed_individual
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -282,7 +278,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
 
         Steps:
         - For objects that are open yet required to be closed to toggle on, VALUE = False, robot_can_toggle_step = 0
-        - Find what toggable objects have a finger nearby. For those who have, check fingers truly overlap the button mesh.
+        - Find what toggleable objects have a finger nearby. For those who have, check fingers truly overlap the button mesh.
         - Increment robot_can_toggle_steps for objects that can be toggled.
         - Set VALUES to be True for whose robot_can_toggle_steps == m.CAN_TOGGLE_STEPS.
 
@@ -291,8 +287,8 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         """
         S = values.shape[0]
 
-        # Get what toggable objects have a finger nearby
-        cls._mask_objects_near_finger.fill_(False)
+        # Get what toggleable objects are being touched by a finger
+        cls._mask_can_toggle.fill_(False)
         for scene_idx, (query_mask, with_mask) in enumerate(zip(cls._finger_query_mask, cls._toggable_objs_with_mask)):
             if query_mask is None or with_mask is None:
                 continue
@@ -302,18 +298,28 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 with_masks=with_mask,  # (O, C_s)
                 ignore_masks=None,
                 current_only=False,
-            )  # (N,) bool
-            cls._mask_objects_near_finger[scene_idx].copy_(result)
+            )  # (O,) bool
+            cls._mask_can_toggle[scene_idx].copy_(result)
 
         # For objects that are open yet required to be closed to toggle on, set VALUE = False and robot_can_toggle_step = 0
-        cls._mask_untoggable_open_objs.fill_(False)
-        if Open.VALUES.numel() > 0:
-            cls._mask_untoggable_open_objs.copy_(cls._requires_closed & Open.VALUES[:, cls._open_state_idx])
-        values[cls._mask_untoggable_open_objs] = False
-        cls._robots_can_toggle_steps[cls._mask_untoggable_open_objs] = 0
+        flattened_open_values = Open.VALUES.view(-1)
+        flattened_this_values = values.view(-1)
 
-        # Find what toggable objects have a finger nearby. For those who have, check fingers truly overlap the button mesh.
-        th.logical_and(cls._mask_objects_near_finger, ~cls._mask_untoggable_open_objs, out=cls._mask_can_toggle)
+        # Get the values of the objects that are open yet required to be closed to toggle on
+        requires_closed_obj_open_values = flattened_open_values[cls._requires_closed_obj_idxes_in_open_values]
+
+        # Get the indices of the objects that are open yet required to be closed to toggle on
+        requires_closed_obj_idxes_that_are_open = cls._requires_closed_obj_idxes_in_open_values[
+            requires_closed_obj_open_values
+        ]
+
+        # Set the values of the objects that are open yet required to be closed to toggle on to False and reset the robot_can_toggle_steps to 0
+        # and also set the mask_can_toggle to False for these objects - they cannot be toggled on this step either!
+        flattened_this_values[requires_closed_obj_idxes_that_are_open] = False
+        cls._robots_can_toggle_steps[requires_closed_obj_idxes_that_are_open] = 0
+        cls._mask_can_toggle[requires_closed_obj_idxes_that_are_open] = False
+
+        # Find what toggleable objects have a finger nearby. For those who have, check fingers truly overlap the button mesh.
         for scene_idx in range(S):
             for obj_idx in th.where(cls._mask_can_toggle[scene_idx])[0].tolist():
                 cls._mask_can_toggle[scene_idx, obj_idx] &= cls._check_overlap(scene_idx, obj_idx)
@@ -322,10 +328,10 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         cls._robots_can_toggle_steps[cls._mask_can_toggle] += 1
         cls._robots_can_toggle_steps[~cls._mask_can_toggle] = 0
 
-        # Set VALUES to be True for whose robot_can_toggle_steps == m.CAN_TOGGLE_STEPS.
-        th.eq(cls._robots_can_toggle_steps, m.CAN_TOGGLE_STEPS, out=cls._mask_can_toggle)
+        # Only objects that have robot_can_toggle_steps == m.CAN_TOGGLE_STEPS can be toggled on
+        cls._mask_can_toggle[cls._robots_can_toggle_steps != m.CAN_TOGGLE_STEPS] = False
 
-        # Flip values and reset steps
+        # Flip values
         th.logical_xor(values, cls._mask_can_toggle, out=values)
 
     @classmethod

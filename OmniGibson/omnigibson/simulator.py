@@ -914,6 +914,8 @@ def _launch_simulator(*args, **kwargs):
             self._scenes.append(scene)
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
+            # TODO(vector): After vectorizing `Environment`, we can refactor this function to load a set
+            # of scenes at once, and then play once, that way we don't need the is loading scene thing anymore.
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
             self.play()
 
@@ -1210,18 +1212,6 @@ def _launch_simulator(*args, **kwargs):
                 for state_type in og.sim.object_state_types_requiring_update:
                     if issubclass(state_type, TensorizedValueState):
                         state_type.initialize_view()
-
-        def refresh_physics(self, sync_usd=False):
-            """
-            Synchronizes and evaluates any physics updates that have occurred since the last fetch.
-
-            Args:
-                sync_usd (bool): If True, also fetch physics results to USD backings.
-            """
-            self.pi.update_simulation(elapsedStep=0.0, currentTime=self.current_time)
-            if sync_usd:
-                self.psi.fetch_results()
-            self._sim_context._physx_fabric_interface.update(0, self.current_time)
 
         def _update_view_apis(self):
             """Flush physics caches and sync CPU→GPU. Called after every physics step batch."""

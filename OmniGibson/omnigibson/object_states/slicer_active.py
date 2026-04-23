@@ -136,17 +136,14 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Are we currently touching any sliceables? Result written into cls._currently_touching in-place
         cls._currently_touching_sliceables()
 
-        not_active_not_touching = ~values & ~cls._currently_touching
-        not_active_is_touching = ~values & cls._currently_touching
-
         # Increment cooldown when not active and not touching anything sliceable
-        cls.DELAY_COUNTER[not_active_not_touching] += 1
+        cls.DELAY_COUNTER[~values & ~cls._currently_touching] += 1
 
         # Reset cooldown when not active but touching a sliceable (touching delays reactivation)
-        cls.DELAY_COUNTER[not_active_is_touching] = 0
+        cls.DELAY_COUNTER[~values & cls._currently_touching] = 0
 
-        # Re-activate once the cooldown has elapsed; th.where does not trigger a cpu/gpu sync
-        values.copy_(th.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, values))
+        # Re-activate once the cooldown has elapsed
+        values[cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT] = True
 
         # Record current contact state for the next step
         cls.PREVIOUSLY_TOUCHING.copy_(cls._currently_touching)

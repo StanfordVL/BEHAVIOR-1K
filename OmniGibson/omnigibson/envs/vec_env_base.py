@@ -11,6 +11,7 @@ class VectorEnvironment:
         if og.sim is not None:
             og.sim.stop()
 
+        # TODO(vector): Remove this after moving onto vectorized environment & a more clever way of randomizing
         if isinstance(config, list):
             assert len(config) == num_envs, f"config list length ({len(config)}) must match num_envs ({num_envs})"
             configs = config

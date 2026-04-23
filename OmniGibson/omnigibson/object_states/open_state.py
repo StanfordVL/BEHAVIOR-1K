@@ -139,7 +139,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
     # (S, O) bool — whether each object uses both-sides open logic
     BOTH_SIDES = None
 
-    # (S*O,) int64 — pre-built row indices into ArticulatedObjectViewAPI._POSITIONS
+    # (S*O,) int64 — pre-built row indices into ArticulatedObjectViewAPI._JOINT_POSITIONS
     # rows [obj_idx*S .. (obj_idx+1)*S-1] = scenes 0..S-1 for object obj_idx
     OBJ_IDXES_IN_ARTICULATION_VIEW = None
 
@@ -236,7 +236,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
                             threshold_attr[scene_idx, obj_idx, dof_col] = threshold
                             direction_attr[scene_idx, obj_idx, dof_col] = 1.0 if open_end > threshold else -1.0
 
-        # Pre-build (S, O) row index into ArticulatedObjectViewAPI._POSITIONS — built once, reused every step
+        # Pre-build (S, O) row index into ArticulatedObjectViewAPI._JOINT_POSITIONS — built once, reused every step
         cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(S, O, dtype=th.long, device="cuda")
         for _, obj_idx in cls.OBJ_IDXS.items():
             for scene_idx, scene in enumerate(cls.IDX_OBJS):
@@ -329,6 +329,7 @@ class Open(TensorizedValueState, BooleanStateMixin):
                 joint.set_pos(joint_pos)
 
             # Check success from joint positions (VALUES is stale here)
+            # TODO(vector): When cache invalidation works, we can just call _update_values() here instead of recomputing everything.
             sides_open = []
             for check_side in sides:
                 joint_thresholds = (

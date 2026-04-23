@@ -239,8 +239,8 @@ class RigidBodyViewAPI:
     _PATH_TO_IDX = {}  # {link_absolute_prim_path: int}
     _IDX_TO_PATH = []  # list[link_absolute_prim_path]
 
-    # Raw poses from PhysX — flat across all scenes, physx_tracked links only.
-    # shape: (N_links_physx_tracked, 7) — [px, py, pz, qx, qy, qz, qw]
+    # Position + quaternion pose of all links in the scene, indexed by flat index.
+    # shape: (N_links_total, 7) — [px, py, pz, qx, qy, qz, qw]
     _POSES = None
 
     # Cached 4x4 transformation matrices — flat, covers physx_tracked + physx_untracked.
@@ -299,7 +299,7 @@ class RigidBodyViewAPI:
                 cls._IDX_TO_PATH.append(abs_path)
             poses_list.append(cls._RIGID_BODY_VIEW.get_transforms().clone())
 
-        # Add physx_untracked kinematic links and collects collision_boundary_points_local---
+        # Add physx_untracked kinematic links and collects collision_boundary_points_local
         raw_local_points = {}  # {flat_idx: (V, 3) tensor}
 
         for _, scene in enumerate(og.sim.scenes):
@@ -333,7 +333,8 @@ class RigidBodyViewAPI:
         # Build LOCAL_POINTS and POINTS_MASK tensors.
         N_total = len(cls._PATH_TO_IDX)
         V_max = max((p.shape[0] for p in raw_local_points.values()), default=1)
-        local_points = th.ones(N_total, V_max, 4)
+        local_points = th.zeros(N_total, V_max, 4)
+        local_points[:, :, 3] = 1.0
         points_mask = th.zeros(N_total, V_max, dtype=th.bool)
         for path_idx, pts in raw_local_points.items():
             V = pts.shape[0]
@@ -360,8 +361,9 @@ class RigidBodyViewAPI:
             )
             return
 
-        cls._POSES[: transforms.shape[0]] = transforms
-        cls._POSE_MATRICES_CPU[: transforms.shape[0]] = cls._poses_to_matrices(transforms)
+        N_physx_tracked = transforms.shape[0]
+        cls._POSES[:N_physx_tracked] = transforms
+        cls._POSE_MATRICES_CPU[:N_physx_tracked] = cls._poses_to_matrices(transforms)
 
     @staticmethod
     def _poses_to_matrices(poses):
@@ -414,11 +416,6 @@ class RigidBodyViewAPI:
         world_pts_max = world_pts.clone()
         world_pts_min[~mask] = float("inf")
         world_pts_max[~mask] = float("-inf")
-
-        # For links that don't have any collision geometry, add a point at their local origin
-        objects_missing_points = ~th.any(mask, dim=1)  # (N,)
-        world_pts_min[objects_missing_points, 0, :] = poses[objects_missing_points, :3, 3]
-        world_pts_max[objects_missing_points, 0, :] = poses[objects_missing_points, :3, 3]
 
         # Compute per-link AABBs
         min_p = world_pts_min.min(dim=1).values  # (N, 3)
@@ -489,14 +486,14 @@ class ArticulatedObjectViewAPI:
 
     Data layout:
         _VIEW        ArticulationView          single view for all non-robot articulated objects
-        _OBJ_TO_VIEW_IDX  {abs_art_root_path: int}  row index in _POSITIONS
-        _POSITIONS   (N_objects_all_scenes, max_dof)  one row per object per scene, PhysX row order
+        _OBJ_TO_VIEW_IDX  {abs_art_root_path: int}  row index in _JOINT_POSITIONS
+        _JOINT_POSITIONS   (N_objects_all_scenes, max_dof)  one row per object per scene, PhysX row order
     """
 
     _VIEW = None
     _OBJ_TO_VIEW_IDX = {}
-    _POSITIONS = None  # GPU — written by async_copy_to_gpu()
-    _POSITIONS_CPU = None  # CPU — latest PhysX output, written by update_dof_cache()
+    _JOINT_POSITIONS = None  # GPU — written by async_copy_to_gpu()
+    _JOINT_POSITIONS_CPU = None  # CPU — latest PhysX output, written by update_dof_cache()
 
     @classmethod
     def initialize_view(cls):
@@ -522,46 +519,46 @@ class ArticulatedObjectViewAPI:
             obj.articulation_root_path for obj in articulation_objs
         ), "Articulation view prim paths mismatch!"
         cls._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(cls._VIEW.prim_paths)}
-        # Pre-allocate _POSITIONS on GPU; _POSITIONS_CPU holds the latest PhysX output.
+        # Pre-allocate _JOINT_POSITIONS on GPU; _JOINT_POSITIONS_CPU holds the latest PhysX output.
         positions = cls._VIEW.get_dof_positions()
-        cls._POSITIONS_CPU = positions
-        cls._POSITIONS = cls._POSITIONS_CPU.cuda()  # synchronous init so first read is valid
+        cls._JOINT_POSITIONS_CPU = positions
+        cls._JOINT_POSITIONS = cls._JOINT_POSITIONS_CPU.cuda()  # synchronous init so first read is valid
 
     @classmethod
     def update_dof_cache(cls):
         """Fetch latest DOF positions from PhysX into CPU staging buffer. Called every step."""
         if cls._VIEW is None:
             return
-        cls._POSITIONS_CPU = cls._VIEW.get_dof_positions()
+        cls._JOINT_POSITIONS_CPU = cls._VIEW.get_dof_positions()
 
     @classmethod
     def get_view_row(cls, abs_prim_path):
-        """Return row index in _POSITIONS for a given absolute articulation root path, or None."""
+        """Return row index in _JOINT_POSITIONS for a given absolute articulation root path, or None."""
         return cls._OBJ_TO_VIEW_IDX.get(abs_prim_path)
 
     @classmethod
     def get_max_dof(cls):
-        """Return the padded DOF width of _POSITIONS; 0 if not initialized."""
-        return cls._POSITIONS.shape[1] if cls._POSITIONS is not None else 0
+        """Return the padded DOF width of _JOINT_POSITIONS; 0 if not initialized."""
+        return cls._JOINT_POSITIONS.shape[1] if cls._JOINT_POSITIONS is not None else 0
 
     @classmethod
     def get_articulation_positions(cls, position_rows):
         """Return GPU tensor containing the DOF positions for the given row indices."""
-        return cls._POSITIONS[position_rows]
+        return cls._JOINT_POSITIONS[position_rows]
 
     @classmethod
     def async_copy_to_gpu(cls):
-        """Issue non-blocking copy of _POSITIONS_CPU → _POSITIONS."""
-        if cls._POSITIONS_CPU is None:
+        """Issue non-blocking copy of _JOINT_POSITIONS_CPU → _JOINT_POSITIONS."""
+        if cls._JOINT_POSITIONS_CPU is None:
             return
-        cls._POSITIONS.copy_(cls._POSITIONS_CPU, non_blocking=True)
+        cls._JOINT_POSITIONS.copy_(cls._JOINT_POSITIONS_CPU, non_blocking=True)
 
     @classmethod
     def clear(cls):
         cls._VIEW = None
         cls._OBJ_TO_VIEW_IDX = {}
-        cls._POSITIONS = None
-        cls._POSITIONS_CPU = None
+        cls._JOINT_POSITIONS = None
+        cls._JOINT_POSITIONS_CPU = None
 
 
 class RigidContactAPIImpl:
@@ -1189,7 +1186,7 @@ class RigidContactAPIImpl:
         assert with_masks is None or ignore_masks is None, "Provide either with_masks or ignore_masks, not both."
 
         if scene_idx not in self._CONTACT_MATRIX_GPU or scene_idx not in self._PATH_TO_COL_IDX:
-            return th.zeros(query_masks.shape[0], dtype=th.bool, device=query_masks.device)
+            return th.zeros(query_masks.shape[0], dtype=th.bool, device="cuda")
 
         contact_matrix = (
             self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] if current_only else self._CONTACT_MATRIX_GPU[scene_idx]

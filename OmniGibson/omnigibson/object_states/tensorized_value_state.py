@@ -200,10 +200,6 @@ class TensorizedValueState(AbsoluteObjectState):
         """
         raise NotImplementedError
 
-    def __init__(self, obj):
-        # Run super first; registration in OBJ_IDXS / IDX_OBJS / VALUES is done by initialize_view()
-        super().__init__(obj)
-
     def _get_value(self):
         # Read from the pinned CPU mirror — no GPU stall for Python callers
         s = self.obj.scene.idx
