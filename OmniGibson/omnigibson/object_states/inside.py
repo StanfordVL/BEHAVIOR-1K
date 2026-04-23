@@ -3,6 +3,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import macros, create_module_macros
 from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.joint_state import Joint
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
@@ -58,6 +59,8 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
 
         # Save the initial position and orientation of the container
         container_pos_initial, container_orn_initial = other.get_position_orientation()
+        other_joint_positions_initial = other.states[Joint].get_value() if other.n_joints > 0 else None
+        other_joint_positions_t = og.sim.current_time_step_index if other_joint_positions_initial is not None else None
 
         # Find the container's fillable meta link (fillable or openfillable)
         container_link = None
@@ -128,8 +131,21 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             pos[2] += 0.01
             self.obj.set_position_orientation(position=pos, orientation=orientation)
             self.obj.keep_still()
+            # step physics once to ensure the object is registered in the contact API
+            og.sim.step_physics()
 
-            # Rejection sampling #2: Check for collision after placement
+            # Rejection sampling #2: Reject if the object is already intersecting anything immediately after placement
+            if RigidContactAPI.is_in_contact(
+                scene_idx=self.obj.scene.idx,
+                query_set=[self.obj],
+                with_set=None,
+                ignore_set=None,
+                current_only=True,
+            ):
+                og.sim.load_state(state, serialized=False)
+                continue
+
+            # Rejection sampling #3: Check for collision after placement
             # Step until contact is made or max steps reached (0.5 seconds of sim time)
             n_steps_max = int(0.5 / og.sim.get_physics_dt())
             step_idx = 0
@@ -167,7 +183,17 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
                 og.sim.load_state(state, serialized=False)
                 continue
 
-            # Rejection sampling #3: Verify object is still inside after settling and within reach if using trav map
+            # Check that the container object's articulated joints have not changed.
+            if other_joint_positions_initial is not None and other.states[Joint].has_changed(
+                get_value_args=(),
+                value=other_joint_positions_initial,
+                info={},
+                t=other_joint_positions_t,
+            ):
+                og.sim.load_state(state, serialized=False)
+                continue
+
+            # Rejection sampling #4: Verify object is still inside after settling and within reach if using trav map
             if self.get_value(other):
                 if use_trav_map:
                     settled_pos, _ = self.obj.get_position_orientation()
