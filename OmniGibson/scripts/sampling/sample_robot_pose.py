@@ -241,11 +241,8 @@ def process_task(task_info: Dict):
         with open(tro_file, "w") as f:
             json.dump(tro_data, f, indent=4)
 
-    # Clean up environment
-    og.clear()
-
-    print(f"  Updated template, partial template, and {len(task_info['tro_files'])} TRO files")
     print(f"  Added pose for: {list(template_robot_poses.keys())}")
+    print(f"  Updated template, partial template, and {len(task_info['tro_files'])} TRO files")
 
 
 def main():
@@ -270,6 +267,8 @@ def main():
     for i, task_info in enumerate(tasks):
         print(f"\n[{i + 1}/{len(tasks)}] ", end="")
         process_task(task_info)
+        if i < len(tasks) - 1:
+            og.clear()
 
     og.shutdown()
 
