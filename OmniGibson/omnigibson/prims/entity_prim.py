@@ -867,6 +867,21 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
 
+    def get_joint_dof_types(self):
+        """
+        Per-DOF type mask for this articulation's joints.
+
+        Collapses the underlying ``omni.physics.tensors.DofType`` enum returned by the
+        articulation view into a boolean tensor, so it can be used directly with ``th.where``
+        to pick per-DOF-type values (e.g. degree-vs-meter thresholds).
+
+        Returns:
+            th.Tensor: (n_dof,) boolean tensor. True for rotational DOFs, False for translational.
+        """
+        return th.as_tensor(
+            [x == lazy.omni.physics.tensors.DofType.Rotation for x in self._articulation_view.get_dof_types()]
+        )
+
     def get_joint_velocities(self, normalized=False):
         """
         Grabs this entity's joint velocities
