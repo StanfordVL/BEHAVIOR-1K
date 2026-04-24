@@ -359,9 +359,9 @@ class TouchingAnyCondition(RuleCondition):
     Rule condition that prunes object candidates from @filter_1_name, only keeping any that are touching any object
     from @filter_2_name
 
-    Note that this condition uses the RigidContactAPI for contact checking. This is not a persistent contact check,
-    meaning that if objects get in contact for some time and both fall asleep, the contact will not be detected.
-    To get persistent contact checking, please use contact_sensor.
+    Note that this condition uses the RigidContactAPI for contact checking, which persists contact state
+    across physics steps even when both bodies fall asleep (current_only=False queries the "recent"
+    contact matrix that retains the last observed value for sleeping pairs).
     """
 
     def __init__(self, filter_1_name, filter_2_name):
