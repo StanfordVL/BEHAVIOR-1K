@@ -672,14 +672,14 @@ class DataPlaybackWrapper(DataWrapper):
             }, "Expected reset() to have inserted an initial obs-only entry into the trajectory history!"
             self.current_traj_history[-1]["obs"] = self._process_obs(self.current_obs, init_info)
 
-        for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
+        # Iterate through the rest of the episode and playback each step
+        for i, (a, s, ss, r, te, tr) in enumerate(
+            zip(action, state[1:], state_size[1:], reward, terminated, truncated)
+        ):
             if i % 1000 == 0:
                 log.info(f"Playing back episode {episode_id}, step {i}/{len(action)}")
 
-            # Restore the sim state first; the recorded state at step i is the pre-transition snapshot.
-            og.sim.load_state(s[: int(ss)], serialized=True)
-
-            # Then execute any transitions recorded at this step so the scene matches state[i+1].
+            # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
                 scene = og.sim.scenes[0]
@@ -696,6 +696,10 @@ class DataPlaybackWrapper(DataWrapper):
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
                 # Step physics to initialize any new objects
                 og.sim.step()
+
+            # Restore the sim state, and take a very small step with the action to make sure
+            # physics are properly propagated after the sim state update
+            og.sim.load_state(s[: int(ss)], serialized=True)
             if not self.include_contacts:
                 # When all objects/systems are visual-only, keep them still on every step
                 for obj in self.scene.objects:
