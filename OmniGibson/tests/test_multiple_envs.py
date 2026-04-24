@@ -483,3 +483,71 @@ def test_behavior_setter():
     got_world_pos, got_world_ori = robot.get_position_orientation()
     assert not th.allclose(got_world_pos, new_world_pos, atol=1e-3)
     assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+
+
+def test_objects_with_different_joints_open_state():
+    # ufhpbn: 1 openable joint, fmelap: 2 openable joints
+    # Both named "cabinet" so they share the same obj_idx in Open.OBJ_IDXS
+    base_cfg = {
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["floors", "walls"],
+        },
+        "robots": [{"model": "fetch", "obs_modalities": []}],
+    }
+    import copy
+
+    cfg_0 = copy.deepcopy(base_cfg)
+    cfg_0["objects"] = [
+        {
+            "type": "DatasetObject",
+            "name": "cabinet",
+            "category": "bottom_cabinet_no_top",
+            "model": "ufhpbn",
+            "position": [3.0, 0.0, 0.5],
+        }
+    ]
+    cfg_1 = copy.deepcopy(base_cfg)
+    cfg_1["objects"] = [
+        {
+            "type": "DatasetObject",
+            "name": "cabinet",
+            "category": "bottom_cabinet_no_top",
+            "model": "fmelap",
+            "position": [3.0, 0.0, 0.5],
+        }
+    ]
+
+    if og.sim is not None:
+        og.sim.stop()
+
+    vec_env = og.VectorEnvironment(2, [cfg_0, cfg_1])
+
+    cabinet_0 = vec_env.envs[0].scene.object_registry("name", "cabinet")
+    cabinet_1 = vec_env.envs[1].scene.object_registry("name", "cabinet")
+    assert cabinet_0 is not None
+    assert cabinet_1 is not None
+
+    obj_idx = object_states.Open.OBJ_IDXS[cabinet_0.relative_prim_path]
+    n_joints_s0 = int(object_states.Open.OPENABLE_MASK[0, obj_idx].sum().item())
+    n_joints_s1 = int(object_states.Open.OPENABLE_MASK[1, obj_idx].sum().item())
+    assert n_joints_s0 != n_joints_s1, f"Expected different joint counts, got {n_joints_s0} in both scenes"
+
+    # Open cabinet_0, close cabinet_1 — they're controlled independently
+    cabinet_0.states[object_states.Open].set_value(True)
+    cabinet_1.states[object_states.Open].set_value(False)
+    for _ in range(5):
+        og.sim.step()
+    assert cabinet_0.states[object_states.Open].get_value() is True
+    assert cabinet_1.states[object_states.Open].get_value() is False
+
+    # Flip: close cabinet_0, open cabinet_1
+    cabinet_0.states[object_states.Open].set_value(False)
+    cabinet_1.states[object_states.Open].set_value(True)
+    for _ in range(5):
+        og.sim.step()
+    assert cabinet_0.states[object_states.Open].get_value() is False
+    assert cabinet_1.states[object_states.Open].get_value() is True
+
+    og.clear()

@@ -2,7 +2,7 @@ import torch as th
 
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
-from omnigibson.utils.python_utils import classproperty, torch_delete
+from omnigibson.utils.python_utils import classproperty
 
 
 class MaxTemperature(TensorizedValueState):
@@ -10,7 +10,7 @@ class MaxTemperature(TensorizedValueState):
     This state remembers the highest temperature reached by an object.
     """
 
-    # th.tensor: Array of Temperature.VALUE indices that correspond to the internally tracked MaxTemperature objects
+    # th.tensor: Array of Temperature.OBJ_IDXS N-indices that correspond to each MaxTemperature object
     TEMPERATURE_IDXS = None
 
     @classmethod
@@ -20,61 +20,37 @@ class MaxTemperature(TensorizedValueState):
         return deps
 
     @classmethod
-    def global_initialize(cls):
-        # Call super first
-        super().global_initialize()
+    def initialize_view(cls):
+        # Snapshot which relative paths existed before the rebuild
+        prev_rel_paths = set(cls.OBJ_IDXS.keys()) if cls.OBJ_IDXS is not None else set()
 
-        # Initialize other global variables
-        cls.TEMPERATURE_IDXS = th.empty(0, dtype=int)
+        # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
+        super().initialize_view()
 
-        # Add global callback to Temperature state so that temperature idxs will be updated
-        def _update_temperature_idxs(obj):
-            # Decrement all remaining temperature idxs -- they're strictly increasing so we can simply
-            # subtract 1 from all downstream indices
-            deleted_idx = Temperature.OBJ_IDXS[obj]
-            cls.TEMPERATURE_IDXS = th.where(
-                cls.TEMPERATURE_IDXS >= deleted_idx, cls.TEMPERATURE_IDXS - 1, cls.TEMPERATURE_IDXS
-            )
-
-        Temperature.add_callback_on_remove(
-            name="MaxTemperature_temperature_idx_update", callback=_update_temperature_idxs
+        # Rebuild TEMPERATURE_IDXS: for each MaxTemp N index, find matching Temperature N index.
+        # MaxTemp objects are a subset of Temperature objects with the same relative paths.
+        # cls.OBJ_IDXS is insertion-ordered (Python 3.7+), so iterating yields keys in N=0,1,2,... order.
+        cls.TEMPERATURE_IDXS = th.tensor(
+            [Temperature.OBJ_IDXS[rel_path] for rel_path in cls.OBJ_IDXS],
+            dtype=th.long,
+            device="cuda",
         )
 
-    @classmethod
-    def _add_obj(cls, obj):
-        # Call super first
-        super()._add_obj(obj=obj)
-
-        # Add to temperature index
-        cls.TEMPERATURE_IDXS = th.cat([cls.TEMPERATURE_IDXS, th.tensor([Temperature.OBJ_IDXS[obj]])])
-
-    @classmethod
-    def _remove_obj(cls, obj):
-        # Grab idx we'll delete before the object is deleted
-        deleted_idx = cls.OBJ_IDXS[obj]
-
-        # Remove from temperature index
-        cls.TEMPERATURE_IDXS = torch_delete(cls.TEMPERATURE_IDXS, [deleted_idx])
-
-        # Decrement all remaining temperature idxs -- they're strictly increasing so we can simply
-        # subtract 1 from all downstream indices
-        if deleted_idx < len(cls.TEMPERATURE_IDXS):
-            cls.TEMPERATURE_IDXS[deleted_idx:] -= 1
-
-        # Call super
-        super()._remove_obj(obj=obj)
+        # Initialize new VALUE slots (not carried over) to -inf
+        for rel_path, obj_idx in cls.OBJ_IDXS.items():
+            if rel_path not in prev_rel_paths:
+                for s_idx in range(len(cls.IDX_OBJS)):
+                    if cls.IDX_OBJS[s_idx][obj_idx] is not None:
+                        cls.VALUES[s_idx, obj_idx] = -float("inf")
+                        cls.VALUES_CPU[s_idx, obj_idx] = -float("inf")
 
     @classmethod
     def _update_values(cls, values):
-        # Value is max between stored values and current temperature values
-        return th.maximum(values, Temperature.VALUES[cls.TEMPERATURE_IDXS])
+        # Value is max between stored values and current temperature values.
+        # Temperature.VALUES is (S, N_temp); cls.TEMPERATURE_IDXS maps MaxTemp N → Temperature N,
+        # so Temperature.VALUES[:, cls.TEMPERATURE_IDXS] has shape (S, N_max).
+        th.maximum(values, Temperature.VALUES[:, cls.TEMPERATURE_IDXS], out=values)
 
     @classproperty
     def value_name(cls):
         return "max_temperature"
-
-    def __init__(self, obj):
-        super(MaxTemperature, self).__init__(obj)
-
-        # Set value to be default
-        self._set_value(-float("inf"))

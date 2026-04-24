@@ -21,7 +21,8 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
+from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims import XFormPrim
@@ -45,13 +46,15 @@ from omnigibson.utils.ui_utils import (
 )
 from omnigibson.utils.vision_utils import add_semantic_label
 from omnigibson.utils.usd_utils import (
+    ArticulatedObjectViewAPI,
     CollisionAPI,
     ControllableObjectViewAPI,
+    RigidBodyViewAPI,
     RigidContactAPI,
+    clear as clear_usd_utils,
+    triangularize_mesh,
 )
-from omnigibson.utils.usd_utils import clear as clear_usd_utils
 from omnigibson.controllers import ControllerView
-from omnigibson.utils.usd_utils import triangularize_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -86,6 +89,25 @@ def with_profiler(name):
         return wrapper
 
     return decorator
+
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
+m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
+
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
+m.SCENE_MARGIN = 10.0
+m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
+
+m.KIT_FILES = {
+    (5, 1, 0): "omnigibson_5_1_0.kit",
+}
 
 
 # Helper functions for starting omnigibson
@@ -460,6 +482,8 @@ def _launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scenes = []
+            # Whether sim is currently in the middle of loading scenes
+            self._is_loading_scene = False
             # The callback will be called right *before* the physics step
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
@@ -503,7 +527,7 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_requiring_update = [
                 state
                 for state in self.object_state_types
-                if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedValueState))
             ]
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
@@ -524,7 +548,7 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
 
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
+                if issubclass(state, TensorizedValueState):
                     state.global_initialize()
 
             # Now start rebuilding everything
@@ -547,9 +571,6 @@ def _launch_simulator(*args, **kwargs):
                     position=th.tensor(m.DEFAULT_VIEWER_CAMERA_POS),
                     orientation=th.tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
-
-            # Acquire contact sensor interface
-            self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()
 
             # Enable the USD edit guard - from now on, any USD edits outside editing_usd() will crash
             self._enable_usd_guard()
@@ -890,6 +911,8 @@ def _launch_simulator(*args, **kwargs):
             self._scenes.append(scene)
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
+            # TODO(vector): After vectorizing `Environment`, we can refactor this function to load a set
+            # of scenes at once, and then play once, that way we don't need the is loading scene thing anymore.
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
             self.play()
 
@@ -1178,7 +1201,24 @@ def _launch_simulator(*args, **kwargs):
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
+            RigidBodyViewAPI.initialize_view()
+            ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+
+            if gm.ENABLE_OBJECT_STATES:
+                for state_type in og.sim.object_state_types_requiring_update:
+                    if issubclass(state_type, TensorizedValueState):
+                        state_type.initialize_view()
+
+        def _update_view_apis(self):
+            """Flush physics caches and sync CPU→GPU. Called after every physics step batch."""
+            RigidContactAPI.update_contact_cache()
+            RigidBodyViewAPI.update_pose_cache()
+            ArticulatedObjectViewAPI.update_dof_cache()
+
+            RigidBodyViewAPI.async_copy_to_gpu()
+            ArticulatedObjectViewAPI.async_copy_to_gpu()
+            th.cuda.synchronize()
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1191,8 +1231,8 @@ def _launch_simulator(*args, **kwargs):
 
             # If we're playing we, also run additional logic
             if self.is_playing():
-                # Update persistent rigid contact caches from the latest step
-                RigidContactAPI.update_contact_cache()
+                # Update persistent rigid contact and body pose caches from the latest step
+                self._update_view_apis()
 
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
@@ -1221,35 +1261,47 @@ def _launch_simulator(*args, **kwargs):
                         for scene in scenes_modified:
                             scene.transition_rule_api.refresh_all_rules()
 
-                # Update any system-related state
-                for scene in self.scenes:
-                    for system in scene.active_systems.values():
-                        system.update()
-
-                # Propagate states if the feature is enabled
-                if gm.ENABLE_OBJECT_STATES:
-                    # Step the object states in global topological order (if the scene exists)
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, GlobalUpdateStateMixin):
-                            state_type.global_update()
-                        if issubclass(state_type, UpdateStateMixin):
-                            for scene in self.scenes:
-                                for obj in scene.get_objects_with_state(state_type):
-                                    # Update the state (object should already be initialized since
-                                    # this step will only occur after objects are initialized and sim
-                                    # is playing
-                                    obj.states[state_type].update()
-
+                # Only run the update when sim is not in the middle of scene loading
+                if not self._is_loading_scene:
+                    # Update any system-related state
                     for scene in self.scenes:
-                        for obj in scene.objects:
-                            # Only update visuals for objects that have been initialized so far
-                            if obj.initialized:
-                                obj.update_visuals()
+                        for system in scene.active_systems.values():
+                            system.update()
 
-                # Possibly run transition rule step
-                if gm.ENABLE_TRANSITION_RULES:
-                    for scene in self.scenes:
-                        scene.transition_rule_api.step()
+                    # Propagate states if the feature is enabled
+                    if gm.ENABLE_OBJECT_STATES:
+                        # TensorizedValueState global_updates (GPU computation)
+                        for state_type in self.object_state_types_requiring_update:
+                            if issubclass(state_type, TensorizedValueState):
+                                state_type.global_update()
+
+                        th.cuda.synchronize()
+
+                        # TensorizedValueState post_updates (CPU change detection + state_updated())
+                        for state_type in self.object_state_types_requiring_update:
+                            if issubclass(state_type, TensorizedValueState):
+                                state_type.post_update()
+
+                        # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
+                        for state_type in self.object_state_types_requiring_update:
+                            if issubclass(state_type, UpdateStateMixin):
+                                for scene in self.scenes:
+                                    for obj in scene.get_objects_with_state(state_type):
+                                        # Update the state (object should already be initialized since
+                                        # this step will only occur after objects are initialized and sim
+                                        # is playing
+                                        obj.states[state_type].update()
+
+                        for scene in self.scenes:
+                            for obj in scene.objects:
+                                # Only update visuals for objects that have been initialized so far
+                                if obj.initialized:
+                                    obj.update_visuals()
+
+                    # Possibly run transition rule step
+                    if gm.ENABLE_TRANSITION_RULES:
+                        for scene in self.scenes:
+                            scene.transition_rule_api.step()
 
         def play(self):
             if not self.is_playing():
@@ -1395,7 +1447,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Accumulate contact data from this physics step and then flush to cache.
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-            RigidContactAPI.update_contact_cache()
+            self._update_view_apis()
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
@@ -1959,10 +2011,10 @@ def _launch_simulator(*args, **kwargs):
             # Stop the physics
             self.stop()
 
-            # # Clean subscribed callbacks
-            # self._pre_physics_step_callback.unsubscribe()
-            # self._post_physics_step_callback.unsubscribe()
-            # self._simulation_event_callback.unsubscribe()
+            # Clean subscribed callbacks
+            self._pre_physics_step_callback.unsubscribe()
+            self._post_physics_step_callback.unsubscribe()
+            self._simulation_event_callback.unsubscribe()
 
             # Clear all scenes
             for scene in self.scenes:
@@ -1986,7 +2038,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
+                if issubclass(state, TensorizedValueState):
                     state.global_initialize()
 
             # Clear all materials
@@ -2049,14 +2101,6 @@ def _launch_simulator(*args, **kwargs):
                 float: Rendering timestep
             """
             return self._initial_rendering_dt
-
-        @property
-        def contact_sensor(self):
-            """
-            Returns:
-                ContactSensor: Contact sensor object
-            """
-            return self._contact_sensor
 
         def _dump_state(self):
             # Default state is from the scene

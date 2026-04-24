@@ -46,7 +46,7 @@ from omnigibson.controllers import (
     DifferentialDriveController,
     ControllerView,
 )
-from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
@@ -289,6 +289,13 @@ class Robot(USDObject, GymObservable):
         self._include_sensor_names = None if include_sensor_names is None else set(include_sensor_names)
         self._exclude_sensor_names = None if exclude_sensor_names is None else set(exclude_sensor_names)
         self._sensors = None  # e.g.: scan sensor, vision sensor
+
+        # Per-robot rigid contact view, used for reading contact positions between the robot's finger
+        # links and any other rigid body in the scene for assisted grasping. The view is rebuilt every
+        # time update_handles runs so new/removed bodies are picked up.
+        self._rigid_contact_view = None
+        self._rigid_contact_view_row_path_to_idx = {}
+        self._rigid_contact_view_col_path_to_idx = {}
 
         # All BaseRobots should have xform properties pre-loaded
         load_config = {} if load_config is None else load_config
@@ -1275,6 +1282,86 @@ class Robot(USDObject, GymObservable):
 
             # Reload the controllers to update their command_output_limits and control_limits
             self.reload_controllers(self._controller_config)
+
+    def update_handles(self):
+        # Run super first so the articulation / link / joint views are re-created.
+        super().update_handles()
+        # Rebuild the per-robot rigid contact view so it picks up any new/removed rigid bodies.
+        # This intentionally runs after the physics sim view has been refreshed by the simulator.
+        self._refresh_rigid_contact_view()
+
+    def _refresh_rigid_contact_view(self):
+        """
+        (Re)creates this robot's rigid contact view, which provides per-contact force/position data
+        between dynamic rigid bodies in the scene (rows) and this robot's finger links (columns).
+        Kinematic and static bodies are not included as rows by Isaac's RigidContactView.
+
+        Only manipulation robots own a view — any other robot simply clears its state.
+        """
+        # Non-manipulation robots don't need contact positions from fingers; just clear and exit.
+        if not self.is_manipulation:
+            self._rigid_contact_view = None
+            self._rigid_contact_view_row_path_to_idx = {}
+            self._rigid_contact_view_col_path_to_idx = {}
+            return
+
+        # Collect finger prim paths across all arms — these become the columns of the contact view.
+        finger_paths = sorted({link.prim_path for links in self.finger_links.values() for link in links})
+        if len(finger_paths) == 0:
+            self._rigid_contact_view = None
+            self._rigid_contact_view_row_path_to_idx = {}
+            self._rigid_contact_view_col_path_to_idx = {}
+            return
+
+        # Rows are dynamic rigid bodies in the robot's scene; columns are the robot's fingers.
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            self._rigid_contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
+                pattern=f"/World/scene_{self.scene.idx}/*/*",
+                filter_patterns=finger_paths,
+                max_contact_data_count=len(finger_paths) * 8,
+            )
+
+        row_paths = list(self._rigid_contact_view.sensor_paths)
+        col_paths = list(getattr(self._rigid_contact_view, "filter_patterns", finger_paths))
+        self._rigid_contact_view_row_path_to_idx = {path: i for i, path in enumerate(row_paths)}
+        self._rigid_contact_view_col_path_to_idx = {path: i for i, path in enumerate(col_paths)}
+
+    def _find_finger_contact_position(self, arm, target_link_prim_path):
+        """
+        Looks up the world-frame (x,y,z) position of a contact between one of this robot's finger links
+        for @arm and the rigid body at @target_link_prim_path, using this robot's rigid contact view.
+
+        Args:
+            arm (str): Arm name whose fingers should be queried.
+            target_link_prim_path (str): Prim path of the target rigid body to find contact against.
+
+        Returns:
+            None or th.Tensor: (3,) float tensor world-frame contact position, or None if no contact
+                exists between any finger and the target link.
+        """
+        if self._rigid_contact_view is None:
+            return None
+
+        row_idx = self._rigid_contact_view_row_path_to_idx.get(target_link_prim_path)
+        if row_idx is None:
+            return None
+
+        forces, points, normals, separations, contact_counts, start_indices = self._rigid_contact_view.get_contact_data(
+            dt=og.sim.get_physics_dt()
+        )
+
+        for finger_link in self.finger_links[arm]:
+            col_idx = self._rigid_contact_view_col_path_to_idx.get(finger_link.prim_path)
+            if col_idx is None:
+                continue
+            count = int(contact_counts[row_idx, col_idx])
+            if count == 0:
+                continue
+            start = int(start_indices[row_idx, col_idx])
+            if start >= len(points):
+                continue
+            return th.as_tensor(points[start], dtype=th.float32)
+        return None
 
     def _load_sensors(self):
         """
@@ -3402,25 +3489,9 @@ class Robot(USDObject, GymObservable):
         if joint_type is None:
             return
 
-        # Compute the contact position in world frame
-        # Note that this relies on the legacy contact sensor API and not the RigidContactAPI,
-        # because the position information is not reliably available through the RigidContactAPI.
+        # Compute the contact position in world frame using this robot's own rigid contact view.
         target_link_prim_path = target_obj.links[target_link_name].prim_path
-        finger_paths = {link.prim_path for link in self.finger_links[arm]}
-        contact_pos_world = None
-        for finger_path in finger_paths:
-            raw_data = og.sim.contact_sensor.get_rigid_body_raw_data(finger_path)
-            for c in raw_data:
-                # Convert body handles to prim paths for robust matching
-                body0 = og.sim.contact_sensor.decode_body_name(c[2])
-                body1 = og.sim.contact_sensor.decode_body_name(c[3])
-                if (body0 == finger_path and body1 == target_link_prim_path) or (
-                    body0 == target_link_prim_path and body1 == finger_path
-                ):
-                    contact_pos_world = th.as_tensor(c[4], dtype=th.float32)
-                    break
-            if contact_pos_world is not None:
-                break
+        contact_pos_world = self._find_finger_contact_position(arm, target_link_prim_path)
         if contact_pos_world is None:
             return
 

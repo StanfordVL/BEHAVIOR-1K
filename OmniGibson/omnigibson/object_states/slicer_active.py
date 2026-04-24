@@ -6,7 +6,7 @@ import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
-from omnigibson.utils.python_utils import classproperty, torch_delete
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create settings for this module
@@ -18,14 +18,25 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # int: Keep track of how many steps each object is waiting for
     STEPS_TO_WAIT = None
 
-    # th.tensor: Keep track of the current delay for a given slicer
+    # th.tensor (scene_number, obj_number): Keep track of the current delay for a given slicer
     DELAY_COUNTER = None
 
-    # th.tensor: Keep track of whether we touched a sliceable in the previous timestep
+    # th.tensor (scene_number, obj_number): Keep track of whether we touched a sliceable in the previous timestep
     PREVIOUSLY_TOUCHING = None
 
-    # list of list of str: Body prim paths belonging to each slicer obj
-    SLICER_LINK_PATHS = None
+    # S = number of scenes
+    # O = number of objects that have SlicerActive state
+    # R_s = number of contact-matrix rows (links on the "who is touching" side) for scene s
+    # C_s = number of contact-matrix columns (links on the "what are they touching" side) for scene s
+
+    # list[Tensor(O, R_s) | None] — row mask per slicer object per scene; len(list) = S; GPU
+    _slicer_contact_query_masks = None
+
+    # list[Tensor(1, C_s) | None] — col mask for all sliceable links per scene; len(list) = S; GPU
+    _sliceable_contact_col_mask = None
+
+    # (S, O) bool — scratch buffer filled each step by _currently_touching_sliceables(); GPU
+    _currently_touching = None
 
     @classmethod
     def get_dependencies(cls):
@@ -37,104 +48,127 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Call super first
         super().global_initialize()
 
-        # Initialize other global variables
+        # Compute step-based reactivation threshold (constant for the lifetime of the simulator)
         cls.STEPS_TO_WAIT = max(1, int(math.ceil(m.REACTIVATION_DELAY / og.sim.get_sim_step_dt())))
-        cls.DELAY_COUNTER = th.empty(0, dtype=int)
-        cls.PREVIOUSLY_TOUCHING = th.empty(0, dtype=bool)
-        cls.SLICER_LINK_PATHS = []
+        cls._slicer_contact_query_masks = None
+        cls._sliceable_contact_col_mask = None
+        cls._currently_touching = None
 
     @classmethod
-    def _add_obj(cls, obj):
-        # Call super first
-        super()._add_obj(obj=obj)
+    def initialize_view(cls):
+        # Snapshot which relative paths existed before the rebuild
+        prev_rel_paths = set(cls.OBJ_IDXS.keys()) if cls.OBJ_IDXS is not None else set()
 
-        # Add to previously touching and delay counter
-        cls.DELAY_COUNTER = th.cat([cls.DELAY_COUNTER, th.tensor([0])])
-        cls.PREVIOUSLY_TOUCHING = th.cat([cls.PREVIOUSLY_TOUCHING, th.tensor([False])])
+        # Snapshot tracking tensors before rebuild so survivors can be carried over
+        prev_previously_touching = cls.PREVIOUSLY_TOUCHING.clone() if cls.PREVIOUSLY_TOUCHING is not None else None
+        prev_delay_counter = cls.DELAY_COUNTER.clone() if cls.DELAY_COUNTER is not None else None
+        prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
 
-        # Add this object's prim paths to slicer paths
-        cls.SLICER_LINK_PATHS.append([link.prim_path for link in obj.links.values()])
+        # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
+        super().initialize_view()
 
-    @classmethod
-    def _remove_obj(cls, obj):
-        # Grab idx we'll delete before the object is deleted
-        deleted_idx = cls.OBJ_IDXS[obj]
+        S = len(cls.IDX_OBJS)
+        O = len(cls.OBJ_IDXS)
 
-        # Remove from all internal tracked arrays
-        cls.DELAY_COUNTER = torch_delete(cls.DELAY_COUNTER, [deleted_idx])
-        cls.PREVIOUSLY_TOUCHING = torch_delete(cls.PREVIOUSLY_TOUCHING, [deleted_idx])
-        del cls.SLICER_LINK_PATHS[deleted_idx]
+        # Allocate fresh tracking tensors; carry over values for surviving slicers so that
+        # PREVIOUSLY_TOUCHING=True set during a slicing step is not lost when initialize_view()
+        # is called again on the next step (e.g. when new objects are initialized).
+        cls.PREVIOUSLY_TOUCHING = th.zeros((S, O), dtype=th.bool, device="cuda")
+        cls.DELAY_COUNTER = th.zeros((S, O), dtype=th.float32, device="cuda")
+        if prev_previously_touching is not None and prev_previously_touching.numel() > 0:
+            for rel_path, obj_idx_new in cls.OBJ_IDXS.items():
+                if rel_path not in prev_obj_idxs:
+                    continue
+                obj_idx_old = prev_obj_idxs[rel_path]
+                n_scenes = min(prev_previously_touching.shape[0], S)
+                cls.PREVIOUSLY_TOUCHING[:n_scenes, obj_idx_new] = prev_previously_touching[:n_scenes, obj_idx_old]
+                cls.DELAY_COUNTER[:n_scenes, obj_idx_new] = prev_delay_counter[:n_scenes, obj_idx_old]
 
-        # Call super
-        super()._remove_obj(obj=obj)
+        # Initialize new VALUE slots (not carried over) to True (slicer starts active)
+        for rel_path, obj_idx in cls.OBJ_IDXS.items():
+            if rel_path not in prev_rel_paths:
+                cls.VALUES[:, obj_idx] = True
+                cls.VALUES_CPU[:, obj_idx] = True
+
+        # Pre-allocate scratch buffer for _currently_touching_sliceables(); same shape as PREVIOUSLY_TOUCHING
+        cls._currently_touching = th.zeros((S, O), dtype=th.bool, device="cuda")
+
+        # Build per-scene contact masks for batch contact queries
+        cls._slicer_contact_query_masks = []
+        cls._sliceable_contact_col_mask = []
+
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            if not RigidContactAPI.has_contact_view(scene_idx):
+                cls._slicer_contact_query_masks.append(None)
+                cls._sliceable_contact_col_mask.append(None)
+                continue
+
+            sliceable_objs = scene.object_registry("abilities", "sliceable", [])
+            # If there's no sliceable objects or slicer, append None
+            if not sliceable_objs or O == 0:
+                cls._slicer_contact_query_masks.append(None)
+                cls._sliceable_contact_col_mask.append(None)
+                continue
+
+            # Col mask (1, C_s) for all sliceable links — shared across all O slicer queries
+            sliceable_paths = [link.prim_path for obj in sliceable_objs for link in obj.links.values()]
+            sliceable_col = RigidContactAPI.get_contact_col_mask(scene_idx, sliceable_paths)  # (C_s,) CPU
+            cls._sliceable_contact_col_mask.append(sliceable_col.unsqueeze(0).cuda())  # (1, C_s) GPU
+
+            # Row masks (O, R_s). N slicer objects form N queries
+            slicer_masks = []
+            any_uninitialized = False
+            for obj_idx in range(O):
+                if cls.IDX_OBJS[scene_idx][obj_idx] is None:
+                    any_uninitialized = True
+                    break
+                slicer_masks.append(
+                    RigidContactAPI.get_contact_row_mask(
+                        scene_idx, [link.prim_path for link in cls.IDX_OBJS[scene_idx][obj_idx].links.values()]
+                    )
+                )  # (R_s,) CPU bool
+            if any_uninitialized:
+                cls._slicer_contact_query_masks.append(None)
+            else:
+                cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (O, R_s) GPU
 
     @classmethod
     def _update_values(cls, values):
-        # If we were slicing in the past step, deactivate now
-        previously_touching_idxs = th.nonzero(cls.PREVIOUSLY_TOUCHING)
-        values[previously_touching_idxs] = False
-        cls.DELAY_COUNTER[previously_touching_idxs] = 0  # Reset the counter when we stop touching a sliceable object
+        # If we were touching a sliceable last step, deactivate now
+        cls.DELAY_COUNTER[cls.PREVIOUSLY_TOUCHING] = 0
+        values[cls.PREVIOUSLY_TOUCHING] = False
 
-        # Are we currently touching any sliceables?
-        currently_touching_sliceables = cls._currently_touching_sliceables()
+        # Are we currently touching any sliceables? Result written into cls._currently_touching in-place
+        cls._currently_touching_sliceables()
 
-        # Track changed variables between currently and previously touched sliceables
-        changed_idxs = set((cls.PREVIOUSLY_TOUCHING ^ currently_touching_sliceables).nonzero().flatten().tolist())
+        # Increment cooldown when not active and not touching anything sliceable
+        cls.DELAY_COUNTER[~values & ~cls._currently_touching] += 1
 
-        # If any of our values are False, we need to consider reverting back.
-        if not th.all(values):
-            not_active_not_touching = ~values & ~currently_touching_sliceables
-            not_active_is_touching = ~values & currently_touching_sliceables
+        # Reset cooldown when not active but touching a sliceable (touching delays reactivation)
+        cls.DELAY_COUNTER[~values & cls._currently_touching] = 0
 
-            not_active_not_touching_idxs = th.where(not_active_not_touching)[0]
-            not_active_is_touching_idxs = th.where(not_active_is_touching)[0]
+        # Re-activate once the cooldown has elapsed
+        values[cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT] = True
 
-            # If we are not touching any sliceable objects, we increment the delay "cooldown" counter that will
-            # eventually re-activate the slicer
-            cls.DELAY_COUNTER[not_active_not_touching_idxs] += 1
-
-            # If we are touching a sliceable object, reset the counter
-            cls.DELAY_COUNTER[not_active_is_touching_idxs] = 0
-
-            # Update changed idxs to include not active not touching / is touching
-            changed_idxs = set.union(changed_idxs, not_active_not_touching_idxs, not_active_is_touching_idxs)
-
-            # If the delay counter is greater than steps to wait, set to True
-            values = th.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, values)
-
-        # Record if we were touching anything previously
-        cls.PREVIOUSLY_TOUCHING = currently_touching_sliceables
-
-        # Add all changed objects to the current state update set in their respective scenes
-        for idx in changed_idxs:
-            cls.IDX_OBJS[idx].state_updated()
-
-        return values
+        # Record current contact state for the next step
+        cls.PREVIOUSLY_TOUCHING.copy_(cls._currently_touching)
 
     @classmethod
     def _currently_touching_sliceables(cls):
-        # Grab all sliceable objects
-        currently_touching = th.zeros_like(cls.PREVIOUSLY_TOUCHING)
-        for scene in og.sim.scenes:
-            sliceable_objs = scene.object_registry("abilities", "sliceable", [])
-
-            # If there's no sliceables in the scene, continue to the next scene.
-            if len(sliceable_objs) == 0:
+        """Fills cls._currently_touching (S, O) bool tensor in-place."""
+        cls._currently_touching.fill_(False)
+        for scene_idx in range(len(og.sim.scenes)):
+            query_masks = cls._slicer_contact_query_masks[scene_idx]  # (O, R_s) GPU | None
+            with_mask = cls._sliceable_contact_col_mask[scene_idx]  # (1, C_s) GPU | None
+            if query_masks is None or with_mask is None:
                 continue
-
-            # Get the prim paths of all the sliceables in this scene
-            sliceable_prim_paths = [link_prim_path for obj in sliceable_objs for link_prim_path in obj.link_prim_paths]
-
-            # Aggregate all link prim path indices for the slicers in this scene
-            for i, (obj, link_paths) in enumerate(zip(cls.IDX_OBJS, cls.SLICER_LINK_PATHS)):
-                if obj.scene != scene:
-                    continue
-                if RigidContactAPI.is_in_contact(
-                    scene.idx, link_paths, with_set=sliceable_prim_paths, ignore_set=None, current_only=False
-                ):
-                    currently_touching[i] = True
-
-        return currently_touching
+            cls._currently_touching[scene_idx] = RigidContactAPI.is_in_contact_batch(
+                scene_idx=scene_idx,
+                query_masks=query_masks,  # (O, R_s)
+                with_masks=with_mask,  # (1, C_s) — broadcasts to (O, C_s) inside the call
+                ignore_masks=None,
+                current_only=False,
+            )  # (O,) bool
 
     @classproperty
     def value_name(cls):
@@ -142,14 +176,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
     @classproperty
     def value_type(cls):
-        return bool
-
-    def __init__(self, obj):
-        # Run super first
-        super(SlicerActive, self).__init__(obj)
-
-        # Set value to be default (True)
-        self._set_value(True)
+        return th.bool
 
     @property
     def state_size(self):
@@ -159,18 +186,22 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Add additional 2 to keep track of previously touching and delay counter
         return size + 2
 
-    # For this state, we simply store its value.
     def _dump_state(self):
+        if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
+            return dict(value=True, previously_touching=False, delay_counter=0)
         state = super()._dump_state()
-        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj]])
-        state["delay_counter"] = int(self.DELAY_COUNTER[self.OBJ_IDXS[self.obj]])
-
+        scene_idx = self.obj.scene.idx
+        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[scene_idx, obj_idx])
+        state["delay_counter"] = int(self.DELAY_COUNTER[scene_idx, obj_idx])
         return state
 
     def _load_state(self, state):
         super()._load_state(state=state)
-        self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj]] = state["previously_touching"]
-        self.DELAY_COUNTER[self.OBJ_IDXS[self.obj]] = state["delay_counter"]
+        s = self.obj.scene.idx
+        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+        self.PREVIOUSLY_TOUCHING[s, obj_idx] = state["previously_touching"]
+        self.DELAY_COUNTER[s, obj_idx] = state["delay_counter"]
 
     def serialize(self, state):
         state_flat = super().serialize(state=state)

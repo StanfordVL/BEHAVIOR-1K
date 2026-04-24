@@ -213,6 +213,372 @@ def create_joint(
     return joint_prim
 
 
+class RigidBodyViewAPI:
+    """
+    Batched rigid-body pose cache for all rigid bodies across all scenes.
+
+    Poses are stored in a flat layout keyed by absolute prim path, so each scene can
+    have an independent link count (different object models are supported).
+
+    Two categories of links are tracked:
+      - physx_tracked:   rigid body links included in create_rigid_body_view.
+                         Poses updated every step from PhysX.
+      - physx_untracked: kinematic-only articulated objects' links not tracked by physx's rigid body view.
+                         Poses seeded once at initialize_view() and refreshed only by invalidate_kinematic().
+
+    Flat index layout in _POSE_MATRICES (N_links_total, 4, 4):
+      [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked links across all scenes]
+
+    Also stores LOCAL_POINTS / POINTS_MASK for batched AABB computation via get_aabb().
+    """
+
+    # Rigid body view for batched pose reads (one per scene)
+    _RIGID_BODY_VIEW = None
+
+    # Flat path index across all scenes keyed by absolute prim path.
+    _PATH_TO_IDX = {}  # {link_absolute_prim_path: int}
+    _IDX_TO_PATH = []  # list[link_absolute_prim_path]
+
+    # Position + quaternion pose of all links in the scene, indexed by flat index.
+    # shape: (N_links_total, 7) — [px, py, pz, qx, qy, qz, qw]
+    _POSES = None  # CPU — written by update_pose_cache() / invalidate_kinematic()
+    _POSES_GPU = None  # GPU — written by async_copy_to_gpu()
+
+    # Cached 4x4 transformation matrices — flat, covers physx_tracked + physx_untracked.
+    # shape: (N_links_total, 4, 4)
+    # physx_untracked slice is appended after all physx_tracked entries and never
+    # overwritten by update_pose_cache(); refreshed only by invalidate_kinematic().
+    _POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
+    _POSE_MATRICES_CPU = None  # CPU — written by update_pose_cache()
+
+    # Local homogeneous collision points for every rigid link, indexed by flat pose index.
+    # shape: (N_links_total, V_max, 4)
+    # V_max is a global maximum across all links/scenes; may be wasteful when one scene
+    # has unusually dense collision geometry — acceptable for now.
+    LOCAL_POINTS = None
+
+    # Valid-point mask; True for non-padded slots. shape: (N_links_total, V_max) bool
+    POINTS_MASK = None
+
+    # Tolerances for change detection
+    _POS_EPS = 1e-4
+    _ORI_EPS = 1e-4
+
+    @classmethod
+    def initialize_view(cls):
+        """
+        Initializes the rigid body view. Note: Can only be done when sim is playing!
+
+        Builds a flat layout keyed by absolute prim path so each scene can have an
+        independent link count. Layout of _POSE_MATRICES (N_links_total, 4, 4):
+          [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked across all scenes]
+        """
+        assert og.sim.is_playing(), "Cannot create rigid body view while sim is not playing!"
+
+        # Snapshot existing kinematic-link poses ton reuse them below
+        prev_path_to_idx = dict(cls._PATH_TO_IDX)  # snapshot before clear()
+        prev_poses = cls._POSES  # None on very first call; CPU tensor otherwise
+
+        # Reset
+        cls.clear()
+
+        if len(og.sim.scenes) == 0:
+            return
+
+        # If there are no rigid bodies in any scene, return early (view creation would fail)
+        has_rigid_bodies = any(
+            obj.prim_type == PrimType.RIGID and len(obj.links) > 0 for scene in og.sim.scenes for obj in scene.objects
+        )
+        if not has_rigid_bodies:
+            cls.clear()
+            return
+
+        # Create a PhysX view for all scenes, build _PATH_TO_IDX, collect poses
+        poses_list = []
+
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            cls._RIGID_BODY_VIEW = og.sim.physics_sim_view.create_rigid_body_view(pattern="/World/scene_*/*/*")
+            for abs_path in list(cls._RIGID_BODY_VIEW.prim_paths):
+                cls._PATH_TO_IDX[abs_path] = len(cls._PATH_TO_IDX)
+                cls._IDX_TO_PATH.append(abs_path)
+            poses_list.append(cls._RIGID_BODY_VIEW.get_transforms().clone())
+
+        # Add physx_untracked kinematic links and collect collision_boundary_points_local
+        raw_local_points = {}  # {flat_idx: (V, 3) tensor}
+
+        for _, scene in enumerate(og.sim.scenes):
+            for obj in scene.objects:
+                is_untracked = obj.kinematic_only and obj.prim_type != PrimType.CLOTH
+                for link in obj.links.values():
+                    abs_path = link.prim_path
+
+                    # Kinematic objects' child links (e.g. fillable meta links) may be dynamic
+                    # and already tracked by PhysX even though the parent is kinematic_only=True.
+                    # Only manually register links that PhysX did not track.
+                    if is_untracked and abs_path not in cls._PATH_TO_IDX:
+                        idx = len(cls._PATH_TO_IDX)
+                        cls._PATH_TO_IDX[abs_path] = idx
+                        cls._IDX_TO_PATH.append(abs_path)
+
+                        if abs_path in prev_path_to_idx and prev_poses is not None:
+                            # Reuse the cached pose
+                            pose = prev_poses[prev_path_to_idx[abs_path]].unsqueeze(0)
+                        elif og.sim.currently_stepping:
+                            # New kinematic link appearing mid-step, cannot read Fabric.
+                            # Use zero placeholder.
+                            # Corrected by the next out-of-step initialize_view() or update_handles().
+                            pose = th.zeros(1, 7)
+                        else:
+                            pos, quat_xyzw = link.get_position_orientation()
+                            pose = th.cat([pos, quat_xyzw]).unsqueeze(0)
+                        poses_list.append(pose)
+
+                    # Collect local collision points for AABB (for all registered links)
+                    if abs_path in cls._PATH_TO_IDX:
+                        pts = link.collision_boundary_points_local  # (V, 3) or None
+                        if pts is not None:
+                            scale = link.get_world_scale()
+                            raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
+
+        cls._POSES = th.cat(poses_list, dim=0).pin_memory()  # (N_links_total, 7), CPU
+        cls._POSES_GPU = cls._POSES.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
+        cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
+        cls._POSE_MATRICES = cls._POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
+
+        # Build LOCAL_POINTS and POINTS_MASK tensors.
+        N_total = len(cls._PATH_TO_IDX)
+        V_max = max((p.shape[0] for p in raw_local_points.values()), default=1)
+        local_points = th.zeros(N_total, V_max, 4)
+        local_points[:, :, 3] = 1.0
+        points_mask = th.zeros(N_total, V_max, dtype=th.bool)
+        for path_idx, pts in raw_local_points.items():
+            V = pts.shape[0]
+            local_points[path_idx, :V, :3] = pts
+            points_mask[path_idx, :V] = True
+        cls.LOCAL_POINTS = local_points.cuda()
+        cls.POINTS_MASK = points_mask.cuda()
+
+    @classmethod
+    def update_pose_cache(cls):
+        """
+        Updates pose cache from the latest physics step.
+        Only recomputes 4x4 matrices for bodies whose pose has changed.
+        physx_untracked links are never touched here; they are updated only by invalidate_kinematic().
+        """
+        if not cls._RIGID_BODY_VIEW:
+            return
+        try:
+            transforms = cls._RIGID_BODY_VIEW.get_transforms()
+        except Exception:
+            log.warning(
+                "RigidBodyViewAPI cannot fetch transforms because the physics sim view is invalid. "
+                "This is expected during initial scene loading."
+            )
+            return
+
+        N_physx_tracked = transforms.shape[0]
+        cls._POSES[:N_physx_tracked] = transforms
+        cls._POSE_MATRICES_CPU[:N_physx_tracked] = cls._poses_to_matrices(transforms)
+
+    @staticmethod
+    def _poses_to_matrices(poses):
+        """
+        Convert poses tensor to 4x4 transformation matrices.
+
+        Args:
+            poses (th.Tensor): (N, 7) — [px, py, pz, qx, qy, qz, qw]
+
+        Returns:
+            th.Tensor: (N, 4, 4)
+        """
+        pos = poses[:, :3]  # (N, 3)
+        quat_xyzw = poses[:, 3:]  # (N, 4) — PhysX returns wxyz, T.pose2mat expects xyzw
+        result = TT.pose2mat((pos, quat_xyzw))
+        return result.unsqueeze(0) if result.ndim == 2 else result  # shape is (N, 4, 4)
+
+    @classmethod
+    def get_flat_idx(cls, abs_prim_path):
+        """
+        Return the flat index into _POSE_MATRICES for a link's absolute prim path, or None.
+
+        Args:
+            abs_prim_path (str): Absolute prim path of the link (e.g. /World/scene_0/obj/link).
+
+        Returns:
+            int or None
+        """
+        return cls._PATH_TO_IDX.get(abs_prim_path)
+
+    @classmethod
+    def get_aabb(cls, prim_body_idx, link_idx, out_values):
+        """
+        Compute per-link world-space AABB mins/maxes and scatter into per-object scratch buffers.
+
+        Args:
+            prim_body_idx (th.Tensor): (N,) int64 — flat indices into _POSE_MATRICES / LOCAL_POINTS
+            link_idx (th.Tensor):      (N,) int64 — pre-computed s*O + obj_idx for each link
+            out_values (th.Tensor):    (S*O, 6) — caller pre-fills with +/-inf, written in-place
+        """
+        poses = cls._POSE_MATRICES[prim_body_idx]  # (N, 4, 4)
+        local_pts = cls.LOCAL_POINTS[prim_body_idx]  # (N, V, 4)
+        mask = cls.POINTS_MASK[prim_body_idx]  # (N, V)
+
+        # Transform local homogeneous points to world frame
+        world_pts = th.einsum("nij,nvj->nvi", poses, local_pts)[..., :3]  # (N, V, 3)
+
+        # Mask padding slots so they don't affect min/max
+        world_pts_min = world_pts.clone()
+        world_pts_max = world_pts.clone()
+        world_pts_min[~mask] = float("inf")
+        world_pts_max[~mask] = float("-inf")
+
+        # Compute per-link AABBs
+        min_p = world_pts_min.min(dim=1).values  # (N, 3)
+        max_p = world_pts_max.max(dim=1).values  # (N, 3)
+
+        # Scatter into per-object AABBs
+        idx_exp = link_idx.unsqueeze(1).expand(-1, 3)  # (N, 3)
+        out_values[:, :3].scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_self=True)
+        out_values[:, 3:].scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_self=True)
+
+    @classmethod
+    def invalidate_kinematic(cls, links):
+        """
+        Refresh cached pose matrices for kinematic links after an explicit move.
+
+        For physx_untracked links (no physics:RigidBodyAPI) this is the only update path.
+        For physx_tracked kinematic links this write is harmless — update_pose_cache() will
+        re-read from PhysX on the next step.
+
+        Args:
+            links: iterable of RigidPrim link objects whose poses should be refreshed.
+        """
+        if cls._POSE_MATRICES is None:
+            return
+        for link in links:
+            idx = cls._PATH_TO_IDX.get(link.prim_path)
+            if idx is None:
+                continue  # not registered (e.g. particle templates not in scene.objects)
+            pos, quat_xyzw = link.get_position_orientation()
+            cls._POSES[idx][:3] = pos  # _POSES[idx]: (7,)
+            cls._POSES[idx][3:] = quat_xyzw
+            cls._POSES_GPU[idx] = cls._POSES[idx].cuda()
+            # unsqueeze(0): (7,) -> (1, 7) so _poses_to_matrices gets its expected (N, 7) input;
+            # [0]: (1, 4, 4) -> (4, 4) to match _POSE_MATRICES_CPU[idx] slot
+            cls._POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls._POSES[idx].unsqueeze(0))[0]
+            cls._POSE_MATRICES[idx] = cls._POSE_MATRICES_CPU[idx].cuda()  # (4, 4), GPU
+
+    @classmethod
+    def async_copy_to_gpu(cls):
+        """Issue non-blocking bulk copy of _POSES/_POSE_MATRICES CPU → GPU."""
+        if cls._POSE_MATRICES_CPU is None:
+            return
+        cls._POSES_GPU.copy_(cls._POSES, non_blocking=True)
+        cls._POSE_MATRICES.copy_(cls._POSE_MATRICES_CPU, non_blocking=True)
+
+    @classmethod
+    def clear(cls):
+        """Reset all cached state."""
+        cls._RIGID_BODY_VIEW = None
+        cls._PATH_TO_IDX = {}
+        cls._IDX_TO_PATH = []
+        cls._POSES = None
+        cls._POSES_GPU = None
+        cls._POSE_MATRICES = None
+        cls._POSE_MATRICES_CPU = None
+        cls.LOCAL_POINTS = None
+        cls.POINTS_MASK = None
+
+
+class ArticulatedObjectViewAPI:
+    """
+    Batched DOF position cache for non-robot articulated objects across all scenes.
+
+    We exclude robots because they have a lot more DOFs than other objects, which would inflate the
+    size of this view drastically. However, this view is mainly used for Open state checking, which
+    does not apply to robots. As a result, robots are excluded for optimization purposes.
+
+    Creates a single ArticulationView covering all non-robot articulated objects across all scenes
+    using the pattern "/World/scene_\\d+/articulated_.*" (objects are placed under articulated_<name>
+    by _preapply_articulation_root in usd_object.py).
+
+    Data layout:
+        _VIEW        ArticulationView          single view for all non-robot articulated objects
+        _OBJ_TO_VIEW_IDX  {abs_art_root_path: int}  row index in _JOINT_POSITIONS
+        _JOINT_POSITIONS   (N_objects_all_scenes, max_dof)  one row per object per scene, PhysX row order
+    """
+
+    _VIEW = None
+    _OBJ_TO_VIEW_IDX = {}
+    _JOINT_POSITIONS = None  # GPU — written by async_copy_to_gpu()
+    _JOINT_POSITIONS_CPU = None  # CPU — latest PhysX output, written by update_dof_cache()
+
+    @classmethod
+    def initialize_view(cls):
+        cls.clear()
+
+        if len(og.sim.scenes) == 0:
+            return
+
+        from omnigibson.robots import Robot
+
+        articulation_objs = [
+            obj
+            for scene in og.sim.scenes
+            for obj in scene.objects
+            if obj.relative_prim_path.startswith("/articulated__") and not isinstance(obj, Robot)
+        ]
+        if not articulation_objs:
+            return
+
+        pattern = "/World/scene_*/articulated__*/*"
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
+        assert set(cls._VIEW.prim_paths) == set(
+            obj.articulation_root_path for obj in articulation_objs
+        ), "Articulation view prim paths mismatch!"
+        cls._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(cls._VIEW.prim_paths)}
+        # Pre-allocate _JOINT_POSITIONS on GPU; _JOINT_POSITIONS_CPU holds the latest PhysX output.
+        positions = cls._VIEW.get_dof_positions()
+        cls._JOINT_POSITIONS_CPU = positions
+        cls._JOINT_POSITIONS = cls._JOINT_POSITIONS_CPU.cuda()  # synchronous init so first read is valid
+
+    @classmethod
+    def update_dof_cache(cls):
+        """Fetch latest DOF positions from PhysX into CPU staging buffer. Called every step."""
+        if cls._VIEW is None:
+            return
+        cls._JOINT_POSITIONS_CPU = cls._VIEW.get_dof_positions()
+
+    @classmethod
+    def get_view_row(cls, abs_prim_path):
+        """Return row index in _JOINT_POSITIONS for a given absolute articulation root path, or None."""
+        return cls._OBJ_TO_VIEW_IDX.get(abs_prim_path)
+
+    @classmethod
+    def get_max_dof(cls):
+        """Return the padded DOF width of _JOINT_POSITIONS; 0 if not initialized."""
+        return cls._JOINT_POSITIONS.shape[1] if cls._JOINT_POSITIONS is not None else 0
+
+    @classmethod
+    def get_articulation_positions(cls, position_rows):
+        """Return GPU tensor containing the DOF positions for the given row indices."""
+        return cls._JOINT_POSITIONS[position_rows]
+
+    @classmethod
+    def async_copy_to_gpu(cls):
+        """Issue non-blocking copy of _JOINT_POSITIONS_CPU → _JOINT_POSITIONS."""
+        if cls._JOINT_POSITIONS_CPU is None:
+            return
+        cls._JOINT_POSITIONS.copy_(cls._JOINT_POSITIONS_CPU, non_blocking=True)
+
+    @classmethod
+    def clear(cls):
+        cls._VIEW = None
+        cls._OBJ_TO_VIEW_IDX = {}
+        cls._JOINT_POSITIONS = None
+        cls._JOINT_POSITIONS_CPU = None
+
+
 class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator.
@@ -250,9 +616,11 @@ class RigidContactAPIImpl:
         # Contact matrix tracking contacts that occurred at any point during the last N physics steps
         # (between consecutive update_contact_cache calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
 
         # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
         self._CURRENT_CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
@@ -263,6 +631,7 @@ class RigidContactAPIImpl:
 
         # Accumulated impulse matrices and transforms from individual physics steps,
         # collected between consecutive update_contact_cache calls.
+        self._PENDING_STEPS = 0
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
         self._PENDING_NET_FORCES = dict()
@@ -381,35 +750,31 @@ class RigidContactAPIImpl:
                 )
                 path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
                 self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
-                    [path_to_view_idx[path] for path in row_paths], dtype=th.long
+                    [path_to_view_idx[path] for path in row_paths], dtype=th.long, device="cuda"
                 )
 
                 # Some contact-matrix columns can correspond to kinematic-only links that do not appear
                 # in the rigid-body view. We encode those as -1 and track a validity mask.
                 col_to_rigid_rows = [path_to_view_idx.get(path, -1) for path in col_paths]
-                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(col_to_rigid_rows, dtype=th.long)
+                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
+                    col_to_rigid_rows, dtype=th.long, device="cuda"
+                )
                 self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx] = (
                     self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] >= 0
                 )
                 ii, jj = th.meshgrid(th.arange(len(row_paths)), th.arange(len(col_paths)), indexing="ij")
                 self._INDEX_MATRIX[scene_idx] = th.stack([ii, jj], dim=-1)
-                self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().clone()
+                self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().cuda()
 
                 # Build the new contact matrices. Start from current impulses (captures contacts
                 # for newly added bodies), then overwrite with previously cached values for
                 # every pair of bodies that already existed before the rebuild.
                 initial_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
                 initial_contacts = th.any(initial_impulses != 0, dim=-1)
-                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
-                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
-
-                # Initialize pending accumulation lists for this scene
-                # Note that existing data in these lists will be lost when the view is rebuilt.
-                # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
-                # This TODO can be accomplished after the follow-up PR removes RigidContactAPI use in assisted grasping.
-                self._PENDING_IMPULSES[scene_idx] = []
-                self._PENDING_TRANSFORMS[scene_idx] = []
-                self._PENDING_NET_FORCES[scene_idx] = []
+                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
+                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
+                self._CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
 
                 # Finally, remap data from the old matrices into the new ones. This lets us avoid losing our
                 # cached data when new bodies are added or removed.
@@ -437,6 +802,33 @@ class RigidContactAPIImpl:
                             old_current_matrix[old_row_idxs[:, None], old_col_idxs[None, :]]
                         )
 
+                # Sync GPU mirrors from CPU matrices — carry-over may have updated the CPU tensors above.
+                self._CONTACT_MATRIX_GPU[scene_idx].copy_(self._CONTACT_MATRIX[scene_idx])
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].copy_(self._CURRENT_CONTACT_MATRIX[scene_idx])
+
+                # Initialize pending accumulation lists for this scene
+                # Note that existing data in these lists will be lost when the view is rebuilt.
+                # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
+                # This TODO can be accomplished after the follow-up PR removes RigidContactAPI use in assisted grasping.
+                n_physics_steps = og.sim.n_physics_timesteps_per_render
+                self._PENDING_STEPS = 0
+                self._PENDING_IMPULSES[scene_idx] = th.zeros(
+                    n_physics_steps,
+                    self._CONTACT_MATRIX[scene_idx].shape[0],
+                    self._CONTACT_MATRIX[scene_idx].shape[1],
+                    3,
+                    device="cuda",
+                )
+                self._PENDING_TRANSFORMS[scene_idx] = th.zeros(
+                    n_physics_steps, self._BODY_TRANSFORMS[scene_idx].shape[0], 7, device="cuda"
+                )
+                self._PENDING_NET_FORCES[scene_idx] = th.zeros(
+                    n_physics_steps,
+                    self._CONTACT_MATRIX[scene_idx].shape[0],
+                    3,
+                    device="cuda",
+                )
+
     def add_contacts_from_physics_step(self):
         """
         Fetches contact impulse matrices and body transforms from the current physics step
@@ -445,12 +837,20 @@ class RigidContactAPIImpl:
         update_contact_cache.
         """
         assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
+        assert self._PENDING_STEPS < og.sim.n_physics_timesteps_per_render, "Pending steps buffer is full"
 
-        for scene_idx in list(self._CONTACT_VIEW.keys()):
+        scene_idx_list = list(self._CONTACT_VIEW.keys())
+        for scene_idx in scene_idx_list:
             try:
                 # Get the contact impulse and net force matrices for this scene
-                impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
-                net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt())
+                self._PENDING_IMPULSES[scene_idx][self._PENDING_STEPS].copy_(
+                    self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt()),
+                    non_blocking=True,
+                )
+                self._PENDING_NET_FORCES[scene_idx][self._PENDING_STEPS].copy_(
+                    self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt()),
+                    non_blocking=True,
+                )
             except Exception:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
@@ -460,13 +860,15 @@ class RigidContactAPIImpl:
                 continue
 
             # Get the body transforms for this scene
-            transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
+            self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
+                self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
+            )
 
-            # Append the data to the pending lists. Note that we have to clone these matrices because
-            # the view actually reuses the buffer.
-            self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
-            self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
-            self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
+        # Increment once per physics step
+        if scene_idx_list:
+            self._PENDING_STEPS += 1
+
+        th.cuda.synchronize()
 
     def update_contact_cache(self):
         """
@@ -478,21 +880,14 @@ class RigidContactAPIImpl:
         transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
         force are also treated as awake.  Contact matrices are only updated from awake steps.
         """
-        for scene_idx in list(self._CONTACT_VIEW.keys()):
-            # Get the pending data for this scene
-            pending_impulses = self._PENDING_IMPULSES[scene_idx]
-            pending_transforms = self._PENDING_TRANSFORMS[scene_idx]
-            pending_net_forces = self._PENDING_NET_FORCES[scene_idx]
-            assert len(pending_impulses) == len(pending_transforms), "Number of impulses and transforms must match"
-            assert len(pending_impulses) == len(pending_net_forces), "Number of impulses and net forces must match"
-            N = len(pending_impulses)
-            if N == 0:
-                continue
+        if self._PENDING_STEPS == 0:
+            return
 
+        for scene_idx in list(self._CONTACT_VIEW.keys()):
             # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
-            all_impulses = th.stack(pending_impulses, dim=0)
-            all_transforms = th.stack(pending_transforms, dim=0)
-            all_net_forces = th.stack(pending_net_forces, dim=0)
+            all_impulses = self._PENDING_IMPULSES[scene_idx][: self._PENDING_STEPS]
+            all_transforms = self._PENDING_TRANSFORMS[scene_idx][: self._PENDING_STEPS]
+            all_net_forces = self._PENDING_NET_FORCES[scene_idx][: self._PENDING_STEPS]
 
             # Get the previous body transforms for the cache
             prev_transforms = self._BODY_TRANSFORMS[scene_idx]
@@ -517,9 +912,13 @@ class RigidContactAPIImpl:
 
             # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
             # data for all the indices where the object is not asleep.
-            body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
+            body_step_indices = (
+                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda").unsqueeze(1).expand_as(per_step_awake)
+            )
             last_awake_body_step = (
-                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
+                .max(dim=0)
+                .values
             )  # (num_bodies,)
 
             # For each step, compute the rows that are awake
@@ -528,32 +927,43 @@ class RigidContactAPIImpl:
             # For each step, compute the columns that are awake
             col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
             valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
-            per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
+            per_step_col_awake = th.zeros(
+                self._PENDING_STEPS, len(col_to_rigid), dtype=th.bool, device="cuda"
+            )  # (N, C)
             per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
             # For each step, compute the pairs that are awake. This is an outer-OR of the row and column awake masks.
             per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
 
             # What is the last step that the pair was awake?
-            pair_step_indices = th.arange(N, dtype=th.long).reshape(N, 1, 1).expand_as(per_step_awake_pairs)
+            pair_step_indices = (
+                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda")
+                .reshape(self._PENDING_STEPS, 1, 1)
+                .expand_as(per_step_awake_pairs)
+            )
             last_awake_pair_step = (
-                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
+                .max(dim=0)
+                .values
             )  # (R, C)
             pair_was_awake = last_awake_pair_step >= 0  # (R, C)
 
             # "Current" contact matrix: impulses from the last awake step per pair.
             # Pairs that were never awake retain their previous value.
+            # All writes go directly to the GPU matrices; CPU mirrors are updated at the end.
             awake_rc = th.where(pair_was_awake)
             awake_pair_steps = last_awake_pair_step[pair_was_awake]
             last_awake_impulses = all_impulses[awake_pair_steps, awake_rc[0], awake_rc[1]]  # (num_awake, 3)
-            self._CURRENT_CONTACT_MATRIX[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
+            self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
 
             # "Recent" contact matrix: any contact across awake steps for awake pairs,
             # or the (now-updated) current contact value for non-awake pairs.
             any_contact_per_step = th.any(all_impulses != 0, dim=-1)  # (N, R, C)
             any_awake_contact = th.any(any_contact_per_step & per_step_awake_pairs, dim=0)  # (R, C)
-            self._CONTACT_MATRIX[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
-            self._CONTACT_MATRIX[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX[scene_idx][~pair_was_awake]
+            self._CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
+            self._CONTACT_MATRIX_GPU[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][
+                ~pair_was_awake
+            ]
 
             # Update body transforms from each body's last awake step
             awake_body_indices = th.where(last_awake_body_step >= 0)[0]
@@ -561,10 +971,16 @@ class RigidContactAPIImpl:
                 last_awake_body_step[awake_body_indices], awake_body_indices
             ]
 
-            # Clear pending data for this scene
-            self._PENDING_IMPULSES[scene_idx] = []
-            self._PENDING_TRANSFORMS[scene_idx] = []
-            self._PENDING_NET_FORCES[scene_idx] = []
+            # Copy updated GPU matrices back to CPU mirrors so is_in_contact()
+            # can read them without a GPU stall.
+            # This will be synced in simulator._update_view_apis()
+            self._CONTACT_MATRIX[scene_idx].copy_(self._CONTACT_MATRIX_GPU[scene_idx], non_blocking=True)
+            self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True
+            )
+
+        # Clear pending step counter once after all scenes are processed
+        self._PENDING_STEPS = 0
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
@@ -684,6 +1100,8 @@ class RigidContactAPIImpl:
         """
         Check if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set.
 
+        Returns CPU tensors.
+
         Args:
             scene_idx (int): Scene index to check for contact.
             query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact.
@@ -755,7 +1173,7 @@ class RigidContactAPIImpl:
 
     def is_in_contact_batch(self, scene_idx, query_masks, with_masks, ignore_masks, current_only):
         """
-        Batch contact check for N queries, fully tensorized.
+        Batch contact check for N queries, fully tensorized. Returns GPU tensors.
 
         Each row ``i`` of the input masks defines one independent contact query. The method
         returns an ``(N,)`` boolean tensor where entry ``i`` is ``True`` iff any row selected
@@ -785,10 +1203,12 @@ class RigidContactAPIImpl:
         """
         assert with_masks is None or ignore_masks is None, "Provide either with_masks or ignore_masks, not both."
 
-        if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
-            return th.zeros(query_masks.shape[0], dtype=th.bool)
+        if scene_idx not in self._CONTACT_MATRIX_GPU or scene_idx not in self._PATH_TO_COL_IDX:
+            return th.zeros(query_masks.shape[0], dtype=th.bool, device="cuda")
 
-        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = (
+            self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] if current_only else self._CONTACT_MATRIX_GPU[scene_idx]
+        )
 
         # query_contacts[i, c] = True iff any row in query set i is in contact with column c.
         # We use float matmul for speed: (N, R) @ (R, C) -> (N, C), then threshold.
@@ -800,6 +1220,10 @@ class RigidContactAPIImpl:
             return (query_contacts & ~ignore_masks).any(dim=1)
 
         return query_contacts.any(dim=1)
+
+    def has_contact_view(self, scene_idx):
+        """Returns True if a valid contact view has been initialized for @scene_idx."""
+        return scene_idx in self._CONTACT_MATRIX
 
     def clear(self):
         """
@@ -815,9 +1239,12 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_GPU = dict()
         self._CURRENT_CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()
         self._INDEX_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
+        self._PENDING_STEPS = 0
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
         self._PENDING_NET_FORCES = dict()
@@ -1980,7 +2407,9 @@ def clear():
     Clear state tied to singleton classes
     """
     CollisionAPI.clear()
+    RigidBodyViewAPI.clear()
     RigidContactAPI.clear()
+    ArticulatedObjectViewAPI.clear()
     ControllableObjectViewAPI.clear()
 
 
@@ -2372,6 +2801,13 @@ def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
     if relative_prim_path.startswith("/OmniGraph"):
         return relative_prim_path
 
+    # Special case for global floor plane collision prim — already an absolute path
+    if (
+        og.sim.floor_plane is not None
+        and relative_prim_path == og.sim.floor_plane.relative_prim_path + "/collisionPlane"
+    ):
+        return relative_prim_path
+
     # Make sure the relative path is actually relative
     assert not relative_prim_path.startswith("/World"), f"Expected relative prim path, got {relative_prim_path}"
 
@@ -2396,6 +2832,13 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     """
     # Special case for OmniGraph prims
     if absolute_prim_path.startswith("/OmniGraph"):
+        return absolute_prim_path
+
+    # Special case for global floor plane collision prim — not scene-scoped, return unchanged
+    if (
+        og.sim.floor_plane is not None
+        and absolute_prim_path == og.sim.floor_plane.relative_prim_path + "/collisionPlane"
+    ):
         return absolute_prim_path
 
     assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"

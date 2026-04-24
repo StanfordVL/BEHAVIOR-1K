@@ -16,7 +16,7 @@ from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.render_utils import force_pbr_material_for_link
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints
+from omnigibson.utils.usd_utils import RigidBodyViewAPI, absolute_prim_path_to_scene_relative, count_joints
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -867,6 +867,21 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
 
+    def get_joint_dof_types(self):
+        """
+        Per-DOF type mask for this articulation's joints.
+
+        Collapses the underlying ``omni.physics.tensors.DofType`` enum returned by the
+        articulation view into a boolean tensor, so it can be used directly with ``th.where``
+        to pick per-DOF-type values (e.g. degree-vs-meter thresholds).
+
+        Returns:
+            th.Tensor: (n_dof,) boolean tensor. True for rotational DOFs, False for translational.
+        """
+        return th.as_tensor(
+            [x == lazy.omni.physics.tensors.DofType.Rotation for x in self._articulation_view.get_dof_types()]
+        )
+
     def get_joint_velocities(self, normalized=False):
         """
         Grabs this entity's joint velocities
@@ -1015,9 +1030,9 @@ class EntityPrim(XFormPrim):
             ), "Orientation mismatch between entity prim and root link"
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
             if self.kinematic_only:
-                for link in self._links.values():
-                    if isinstance(link, RigidKinematicPrim):
-                        link.clear_kinematic_only_cache()
+                RigidBodyViewAPI.invalidate_kinematic(
+                    [link for link in self._links.values() if isinstance(link, RigidKinematicPrim)]
+                )
         else:
             # Otherwise, we simply move the object in PhysX and force it to update Fabric, too.
             if self.articulated:
