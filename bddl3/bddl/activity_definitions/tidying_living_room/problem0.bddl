@@ -8,7 +8,7 @@
         letter.n.01_1 - letter.n.01
         book.n.02_1 - book.n.02
         coffee_table.n.01_1 - coffee_table.n.01
-        bookcase.n.01_1 - bookcase.n.01
+        bookcase.n.01_* - bookcase.n.01
         agent.n.01_1 - agent.n.01
     )
 
@@ -19,7 +19,7 @@
         (ontop book.n.02_1 floor.n.01_1)
         (inroom floor.n.01_1 living_room)
         (inroom coffee_table.n.01_1 living_room)
-        (inroom bookcase.n.01_1 living_room)
+        (inroom bookcase.n.01_* living_room)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
