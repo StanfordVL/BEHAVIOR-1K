@@ -597,7 +597,7 @@ class FailedGraspMetric(MetricBase):
                 step_metrics[f"robot{i}::arm_{arm}::fingers_closed"] = th.allclose(
                     robot.get_joint_positions()[robot.gripper_control_idx[arm]],
                     th.zeros(2),
-                    atol=1e-4,
+                    atol=1e-2,
                 )
         return step_metrics
 
