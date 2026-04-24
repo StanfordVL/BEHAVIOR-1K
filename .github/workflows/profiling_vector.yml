@@ -1,0 +1,406 @@
+name: Vector Profiling
+
+on:
+  pull_request:
+    branches:
+      - vector
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      set_as_baseline:
+        description: "Commit results as new baseline to vector branch"
+        type: boolean
+        default: false
+
+permissions:
+  pull-requests: write
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  profile:
+    name: "VecProfile: ${{ matrix.label }}"
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 1 env
+          - name: "1env-norender-simple-nostates"
+            args: "--n-envs 1"
+            label: "1 env, no render, simple, states off"
+          - name: "1env-norender-simple-states"
+            args: "--n-envs 1 --object-states"
+            label: "1 env, no render, simple, states on"
+          - name: "1env-norender-behavior-nostates"
+            args: "--n-envs 1 --task-type behavior"
+            label: "1 env, no render, behavior, states off"
+          - name: "1env-norender-behavior-states"
+            args: "--n-envs 1 --task-type behavior --object-states"
+            label: "1 env, no render, behavior, states on"
+          - name: "1env-render-simple-nostates"
+            args: "--n-envs 1 --rendering"
+            label: "1 env, render, simple, states off"
+          - name: "1env-render-simple-states"
+            args: "--n-envs 1 --rendering --object-states"
+            label: "1 env, render, simple, states on"
+          - name: "1env-render-behavior-nostates"
+            args: "--n-envs 1 --rendering --task-type behavior"
+            label: "1 env, render, behavior, states off"
+          - name: "1env-render-behavior-states"
+            args: "--n-envs 1 --rendering --task-type behavior --object-states"
+            label: "1 env, render, behavior, states on"
+          - name: "1env-norender-navigation-nostates"
+            args: "--n-envs 1 --task-type navigation"
+            label: "1 env, no render, navigation, states off"
+          - name: "1env-norender-navigation-states"
+            args: "--n-envs 1 --task-type navigation --object-states"
+            label: "1 env, no render, navigation, states on"
+          - name: "1env-render-navigation-nostates"
+            args: "--n-envs 1 --rendering --task-type navigation"
+            label: "1 env, render, navigation, states off"
+          - name: "1env-render-navigation-states"
+            args: "--n-envs 1 --rendering --task-type navigation --object-states"
+            label: "1 env, render, navigation, states on"
+          # 10 envs
+          - name: "10env-norender-simple-nostates"
+            args: "--n-envs 10"
+            label: "10 envs, no render, simple, states off"
+          - name: "10env-norender-simple-states"
+            args: "--n-envs 10 --object-states"
+            label: "10 envs, no render, simple, states on"
+          - name: "10env-norender-behavior-nostates"
+            args: "--n-envs 10 --task-type behavior"
+            label: "10 envs, no render, behavior, states off"
+          - name: "10env-norender-behavior-states"
+            args: "--n-envs 10 --task-type behavior --object-states"
+            label: "10 envs, no render, behavior, states on"
+          - name: "10env-render-simple-nostates"
+            args: "--n-envs 10 --rendering"
+            label: "10 envs, render, simple, states off"
+          - name: "10env-render-simple-states"
+            args: "--n-envs 10 --rendering --object-states"
+            label: "10 envs, render, simple, states on"
+          - name: "10env-render-behavior-nostates"
+            args: "--n-envs 10 --rendering --task-type behavior"
+            label: "10 envs, render, behavior, states off"
+          - name: "10env-render-behavior-states"
+            args: "--n-envs 10 --rendering --task-type behavior --object-states"
+            label: "10 envs, render, behavior, states on"
+          - name: "10env-norender-navigation-nostates"
+            args: "--n-envs 10 --task-type navigation"
+            label: "10 envs, no render, navigation, states off"
+          - name: "10env-norender-navigation-states"
+            args: "--n-envs 10 --task-type navigation --object-states"
+            label: "10 envs, no render, navigation, states on"
+          - name: "10env-render-navigation-nostates"
+            args: "--n-envs 10 --rendering --task-type navigation"
+            label: "10 envs, render, navigation, states off"
+          - name: "10env-render-navigation-states"
+            args: "--n-envs 10 --rendering --task-type navigation --object-states"
+            label: "10 envs, render, navigation, states on"
+          # 50 envs
+          - name: "50env-norender-simple-nostates"
+            args: "--n-envs 50"
+            label: "50 envs, no render, simple, states off"
+          - name: "50env-norender-simple-states"
+            args: "--n-envs 50 --object-states"
+            label: "50 envs, no render, simple, states on"
+          - name: "50env-norender-behavior-nostates"
+            args: "--n-envs 50 --task-type behavior"
+            label: "50 envs, no render, behavior, states off"
+          - name: "50env-norender-behavior-states"
+            args: "--n-envs 50 --task-type behavior --object-states"
+            label: "50 envs, no render, behavior, states on"
+          - name: "50env-render-simple-nostates"
+            args: "--n-envs 50 --rendering"
+            label: "50 envs, render, simple, states off"
+          - name: "50env-render-simple-states"
+            args: "--n-envs 50 --rendering --object-states"
+            label: "50 envs, render, simple, states on"
+          - name: "50env-render-behavior-nostates"
+            args: "--n-envs 50 --rendering --task-type behavior"
+            label: "50 envs, render, behavior, states off"
+          - name: "50env-render-behavior-states"
+            args: "--n-envs 50 --rendering --task-type behavior --object-states"
+            label: "50 envs, render, behavior, states on"
+          - name: "50env-norender-navigation-nostates"
+            args: "--n-envs 50 --task-type navigation"
+            label: "50 envs, no render, navigation, states off"
+          - name: "50env-norender-navigation-states"
+            args: "--n-envs 50 --task-type navigation --object-states"
+            label: "50 envs, no render, navigation, states on"
+          - name: "50env-render-navigation-nostates"
+            args: "--n-envs 50 --rendering --task-type navigation"
+            label: "50 envs, render, navigation, states off"
+          - name: "50env-render-navigation-states"
+            args: "--n-envs 50 --rendering --task-type navigation --object-states"
+            label: "50 envs, render, navigation, states on"
+          # 100 envs
+          - name: "100env-norender-simple-nostates"
+            args: "--n-envs 100"
+            label: "100 envs, no render, simple, states off"
+          - name: "100env-norender-simple-states"
+            args: "--n-envs 100 --object-states"
+            label: "100 envs, no render, simple, states on"
+          - name: "100env-norender-behavior-nostates"
+            args: "--n-envs 100 --task-type behavior"
+            label: "100 envs, no render, behavior, states off"
+          - name: "100env-norender-behavior-states"
+            args: "--n-envs 100 --task-type behavior --object-states"
+            label: "100 envs, no render, behavior, states on"
+          - name: "100env-render-simple-nostates"
+            args: "--n-envs 100 --rendering"
+            label: "100 envs, render, simple, states off"
+          - name: "100env-render-simple-states"
+            args: "--n-envs 100 --rendering --object-states"
+            label: "100 envs, render, simple, states on"
+          - name: "100env-render-behavior-nostates"
+            args: "--n-envs 100 --rendering --task-type behavior"
+            label: "100 envs, render, behavior, states off"
+          - name: "100env-render-behavior-states"
+            args: "--n-envs 100 --rendering --task-type behavior --object-states"
+            label: "100 envs, render, behavior, states on"
+          - name: "100env-norender-navigation-nostates"
+            args: "--n-envs 100 --task-type navigation"
+            label: "100 envs, no render, navigation, states off"
+          - name: "100env-norender-navigation-states"
+            args: "--n-envs 100 --task-type navigation --object-states"
+            label: "100 envs, no render, navigation, states on"
+          - name: "100env-render-navigation-nostates"
+            args: "--n-envs 100 --rendering --task-type navigation"
+            label: "100 envs, render, navigation, states off"
+          - name: "100env-render-navigation-states"
+            args: "--n-envs 100 --rendering --task-type navigation --object-states"
+            label: "100 envs, render, navigation, states on"
+          # 200 envs
+          - name: "200env-norender-simple-nostates"
+            args: "--n-envs 200"
+            label: "200 envs, no render, simple, states off"
+          - name: "200env-norender-simple-states"
+            args: "--n-envs 200 --object-states"
+            label: "200 envs, no render, simple, states on"
+          - name: "200env-norender-behavior-nostates"
+            args: "--n-envs 200 --task-type behavior"
+            label: "200 envs, no render, behavior, states off"
+          - name: "200env-norender-behavior-states"
+            args: "--n-envs 200 --task-type behavior --object-states"
+            label: "200 envs, no render, behavior, states on"
+          - name: "200env-render-simple-nostates"
+            args: "--n-envs 200 --rendering"
+            label: "200 envs, render, simple, states off"
+          - name: "200env-render-simple-states"
+            args: "--n-envs 200 --rendering --object-states"
+            label: "200 envs, render, simple, states on"
+          - name: "200env-render-behavior-nostates"
+            args: "--n-envs 200 --rendering --task-type behavior"
+            label: "200 envs, render, behavior, states off"
+          - name: "200env-render-behavior-states"
+            args: "--n-envs 200 --rendering --task-type behavior --object-states"
+            label: "200 envs, render, behavior, states on"
+          - name: "200env-norender-navigation-nostates"
+            args: "--n-envs 200 --task-type navigation"
+            label: "200 envs, no render, navigation, states off"
+          - name: "200env-norender-navigation-states"
+            args: "--n-envs 200 --task-type navigation --object-states"
+            label: "200 envs, no render, navigation, states on"
+          - name: "200env-render-navigation-nostates"
+            args: "--n-envs 200 --rendering --task-type navigation"
+            label: "200 envs, render, navigation, states off"
+          - name: "200env-render-navigation-states"
+            args: "--n-envs 200 --rendering --task-type navigation --object-states"
+            label: "200 envs, render, navigation, states on"
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/OmniGibson
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install BDDL
+        run: pip install -e .
+        working-directory: ${{ github.workspace }}/bddl3
+
+      - name: Install OmniGibson
+        run: pip install -e .[dev,primitives,eval] --no-build-isolation
+
+      - name: Run vector profiling
+        env:
+          OMNIGIBSON_HEADLESS: "1"
+        run: |
+          rm -f vector_output.json
+          python tests/benchmark/vector_profiling.py -g ${{ matrix.args }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vec-profiling-${{ matrix.name }}
+          path: OmniGibson/vector_output.json
+          if-no-files-found: warn
+
+  report:
+    name: Compile Vector Profiling Report
+    runs-on: ubuntu-latest
+    needs: [profile]
+    if: always()
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout vector branch
+        uses: actions/checkout@v4
+        with:
+          ref: vector
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download all profiling results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: pr-results
+          pattern: vec-profiling-*
+
+      - name: Merge results and compare or set baseline
+        run: |
+          python3 << 'PYEOF'
+          import json, os, sys
+
+          # Merge all downloaded artifacts into one list
+          merged = []
+          results_dir = "pr-results"
+          if os.path.isdir(results_dir):
+              for dirpath, _, filenames in os.walk(results_dir):
+                  for fname in filenames:
+                      if fname == "vector_output.json":
+                          with open(os.path.join(dirpath, fname)) as f:
+                              merged.extend(json.load(f))
+
+          set_as_baseline = os.environ.get("SET_AS_BASELINE", "false").lower() == "true"
+
+          if set_as_baseline:
+              baseline_path = "OmniGibson/tests/benchmark/vector_baseline.json"
+              with open(baseline_path, "w") as f:
+                  json.dump(merged, f, indent=4)
+              print(f"Wrote {len(merged)} entries to {baseline_path}")
+              sys.exit(0)
+
+          # Build lookup: label -> metric -> value
+          def build_lookup(entries):
+              result = {}
+              for e in entries:
+                  label = e["name"]
+                  metric = e["extra"][0]
+                  if label not in result:
+                      result[label] = {}
+                  result[label][metric] = e["value"]
+              return result
+
+          pr = build_lookup(merged)
+
+          baseline_path = "OmniGibson/tests/benchmark/vector_baseline.json"
+          base = {}
+          if os.path.exists(baseline_path):
+              with open(baseline_path) as f:
+                  base = build_lookup(json.load(f))
+          has_base = len(base) > 0
+
+          METRICS = ["FPS", "Loading time", "Isaac step time", "Non-Isaac step time", "Memory usage", "Vram usage"]
+          HEADERS = {
+              "FPS": "FPS",
+              "Loading time": "Load (s)",
+              "Isaac step time": "Isaac (ms)",
+              "Non-Isaac step time": "Non-Isaac (ms)",
+              "Memory usage": "Mem (GB)",
+              "Vram usage": "VRAM (GB)",
+          }
+          HIGHER_IS_BETTER = {"FPS"}
+          N_ENV_GROUPS = ["1 env", "10 envs", "50 envs", "100 envs", "200 envs"]
+
+          def fmt(metric, value):
+              if value is None:
+                  return "N/A"
+              return f"{value:.1f}" if metric in ("FPS", "Loading time") else f"{value:.2f}"
+
+          def delta(metric, pr_val, base_val):
+              if pr_val is None or base_val is None or base_val == 0:
+                  return ""
+              pct = ((pr_val - base_val) / abs(base_val)) * 100
+              is_better = (pct > 0) if metric in HIGHER_IS_BETTER else (pct < 0)
+              emoji = "⚪" if abs(pct) < 5 else ("🟢" if is_better else "🔴")
+              sign = "+" if pct > 0 else ""
+              return f" ({sign}{pct:.1f}% {emoji})"
+
+          lines = ["## Vector Profiling Report\n"]
+          if not has_base:
+              lines.append("> **Note:** No baseline found. Showing absolute values only.\n")
+
+          all_labels = sorted(pr.keys())
+
+          for group in N_ENV_GROUPS:
+              group_labels = [l for l in all_labels if l.startswith(group + ",")]
+              if not group_labels:
+                  continue
+              lines.append(f"\n### {group}\n")
+              hdr = "| Scenario |" + "".join(f" {HEADERS[m]} |" for m in METRICS)
+              sep = "|---|" + "---|" * len(METRICS)
+              lines.append(hdr)
+              lines.append(sep)
+              for label in sorted(group_labels):
+                  pr_m = pr.get(label, {})
+                  base_m = base.get(label, {})
+                  row = f"| {label.split(', ', 1)[1] if ', ' in label else label}"
+                  for m in METRICS:
+                      pv = pr_m.get(m)
+                      bv = base_m.get(m)
+                      cell = fmt(m, pv)
+                      if has_base and pv is not None:
+                          cell += delta(m, pv, bv)
+                      row += f" | {cell}"
+                  lines.append(row + " |")
+
+          lines.append("")
+          lines.append("<details><summary>Legend</summary>\n")
+          lines.append("- 🟢 Improvement >= 5%")
+          lines.append("- 🔴 Regression >= 5%")
+          lines.append("- ⚪ Change < 5%")
+          lines.append("- **FPS**: higher is better. All other metrics: lower is better.")
+          lines.append("- FPS = total throughput across all envs (n_envs × per-env FPS)")
+          lines.append("\n</details>")
+
+          report = "\n".join(lines)
+          with open("profiling-vector-report.md", "w") as f:
+              f.write(report)
+          print(report)
+          PYEOF
+        env:
+          SET_AS_BASELINE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'true' || (github.event.inputs.set_as_baseline == 'true' && 'true' || 'false') }}
+
+      - name: Commit updated baseline
+        if: |
+          github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+          github.event.inputs.set_as_baseline == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add OmniGibson/tests/benchmark/vector_baseline.json
+          git diff --cached --quiet || git commit -m "chore: update vector profiling baseline [skip ci]"
+          git push origin vector
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: vector-profiling-report
+          path: profiling-vector-report.md

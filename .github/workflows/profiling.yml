@@ -269,6 +269,20 @@ jobs:
           header: profiling-report
           path: profiling-report.md
 
+  trigger_vector_baseline:
+    name: Trigger Vector Profiling Baseline
+    runs-on: ubuntu-latest
+    needs: [profile]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger vector profiling on main to update baseline
+        run: |
+          gh workflow run profiling_vector.yml \
+            --repo ${{ github.repository }} \
+            --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   save_baseline:
     name: Save Baseline
     runs-on: ubuntu-latest
