@@ -206,6 +206,9 @@ def create_joint(
         # Possibly exclude this joint from the articulation
         joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
 
+    # Update handles to include the new joint
+    og.sim.update_handles()
+
     # Return this joint
     return joint_prim
 
@@ -1002,108 +1005,71 @@ def apply_collision_approximation(prim, mesh_collision_api, approximation_type):
         mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
-class PoseAPI:
+def get_world_pose(prim_path):
     """
-    This is a singleton class for getting world and local (parent-relative) poses from Fabric.
-    Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
-    After that, if we need to access the pose of a prim without stepping physics,
-    this class will refresh the poses by syncing across USD-fabric-PhysX.
+    Gets pose of the prim object with respect to the world frame
+    Args:
+        Prim_path: the path of the prim object
+    Returns:
+        2-tuple:
+            - torch.Tensor: (x,y,z) position in the world frame
+            - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
+    """
+    matrix = _get_world_pose_with_scale_from_fabric_hierarchy(prim_path)
+    quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
+    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+    return position, orientation
+
+
+def _get_world_pose_with_scale_from_fabric_hierarchy(prim_path):
+    # Check that no reads from Fabric are happening during a physics step.
+    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
+
+    return og.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
+
+
+def get_world_pose_with_scale(prim_path):
+    """
+    This is used when information about the prim's global scale is needed,
+    e.g. when converting points in the prim frame to the world frame.
     """
 
-    VALID = False
+    return th.tensor(_get_world_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
 
-    @classmethod
-    def invalidate(cls):
-        cls.VALID = False
 
-    @classmethod
-    def mark_valid(cls):
-        cls.VALID = True
+def get_local_pose(prim_path):
+    """
+    Gets pose of the prim with respect to its parent prim's frame (local / parent-relative transform).
 
-    @classmethod
-    def _refresh(cls):
-        if og.sim is not None and not cls.VALID:
-            # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
-            assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
+    Args:
+        prim_path: the path of the prim object
 
-            og.sim._sim_context._physx_fabric_interface.update(og.sim.current_time, og.sim.get_physics_dt())
+    Returns:
+        2-tuple:
+            - torch.Tensor: (x,y,z) position in the parent frame
+            - torch.Tensor: (x,y,z,w) quaternion orientation in the parent frame
+    """
+    matrix = _get_local_pose_with_scale_from_fabric_hierarchy(prim_path)
+    quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
+    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+    return position, orientation
 
-            cls.mark_valid()
 
-    @classmethod
-    def get_world_pose(cls, prim_path):
-        """
-        Gets pose of the prim object with respect to the world frame
-        Args:
-            Prim_path: the path of the prim object
-        Returns:
-            2-tuple:
-                - torch.Tensor: (x,y,z) position in the world frame
-                - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
-        """
-        matrix = cls._get_world_pose_with_scale_from_fabric_hierarchy(prim_path)
-        quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
-        position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
-        orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
-        return position, orientation
+def _get_local_pose_with_scale_from_fabric_hierarchy(prim_path):
+    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
 
-    @classmethod
-    def _get_world_pose_with_scale_from_fabric_hierarchy(cls, prim_path):
-        # Check that no reads from PoseAPI are happening during a physics step.
-        assert (
-            not og.sim.currently_stepping
-        ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
+    return og.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
 
-        cls._refresh()
 
-        return og.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
+def get_local_pose_with_scale(prim_path):
+    """
+    Like get_local_pose, but returns the full 4x4 local transform matrix (with scale),
+    for converting points between the prim frame and the parent frame.
+    """
 
-    @classmethod
-    def get_world_pose_with_scale(cls, prim_path):
-        """
-        This is used when information about the prim's global scale is needed,
-        e.g. when converting points in the prim frame to the world frame.
-        """
-
-        return th.tensor(cls._get_world_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
-
-    @classmethod
-    def get_local_pose(cls, prim_path):
-        """
-        Gets pose of the prim with respect to its parent prim's frame (local / parent-relative transform).
-
-        Args:
-            prim_path: the path of the prim object
-
-        Returns:
-            2-tuple:
-                - torch.Tensor: (x,y,z) position in the parent frame
-                - torch.Tensor: (x,y,z,w) quaternion orientation in the parent frame
-        """
-        matrix = cls._get_local_pose_with_scale_from_fabric_hierarchy(prim_path)
-        quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
-        position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
-        orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
-        return position, orientation
-
-    @classmethod
-    def _get_local_pose_with_scale_from_fabric_hierarchy(cls, prim_path):
-        assert (
-            not og.sim.currently_stepping
-        ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
-
-        cls._refresh()
-
-        return og.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
-
-    @classmethod
-    def get_local_pose_with_scale(cls, prim_path):
-        """
-        Like get_local_pose, but returns the full 4x4 local transform matrix (with scale),
-        for converting points between the prim frame and the parent frame.
-        """
-
-        return th.tensor(cls._get_local_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
+    return th.tensor(_get_local_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
 
 
 class BatchControlViewAPIImpl:
@@ -2013,7 +1979,6 @@ def clear():
     """
     Clear state tied to singleton classes
     """
-    PoseAPI.invalidate()
     CollisionAPI.clear()
     RigidContactAPI.clear()
     ControllableObjectViewAPI.clear()
@@ -2167,7 +2132,7 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
         trimesh_mesh = mesh_prim_shape_to_trimesh_mesh(mesh_prim)
 
     if world_frame:
-        trimesh_mesh.apply_transform(PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString))
+        trimesh_mesh.apply_transform(get_world_pose_with_scale(mesh_prim.GetPath().pathString))
 
     return trimesh_mesh
 
@@ -2450,6 +2415,11 @@ def delete_or_deactivate_prim(prim_path):
     """
     Attept to delete or deactivate the prim defined at @prim_path.
 
+    Note that the removal of prims usually has an impact on the PhysX state and needs to be followed
+    by a call to og.sim.update_handles() to update tensor views etc. - we do not do here to avoid
+    performance overhead when lots of prims are removed at once in clear() etc. and instead we
+    delegate this to the caller.
+
     Args:
         prim_path (str): Path defining which prim should be deleted or deactivated
 
@@ -2489,7 +2459,7 @@ def delete_or_deactivate_prim(prim_path):
                 assert attr.ClearDefault()
             lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
-        return True
+    return True
 
 
 def activate_prim_and_children(prim_path):

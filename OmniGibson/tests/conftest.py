@@ -56,6 +56,20 @@ def robot(stopped_env):
     return obj
 
 
+@pytest.fixture
+def assisted_robot(stopped_env):
+    obj = Robot(
+        name="r1pro",
+        model="r1pro",
+        grasping_mode="assisted",
+        obs_modalities=[],
+        position=[150, 150, 100],
+        orientation=[0, 0, 0, 1],
+    )
+    stopped_env.scene.add_object(obj)
+    return obj
+
+
 # --- Object fixtures ---
 
 

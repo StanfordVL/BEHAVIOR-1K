@@ -46,7 +46,7 @@ from omnigibson.controllers import (
     DifferentialDriveController,
     ControllerView,
 )
-from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import JointType, PrimType, ROBOT_CATEGORY
 from omnigibson.utils.sampling_utils import raytest_batch
@@ -92,6 +92,14 @@ AG_MODES = {
     "sticky",
 }
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
+
+# Sentinel written before each grasping-arm block in the serialized state tensor. Should be:
+#   - Larger than the max UUID (10^8 - 1 = 99,999,999) to avoid false positives on UUID values
+#   - Exactly representable in float32
+# Old recordings that predate AG serialization will not contain this value, so the block is skipped.
+_AG_MAGIC = 1e8 + 123456
+# Floats of payload per grasping arm (after the magic + arm_idx): [obj_uuid, link_idx, parent_pos(3), parent_orn(4), child_pos(3), child_orn(4), joint_type]
+_AG_STATE_SIZE = 17
 
 
 class Robot(USDObject, GymObservable):
@@ -205,8 +213,9 @@ class Robot(USDObject, GymObservable):
         """
         self.model = model
         # Read and validate robot definition YAML file using OmegaConf
-        definition_dir = os.path.dirname(__file__)
-        definition_path = os.path.join(definition_dir, "definitions", self.model + ".yaml")
+        definition_path = os.path.join(
+            get_dataset_path("omnigibson-robot-assets"), "models", self.model, self.model + ".yaml"
+        )
         yaml_definition = OmegaConf.load(definition_path)
         schema = OmegaConf.structured(RobotDefinition)
         merged_definition = OmegaConf.merge(schema, yaml_definition)
@@ -280,6 +289,13 @@ class Robot(USDObject, GymObservable):
         self._include_sensor_names = None if include_sensor_names is None else set(include_sensor_names)
         self._exclude_sensor_names = None if exclude_sensor_names is None else set(exclude_sensor_names)
         self._sensors = None  # e.g.: scan sensor, vision sensor
+
+        # Per-robot rigid contact view, used for reading contact positions between the robot's finger
+        # links and any other rigid body in the scene for assisted grasping. The view is rebuilt every
+        # time update_handles runs so new/removed bodies are picked up.
+        self._rigid_contact_view = None
+        self._rigid_contact_view_row_path_to_idx = {}
+        self._rigid_contact_view_col_path_to_idx = {}
 
         # All BaseRobots should have xform properties pre-loaded
         load_config = {} if load_config is None else load_config
@@ -1115,10 +1131,38 @@ class Robot(USDObject, GymObservable):
                 group_parts.append(ControllerView.serialize(group_key, controller_idx, controller_state))
         if group_parts:
             state_flat = th.cat([state_flat] + group_parts)
-        if self.is_manipulation:
-            # No additional serialization needed if we're using physical grasping
-            if self.grasping_mode == "physical":
-                return state_flat
+
+        if self.is_manipulation and self.grasping_mode != "physical":
+            ag_params = state.get("ag_obj_constraint_params", {})
+            # One block per grasping arm, each prefixed with the magic sentinel and arm_idx.
+            # Non-grasping arms are omitted entirely, and old recordings that predate AG
+            # serialization simply have no trailing magic — deserialize() skips cleanly.
+            ag_parts = []
+            for arm_idx, arm in enumerate(self.arm_names):
+                arm_params = ag_params.get(arm)
+                if arm_params is None:
+                    continue
+                target_obj = self.scene.object_registry("name", arm_params["target_obj"])
+                link_names = sorted(target_obj.links.keys())
+                link_idx = link_names.index(arm_params["target_link_name"])
+                ag_parts.append(
+                    th.tensor(
+                        [
+                            _AG_MAGIC,
+                            float(arm_idx),
+                            float(target_obj.uuid),
+                            float(link_idx),
+                            *arm_params["parent_frame_pos"].tolist(),
+                            *arm_params["parent_frame_orn"].tolist(),
+                            *arm_params["child_frame_pos"].tolist(),
+                            *arm_params["child_frame_orn"].tolist(),
+                            float(arm_params["joint_type"] == "SphericalJoint"),
+                        ]
+                    )
+                )
+            if ag_parts:
+                state_flat = th.cat([state_flat] + ag_parts)
+
         return state_flat
 
     def deserialize(self, state):
@@ -1132,10 +1176,33 @@ class Robot(USDObject, GymObservable):
             idx += n
         state_dict["controller_groups"] = group_states
 
-        if self.is_manipulation:
-            # No additional deserialization needed if we're using physical grasping
-            if self.grasping_mode == "physical":
-                return state_dict, idx
+        if self.is_manipulation and self.grasping_mode != "physical":
+            state_dict["ag_obj_constraint_params"] = {}
+            # One block per grasping arm, each starting with the magic sentinel followed by
+            # arm_idx and the constraint payload. Old recordings that predate AG serialization
+            # lack the sentinel entirely, so this loop is safely skipped for them.
+            while idx < len(state) and state[idx].item() == _AG_MAGIC:
+                idx += 1
+                arm_idx = int(state[idx].item())
+                idx += 1
+                arm = self.arm_names[arm_idx]
+                arm_data = state[idx : idx + _AG_STATE_SIZE]
+                idx += _AG_STATE_SIZE
+                obj_uuid = int(arm_data[0].item())
+                link_idx = int(arm_data[1].item())
+                target_obj = self.scene.object_registry("uuid", obj_uuid)
+                assert target_obj is not None, f"Object with UUID {obj_uuid} not found in scene registry"
+                link_name = sorted(target_obj.links.keys())[link_idx]
+                state_dict["ag_obj_constraint_params"][arm] = {
+                    "target_obj": target_obj.name,
+                    "target_link_name": link_name,
+                    "parent_frame_pos": arm_data[2:5].clone(),
+                    "parent_frame_orn": arm_data[5:9].clone(),
+                    "child_frame_pos": arm_data[9:12].clone(),
+                    "child_frame_orn": arm_data[12:16].clone(),
+                    "joint_type": "SphericalJoint" if bool(arm_data[16].item()) else "FixedJoint",
+                }
+
         return state_dict, idx
 
     def _initialize(self):
@@ -1215,6 +1282,86 @@ class Robot(USDObject, GymObservable):
 
             # Reload the controllers to update their command_output_limits and control_limits
             self.reload_controllers(self._controller_config)
+
+    def update_handles(self):
+        # Run super first so the articulation / link / joint views are re-created.
+        super().update_handles()
+        # Rebuild the per-robot rigid contact view so it picks up any new/removed rigid bodies.
+        # This intentionally runs after the physics sim view has been refreshed by the simulator.
+        self._refresh_rigid_contact_view()
+
+    def _refresh_rigid_contact_view(self):
+        """
+        (Re)creates this robot's rigid contact view, which provides per-contact force/position data
+        between dynamic rigid bodies in the scene (rows) and this robot's finger links (columns).
+        Kinematic and static bodies are not included as rows by Isaac's RigidContactView.
+
+        Only manipulation robots own a view — any other robot simply clears its state.
+        """
+        # Non-manipulation robots don't need contact positions from fingers; just clear and exit.
+        if not self.is_manipulation:
+            self._rigid_contact_view = None
+            self._rigid_contact_view_row_path_to_idx = {}
+            self._rigid_contact_view_col_path_to_idx = {}
+            return
+
+        # Collect finger prim paths across all arms — these become the columns of the contact view.
+        finger_paths = sorted({link.prim_path for links in self.finger_links.values() for link in links})
+        if len(finger_paths) == 0:
+            self._rigid_contact_view = None
+            self._rigid_contact_view_row_path_to_idx = {}
+            self._rigid_contact_view_col_path_to_idx = {}
+            return
+
+        # Rows are dynamic rigid bodies in the robot's scene; columns are the robot's fingers.
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            self._rigid_contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
+                pattern=f"/World/scene_{self.scene.idx}/*/*",
+                filter_patterns=finger_paths,
+                max_contact_data_count=len(finger_paths) * 8,
+            )
+
+        row_paths = list(self._rigid_contact_view.sensor_paths)
+        col_paths = list(getattr(self._rigid_contact_view, "filter_patterns", finger_paths))
+        self._rigid_contact_view_row_path_to_idx = {path: i for i, path in enumerate(row_paths)}
+        self._rigid_contact_view_col_path_to_idx = {path: i for i, path in enumerate(col_paths)}
+
+    def _find_finger_contact_position(self, arm, target_link_prim_path):
+        """
+        Looks up the world-frame (x,y,z) position of a contact between one of this robot's finger links
+        for @arm and the rigid body at @target_link_prim_path, using this robot's rigid contact view.
+
+        Args:
+            arm (str): Arm name whose fingers should be queried.
+            target_link_prim_path (str): Prim path of the target rigid body to find contact against.
+
+        Returns:
+            None or th.Tensor: (3,) float tensor world-frame contact position, or None if no contact
+                exists between any finger and the target link.
+        """
+        if self._rigid_contact_view is None:
+            return None
+
+        row_idx = self._rigid_contact_view_row_path_to_idx.get(target_link_prim_path)
+        if row_idx is None:
+            return None
+
+        forces, points, normals, separations, contact_counts, start_indices = self._rigid_contact_view.get_contact_data(
+            dt=og.sim.get_physics_dt()
+        )
+
+        for finger_link in self.finger_links[arm]:
+            col_idx = self._rigid_contact_view_col_path_to_idx.get(finger_link.prim_path)
+            if col_idx is None:
+                continue
+            count = int(contact_counts[row_idx, col_idx])
+            if count == 0:
+                continue
+            start = int(start_indices[row_idx, col_idx])
+            if start >= len(points):
+                continue
+            return th.as_tensor(points[start], dtype=th.float32)
+        return None
 
     def _load_sensors(self):
         """
@@ -1886,6 +2033,7 @@ class Robot(USDObject, GymObservable):
 
         # Remove joint and filtered collision restraints
         delete_or_deactivate_prim(self._ag_obj_constraints[arm].GetPath().pathString)
+        og.sim.update_handles()
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = None
         self._ag_release_counter[arm] = 0
@@ -3341,25 +3489,9 @@ class Robot(USDObject, GymObservable):
         if joint_type is None:
             return
 
-        # Compute the contact position in world frame
-        # Note that this relies on the legacy contact sensor API and not the RigidContactAPI,
-        # because the position information is not reliably available through the RigidContactAPI.
+        # Compute the contact position in world frame using this robot's own rigid contact view.
         target_link_prim_path = target_obj.links[target_link_name].prim_path
-        finger_paths = {link.prim_path for link in self.finger_links[arm]}
-        contact_pos_world = None
-        for finger_path in finger_paths:
-            raw_data = og.sim.contact_sensor.get_rigid_body_raw_data(finger_path)
-            for c in raw_data:
-                # Convert body handles to prim paths for robust matching
-                body0 = og.sim.contact_sensor.decode_body_name(c[2])
-                body1 = og.sim.contact_sensor.decode_body_name(c[3])
-                if (body0 == finger_path and body1 == target_link_prim_path) or (
-                    body0 == target_link_prim_path and body1 == finger_path
-                ):
-                    contact_pos_world = th.as_tensor(c[4], dtype=th.float32)
-                    break
-            if contact_pos_world is not None:
-                break
+        contact_pos_world = self._find_finger_contact_position(arm, target_link_prim_path)
         if contact_pos_world is None:
             return
 
@@ -3387,7 +3519,7 @@ class Robot(USDObject, GymObservable):
         """
 
         # Find out where the joint should go in the local frame of both the robot and the target object
-        # Note that we can't use scaled transforms here because those are only available through PoseAPI
+        # Note that we can't use scaled transforms here because those are only available through Fabric getters
         # which cannot be refreshed during a physics step. We instead use the unscaled position and orientation
         # and divide by the scale of the robot and target object to get the local frame position and orientation.
         joint_frame_orn = th.tensor([0, 0, 0, 1.0])

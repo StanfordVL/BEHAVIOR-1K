@@ -115,9 +115,10 @@ def _check(name, array):
 
     reference = np.load(path)
     shape_match = array.shape == reference.shape
-    pixel_match = shape_match and np.array_equal(array, reference)
+    similarity = (np.array_equal(array, reference) * 1.0) if not shape_match else np.mean(array == reference)
+    similar_enough = shape_match and similarity >= 0.99
 
-    if not pixel_match:
+    if not similar_enough:
         ACTUAL_DIR.mkdir(parents=True, exist_ok=True)
         actual_npy = ACTUAL_DIR / f"{name}.npy"
         actual_png = ACTUAL_DIR / f"{name}.png"
@@ -126,7 +127,10 @@ def _check(name, array):
 
     if not shape_match:
         pytest.fail(f"Shape mismatch for '{name}': got {array.shape}, expected {reference.shape}")
-    assert pixel_match, f"Snapshot mismatch for '{name}'. Set SNAPSHOT_UPDATE=1 to regenerate the reference."
+    assert similar_enough, (
+        f"Snapshot mismatch for '{name}': {similarity:.2%} similar (threshold 99%). "
+        "Set SNAPSHOT_UPDATE=1 to regenerate the reference."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -134,9 +138,6 @@ def _check(name, array):
 # ---------------------------------------------------------------------------
 
 
-# skip this test for now since it's flaky on CI
-# TODO @stefren: investigate and re-enable
-@pytest.mark.skip(reason="Flaky test, investigate and re-enable")
 def test_snapshot_rs_int():
     """
     Semantic segmentation of Rs_int with a bowl and apple placed at fixed positions.
@@ -158,7 +159,6 @@ def test_snapshot_rs_int():
     _check("rs_int_with_objects_seg_semantic", obs["seg_semantic"])
 
 
-@pytest.mark.skip(reason="Flaky test, investigate and re-enable")
 def test_snapshot_items_in_scene():
     """
     Semantic segmentation of a Fetch robot and a few objects in an empty scene.

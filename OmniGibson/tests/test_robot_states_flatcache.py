@@ -8,7 +8,7 @@ from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import get_world_pose_with_scale
 from omnigibson.object_states.robot_related_states import ObjectsInFOVOfRobot
 from omnigibson.utils.constants import semantic_class_name_to_id
 
@@ -88,7 +88,7 @@ def test_camera_pose():
     new_camera_world_pose = vision_sensor.get_position_orientation()
     camera_parent_prim = lazy.isaacsim.core.utils.prims.get_prim_parent(vision_sensor.prim)
     camera_parent_path = str(camera_parent_prim.GetPath())
-    camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
+    camera_parent_world_transform = get_world_pose_with_scale(camera_parent_path)
     expected_new_camera_world_pos, expected_new_camera_world_ori = mat2pose(
         camera_parent_world_transform
         @ pose2mat((th.tensor([10, 10, 10], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)))
@@ -111,7 +111,7 @@ def test_camera_pose():
 
     # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
     camera_parent_prim.scale = th.tensor([2.0, 2.0, 2.0])
-    camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
+    camera_parent_world_transform = get_world_pose_with_scale(camera_parent_path)
     camera_local_pose = vision_sensor.get_position_orientation(frame="parent")
     expected_mat = camera_parent_world_transform @ pose2mat(camera_local_pose)
     expected_mat[:3, :3] = expected_mat[:3, :3] / th.norm(expected_mat[:3, :3], dim=0, keepdim=True)
@@ -214,59 +214,55 @@ def test_robot_load_drive(robot_name):
             og.clear()
 
 
-def test_grasping_mode():
-    if og.sim is not None:
-        # Make sure sim is stopped
+def _object_is_in_hand(robot, obj, grasping_mode):
+    if grasping_mode in ["sticky", "assisted"]:
+        return robot._ag_obj_in_hand[robot.default_arm] == obj
+    elif grasping_mode == "physical":
+        prim_paths = robot._find_gripper_raycast_collisions()
+        return len(prim_paths.intersection(obj.link_prim_paths)) > 0
+    else:
+        raise ValueError(f"Unknown grasping mode: {grasping_mode}")
+
+
+@pytest.mark.parametrize("grasping_mode", ["sticky", "assisted", "physical"])
+def test_grasping_mode(grasping_mode):
+    try:
+        if og.sim is not None:
+            # Make sure sim is stopped
+            og.sim.stop()
+
+        scene_cfg = dict(type="Scene")
+        objects_cfg = []
+        objects_cfg.append(
+            dict(
+                type="DatasetObject",
+                name="table",
+                category="breakfast_table",
+                model="lcsizg",
+                bounding_box=[0.5, 0.5, 0.8],
+                fixed_base=True,
+                position=[0.7, -0.1, 0.6],
+            )
+        )
+        objects_cfg.append(
+            dict(
+                type="PrimitiveObject",
+                name="box",
+                primitive_type="Cube",
+                rgba=[1.0, 0, 0, 1.0],
+                size=0.05,
+                position=[0.53, 0.0, 0.87],
+            )
+        )
+        cfg = dict(scene=scene_cfg, objects=objects_cfg)
+
+        env = og.Environment(configs=cfg)
+        og.sim.viewer_camera.set_position_orientation(
+            position=[1.0170, 0.5663, 1.0554],
+            orientation=[0.1734, 0.5006, 0.8015, 0.2776],
+        )
         og.sim.stop()
 
-    scene_cfg = dict(type="Scene")
-    objects_cfg = []
-    objects_cfg.append(
-        dict(
-            type="DatasetObject",
-            name="table",
-            category="breakfast_table",
-            model="lcsizg",
-            bounding_box=[0.5, 0.5, 0.8],
-            fixed_base=True,
-            position=[0.7, -0.1, 0.6],
-        )
-    )
-    objects_cfg.append(
-        dict(
-            type="PrimitiveObject",
-            name="box",
-            primitive_type="Cube",
-            rgba=[1.0, 0, 0, 1.0],
-            size=0.05,
-            position=[0.53, 0.0, 0.87],
-        )
-    )
-    cfg = dict(scene=scene_cfg, objects=objects_cfg)
-
-    env = og.Environment(configs=cfg)
-    og.sim.viewer_camera.set_position_orientation(
-        position=[1.0170, 0.5663, 1.0554],
-        orientation=[0.1734, 0.5006, 0.8015, 0.2776],
-    )
-    og.sim.stop()
-
-    grasping_modes = dict(
-        sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",
-        assisted="Assisted Grasping - Objects are magnetized when they touch the fingers, are within the hand, and a CLOSE command is given",
-        physical="Physical Grasping - No additional grasping assistance applied",
-    )
-
-    def object_is_in_hand(robot, obj, grasping_mode):
-        if grasping_mode in ["sticky", "assisted"]:
-            return robot._ag_obj_in_hand[robot.default_arm] == obj
-        elif grasping_mode == "physical":
-            prim_paths = robot._find_gripper_raycast_collisions()
-            return len(prim_paths.intersection(obj.link_prim_paths)) > 0
-        else:
-            raise ValueError(f"Unknown grasping mode: {grasping_mode}")
-
-    for grasping_mode in grasping_modes:
         robot = Robot(
             name="Fetch",
             model="fetch",
@@ -306,7 +302,7 @@ def test_grasping_mode():
         for _ in range(30):
             og.sim.step()
 
-        assert object_is_in_hand(
+        assert _object_is_in_hand(
             robot, box_object, grasping_mode
         ), f"Grasping mode {grasping_mode} failed to grasp the object"
 
@@ -315,7 +311,7 @@ def test_grasping_mode():
         for action in action_primitives._move_hand_direct_ik((target_eef_pos + eef_offset, target_eef_orn)):
             env.step(action)
 
-        assert object_is_in_hand(
+        assert _object_is_in_hand(
             robot, box_object, grasping_mode
         ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
@@ -324,15 +320,12 @@ def test_grasping_mode():
         for _ in range(20):
             og.sim.step()
 
-        assert not object_is_in_hand(
+        assert not _object_is_in_hand(
             robot, box_object, grasping_mode
         ), f"Grasping mode {grasping_mode} failed to release the object"
-
-        # Stop the simulator and remove the robot
-        og.sim.stop()
-        env.scene.remove_object(obj=robot)
-
-    og.clear()
+    finally:
+        if og.sim is not None:
+            og.clear()
 
 
 def test_camera_semantic_segmentation():

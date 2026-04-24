@@ -129,21 +129,28 @@ def replay_hdf5_to_video(
     ) as f:
         available_tasks.update(yaml.safe_load(f))
     scene_model = available_tasks[task_name][0]["scene_model"]
-    task_scene_file_folder = os.path.join(
-        gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_model, "json"
-    )
     full_scene_file = None
-    for file in os.listdir(task_scene_file_folder):
-        if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
-            full_scene_file = os.path.join(task_scene_file_folder, file)
-    assert full_scene_file is not None, (
-        f"No full scene file found in {task_scene_file_folder}"
-    )
+    for year in ("2026", "2025"):
+        task_scene_file_folder = os.path.join(
+            gm.DATA_PATH, f"{year}-challenge-task-instances", "scenes", scene_model, "json"
+        )
+        if not os.path.isdir(task_scene_file_folder):
+            continue
+        for file in os.listdir(task_scene_file_folder):
+            if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
+                full_scene_file = os.path.join(task_scene_file_folder, file)
+                break
+        if full_scene_file is not None:
+            break
+    if full_scene_file is None:
+        raise FileNotFoundError(
+            f"No full scene file found for task '{task_name}' in either 2026 or 2025 scene directories"
+        )
 
     load_room_instances = None
     try:
         with open(
-            f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv",
+            f"{gm.DATA_PATH}/2026-challenge-task-instances/metadata/B100_task_misc.csv",
             newline="",
             encoding="utf-8",
         ) as f:
@@ -202,6 +209,10 @@ def replay_hdf5_to_video(
     # add seg_instance_id to robot head camera
     env.robots[0].sensors["robot:zed_link:Camera:0"].add_modality("seg_instance_id")
     env.load_observation_space()
+    # Set robot base mass to 250kg to match data collection for r1/r1pro
+    if env.robots[0].model in ("r1", "r1pro"):
+        with og.sim.stopped():
+            env.robots[0].base_footprint_link.mass = 250.0
 
     if run_qa:
         metric_kwargs = dict(
@@ -287,6 +298,7 @@ def main():
     )
     parser.add_argument("input", type=str, help="Path to the HDF5 file")
     parser.add_argument(
+        "-t",
         "--task",
         type=str,
         required=True,
