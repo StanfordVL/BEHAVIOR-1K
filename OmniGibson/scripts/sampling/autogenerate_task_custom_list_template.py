@@ -1,18 +1,39 @@
 import json
 import argparse
+import glob
 import os
-from omnigibson.utils.bddl_utils import get_knowledge_base
-from omnigibson.macros import gm
-from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from omnigibson.utils.bddl_utils import get_knowledge_base, GOOD_MODELS, BAD_CLOTH_MODELS
+from omnigibson.utils.asset_utils import get_all_object_category_models
+from constants import DATASET_2025_PATH, DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 
 
-PREFERRED_SCENES = ["house_double_floor_lower", "house_double_floor_upper", "house_single_floor"]
 SYNSET_BASE_URL = "https://behavior.stanford.edu/knowledgebase/synsets"
-SCENES_PATH = os.path.join(gm.DATA_PATH, "behavior-1k-assets", "scenes")
-OBJECTS_PATH = os.path.join(gm.DATA_PATH, "behavior-1k-assets", "objects")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-t", "--activity", type=str, required=True)
+
+
+def get_2025_models_for_task(activity_name):
+    """Return {synset: {category: [model_id, ...]}} for a task found in the 2025 dataset."""
+    pattern = os.path.join(DATASET_2025_PATH, "scenes", "*", "json", f"*_task_{activity_name}_0_0_template.json")
+    results = {}
+    for template_path in glob.glob(pattern):
+        try:
+            with open(template_path) as f:
+                d = json.load(f)
+            inst_to_name = d["metadata"]["task"]["inst_to_name"]
+            objs_info = d["objects_info"]["init_info"]
+            for bddl_inst, obj_name in inst_to_name.items():
+                if "agent" in bddl_inst or obj_name not in objs_info:
+                    continue
+                args = objs_info[obj_name]["args"]
+                synset = "_".join(bddl_inst.split("_")[:-1])
+                category = args["category"]
+                model = args["model"]
+                results.setdefault(synset, {}).setdefault(category, set()).add(model)
+        except Exception:
+            pass
+    return results
 
 
 def prompt_choice(prompt, options, multi=False):
@@ -57,35 +78,47 @@ def autogenerate_task_custom_list(activity_name):
                 continue
             synsets.add(synset)
 
-    # Prompt for scene
-    print(f"\nSelect scene for activity '{activity_name}':")
-    for i, s in enumerate(PREFERRED_SCENES):
+    # Prompt for scene — only offer scenes that match the task per the knowledge base
+    matched_scene_names = sorted(s.name for s in task.matched_scenes)
+    print(f"\nSelect scene for activity '{activity_name}' ({len(matched_scene_names)} matching):")
+    for i, s in enumerate(matched_scene_names):
         print(f"  [{i}] {s}")
     while True:
         raw = input("Enter index, name, or custom string: ").strip()
-        if raw.isdigit() and int(raw) < len(PREFERRED_SCENES):
-            scene = PREFERRED_SCENES[int(raw)]
+        if raw.isdigit() and int(raw) < len(matched_scene_names):
+            scene = matched_scene_names[int(raw)]
             break
         elif raw:
             scene = raw
             break
 
     # Prompt for models per synset/category
+    models_2025 = get_2025_models_for_task(activity_name)
     whitelist = {}
     for synset in sorted(synsets):
         synset_obj = get_knowledge_base().get_synset(synset)
         if synset_obj is None:
             continue
         whitelist[synset] = {}
-        for cat in synset_obj.categories:
+        # Non-leaf synsets have no direct categories; walk to leaf descendants
+        leaf_synsets = [synset_obj] if synset_obj.is_leaf else [d for d in synset_obj.descendants if d.is_leaf]
+        all_cats = [cat for s in leaf_synsets for cat in s.categories]
+        for cat in all_cats:
             cat_name = cat.name
-            cat_models_dir = os.path.join(OBJECTS_PATH, cat_name)
-            available_models = sorted(os.listdir(cat_models_dir)) if os.path.exists(cat_models_dir) else []
+            available_models = set(get_all_object_category_models(cat_name))
+            available_models = (
+                available_models
+                if cat_name not in GOOD_MODELS
+                else available_models.intersection(GOOD_MODELS[cat_name])
+            )
+            available_models = sorted(available_models - BAD_CLOTH_MODELS.get(cat_name, set()))
             if not available_models:
                 print(f"\n  No models found for category '{cat_name}', skipping.")
                 continue
+            used_in_2025 = sorted(models_2025.get(synset, {}).get(cat_name, []))
+            hint = f"  (used in 2025: {', '.join(used_in_2025)})" if used_in_2025 else "  (not found in 2025 dataset)"
             models = prompt_choice(
-                f"Select model(s) for {synset} / {cat_name} ({SYNSET_BASE_URL}/{synset}.html):",
+                f"Select model(s) for {synset} / {cat_name} ({SYNSET_BASE_URL}/{synset}.html):\n{hint}",
                 available_models,
                 multi=True,
             )
