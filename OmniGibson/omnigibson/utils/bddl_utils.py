@@ -489,6 +489,7 @@ class BDDLSampler:
         # Initialize other variables that will be filled in later
         self._sampling_whitelist = None  # Maps str to str to list
         self._sampling_blacklist = None  # Maps str to str to list
+        self._unique_models_per_synset = False  # bool: if True, sample models without replacement per synset
         self._room_type_to_object_instance = None  # dict
         self._inroom_object_instances = None  # set of str
         self._object_sampling_orders = None  # dict mapping str to list of str
@@ -503,7 +504,7 @@ class BDDLSampler:
         resolved = [self._object_scope.get(a, a) if isinstance(a, str) else a for a in args]
         return sample_bddl_predicate(predicate_cls, *resolved, **kwargs)
 
-    def assign_objects(self, sampling_whitelist=None, sampling_blacklist=None):
+    def assign_objects(self, sampling_whitelist=None, sampling_blacklist=None, unique_models_per_synset=False):
         """Assign inroom objects and import sampleable objects into the scene.
 
         This is phase 1 of sampling: it finds/imports all objects needed by the
@@ -515,6 +516,10 @@ class BDDLSampler:
                 category -> list of valid models.
             sampling_blacklist (None or dict): Maps synset name to dict of
                 category -> list of invalid models.
+            unique_models_per_synset (bool): If True, ensures that each instance
+                of the same synset is assigned a distinct object model (sampling
+                without replacement). Sampling fails if there are fewer valid
+                models than instances for a given synset.
 
         Returns:
             2-tuple:
@@ -524,6 +529,7 @@ class BDDLSampler:
         log.info("Assigning objects for task...")
         self._sampling_whitelist = sampling_whitelist
         self._sampling_blacklist = sampling_blacklist
+        self._unique_models_per_synset = unique_models_per_synset
 
         # Derive future object instances from parsed initial conditions
         self._future_obj_instances = {
@@ -1149,6 +1155,9 @@ class BDDLSampler:
 
         self._sampled_objects = set()
         num_new_obj = 0
+        # Tracks which models have already been used per synset, to enforce
+        # without-replacement sampling when self._unique_models_per_synset is True
+        sampled_models_per_synset = defaultdict(set)
         # Only populate self.object_scope for sampleable objects
         available_categories = set(get_all_object_categories())
 
@@ -1240,16 +1249,27 @@ class BDDLSampler:
                             else model_choices
                         )
 
+                    # Exclude models already assigned to other instances of this synset
+                    if self._unique_models_per_synset:
+                        model_choices = model_choices - sampled_models_per_synset[obj_synset]
+
                     # Filter by category
                     if len(model_choices) > 0:
                         break
 
                 if len(model_choices) == 0:
                     # We failed to find ANY valid model across ALL valid categories
+                    if self._unique_models_per_synset:
+                        return (
+                            f"Ran out of unique models for synset {obj_synset} "
+                            f"(already used: {sorted(sampled_models_per_synset[obj_synset])})"
+                        )
                     return f"Missing valid object models for all categories: {categories}"
 
                 # Randomly select an object model
                 model = random.choice(list(model_choices))
+                if self._unique_models_per_synset:
+                    sampled_models_per_synset[obj_synset].add(model)
 
                 # Potentially add additional kwargs
                 obj_kwargs = dict()
