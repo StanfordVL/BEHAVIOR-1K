@@ -50,7 +50,7 @@ setup(
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
         "lxml>=5.2.2",
-        "numba>=0.59.1",
+        "numba==0.59.1",
         "cffi==1.17.1",
         "pillow~=11.0.0",
         "websockets>=15.0.1",
@@ -85,7 +85,7 @@ setup(
             "msgpack>=1.1.0",
             "gspread>=6.2.1",
             "open3d>=0.19.0",
-        ]
+        ],
     },
     tests_require=[],
     python_requires=">=3",
