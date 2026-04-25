@@ -676,7 +676,7 @@ class DataPlaybackWrapper(DataWrapper):
             if self.video_writers:
                 self._write_video_frames()
         for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
-            # Here, state i is the state before takign action i, and reward, terminated, truncated are the results of taking action i
+            # Here, state i is the state before taking action i, and reward, terminated, truncated are the results of taking action i
             if i % 1000 == 0:
                 log.info(f"Playing back episode {episode_id}, step {i}/{len(action)}")
             # Restore the sim state, and take a very small step with the action to make sure physics are
