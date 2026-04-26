@@ -363,23 +363,26 @@ class BehaviorTask(BaseTask):
             dict: Maps room_type (str) -> room_instance_name (str).
         """
         room_instances = {}
+        # Fall back to the sampler's candidate map: inroom objects aren't in object_scope yet at this point.
+        inroom_scope = getattr(getattr(self, "sampler", None), "_inroom_object_scope", None) or {}
         for obj_inst, room_type in self._base_inroom_assignments.items():
             entity = self.object_scope.get(obj_inst)
-            if entity is None:
-                continue
-            # Find which room instance this object is in
-            if hasattr(entity, "in_rooms") and entity.in_rooms:
-                for room_inst in entity.in_rooms:
-                    inst_room_type = room_inst.rsplit("_", 1)[0]  # Get room type by removing instance number suffix
-                    if inst_room_type == room_type:
-                        if room_type in room_instances and room_instances[room_type] != room_inst:
-                            log.warning(
-                                f"Multiple room instances for room type '{room_type}': "
-                                f"{room_instances[room_type]} vs {room_inst}. Using {room_instances[room_type]}."
-                            )
-                        else:
-                            room_instances[room_type] = room_inst
-                        break
+            candidate_room_insts = []
+            if entity is not None and getattr(entity, "in_rooms", None):
+                candidate_room_insts = list(entity.in_rooms)
+            else:
+                candidate_room_insts = sorted(inroom_scope.get(room_type, {}).get(obj_inst, {}).keys())
+            for room_inst in candidate_room_insts:
+                inst_room_type = room_inst.rsplit("_", 1)[0]  # Get room type by removing instance number suffix
+                if inst_room_type == room_type:
+                    if room_type in room_instances and room_instances[room_type] != room_inst:
+                        log.warning(
+                            f"Multiple room instances for room type '{room_type}': "
+                            f"{room_instances[room_type]} vs {room_inst}. Using {room_instances[room_type]}."
+                        )
+                    else:
+                        room_instances[room_type] = room_inst
+                    break
         return room_instances
 
     def _compile_with_rooms(self, env):
@@ -400,6 +403,22 @@ class BehaviorTask(BaseTask):
 
         # Compile with the correct scene layout
         self.compiled_task = self._task_def.compile(scene_layout=scene_layout)
+
+        # Sampler was init'd from base (wildcard-stripped) conditions; backfill the wildcard-expanded instances.
+        if self.sampler is not None and self.sampler._inroom_object_instances is not None:
+            new_inroom = False
+            for synset_name, instances in self.compiled_task.parsed_objects.items():
+                for inst in instances:
+                    self.sampler._object_instance_to_synset.setdefault(inst, synset_name)
+            for cond in self.compiled_task.conditions.parsed_initial_conditions:
+                if cond[0] == "inroom":
+                    inst, rt = cond[1], cond[2]
+                    if inst not in self.sampler._inroom_object_instances:
+                        self.sampler._inroom_object_instances.add(inst)
+                        self.sampler._room_type_to_object_instance.setdefault(rt, []).append(inst)
+                        new_inroom = True
+            if new_inroom:
+                self.sampler._build_inroom_object_scope()
 
         # Preserve existing object assignments in the new scope
         old_scope = self.object_scope
