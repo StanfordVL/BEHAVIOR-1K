@@ -143,8 +143,9 @@ def expand_wildcards(raw_bddl_str, scene_layout, kb):
                 if cat in info["categories"]
             )
 
-            assert n_valid >= n_min, (
-                f"BDDL requires at least {n_min} instances of synset {synset}, "
+            required = max(1, n_min)
+            assert n_valid >= required, (
+                f"BDDL requires at least {required} instance(s) of synset {synset}, "
                 f"but only found {n_valid} in rooms of type {room_type}!"
             )
 
