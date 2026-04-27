@@ -80,35 +80,37 @@ def main():
         ]
         subMenu = subMenuItem.getSubMenu()
 
-        this_dir = pathlib.Path(__file__).parent
+    this_dir = pathlib.Path(__file__).parent
 
-        for entrypoint, tooltip in ENTRYPOINTS.items():
-            script_name = entrypoint.replace(".py", "")
-            script_human_readable_name = script_name.replace("_", " ").title()
+    for entrypoint, tooltip in ENTRYPOINTS.items():
+        script_name = entrypoint.replace(".py", "")
+        script_human_readable_name = script_name.replace("_", " ").title()
 
-            # Create the script
-            entrypoint_fullname = str((this_dir / entrypoint).absolute())
-            script = f'Python.ExecuteFile @"{entrypoint_fullname}"'
-            rt.macros.new(
-                "SVL_Tools", script_name, tooltip, script_human_readable_name, script
-            )
+        # Create the script
+        entrypoint_fullname = str((this_dir / entrypoint).absolute())
+        script = f'Python.ExecuteFile @"{entrypoint_fullname}"'
+        rt.macros.new(
+            "SVL_Tools", script_name, tooltip, script_human_readable_name, script
+        )
 
-            # Check if it already exists
-            existing_menu_items_with_name = [
-                x
-                for x in range(subMenu.numItems())
-                if subMenu.getItem(x + 1).getTitle() == script_human_readable_name
-            ]
-            if existing_menu_items_with_name:
-                continue
+        # Check if it already exists
+        existing_menu_items_with_name = [
+            x
+            for x in range(subMenu.numItems())
+            if subMenu.getItem(x + 1).getTitle() == script_human_readable_name
+        ]
+        if existing_menu_items_with_name:
+            for i in reversed(existing_menu_items_with_name):
+                print("Removing existing menu item at position", i + 1)
+                subMenu.removeItemByPosition(i + 1)
 
-            # Create a menu item that calls the sample macroScript
-            actionItem = rt.menuMan.createActionItem(script_name, "SVL_Tools")
-            assert actionItem, (
-                "Failed to create action item " + script_human_readable_name
-            )
-            # Add the item to the menu
-            subMenu.addItem(actionItem, -1)
+        # Create a menu item that calls the sample macroScript
+        actionItem = rt.menuMan.createActionItem(script_name, "SVL_Tools")
+        assert actionItem, (
+            "Failed to create action item " + script_human_readable_name
+        )
+        # Add the item to the menu
+        subMenu.addItem(actionItem, -1)
 
         # Redraw the menu bar with the new item
         rt.menuMan.updateMenuBar()
