@@ -1,5 +1,5 @@
 (define (problem hang_icicle_lights-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         icicle_lights.n.01_1 - icicle_lights.n.01

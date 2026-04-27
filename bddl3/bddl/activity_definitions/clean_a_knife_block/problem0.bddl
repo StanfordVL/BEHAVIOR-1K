@@ -1,5 +1,5 @@
 (define (problem clean_a_knife_block-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         knife_block.n.01_1 - knife_block.n.01

@@ -49,10 +49,9 @@ def setup_environment(load_object_categories, robot="R1"):
     th.backends.cudnn.deterministic = True
 
     if og.sim is None:
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = False
-        gm.ENABLE_FLATCACHE = False
         gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped

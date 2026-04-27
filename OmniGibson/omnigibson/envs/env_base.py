@@ -1,5 +1,3 @@
-import random
-import string
 from collections import OrderedDict
 from collections.abc import Iterable
 from copy import deepcopy
@@ -262,9 +260,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         loaded_from_config = False
 
         # Pre-assign robot names so all scenes share the same names
-        for robot_config in self.robots_config:
+        for i, robot_config in enumerate(self.robots_config):
+            # Add a name for the robot if necessary. Make sure robots in different scenes share the same relative_prim_path
             if "name" not in robot_config:
-                robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
+                robot_config["name"] = f"robot_{i}"
 
         for scene in self._scenes:
             if len(scene.robots) == 0:
@@ -453,6 +452,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load the scene and robot specified in the config file.
         """
+        # TODO(vector): Remove this after moving onto vectorized environment
+        og.sim._is_loading_scene = True
+
         # This environment is not loaded
         self._loaded = False
 
@@ -465,6 +467,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_task()
         self._load_external_sensors()
+
+        # TODO(vector): Remove this after moving onto vectorized environment
+        og.sim._is_loading_scene = False
 
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""

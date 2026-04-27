@@ -1,5 +1,5 @@
 (define (problem mowing_the_lawn-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	bunchgrass.n.01_1 - bunchgrass.n.01

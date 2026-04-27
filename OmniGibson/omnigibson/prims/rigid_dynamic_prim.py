@@ -5,7 +5,6 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.usd_utils import PoseAPI
 
 from .rigid_prim import RigidPrim
 
@@ -53,7 +52,8 @@ class RigidDynamicPrim(RigidPrim):
         from omnigibson.utils.deprecated_utils import RigidPrimView
 
         # set reset_xform_properties to False for load time
-        self._rigid_prim_view = RigidPrimView(self.prim_path, reset_xform_properties=False)
+        with og.sim.editing_usd():
+            self._rigid_prim_view = RigidPrimView(self.prim_path, reset_xform_properties=False)
 
         # Run super method to handle common functionality
         super()._post_load()
@@ -81,7 +81,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
-        self._rigid_prim_view.set_linear_velocities(velocity[None, :])
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
     def get_linear_velocity(self, clone=True):
         """
@@ -100,7 +101,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
-        self._rigid_prim_view.set_angular_velocities(velocity[None, :])
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
     def get_angular_velocity(self, clone=True):
         """
@@ -124,6 +126,11 @@ class RigidDynamicPrim(RigidPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
+        # If the simulation is stopped, we can just use the XFormPrim implementation directly. This is slower than
+        # the PhysX-based implementation, but the PhysX implementation is not available when the simulation is stopped.
+        if og.sim.is_stopped():
+            return super().set_position_orientation(position=position, orientation=orientation, frame=frame)
+
         # If no position or no orientation are given, get the current position and orientation of the object
         if position is None or orientation is None:
             current_position, current_orientation = self.get_position_orientation(frame=frame)
@@ -144,8 +151,11 @@ class RigidDynamicPrim(RigidPrim):
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
             position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
+        assert (
+            self._rigid_prim_view.is_physics_handle_valid()
+        ), "Unexpected: rigid prim view is not valid while simulation is playing."
         self._rigid_prim_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
-        PoseAPI.invalidate()
+        og.sim.sync_physx_to_fabric()
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
@@ -196,7 +206,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             com (th.Tensor): (x,y,z) position of link CoM in the link frame
         """
-        self._rigid_prim_view.set_coms(positions=com.reshape(1, 1, 3))
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_coms(positions=com.reshape(1, 1, 3))
 
     @property
     def mass(self):
@@ -218,7 +229,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        self._rigid_prim_view.set_masses(th.tensor([mass]))
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_masses(th.tensor([mass]))
 
     @property
     def density(self):
@@ -245,7 +257,8 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        self._rigid_prim_view.set_densities(th.tensor([density]))
+        with og.sim.editing_usd():
+            self._rigid_prim_view.set_densities(th.tensor([density]))
 
     @property
     def is_asleep(self):
@@ -259,13 +272,15 @@ class RigidDynamicPrim(RigidPrim):
         """
         Enables gravity for this rigid body
         """
-        self._rigid_prim_view.enable_gravities()
+        with og.sim.editing_usd():
+            self._rigid_prim_view.enable_gravities()
 
     def disable_gravity(self):
         """
         Disables gravity for this rigid body
         """
-        self._rigid_prim_view.disable_gravities()
+        with og.sim.editing_usd():
+            self._rigid_prim_view.disable_gravities()
 
     def wake(self):
         """

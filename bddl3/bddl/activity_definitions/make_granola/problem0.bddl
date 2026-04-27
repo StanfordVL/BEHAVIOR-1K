@@ -1,5 +1,5 @@
 (define (problem make_granola-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         oat.n.02_1 - oat.n.02

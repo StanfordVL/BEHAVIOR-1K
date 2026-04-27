@@ -8,7 +8,7 @@ from functools import cached_property
 from typing import Literal
 
 import torch as th
-from bddl.object_taxonomy import ObjectTaxonomy
+from omnigibson.utils.bddl_utils import get_knowledge_base
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -36,7 +36,7 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, extract_class_init_kwargs_from_dict, get_uuid
-from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     add_asset_to_stage,
@@ -44,6 +44,7 @@ from omnigibson.utils.usd_utils import (
     count_joints,
     create_joint,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -66,8 +67,6 @@ m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]  # (x,y,z) scale of generated steam
 m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1  # scale of steam density relative to its object, range [0, inf)
 m.STEAM_EMITTER_HEIGHT_RATIO = 0.6  # z-height of generated steam relative to its object's native height, range [0, inf)
 m.FIRE_EMITTER_HEIGHT_RATIO = 0.4  # z-height of generated fire relative to its object's native height, range [0, inf)
-
-OBJECT_TAXONOMY = ObjectTaxonomy()
 
 
 # Counter that assigns each flow emitter a unique layer number so emitters don't interfere.
@@ -160,11 +159,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._include_default_states = include_default_states
 
         # Load abilities from taxonomy if needed & possible
+        # TODO: Move this to dataset object? Loads B1K abilities for non-B1K objects.
         if abilities is None:
             abilities = {}
-            taxonomy_class = OBJECT_TAXONOMY.get_synset_from_category(category)
-            if taxonomy_class is not None:
-                abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
+            kb_category = get_knowledge_base().get_category(category)
+            if kb_category is not None and kb_category.synset is not None:
+                abilities = kb_category.synset.abilities
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
         self._abilities = abilities
 
@@ -229,6 +229,25 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         return usd_path
 
+    def _get_preapply_scale(self, default_prim):
+        """
+        Returns the scale tensor to use when computing kinematic_only inside _preapply_articulation_root.
+        Subclasses can override to derive scale from USD-side data (e.g. ig:nativeBB for dataset objects).
+
+        Args:
+            default_prim (Usd.Prim): The default prim of the side stage opened by _preapply_articulation_root.
+
+        Returns:
+            th.Tensor: 3-element float scale tensor.
+        """
+        raw_scale = self._load_config.get("scale", None)
+        if raw_scale is not None:
+            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
+            if scale.dim() == 0:
+                scale = scale.expand(3)
+            return scale.float()
+        return th.ones(3)
+
     def _preapply_articulation_root(self, usd_path):
         """
         Opens @usd_path with the pxr library, strips any existing ArticulationRootAPI, determines the correct prim to
@@ -243,14 +262,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
 
-        raw_scale = self._load_config.get("scale", None)
-        if raw_scale is not None:
-            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
-            if scale.dim() == 0:
-                scale = scale.expand(3)
-            scale = scale.float()
-        else:
-            scale = th.ones(3)
+        scale = self._get_preapply_scale(default_prim)
+        # Only persist scale to _load_config if the user already provided one, or if a non-trivial
+        # scale was derived (e.g. from bounding_box).  Avoid overwriting None with the default
+        # ones(3) so that PrimitiveObjects using radius/height/size are not affected.
+        if self._load_config.get("scale", None) is not None or not th.allclose(scale, th.ones_like(scale)):
+            self._load_config["scale"] = scale
 
         kinematic_only = compute_kinematic_only(
             self.fixed_base,
@@ -260,40 +277,64 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self._load_config.get("kinematic_only", None),
             has_attachment,
         )
+        self._load_config["kinematic_only"] = kinematic_only
+
+        # Find root link: the Xform child that is not body1 of any joint that also has a body0.
+        joint_children = set()
+        link_names = []
+        for prim in default_prim.GetChildren():
+            if prim.GetTypeName() != "Xform":
+                continue
+            link_names.append(prim.GetName())
+            for child in prim.GetChildren():
+                if "joint" not in child.GetTypeName().lower():
+                    continue
+                rels = {r.GetName(): r for r in child.GetRelationships()}
+                body0_rel = rels.get("physics:body0")
+                body1_rel = rels.get("physics:body1")
+                if body0_rel is None or body1_rel is None:
+                    continue
+                if len(body0_rel.GetTargets()) > 0 and len(body1_rel.GetTargets()) > 0:
+                    joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
+        valid_roots = list(set(link_names) - joint_children)
+        assert len(valid_roots) == 1, (
+            f"Exactly one root link should have been found for {default_prim.GetName()}, "
+            f"but found none/multiple instead: {valid_roots}"
+        )
+        root_link = default_prim.GetPrimAtPath(valid_roots[0])
+
+        if self.fixed_base and not kinematic_only:
+            create_joint(
+                prim_path=f"{default_prim.GetPath()}/rootJoint",
+                joint_type="FixedJoint",
+                body1=f"{root_link.GetPath()}",
+                stage=stage,
+            )
+            n_fixed_joints += 1
+
+        # Add articulated_ prefix into prim path so ArticulationView can use a simple pattern match
+        # Only for non-robot articulated objects
+        if (
+            not kinematic_only
+            and (n_joints > 0 or n_fixed_joints > 0)
+            and not self._relative_prim_path.startswith("/controllable")
+        ):
+            self._relative_prim_path = f"/articulated__{self.name}"
 
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
-            if not self.fixed_base and n_joints > 0:
-                # Root link = the Xform child that is not body1 of any joint with a body0
-                joint_children = set()
-                link_names = []
-                for prim in default_prim.GetChildren():
-                    if prim.GetTypeName() != "Xform":
-                        continue
-                    link_names.append(prim.GetName())
-                    for child in prim.GetChildren():
-                        if "joint" not in child.GetTypeName().lower():
-                            continue
-                        rels = {r.GetName(): r for r in child.GetRelationships()}
-                        body0_rel = rels.get("physics:body0")
-                        body1_rel = rels.get("physics:body1")
-                        if body0_rel is None or body1_rel is None:
-                            continue
-                        if len(body0_rel.GetTargets()) > 0 and len(body1_rel.GetTargets()) > 0:
-                            joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
-                valid_roots = list(set(link_names) - joint_children)
-                assert len(valid_roots) == 1, (
-                    f"Exactly one root link should have been found for {default_prim.GetName()}, "
-                    f"but found none/multiple instead: {valid_roots}"
-                )
-                articulation_root_prim = default_prim.GetPrimAtPath(valid_roots[0])
+            if not self.fixed_base:
+                articulation_root_prim = root_link
             else:
                 articulation_root_prim = default_prim
 
         if articulation_root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(articulation_root_prim)
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(articulation_root_prim)
+            articulation_root_prim.GetAttribute("physxArticulation:enabledSelfCollisions").Set(
+                bool(self._load_config.get("self_collisions", False))
+            )
 
         # Export to a temp file
         basename = os.path.basename(usd_path)
@@ -308,18 +349,21 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         This is useful for pre-compiling scene USDs, speeding up load times especially for parallel envs.
         """
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
-        prim_path = "/World" + self._relative_prim_path
         usd_path = self._prepare_to_load()
+        prim_path = "/World" + self._relative_prim_path
         prim = stage.GetPrimAtPath(prim_path)
         assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
         prim = stage.DefinePrim(prim_path, "Xform")
         assert prim.GetReferences().AddReference(usd_path)
 
     def _load(self):
-        usd_path = self._prepare_to_load()
-        return add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
+        return add_asset_to_stage(asset_path=self._prepared_usd_path, prim_path=self.prim_path)
 
     def load(self, scene):
+        # Always run _prepare_to_load (which calls _preapply_articulation_root) so that
+        # _load_config["kinematic_only"] and _load_config["scale"] are set correctly before
+        # _post_load runs, even when the prim already exists in the stage (e.g. from prebuild).
+        self._prepared_usd_path = self._prepare_to_load()
         prim = super().load(scene)
         log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
@@ -336,66 +380,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             state_instance.remove()
 
     def _post_load(self):
-        # Add fixed joint or make object kinematic only if we're fixing the base
-        kinematic_only = False
-        if self.fixed_base:
-            # For optimization purposes, if we only have a single rigid body that has either
-            # (no custom scaling OR no fixed joints), we assume this is not an articulated object so we
-            # merely set this to be a static collider, i.e.: kinematic-only
-            # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
-            # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
-            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
-            if (
-                # no articulated joints
-                self.n_joints == 0
-                # no fixed joints or scaling is [1, 1, 1] (TODO verify [1, 1, 1] is still needed)
-                and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
-                # users force the object to not have kinematic_only
-                and self._load_config["kinematic_only"] is not False  # if can be True or None
-                and not self.has_attachment_points
-            ):
-                kinematic_only = True
-
-        # Validate that we didn't make a kinematic-only decision that does not match
-        assert (
-            self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"]
-        ), f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
-
-        # Actually apply the kinematic-only decision
-        self._load_config["kinematic_only"] = kinematic_only
-
         # Run super first
         super()._post_load()
-
-        # If the object is fixed_base but kinematic only is false, create the joint
-        if self.fixed_base and not self.kinematic_only:
-            # Create fixed joint, and set Body0 to be this object's root prim
-            # This renders, which causes a material lookup error since we're creating a temp file, so we suppress
-            # the error explicitly here
-            with suppress_omni_log(channels=["omni.hydra"]):
-                create_joint(
-                    prim_path=f"{self.prim_path}/rootJoint",
-                    joint_type="FixedJoint",
-                    body1=f"{self.prim_path}/{self._root_link_name}",
-                )
-
-            # Delete n_fixed_joints cached property if it exists since the number of fixed joints has now changed
-            # See https://stackoverflow.com/questions/59899732/python-cached-property-how-to-delete and
-            # https://docs.python.org/3/library/functools.html#functools.cached_property
-            if "n_fixed_joints" in self.__dict__:
-                del self.n_fixed_joints
 
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
-
-        root_prim = (
-            None
-            if self.articulation_root_path is None
-            else lazy.isaacsim.core.utils.prims.get_prim_at_path(self.articulation_root_path)
-        )
-        if root_prim is not None:
-            self.self_collisions = self._load_config["self_collisions"]
 
         # Set position / velocity solver iterations if we're not cloth and not kinematic only
         if self._prim_type != PrimType.CLOTH and not self.kinematic_only:
@@ -417,11 +407,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 self._link_physics_materials[link_name] = physics_mat
 
         # Add semantics
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=self._prim,
-            semantic_label=self.category,
-            type_label="class",
-        )
+        add_semantic_label(prim=self._prim, label=self.category)
+
         # Prepare the object states
         self._states = {}
         self.prepare_object_states()
@@ -655,7 +642,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # as the object moves. We put it under a dummy mesh so as not to force write synchronization to the actual
         # physx-tracked links (required when using Fabric), which causes physics issues
         dummy_mesh_path = f"{link.prim_path}/emitter"
-        lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, dummy_mesh_path)
+        with og.sim.editing_usd():
+            lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, dummy_mesh_path)
         relative_dummy_mesh_path = absolute_prim_path_to_scene_relative(self._scene, dummy_mesh_path)
         mesh = GeomPrim(relative_prim_path=relative_dummy_mesh_path, name=f"{self.name}_emitter")
         mesh.load(self._scene)
@@ -666,90 +654,97 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         flowOffscreen_prim_path = f"{mesh.prim_path}/flowOffscreen"
         flowRender_prim_path = f"{mesh.prim_path}/flowRender"
 
-        # Define prims.
-        stage = og.sim.stage
-        emitter = stage.DefinePrim(flowEmitter_prim_path, emitter_config["type"])
-        simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
-        offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
-        renderer = stage.DefinePrim(flowRender_prim_path, "FlowRender")
-        advection = stage.DefinePrim(flowSimulate_prim_path + "/advection", "FlowAdvectionCombustionParams")
-        smoke = stage.DefinePrim(flowSimulate_prim_path + "/advection/smoke", "FlowAdvectionCombustionParams")
-        vorticity = stage.DefinePrim(flowSimulate_prim_path + "/vorticity", "FlowVorticityParams")
-        rayMarch = stage.DefinePrim(flowRender_prim_path + "/rayMarch", "FlowRayMarchParams")
-        colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
+        # Define prims and set attributes — all USD edits for this emitter.
+        with og.sim.editing_usd():
+            stage = og.sim.stage
+            emitter = stage.DefinePrim(flowEmitter_prim_path, emitter_config["type"])
+            simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
+            offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
+            renderer = stage.DefinePrim(flowRender_prim_path, "FlowRender")
+            advection = stage.DefinePrim(flowSimulate_prim_path + "/advection", "FlowAdvectionCombustionParams")
+            smoke = stage.DefinePrim(flowSimulate_prim_path + "/advection/smoke", "FlowAdvectionCombustionParams")
+            vorticity = stage.DefinePrim(flowSimulate_prim_path + "/vorticity", "FlowVorticityParams")
+            rayMarch = stage.DefinePrim(flowRender_prim_path + "/rayMarch", "FlowRayMarchParams")
+            colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
 
-        self._emitters[emitter_type] = {
-            "emitter": emitter,
-            "mesh": mesh,
-            "link": link,
-            "canonical_pose": mesh.get_position_orientation(),
-        }
+            self._emitters[emitter_type] = {
+                "emitter": emitter,
+                "mesh": mesh,
+                "link": link,
+                "canonical_pose": mesh.get_position_orientation(),
+            }
 
-        global _EMITTER_LAYER_COUNTER
-        layer_number = _EMITTER_LAYER_COUNTER
-        _EMITTER_LAYER_COUNTER += 1
+            global _EMITTER_LAYER_COUNTER
+            layer_number = _EMITTER_LAYER_COUNTER
+            _EMITTER_LAYER_COUNTER += 1
 
-        # Update emitter general settings.
-        emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
-        emitter.CreateAttribute("position", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["position"])
-        emitter.CreateAttribute("fuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["fuel"])
-        emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["coupleRateFuel"]
-        )
-        emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
-        emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
-        emitter.CreateAttribute("physicsVelocityScale", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1.0)
-        emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            1 / og.sim.get_sim_step_dt()
-        )
-        offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["buoyancyPerTemp"]
-        )
-        advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["burnPerTemp"]
-        )
-        advection.CreateAttribute("gravity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["gravity"])
-        vorticity.CreateAttribute("constantMask", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["constantMask"]
-        )
-        rayMarch.CreateAttribute("attenuation", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-            emitter_config["attenuation"]
-        )
-
-        # Update emitter unique settings.
-        if emitter_type == EmitterType.FIRE:
-            # Radius is in the absolute world coordinate even though the fire is under the link frame.
-            # In other words, scaling the object doesn't change the fire radius.
-            if fire_at_meta_link:
-                # TODO: get radius of heat_source_link from metadata.
-                radius = 0.05
-            else:
-                bbox_extent_world = self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
-                # Radius is the average x-y half-extent of the object
-                radius = float(th.mean(bbox_extent_world[:2]) / 2.0)
-            emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
-            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
-            smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
-            # Set fire colormap.
-            rgbaPoints = []
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.0154, 0.0177, 0.0154, 0.004902))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(1, 0.1594, 0.0134, 0.8))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(13.53, 2.99, 0.12599, 0.8))
-            rgbaPoints.append(lazy.pxr.Gf.Vec4f(78, 39, 6.1, 0.7))
-            colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
-        elif emitter_type == EmitterType.STEAM:
-            emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+            # Update emitter general settings.
+            emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
+            emitter.CreateAttribute("position", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
+                emitter_config["position"]
             )
-            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-                bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+            emitter.CreateAttribute("fuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["fuel"])
+            emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["coupleRateFuel"]
             )
+            emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
+            emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
+            emitter.CreateAttribute("physicsVelocityScale", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1.0)
+            emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                1 / og.sim.get_sim_step_dt()
+            )
+            offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+            advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["buoyancyPerTemp"]
+            )
+            advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["burnPerTemp"]
+            )
+            advection.CreateAttribute("gravity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
+                emitter_config["gravity"]
+            )
+            vorticity.CreateAttribute("constantMask", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["constantMask"]
+            )
+            rayMarch.CreateAttribute("attenuation", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                emitter_config["attenuation"]
+            )
+
+            # Update emitter unique settings.
+            if emitter_type == EmitterType.FIRE:
+                # Radius is in the absolute world coordinate even though the fire is under the link frame.
+                # In other words, scaling the object doesn't change the fire radius.
+                if fire_at_meta_link:
+                    # TODO: get radius of heat_source_link from metadata.
+                    radius = 0.05
+                else:
+                    bbox_extent_world = (
+                        self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
+                    )
+                    # Radius is the average x-y half-extent of the object
+                    radius = float(th.mean(bbox_extent_world[:2]) / 2.0)
+                emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
+                simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
+                smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
+                # Set fire colormap.
+                rgbaPoints = []
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.0154, 0.0177, 0.0154, 0.004902))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(1, 0.1594, 0.0134, 0.8))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(13.53, 2.99, 0.12599, 0.8))
+                rgbaPoints.append(lazy.pxr.Gf.Vec4f(78, 39, 6.1, 0.7))
+                colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
+            elif emitter_type == EmitterType.STEAM:
+                emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
+                    tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+                )
+                simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                    bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+                )
 
     def set_emitter_enabled(self, emitter_type, value):
         """
@@ -761,12 +756,14 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         if emitter_type not in self._emitters:
             return
-        # If we're running flatcache and the value is active, we need to manually update the pose in the USD
+        # If we're running fabric and the value is active, we need to manually update the pose in the USD
         # to ensure the rendering is updated properly at the correct pose
-        if gm.ENABLE_FLATCACHE and value:
+        # TODO(#2082): Verify if this is still needed.
+        if value:
             self._sync_emitter_mesh_on_usd(emitter_type=emitter_type)
         if value != self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Get():
-            self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Set(value)
+            with og.sim.editing_usd():
+                self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Set(value)
 
     def _sync_emitter_mesh_on_usd(self, emitter_type):
         """
@@ -780,6 +777,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         link_pose = emitter_info["link"].get_position_orientation()
         position, orientation = T.relative_pose_transform(*link_pose, *emitter_info["canonical_pose"])
 
+        # TODO(#2082): Verify if this is still needed.
         # Actually set the local pose now.
         position = lazy.pxr.Gf.Vec3d(*position.tolist())
         mesh.set_attribute("xformOp:translate", position)
@@ -789,7 +787,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             rotq = lazy.pxr.Gf.Quatf(*orientation)
         else:
             rotq = lazy.pxr.Gf.Quatd(*orientation)
-        xform_op.Set(rotq)
+        with og.sim.editing_usd():
+            xform_op.Set(rotq)
 
     def update_visuals(self):
         """
@@ -856,10 +855,10 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
     @cached_property
     def articulation_root_path(self):
         has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
-        if self.kinematic_only or ((not has_articulated_joints) and (not has_fixed_joints)):
+        if self.kinematic_only or (not has_articulated_joints and not has_fixed_joints):
             # Kinematic only, or non-jointed single body objects
             return None
-        elif not self.fixed_base and has_articulated_joints:
+        elif not self.fixed_base:
             # This is all remaining non-fixed objects
             # This is a bit hacky because omniverse is buggy
             # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a

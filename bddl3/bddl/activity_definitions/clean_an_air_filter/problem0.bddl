@@ -1,5 +1,5 @@
 (define (problem clean_an_air_filter-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         air_filter.n.01_1 - air_filter.n.01

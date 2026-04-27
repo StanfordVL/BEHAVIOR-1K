@@ -1,5 +1,5 @@
 (define (problem clean_fur-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         fur_coat.n.01_1 - fur_coat.n.01

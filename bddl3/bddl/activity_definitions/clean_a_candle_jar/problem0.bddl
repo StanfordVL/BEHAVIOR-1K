@@ -1,5 +1,5 @@
 (define (problem clean_a_candle_jar-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mason_jar.n.01_1 - mason_jar.n.01

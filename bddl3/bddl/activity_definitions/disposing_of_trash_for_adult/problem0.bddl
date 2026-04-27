@@ -1,5 +1,5 @@
 (define (problem disposing_of_trash_for_adult-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tray.n.01_1 - tray.n.01

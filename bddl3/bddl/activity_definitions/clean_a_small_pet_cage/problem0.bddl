@@ -1,5 +1,5 @@
 (define (problem clean_a_small_pet_cage-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         birdcage.n.01_1 - birdcage.n.01

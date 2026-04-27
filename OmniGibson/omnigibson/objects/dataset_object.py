@@ -4,6 +4,7 @@ import random
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -230,7 +231,8 @@ class DatasetObject(USDObject):
                 for child_child_prim in child_prim.GetChildren():
                     recursive_light_update(child_child_prim)
 
-            recursive_light_update(self._prim)
+            with og.sim.editing_usd():
+                recursive_light_update(self._prim)
 
         # Set the joint frictions based on joint type
         for joint in self._joints.values():
@@ -239,54 +241,62 @@ class DatasetObject(USDObject):
             elif joint.joint_type == JointType.JOINT_REVOLUTE:
                 joint.friction = DEFAULT_REVOLUTE_JOINT_FRICTION
 
+    def _get_preapply_scale(self, default_prim):
+        # If bounding_box is set, scale hasn't been computed yet (that happens in _post_load).
+        # Derive it here from ig:nativeBB so kinematic_only is computed correctly and
+        # PhysxArticulationAPI is pre-applied when needed.
+        bounding_box = self._load_config.get("bounding_box", None)
+        if bounding_box is not None and self._load_config.get("scale", None) is None:
+            native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
+            if native_bb_attr.IsValid():
+                native_bb = th.tensor(list(native_bb_attr.Get()))
+                bb = th.tensor(bounding_box, dtype=th.float32)
+                scale = th.ones(3)
+                valid_idxes = native_bb > 1e-4
+                scale[valid_idxes] = bb[valid_idxes] / native_bb[valid_idxes]
+                return scale
+        return super()._get_preapply_scale(default_prim)
+
     def _post_load(self):
-        # If manual bounding box is specified, scale based on ratio between that and the native bbox
-        if self._load_config["bounding_box"] is not None:
-            scale = th.ones(3)
-            valid_idxes = self.native_bbox > 1e-4
-            scale[valid_idxes] = (
-                th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
-            )
-        elif self._load_config["scale"] is not None:
-            scale = self._load_config["scale"]
-            scale = scale if th.is_tensor(scale) else th.tensor(scale, dtype=th.float32)
-        else:
-            scale = th.ones(3)
-
-        # Assert that the scale does not have too small dimensions
-        assert th.all(th.abs(scale) > 1e-4), f"Scale of {self.name} is too small: {scale}"
-
-        # Set this scale in the load config -- it will automatically scale the object during self.initialize()
-        self._load_config["scale"] = scale
-
+        # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
+        # If neither was provided, default to ones(3) (no scaling).
+        if self._load_config.get("scale", None) is None:
+            self._load_config["scale"] = th.ones(3)
+        assert th.all(
+            th.abs(self._load_config["scale"]) > 1e-4
+        ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
         # Run super last
         super()._post_load()
 
-        # Get the average mass/density for this object category
-        avg_specs = get_avg_category_specs()
-        if self.category in avg_specs:
-            category_mass = avg_specs[self.category]["mass"]
-            category_density = avg_specs[self.category]["density"]
-        else:
-            log.warning(
-                f"Category {self.category} not found in average object specs! Defaulting to unit mass or density."
-            )
-            category_mass = 1.0
-            category_density = 1.0
+        category_mass = None
+        category_density = None
+        if self._load_config["dataset_name"] == "behavior-1k-assets":
+            # Get the average mass/density for this object category
+            avg_specs = get_avg_category_specs()
+            if self.category in avg_specs:
+                category_mass = avg_specs[self.category]["mass"]
+                category_density = avg_specs[self.category]["density"]
+            else:
+                log.warning(
+                    f"Category {self.category} not found in average object specs! Defaulting to unit mass or density."
+                )
+                category_mass = 1.0
+                category_density = 1.0
 
         if self._prim_type == PrimType.RIGID:
-            total_volume = sum(link.volume for link in self._links.values())
-            for link in self._links.values():
-                # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
-                if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
-                    if gm.FORCE_CATEGORY_MASS:
-                        # Each link should get the appropriate fraction of the category mass
-                        # based on the link volume
-                        link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
-                        link.density = 0.0
-                    else:
-                        link.mass = 0.0
-                        link.density = category_density
+            if category_mass is not None:
+                total_volume = sum(link.volume for link in self._links.values())
+                for link in self._links.values():
+                    # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
+                    if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
+                        if gm.FORCE_CATEGORY_MASS:
+                            # Each link should get the appropriate fraction of the category mass
+                            # based on the link volume
+                            link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
+                            link.density = 0.0
+                        else:
+                            link.mass = 0.0
+                            link.density = category_density
 
             # If there exists a center of mass annotation, apply it now
             if self.prim.HasAttribute("ig:centerOfMass"):
@@ -304,21 +314,25 @@ class DatasetObject(USDObject):
 
             prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
             revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
-            for prismatic_joint in prismatic_joints:
-                prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
-                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
-                prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
-            for revolute_joint in revolute_joints:
-                revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
-                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
-                revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
+            with og.sim.editing_usd():
+                for prismatic_joint in prismatic_joints:
+                    prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
+                    prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
+                    prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
+                for revolute_joint in revolute_joints:
+                    revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
+                    revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
+                    revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
 
         elif self._prim_type == PrimType.CLOTH:
-            self.root_link.mass = category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
+            if category_mass is not None:
+                self.root_link.mass = (
+                    category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
+                )
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
         """

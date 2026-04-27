@@ -1,5 +1,5 @@
 (define (problem make_waffles-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         raw_egg.n.01_1 raw_egg.n.01_2 - raw_egg.n.01

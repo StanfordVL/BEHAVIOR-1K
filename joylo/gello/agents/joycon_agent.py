@@ -1,36 +1,137 @@
-from gello.agents.agent import Agent
-from gello.joycon.rumble import RumbleJoyCon, RumbleData
+import math
 import numpy as np
-from pyjoycon import get_L_id, get_R_id
-from typing import Optional, Dict
-import yaml
 import torch as th
+import yaml
+from gello.agents.agent import Agent
+from omnigibson.macros import gm
+from omnigibson.utils.processing_utils import (
+    MovingAverageFilter,
+    ExponentialAverageFilter,
+)
+from pyjoycon import JoyCon, get_L_id, get_R_id
+from typing import Dict
 
 import omnigibson.utils.backend_utils as _backend_utils
-from omnigibson.macros import gm
-
 _backend_utils._compute_backend.set_methods_from_backend(
-    _backend_utils._ComputeNumpyBackend if gm.USE_NUMPY_CONTROLLER_BACKEND else _backend_utils._ComputeTorchBackend
+    _backend_utils._ComputeNumpyBackend
+    if gm.USE_NUMPY_CONTROLLER_BACKEND
+    else _backend_utils._ComputeTorchBackend
 )
 
-from omnigibson.utils.processing_utils import MovingAverageFilter, ExponentialAverageFilter
+# Adapted from https://github.com/tocoteron/joycon-python/issues/16#issuecomment-1236055410
+
+
+def clamp(x, min, max):
+    if (x < min): return min;
+    if (x > max): return max;
+    return x;
+
+
+# thanks to https://github.com/tocoteron/joycon-python/pull/27
+class RumbleJoyCon(JoyCon):
+    def __init__(self, *args, **kwargs):
+        JoyCon.__init__(self, *args, **kwargs)
+
+    def _send_rumble(self, data=b'\x00\x00\x00\x00\x00\x00\x00\x00'):
+        self._RUMBLE_DATA = data
+        self._write_output_report(b'\x10', b'', b'')
+
+    def enable_vibration(self, enable=True):
+        """Sends enable or disable command for vibration. Seems to do nothing."""
+        self._write_output_report(b'\x01', b'\x48', b'\x01' if enable else b'\x00')
+
+    def rumble_simple(self):
+        """Rumble for approximately 1.5 seconds (why?). Repeat sending to keep rumbling."""
+        self._send_rumble(b'\x98\x1e\xc6\x47\x98\x1e\xc6\x47')
+
+    def rumble_stop(self):
+        """Instantly stops the rumble"""
+        self._send_rumble()
+
+
+# derived from https://github.com/Looking-Glass/JoyconLib/blob/master/Packages/com.lookingglass.joyconlib/JoyconLib_scripts/Joycon.cs
+
+class RumbleData:
+
+    def set_vals(self, low_freq, high_freq, amplitude, time=0):
+        self.h_f = high_freq
+        self.amp = amplitude
+        self.l_f = low_freq
+        self.timed_rumble = False
+        self.t = 0
+        if time != 0:
+            self.t = time / 1000.0
+            self.timed_rumble = True
+
+    def __init__(self, low_freq, high_freq, amplitude, time=0):
+        self.h_f = None
+        self.amp = None
+        self.l_f = None
+        self.t = None
+        self.timed_rumble = None
+        self.set_vals(low_freq, high_freq, amplitude, time)
+
+    def GetData(self):
+        rumble_data = [None] * 8
+        if (self.amp == 0.0):
+            rumble_data[0] = 0x0
+            rumble_data[1] = 0x1
+            rumble_data[2] = 0x40
+            rumble_data[3] = 0x40
+        else:
+            l_f = clamp(self.l_f, 40.875885, 626.286133)
+            amp = clamp(self.amp, 0.0, 1.0)
+            h_f = clamp(self.h_f, 81.75177, 1252.572266)
+            hf = int((round(32.0 * math.log(h_f * 0.1, 2)) - 0x60) * 4)
+            lf = int(round(32.0 * math.log(l_f * 0.1, 2)) - 0x40)
+            hf_amp = None
+            if (amp == 0):
+                hf_amp = 0
+            elif amp < 0.01:
+                hf_amp = 1
+            elif amp < 0.117:
+                hf_amp = int(((math.log(amp * 1000, 2) * 32) - 0x60) / (5 - pow(2, amp)) - 1)
+            elif amp < 0.23:
+                hf_amp = int(((math.log(amp * 1000, 2) * 32) - 0x60) - 0x5c)
+            else:
+                hf_amp = int((((math.log(amp * 1000, 2) * 32) - 0x60) * 2) - 0xf6)
+
+            assert hf_amp is not None
+            lf_amp = int(round(hf_amp) * .5)
+            parity = int(lf_amp % 2)
+            if (parity > 0):
+                lf_amp -= 1
+
+            lf_amp = int(lf_amp >> 1)
+            lf_amp += 0x40
+            if (parity > 0):
+                lf_amp |= 0x8000
+
+            rumble_data[0] = int(hf & 0xff)
+            rumble_data[1] = int((hf >> 8) & 0xff)
+            rumble_data[2] = lf
+            rumble_data[1] += hf_amp
+            rumble_data[2] += int((lf_amp >> 8) & 0xff)
+            rumble_data[3] = int(lf_amp & 0xff)
+        for i in range(4):
+            rumble_data[4 + i] = rumble_data[i]
+        return bytes(rumble_data)
 
 
 class JoyconAgent(Agent):
     """
     Agent for controlling base + additional joints
     """
+
     def __init__(
-            self,
-            calibration_dir: str,
-            deadzone_threshold: float = 0.1,
-            max_translation: float = 0.05,
-            max_rotation: float = 0.1,
-            max_trunk_translate: float = 0.05,
-            max_trunk_tilt: float = 0.001,
-            enable_rumble: bool = True,
-            # default_trunk_translate: float = 0.0,
-            # default_trunk_tilt: float = 0.0,
+        self,
+        calibration_dir: str,
+        deadzone_threshold: float = 0.1,
+        max_translation: float = 0.05,
+        max_rotation: float = 0.1,
+        max_trunk_translate: float = 0.05,
+        max_trunk_tilt: float = 0.001,
+        enable_rumble: bool = True,
     ):
         self.deadzone_threshold = deadzone_threshold
         self.max_translation = max_translation
@@ -46,22 +147,22 @@ class JoyconAgent(Agent):
             "left": {
                 "cooldown": 0,
                 "pressed": False,
-                "status": 1,                # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to gripper actions
+                "status": 1,  # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to gripper actions
             },
             "right": {
                 "cooldown": 0,
                 "pressed": False,
-                "status": 1,                # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to gripper actions
+                "status": 1,  # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to gripper actions
             },
             "-": {
                 "cooldown": 0,
                 "pressed": False,
-                "status": 1,                # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to external actions
+                "status": 1,  # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to external actions
             },
             "+": {
                 "cooldown": 0,
                 "pressed": False,
-                "status": 1,                # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to external actions
+                "status": 1,  # 'status' can be either 1 or -1, working as a toggle rather than directly mapping to external actions
             },
         }
         self.enable_rumble = enable_rumble
@@ -70,7 +171,7 @@ class JoyconAgent(Agent):
             "right": None,
         }
         # self.current_tilt = default_tilt
-        
+
         self.velocity_filters = {
             "left": ExponentialAverageFilter(obs_dim=2, alpha=0.2),
             "right": ExponentialAverageFilter(obs_dim=2, alpha=0.2),
@@ -91,12 +192,18 @@ class JoyconAgent(Agent):
 
         for serial, side in zip((left_serial, right_serial), ("left", "right")):
             try:
-                path_serial = serial.replace(':', '-')
-                with open(f"{calibration_dir}/joycon_calibration_{path_serial}.yaml", "r") as f:
-                    self.calibration_data["joystick"][side] = yaml.load(f, Loader=yaml.FullLoader)["joystick"]
+                path_serial = serial.replace(":", "-")
+                with open(
+                    f"{calibration_dir}/joycon_calibration_{path_serial}.yaml", "r"
+                ) as f:
+                    self.calibration_data["joystick"][side] = yaml.load(
+                        f, Loader=yaml.FullLoader
+                    )["joystick"]
 
             except FileNotFoundError as e:
-                raise FileNotFoundError(f"""No calibration data found for {side} joycon (serial={serial})! \nTry running scripts/calibrate_joycons.py""") from e
+                raise FileNotFoundError(
+                    f"""No calibration data found for {side} joycon (serial={serial})! \nTry running scripts/calibrate_joycons.py"""
+                ) from e
 
     def act(self, obs: Dict[str, np.ndarray]) -> th.tensor:
         # Vibrate motors if we're in contact
@@ -105,9 +212,9 @@ class JoyconAgent(Agent):
         trunk_freq = 160
         base_freq = 40
         finger_amp = 0.01
-        arm_amp = 0.2 #0.3
-        trunk_amp = 0.2 #0.3
-        base_amp = 0.3 #0.37
+        arm_amp = 0.2  # 0.3
+        trunk_amp = 0.2  # 0.3
+        base_amp = 0.3  # 0.37
         finger_b = RumbleData(finger_freq / 2, finger_freq, finger_amp).GetData()
         arm_b = RumbleData(arm_freq / 2, arm_freq, arm_amp).GetData()
 
@@ -116,33 +223,33 @@ class JoyconAgent(Agent):
                 "left": None,
                 "right": None,
             }
-    
+
             # Parse fingers, then arms, then trunk, then base
             # This defines the rumble priority (in increasing order)
-    
+
             for arm in ["left", "right"]:
                 if obs[f"arm_{arm}_finger_max_contact"] > 0:
                     # print(obs[f"arm_{arm}_finger_max_contact"])
                     # Handle finger grasping haptic feedback
                     # finger_amp = #min(np.sqrt(obs[f"arm_{arm}_finger_max_contact"]) * 0.5, 0.6)
                     cur_rumble_info[arm] = finger_b
-    
+
                 # Handle arm grasping haptic feedback
                 if obs[f"arm_{arm}_contact"]:
                     cur_rumble_info[arm] = arm_b
-    
+
             # Handle trunk collision haptic feedback
             if obs[f"trunk_contact"]:
                 trunk_b = RumbleData(trunk_freq / 2, trunk_freq, trunk_amp).GetData()
                 cur_rumble_info["left"] = trunk_b
                 cur_rumble_info["right"] = trunk_b
-    
+
             # Handle base collision haptic feedback
             if obs[f"base_contact"]:
                 base_b = RumbleData(base_freq / 2, base_freq, base_amp).GetData()
                 cur_rumble_info["left"] = base_b
                 cur_rumble_info["right"] = base_b
-    
+
             # Send values if active
             for arm, joycon in zip(["left", "right"], [self.jc_left, self.jc_right]):
                 cur_val, previous_val = cur_rumble_info[arm], self.rumble_info[arm]
@@ -155,7 +262,7 @@ class JoyconAgent(Agent):
                 # Otherwise -- should be off -- disable if we're previously on
                 elif previous_val is not None:
                     joycon.enable_vibration(False)
-    
+
             # Update rumble info
             self.rumble_info = cur_rumble_info
 
@@ -170,7 +277,7 @@ class JoyconAgent(Agent):
             "right": {
                 "horizontal": self.jc_right.get_stick_right_horizontal(),
                 "vertical": self.jc_right.get_stick_right_vertical(),
-            }
+            },
         }
 
         # Apply calibration and update moving average filters
@@ -193,25 +300,38 @@ class JoyconAgent(Agent):
                 this_joystick_vals[i] = val
 
             # Update moving average filters
-            joystick_values[side] = self.joystick_filters[side].estimate(observation=this_joystick_vals)
+            joystick_values[side] = self.joystick_filters[side].estimate(
+                member_idx=0, observation=this_joystick_vals
+            )
 
         # Use joysticks to genreate array of motions for the base
         # Values are:  (base_dx, base_dy, base_drz, trunk_dz, trunk_dry)
         base_trunk_vals = np.zeros(5)
-        base_speed = self.max_translation if not self.jc_left.get_button_l_stick() else self.max_translation * 2.0
-        
+        base_speed = (
+            self.max_translation
+            if not self.jc_left.get_button_l_stick()
+            else self.max_translation * 2.0
+        )
+
         # Get filtered joystick values with smooth acceleration
         left_filtered = self.velocity_filters["left"].estimate(joystick_values["left"])
-        right_filtered = self.velocity_filters["right"].estimate(joystick_values["right"])
+        right_filtered = self.velocity_filters["right"].estimate(
+            joystick_values["right"]
+        )
 
         # Left stick is (base_dx, base_dy)
         base_trunk_vals[:2] = left_filtered * base_speed * np.array([1.0, -1.0])
         # Right stick is (trunk_dry, base_drz); only apply trunk_dry if the right stick is pressed
-        trunk_tilt_value = -self.max_trunk_tilt if not self.jc_right.get_button_r_stick() else 0
-        base_yaw_value = -self.max_rotation if not self.jc_right.get_button_r_stick() else 0
-        base_trunk_vals[[4, 2]] = right_filtered * np.array([trunk_tilt_value, base_yaw_value])
- 
-            
+        trunk_tilt_value = (
+            -self.max_trunk_tilt if not self.jc_right.get_button_r_stick() else 0
+        )
+        base_yaw_value = (
+            -self.max_rotation if not self.jc_right.get_button_r_stick() else 0
+        )
+        base_trunk_vals[[4, 2]] = right_filtered * np.array(
+            [trunk_tilt_value, base_yaw_value]
+        )
+
         # Left joycon up/down buttons control (trunk_dz or combined trunk dz and tilt)
         trunk_translate = 0.0
         if self.jc_left.get_button_up():
@@ -224,10 +344,22 @@ class JoyconAgent(Agent):
         vals += base_trunk_vals.tolist()
 
         # Get L / R gripper action
-        for arm, button_pressed in zip(("left", "right", "-", "+"), (self.jc_left.get_button_zl(), self.jc_right.get_button_zr(), self.jc_left.get_button_minus(), self.jc_right.get_button_plus())):
+        for arm, button_pressed in zip(
+            ("left", "right", "-", "+"),
+            (
+                self.jc_left.get_button_zl(),
+                self.jc_right.get_button_zr(),
+                self.jc_left.get_button_minus(),
+                self.jc_right.get_button_plus(),
+            ),
+        ):
             gripper_info = self.gripper_info[arm]
             # Toggle grasping state if cooldown is 0 and transition from F -> T
-            if gripper_info["cooldown"] == 0 and not gripper_info["pressed"] and button_pressed:
+            if (
+                gripper_info["cooldown"] == 0
+                and not gripper_info["pressed"]
+                and button_pressed
+            ):
                 gripper_info["status"] = -gripper_info["status"]
                 gripper_info["cooldown"] = self.max_gripper_cooldown
             # Update internal gripper info

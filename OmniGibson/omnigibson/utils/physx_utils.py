@@ -4,6 +4,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import ensure_usd_api
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -41,40 +42,42 @@ def create_physx_particle_system(
     Returns:
         UsdGeom.PhysxParticleSystem: Generated particle system prim
     """
-    # TODO: Add sanity check to make sure GPU dynamics are enabled
-    # Create particle system
-    stage = lazy.isaacsim.core.utils.stage.get_current_stage()
-    particle_system = lazy.pxr.PhysxSchema.PhysxParticleSystem.Define(stage, prim_path)
-    particle_system.CreateSimulationOwnerRel().SetTargets([physics_scene_path])
+    with og.sim.editing_usd():
+        # TODO: Add sanity check to make sure GPU dynamics are enabled
+        # Create particle system
+        stage = lazy.isaacsim.core.utils.stage.get_current_stage()
+        particle_system = lazy.pxr.PhysxSchema.PhysxParticleSystem.Define(stage, prim_path)
+        particle_system.CreateSimulationOwnerRel().SetTargets([physics_scene_path])
 
-    # Use a smaller particle size for nicer fluid, and let the sim figure out the other offsets
-    particle_system.CreateParticleContactOffsetAttr().Set(particle_contact_offset)
+        # Use a smaller particle size for nicer fluid, and let the sim figure out the other offsets
+        particle_system.CreateParticleContactOffsetAttr().Set(particle_contact_offset)
 
-    # Possibly disable collisions if we're only visual
-    if visual_only:
-        particle_system.GetGlobalSelfCollisionEnabledAttr().Set(False)
-        particle_system.GetNonParticleCollisionEnabledAttr().Set(False)
+        # Possibly disable collisions if we're only visual
+        if visual_only:
+            particle_system.GetGlobalSelfCollisionEnabledAttr().Set(False)
+            particle_system.GetNonParticleCollisionEnabledAttr().Set(False)
 
     if anisotropy:
         # apply api and use all defaults
-        lazy.pxr.PhysxSchema.PhysxParticleAnisotropyAPI.Apply(particle_system.GetPrim())
+        ani_api = ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleAnisotropyAPI)
 
     if smoothing:
         # apply api and use all defaults
-        lazy.pxr.PhysxSchema.PhysxParticleSmoothingAPI.Apply(particle_system.GetPrim())
+        ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleSmoothingAPI)
 
     if isosurface:
         # apply api and use all defaults
-        lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI.Apply(particle_system.GetPrim())
-        # Make sure we're not casting shadows
-        primVarsApi = lazy.pxr.UsdGeom.PrimvarsAPI(particle_system.GetPrim())
-        primVarsApi.CreatePrimvar("doNotCastShadows", lazy.pxr.Sdf.ValueTypeNames.Bool).Set(True)
-        # tweak anisotropy min, max, and scale to work better with isosurface:
-        if anisotropy:
-            ani_api = lazy.pxr.PhysxSchema.PhysxParticleAnisotropyAPI.Apply(particle_system.GetPrim())
-            ani_api.CreateScaleAttr().Set(5.0)
-            ani_api.CreateMinAttr().Set(1.0)  # avoids gaps in surface
-            ani_api.CreateMaxAttr().Set(2.0)
+        ensure_usd_api(particle_system.GetPrim(), lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI)
+
+        with og.sim.editing_usd():
+            # Make sure we're not casting shadows
+            primVarsApi = lazy.pxr.UsdGeom.PrimvarsAPI(particle_system.GetPrim())
+            primVarsApi.CreatePrimvar("doNotCastShadows", lazy.pxr.Sdf.ValueTypeNames.Bool).Set(True)
+            # tweak anisotropy min, max, and scale to work better with isosurface:
+            if anisotropy:
+                ani_api.CreateScaleAttr().Set(5.0)
+                ani_api.CreateMinAttr().Set(1.0)  # avoids gaps in surface
+                ani_api.CreateMaxAttr().Set(2.0)
 
     return particle_system
 
@@ -87,12 +90,13 @@ def bind_material(prim_path, material_path):
         prim_path (str): Stage path to prim to bind material to
         material_path (str): Stage path to material to be bound
     """
-    lazy.omni.kit.commands.execute(
-        "BindMaterialCommand",
-        prim_path=prim_path,
-        material_path=material_path,
-        strength=None,
-    )
+    with og.sim.editing_usd():
+        lazy.omni.kit.commands.execute(
+            "BindMaterialCommand",
+            prim_path=prim_path,
+            material_path=material_path,
+            strength=None,
+        )
 
 
 def create_physx_particleset_pointinstancer(
@@ -148,117 +152,120 @@ def create_physx_particleset_pointinstancer(
     Returns:
         UsdGeom.PointInstancer: Created point instancer prim
     """
-    stage = og.sim.stage
-    n_particles = len(positions)
-    particle_system = lazy.isaacsim.core.utils.prims.get_prim_at_path(physx_particle_system_path)
+    with og.sim.editing_usd():
+        stage = og.sim.stage
+        n_particles = len(positions)
+        particle_system = lazy.isaacsim.core.utils.prims.get_prim_at_path(physx_particle_system_path)
 
-    # Create point instancer scope
-    prim_path = f"{particle_system_path}/{name}"
-    assert not stage.GetPrimAtPath(prim_path), f"Cannot create an instancer scope, scope already exists at {prim_path}!"
-    stage.DefinePrim(prim_path, "Scope")
+        # Create point instancer scope
+        prim_path = f"{particle_system_path}/{name}"
+        assert not stage.GetPrimAtPath(
+            prim_path
+        ), f"Cannot create an instancer scope, scope already exists at {prim_path}!"
+        stage.DefinePrim(prim_path, "Scope")
 
-    # Create point instancer
-    instancer_prim_path = f"{prim_path}/instancer"
-    assert not stage.GetPrimAtPath(
-        instancer_prim_path
-    ), f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
-    instancer = lazy.pxr.UsdGeom.PointInstancer.Define(stage, instancer_prim_path)
+        # Create point instancer
+        instancer_prim_path = f"{prim_path}/instancer"
+        assert not stage.GetPrimAtPath(
+            instancer_prim_path
+        ), f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
+        instancer = lazy.pxr.UsdGeom.PointInstancer.Define(stage, instancer_prim_path)
 
-    is_isosurface = (
-        particle_system.HasAPI(lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI)
-        and particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
-    )
-
-    # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
-    # We need to make copies of prototypes for each instancer currently because particles won't render properly
-    # if multiple instancers share the same prototypes for some reason
-    mesh_list = instancer.GetPrototypesRel()
-    prototype_prims = []
-    for i, original_path in enumerate(prototype_prim_paths):
-        prototype_prim_path = f"{prim_path}/prototype{i}"
-        lazy.omni.kit.commands.execute("CopyPrim", path_from=original_path, path_to=prototype_prim_path)
-        prototype_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prototype_prim_path)
-        # Make sure this prim is invisible if we're using isosurface, and vice versa.
-        imageable = lazy.pxr.UsdGeom.Imageable(prototype_prim)
-        if is_isosurface:
-            imageable.MakeInvisible()
-        else:
-            imageable.MakeVisible()
-
-        # Move the prototype to the graveyard position so that it won't be visible to the agent
-        # We can't directly hide the prototype because it will also hide all the generated particles (if not isosurface)
-        prototype_prim.GetAttribute("xformOp:translate").Set(m.PROTOTYPE_GRAVEYARD_POS)
-
-        mesh_list.AddTarget(lazy.pxr.Sdf.Path(prototype_prim_path))
-        prototype_prims.append(prototype_prim)
-
-    # Set particle instance default data
-    prototype_indices = [0] * n_particles if prototype_indices is None else prototype_indices
-    if orientations is None:
-        orientations = th.zeros((n_particles, 4))
-        orientations[:, -1] = 1.0
-    orientations = th.tensor(orientations) if not isinstance(orientations, th.Tensor) else orientations
-    orientations = orientations[:, [3, 0, 1, 2]]  # x,y,z,w --> w,x,y,z
-    velocities = th.zeros((n_particles, 3)) if velocities is None else velocities
-    angular_velocities = th.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
-    scales = th.ones((n_particles, 3)) if scales is None else scales
-    assert (
-        particle_mass is not None or particle_density is not None
-    ), "Either particle mass or particle density must be specified when creating particle instancer!"
-    particle_mass = 0.0 if particle_mass is None else particle_mass
-    particle_density = 0.0 if particle_density is None else particle_density
-
-    # Set particle states
-    instancer.GetProtoIndicesAttr().Set(prototype_indices)
-    instancer.GetPositionsAttr().Set(lazy.pxr.Vt.Vec3fArray(positions.tolist()))
-    instancer.GetOrientationsAttr().Set(lazy.pxr.Vt.QuathArray.FromNumpy(orientations.cpu().numpy()))
-    instancer.GetVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(velocities.tolist()))
-    instancer.GetAngularVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(angular_velocities.tolist()))
-    instancer.GetScalesAttr().Set(lazy.pxr.Vt.Vec3fArray(scales.tolist()))
-
-    # Take a render step to "lock" the visuals of the prototypes at the graveyard position
-    # This needs to happen AFTER setting particle states
-    # We suppress a known warning that we have no control over where omni complains about a prototype
-    # not being populated yet
-    with suppress_omni_log(channels=["omni.hydra.scene_delegate.plugin"]):
-        og.sim.render()
-
-    # Then we move the prototypes back to zero offset because otherwise all the generated particles will be offset by
-    # the graveyard position. At this point, the prototypes themselves no longer appear at the zero offset (locked at
-    # the graveyard position), which is desirable because we don't want the agent to see the prototypes themselves.
-    for prototype_prim in prototype_prims:
-        prototype_prim.GetAttribute("xformOp:translate").Set((0.0, 0.0, 0.0))
-
-    instancer_prim = instancer.GetPrim()
-
-    lazy.omni.physx.scripts.particleUtils.configure_particle_set(
-        instancer_prim,
-        physx_particle_system_path,
-        self_collision,
-        fluid,
-        particle_group,
-        particle_mass * n_particles,
-        particle_density,
-    )
-
-    # Set whether the instancer is enabled or not
-    instancer_prim.GetAttribute("physxParticle:particleEnabled").Set(enabled)
-
-    # Render three more times to fully propagate changes
-    # Omni always complains about a low-level USD thing we have no control over
-    # so we suppress the warnings
-    with suppress_omni_log(channels=["omni.usd"]):
-        for i in range(3):
-            og.sim.render()
-
-    # Isosurfaces require an additional physics timestep before they're actually rendered
-    if is_isosurface:
-        og.log.warning(
-            f"Creating an instancer that uses isosurface {instancer_prim_path}. "
-            f"The rendering of these particles will have a delay of one timestep."
+        is_isosurface = (
+            particle_system.HasAPI(lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI)
+            and particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
         )
 
-    return instancer_prim
+        # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
+        # We need to make copies of prototypes for each instancer currently because particles won't render properly
+        # if multiple instancers share the same prototypes for some reason
+        mesh_list = instancer.GetPrototypesRel()
+        prototype_prims = []
+        for i, original_path in enumerate(prototype_prim_paths):
+            prototype_prim_path = f"{prim_path}/prototype{i}"
+            lazy.omni.kit.commands.execute("CopyPrim", path_from=original_path, path_to=prototype_prim_path)
+            prototype_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prototype_prim_path)
+            # Make sure this prim is invisible if we're using isosurface, and vice versa.
+            imageable = lazy.pxr.UsdGeom.Imageable(prototype_prim)
+            if is_isosurface:
+                imageable.MakeInvisible()
+            else:
+                imageable.MakeVisible()
+
+            # Move the prototype to the graveyard position so that it won't be visible to the agent
+            # We can't directly hide the prototype because it will also hide all the generated particles (if not isosurface)
+            prototype_prim.GetAttribute("xformOp:translate").Set(m.PROTOTYPE_GRAVEYARD_POS)
+
+            mesh_list.AddTarget(lazy.pxr.Sdf.Path(prototype_prim_path))
+            prototype_prims.append(prototype_prim)
+
+        # Set particle instance default data
+        prototype_indices = [0] * n_particles if prototype_indices is None else prototype_indices
+        if orientations is None:
+            orientations = th.zeros((n_particles, 4))
+            orientations[:, -1] = 1.0
+        orientations = th.tensor(orientations) if not isinstance(orientations, th.Tensor) else orientations
+        orientations = orientations[:, [3, 0, 1, 2]]  # x,y,z,w --> w,x,y,z
+        velocities = th.zeros((n_particles, 3)) if velocities is None else velocities
+        angular_velocities = th.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
+        scales = th.ones((n_particles, 3)) if scales is None else scales
+        assert (
+            particle_mass is not None or particle_density is not None
+        ), "Either particle mass or particle density must be specified when creating particle instancer!"
+        particle_mass = 0.0 if particle_mass is None else particle_mass
+        particle_density = 0.0 if particle_density is None else particle_density
+
+        # Set particle states
+        instancer.GetProtoIndicesAttr().Set(prototype_indices)
+        instancer.GetPositionsAttr().Set(lazy.pxr.Vt.Vec3fArray(positions.tolist()))
+        instancer.GetOrientationsAttr().Set(lazy.pxr.Vt.QuathArray.FromNumpy(orientations.cpu().numpy()))
+        instancer.GetVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(velocities.tolist()))
+        instancer.GetAngularVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(angular_velocities.tolist()))
+        instancer.GetScalesAttr().Set(lazy.pxr.Vt.Vec3fArray(scales.tolist()))
+
+        # Take a render step to "lock" the visuals of the prototypes at the graveyard position
+        # This needs to happen AFTER setting particle states
+        # We suppress a known warning that we have no control over where omni complains about a prototype
+        # not being populated yet
+        with suppress_omni_log(channels=["omni.hydra.scene_delegate.plugin"]):
+            og.sim.render()
+
+        # Then we move the prototypes back to zero offset because otherwise all the generated particles will be offset by
+        # the graveyard position. At this point, the prototypes themselves no longer appear at the zero offset (locked at
+        # the graveyard position), which is desirable because we don't want the agent to see the prototypes themselves.
+        for prototype_prim in prototype_prims:
+            prototype_prim.GetAttribute("xformOp:translate").Set((0.0, 0.0, 0.0))
+
+        instancer_prim = instancer.GetPrim()
+
+        lazy.omni.physx.scripts.particleUtils.configure_particle_set(
+            instancer_prim,
+            physx_particle_system_path,
+            self_collision,
+            fluid,
+            particle_group,
+            particle_mass * n_particles,
+            particle_density,
+        )
+
+        # Set whether the instancer is enabled or not
+        instancer_prim.GetAttribute("physxParticle:particleEnabled").Set(enabled)
+
+        # Render three more times to fully propagate changes
+        # Omni always complains about a low-level USD thing we have no control over
+        # so we suppress the warnings
+        with suppress_omni_log(channels=["omni.usd"]):
+            for i in range(3):
+                og.sim.render()
+
+        # Isosurfaces require an additional physics timestep before they're actually rendered
+        if is_isosurface:
+            og.log.warning(
+                f"Creating an instancer that uses isosurface {instancer_prim_path}. "
+                f"The rendering of these particles will have a delay of one timestep."
+            )
+
+        return instancer_prim
 
 
 def apply_force_at_pos(prim, force, pos):

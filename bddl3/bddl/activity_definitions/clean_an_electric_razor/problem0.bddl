@@ -1,5 +1,5 @@
 (define (problem clean_an_electric_razor-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	razor.n.01_1 - razor.n.01

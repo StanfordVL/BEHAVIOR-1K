@@ -1,14 +1,11 @@
 import torch as th
-from utils import SYSTEM_EXAMPLES, og_test, place_obj_on_floor_plane
+from utils import SYSTEM_EXAMPLES, place_obj_on_floor_plane
 
 import omnigibson as og
 from omnigibson.utils.constants import semantic_class_id_to_name
 
 
-@og_test
-def test_segmentation_modalities(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
+def test_segmentation_modalities(env, breakfast_table, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation(position=[-0.4, 0.0, 0.55], orientation=[0, 0, 0, 1])
 
@@ -43,7 +40,6 @@ def test_segmentation_modalities(env):
     seg_semantic_info = all_info["seg_semantic"]
     assert set(int(x.item()) for x in th.unique(seg_semantic)) == set(seg_semantic_info.keys())
     expected_dict = {
-        335706086: "diced__apple",
         825831922: "floors",
         884110082: "stain",
         1949122937: "breakfast_table",
@@ -59,7 +55,6 @@ def test_segmentation_modalities(env):
     expected_dict = {
         2: "groundPlane",
         3: "water",
-        4: "diced__apple",
         5: "stain",
         6: "white_rice",
         7: "breakfast_table",
@@ -73,13 +68,11 @@ def test_segmentation_modalities(env):
     expected_dict = {
         1: "/World/ground_plane/geom",
         2: "/World/scene_0/breakfast_table/base_link/visuals",
-        3: "/World/scene_0/dishtowel/base_link_cloth",
+        3: "/World/scene_0/dishtowel/base_link/visuals",
         4: "/World/scene_0/water/waterInstancer0/prototype0",
         5: "/World/scene_0/white_rice/white_riceInstancer0/prototype0",
-        6: "/World/scene_0/diced__apple/particles/diced__appleParticle1",
         7: "/World/scene_0/breakfast_table/base_link/stainParticle1",
         8: "/World/scene_0/breakfast_table/base_link/stainParticle0",
-        9: "/World/scene_0/diced__apple/particles/diced__appleParticle0",
     }
     assert set(seg_instance_id_info.values()) == set(expected_dict.values())
 
@@ -87,10 +80,7 @@ def test_segmentation_modalities(env):
         env.scene.clear_system(system.name)
 
 
-@og_test
-def test_bbox_modalities(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
+def test_bbox_modalities(env, breakfast_table, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation(position=[-0.4, 0.0, 0.55], orientation=[0, 0, 0, 1])
 

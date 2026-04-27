@@ -1,5 +1,5 @@
 (define (problem put_together_a_scrapping_tool_kit-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	toolbox.n.01_1 - toolbox.n.01

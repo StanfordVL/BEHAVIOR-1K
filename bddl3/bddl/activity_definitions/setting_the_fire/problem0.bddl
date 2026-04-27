@@ -1,5 +1,5 @@
 (define (problem setting_the_fire-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         firewood.n.01_1 firewood.n.01_2 - firewood.n.01

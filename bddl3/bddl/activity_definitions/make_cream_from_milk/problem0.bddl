@@ -1,5 +1,5 @@
 (define (problem make_cream_from_milk-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         whole_milk.n.01_1 - whole_milk.n.01

@@ -1,5 +1,5 @@
 (define (problem cleaning_up_after_an_event-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cup.n.01_1 cup.n.01_2 cup.n.01_3 cup.n.01_4 - cup.n.01

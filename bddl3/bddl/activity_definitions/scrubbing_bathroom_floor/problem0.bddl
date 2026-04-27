@@ -1,5 +1,5 @@
 (define (problem scrubbing_bathroom_floor-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dirt.n.02_1 - dirt.n.02

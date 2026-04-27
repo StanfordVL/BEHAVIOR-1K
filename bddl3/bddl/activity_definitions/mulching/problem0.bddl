@@ -1,5 +1,5 @@
 (define (problem mulching-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         mulch__bag.n.01_1 mulch__bag.n.01_2 mulch__bag.n.01_3 mulch__bag.n.01_4 mulch__bag.n.01_5 - mulch__bag.n.01

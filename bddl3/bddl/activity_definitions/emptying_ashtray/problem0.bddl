@@ -1,5 +1,5 @@
 (define (problem emptying_ashtray-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cigarette.n.01_1 - cigarette.n.01

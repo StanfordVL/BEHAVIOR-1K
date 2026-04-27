@@ -2,145 +2,185 @@ import math
 
 import torch as th
 
+import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
-from omnigibson.utils.python_utils import classproperty, torch_delete
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
-class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
+class TensorizedValueState(AbsoluteObjectState):
     """
     A state-mixin that implements optimized global value updates across all object state instances
     of this type, i.e.: all values across all object state instances are updated at once, rather than per
     individual instance update() call.
+
+    Multi-scene layout
+    ------------------
+    VALUES      (S, N, *value_shape)  — S = number of scenes, N = number of unique object types
+    OBJ_IDXS    {relative_prim_path: int}  — shared N index; same for the same object type in every scene
+    IDX_OBJS    list[list[obj|None]]  — IDX_OBJS[scene_idx][obj_idx] = object instance
+
+    Registration and tensor allocation are handled exclusively by ``initialize_view()``,
+    which is called from ``simulator.py`` after scene changes.
     """
 
-    # Tensor of raw internally tracked values
-    # Shape is (N, ...), where the ith entry in the first dimension corresponds to the ith object state instance's value
+    # Tensor of raw internally tracked values — GPU-resident during computation
+    # Shape is (S, N, ...), where S = scenes, N = object types, ... = value_shape
     VALUES = None
 
-    # Dictionary mapping object to index in VALUES, as well as the reverse (a simple list)
-    OBJ_IDXS = None
-    IDX_OBJS = None
+    # Pinned CPU mirror of VALUES — updated via async DMA after each global_update pass.
+    # _get_value() always reads from here to avoid GPU stalls for Python callers.
+    VALUES_CPU = None
 
-    # Dict of callbacks that can be added to when an object is removed
-    CALLBACKS_ON_REMOVE = None
+    # CPU tensor to store VALUES_CPU from the previous step — used for change detection.
+    PREV_VALUES = None
+
+    # Dictionary mapping relative prim path to index in the N dimension of VALUES
+    OBJ_IDXS = None
+
+    # 2-D list: IDX_OBJS[scene_idx][obj_idx] = object instance (or None if absent in that scene)
+    IDX_OBJS = None
 
     # Int representing per-object state size
     STATE_SIZE = None
 
     @classmethod
     def global_initialize(cls):
-        # Call super first
-        super().global_initialize()
-
-        # Initialize the global variables
-        cls.VALUES = th.empty(0, dtype=cls.value_type).reshape(0, *cls.value_shape)
-        cls.OBJ_IDXS = dict()
-        cls.IDX_OBJS = []
-        cls.CALLBACKS_ON_REMOVE = dict()
+        """Initialize the global class-level tensors and indices."""
+        # Shape (0, 0, *value_shape) — zero scenes, zero object types; GPU-resident
+        cls.VALUES = th.empty(0, dtype=cls.value_type, device="cuda").reshape(0, 0, *cls.value_shape)
+        cls.VALUES_CPU = th.empty(0, dtype=cls.value_type).pin_memory().reshape(0, 0, *cls.value_shape)
+        cls.PREV_VALUES = th.empty(0, dtype=cls.value_type).reshape(0, 0, *cls.value_shape)
+        cls.OBJ_IDXS = {}  # {relative_prim_path: int}
+        cls.IDX_OBJS = []  # list[list[obj|None]]
 
         # Compute and cache state size
         # This is the flattened size of @self.value_shape
-        cls.STATE_SIZE = 1 if cls.value_shape == () else int(th.prod(th.tensor(cls.value_shape)))
+        cls.STATE_SIZE = math.prod(cls.value_shape)
+
+    @classmethod
+    def initialize_view(cls):
+        """
+        Rebuild all class-level tensors by scanning current objects across all scenes.
+        Called from ``simulator.py`` after scene changes. Child classes should call
+        ``super().initialize_view()`` first, then extend with their own initialization.
+
+        Carry-over: values for objects whose relative_prim_path still exists are preserved;
+        new slots are initialized to zero (subclasses override to set correct defaults).
+        """
+        # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)
+        prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
+        prev_values = cls.VALUES.clone() if cls.VALUES is not None and cls.VALUES.numel() > 0 else None
+
+        # Check that every scene has the same number of objects,
+        # and the same object at the same relative prim path has same state settings.
+
+        # Reset
+        cls.global_initialize()
+
+        # Scan all scenes and register objects that have this state
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            for obj in scene.objects:
+                if cls not in obj.states:
+                    continue
+                rel_path = obj.relative_prim_path
+
+                # Extend scene dimension if this is a new scene index
+                while len(cls.IDX_OBJS) <= scene_idx:
+                    obj_idx = len(cls.OBJ_IDXS)
+                    cls.IDX_OBJS.append([None] * obj_idx)
+                    cls.VALUES = th.cat(
+                        [cls.VALUES, th.zeros((1, obj_idx, *cls.value_shape), dtype=cls.value_type, device="cuda")],
+                        dim=0,
+                    )
+
+                # Register new relative path if first seen across all scenes
+                if rel_path not in cls.OBJ_IDXS:
+                    obj_idx = len(cls.OBJ_IDXS)
+                    cls.OBJ_IDXS[rel_path] = obj_idx
+                    for s_row in cls.IDX_OBJS:
+                        s_row.append(None)
+                    cls.VALUES = th.cat(
+                        [
+                            cls.VALUES,
+                            th.zeros((len(cls.IDX_OBJS), 1, *cls.value_shape), dtype=cls.value_type, device="cuda"),
+                        ],
+                        dim=1,
+                    )
+
+                cls.IDX_OBJS[scene_idx][cls.OBJ_IDXS[rel_path]] = obj
+
+        # Carry over values for surviving objects (same relative path present before and after)
+        if prev_values is not None and cls.VALUES.numel() > 0:
+            for rel_path, obj_idx_old in prev_obj_idxs.items():
+                if rel_path not in cls.OBJ_IDXS:
+                    continue
+                obj_idx_new = cls.OBJ_IDXS[rel_path]
+                for s_idx in range(min(prev_values.shape[0], len(cls.IDX_OBJS))):
+                    if cls.IDX_OBJS[s_idx][obj_idx_new] is not None:  # Only retain initialized obj's value
+                        cls.VALUES[s_idx, obj_idx_new] = prev_values[s_idx, obj_idx_old]
+
+        # Rebuild pinned CPU mirror — synchronous copy so _get_value() is valid before first async copy
+        cls.VALUES_CPU = th.zeros(cls.VALUES.shape, dtype=cls.value_type).pin_memory()
+        if cls.VALUES.numel() > 0:
+            cls.VALUES_CPU.copy_(cls.VALUES)
+
+        # PREV_VALUES mirrors VALUES_CPU on CPU; seed so first post_update() fires no spurious state_updated().
+        cls.PREV_VALUES = cls.VALUES_CPU.clone()
 
     @classmethod
     def global_update(cls):
-        # Call super first
-        super().global_update()
-
-        # This should be globally update all values. If there are no values, we skip by default since there is nothing
-        # being tracked currently
-        n_values = len(cls.VALUES)
-        if n_values == 0:
+        """
+        Globally update all values via _update_values() and async-copy to VALUES_CPU.
+        Change detection and post_update() are called separately by the simulator after synchronize().
+        Skips if there are no tracked objects.
+        """
+        if cls.VALUES is None or cls.VALUES.numel() == 0:
+            return
+        S, N = cls.VALUES.shape[:2]
+        if S == 0 or N == 0:
             return
 
-        new_values = cls._update_values(values=cls.VALUES)
+        cls.PREV_VALUES.copy_(cls.VALUES_CPU)
+        cls._update_values(values=cls.VALUES)
+        cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
 
-        # Compare with previous values, and add any changed objects to the scene-tracked set
-        changed_idxs = th.where(th.any(new_values != cls.VALUES, dim=-1))[0]
-        for idx in changed_idxs:
-            cls.IDX_OBJS[idx].state_updated()
+    @classmethod
+    def post_update(cls):
+        """
+        Called by the simulator after th.cuda.synchronize(). Compares VALUES_CPU with PREV_VALUES
+        (both CPU) to detect changes, fires state_updated() for affected objects, then updates PREV_VALUES.
+        """
+        if cls.VALUES_CPU is None or cls.VALUES_CPU.numel() == 0:
+            return
+        S = cls.VALUES_CPU.shape[0]
 
-        cls.VALUES = new_values
+        diff = cls.VALUES_CPU != cls.PREV_VALUES
+        changed_mask = th.any(diff, dim=tuple(range(2, diff.ndim))) if diff.ndim > 2 else diff
+        for s_idx in range(S):
+            for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
+                obj = cls.IDX_OBJS[s_idx][obj_idx]
+                obj.state_updated()
 
     @classmethod
     def _update_values(cls, values):
         """
         Updates all internally tracked @values for this object state. Should be implemented by subclass.
+        Mutates @values in-place. Must not return anything.
 
         Args:
-            values (th.tensor): Tensorized value array
-
-        Returns:
-            th.tensor: Updated tensorized value array
+            values (th.tensor): Tensorized value array of shape (S, N, *value_shape)
         """
         raise NotImplementedError
-
-    @classmethod
-    def _add_obj(cls, obj):
-        """
-        Adds object @obj to be tracked internally in @VALUES array.
-
-        Args:
-            obj (StatefulObject): Object to add
-        """
-        assert (
-            obj not in cls.OBJ_IDXS
-        ), f"Tried to add object {obj.name} to the global tensorized value array but the object already exists!"
-
-        # Add this object to the tracked global state
-        cls.OBJ_IDXS[obj] = len(cls.VALUES)
-        cls.IDX_OBJS.append(obj)
-        cls.VALUES = th.cat([cls.VALUES, th.zeros((1, *cls.value_shape), dtype=cls.value_type)], dim=0)
-
-    @classmethod
-    def _remove_obj(cls, obj):
-        """
-        Removes object @obj from the internally tracked @VALUES array.
-        This also removes the corresponding tracking idx in @OBJ_IDXS
-
-        Args:
-            obj (StatefulObject): Object to remove
-        """
-        # Removes this tracked object from the global value array
-        assert (
-            obj in cls.OBJ_IDXS
-        ), f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
-        deleted_idx = cls.OBJ_IDXS.pop(obj)
-
-        # Re-standardize the indices
-        for i, o in enumerate(cls.OBJ_IDXS.keys()):
-            cls.OBJ_IDXS[o] = i
-        cls.IDX_OBJS.pop(deleted_idx)
-        cls.VALUES = torch_delete(cls.VALUES, [deleted_idx])
-
-    @classmethod
-    def add_callback_on_remove(cls, name, callback):
-        """
-        Adds a callback that will be triggered when @self.remove is called
-
-        Args:
-            name (str): Name of the callback to trigger
-            callback (function): Function to execute. Should have signature callback(obj: USDObject) --> None
-        """
-        cls.CALLBACKS_ON_REMOVE[name] = callback
-
-    @classmethod
-    def remove_callback_on_remove(cls, name):
-        """
-        Removes callback with name @name from the internal set of callbacks
-
-        Args:
-            name (str): Name of the callback to remove
-        """
-        cls.CALLBACKS_ON_REMOVE.pop(name)
 
     @classproperty
     def value_shape(cls):
         """
         Returns:
-            tuple: Expected shape of the per-object state instance value. If empty (), this assumes
-                that each entry is a single (non-array) value. Default is ()
+            tuple: Expected shape of the per-object state instance value. Default is () (scalar).
         """
         return ()
 
@@ -160,30 +200,22 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         """
         raise NotImplementedError
 
-    def __init__(self, *args, **kwargs):
-        # Run super first
-        super().__init__(*args, **kwargs)
-
-        self._add_obj(obj=self.obj)
-
-    def remove(self):
-        # Execute all callbacks
-        for callback in self.CALLBACKS_ON_REMOVE.values():
-            callback(self.obj)
-
-        # Removes this tracked object from the global value array
-        self._remove_obj(obj=self.obj)
-
     def _get_value(self):
-        # Directly access value from global register
-        val = self.VALUES[self.OBJ_IDXS[self.obj]].to(self.value_type)
+        # Read from the pinned CPU mirror — no GPU stall for Python callers
+        s = self.obj.scene.idx
+        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+        val = self.VALUES_CPU[s, obj_idx].to(self.value_type)
         if isinstance(val, th.Tensor) and val.numel() == 1:
             val = val.item()
         return val
 
     def _set_value(self, new_value):
-        # Directly set value in global register
-        self.VALUES[self.OBJ_IDXS[self.obj]] = new_value
+        # Write to both GPU (VALUES) and CPU mirror (VALUES_CPU) synchronously.
+        # Safe: setters are never called from within _update_values.
+        s = self.obj.scene.idx
+        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+        self.VALUES[s, obj_idx] = new_value
+        self.VALUES_CPU[s, obj_idx] = new_value
         return True
 
     @property
@@ -191,8 +223,9 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # This is merely the class state size
         return self.STATE_SIZE
 
-    # For this state, we simply store its value.
     def _dump_state(self):
+        if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
+            return {self.value_name: th.zeros(self.value_shape, dtype=self.value_type)}
         return {self.value_name: self._get_value()}
 
     def _load_state(self, state):
@@ -209,7 +242,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def deserialize(self, state):
         value_length = int(math.prod(self.value_shape))
-        value = state[:value_length].reshape(self.value_shape) if len(self.value_shape) > 0 else state[0]
+        value = state[:value_length].reshape(self.value_shape)
         return {self.value_name: value}, value_length
 
     @classproperty

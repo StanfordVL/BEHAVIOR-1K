@@ -1,5 +1,5 @@
 (define (problem clean_a_toaster_oven-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         toaster_oven.n.01_1 - toaster_oven.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_a_turkey-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         carton.n.02_1 - carton.n.02

@@ -40,7 +40,6 @@ from omnigibson.macros import macros
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots import Robot
 from omnigibson.tasks.behavior_task import BehaviorTask
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import detect_robot_collision_in_sim
@@ -182,7 +181,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Batched read of joint positions for all controllers
             joint_positions = self.robot.get_joint_positions()
             for arm_name in self.robot.arm_names:
-                eef = f"eef_{arm_name}"
                 arm = f"arm_{arm_name}"
                 arm_group_key, _ = self.robot.controllers[arm]
                 if ControllerView.is_controller_type(arm_group_key, InverseKinematicsController):
@@ -223,7 +221,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             assert isinstance(
                 self.env.task, BehaviorTask
             ), "Activity relevant objects can only be used for BEHAVIOR tasks"
-            self.addressable_objects = sorted(set(self.env.task.object_scope.values()), key=lambda obj: obj.name)
+            self.addressable_objects = sorted(set(self.env.task.object_scope[0].values()), key=lambda obj: obj.name)
         else:
             self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
 

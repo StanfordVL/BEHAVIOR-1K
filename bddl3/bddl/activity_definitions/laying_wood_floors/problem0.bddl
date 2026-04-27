@@ -1,5 +1,5 @@
 (define (problem laying_wood_floors-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	plywood.n.01_1 plywood.n.01_2 plywood.n.01_3 plywood.n.01_4 - plywood.n.01

@@ -1,5 +1,5 @@
 (define (problem clean_a_baseball_glove-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         baseball_glove.n.01_1 - baseball_glove.n.01

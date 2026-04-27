@@ -4,12 +4,10 @@ import math
 import os
 import pathlib
 import shutil
-import tempfile
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
-from os.path import exists
 from pathlib import Path
 from xml.dom import minidom
 
@@ -20,7 +18,6 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
@@ -117,7 +114,7 @@ def _space_string_to_tensor(string):
     Returns:
         torch.Tensor: Tensor containing the numerical values from the input string.
     """
-    return th.tensor([float(x) for x in string.split(" ")])
+    return th.tensor([float(x) for x in string.split(" ") if len(x) > 0])
 
 
 def _tensor_to_space_script(array):
@@ -722,7 +719,9 @@ def _process_glass_link(prim):
         )
 
 
-def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_asset_pipeline_materials=False):
+def import_obj_metadata(
+    usd_path, obj_category, obj_model, dataset_root, keep_instanceable=True, force_asset_pipeline_materials=False
+):
     """
     Imports metadata for a given object model from the dataset. This metadata consist of information
     that is NOT included in the URDF file and instead included in the various JSON files shipped in
@@ -733,6 +732,7 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_a
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
+        keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
         force_asset_pipeline_materials (bool, optional): Flag to force the use of asset pipeline materials. Defaults to False.
 
     Raises:
@@ -749,6 +749,19 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_a
     lazy.isaacsim.core.utils.stage.open_stage(str(usd_path))
     stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     prim = stage.GetDefaultPrim()
+
+    # First traverse entire tree and modify the prims in place if not keeping instanceable
+    if not keep_instanceable:
+
+        def remove_instanceable_recursive(_root):
+            # See https://openusd.org/docs/api/_usd__page__scenegraph_instancing.html ("Traversing Into Instances with Instance Proxies")
+            children = _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies())
+            for child in children:
+                if child.IsInstanceable():
+                    child.SetInstanceable(False)
+                remove_instanceable_recursive(_root=child)
+
+        remove_instanceable_recursive(_root=prim)
 
     data = dict()
     for data_group in {"metadata", "mvbb_meta", "material_groups", "heights_per_link"}:
@@ -957,6 +970,7 @@ def _recursively_replace_list_of_dict(dic):
 def _create_urdf_import_config(
     use_convex_decomposition=False,
     merge_fixed_joints=False,
+    import_inertia_tensor=True,
 ):
     """
     Creates and configures a URDF import configuration.
@@ -971,6 +985,7 @@ def _create_urdf_import_config(
         use_convex_decomposition (bool): Whether to have omniverse use internal convex decomposition
             on any collision meshes
         merge_fixed_joints (bool): Whether to merge fixed joints or not
+        import_inertia_tensor (bool): Whether to import the URDF's native inertia tensor or not
 
     Returns:
         import_config: The configured URDF import configuration object.
@@ -984,7 +999,7 @@ def _create_urdf_import_config(
     import_config.set_merge_fixed_joints(merge_fixed_joints)
     import_config.set_convex_decomp(use_convex_decomposition)
     import_config.set_fix_base(False)
-    import_config.set_import_inertia_tensor(True)
+    import_config.set_import_inertia_tensor(import_inertia_tensor)
     import_config.set_distance_scale(1.0)
     import_config.set_density(0.0)
     import_config.set_default_drive_type(drive_mode.JOINT_DRIVE_NONE)
@@ -997,14 +1012,102 @@ def _create_urdf_import_config(
     return import_config
 
 
+def _migrate_materials_to_looks(stage):
+    """
+    Migrates material prims from the /meshes hierarchy to /Looks hierarchy and updates all material bindings.
+
+    This is necessary for IsaacSim 5.1+ where materials are placed under the /meshes hierarchy,
+    which gets deleted during post-processing. By moving materials to /Looks, we preserve them
+    and follow USD best practices.
+
+    Args:
+        stage (pxr.Usd.Stage): The USD stage containing the materials to migrate
+
+    Returns:
+        dict: Mapping from old material paths to new material paths
+    """
+    # Get the meshes prim - this is where materials are currently located
+    meshes_prim = stage.GetPrimAtPath("/meshes")
+    if not meshes_prim.IsValid():
+        log.debug("No /meshes prim found, skipping material migration")
+        return {}
+
+    # Find all Material prims under /meshes
+    material_prims = []
+    for prim in lazy.pxr.Usd.PrimRange(meshes_prim):
+        if prim.GetTypeName() == "Material":
+            material_prims.append(prim)
+
+    if not material_prims:
+        log.debug("No materials found in /meshes hierarchy")
+        return {}
+
+    log.debug(f"Found {len(material_prims)} material prims to migrate")
+
+    # Get the /Looks scope
+    looks_prim = stage.GetDefaultPrim().GetChild("Looks")
+    looks_path = looks_prim.GetPath()
+
+    # Map from old paths to new paths
+    material_path_mapping = {}
+
+    # Move each material to /Looks
+    for material_prim in material_prims:
+        old_path = material_prim.GetPath()
+        material_name = material_prim.GetName()
+
+        # Create a unique name in /Looks if there's a conflict
+        new_path = looks_path.AppendChild(material_name)
+        counter = 0
+        while stage.GetPrimAtPath(new_path).IsValid():
+            new_path = looks_path.AppendChild(f"{material_name}_{counter}")
+            counter += 1
+
+        # Copy the material prim to the new location
+        success = lazy.pxr.Sdf.CopySpec(stage.GetRootLayer(), old_path, stage.GetRootLayer(), new_path)
+
+        if success:
+            material_path_mapping[str(old_path)] = str(new_path)
+            log.debug(f"Moved material from {old_path} to {new_path}")
+        else:
+            log.warning(f"Failed to copy material from {old_path} to {new_path}")
+
+    # Update all material bindings to point to new paths
+    for prim in stage.Traverse():
+        # Check if this prim has material bindings
+        if lazy.pxr.UsdShade.MaterialBindingAPI.CanApply(prim):
+            binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(prim)
+
+            # Get direct binding
+            direct_binding = binding_api.GetDirectBinding()
+            if direct_binding:
+                material_path = direct_binding.GetMaterialPath()
+                material_path_str = str(material_path)
+
+                # If this material was moved, update the binding
+                if material_path_str in material_path_mapping:
+                    new_material_path = material_path_mapping[material_path_str]
+                    new_material_prim = stage.GetPrimAtPath(new_material_path)
+
+                    if new_material_prim.IsValid():
+                        new_material = lazy.pxr.UsdShade.Material(new_material_prim)
+                        binding_api.Bind(new_material)
+                        log.debug(
+                            f"Updated material binding on {prim.GetPath()} from {material_path_str} to {new_material_path}"
+                        )
+
+    return material_path_mapping
+
+
 def convert_urdf_to_usd(
     urdf_path,
     obj_category,
     obj_model,
-    dataset_name="custom_dataset",
+    dataset_root,
     use_omni_convex_decomp=False,
     use_usda=False,
     merge_fixed_joints=False,
+    import_inertia_tensor=True,
 ):
     """
     Imports an object from a URDF file into the current stage.
@@ -1013,11 +1116,12 @@ def convert_urdf_to_usd(
         urdf_path (str): Path to URDF file to import
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
-        dataset_name (str): The name of the dataset.
+        dataset_root (str): Dataset root directory to use for writing imported USD file.
         use_omni_convex_decomp (bool): Whether to use omniverse's built-in convex decomposer for collision meshes
         use_usda (bool): If set, will write files to .usda files instead of .usd
             (bigger memory footprint, but human-readable)
         merge_fixed_joints (bool): whether to merge fixed joints or not
+        import_inertia_tensor (bool): Whether to import the URDF's native inertia tensor or not
 
     Returns:
         2-tuple:
@@ -1025,7 +1129,6 @@ def convert_urdf_to_usd(
             - str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for meta links
-    dataset_root = get_dataset_path(dataset_name)
     urdf_path = _add_meta_links_to_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
@@ -1033,6 +1136,7 @@ def convert_urdf_to_usd(
     cfg = _create_urdf_import_config(
         use_convex_decomposition=use_omni_convex_decomp,
         merge_fixed_joints=merge_fixed_joints,
+        import_inertia_tensor=import_inertia_tensor,
     )
 
     # Pre-clear the scene.
@@ -1058,7 +1162,6 @@ def convert_urdf_to_usd(
     configuration_dir = usd_dir / "configuration"
     physics_usd_path = configuration_dir / f"{obj_model}_physics.usd"
     sensor_usd_path = configuration_dir / f"{obj_model}_sensor.usd"
-    base_usd_path = configuration_dir / f"{obj_model}_base.usd"
 
     # Remove the mixed and sensor files
     usd_path.unlink()
@@ -1068,7 +1171,7 @@ def convert_urdf_to_usd(
     current_materials = configuration_dir / "materials" / "textures"
     new_materials = model_root_path / "material"
     if current_materials.exists():
-        new_materials.mkdir()
+        new_materials.mkdir(parents=True, exist_ok=True)
         for texture in current_materials.iterdir():
             texture.rename(new_materials / texture.name)
 
@@ -1135,6 +1238,7 @@ def convert_urdf_to_usd(
     colliders_prim = side_stage.GetPrimAtPath("/colliders")
     links = list(visuals_prim.GetChildren()) + list(colliders_prim.GetChildren())
     wrappers = [wrapper for link in links for wrapper in link.GetChildren()]
+
     for parent_prim in wrappers:
         parent_path = parent_prim.GetPath()
         grandparent_path = parent_path.GetParentPath()
@@ -1146,7 +1250,7 @@ def convert_urdf_to_usd(
         referenced_wrapper_prim = side_stage.GetPrimAtPath(referenced_wrapper_path_str)
         assert referenced_wrapper_prim.IsValid()
 
-        child_prim = referenced_wrapper_prim.GetChild("mesh")
+        child_prim = referenced_wrapper_prim.GetChild("World").GetChild("mesh")
         assert child_prim.IsValid()
         child_path = child_prim.GetPath()
 
@@ -1172,6 +1276,10 @@ def convert_urdf_to_usd(
 
         # Delete the child's original path
         del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
+
+    # Migrate materials from /meshes to /Looks before deleting the meshes hierarchy
+    # This is necessary for IsaacSim 5.1+ where materials are now placed under /meshes
+    _migrate_materials_to_looks(side_stage)
 
     # Remove the meshes hierarchy altogether
     del side_stage.GetRootLayer().rootPrims["meshes"]
@@ -1223,10 +1331,8 @@ def convert_urdf_to_usd(
 
             # Add the collision APIs
             if referrer_prim_path.name == "collisions":
-                collision_api = lazy.pxr.UsdPhysics.CollisionAPI.Apply(mesh_prim)
                 mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(mesh_prim)
                 mesh_collision_api.GetApproximationAttr().Set("convexHull")
-                convex_hull_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(mesh_prim)
 
             # Add the reference to the actual collisions
             mesh_prim.GetReferences().AddReference("", mesh_original.GetPath())
@@ -2387,27 +2493,29 @@ def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", over
 def import_og_asset_from_urdf(
     category,
     model,
-    dataset_root,
+    dataset_name,
     urdf_path=None,
     collision_method="coacd",
     coacd_links=None,
     convex_links=None,
     no_decompose_links=None,
     visual_only_links=None,
+    keep_instanceable=True,
     merge_fixed_joints=False,
+    import_inertia_tensor=True,
     hull_count=32,
     overwrite=False,
     use_usda=False,
 ):
     """
     Imports an asset from URDF format into OmniGibson-compatible USD format. This will write the new USD
-    (and copy the URDF if it does not already exist within @dataset_root) to @dataset_root
+    (and copy the URDF if it does not already exist within @dataset_name) to @dataset_name
 
     Args:
         category (str): Category to assign to imported asset
         model (str): Model name to assign to imported asset
         urdf_path (None or str): If specified, external URDF that should be copied into the dataset first before
-            converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_root dir
+            converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_name dir
         collision_method (None or str): If specified, collision decomposition method to use to generate
             OmniGibson-compatible collision meshes. Valid options are {"coacd", "convex"}
         coacd_links (None or list of str): If specified, links that should use CoACD to decompose collision meshes
@@ -2415,9 +2523,10 @@ def import_og_asset_from_urdf(
         no_decompose_links (None or list of str): If specified, links that should not have any special collision
             decomposition applied. This will only use the convex hull
         visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
+        keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
         merge_fixed_joints (bool): Whether to merge fixed joints or not
-        dataset_root (str): Dataset root directory to use for writing imported USD file. Default is custom dataset
-            path set from the global macros
+        import_inertia_tensor (bool): Whether to import the URDF's native inertia tensor or not
+        dataset_name (str): Dataset name to which the USD will be written. Lives in get_dataset_path(dataset_name)
         hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
             Only relevant if @collision_method is "coacd"
         overwrite (bool): If set, will overwrite any pre-existing files
@@ -2431,6 +2540,7 @@ def import_og_asset_from_urdf(
             - Usd.Prim: Generated root USD prim (currently on active stage)
     """
     # Make sure all scaling is positive
+    dataset_root = get_dataset_path(dataset_name)
     model_dir = os.path.join(dataset_root, "objects", category, model)
     os.makedirs(model_dir, exist_ok=overwrite)
     # urdf_path = make_asset_positive(urdf_fpath=urdf_path)
@@ -2469,9 +2579,16 @@ def import_og_asset_from_urdf(
         use_omni_convex_decomp=False,  # We already pre-decomposed the values, so don' use omni convex decomp
         use_usda=use_usda,
         merge_fixed_joints=merge_fixed_joints,
+        import_inertia_tensor=import_inertia_tensor,
     )
 
-    prim = import_obj_metadata(usd_path=usd_path, obj_category=category, obj_model=model, dataset_root=dataset_root)
+    prim = import_obj_metadata(
+        usd_path=usd_path,
+        obj_category=category,
+        obj_model=model,
+        dataset_root=dataset_root,
+        keep_instanceable=keep_instanceable,
+    )
     print(
         f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
     )

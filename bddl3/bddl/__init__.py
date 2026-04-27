@@ -1,30 +1,23 @@
-from bddl.backend_abc import BDDLBackend
+"""BDDL -- Behavior Domain Definition Language.
 
-_AVAILABLE_BACKENDS = ["iGibson"]
-_backend = None
+BDDL defines a symbolic language for specifying household activities as
+initial-state / goal-state condition pairs over a set of typed objects and
+predicates.
 
+The public API is through the :class:`~bddl.knowledge_base.KnowledgeBase`
+and its models::
 
-def set_backend(backend_name):
-    global _backend
-    if backend_name == "iGibson":
-        from igibson.tasks.bddl_backend import IGibsonBDDLBackend
+    from bddl.knowledge_base import KnowledgeBase, Task, Synset
 
-        _backend = IGibsonBDDLBackend()
-    else:
-        raise ValueError(
-            "Invalid backend. Currently supported backends: %s."
-            % ", ".join(_AVAILABLE_BACKENDS)
-        )
+    kb = KnowledgeBase(populate=True)
+    task = kb.get_task("cleaning_up_after_a_meal-0")
 
-    if not isinstance(_backend, BDDLBackend):
-        raise ValueError("Backends must implement bddl.backend_abc.BDDLBackend.")
+    # Evaluate goal with a user-supplied callback
+    def my_eval(predicate_cls, *entity_names):
+        ...  # return True/False from your simulator
 
+    success, results = task.check_goal(my_eval)
 
-def get_backend():
-    if _backend is None:
-        raise ValueError(
-            "Before calling bddl functions, a backend must be set using bddl.set_backend(backend_name). "
-            "Available backend names: %s." % ", ".join(_AVAILABLE_BACKENDS)
-        )
-
-    return _backend
+Predicate classes (used as callback arguments and dict keys) are in
+:mod:`bddl.predicates`.
+"""

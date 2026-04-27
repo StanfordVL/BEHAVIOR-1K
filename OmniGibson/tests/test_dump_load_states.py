@@ -1,16 +1,14 @@
 import tempfile
 
 import torch as th
-from utils import SYSTEM_EXAMPLES, og_test
+from utils import SYSTEM_EXAMPLES
 
 import omnigibson as og
 from omnigibson.object_states import Covered
 from omnigibson.systems import VisualParticleSystem
 
 
-@og_test
-def test_dump_load(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+def test_dump_load(env, breakfast_table):
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
@@ -28,9 +26,7 @@ def test_dump_load(env):
         env.scene.clear_system(system_name)
 
 
-@og_test
-def test_dump_load_serialized(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+def test_dump_load_serialized(env, breakfast_table):
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
@@ -47,10 +43,7 @@ def test_dump_load_serialized(env):
         env.scene.clear_system(system_name)
 
 
-@og_test
-def test_save_restore_partial(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-
+def test_save_restore_partial(env, breakfast_table):
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
 
@@ -66,8 +59,7 @@ def test_save_restore_partial(env):
     assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None
 
 
-@og_test
-def test_save_restore_full(env):
+def test_save_restore_full(env, breakfast_table):
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
 

@@ -1,5 +1,5 @@
 (define (problem can_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         asparagus.n.02_1 asparagus.n.02_2 asparagus.n.02_3 - asparagus.n.02

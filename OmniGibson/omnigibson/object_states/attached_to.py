@@ -301,7 +301,10 @@ class AttachedTo(
         """
         if joint_type is None:
             joint_type = m.DEFAULT_JOINT_TYPE
-        assert joint_type in {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}, f"Unsupported joint type {joint_type}"
+        assert joint_type in {
+            JointType.JOINT_FIXED,
+            JointType.JOINT_SPHERICAL,
+        }, f"Unsupported joint type {joint_type}"
 
         # Set pose for self.obj so that child_link and parent_link align (6dof alignment for FixedJoint and 3dof alignment for SphericalJoint)
         parent_pos, parent_quat = parent_link.get_position_orientation()
@@ -410,6 +413,7 @@ class AttachedTo(
         if self.parent_link is not None:
             # Remove the attachment joint prim from the stage
             delete_or_deactivate_prim(self.attachment_joint_prim_path)
+            og.sim.update_handles()
 
             # Remove child reference from the parent object
             self.parent.states[AttachedTo].children[self.parent_link.body_name] = None

@@ -17,7 +17,6 @@ import tqdm
 gm.HEADLESS = True
 gm.USE_ENCRYPTED_ASSETS = True
 gm.USE_GPU_DYNAMICS = True
-gm.ENABLE_FLATCACHE = False
 
 MAX_BBOX = 0.3
 

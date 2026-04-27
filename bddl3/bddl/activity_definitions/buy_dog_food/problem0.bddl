@@ -1,5 +1,5 @@
 (define (problem buy_dog_food-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         can__of__dog_food.n.01_1 - can__of__dog_food.n.01

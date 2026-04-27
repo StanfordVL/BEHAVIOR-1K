@@ -1,5 +1,5 @@
 (define (problem clean_a_longboard-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         skateboard.n.01_1 - skateboard.n.01

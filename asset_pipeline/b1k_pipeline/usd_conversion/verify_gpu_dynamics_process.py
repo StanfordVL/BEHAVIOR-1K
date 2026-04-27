@@ -5,7 +5,6 @@ from omnigibson.objects.dataset_object import DatasetObject
 gm.HEADLESS = True
 gm.USE_ENCRYPTED_ASSETS = True
 gm.USE_GPU_DYNAMICS = True
-gm.ENABLE_FLATCACHE = False
 
 
 def process_object(cat, mdl):

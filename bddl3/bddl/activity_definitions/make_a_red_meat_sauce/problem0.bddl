@@ -1,5 +1,5 @@
 (define (problem make_a_red_meat_sauce-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         tomato_sauce.n.01_1 - tomato_sauce.n.01

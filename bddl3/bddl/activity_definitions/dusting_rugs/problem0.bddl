@@ -1,5 +1,5 @@
 (define (problem dusting_rugs-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dust.n.01_1 - dust.n.01

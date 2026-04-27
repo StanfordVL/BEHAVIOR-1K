@@ -1,5 +1,5 @@
 (define (problem set_a_table_for_a_tea_party-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         napkin.n.01_1 - napkin.n.01

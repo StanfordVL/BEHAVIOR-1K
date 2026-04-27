@@ -1,5 +1,5 @@
 (define (problem make_popsicles-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         raspberry.n.02_1 raspberry.n.02_2 - raspberry.n.02

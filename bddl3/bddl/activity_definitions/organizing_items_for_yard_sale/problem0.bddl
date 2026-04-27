@@ -1,5 +1,5 @@
 (define (problem organizing_items_for_yard_sale-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sweater.n.01_1 sweater.n.01_2 - sweater.n.01

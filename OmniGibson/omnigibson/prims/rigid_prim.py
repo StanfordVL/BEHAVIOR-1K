@@ -18,6 +18,7 @@ from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     apply_collision_approximation,
     check_extent_radius_ratio,
+    ensure_usd_api,
     get_mesh_volume_and_com,
 )
 
@@ -88,12 +89,9 @@ class RigidPrim(XFormPrim):
         super()._post_load()
 
         # Apply rigid body and mass APIs
-        if not self._prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
-            lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI):
-            lazy.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI):
-            lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
+        ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.RigidBodyAPI)
+        ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxRigidBodyAPI)
+        ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
 
         # Check if it's part of an articulation view
         self._belongs_to_articulation = (
@@ -108,12 +106,9 @@ class RigidPrim(XFormPrim):
         )
 
         if not self._visual_only:
-            contact_api = (
-                lazy.pxr.PhysxSchema.PhysxContactReportAPI(self._prim)
-                if self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
-                else lazy.pxr.PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
-            )
-            contact_api.GetThresholdAttr().Set(0.0)
+            contact_api = ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxContactReportAPI)
+            with og.sim.editing_usd():
+                contact_api.GetThresholdAttr().Set(0.0)
 
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
@@ -142,10 +137,6 @@ class RigidPrim(XFormPrim):
         for mesh_group in (self._collision_meshes, self._visual_meshes):
             for mesh in mesh_group.values():
                 mesh.initialize()
-
-        # Get contact info first
-        if self.contact_reporting_enabled:
-            og.sim.contact_sensor.get_rigid_body_raw_data(self.prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
@@ -205,9 +196,10 @@ class RigidPrim(XFormPrim):
         _find_geom_prims(self._prim)
 
         # Set default contact/rest offsets on all PhysxCollisionAPIs
-        for api in self._physx_collision_apis:
-            api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
-            api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
+                api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
 
         coms, vols = [], []
         for prim, is_collision in geom_prims:
@@ -255,8 +247,7 @@ class RigidPrim(XFormPrim):
                         # Make sure particlesource, particlesink and fillable meshes are not visible
                         mesh.purpose = "guide"
 
-        # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
-        # for this link
+        # If we have any collision meshes, compute the center of mass from collision geometry
         if len(coms) > 0:
             coms_tensor = th.stack(coms)
             vols_tensor = th.tensor(vols).unsqueeze(1)
@@ -267,15 +258,17 @@ class RigidPrim(XFormPrim):
         """
         Enable collisions for all collision meshes owned by this RigidPrim
         """
-        for collision_api in self._collision_apis:
-            collision_api.GetCollisionEnabledAttr().Set(True)
+        with og.sim.editing_usd():
+            for collision_api in self._collision_apis:
+                collision_api.GetCollisionEnabledAttr().Set(True)
 
     def disable_collisions(self):
         """
         Disable collisions for all collision meshes owned by this RigidPrim
         """
-        for collision_api in self._collision_apis:
-            collision_api.GetCollisionEnabledAttr().Set(False)
+        with og.sim.editing_usd():
+            for collision_api in self._collision_apis:
+                collision_api.GetCollisionEnabledAttr().Set(False)
 
     def set_contact_offset(self, offset):
         """
@@ -285,8 +278,9 @@ class RigidPrim(XFormPrim):
             offset (float): Contact offset of a collision shape. Allowed range [maximum(0, rest_offset), 0].
                             Default value is -inf, means default is picked by simulation based on the shape extent.
         """
-        for api in self._physx_collision_apis:
-            api.GetContactOffsetAttr().Set(offset)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetContactOffsetAttr().Set(offset)
 
     def set_rest_offset(self, offset):
         """
@@ -296,8 +290,9 @@ class RigidPrim(XFormPrim):
             offset (float): Rest offset of a collision shape. Allowed range [-max_float, contact_offset.
                             Default value is -inf, means default is picked by simulation. For rigid bodies its zero.
         """
-        for api in self._physx_collision_apis:
-            api.GetRestOffsetAttr().Set(offset)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetRestOffsetAttr().Set(offset)
 
     def set_torsional_patch_radius(self, radius):
         """
@@ -306,8 +301,9 @@ class RigidPrim(XFormPrim):
         Args:
             radius (float): radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
         """
-        for api in self._physx_collision_apis:
-            api.GetTorsionalPatchRadiusAttr().Set(radius)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetTorsionalPatchRadiusAttr().Set(radius)
 
     def set_min_torsional_patch_radius(self, radius):
         """
@@ -317,8 +313,9 @@ class RigidPrim(XFormPrim):
             radius (float): minimum radius of the contact patch used to apply torsional friction.
                             Allowed range [0, max_float].
         """
-        for api in self._physx_collision_apis:
-            api.GetMinTorsionalPatchRadiusAttr().Set(radius)
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetMinTorsionalPatchRadiusAttr().Set(radius)
 
     def set_collision_approximation(self, approximation_type):
         """
@@ -400,7 +397,7 @@ class RigidPrim(XFormPrim):
         # Also set the internal value
         self._visual_only = val
 
-    @property
+    @cached_property
     def volume(self):
         """
         Note: Currently it doesn't support Capsule type yet

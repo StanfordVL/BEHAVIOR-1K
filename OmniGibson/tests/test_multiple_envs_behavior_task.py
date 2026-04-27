@@ -14,7 +14,6 @@ import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.tasks.behavior_task import BehaviorTask
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -84,7 +83,7 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
         f"activity={ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}"
     )
     env = og.Environment(configs=cfg)
-    print(f"  BehaviorTask environment created successfully")
+    print("  BehaviorTask environment created successfully")
     return env
 
 
@@ -108,7 +107,7 @@ class TestBehaviorTaskLogic:
             assert scope is not None, f"object_scope[{env_idx}] is None"
             assert isinstance(scope, dict)
             assert "agent.n.01_1" in scope, f"agent not found in object_scope[{env_idx}]"
-            # Agent entity should be a BDDLEntity wrapping this scene's robot
+            # Agent entity should be this scene's robot (raw sim object after #2040 BDDLEntity removal)
             agent_entity = scope["agent.n.01_1"]
             assert agent_entity is not None
             print(f"  env {env_idx}: scope has {len(scope)} entries, agent={agent_entity.name}")

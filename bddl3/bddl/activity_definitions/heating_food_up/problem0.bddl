@@ -1,5 +1,5 @@
 (define (problem heating_food_up-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         hamburger.n.01_1 - hamburger.n.01

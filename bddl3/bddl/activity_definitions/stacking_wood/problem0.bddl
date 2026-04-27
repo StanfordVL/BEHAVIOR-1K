@@ -1,5 +1,5 @@
 (define (problem stacking_wood-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         log.n.01_1 log.n.01_2 log.n.01_3 log.n.01_4 log.n.01_5 log.n.01_6 - log.n.01

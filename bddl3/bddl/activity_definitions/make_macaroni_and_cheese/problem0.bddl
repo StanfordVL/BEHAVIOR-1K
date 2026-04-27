@@ -1,5 +1,5 @@
 (define (problem make_macaroni_and_cheese-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cream_cheese.n.01_1 - cream_cheese.n.01

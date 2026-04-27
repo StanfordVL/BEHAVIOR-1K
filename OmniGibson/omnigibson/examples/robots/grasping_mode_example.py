@@ -15,9 +15,8 @@ GRASPING_MODES = dict(
     physical="Physical Grasping - No additional grasping assistance applied",
 )
 
-# Don't use GPU dynamics and Use flatcache for performance boost
+# Don't use GPU dynamics for performance boost
 gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):

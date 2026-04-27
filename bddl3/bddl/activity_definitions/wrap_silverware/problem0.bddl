@@ -1,5 +1,5 @@
 (define (problem wrap_silverware-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         table_knife.n.01_1 table_knife.n.01_2 table_knife.n.01_3 - table_knife.n.01

@@ -1,5 +1,5 @@
 (define (problem setting_the_table-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cupcake.n.01_1 cupcake.n.01_2 - cupcake.n.01

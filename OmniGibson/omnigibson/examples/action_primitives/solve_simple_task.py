@@ -8,9 +8,8 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitiveSet,
 )
 
-# Don't use GPU dynamics and use flatcache for performance boost
+# Don't use GPU dynamics for performance boost
 # gm.USE_GPU_DYNAMICS = True
-# gm.ENABLE_FLATCACHE = True
 
 
 def execute_controller(ctrl_gen, env):

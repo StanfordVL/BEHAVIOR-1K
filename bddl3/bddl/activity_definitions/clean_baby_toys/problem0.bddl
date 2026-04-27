@@ -1,5 +1,5 @@
 (define (problem clean_baby_toys-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	teddy.n.01_1 teddy.n.01_2 - teddy.n.01

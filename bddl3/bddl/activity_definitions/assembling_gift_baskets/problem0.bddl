@@ -1,5 +1,5 @@
 (define (problem assembling_gift_baskets-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
      	wicker_basket.n.01_1 wicker_basket.n.01_2 wicker_basket.n.01_3 wicker_basket.n.01_4 - wicker_basket.n.01

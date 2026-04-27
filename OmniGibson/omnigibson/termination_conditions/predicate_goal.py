@@ -1,6 +1,5 @@
 import torch as th
 
-from bddl.activity import evaluate_goal_conditions
 
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
@@ -11,16 +10,16 @@ class PredicateGoal(SuccessCondition):
     Episode terminates if all the predicates are satisfied
 
     Args:
-        goal_fcn (method): function for calculating goal(s). Function signature should be:
+        check_goal_fn (method): function that checks goal satisfaction. Function signature should be:
 
-            goals = goal_fcn(env_idx)
+            (all_satisfied, results) = check_goal_fn()
 
-            where @env_idx is the environment index and @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
+            where @all_satisfied is a bool and @results maps "satisfied"/"unsatisfied" to lists of indices.
     """
 
-    def __init__(self, goal_fcn):
+    def __init__(self, check_goal_fn):
         # Store internal vars
-        self._goal_fcn = goal_fcn
+        self._check_goal_fn = check_goal_fn
         self._goal_status = None
 
         # Run super
@@ -40,7 +39,7 @@ class PredicateGoal(SuccessCondition):
         # Terminate if all goal conditions are met in the task
         results = th.zeros(env.num_envs, dtype=th.bool)
         for env_idx in range(env.num_envs):
-            done, self._goal_status[env_idx] = evaluate_goal_conditions(self._goal_fcn(env_idx))
+            done, self._goal_status[env_idx] = self._check_goal_fn(env_idx)
             results[env_idx] = done
         return results
 

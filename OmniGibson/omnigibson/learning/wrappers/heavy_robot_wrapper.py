@@ -18,7 +18,7 @@ class HeavyRobotWrapper(EnvironmentWrapper):
         # Here, we modify the robot observation to  use 224 * 224 resolution
         # For a complete list of available modalities, see VisionSensor.ALL_MODALITIES
         # We also change the robot base mass to 250kg to match the configuration during data collection.
-        robot = env.robots[0]
+        robot = env.scene.robots[0]
         with og.sim.stopped():
             robot.base_footprint_link.mass = 250.0  # increase base mass to 250kg
         # Update robot sensors:

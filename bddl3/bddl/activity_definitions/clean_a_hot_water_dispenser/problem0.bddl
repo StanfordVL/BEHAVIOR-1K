@@ -1,5 +1,5 @@
 (define (problem clean_a_hot_water_dispenser-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         water.n.06_1 - water.n.06

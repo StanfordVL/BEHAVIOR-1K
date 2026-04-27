@@ -10,13 +10,13 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.sensors.vision_sensor import VisionSensor
 import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.constants import ROBOT_CATEGORY
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -30,7 +30,7 @@ from omnigibson.systems.system_base import (
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
+from omnigibson.utils.constants import ROBOT_CATEGORY, STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -502,6 +502,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         for system in self.active_systems.values():
             self.clear_system(system_name=system.name)
 
+        # Remove any vision sensors attached to this scene
+        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+        # which will cause segfault during og.clear()
+        scene_prim_path = self.prim_path
+        scene_prim_prefix = f"{scene_prim_path}/"
+        for sensor in tuple(VisionSensor.SENSORS.values()):
+            if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
+                sensor.remove()
+
         # Remove all of the scene's objects.
         og.sim.batch_remove_objects(list(self.objects))
 
@@ -769,17 +778,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 },
                 "bddl": {
                     "version": omnigibson.utils.asset_utils.get_bddl_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_bddl_git_hash(),
                 },
                 "behavior-1k-assets": {
                     "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
                 },
                 "omnigibson-robot-assets": {
                     "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_git_hash(),
                 },
             },
-            "metadata": self._task_metadata,
+            "metadata": {"task": self._task_metadata},
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),
             "objects_info": self.get_objects_info(),
@@ -823,8 +830,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         state = recursively_convert_to_torch(scene_info["state"])
 
         # Recover metadata
-        for key, data in scene_info.get("metadata", dict()).items():
-            self.write_task_metadata(key=key, data=data)
+        if "metadata" in scene_info:
+            metadata = scene_info["metadata"]
+            task_metadata = metadata["task"] if "task" in metadata else metadata
+            for key, data in task_metadata.items():
+                self.write_task_metadata(key=key, data=data)
 
         # Make sure the class type is the same
         if self.__class__.__name__ != init_info["class_name"]:
@@ -892,9 +902,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             orientation (th.Tensor): (4,) orientation of the scene
         """
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
-        # Need to update sim here -- this is because downstream setters called immediately may not be respected,
-        # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+
         # Update the cached pose and inverse pose
         pos_ori = self._scene_prim.get_position_orientation()
         pose = T.pose2mat(pos_ori)
@@ -1163,6 +1171,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
+            # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
             self._registry.load_state(state=state, serialized=False)

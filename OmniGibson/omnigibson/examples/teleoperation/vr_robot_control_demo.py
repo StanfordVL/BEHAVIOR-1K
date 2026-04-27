@@ -8,7 +8,6 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
-gm.ENABLE_FLATCACHE = True
 
 CONTROLLER_VISIBLE = True
 ENABLE_CAMERA_LIMITS = False

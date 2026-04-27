@@ -11,7 +11,6 @@ from numba import jit, prange
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -24,6 +23,25 @@ from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+
+def ensure_usd_api(prim, api):
+    """
+    Ensures that a USD API schema is applied to a prim. If the prim already has the API,
+    returns the existing wrapper. Otherwise, applies the API inside an editing_usd() context
+    (triggering a USD-to-Fabric sync) and returns the newly applied wrapper.
+
+    Args:
+        prim (Usd.Prim): The prim to check / apply the API on
+        api: The USD API class (e.g. lazy.pxr.UsdPhysics.RigidBodyAPI)
+
+    Returns:
+        The API wrapper for the prim
+    """
+    if prim.HasAPI(api):
+        return api(prim)
+    with og.sim.editing_usd():
+        return api.Apply(prim)
 
 
 def array_to_vtarray(arr, element_type):
@@ -100,6 +118,7 @@ def create_joint(
     joint_frame_in_child_frame_quat=None,
     break_force=None,
     break_torque=None,
+    stage=None,
 ):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
@@ -119,71 +138,445 @@ def create_joint(
         joint_frame_in_child_frame_quat (th.tensor or None): relative orientation of the joint frame to the child frame (body1).
         break_force (float or None): break force for linear dofs, unit is Newton.
         break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
+        stage (None or Usd.Stage): If specified, stage on which the joint should be created. If None, will use og.sim.stage
 
     Returns:
         Usd.Prim: Created joint prim
     """
-    # Make sure we have valid joint_type
-    assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
+    with og.sim.editing_usd(stage=stage):
+        current_stage = stage or og.sim.stage
+        # Make sure we have valid joint_type
+        assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
 
-    # Make sure at least body0 or body1 is specified
-    assert (
-        body0 is not None or body1 is not None
-    ), "At least either body0 or body1 must be specified when creating a joint!"
+        # Make sure at least body0 or body1 is specified
+        assert (
+            body0 is not None or body1 is not None
+        ), "At least either body0 or body1 must be specified when creating a joint!"
 
-    # Create the joint
-    joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
+        # Create the joint
+        joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(current_stage, prim_path)
 
-    # Possibly add body0, body1 targets
-    if body0 is not None:
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
-        joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
-    if body1 is not None:
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
-        joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
+        # Possibly add body0, body1 targets
+        if body0 is not None:
+            assert current_stage.GetPrimAtPath(body0).IsValid(), f"Invalid body0 path specified: {body0}"
+            joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
+        if body1 is not None:
+            assert current_stage.GetPrimAtPath(body1).IsValid(), f"Invalid body1 path specified: {body1}"
+            joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
 
-    # Get the prim pointed to at this path
-    joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+        # Get the prim pointed to at this path
+        joint_prim = current_stage.GetPrimAtPath(prim_path)
 
     # Apply joint API interface
-    lazy.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
+    ensure_usd_api(joint_prim, lazy.pxr.PhysxSchema.PhysxJointAPI)
 
     # We need to step rendering once to auto-fill the local pose before overwriting it.
     # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
     # callback, e.g. when an attachment joint is being created due to contacts.
-    og.sim.render()
+    # TODO(#2082): Is this necessary? Can it be removed altogether or replaced with a refresh?
+    if stage is None:
+        og.sim.render()
 
-    if joint_frame_in_parent_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos.tolist()))
-    if joint_frame_in_parent_frame_quat is not None:
-        joint_prim.GetAttribute("physics:localRot0").Set(
-            lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]].tolist())
-        )
-    if joint_frame_in_child_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos.tolist()))
-    if joint_frame_in_child_frame_quat is not None:
-        joint_prim.GetAttribute("physics:localRot1").Set(
-            lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]].tolist())
-        )
+    with og.sim.editing_usd(stage=stage):
+        if joint_frame_in_parent_frame_pos is not None:
+            joint_prim.GetAttribute("physics:localPos0").Set(
+                lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos.tolist())
+            )
+        if joint_frame_in_parent_frame_quat is not None:
+            joint_prim.GetAttribute("physics:localRot0").Set(
+                lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]].tolist())
+            )
+        if joint_frame_in_child_frame_pos is not None:
+            joint_prim.GetAttribute("physics:localPos1").Set(
+                lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos.tolist())
+            )
+        if joint_frame_in_child_frame_quat is not None:
+            joint_prim.GetAttribute("physics:localRot1").Set(
+                lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]].tolist())
+            )
 
-    if break_force is not None:
-        joint_prim.GetAttribute("physics:breakForce").Set(break_force)
-    if break_torque is not None:
-        joint_prim.GetAttribute("physics:breakTorque").Set(break_torque)
+        if break_force is not None:
+            joint_prim.GetAttribute("physics:breakForce").Set(break_force)
+        if break_torque is not None:
+            joint_prim.GetAttribute("physics:breakTorque").Set(break_torque)
 
-    # Possibly (un-/)enable this joint
-    joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
+        # Possibly (un-/)enable this joint
+        joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
 
-    # Possibly exclude this joint from the articulation
-    joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
+        # Possibly exclude this joint from the articulation
+        joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
 
-    # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
-    if og.sim.is_playing():
-        with suppress_omni_log(channels=["omni.physx.plugin"]):
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+    # Update handles to include the new joint
+    og.sim.update_handles()
 
     # Return this joint
     return joint_prim
+
+
+class RigidBodyViewAPI:
+    """
+    Batched rigid-body pose cache for all rigid bodies across all scenes.
+
+    Poses are stored in a flat layout keyed by absolute prim path, so each scene can
+    have an independent link count (different object models are supported).
+
+    Two categories of links are tracked:
+      - physx_tracked:   rigid body links included in create_rigid_body_view.
+                         Poses updated every step from PhysX.
+      - physx_untracked: kinematic-only articulated objects' links not tracked by physx's rigid body view.
+                         Poses seeded once at initialize_view() and refreshed only by invalidate_kinematic().
+
+    Flat index layout in _POSE_MATRICES (N_links_total, 4, 4):
+      [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked links across all scenes]
+
+    Also stores LOCAL_POINTS / POINTS_MASK for batched AABB computation via get_aabb().
+    """
+
+    # Rigid body view for batched pose reads (one per scene)
+    _RIGID_BODY_VIEW = None
+
+    # Flat path index across all scenes keyed by absolute prim path.
+    _PATH_TO_IDX = {}  # {link_absolute_prim_path: int}
+    _IDX_TO_PATH = []  # list[link_absolute_prim_path]
+
+    # Position + quaternion pose of all links in the scene, indexed by flat index.
+    # shape: (N_links_total, 7) — [px, py, pz, qx, qy, qz, qw]
+    _POSES = None  # CPU — written by update_pose_cache() / invalidate_kinematic()
+    _POSES_GPU = None  # GPU — written by async_copy_to_gpu()
+
+    # Cached 4x4 transformation matrices — flat, covers physx_tracked + physx_untracked.
+    # shape: (N_links_total, 4, 4)
+    # physx_untracked slice is appended after all physx_tracked entries and never
+    # overwritten by update_pose_cache(); refreshed only by invalidate_kinematic().
+    _POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
+    _POSE_MATRICES_CPU = None  # CPU — written by update_pose_cache()
+
+    # Local homogeneous collision points for every rigid link, indexed by flat pose index.
+    # shape: (N_links_total, V_max, 4)
+    # V_max is a global maximum across all links/scenes; may be wasteful when one scene
+    # has unusually dense collision geometry — acceptable for now.
+    LOCAL_POINTS = None
+
+    # Valid-point mask; True for non-padded slots. shape: (N_links_total, V_max) bool
+    POINTS_MASK = None
+
+    # Tolerances for change detection
+    _POS_EPS = 1e-4
+    _ORI_EPS = 1e-4
+
+    @classmethod
+    def initialize_view(cls):
+        """
+        Initializes the rigid body view. Note: Can only be done when sim is playing!
+
+        Builds a flat layout keyed by absolute prim path so each scene can have an
+        independent link count. Layout of _POSE_MATRICES (N_links_total, 4, 4):
+          [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked across all scenes]
+        """
+        assert og.sim.is_playing(), "Cannot create rigid body view while sim is not playing!"
+
+        # Snapshot existing kinematic-link poses ton reuse them below
+        prev_path_to_idx = dict(cls._PATH_TO_IDX)  # snapshot before clear()
+        prev_poses = cls._POSES  # None on very first call; CPU tensor otherwise
+
+        # Reset
+        cls.clear()
+
+        if len(og.sim.scenes) == 0:
+            return
+
+        # If there are no rigid bodies in any scene, return early (view creation would fail)
+        has_rigid_bodies = any(
+            obj.prim_type == PrimType.RIGID and len(obj.links) > 0 for scene in og.sim.scenes for obj in scene.objects
+        )
+        if not has_rigid_bodies:
+            cls.clear()
+            return
+
+        # Create a PhysX view for all scenes, build _PATH_TO_IDX, collect poses
+        poses_list = []
+
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            cls._RIGID_BODY_VIEW = og.sim.physics_sim_view.create_rigid_body_view(pattern="/World/scene_*/*/*")
+            for abs_path in list(cls._RIGID_BODY_VIEW.prim_paths):
+                cls._PATH_TO_IDX[abs_path] = len(cls._PATH_TO_IDX)
+                cls._IDX_TO_PATH.append(abs_path)
+            poses_list.append(cls._RIGID_BODY_VIEW.get_transforms().clone())
+
+        # Add physx_untracked kinematic links and collect collision_boundary_points_local
+        raw_local_points = {}  # {flat_idx: (V, 3) tensor}
+
+        for _, scene in enumerate(og.sim.scenes):
+            for obj in scene.objects:
+                is_untracked = obj.kinematic_only and obj.prim_type != PrimType.CLOTH
+                for link in obj.links.values():
+                    abs_path = link.prim_path
+
+                    # Kinematic objects' child links (e.g. fillable meta links) may be dynamic
+                    # and already tracked by PhysX even though the parent is kinematic_only=True.
+                    # Only manually register links that PhysX did not track.
+                    if is_untracked and abs_path not in cls._PATH_TO_IDX:
+                        idx = len(cls._PATH_TO_IDX)
+                        cls._PATH_TO_IDX[abs_path] = idx
+                        cls._IDX_TO_PATH.append(abs_path)
+
+                        if abs_path in prev_path_to_idx and prev_poses is not None:
+                            # Reuse the cached pose
+                            pose = prev_poses[prev_path_to_idx[abs_path]].unsqueeze(0)
+                        elif og.sim.currently_stepping:
+                            # New kinematic link appearing mid-step, cannot read Fabric.
+                            # Use zero placeholder.
+                            # Corrected by the next out-of-step initialize_view() or update_handles().
+                            pose = th.zeros(1, 7)
+                        else:
+                            pos, quat_xyzw = link.get_position_orientation()
+                            pose = th.cat([pos, quat_xyzw]).unsqueeze(0)
+                        poses_list.append(pose)
+
+                    # Collect local collision points for AABB (for all registered links)
+                    if abs_path in cls._PATH_TO_IDX:
+                        pts = link.collision_boundary_points_local  # (V, 3) or None
+                        if pts is not None:
+                            scale = link.get_world_scale()
+                            raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
+
+        cls._POSES = th.cat(poses_list, dim=0).pin_memory()  # (N_links_total, 7), CPU
+        cls._POSES_GPU = cls._POSES.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
+        cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
+        cls._POSE_MATRICES = cls._POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
+
+        # Build LOCAL_POINTS and POINTS_MASK tensors.
+        N_total = len(cls._PATH_TO_IDX)
+        V_max = max((p.shape[0] for p in raw_local_points.values()), default=1)
+        local_points = th.zeros(N_total, V_max, 4)
+        local_points[:, :, 3] = 1.0
+        points_mask = th.zeros(N_total, V_max, dtype=th.bool)
+        for path_idx, pts in raw_local_points.items():
+            V = pts.shape[0]
+            local_points[path_idx, :V, :3] = pts
+            points_mask[path_idx, :V] = True
+        cls.LOCAL_POINTS = local_points.cuda()
+        cls.POINTS_MASK = points_mask.cuda()
+
+    @classmethod
+    def update_pose_cache(cls):
+        """
+        Updates pose cache from the latest physics step.
+        Only recomputes 4x4 matrices for bodies whose pose has changed.
+        physx_untracked links are never touched here; they are updated only by invalidate_kinematic().
+        """
+        if not cls._RIGID_BODY_VIEW:
+            return
+        try:
+            transforms = cls._RIGID_BODY_VIEW.get_transforms()
+        except Exception:
+            log.warning(
+                "RigidBodyViewAPI cannot fetch transforms because the physics sim view is invalid. "
+                "This is expected during initial scene loading."
+            )
+            return
+
+        N_physx_tracked = transforms.shape[0]
+        cls._POSES[:N_physx_tracked] = transforms
+        cls._POSE_MATRICES_CPU[:N_physx_tracked] = cls._poses_to_matrices(transforms)
+
+    @staticmethod
+    def _poses_to_matrices(poses):
+        """
+        Convert poses tensor to 4x4 transformation matrices.
+
+        Args:
+            poses (th.Tensor): (N, 7) — [px, py, pz, qx, qy, qz, qw]
+
+        Returns:
+            th.Tensor: (N, 4, 4)
+        """
+        pos = poses[:, :3]  # (N, 3)
+        quat_xyzw = poses[:, 3:]  # (N, 4) — PhysX returns wxyz, T.pose2mat expects xyzw
+        result = TT.pose2mat((pos, quat_xyzw))
+        return result.unsqueeze(0) if result.ndim == 2 else result  # shape is (N, 4, 4)
+
+    @classmethod
+    def get_flat_idx(cls, abs_prim_path):
+        """
+        Return the flat index into _POSE_MATRICES for a link's absolute prim path, or None.
+
+        Args:
+            abs_prim_path (str): Absolute prim path of the link (e.g. /World/scene_0/obj/link).
+
+        Returns:
+            int or None
+        """
+        return cls._PATH_TO_IDX.get(abs_prim_path)
+
+    @classmethod
+    def get_aabb(cls, prim_body_idx, link_idx, out_values):
+        """
+        Compute per-link world-space AABB mins/maxes and scatter into per-object scratch buffers.
+
+        Args:
+            prim_body_idx (th.Tensor): (N,) int64 — flat indices into _POSE_MATRICES / LOCAL_POINTS
+            link_idx (th.Tensor):      (N,) int64 — pre-computed s*O + obj_idx for each link
+            out_values (th.Tensor):    (S*O, 6) — caller pre-fills with +/-inf, written in-place
+        """
+        poses = cls._POSE_MATRICES[prim_body_idx]  # (N, 4, 4)
+        local_pts = cls.LOCAL_POINTS[prim_body_idx]  # (N, V, 4)
+        mask = cls.POINTS_MASK[prim_body_idx]  # (N, V)
+
+        # Transform local homogeneous points to world frame
+        world_pts = th.einsum("nij,nvj->nvi", poses, local_pts)[..., :3]  # (N, V, 3)
+
+        # Mask padding slots so they don't affect min/max
+        world_pts_min = world_pts.clone()
+        world_pts_max = world_pts.clone()
+        world_pts_min[~mask] = float("inf")
+        world_pts_max[~mask] = float("-inf")
+
+        # Compute per-link AABBs
+        min_p = world_pts_min.min(dim=1).values  # (N, 3)
+        max_p = world_pts_max.max(dim=1).values  # (N, 3)
+
+        # Scatter into per-object AABBs
+        idx_exp = link_idx.unsqueeze(1).expand(-1, 3)  # (N, 3)
+        out_values[:, :3].scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_self=True)
+        out_values[:, 3:].scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_self=True)
+
+    @classmethod
+    def invalidate_kinematic(cls, links):
+        """
+        Refresh cached pose matrices for kinematic links after an explicit move.
+
+        For physx_untracked links (no physics:RigidBodyAPI) this is the only update path.
+        For physx_tracked kinematic links this write is harmless — update_pose_cache() will
+        re-read from PhysX on the next step.
+
+        Args:
+            links: iterable of RigidPrim link objects whose poses should be refreshed.
+        """
+        if cls._POSE_MATRICES is None:
+            return
+        for link in links:
+            idx = cls._PATH_TO_IDX.get(link.prim_path)
+            if idx is None:
+                continue  # not registered (e.g. particle templates not in scene.objects)
+            pos, quat_xyzw = link.get_position_orientation()
+            cls._POSES[idx][:3] = pos  # _POSES[idx]: (7,)
+            cls._POSES[idx][3:] = quat_xyzw
+            cls._POSES_GPU[idx] = cls._POSES[idx].cuda()
+            # unsqueeze(0): (7,) -> (1, 7) so _poses_to_matrices gets its expected (N, 7) input;
+            # [0]: (1, 4, 4) -> (4, 4) to match _POSE_MATRICES_CPU[idx] slot
+            cls._POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls._POSES[idx].unsqueeze(0))[0]
+            cls._POSE_MATRICES[idx] = cls._POSE_MATRICES_CPU[idx].cuda()  # (4, 4), GPU
+
+    @classmethod
+    def async_copy_to_gpu(cls):
+        """Issue non-blocking bulk copy of _POSES/_POSE_MATRICES CPU → GPU."""
+        if cls._POSE_MATRICES_CPU is None:
+            return
+        cls._POSES_GPU.copy_(cls._POSES, non_blocking=True)
+        cls._POSE_MATRICES.copy_(cls._POSE_MATRICES_CPU, non_blocking=True)
+
+    @classmethod
+    def clear(cls):
+        """Reset all cached state."""
+        cls._RIGID_BODY_VIEW = None
+        cls._PATH_TO_IDX = {}
+        cls._IDX_TO_PATH = []
+        cls._POSES = None
+        cls._POSES_GPU = None
+        cls._POSE_MATRICES = None
+        cls._POSE_MATRICES_CPU = None
+        cls.LOCAL_POINTS = None
+        cls.POINTS_MASK = None
+
+
+class ArticulatedObjectViewAPI:
+    """
+    Batched DOF position cache for non-robot articulated objects across all scenes.
+
+    We exclude robots because they have a lot more DOFs than other objects, which would inflate the
+    size of this view drastically. However, this view is mainly used for Open state checking, which
+    does not apply to robots. As a result, robots are excluded for optimization purposes.
+
+    Creates a single ArticulationView covering all non-robot articulated objects across all scenes
+    using the pattern "/World/scene_\\d+/articulated_.*" (objects are placed under articulated_<name>
+    by _preapply_articulation_root in usd_object.py).
+
+    Data layout:
+        _VIEW        ArticulationView          single view for all non-robot articulated objects
+        _OBJ_TO_VIEW_IDX  {abs_art_root_path: int}  row index in _JOINT_POSITIONS
+        _JOINT_POSITIONS   (N_objects_all_scenes, max_dof)  one row per object per scene, PhysX row order
+    """
+
+    _VIEW = None
+    _OBJ_TO_VIEW_IDX = {}
+    _JOINT_POSITIONS = None  # GPU — written by async_copy_to_gpu()
+    _JOINT_POSITIONS_CPU = None  # CPU — latest PhysX output, written by update_dof_cache()
+
+    @classmethod
+    def initialize_view(cls):
+        cls.clear()
+
+        if len(og.sim.scenes) == 0:
+            return
+
+        from omnigibson.robots import Robot
+
+        articulation_objs = [
+            obj
+            for scene in og.sim.scenes
+            for obj in scene.objects
+            if obj.relative_prim_path.startswith("/articulated__") and not isinstance(obj, Robot)
+        ]
+        if not articulation_objs:
+            return
+
+        pattern = "/World/scene_*/articulated__*/*"
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
+        assert set(cls._VIEW.prim_paths) == set(
+            obj.articulation_root_path for obj in articulation_objs
+        ), "Articulation view prim paths mismatch!"
+        cls._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(cls._VIEW.prim_paths)}
+        # Pre-allocate _JOINT_POSITIONS on GPU; _JOINT_POSITIONS_CPU holds the latest PhysX output.
+        positions = cls._VIEW.get_dof_positions()
+        cls._JOINT_POSITIONS_CPU = positions
+        cls._JOINT_POSITIONS = cls._JOINT_POSITIONS_CPU.cuda()  # synchronous init so first read is valid
+
+    @classmethod
+    def update_dof_cache(cls):
+        """Fetch latest DOF positions from PhysX into CPU staging buffer. Called every step."""
+        if cls._VIEW is None:
+            return
+        cls._JOINT_POSITIONS_CPU = cls._VIEW.get_dof_positions()
+
+    @classmethod
+    def get_view_row(cls, abs_prim_path):
+        """Return row index in _JOINT_POSITIONS for a given absolute articulation root path, or None."""
+        return cls._OBJ_TO_VIEW_IDX.get(abs_prim_path)
+
+    @classmethod
+    def get_max_dof(cls):
+        """Return the padded DOF width of _JOINT_POSITIONS; 0 if not initialized."""
+        return cls._JOINT_POSITIONS.shape[1] if cls._JOINT_POSITIONS is not None else 0
+
+    @classmethod
+    def get_articulation_positions(cls, position_rows):
+        """Return GPU tensor containing the DOF positions for the given row indices."""
+        return cls._JOINT_POSITIONS[position_rows]
+
+    @classmethod
+    def async_copy_to_gpu(cls):
+        """Issue non-blocking copy of _JOINT_POSITIONS_CPU → _JOINT_POSITIONS."""
+        if cls._JOINT_POSITIONS_CPU is None:
+            return
+        cls._JOINT_POSITIONS.copy_(cls._JOINT_POSITIONS_CPU, non_blocking=True)
+
+    @classmethod
+    def clear(cls):
+        cls._VIEW = None
+        cls._OBJ_TO_VIEW_IDX = {}
+        cls._JOINT_POSITIONS = None
+        cls._JOINT_POSITIONS_CPU = None
 
 
 class RigidContactAPIImpl:
@@ -223,9 +616,11 @@ class RigidContactAPIImpl:
         # Contact matrix tracking contacts that occurred at any point during the last N physics steps
         # (between consecutive update_contact_cache calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
 
         # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
         self._CURRENT_CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
@@ -236,6 +631,7 @@ class RigidContactAPIImpl:
 
         # Accumulated impulse matrices and transforms from individual physics steps,
         # collected between consecutive update_contact_cache calls.
+        self._PENDING_STEPS = 0
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
         self._PENDING_NET_FORCES = dict()
@@ -249,6 +645,11 @@ class RigidContactAPIImpl:
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
+
+            # Add the (global) floor plane if there is one
+            if og.sim.floor_plane is not None:
+                filters[scene_idx].append(og.sim.floor_plane.prim_path + "/collisionPlane")
+
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
@@ -288,7 +689,6 @@ class RigidContactAPIImpl:
             return
 
         # Generate views, making sure to update simulation first so the physx backend is synchronized.
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
                 scene_body_filters = body_filters[scene_idx]
@@ -304,6 +704,10 @@ class RigidContactAPIImpl:
 
                             if isinstance(link, RigidDynamicPrim) and link.contact_reporting_enabled:
                                 scene_dynamic_body_filters.append(link.prim_path)
+
+                # If there are only kinematic/static bodies, skip view creation for this scene.
+                if len(scene_dynamic_body_filters) == 0:
+                    continue
 
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=f"/World/scene_{scene_idx}/*/*",
@@ -346,35 +750,31 @@ class RigidContactAPIImpl:
                 )
                 path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
                 self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
-                    [path_to_view_idx[path] for path in row_paths], dtype=th.long
+                    [path_to_view_idx[path] for path in row_paths], dtype=th.long, device="cuda"
                 )
 
                 # Some contact-matrix columns can correspond to kinematic-only links that do not appear
                 # in the rigid-body view. We encode those as -1 and track a validity mask.
                 col_to_rigid_rows = [path_to_view_idx.get(path, -1) for path in col_paths]
-                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(col_to_rigid_rows, dtype=th.long)
+                self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
+                    col_to_rigid_rows, dtype=th.long, device="cuda"
+                )
                 self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx] = (
                     self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx] >= 0
                 )
                 ii, jj = th.meshgrid(th.arange(len(row_paths)), th.arange(len(col_paths)), indexing="ij")
                 self._INDEX_MATRIX[scene_idx] = th.stack([ii, jj], dim=-1)
-                self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().clone()
+                self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().cuda()
 
                 # Build the new contact matrices. Start from current impulses (captures contacts
                 # for newly added bodies), then overwrite with previously cached values for
                 # every pair of bodies that already existed before the rebuild.
                 initial_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
                 initial_contacts = th.any(initial_impulses != 0, dim=-1)
-                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
-                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone()
-
-                # Initialize pending accumulation lists for this scene
-                # Note that existing data in these lists will be lost when the view is rebuilt.
-                # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
-                # This TODO can be accomplished after the follow-up PR removes RigidContactAPI use in assisted grasping.
-                self._PENDING_IMPULSES[scene_idx] = []
-                self._PENDING_TRANSFORMS[scene_idx] = []
-                self._PENDING_NET_FORCES[scene_idx] = []
+                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
+                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
+                self._CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
 
                 # Finally, remap data from the old matrices into the new ones. This lets us avoid losing our
                 # cached data when new bodies are added or removed.
@@ -402,6 +802,33 @@ class RigidContactAPIImpl:
                             old_current_matrix[old_row_idxs[:, None], old_col_idxs[None, :]]
                         )
 
+                # Sync GPU mirrors from CPU matrices — carry-over may have updated the CPU tensors above.
+                self._CONTACT_MATRIX_GPU[scene_idx].copy_(self._CONTACT_MATRIX[scene_idx])
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].copy_(self._CURRENT_CONTACT_MATRIX[scene_idx])
+
+                # Initialize pending accumulation lists for this scene
+                # Note that existing data in these lists will be lost when the view is rebuilt.
+                # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
+                # This TODO can be accomplished after the follow-up PR removes RigidContactAPI use in assisted grasping.
+                n_physics_steps = og.sim.n_physics_timesteps_per_render
+                self._PENDING_STEPS = 0
+                self._PENDING_IMPULSES[scene_idx] = th.zeros(
+                    n_physics_steps,
+                    self._CONTACT_MATRIX[scene_idx].shape[0],
+                    self._CONTACT_MATRIX[scene_idx].shape[1],
+                    3,
+                    device="cuda",
+                )
+                self._PENDING_TRANSFORMS[scene_idx] = th.zeros(
+                    n_physics_steps, self._BODY_TRANSFORMS[scene_idx].shape[0], 7, device="cuda"
+                )
+                self._PENDING_NET_FORCES[scene_idx] = th.zeros(
+                    n_physics_steps,
+                    self._CONTACT_MATRIX[scene_idx].shape[0],
+                    3,
+                    device="cuda",
+                )
+
     def add_contacts_from_physics_step(self):
         """
         Fetches contact impulse matrices and body transforms from the current physics step
@@ -410,12 +837,20 @@ class RigidContactAPIImpl:
         update_contact_cache.
         """
         assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
+        assert self._PENDING_STEPS < og.sim.n_physics_timesteps_per_render, "Pending steps buffer is full"
 
-        for scene_idx in list(self._CONTACT_VIEW.keys()):
+        scene_idx_list = list(self._CONTACT_VIEW.keys())
+        for scene_idx in scene_idx_list:
             try:
                 # Get the contact impulse and net force matrices for this scene
-                impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt())
-                net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt())
+                self._PENDING_IMPULSES[scene_idx][self._PENDING_STEPS].copy_(
+                    self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt()),
+                    non_blocking=True,
+                )
+                self._PENDING_NET_FORCES[scene_idx][self._PENDING_STEPS].copy_(
+                    self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt()),
+                    non_blocking=True,
+                )
             except Exception:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
@@ -425,17 +860,15 @@ class RigidContactAPIImpl:
                 continue
 
             # Get the body transforms for this scene
-            transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
+            self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
+                self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
+            )
 
-            # Append the data to the pending lists. Note that we have to clone these matrices because
-            # the view actually reuses the buffer.
-            if scene_idx not in self._PENDING_IMPULSES:
-                self._PENDING_IMPULSES[scene_idx] = []
-                self._PENDING_TRANSFORMS[scene_idx] = []
-                self._PENDING_NET_FORCES[scene_idx] = []
-            self._PENDING_IMPULSES[scene_idx].append(impulses.clone())
-            self._PENDING_TRANSFORMS[scene_idx].append(transforms.clone())
-            self._PENDING_NET_FORCES[scene_idx].append(net_forces.clone())
+        # Increment once per physics step
+        if scene_idx_list:
+            self._PENDING_STEPS += 1
+
+        th.cuda.synchronize()
 
     def update_contact_cache(self):
         """
@@ -447,21 +880,14 @@ class RigidContactAPIImpl:
         transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
         force are also treated as awake.  Contact matrices are only updated from awake steps.
         """
-        for scene_idx in list(self._CONTACT_VIEW.keys()):
-            # Get the pending data for this scene
-            pending_impulses = self._PENDING_IMPULSES[scene_idx]
-            pending_transforms = self._PENDING_TRANSFORMS[scene_idx]
-            pending_net_forces = self._PENDING_NET_FORCES[scene_idx]
-            assert len(pending_impulses) == len(pending_transforms), "Number of impulses and transforms must match"
-            assert len(pending_impulses) == len(pending_net_forces), "Number of impulses and net forces must match"
-            N = len(pending_impulses)
-            if N == 0:
-                continue
+        if self._PENDING_STEPS == 0:
+            return
 
+        for scene_idx in list(self._CONTACT_VIEW.keys()):
             # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
-            all_impulses = th.stack(pending_impulses, dim=0)
-            all_transforms = th.stack(pending_transforms, dim=0)
-            all_net_forces = th.stack(pending_net_forces, dim=0)
+            all_impulses = self._PENDING_IMPULSES[scene_idx][: self._PENDING_STEPS]
+            all_transforms = self._PENDING_TRANSFORMS[scene_idx][: self._PENDING_STEPS]
+            all_net_forces = self._PENDING_NET_FORCES[scene_idx][: self._PENDING_STEPS]
 
             # Get the previous body transforms for the cache
             prev_transforms = self._BODY_TRANSFORMS[scene_idx]
@@ -486,9 +912,13 @@ class RigidContactAPIImpl:
 
             # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
             # data for all the indices where the object is not asleep.
-            body_step_indices = th.arange(N, dtype=th.long).unsqueeze(1).expand_as(per_step_awake)
+            body_step_indices = (
+                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda").unsqueeze(1).expand_as(per_step_awake)
+            )
             last_awake_body_step = (
-                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
+                .max(dim=0)
+                .values
             )  # (num_bodies,)
 
             # For each step, compute the rows that are awake
@@ -497,32 +927,43 @@ class RigidContactAPIImpl:
             # For each step, compute the columns that are awake
             col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
             valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
-            per_step_col_awake = th.zeros(N, len(col_to_rigid), dtype=th.bool)  # (N, C)
+            per_step_col_awake = th.zeros(
+                self._PENDING_STEPS, len(col_to_rigid), dtype=th.bool, device="cuda"
+            )  # (N, C)
             per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
 
             # For each step, compute the pairs that are awake. This is an outer-OR of the row and column awake masks.
             per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
 
             # What is the last step that the pair was awake?
-            pair_step_indices = th.arange(N, dtype=th.long).reshape(N, 1, 1).expand_as(per_step_awake_pairs)
+            pair_step_indices = (
+                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda")
+                .reshape(self._PENDING_STEPS, 1, 1)
+                .expand_as(per_step_awake_pairs)
+            )
             last_awake_pair_step = (
-                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long)).max(dim=0).values
+                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
+                .max(dim=0)
+                .values
             )  # (R, C)
             pair_was_awake = last_awake_pair_step >= 0  # (R, C)
 
             # "Current" contact matrix: impulses from the last awake step per pair.
             # Pairs that were never awake retain their previous value.
+            # All writes go directly to the GPU matrices; CPU mirrors are updated at the end.
             awake_rc = th.where(pair_was_awake)
             awake_pair_steps = last_awake_pair_step[pair_was_awake]
             last_awake_impulses = all_impulses[awake_pair_steps, awake_rc[0], awake_rc[1]]  # (num_awake, 3)
-            self._CURRENT_CONTACT_MATRIX[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
+            self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
 
             # "Recent" contact matrix: any contact across awake steps for awake pairs,
             # or the (now-updated) current contact value for non-awake pairs.
             any_contact_per_step = th.any(all_impulses != 0, dim=-1)  # (N, R, C)
             any_awake_contact = th.any(any_contact_per_step & per_step_awake_pairs, dim=0)  # (R, C)
-            self._CONTACT_MATRIX[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
-            self._CONTACT_MATRIX[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX[scene_idx][~pair_was_awake]
+            self._CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
+            self._CONTACT_MATRIX_GPU[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][
+                ~pair_was_awake
+            ]
 
             # Update body transforms from each body's last awake step
             awake_body_indices = th.where(last_awake_body_step >= 0)[0]
@@ -530,10 +971,16 @@ class RigidContactAPIImpl:
                 last_awake_body_step[awake_body_indices], awake_body_indices
             ]
 
-            # Clear pending data for this scene
-            self._PENDING_IMPULSES[scene_idx] = []
-            self._PENDING_TRANSFORMS[scene_idx] = []
-            self._PENDING_NET_FORCES[scene_idx] = []
+            # Copy updated GPU matrices back to CPU mirrors so is_in_contact()
+            # can read them without a GPU stall.
+            # This will be synced in simulator._update_view_apis()
+            self._CONTACT_MATRIX[scene_idx].copy_(self._CONTACT_MATRIX_GPU[scene_idx], non_blocking=True)
+            self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
+                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True
+            )
+
+        # Clear pending step counter once after all scenes are processed
+        self._PENDING_STEPS = 0
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
@@ -578,9 +1025,10 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths
+        # Otherwise, convert to prim paths, filtering out kinematic-only bodies that are not rows
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths])
+        row_map = self._PATH_TO_ROW_IDX.get(scene_idx, {})
+        return th.tensor([row_map[path] for path in prim_paths if path in row_map])
 
     def get_contact_col_indices(self, scene_idx, objects_links_or_prim_paths):
         """
@@ -652,6 +1100,8 @@ class RigidContactAPIImpl:
         """
         Check if any of the prims in @query_set are in contact with any of the prims in @with_set, or not in contact with any of the prims in @ignore_set.
 
+        Returns CPU tensors.
+
         Args:
             scene_idx (int): Scene index to check for contact.
             query_set (set of RigidPrim, str, or USDObject): Prims, prim paths, or objects to check for contact.
@@ -672,6 +1122,8 @@ class RigidContactAPIImpl:
 
         contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
         rows = self.get_contact_row_indices(scene_idx, query_set)
+        if rows.numel() == 0:
+            return False
         if with_set is not None:
             cols = self.get_contact_col_indices(scene_idx, with_set)
             return th.any(contact_matrix[rows, :][:, cols]).item()
@@ -721,7 +1173,7 @@ class RigidContactAPIImpl:
 
     def is_in_contact_batch(self, scene_idx, query_masks, with_masks, ignore_masks, current_only):
         """
-        Batch contact check for N queries, fully tensorized.
+        Batch contact check for N queries, fully tensorized. Returns GPU tensors.
 
         Each row ``i`` of the input masks defines one independent contact query. The method
         returns an ``(N,)`` boolean tensor where entry ``i`` is ``True`` iff any row selected
@@ -751,10 +1203,12 @@ class RigidContactAPIImpl:
         """
         assert with_masks is None or ignore_masks is None, "Provide either with_masks or ignore_masks, not both."
 
-        if scene_idx not in self._CONTACT_MATRIX or scene_idx not in self._PATH_TO_COL_IDX:
-            return th.zeros(query_masks.shape[0], dtype=th.bool)
+        if scene_idx not in self._CONTACT_MATRIX_GPU or scene_idx not in self._PATH_TO_COL_IDX:
+            return th.zeros(query_masks.shape[0], dtype=th.bool, device="cuda")
 
-        contact_matrix = self._CURRENT_CONTACT_MATRIX[scene_idx] if current_only else self._CONTACT_MATRIX[scene_idx]
+        contact_matrix = (
+            self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] if current_only else self._CONTACT_MATRIX_GPU[scene_idx]
+        )
 
         # query_contacts[i, c] = True iff any row in query set i is in contact with column c.
         # We use float matmul for speed: (N, R) @ (R, C) -> (N, C), then threshold.
@@ -766,6 +1220,10 @@ class RigidContactAPIImpl:
             return (query_contacts & ~ignore_masks).any(dim=1)
 
         return query_contacts.any(dim=1)
+
+    def has_contact_view(self, scene_idx):
+        """Returns True if a valid contact view has been initialized for @scene_idx."""
+        return scene_idx in self._CONTACT_MATRIX
 
     def clear(self):
         """
@@ -781,9 +1239,12 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
+        self._CONTACT_MATRIX_GPU = dict()
         self._CURRENT_CONTACT_MATRIX = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()
         self._INDEX_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
+        self._PENDING_STEPS = 0
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
         self._PENDING_NET_FORCES = dict()
@@ -809,21 +1270,22 @@ class CollisionAPI:
             col_group (str): Name of the collision group to create
             filter_self_collisions (bool): Whether to ignore self-collisions within the group. Default is False
         """
-        # Can only be done when sim is stopped
-        assert og.sim is None or og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
+        with og.sim.editing_usd():
+            # Can only be done when sim is stopped
+            assert og.sim is None or og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
 
-        # Make sure the group doesn't already exist
-        assert (
-            col_group not in cls.ACTIVE_COLLISION_GROUPS
-        ), f"Cannot create collision group {col_group} because it already exists!"
+            # Make sure the group doesn't already exist
+            assert (
+                col_group not in cls.ACTIVE_COLLISION_GROUPS
+            ), f"Cannot create collision group {col_group} because it already exists!"
 
-        # Create the group
-        col_group_prim_path = f"/World/collision_groups/{col_group}"
-        group = lazy.pxr.UsdPhysics.CollisionGroup.Define(og.sim.stage, col_group_prim_path)
-        if filter_self_collisions:
-            # Do not collide with self
-            group.GetFilteredGroupsRel().AddTarget(col_group_prim_path)
-        cls.ACTIVE_COLLISION_GROUPS[col_group] = group
+            # Create the group
+            col_group_prim_path = f"/World/collision_groups/{col_group}"
+            group = lazy.pxr.UsdPhysics.CollisionGroup.Define(og.sim.stage, col_group_prim_path)
+            if filter_self_collisions:
+                # Do not collide with self
+                group.GetFilteredGroupsRel().AddTarget(col_group_prim_path)
+            cls.ACTIVE_COLLISION_GROUPS[col_group] = group
 
     @classmethod
     def add_to_collision_group(cls, col_group, prim_path):
@@ -834,13 +1296,14 @@ class CollisionAPI:
             col_group (str): Name of the collision group to assign the prim at @prim_path to
             prim_path (str): Prim (and all nested prims) to assign to this @col_group
         """
-        # Make sure collision group exists
-        assert (
-            col_group in cls.ACTIVE_COLLISION_GROUPS
-        ), f"Cannot add to collision group {col_group} because it does not exist!"
+        with og.sim.editing_usd():
+            # Make sure collision group exists
+            assert (
+                col_group in cls.ACTIVE_COLLISION_GROUPS
+            ), f"Cannot add to collision group {col_group} because it does not exist!"
 
-        # Add this prim to the collision group
-        cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
+            # Add this prim to the collision group
+            cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
 
     @classmethod
     def add_group_filter(cls, col_group, filter_group):
@@ -850,17 +1313,18 @@ class CollisionAPI:
             col_group (str): Name of the collision group which will have a new filter group added
             filter_group (str): Name of the group that should be filtered
         """
-        # Make sure the group doesn't already exist
-        for group_name in (col_group, filter_group):
-            assert group_name in cls.ACTIVE_COLLISION_GROUPS, (
-                f"Cannot add group filter {filter_group} to collision group {col_group} because at least one group "
-                f"does not exist!"
-            )
+        with og.sim.editing_usd():
+            # Make sure the group doesn't already exist
+            for group_name in (col_group, filter_group):
+                assert group_name in cls.ACTIVE_COLLISION_GROUPS, (
+                    f"Cannot add group filter {filter_group} to collision group {col_group} because at least one group "
+                    f"does not exist!"
+                )
 
-        # Grab the group, and add the filter
-        filter_group_prim_path = f"/World/collision_groups/{filter_group}"
-        group = cls.ACTIVE_COLLISION_GROUPS[col_group]
-        group.GetFilteredGroupsRel().AddTarget(filter_group_prim_path)
+            # Grab the group, and add the filter
+            filter_group_prim_path = f"/World/collision_groups/{filter_group}"
+            group = cls.ACTIVE_COLLISION_GROUPS[col_group]
+            group.GetFilteredGroupsRel().AddTarget(filter_group_prim_path)
 
     @classmethod
     def clear(cls):
@@ -898,30 +1362,22 @@ def setup_collision_apis(prim):
             may be None for non-mesh prims.
     """
     # Create / get CollisionAPI reference
-    collision_api = (
-        lazy.pxr.UsdPhysics.CollisionAPI(prim)
-        if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
-        else lazy.pxr.UsdPhysics.CollisionAPI.Apply(prim)
-    )
-    physx_collision_api = (
-        lazy.pxr.PhysxSchema.PhysxCollisionAPI(prim)
-        if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI)
-        else lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(prim)
+    collision_api = ensure_usd_api(prim, lazy.pxr.UsdPhysics.CollisionAPI)
+    physx_collision_api = ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxCollisionAPI)
+    mesh_collision_api = (
+        ensure_usd_api(prim, lazy.pxr.UsdPhysics.MeshCollisionAPI)
+        if prim.GetPrimTypeInfo().GetTypeName() == "Mesh"
+        else None
     )
 
     # Optionally add mesh collision API if this is a mesh
-    mesh_collision_api = None
-    if prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
-        mesh_collision_api = (
-            lazy.pxr.UsdPhysics.MeshCollisionAPI(prim)
-            if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI)
-            else lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(prim)
-        )
+    if mesh_collision_api is not None:
         # Set the approximation to be convex hull by default
         apply_collision_approximation(prim, mesh_collision_api, "convexHull")
 
-    # Set collision enabled based on global setting
-    collision_api.GetCollisionEnabledAttr().Set(not gm.VISUAL_ONLY)
+    with og.sim.editing_usd():
+        # Set collision enabled based on global setting
+        collision_api.GetCollisionEnabledAttr().Set(not gm.VISUAL_ONLY)
 
     return collision_api, physx_collision_api, mesh_collision_api
 
@@ -953,135 +1409,94 @@ def apply_collision_approximation(prim, mesh_collision_api, approximation_type):
     )
 
     # Make sure to add the appropriate API if we're setting certain values
-    if approximation_type == "convexHull" and not prim.HasAPI(lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI):
-        lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(prim)
-    elif approximation_type == "convexDecomposition" and not prim.HasAPI(
-        lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI
-    ):
-        lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(prim)
-    elif approximation_type == "meshSimplification" and not prim.HasAPI(
-        lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI
-    ):
-        lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(prim)
-    elif approximation_type == "sdf" and not prim.HasAPI(lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
-        lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(prim)
-    elif approximation_type == "none" and not prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI):
-        lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(prim)
-
     if approximation_type == "convexHull":
-        pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(prim)
-        # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
-        # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
-        if pch_api.GetHullVertexLimitAttr().Get() is None:
-            pch_api.CreateHullVertexLimitAttr()
-        pch_api.GetHullVertexLimitAttr().Set(60)
+        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI)
+    elif approximation_type == "convexDecomposition":
+        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI)
+    elif approximation_type == "meshSimplification":
+        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI)
+    elif approximation_type == "sdf":
+        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI)
+    elif approximation_type == "none":
+        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI)
 
-    mesh_collision_api.GetApproximationAttr().Set(approximation_type)
+    with og.sim.editing_usd():
+        if approximation_type == "convexHull":
+            pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(prim)
+            # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
+            # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
+            if pch_api.GetHullVertexLimitAttr().Get() is None:
+                pch_api.CreateHullVertexLimitAttr()
+            pch_api.GetHullVertexLimitAttr().Set(60)
+
+        mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
-class PoseAPI:
+def get_world_pose(prim_path):
     """
-    This is a singleton class for getting world poses.
-    Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
-    After that, if we need to access the pose of a prim without stepping physics,
-    this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
+    Gets pose of the prim object with respect to the world frame
+    Args:
+        Prim_path: the path of the prim object
+    Returns:
+        2-tuple:
+            - torch.Tensor: (x,y,z) position in the world frame
+            - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
+    """
+    matrix = _get_world_pose_with_scale_from_fabric_hierarchy(prim_path)
+    quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
+    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+    return position, orientation
+
+
+def _get_world_pose_with_scale_from_fabric_hierarchy(prim_path):
+    # Check that no reads from Fabric are happening during a physics step.
+    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
+
+    return og.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
+
+
+def get_world_pose_with_scale(prim_path):
+    """
+    This is used when information about the prim's global scale is needed,
+    e.g. when converting points in the prim frame to the world frame.
     """
 
-    VALID = False
+    return th.tensor(_get_world_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
 
-    # Dictionary mapping prim path to fabric prim
-    PRIMS = dict()
 
-    @classmethod
-    def clear(cls):
-        cls.PRIMS = dict()
+def get_local_pose(prim_path):
+    """
+    Gets pose of the prim with respect to its parent prim's frame (local / parent-relative transform).
 
-    @classmethod
-    def invalidate(cls):
-        cls.VALID = False
+    Args:
+        prim_path: the path of the prim object
 
-    @classmethod
-    def mark_valid(cls):
-        cls.VALID = True
+    Returns:
+        2-tuple:
+            - torch.Tensor: (x,y,z) position in the parent frame
+            - torch.Tensor: (x,y,z,w) quaternion orientation in the parent frame
+    """
+    matrix = _get_local_pose_with_scale_from_fabric_hierarchy(prim_path)
+    quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
+    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+    return position, orientation
 
-    @classmethod
-    def _refresh(cls):
-        if og.sim is not None and not cls.VALID:
-            # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
-            assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
-            # when flatcache is on
-            if og.sim._physx_fabric_interface:
-                # no time step is taken here
-                og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
-            # when flatcache is off
-            else:
-                # no time step is taken here
-                og.sim.psi.fetch_results()
-            cls.mark_valid()
+def _get_local_pose_with_scale_from_fabric_hierarchy(prim_path):
+    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
 
-    @classmethod
-    def get_world_pose(cls, prim_path):
-        """
-        Gets pose of the prim object with respect to the world frame
-        Args:
-            Prim_path: the path of the prim object
-        Returns:
-            2-tuple:
-                - torch.Tensor: (x,y,z) position in the world frame
-                - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
-        """
-        # Check that no reads from PoseAPI are happening during a physics step.
-        assert (
-            not og.sim.currently_stepping
-        ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
+    return og.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
 
-        # Add to stored prims if not already existing
-        if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
-        cls._refresh()
+def get_local_pose_with_scale(prim_path):
+    """
+    Like get_local_pose, but returns the full 4x4 local transform matrix (with scale),
+    for converting points between the prim frame and the parent frame.
+    """
 
-        # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import get_world_pose
-
-        position, orientation = get_world_pose(cls.PRIMS[prim_path])
-        return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
-
-    @classmethod
-    def get_world_pose_with_scale(cls, prim_path):
-        """
-        This is used when information about the prim's global scale is needed,
-        e.g. when converting points in the prim frame to the world frame.
-        """
-        # Add to stored prims if not already existing
-        if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-
-        cls._refresh()
-        # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
-
-        return th.tensor(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path]), dtype=th.float32).T
-
-    @classmethod
-    def convert_world_pose_to_local(cls, prim, position, orientation):
-        """Converts a world pose to a local pose under a prim's parent."""
-        world_transform = T.pose2mat((position, orientation))
-        parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(prim).GetPath())
-        parent_world_transform = cls.get_world_pose_with_scale(parent_path)
-
-        local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
-        local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)  # unscale local transform's rotation
-
-        # Check that the local transform consists only of a position, scale and rotation
-        product = local_transform[:3, :3] @ local_transform[:3, :3].T
-        assert th.allclose(
-            product, th.diag(th.diag(product)), atol=1e-3
-        ), f"{prim.GetPath()} local transform is not orthogonal."
-
-        # Return the local pose
-        return T.mat2pose(local_transform)
+    return th.tensor(_get_local_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
 
 
 class BatchControlViewAPIImpl:
@@ -1991,9 +2406,10 @@ def clear():
     """
     Clear state tied to singleton classes
     """
-    PoseAPI.invalidate()
     CollisionAPI.clear()
+    RigidBodyViewAPI.clear()
     RigidContactAPI.clear()
+    ArticulatedObjectViewAPI.clear()
     ControllableObjectViewAPI.clear()
 
 
@@ -2012,42 +2428,43 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
         stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
             use og.sim.stage
     """
-    MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
-        "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
-        "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
-        "Plane": lazy.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
-        "Cylinder": lazy.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
-        "Torus": lazy.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
-        "Cone": lazy.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
-        "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
-    }
+    with og.sim.editing_usd(stage=stage):
+        MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
+            "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
+            "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
+            "Plane": lazy.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
+            "Cylinder": lazy.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
+            "Torus": lazy.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
+            "Cone": lazy.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
+            "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
+        }
 
-    assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
-    evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
-    u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
-    v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
-    hs_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
-    lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
-    lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
-    stage = og.sim.stage if stage is None else stage
+        assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
+        evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
+        u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
+        v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
+        hs_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
+        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
+        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
+        stage = og.sim.stage if stage is None else stage
 
-    # Default half_scale (i.e. half-extent, half_height, radius) is 1.
-    # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
-    #  (currently it only accepts integer-number and floors 0.5 into 0).
-    lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
-    kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
-    if u_patches is not None and v_patches is not None:
-        kwargs["u_patches"] = u_patches
-        kwargs["v_patches"] = v_patches
+        # Default half_scale (i.e. half-extent, half_height, radius) is 1.
+        # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
+        #  (currently it only accepts integer-number and floors 0.5 into 0).
+        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
+        kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
+        if u_patches is not None and v_patches is not None:
+            kwargs["u_patches"] = u_patches
+            kwargs["v_patches"] = v_patches
 
-    # Import now to avoid too-eager load of Omni classes due to inheritance
-    from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
+        # Import now to avoid too-eager load of Omni classes due to inheritance
+        from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
 
-    CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
+        CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
 
-    lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
-    lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
-    lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
+        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
+        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
+        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
 
 def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
@@ -2144,7 +2561,7 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
         trimesh_mesh = mesh_prim_shape_to_trimesh_mesh(mesh_prim)
 
     if world_frame:
-        trimesh_mesh.apply_transform(PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString))
+        trimesh_mesh.apply_transform(get_world_pose_with_scale(mesh_prim.GetPath().pathString))
 
     return trimesh_mesh
 
@@ -2282,20 +2699,22 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     create_mesh_prim_with_default_xform(
         primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage
     )
-    mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
-    # Modify the points and normals attributes so that total extents is the desired
-    # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
-    # -- i.e.: 2cm-wide mesh
-    extents = th.ones(3) * extents if isinstance(extents, float) else th.tensor(extents)
-    for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
-        vals = th.tensor(attr.Get()).double()
-        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0).tolist()) for val in vals]))
-    mesh.GetExtentAttr().Set(
-        lazy.pxr.Vt.Vec3fArray(
-            [lazy.pxr.Gf.Vec3f(*(-extents / 2.0).tolist()), lazy.pxr.Gf.Vec3f(*(extents / 2.0).tolist())]
+    with og.sim.editing_usd(stage=stage):
+        mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
+
+        # Modify the points and normals attributes so that total extents is the desired
+        # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
+        # -- i.e.: 2cm-wide mesh
+        extents = th.ones(3) * extents if isinstance(extents, float) else th.tensor(extents)
+        for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
+            vals = th.tensor(attr.Get()).double()
+            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0).tolist()) for val in vals]))
+        mesh.GetExtentAttr().Set(
+            lazy.pxr.Vt.Vec3fArray(
+                [lazy.pxr.Gf.Vec3f(*(-extents / 2.0).tolist()), lazy.pxr.Gf.Vec3f(*(extents / 2.0).tolist())]
+            )
         )
-    )
 
     return triangularize_mesh(mesh)
 
@@ -2311,20 +2730,21 @@ def triangularize_mesh(mesh):
     """
     Triangulates the mesh @mesh, modification in-place
     """
-    tm = mesh_prim_to_trimesh_mesh(mesh.GetPrim())
+    with og.sim.editing_usd():
+        tm = mesh_prim_to_trimesh_mesh(mesh.GetPrim())
 
-    face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
-    mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
-    mesh.GetFaceVertexIndicesAttr().Set(tm.faces.flatten())
-    mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals[tm.faces.flatten()]))
+        face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
+        mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
+        mesh.GetFaceVertexIndicesAttr().Set(tm.faces.flatten())
+        mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals[tm.faces.flatten()]))
 
-    # Modify the UV mapping if it exists
-    if isinstance(tm.visual, trimesh.visual.TextureVisuals):
-        mesh.GetPrim().GetAttribute("primvars:st").Set(
-            lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()])
-        )
+        # Modify the UV mapping if it exists
+        if isinstance(tm.visual, trimesh.visual.TextureVisuals):
+            mesh.GetPrim().GetAttribute("primvars:st").Set(
+                lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()])
+            )
 
-    return mesh
+        return mesh
 
 
 def add_asset_to_stage(asset_path, prim_path):
@@ -2338,21 +2758,24 @@ def add_asset_to_stage(asset_path, prim_path):
     Returns:
         Usd.Prim: Loaded prim as a USD prim
     """
-    # Make sure this is actually a supported asset type
-    asset_type = asset_path.split(".")[-1]
-    assert asset_type in {"usd", "usda", "obj"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
+    with og.sim.editing_usd():
+        # Make sure this is actually a supported asset type
+        asset_type = asset_path.split(".")[-1]
+        assert asset_type in {"usd", "usda", "obj", "usdz"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
-    # Make sure the path exists
-    assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
+        # Make sure the path exists
+        assert os.path.exists(
+            asset_path
+        ), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
 
-    # Add reference to stage and grab prim
-    lazy.isaacsim.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
-    prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+        # Add reference to stage and grab prim
+        lazy.isaacsim.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
+        prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
 
-    # Make sure prim was loaded correctly
-    assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
+        # Make sure prim was loaded correctly
+        assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
 
-    return prim
+        return prim
 
 
 def get_world_prim():
@@ -2376,6 +2799,13 @@ def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
     """
     # Special case for OmniGraph prims
     if relative_prim_path.startswith("/OmniGraph"):
+        return relative_prim_path
+
+    # Special case for global floor plane collision prim — already an absolute path
+    if (
+        og.sim.floor_plane is not None
+        and relative_prim_path == og.sim.floor_plane.relative_prim_path + "/collisionPlane"
+    ):
         return relative_prim_path
 
     # Make sure the relative path is actually relative
@@ -2404,6 +2834,13 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     if absolute_prim_path.startswith("/OmniGraph"):
         return absolute_prim_path
 
+    # Special case for global floor plane collision prim — not scene-scoped, return unchanged
+    if (
+        og.sim.floor_plane is not None
+        and absolute_prim_path == og.sim.floor_plane.relative_prim_path + "/collisionPlane"
+    ):
+        return absolute_prim_path
+
     assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"
 
     # When the scene is set to None, this prim is not in a scene but is global e.g. like the
@@ -2417,49 +2854,14 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     return absolute_prim_path[len(scene.prim_path) :]
 
 
-def deep_copy_prim(source_root_prim, dest_stage, dest_root_path):
-    queue = [(source_root_prim, dest_root_path)]
-
-    while queue:
-        source_prim, dest_path = queue.pop(0)
-
-        # Create a new prim in the destination stage with the same type as the source
-        if source_prim.GetTypeName():
-            dest_prim = dest_stage.DefinePrim(dest_path, source_prim.GetTypeName())
-        else:
-            dest_prim = dest_stage.OverridePrim(dest_path)
-
-        # Copy attributes
-        for attr in source_prim.GetAttributes():
-            # Create a new attribute with the same specifications
-            dest_attr = dest_prim.CreateAttribute(
-                attr.GetName(), attr.GetTypeName(), attr.IsCustom(), attr.GetVariability()
-            )
-
-            # Check if the source attribute has a value
-            if attr.HasValue():
-                # Copy the value
-                dest_attr.Set(attr.Get())
-
-        # Copy relationships
-        for rel in source_prim.GetRelationships():
-            dest_rel = dest_prim.CreateRelationship(rel.GetName(), rel.IsCustom())
-            targets = rel.GetTargets()
-            updated_targets = [
-                x.ReplacePrefix(source_root_prim.GetPath(), lazy.pxr.Sdf.Path(dest_root_path)) for x in targets
-            ]
-            if targets:
-                dest_rel.SetTargets(updated_targets)
-
-        # Copy child prims breadth-first
-        for child in source_prim.GetAllChildren():
-            new_dest_path = dest_path + "/" + child.GetName()
-            queue.append((child, new_dest_path))
-
-
 def delete_or_deactivate_prim(prim_path):
     """
     Attept to delete or deactivate the prim defined at @prim_path.
+
+    Note that the removal of prims usually has an impact on the PhysX state and needs to be followed
+    by a call to og.sim.update_handles() to update tensor views etc. - we do not do here to avoid
+    performance overhead when lots of prims are removed at once in clear() etc. and instead we
+    delegate this to the caller.
 
     Args:
         prim_path (str): Path defining which prim should be deleted or deactivated
@@ -2467,34 +2869,38 @@ def delete_or_deactivate_prim(prim_path):
     Returns:
         bool: Whether the operation was successful or not
     """
-    if not lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
-        return False
-    if lazy.isaacsim.core.utils.prims.is_prim_no_delete(prim_path):
-        return False
-    if lazy.isaacsim.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
-        return False
-    if prim_path == "/World":
-        return False
-    if prim_path == "/":
-        return False
-    # Don't remove any /Render prims as that can cause crashes
-    if prim_path.startswith("/Render"):
-        return False
 
-    # If the prim is not ancestral, we can delete it.
-    if not lazy.isaacsim.core.utils.prims.is_prim_ancestral(prim_path):
-        lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=True).do()
+    # TODO: Replace the weird delete-or-deactivate mechanism here with a concrete deletion
+    # using the Sdf layer deletion API.
+    with og.sim.editing_usd():
+        if not lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
+            return False
+        if lazy.isaacsim.core.utils.prims.is_prim_no_delete(prim_path):
+            return False
+        if lazy.isaacsim.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+            return False
+        if prim_path == "/World":
+            return False
+        if prim_path == "/":
+            return False
+        # Don't remove any /Render prims as that can cause crashes
+        if prim_path.startswith("/Render"):
+            return False
 
-    # Otherwise, we can only deactivate it, which essentially serves the same purpose.
-    # All objects that are originally in the scene are ancestral because we add the pre-build scene to the stage.
-    else:
-        # Clear all default attributes before deactivating the prim to ensure clean reactivation.
-        # Note: Prim deactivation preserves attribute values, so we must explicitly clear defaults
-        # to prevent stale custom values from persisting when the prim is reactivated later.
-        prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
-        for attr in prim.GetAttributes():
-            assert attr.ClearDefault()
-        lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
+        # If the prim is not ancestral, we can delete it.
+        if not lazy.isaacsim.core.utils.prims.is_prim_ancestral(prim_path):
+            lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=True).do()
+
+        # Otherwise, we can only deactivate it, which essentially serves the same purpose.
+        # All objects that are originally in the scene are ancestral because we add the pre-build scene to the stage.
+        else:
+            # Clear all default attributes before deactivating the prim to ensure clean reactivation.
+            # Note: Prim deactivation preserves attribute values, so we must explicitly clear defaults
+            # to prevent stale custom values from persisting when the prim is reactivated later.
+            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+            for attr in prim.GetAttributes():
+                assert attr.ClearDefault()
+            lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
     return True
 
@@ -2635,7 +3041,7 @@ def _compute_relative_poses_torch(
     return rel_poses
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
     tfs = np.zeros((n_links, 4, 4), dtype=np.float32)
     # base vel is the final -1 index

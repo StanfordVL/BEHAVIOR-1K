@@ -1,5 +1,5 @@
 (define (problem line_kitchen_shelves-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lining.n.01_1 lining.n.01_2 - lining.n.01

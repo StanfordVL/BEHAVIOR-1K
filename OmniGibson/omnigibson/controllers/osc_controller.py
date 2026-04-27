@@ -2,14 +2,12 @@ import math
 
 import numpy as np
 import torch as th
-from numba import jit
 
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
-from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
@@ -581,163 +579,6 @@ class OperationalSpaceController(ManipulationController):
     @property
     def command_dim(self):
         return self._command_dim
-
-
-@th.jit.script
-def _compute_osc_torques_torch(
-    q: th.Tensor,
-    qd: th.Tensor,
-    mm: th.Tensor,
-    j_eef: th.Tensor,
-    ee_pos: th.Tensor,
-    ee_mat: th.Tensor,
-    ee_lin_vel: th.Tensor,
-    ee_ang_vel_err: th.Tensor,
-    goal_pos: th.Tensor,
-    goal_ori_mat: th.Tensor,
-    kp: th.Tensor,
-    kd: th.Tensor,
-    kp_null: th.Tensor,
-    kd_null: th.Tensor,
-    rest_qpos: th.Tensor,
-    control_dim: int,
-    decouple_pos_ori: bool,
-    base_lin_vel: th.Tensor,
-    base_ang_vel: th.Tensor,
-):
-    # Compute the inverse
-    mm_inv = th.linalg.inv(mm)
-
-    # Calculate error
-    pos_err = goal_pos - ee_pos
-    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
-    err = th.cat((pos_err, ori_err))
-
-    # Vel target is the base velocity as experienced by the end effector
-    # For angular velocity, this is just the base angular velocity
-    # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
-    #   due to the base linear velocity
-    # For angular velocity, we need to make sure we compute the difference between the base and eef velocity
-    # properly, not simply "subtraction" as in the linear case
-    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos) - ee_lin_vel
-    vel_err = th.cat((lin_vel_err, ee_ang_vel_err))
-
-    # Determine desired wrench
-    err = th.unsqueeze(kp * err + kd * vel_err, dim=-1)
-    m_eef_inv = j_eef @ mm_inv @ j_eef.T
-    m_eef = th.linalg.inv(m_eef_inv)
-
-    if decouple_pos_ori:
-        # # More efficient, but numba doesn't support 3D tensor operations yet
-        # j_eef_batch = j_eef.reshape(2, 3, -1)
-        # m_eef_pose_inv = j_eef_batch @ th.unsqueeze(mm_inv, dim=0) @ th.transpose(j_eef_batch, 0, 2, 1)
-        # m_eef_pose = th.linalg.inv_ex(m_eef_pose_inv).inverse  # Shape (2, 3, 3)
-        # wrench = (m_eef_pose @ err.reshape(2, 3, 1)).flatten()
-        m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
-        m_eef_ori_inv = j_eef[3:, :] @ mm_inv @ j_eef[3:, :].T
-        m_eef_pos = th.linalg.inv(m_eef_pos_inv)
-        m_eef_ori = th.linalg.inv(m_eef_ori_inv)
-        wrench_pos = m_eef_pos @ err[:3, :]
-        wrench_ori = m_eef_ori @ err[3:, :]
-        wrench = th.cat((wrench_pos, wrench_ori))
-    else:
-        wrench = m_eef @ err
-
-    # Compute OSC torques
-    u = j_eef.T @ wrench
-
-    # Nullspace control torques `u_null` prevents large changes in joint configuration
-    # They are added into the nullspace of OSC so that the end effector orientation remains constant
-    # roboticsproceedings.org/rss07/p31.pdf
-    if rest_qpos is not None:
-        j_eef_inv = m_eef @ j_eef @ mm_inv
-        u_null = kd_null * -qd + kp_null * wrap_angle(rest_qpos - q)
-        u_null = mm @ th.unsqueeze(u_null, dim=-1)
-        u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
-
-    return u
-
-
-# Use numba since faster
-@jit(nopython=True)
-def _compute_osc_torques_numpy(
-    q,
-    qd,
-    mm,
-    j_eef,
-    ee_pos,
-    ee_mat,
-    ee_lin_vel,
-    ee_ang_vel_err,
-    goal_pos,
-    goal_ori_mat,
-    kp,
-    kd,
-    kp_null,
-    kd_null,
-    rest_qpos,
-    control_dim,
-    decouple_pos_ori,
-    base_lin_vel,
-    base_ang_vel,
-):
-    # Compute the inverse
-    mm_inv = np.linalg.inv(mm)
-
-    # Calculate error
-    pos_err = goal_pos - ee_pos
-    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
-    err = np.concatenate((pos_err, ori_err))
-
-    # Vel target is the base velocity as experienced by the end effector
-    # For angular velocity, this is just the base angular velocity
-    # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
-    #   due to the base linear velocity
-    # For angular velocity, we need to make sure we compute the difference between the base and eef velocity
-    # properly, not simply "subtraction" as in the linear case
-    lin_vel_err = base_lin_vel + np.cross(base_ang_vel, ee_pos) - ee_lin_vel
-    vel_err = np.concatenate((lin_vel_err, ee_ang_vel_err))
-
-    # Determine desired wrench
-    err = np.expand_dims(kp * err + kd * vel_err, axis=-1)
-    m_eef_inv = j_eef @ mm_inv @ j_eef.T
-    m_eef = np.linalg.inv(m_eef_inv)
-
-    if decouple_pos_ori:
-        # # More efficient, but numba doesn't support 3D tensor operations yet
-        # j_eef_batch = j_eef.reshape(2, 3, -1)
-        # m_eef_pose_inv = np.matmul(np.matmul(j_eef_batch, np.expand_dims(mm_inv, axis=0)), np.transpose(j_eef_batch, (0, 2, 1)))
-        # m_eef_pose = np.linalg.inv(m_eef_pose_inv)  # Shape (2, 3, 3)
-        # wrench = np.matmul(m_eef_pose, err.reshape(2, 3, 1)).flatten()
-        m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
-        m_eef_ori_inv = j_eef[3:, :] @ mm_inv @ j_eef[3:, :].T
-        m_eef_pos = np.linalg.inv(m_eef_pos_inv)
-        m_eef_ori = np.linalg.inv(m_eef_ori_inv)
-        wrench_pos = m_eef_pos @ err[:3, :]
-        wrench_ori = m_eef_ori @ err[3:, :]
-        wrench = np.concatenate((wrench_pos, wrench_ori))
-    else:
-        wrench = m_eef @ err
-
-    # Compute OSC torques
-    u = j_eef.T @ wrench
-
-    # Nullspace control torques `u_null` prevents large changes in joint configuration
-    # They are added into the nullspace of OSC so that the end effector orientation remains constant
-    # roboticsproceedings.org/rss07/p31.pdf
-    if rest_qpos is not None:
-        j_eef_inv = m_eef @ j_eef @ mm_inv
-        u_null = kd_null * -qd + kp_null * ((rest_qpos - q + np.pi) % (2 * np.pi) - np.pi)
-        u_null = mm @ np.expand_dims(u_null, axis=-1).astype(np.float32)
-        u += (np.eye(control_dim, dtype=np.float32) - j_eef.T @ j_eef_inv) @ u_null
-
-    return u
-
-
-# Set these as part of the backend values
-add_compute_function(
-    name="compute_osc_torques", np_function=_compute_osc_torques_numpy, th_function=_compute_osc_torques_torch
-)
 
 
 def _compute_osc_torques_batch_torch(

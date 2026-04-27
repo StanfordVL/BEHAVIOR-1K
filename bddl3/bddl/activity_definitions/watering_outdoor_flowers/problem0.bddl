@@ -1,5 +1,5 @@
 (define (problem watering_outdoor_flowers-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         watering_can.n.01_1 - watering_can.n.01
