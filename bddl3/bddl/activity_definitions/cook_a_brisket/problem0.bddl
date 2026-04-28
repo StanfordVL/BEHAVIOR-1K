@@ -30,6 +30,7 @@
         (and 
             (cooked ?brisket.n.01_1) 
             (ontop ?brisket.n.01_1 ?chopping_board.n.01_1)
+            (ontop ?frying_pan.n.01_1 ?countertop.n.01_1)
         )
     )
 )
