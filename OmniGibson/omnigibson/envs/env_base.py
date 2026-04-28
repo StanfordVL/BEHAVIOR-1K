@@ -698,6 +698,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 For tensors, shape is (num_envs, action_dim).
                 For dicts, a list of dicts (one per env), each mapping robot name to action.
         """
+        if action is None:
+            return
         for env_idx in range(self.num_envs):
             env_action = action[env_idx]
 
