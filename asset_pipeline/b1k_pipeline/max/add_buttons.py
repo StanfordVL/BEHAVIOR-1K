@@ -49,6 +49,8 @@ ENTRYPOINTS = {
     "switch_metalink.py": "Switch type of selected metalinks",
     "toggle_meta_visibility.py": "Toggle visibility of meta links.",
     "translate_ig_dataset.py": "Update names of iG2 objects to new format.",
+    "two_room_assignment.py": "Assign objects to a combined layer for two rooms.",
+    "three_room_assignment.py": "Assign objects to a combined layer for three rooms.",
     "view_complaints.py": "View QA complaints for this file.",
     "resolve_complaints.py": "Resolve QA complaints for this file.",
     "wensi_view_complaints.py": "View Wensi's TODO complaints for this file.",
