@@ -2,8 +2,6 @@ import pytest
 import torch as th
 
 import omnigibson as og
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.transform_utils import quat_multiply
 
 from utils import (
     MULTI_ENV_ROBOTS,

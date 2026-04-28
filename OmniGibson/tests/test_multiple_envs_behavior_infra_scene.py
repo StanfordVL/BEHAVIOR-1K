@@ -9,14 +9,12 @@ Covers:
   Section 5 – Robot getter/setter
 """
 
-import pytest
 import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.reward_functions.potential_reward import PotentialReward
-from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.transform_utils import quat_multiply
@@ -89,7 +87,7 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
         f"activity={ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}"
     )
     env = og.Environment(configs=cfg)
-    print(f"  BehaviorTask environment created successfully")
+    print("  BehaviorTask environment created successfully")
     return env
 
 

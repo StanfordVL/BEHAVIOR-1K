@@ -8,11 +8,9 @@ Covers:
   Section 2 – Step and reset
 """
 
-import pytest
 import torch as th
 
 import omnigibson as og
-import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.tasks.behavior_task import BehaviorTask
 
@@ -84,7 +82,7 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
         f"activity={ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}"
     )
     env = og.Environment(configs=cfg)
-    print(f"  BehaviorTask environment created successfully")
+    print("  BehaviorTask environment created successfully")
     return env
 
 
