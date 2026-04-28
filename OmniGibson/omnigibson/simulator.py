@@ -482,8 +482,6 @@ def _launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scenes = []
-            # Whether sim is currently in the middle of loading scenes
-            self._is_loading_scene = False
             # The callback will be called right *before* the physics step
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
@@ -886,43 +884,44 @@ def _launch_simulator(*args, **kwargs):
             self._camera_mover.print_info()
             return self._camera_mover
 
-        def import_scene(self, scene):
+        def import_scene(self, scenes):
             """
-            Import a scene into the simulator. A scene could be a synthetic one or a realistic Gibson Environment.
+            Import one or more scenes into the simulator. A scene could be a synthetic one or a realistic Gibson
+            Environment.
 
             Args:
-                scene (Scene): a scene object to load
+                scenes (Scene or list of Scenes): scene(s) to load
             """
             assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
-            assert isinstance(scene, Scene), "import_scene can only be called with Scene"
+            if isinstance(scenes, Scene):
+                scenes = [scenes]
+            assert all(
+                isinstance(scene, Scene) for scene in scenes
+            ), "import_scene can only be called with Scene instances"
+            assert len(scenes) > 0, "import_scene requires at least one scene"
 
             # Check that the scene is not already imported
-            if scene.loaded:
-                raise ValueError("Scene is already loaded!")
+            for scene in scenes:
+                if scene.loaded:
+                    raise ValueError("Scene is already loaded!")
+                self._last_scene_edge = scene.load(
+                    idx=len(self.scenes),
+                    last_scene_edge=self._last_scene_edge,
+                    initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
+                    scene_margin=m.SCENE_MARGIN,
+                )
+                # Load the scene.
+                self._scenes.append(scene)
 
-            self._last_scene_edge = scene.load(
-                idx=len(self.scenes),
-                last_scene_edge=self._last_scene_edge,
-                initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
-                scene_margin=m.SCENE_MARGIN,
-            )
-
-            # Load the scene.
-            self._scenes.append(scene)
-
-            # Make sure simulator is not running, then start it so that we can initialize the scene
-            # TODO(vector): After vectorizing `Environment`, we can refactor this function to load a set
-            # of scenes at once, and then play once, that way we don't need the is loading scene thing anymore.
-            assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
             self.play()
-
-            # Initialize the scene
-            scene.initialize()
-
-            # Need to one more step for particle systems to work
+            for scene in scenes:
+                scene.initialize()
+            # One step is needed for particle systems to work.
             self.step()
             self.stop()
-            log.info(f"Imported scene {scene.idx}.")
+
+            for scene in scenes:
+                log.info(f"Imported scene {scene.idx}.")
 
         # TODO: Remove this context manager and call _post_import_object directly since the objects
         # are already known when this is called.
@@ -1261,47 +1260,45 @@ def _launch_simulator(*args, **kwargs):
                         for scene in scenes_modified:
                             scene.transition_rule_api.refresh_all_rules()
 
-                # Only run the update when sim is not in the middle of scene loading
-                if not self._is_loading_scene:
-                    # Update any system-related state
+                # Update any system-related state
+                for scene in self.scenes:
+                    for system in scene.active_systems.values():
+                        system.update()
+
+                # Propagate states if the feature is enabled
+                if gm.ENABLE_OBJECT_STATES:
+                    # TensorizedValueState global_updates (GPU computation)
+                    for state_type in self.object_state_types_requiring_update:
+                        if issubclass(state_type, TensorizedValueState):
+                            state_type.global_update()
+
+                    th.cuda.synchronize()
+
+                    # TensorizedValueState post_updates (CPU change detection + state_updated())
+                    for state_type in self.object_state_types_requiring_update:
+                        if issubclass(state_type, TensorizedValueState):
+                            state_type.post_update()
+
+                    # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
+                    for state_type in self.object_state_types_requiring_update:
+                        if issubclass(state_type, UpdateStateMixin):
+                            for scene in self.scenes:
+                                for obj in scene.get_objects_with_state(state_type):
+                                    # Update the state (object should already be initialized since
+                                    # this step will only occur after objects are initialized and sim
+                                    # is playing
+                                    obj.states[state_type].update()
+
                     for scene in self.scenes:
-                        for system in scene.active_systems.values():
-                            system.update()
+                        for obj in scene.objects:
+                            # Only update visuals for objects that have been initialized so far
+                            if obj.initialized:
+                                obj.update_visuals()
 
-                    # Propagate states if the feature is enabled
-                    if gm.ENABLE_OBJECT_STATES:
-                        # TensorizedValueState global_updates (GPU computation)
-                        for state_type in self.object_state_types_requiring_update:
-                            if issubclass(state_type, TensorizedValueState):
-                                state_type.global_update()
-
-                        th.cuda.synchronize()
-
-                        # TensorizedValueState post_updates (CPU change detection + state_updated())
-                        for state_type in self.object_state_types_requiring_update:
-                            if issubclass(state_type, TensorizedValueState):
-                                state_type.post_update()
-
-                        # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
-                        for state_type in self.object_state_types_requiring_update:
-                            if issubclass(state_type, UpdateStateMixin):
-                                for scene in self.scenes:
-                                    for obj in scene.get_objects_with_state(state_type):
-                                        # Update the state (object should already be initialized since
-                                        # this step will only occur after objects are initialized and sim
-                                        # is playing
-                                        obj.states[state_type].update()
-
-                        for scene in self.scenes:
-                            for obj in scene.objects:
-                                # Only update visuals for objects that have been initialized so far
-                                if obj.initialized:
-                                    obj.update_visuals()
-
-                    # Possibly run transition rule step
-                    if gm.ENABLE_TRANSITION_RULES:
-                        for scene in self.scenes:
-                            scene.transition_rule_api.step()
+                # Possibly run transition rule step
+                if gm.ENABLE_TRANSITION_RULES:
+                    for scene in self.scenes:
+                        scene.transition_rule_api.step()
 
         def play(self):
             if not self.is_playing():
@@ -1337,19 +1334,10 @@ def _launch_simulator(*args, **kwargs):
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
                     # sim was stopped. We need to reset them to default_kp and default_kd defined defined in Robot.
-                    # We also need to take an additional sim step to make sure simulator is functioning properly.
-                    # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
-                    # operations immediately after playing; e.g.: syncing USD poses when fabric is enabled
                     for scene in self.scenes:
                         for robot in scene.robots:
                             if robot.initialized:
                                 robot.update_controller_mode()
-                                # TODO: Typically, robots should be initialized on the first play() call
-                                # Problem: In multi-environment setups, import_scene() for subsequent environments
-                                # calls play()+stop(), which prematurely triggers initialization before all environments
-                                # are loaded. This is a temporary workaround.
-                                robot.reset()
-                                robot.keep_still()
 
                         # Also refresh any transition rules that became stale while sim was stopped
                         if gm.ENABLE_TRANSITION_RULES:
@@ -1928,6 +1916,7 @@ def _launch_simulator(*args, **kwargs):
             # Handle loading scenes differently depending on whether we're loading from scratch or not
             if load_from_scratch:
                 states = []
+                recreated_scenes = []
                 self.stop()
                 for i, scene_file in enumerate(scene_files):
                     # Directly create and load the scene object
@@ -1951,9 +1940,10 @@ def _launch_simulator(*args, **kwargs):
                     # Also make sure we have any additional modifications necessary from the specific scene
                     og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
-                    # Recreate and import the saved scene
-                    recreated_scene = create_object_from_init_info(init_info)
-                    self.import_scene(scene=recreated_scene)
+                    # Recreate the saved scene
+                    recreated_scenes.append(create_object_from_init_info(init_info))
+
+                self.import_scene(recreated_scenes)
                 self.play()
                 for i, state in enumerate(states):
                     self.scenes[i].load_state(state, serialized=False)

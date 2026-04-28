@@ -239,16 +239,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
 
         # Create the scene(s) from our scene config
-        self._scenes = []
-        for i in range(self.num_envs):
-            scene = create_class_from_registry_and_config(
+        self._scenes = [
+            create_class_from_registry_and_config(
                 cls_name=self.scene_config["type"],
                 cls_registry=REGISTERED_SCENES,
                 cfg=deepcopy(self.scene_config),
                 cls_type_descriptor="scene",
             )
-            og.sim.import_scene(scene)
-            self._scenes.append(scene)
+            for _ in range(self.num_envs)
+        ]
+        og.sim.import_scene(self._scenes)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
@@ -452,9 +452,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load the scene and robot specified in the config file.
         """
-        # TODO(vector): Remove this after moving onto vectorized environment
-        og.sim._is_loading_scene = True
-
         # This environment is not loaded
         self._loaded = False
 
@@ -467,9 +464,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_task()
         self._load_external_sensors()
-
-        # TODO(vector): Remove this after moving onto vectorized environment
-        og.sim._is_loading_scene = False
 
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""
