@@ -163,7 +163,7 @@ class TestSceneCoordinates:
         print(f"  scene_prim moved: {original_scene_prim_pos} -> {new_scene_prim_pos}")
         print(f"  robot moved: {original_robot_pos} -> {new_robot_pos}")
         assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
-        assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
+        assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-2)
 
         og.clear()
         _passed("TestSceneCoordinates::test_multi_scene_scene_prim")

@@ -282,7 +282,8 @@ class TestBehaviorTaskLogic:
         assert env.task.activity_name == ACTIVITY_NAME
         assert env.task.activity_definition_id == 0
         assert env.task.activity_instance_id == 0
-        assert env.task.activity_conditions is not None
+        assert env.task.compiled_task[0] is not None
+        assert env.task.compiled_task[0].conditions is not None
         assert env.task.activity_initial_conditions is not None
         assert "BehaviorTask" in env.task.name
         assert ACTIVITY_NAME in env.task.name
@@ -325,7 +326,7 @@ class TestBehaviorTaskLogic:
         initial_idx = env.task.currently_viewed_index
         env.task.iterate_instruction()
         new_idx = env.task.currently_viewed_index
-        total_conditions = len(env.task.activity_conditions.parsed_goal_conditions)
+        total_conditions = len(env.task.compiled_task[0].conditions.parsed_goal_conditions)
         expected_idx = (initial_idx + 1) % total_conditions
         assert new_idx == expected_idx, f"iterate_instruction: expected idx {expected_idx}, got {new_idx}"
         print(f"  iterate_instruction: {initial_idx} -> {new_idx} (total={total_conditions})")
