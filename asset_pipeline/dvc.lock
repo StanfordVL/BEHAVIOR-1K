@@ -7,8 +7,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Beechwood_0_garden/processed.max
       hash: md5
       md5: e278f3ff13a00032c9dd57afb5f17b95
@@ -24,8 +24,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Beechwood_0_int/processed.max
       hash: md5
       md5: e37940442406e279ac8ca069e7d45989
@@ -41,8 +41,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Beechwood_1_int/processed.max
       hash: md5
       md5: 3d390a77671bd423115853b9be5e7d51
@@ -58,8 +58,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Benevolence_0_int/processed.max
       hash: md5
       md5: de52e67a8113f13824a8ad336e9c7b41
@@ -75,8 +75,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Benevolence_1_int/processed.max
       hash: md5
       md5: d9fe1db08ba41e917f8d32c0db923f3b
@@ -92,8 +92,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Benevolence_2_int/processed.max
       hash: md5
       md5: 7667c0ee2b65f84a6d9eb9649853e6f1
@@ -109,8 +109,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Ihlen_0_int/processed.max
       hash: md5
       md5: 508111fbfe9408579439519b5d3ec20d
@@ -126,8 +126,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Ihlen_1_int/processed.max
       hash: md5
       md5: b60fd1f6d99677059e341a4d9f7adb6a
@@ -143,8 +143,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Merom_0_garden/processed.max
       hash: md5
       md5: 9f72abcf00e10c7e024b367ce30ed57b
@@ -160,8 +160,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Merom_0_int/processed.max
       hash: md5
       md5: 4d0c837bbd749f706dfdb4518c36e007
@@ -177,8 +177,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Merom_1_int/processed.max
       hash: md5
       md5: f3a64b9c7a0ca2094242f97685a6bce0
@@ -194,8 +194,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Pomaria_0_garden/processed.max
       hash: md5
       md5: e5d7db26933dd0b10449271c424caca3
@@ -211,8 +211,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Pomaria_0_int/processed.max
       hash: md5
       md5: fe521ffdfa5939cc83a652dddea381d5
@@ -228,8 +228,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Pomaria_1_int/processed.max
       hash: md5
       md5: be8c04d8b44ab0be4fc452da92844ba9
@@ -245,8 +245,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Pomaria_2_int/processed.max
       hash: md5
       md5: 3fc22ba4ad6dfd9fc5dd328881fc1a99
@@ -262,8 +262,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Rs_garden/processed.max
       hash: md5
       md5: 4fbd590db2e98462a6df57df7dcca43a
@@ -279,8 +279,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Rs_int/processed.max
       hash: md5
       md5: f2acf212ea978f410405c054a31255ab
@@ -297,8 +297,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Wainscott_0_garden/processed.max
       hash: md5
       md5: d4ad3636ca14a049dfe82b712e804c5b
@@ -314,8 +314,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Wainscott_0_int/processed.max
       hash: md5
       md5: f6f4c54fb3a9ebc6d2b16ed8c8fdf70c
@@ -331,8 +331,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/Wainscott_1_int/processed.max
       hash: md5
       md5: 7416452010885e1fb14383020c4e3a1a
@@ -349,8 +349,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/commercial_kitchen_fire_extinguisher/processed.max
       hash: md5
       md5: 45dbf54525d9e3d0d3f3ce2768ec7044
@@ -368,8 +368,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/commercial_kitchen_pans/processed.max
       hash: md5
       md5: a0b1b93302e879265697365d55a51599
@@ -385,8 +385,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/gates_bedroom/processed.max
       hash: md5
       md5: bff4985fb5f71833b0783a00b34a35c7
@@ -403,8 +403,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/grocery_store_asian/processed.max
       hash: md5
       md5: 58c491f919187e4cb99eb2005c7776bd
@@ -421,8 +421,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/grocery_store_cafe/processed.max
       hash: md5
       md5: 154434fc71aa87776e0345a24a4f0fbb
@@ -439,8 +439,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/grocery_store_convenience/processed.max
       hash: md5
       md5: 349dbfcb1daad2439b957386c6e232ff
@@ -457,8 +457,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/grocery_store_half_stocked/processed.max
       hash: md5
       md5: 90820ccba1f6f1566e9ab3b4561012c3
@@ -474,8 +474,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/hall_arch_wood/processed.max
       hash: md5
       md5: 462eb72ef87ec0cb5586d31f96142ec2
@@ -492,8 +492,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/hall_conference_large/processed.max
       hash: md5
       md5: d423dc3a145594174e00237b238c2e4a
@@ -510,8 +510,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/hall_glass_ceiling/processed.max
       hash: md5
       md5: c748835f004da8945c0e9252e1b4451e
@@ -528,8 +528,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/hall_train_station/processed.max
       hash: md5
       md5: 9a7913fccde2c9d40be8b04a42817702
@@ -545,8 +545,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/hotel_gym_spa/processed.max
       hash: md5
       md5: d8e2f9b34998ebb32d5fc6a3be975f06
@@ -562,8 +562,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/hotel_suite_large/processed.max
       hash: md5
       md5: ed5f320357659af372aff54db31cf44c
@@ -579,8 +579,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/hotel_suite_small/processed.max
       hash: md5
       md5: 18cb90db973346153fbd8c4f8ed1bc9d
@@ -597,8 +597,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/house_double_floor_lower/processed.max
       hash: md5
       md5: baeeae65c79938cbe7737736207510f9
@@ -615,8 +615,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/house_double_floor_upper/processed.max
       hash: md5
       md5: 40256be8dbdd8f50562032554fe73eb7
@@ -633,8 +633,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/house_single_floor/processed.max
       hash: md5
       md5: 9675dbc522203ccfdb648d04ab468ae4
@@ -650,8 +650,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/office_bike/processed.max
       hash: md5
       md5: 93ca7ce401ad00bd2dca9b3dac86f279
@@ -668,8 +668,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/office_cubicles_left/processed.max
       hash: md5
       md5: 80c7d41e135865c1c71f0d7beefe451a
@@ -686,25 +686,25 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/office_cubicles_right/processed.max
       hash: md5
-      md5: 98c8210ad2f69ffe06ba510077a406ca
-      size: 59020346
+      md5: 926a7c39a323f46fe6ba3f4c14fec21c
+      size: 51463360
     outs:
     - path: cad/scenes/office_cubicles_right/artifacts/object_list.json
       hash: md5
-      md5: def2452609f5de060584dc482d580873
-      size: 398489
+      md5: 1bd6f63506e7809899faf8c01747a859
+      size: 321485
   object_list@scenes/office_large:
     cmd: python b1k_pipeline/batch_3dsmax.py 
       cad/scenes/office_large/processed.max b1k_pipeline/max/object_list.py
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/office_large/processed.max
       hash: md5
       md5: e06a82c60d530a63bd3a0b4dec5572b5
@@ -721,8 +721,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/office_vendor_machine/processed.max
       hash: md5
       md5: 19679ea3f6172c6ccee3463b48c08c94
@@ -739,8 +739,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/public_restroom_blue/processed.max
       hash: md5
       md5: 752b2a1e870610a2efffb204d2256657
@@ -757,8 +757,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/public_restroom_brown/processed.max
       hash: md5
       md5: 1b32e01144c3cfd152e6e1a2a5ebe5d2
@@ -775,8 +775,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/public_restroom_futuristic/processed.max
       hash: md5
       md5: fe7f9645a8b7f58d480d72c91259a8d9
@@ -793,8 +793,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/public_restroom_marble/processed.max
       hash: md5
       md5: f5a0b3a126682419c86a9bc6dd8d188e
@@ -811,8 +811,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/public_restroom_white/processed.max
       hash: md5
       md5: 74e43bcc19e90bcf332421c679dde2e7
@@ -828,8 +828,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/restaurant_asian/processed.max
       hash: md5
       md5: dff805cb9a3edf95fa85993f27ce1337
@@ -845,8 +845,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/restaurant_brunch/processed.max
       hash: md5
       md5: 59f95c7828a24fb3750ad893d984a420
@@ -863,8 +863,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/restaurant_cafeteria/processed.max
       hash: md5
       md5: 98777e953186f2e79063c590b38f6e0e
@@ -880,8 +880,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/restaurant_diner/processed.max
       hash: md5
       md5: 1bfd856e15bd6dac46fda7823cc1d119
@@ -897,8 +897,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/restaurant_hotel/processed.max
       hash: md5
       md5: 5aaac755ffdbfa83cad877bd944ca1d1
@@ -914,8 +914,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/restaurant_urban/processed.max
       hash: md5
       md5: ca8cc026c873eca4c0180bdb6aae4cfe
@@ -931,8 +931,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/school_biology/processed.max
       hash: md5
       md5: 6d8327255dd3a085384d7802a32eba9a
@@ -948,8 +948,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/school_chemistry/processed.max
       hash: md5
       md5: 5831a3c89fbb69ddfeaef5433a60093a
@@ -966,8 +966,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/school_computer_lab_and_infirmary/processed.max
       hash: md5
       md5: 3f95eea9adc5d59d9cf35336cb71d7db
@@ -984,8 +984,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/school_geography/processed.max
       hash: md5
       md5: 7c9b3fd49217d1432cfa38ae485d8a89
@@ -1001,8 +1001,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/scenes/school_gym/processed.max
       hash: md5
       md5: b1fbf49491d7c2879a1194d4069922ee
@@ -5969,8 +5969,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-01/processed.max
       hash: md5
       md5: bec7e0bf3d258d83c10a3a5fe3a368cc
@@ -6116,8 +6116,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-10/processed.max
       hash: md5
       md5: 2aaa59e216f9b7ae9d0d3bf0b68c50d7
@@ -6159,8 +6159,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-06/processed.max
       hash: md5
       md5: e960635e8d746261e0d80b6ab44f99d7
@@ -6202,8 +6202,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-11/processed.max
       hash: md5
       md5: ab6b6001b42437d3d0d402d408f4b2fb
@@ -6245,8 +6245,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-09/processed.max
       hash: md5
       md5: 355baad901d4a90cb60377dcbe4bf951
@@ -6288,8 +6288,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-07/processed.max
       hash: md5
       md5: 71bbbebb0fc9be379a18ab9590781254
@@ -6331,8 +6331,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-04/processed.max
       hash: md5
       md5: 70784d8bd06cefc8a48786bf69a286d3
@@ -6374,8 +6374,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-03/processed.max
       hash: md5
       md5: 3fc6e62265656a2590815bb509a4c21a
@@ -6417,8 +6417,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-12/processed.max
       hash: md5
       md5: d62820069fa11e3e374fe5ed23047895
@@ -6460,8 +6460,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-02/processed.max
       hash: md5
       md5: f034862d368faca3d21f89edbaec4836
@@ -6503,8 +6503,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-08/processed.max
       hash: md5
       md5: f9c315e73a27482d6e4d525e4626ff3e
@@ -6546,8 +6546,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-00/processed.max
       hash: md5
       md5: e7221adef4c05e0f62d1c6f1ac097211
@@ -6589,8 +6589,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/legacy_batch-05/processed.max
       hash: md5
       md5: 744631a3c25b709c6f44d001c968c17b
@@ -6982,8 +6982,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-00/processed.max
       hash: md5
       md5: 3c844fad4c6bb0eee71a7dd37dc79d2b
@@ -6999,8 +6999,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-01/processed.max
       hash: md5
       md5: 396386a5f9c87b938f3c275f7b506fae
@@ -7016,8 +7016,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-02/processed.max
       hash: md5
       md5: ead7a7562300c6d1c9f44668b7885e37
@@ -7033,8 +7033,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-03/processed.max
       hash: md5
       md5: 106a4adc25c7ca47264153c430bf21f8
@@ -7050,8 +7050,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-04/processed.max
       hash: md5
       md5: c81c753298df1b6ac0f33b7c85b84d3b
@@ -7067,8 +7067,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-05/processed.max
       hash: md5
       md5: ca1ed86aa6213149896dc34e3e56d4aa
@@ -7084,8 +7084,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-06/processed.max
       hash: md5
       md5: fdfb1c6e090dade8ec5acd9d6e598e01
@@ -7101,8 +7101,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-07/processed.max
       hash: md5
       md5: 7e7cd78eb1aa69def2fcd0acc62b134e
@@ -7118,8 +7118,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-08/processed.max
       hash: md5
       md5: a23e9d2ee1221afc874f0c051cfbdb1d
@@ -7135,8 +7135,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-09/processed.max
       hash: md5
       md5: 074feea11989ad51e849c995504f03f9
@@ -7152,8 +7152,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-10/processed.max
       hash: md5
       md5: 1d42b86da02834aade0dd1f2812f72be
@@ -7169,8 +7169,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-11/processed.max
       hash: md5
       md5: 2b1e25e1514b1fcbcfc7398ddbef9ce2
@@ -7186,8 +7186,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-12/processed.max
       hash: md5
       md5: 54f5926a9e95c991e96bed99ff99fc3f
@@ -7203,8 +7203,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/batch-13/processed.max
       hash: md5
       md5: a1aa11405aadca154f451bdb975a0177
@@ -7448,8 +7448,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/task_relevant-xy/processed.max
       hash: md5
       md5: ef8a9c51854420aaf1b444d0d13be15b
@@ -8279,8 +8279,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/substances-01/processed.max
       hash: md5
       md5: c7ebf97fffc4fb6ef1035ad437dab00e
@@ -8321,8 +8321,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/task_relavant-ab/processed.max
       hash: md5
       md5: 9e1b1bcdc9243fe14c18a03333c4aeca
@@ -8441,8 +8441,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/procedural-aa/processed.max
       hash: md5
       md5: 7313eed5d175b80fda80445df255b4a1
@@ -17446,8 +17446,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/custom-aa/processed.max
       hash: md5
       md5: c049a50bb13f4bf3cf59dda30a69a8ba
@@ -18528,8 +18528,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/school_objects-aa/processed.max
       hash: md5
       md5: 2cfaa8beb535b440a01c7d9c13871046
@@ -22067,8 +22067,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 1b657c9e9da335f5e9e4ffbf820b042d
-      size: 17943
+      md5: 63af91ae8453c5beabba88c9b9bf0725
+      size: 17969
     - path: cad/objects/ping_pong-ab/processed.max
       hash: md5
       md5: c55c915e1e912034df3e53539971efa6
