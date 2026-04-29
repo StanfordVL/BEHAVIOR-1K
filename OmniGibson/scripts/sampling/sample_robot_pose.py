@@ -130,8 +130,8 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
             break
 
     assert sampled_cylinder_pose is not None, "Failed to sample valid cylinder pose"
-    # set robot z to 0.0
-    sampled_cylinder_pose[0][2] = 0.0
+    # set z to the cylinder base
+    sampled_cylinder_pose[0][2] -= cylinder.height / 2
     robot_poses = {
         "robot": [{"position": sampled_cylinder_pose[0].tolist(), "orientation": sampled_cylinder_pose[1].tolist()}]
     }
