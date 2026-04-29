@@ -162,7 +162,8 @@ class TextureBaker:
 
     def get_process_objs(self):
         objs = []
-        for obj in rt.objects:
+        candidates = rt.objects if len(rt.selection) == 0 else rt.selection
+        for obj in candidates:
             if rt.classOf(obj) != rt.Editable_Poly:
                 continue
             if allow_list and all(
