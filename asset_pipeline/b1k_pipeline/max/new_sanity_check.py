@@ -769,7 +769,7 @@ class SanityCheck:
                 if hull.volume > 0:
                     volume_ratio = m.volume / hull.volume
                     self.expect(
-                        volume_ratio > 0.95,
+                        volume_ratio > 0.99,
                         f"{obj.name} element {i} has volume {m.volume} that is very different from the volume of its convex hull {hull.volume} (ratio {volume_ratio}), which indicates that the mesh is not close to convex.",
                     )
 
@@ -1174,7 +1174,7 @@ class SanityCheck:
             # Check that there is a base link row
             assert (
                 "base_link" in group["name_link_name"].unique()
-            ), f"Model ID {model_id} instance {instance_id} is missing base link."
+            ), f"Model ID {model_id} instance {instance_id} is missing base link. Found: {group['name_link_name'].unique()}"
             base_link_row = group[group["name_link_name"] == "base_link"].iloc[0]
             base_link_transform = base_link_row.object.objecttransform
             inverse_base_link_transform = rt.inverse(base_link_transform)

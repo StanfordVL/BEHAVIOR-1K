@@ -28,6 +28,7 @@ ENTRYPOINTS = {
     "instance_select.py": "Select all instances of objects.",
     "match_links.py": "Match the links on all instances of the selected object.",
     "merge_collision.py": "Merge collision objects into a single object and parent them.",
+    "create_collision_from_self.py": "Create a collision object from the selected object.",
     "new_sanity_check.py": "Run a number of sanity checks.",
     "next_failed.py": "Open the next object file that has failed sanity check.",
     "qa_next_failed.py": "Open the next object file that has unprocessed QA comments.",
