@@ -114,9 +114,11 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
         fixed_base=False,
     )
 
-    # Add cylinder to scene
+    # Add cylinder to scene. Stopping the scene and playing it again causes a reset, so dump the state first.
+    state = og.sim.dump_state()
     with og.sim.stopped():
         env.scene.add_object(cylinder)
+    og.sim.load_state(state)
 
     # Sample pose using OnTop state
     sampled_cylinder_pose = None
