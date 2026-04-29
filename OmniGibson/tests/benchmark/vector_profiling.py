@@ -1,4 +1,5 @@
 import argparse
+import cProfile
 import json
 import os
 import time
@@ -17,6 +18,7 @@ parser.add_argument("-r", "--rendering", action="store_true")
 parser.add_argument("-t", "--task-type", choices=["simple", "behavior", "navigation"], default="simple")
 parser.add_argument("-o", "--object-states", action="store_true")
 parser.add_argument("-g", "--gpu-dynamics", action="store_true")
+parser.add_argument("-d", "--deep-profiling", action="store_true")
 
 NUM_STEPS = 300
 
@@ -25,6 +27,7 @@ def apply_macros(args):
     gm.ENABLE_OBJECT_STATES = args.object_states
     gm.ENABLE_TRANSITION_RULES = args.object_states
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
+    gm.ENABLE_DEEP_PROFILING = args.deep_profiling
 
 
 def make_config(args):
@@ -81,8 +84,14 @@ def main():
     og.launch()
 
     cfg = make_config(args)
+    if args.deep_profiling:
+        load_profiler = cProfile.Profile()
+        load_profiler.enable()
     vec_env = VectorEnvironment(args.n_envs, cfg)
     vec_env.reset()
+    if args.deep_profiling:
+        load_profiler.disable()
+        load_profiler.dump_stats("load.prof")
     total_load_time = time.time() - load_start
 
     og.sim._step_profiler.reset()
@@ -143,6 +152,12 @@ def main():
         f"[{label}] load={total_load_time:.1f}s  FPS={fps:.1f}  Isaac={avg_isaac_ms:.2f}ms  "
         f"OG={avg_og_ms:.2f}ms  RAM={memory_gb:.2f}GB  VRAM={vram_gb:.2f}GB"
     )
+
+    if args.deep_profiling:
+        og.sim._step_profiler.dump_stats("step.prof")
+        og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
+        og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
+        og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
 
     og.shutdown()
 
