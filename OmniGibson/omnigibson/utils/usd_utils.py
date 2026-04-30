@@ -7,6 +7,7 @@ from typing import Tuple
 import numpy as np
 import torch as th
 import trimesh
+import warp as wp
 from numba import jit, prange
 
 import omnigibson as og
@@ -213,6 +214,69 @@ def create_joint(
     return joint_prim
 
 
+@wp.kernel
+def _aabb_reduce_kernel(
+    pose_matrices: wp.array(dtype=wp.mat44),  # (N_links_total,)
+    mesh_ids: wp.array(dtype=wp.uint64),  # (N_links_total,) — 0 if link has no mesh
+    aabb_links: wp.array(dtype=wp.int32),  # (K,) k → which link this thread belongs to
+    aabb_vertices: wp.array(dtype=wp.int32),  # (K,) k → which vertex within that link's mesh
+    aabb_objs: wp.array(dtype=wp.int32),  # (K,) k → output row (= s*O + obj_idx)
+    out_values: wp.array2d(dtype=wp.float32),  # (S*O, 6)
+):
+    # K = total number of link vertices that have AABB state = total number of threads.
+    # Each thread processes ONE (link, vertex) pair. Three K-length lookup tables tell
+    # thread k where to read the point from and where to write its contribution.
+    #
+    # Example with K = 5, two tracked links A (3 verts → object 5) and B (2 verts → object 7):
+    #
+    #   thread index k:    0    1    2    3    4
+    #                     ─────────────────────────
+    #   aabb_links:      [ A ,  A ,  A ,  B ,  B ]   ← which link I belong to
+    #   aabb_vertices:   [ 0 ,  1 ,  2 ,  0 ,  1 ]   ← which vertex within that link
+    #   aabb_objs:       [ 5 ,  5 ,  5 ,  7 ,  7 ]   ← which object's AABB I write to
+    k = wp.tid()
+    body = aabb_links[k]
+    # NOTE: wp.mesh_get_point(id, i) is a *face-vertex* lookup (returns mesh.points[mesh.indices[i]]),
+    # not a vertex lookup. We want vertex i directly, so we read mesh.points[i] via wp.mesh_get(id).
+    mesh = wp.mesh_get(mesh_ids[body])
+    pt3 = mesh.points[aabb_vertices[k]]
+    pt4 = wp.vec4(pt3[0], pt3[1], pt3[2], 1.0)
+    world = wp.mul(pose_matrices[body], pt4)
+    obj = aabb_objs[k]
+    wp.atomic_min(out_values, obj, 0, world[0])
+    wp.atomic_min(out_values, obj, 1, world[1])
+    wp.atomic_min(out_values, obj, 2, world[2])
+    wp.atomic_max(out_values, obj, 3, world[0])
+    wp.atomic_max(out_values, obj, 4, world[1])
+    wp.atomic_max(out_values, obj, 5, world[2])
+
+
+@wp.kernel
+def _aabb_baselink_fallback_kernel(
+    poses: wp.array2d(dtype=wp.float32),  # _POSES_GPU as (N_links_total, 7)
+    base_link_links: wp.array(dtype=wp.int32),  # (N_rigid,) flat body idx of each rigid obj's base link
+    base_link_objs: wp.array(dtype=wp.int32),  # (N_rigid,) output row in out_values
+    out_values: wp.array2d(dtype=wp.float32),  # (S*O, 6) — populated by _aabb_reduce_kernel
+):
+    # Each thread = one rigid object's base link. If the main kernel never touched this
+    # obj's row (still +inf at lo_x), no link had collision geometry — write a point AABB
+    # at the base link's world position. Each rigid object has exactly one base link, so
+    # threads never share an obj — non-atomic writes are safe.
+    n = wp.tid()
+    obj = base_link_objs[n]
+    if wp.isinf(out_values[obj, 0]):
+        body = base_link_links[n]
+        x = poses[body, 0]
+        y = poses[body, 1]
+        z = poses[body, 2]
+        out_values[obj, 0] = x
+        out_values[obj, 1] = y
+        out_values[obj, 2] = z
+        out_values[obj, 3] = x
+        out_values[obj, 4] = y
+        out_values[obj, 5] = z
+
+
 class RigidBodyViewAPI:
     """
     Batched rigid-body pose cache for all rigid bodies across all scenes.
@@ -229,7 +293,9 @@ class RigidBodyViewAPI:
     Flat index layout in _POSE_MATRICES (N_links_total, 4, 4):
       [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked links across all scenes]
 
-    Also stores LOCAL_POINTS / POINTS_MASK for batched AABB computation via get_aabb().
+    Also exposes LINK_MESH_IDS / LINK_VERTEX_COUNTS so the _aabb_reduce_kernel can read each
+    link's collision mesh via wp.mesh_get_point. Each link's wp.Mesh is owned by the
+    RigidPrim itself (link.collision_mesh_warp); RigidBodyViewAPI just collects ids/counts.
     """
 
     # Rigid body view for batched pose reads (one per scene)
@@ -251,14 +317,26 @@ class RigidBodyViewAPI:
     _POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
     _POSE_MATRICES_CPU = None  # CPU — written by update_pose_cache()
 
-    # Local homogeneous collision points for every rigid link, indexed by flat pose index.
-    # shape: (N_links_total, V_max, 4)
-    # V_max is a global maximum across all links/scenes; may be wasteful when one scene
-    # has unusually dense collision geometry — acceptable for now.
-    LOCAL_POINTS = None
+    # Per-link wp.Mesh ids (0 if link has no collision geometry), kernel input for
+    # wp.mesh_get_point(mesh_ids[body], v). Built in initialize_view from
+    # link.collision_mesh_warp on each registered link.
+    LINK_MESH_IDS = None  # wp.array(dtype=wp.uint64) on CUDA, shape (N_links_total,)
 
-    # Valid-point mask; True for non-padded slots. shape: (N_links_total, V_max) bool
-    POINTS_MASK = None
+    # Per-link vertex count. Used by prepare_aabb_kernel_inputs to vectorize the K-length
+    # thread-table expansion. CPU is fine (small, no transfer needed during expansion).
+    LINK_VERTEX_COUNTS = None  # th.Tensor on CPU, shape (N_links_total,) int32
+
+    # K = total number links' vertices of objects with AABB states
+    # Cached K-length kernel inputs for the main AABB kernel. Built by
+    # prepare_aabb_kernel_inputs from the (PRIM_BODY_IDX, LINK_IDX) pair AABB.initialize_view
+    # provides. Reset to None on every initialize_view().
+    _aabb_links = None  # wp.array(dtype=wp.int32) on CUDA, shape (K,)
+    _aabb_vertices = None  # wp.array(dtype=wp.int32) on CUDA, shape (K,)
+    _aabb_objs = None  # wp.array(dtype=wp.int32) on CUDA, shape (K,)
+
+    # Cached fallback-kernel inputs for meshes without boundry points (one entry per rigid object's base link).
+    _aabb_base_link_links = None  # wp.array(dtype=wp.int32) on CUDA, shape (N_rigid,)
+    _aabb_base_link_objs = None  # wp.array(dtype=wp.int32) on CUDA, shape (N_rigid,)
 
     # Tolerances for change detection
     _POS_EPS = 1e-4
@@ -272,8 +350,15 @@ class RigidBodyViewAPI:
         Builds a flat layout keyed by absolute prim path so each scene can have an
         independent link count. Layout of _POSE_MATRICES (N_links_total, 4, 4):
           [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked across all scenes]
+
+        Also collects each registered link's wp.Mesh id and vertex count into
+        LINK_MESH_IDS / LINK_VERTEX_COUNTS for the AABB Warp kernel.
         """
         assert og.sim.is_playing(), "Cannot create rigid body view while sim is not playing!"
+
+        # Ensure Warp's runtime is up before any kernel launches in get_aabb. Idempotent —
+        # subsequent calls are no-ops once the runtime has been constructed.
+        wp.init()
 
         # Snapshot existing kinematic-link poses ton reuse them below
         prev_path_to_idx = dict(cls._PATH_TO_IDX)  # snapshot before clear()
@@ -303,8 +388,9 @@ class RigidBodyViewAPI:
                 cls._IDX_TO_PATH.append(abs_path)
             poses_list.append(cls._RIGID_BODY_VIEW.get_transforms().clone())
 
-        # Add physx_untracked kinematic links and collect collision_boundary_points_local
-        raw_local_points = {}  # {flat_idx: (V, 3) tensor}
+        # Add physx_untracked kinematic links and remember each registered link object so
+        # we can pull its wp.Mesh after _PATH_TO_IDX is finalized below.
+        link_by_idx = {}  # {flat_idx: link object}
 
         for _, scene in enumerate(og.sim.scenes):
             for obj in scene.objects:
@@ -333,30 +419,34 @@ class RigidBodyViewAPI:
                             pose = th.cat([pos, quat_xyzw]).unsqueeze(0)
                         poses_list.append(pose)
 
-                    # Collect local collision points for AABB (for all registered links)
                     if abs_path in cls._PATH_TO_IDX:
-                        pts = link.collision_boundary_points_local  # (V, 3) or None
-                        if pts is not None:
-                            scale = link.get_world_scale()
-                            raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
+                        link_by_idx[cls._PATH_TO_IDX[abs_path]] = link
 
         cls._POSES = th.cat(poses_list, dim=0).pin_memory()  # (N_links_total, 7), CPU
         cls._POSES_GPU = cls._POSES.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
         cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
         cls._POSE_MATRICES = cls._POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
 
-        # Build LOCAL_POINTS and POINTS_MASK tensors.
+        # Collect each link's wp.Mesh id and vertex count. Mesh ownership stays on the link
+        # (link.collision_mesh_warp is a @cached_property); we just record handles here.
         N_total = len(cls._PATH_TO_IDX)
-        V_max = max((p.shape[0] for p in raw_local_points.values()), default=1)
-        local_points = th.zeros(N_total, V_max, 4)
-        local_points[:, :, 3] = 1.0
-        points_mask = th.zeros(N_total, V_max, dtype=th.bool)
-        for path_idx, pts in raw_local_points.items():
-            V = pts.shape[0]
-            local_points[path_idx, :V, :3] = pts
-            points_mask[path_idx, :V] = True
-        cls.LOCAL_POINTS = local_points.cuda()
-        cls.POINTS_MASK = points_mask.cuda()
+        mesh_id_list = [0] * N_total
+        vertex_count_list = [0] * N_total
+        for idx, link in link_by_idx.items():
+            mesh = link.collision_mesh_warp
+            if mesh is not None:
+                mesh_id_list[idx] = mesh.id
+                vertex_count_list[idx] = mesh.points.shape[0]
+        cls.LINK_MESH_IDS = wp.array(mesh_id_list, dtype=wp.uint64, device="cuda")
+        cls.LINK_VERTEX_COUNTS = th.tensor(vertex_count_list, dtype=th.int32)
+
+        # Invalidate any previously cached AABB kernel inputs — AABB.initialize_view() must
+        # call prepare_aabb_kernel_inputs() again before the next get_aabb() call.
+        cls._aabb_links = None
+        cls._aabb_vertices = None
+        cls._aabb_objs = None
+        cls._aabb_base_link_links = None
+        cls._aabb_base_link_objs = None
 
     @classmethod
     def update_pose_cache(cls):
@@ -410,36 +500,108 @@ class RigidBodyViewAPI:
         return cls._PATH_TO_IDX.get(abs_prim_path)
 
     @classmethod
-    def get_aabb(cls, prim_body_idx, link_idx, out_values):
+    def prepare_aabb_kernel_inputs(cls, prim_body_idx, link_idx, base_link_body_idx, base_link_values_idx):
         """
-        Compute per-link world-space AABB mins/maxes and scatter into per-object scratch buffers.
+        Build and cache the K-length kernel input tables for the AABB kernel and the
+        N_rigid-length tables for the base-link fallback kernel. Called once by
+        AABB.initialize_view() after it builds its (PRIM_BODY_IDX, LINK_IDX,
+        BASE_LINK_BODY_IDX, BASE_LINK_VALUES_IDX) tensors.
 
         Args:
-            prim_body_idx (th.Tensor): (N,) int64 — flat indices into _POSE_MATRICES / LOCAL_POINTS
-            link_idx (th.Tensor):      (N,) int64 — pre-computed s*O + obj_idx for each link
-            out_values (th.Tensor):    (S*O, 6) — caller pre-fills with +/-inf, written in-place
+            prim_body_idx (th.Tensor):       (n_tracked_links,) int32 CPU — flat idx per AABB-tracked link
+            link_idx (th.Tensor):            (n_tracked_links,) int32 CPU — output row (s*O + obj_idx) per tracked link
+            base_link_body_idx (th.Tensor):  (n_rigid_objs,) int32 CPU — flat idx of each rigid object's base link
+            base_link_values_idx (th.Tensor):(n_rigid_objs,) int32 CPU — output row per rigid object
         """
-        poses = cls._POSE_MATRICES[prim_body_idx]  # (N, 4, 4)
-        local_pts = cls.LOCAL_POINTS[prim_body_idx]  # (N, V, 4)
-        mask = cls.POINTS_MASK[prim_body_idx]  # (N, V)
+        # Always reset the cache; we rebuild what we can below.
+        cls._aabb_links = None
+        cls._aabb_vertices = None
+        cls._aabb_objs = None
+        cls._aabb_base_link_links = None
+        cls._aabb_base_link_objs = None
 
-        # Transform local homogeneous points to world frame
-        world_pts = th.einsum("nij,nvj->nvi", poses, local_pts)[..., :3]  # (N, V, 3)
+        # Nothing to prepare if no rigid bodies are registered.
+        if cls.LINK_VERTEX_COUNTS is None:
+            return
 
-        # Mask padding slots so they don't affect min/max
-        world_pts_min = world_pts.clone()
-        world_pts_max = world_pts.clone()
-        world_pts_min[~mask] = float("inf")
-        world_pts_max[~mask] = float("-inf")
+        if prim_body_idx.numel() > 0:
+            # Goal: expand from "one entry per tracked link" (length = n_tracked_links) to
+            # "one entry per (link, vertex) pair" (length K = sum of vertex counts). The
+            # K-length tables are what the AABB kernel reads, one per thread.
+            #
+            # All ops on CPU; n_tracked_links is small.
 
-        # Compute per-link AABBs
-        min_p = world_pts_min.min(dim=1).values  # (N, 3)
-        max_p = world_pts_max.max(dim=1).values  # (N, 3)
+            verts_per_link = cls.LINK_VERTEX_COUNTS[prim_body_idx]  # (n_tracked_links,)
+            K = int(verts_per_link.sum().item())
 
-        # Scatter into per-object AABBs
-        idx_exp = link_idx.unsqueeze(1).expand(-1, 3)  # (N, 3)
-        out_values[:, :3].scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_self=True)
-        out_values[:, 3:].scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_self=True)
+            # Repeat each link's body / obj index by its vertex count so each thread that
+            # belongs to that link sees the same body and obj.
+            aabb_links = th.repeat_interleave(prim_body_idx, verts_per_link)  # (K,)
+            aabb_objs = th.repeat_interleave(link_idx, verts_per_link)  # (K,)
+
+            # Compute for each link, the index of the first thread that run the link's vertex
+            link_thread_starts = th.cat([th.zeros(1, dtype=verts_per_link.dtype), verts_per_link.cumsum(0)])
+            thread_idx = th.arange(K, dtype=verts_per_link.dtype)
+            # for thread k, find the smallest i such that k < link_thread_starts[1:][i]
+            tracked_link_per_thread = th.searchsorted(link_thread_starts[1:], thread_idx, right=True)
+            aabb_vertices = (thread_idx - link_thread_starts[tracked_link_per_thread]).to(th.int32)
+
+            cls._aabb_links = wp.from_torch(aabb_links.cuda())
+            cls._aabb_vertices = wp.from_torch(aabb_vertices.cuda())
+            cls._aabb_objs = wp.from_torch(aabb_objs.cuda())
+
+        if base_link_body_idx.numel() > 0:
+            cls._aabb_base_link_links = wp.from_torch(base_link_body_idx.cuda())
+            cls._aabb_base_link_objs = wp.from_torch(base_link_values_idx.cuda())
+
+    @classmethod
+    def get_aabb(cls, out_values):
+        """
+        Compute per-object world-space AABBs by launching two Warp kernels back-to-back on
+        torch's current CUDA stream:
+          1. _aabb_reduce_kernel: per-(link, vertex) thread, transforms one local point and
+             atomically narrows the owning object's (lo, hi) row of out_values.
+          2. _aabb_baselink_fallback_kernel: per-rigid-object thread, writes base-link
+             position as a point AABB for any object whose row was untouched (still +inf).
+
+        Args:
+            out_values (th.Tensor): (S*O, 6) float32 CUDA — caller pre-fills with +/-inf,
+                                    written in-place.
+        """
+        if cls._aabb_links is None or cls._aabb_links.shape[0] == 0:
+            return
+        pose_mats = wp.from_torch(cls._POSE_MATRICES, dtype=wp.mat44)
+        poses = wp.from_torch(cls._POSES_GPU)  # (N_links_total, 7) float32
+        out_arr = wp.from_torch(out_values)
+
+        with wp.ScopedStream(wp.stream_from_torch(th.cuda.current_stream())):
+            # get AABB from meshes
+            wp.launch(
+                kernel=_aabb_reduce_kernel,
+                dim=cls._aabb_links.shape[0],
+                inputs=[
+                    pose_mats,
+                    cls.LINK_MESH_IDS,
+                    cls._aabb_links,
+                    cls._aabb_vertices,
+                    cls._aabb_objs,
+                    out_arr,
+                ],
+                device="cuda",
+            )
+            # use base-link pose for meshes without boundry points
+            if cls._aabb_base_link_links is not None and cls._aabb_base_link_links.shape[0] > 0:
+                wp.launch(
+                    kernel=_aabb_baselink_fallback_kernel,
+                    dim=cls._aabb_base_link_links.shape[0],
+                    inputs=[
+                        poses,
+                        cls._aabb_base_link_links,
+                        cls._aabb_base_link_objs,
+                        out_arr,
+                    ],
+                    device="cuda",
+                )
 
     @classmethod
     def invalidate_kinematic(cls, links):
@@ -486,8 +648,13 @@ class RigidBodyViewAPI:
         cls._POSES_GPU = None
         cls._POSE_MATRICES = None
         cls._POSE_MATRICES_CPU = None
-        cls.LOCAL_POINTS = None
-        cls.POINTS_MASK = None
+        cls.LINK_MESH_IDS = None
+        cls.LINK_VERTEX_COUNTS = None
+        cls._aabb_links = None
+        cls._aabb_vertices = None
+        cls._aabb_objs = None
+        cls._aabb_base_link_links = None
+        cls._aabb_base_link_objs = None
 
 
 class ArticulatedObjectViewAPI:

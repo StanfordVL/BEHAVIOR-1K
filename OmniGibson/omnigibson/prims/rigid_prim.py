@@ -3,6 +3,7 @@ import re
 import math
 
 import torch as th
+import warp as wp
 from scipy.spatial import ConvexHull
 
 import omnigibson as og
@@ -20,6 +21,7 @@ from omnigibson.utils.usd_utils import (
     check_extent_radius_ratio,
     ensure_usd_api,
     get_mesh_volume_and_com,
+    mesh_prim_to_trimesh_mesh,
 )
 
 # Create module logger
@@ -496,6 +498,44 @@ class RigidPrim(XFormPrim):
         if local_points is None:
             return None
         return self.transform_local_points_to_world(local_points)
+
+    @cached_property
+    def collision_mesh_warp(self):
+        """
+        Returns:
+            wp.Mesh or None: One wp.Mesh combining all collision geoms of this link, with
+            vertices in this link's local frame, pre-scaled by the link's world scale.
+            Returns None if the link has no collision geometry. Used by object_states and view APIs.
+
+        The link's world scale is baked into the stored points so that the kernel can
+        transform points to world frame using just the link's pose-matrix (rotation +
+        translation, no scale) — matching what RigidBodyViewAPI._POSE_MATRICES provides.
+        """
+        scale = self.get_world_scale().to(th.float32)  # link's world scale; usd returns float64
+        pts_concat, idx_concat, point_offset = [], [], 0
+        for geom in self._collision_meshes.values():
+            pts = geom.points_in_parent_frame
+            if pts is None or pts.shape[0] == 0:
+                continue
+            pts = (pts * scale).to(th.float32)  # match the old LOCAL_POINTS scaling (usd_utils.py:341 in old code)
+            # mesh_prim_to_trimesh_mesh handles both USD Mesh and primitive shapes
+            # (Sphere/Cube/Cone/Cylinder). Vertex order matches geom.points (and therefore
+            # geom.points_in_parent_frame), so tm.faces indexes correctly.
+            tm = mesh_prim_to_trimesh_mesh(geom.prim, include_normals=False, include_texcoord=False)
+            faces = th.tensor(tm.faces, dtype=th.int32)
+            pts_concat.append(pts)
+            idx_concat.append((faces + point_offset).flatten())
+            point_offset += pts.shape[0]
+
+        if not pts_concat:
+            return None
+
+        pts_torch = th.cat(pts_concat, dim=0).cuda().contiguous()
+        idx_torch = th.cat(idx_concat, dim=0).to(th.int32).cuda().contiguous()
+        return wp.Mesh(
+            points=wp.from_torch(pts_torch, dtype=wp.vec3),
+            indices=wp.from_torch(idx_torch),
+        )
 
     @property
     def aabb(self):

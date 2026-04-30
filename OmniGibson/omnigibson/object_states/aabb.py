@@ -11,28 +11,14 @@ class AABB(TensorizedValueState):
     Axis-aligned bounding box state, computed in bulk across all objects and scenes.
 
     For rigid objects, batched AABB computation is delegated to RigidBodyViewAPI.get_aabb(),
-    which uses pre-stored LOCAL_POINTS and _POSE_MATRICES. Cloth objects fall back to
-    per-object EntityPrim.aabb.
+    which uses each link's wp.Mesh (collision_mesh_warp) plus _POSE_MATRICES. AABB-tracking
+    config (which links to track, where their AABBs go) is handed off once per
+    initialize_view() via RigidBodyViewAPI.prepare_aabb_kernel_inputs(...).
+
+    Cloth objects are disabled for now.
 
     VALUES shape: (S, O, 6) — [lo_x, lo_y, lo_z, hi_x, hi_y, hi_z]
     """
-
-    # (N_links_aabb_tracked,) int64 — index into RigidBodyViewAPI's pose data
-    PRIM_BODY_IDX = None
-
-    # (N_links_aabb_tracked,) int64 — pre-computed s*O + obj_idx for scatter in get_aabb()
-    # The value at index l is the index in VALUES of the object that the link at index l belongs to
-    LINK_IDX = None
-
-    # The below two are used to handle the case where a link has no collision geometry, in which case we use the object base prim's
-    # position and orientation to compute the AABB.
-    # (O_rigid_objects,) int64 — index of rigid-body object base links into RigidBodyViewAPI
-    BASE_LINK_BODY_IDX = None
-    # (O_rigid_objects,) int64 — index of rigid-body object base links into (S*O, 6) flattened VALUES
-    BASE_LINK_VALUES_IDX = None
-
-    # set[int] — O indices of cloth objects (per-object fallback)
-    CLOTH_OBJ_IDXS = None
 
     # (S, O) bool CPU — True where cached AABB may be stale since last global_update()
     # Often caused by sample_kinematics()
@@ -59,26 +45,24 @@ class AABB(TensorizedValueState):
         O = len(cls.OBJ_IDXS)
 
         if S == 0 or O == 0:
-            cls.PRIM_BODY_IDX = th.zeros((0,), dtype=th.long, device="cuda")
-            cls.LINK_IDX = th.zeros((0,), dtype=th.long, device="cuda")
-            cls.BASE_LINK_BODY_IDX = th.zeros((0,), dtype=th.long, device="cuda")
-            cls.BASE_LINK_VALUES_IDX = th.zeros((0,), dtype=th.long, device="cuda")
-            cls.CLOTH_OBJ_IDXS = set()
             cls.STALE = th.zeros((0, 0), dtype=th.bool)
+            empty = th.zeros((0,), dtype=th.int32)
+            RigidBodyViewAPI.prepare_aabb_kernel_inputs(empty, empty, empty, empty)
             return
 
-        prim_body_idx = []
-        link_idx = []
-        base_link_body_idx = []
-        base_link_values_idx = []
-        cls.CLOTH_OBJ_IDXS = set()
+        # Build the (link, output-row) mapping AABB-tracked rigid bodies need:
+        #   - prim_body_idx[i] / link_idx[i]: for the i-th tracked link with collision geom,
+        #     its flat body idx in RigidBodyViewAPI and its output row in (S*O,)-flattened VALUES.
+        #   - base_link_*[j]: same but per rigid object's base link, used by the fallback kernel
+        #     to write a point AABB for objects whose links have no collision geometry.
+        prim_body_idx, link_idx = [], []
+        base_link_body_idx, base_link_values_idx = [], []
 
         for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
             for obj_index, obj in enumerate(scene_row):
                 if obj is None:
                     continue
                 if obj.prim_type == PrimType.CLOTH:
-                    cls.CLOTH_OBJ_IDXS.add(obj_index)
                     continue
 
                 # Add the base link to the base link indices
@@ -90,16 +74,22 @@ class AABB(TensorizedValueState):
                 for link in obj.links.values():
                     flat_idx = RigidBodyViewAPI.get_flat_idx(link.prim_path)
                     assert flat_idx is not None, "Articulated link not in RigidBodyViewAPI"
-                    if not RigidBodyViewAPI.POINTS_MASK[flat_idx].any():
+                    if RigidBodyViewAPI.LINK_VERTEX_COUNTS[flat_idx].item() == 0:
                         continue  # no collision geometry for this link
 
                     prim_body_idx.append(flat_idx)
                     link_idx.append(scene_idx * O + obj_index)
 
-        cls.PRIM_BODY_IDX = th.tensor(prim_body_idx, dtype=th.long, device="cuda")
-        cls.LINK_IDX = th.tensor(link_idx, dtype=th.long, device="cuda")
-        cls.BASE_LINK_BODY_IDX = th.tensor(base_link_body_idx, dtype=th.long, device="cuda")
-        cls.BASE_LINK_VALUES_IDX = th.tensor(base_link_values_idx, dtype=th.long, device="cuda")
+        # Hand off the index tensors to RigidBodyViewAPI. It builds the K-length kernel
+        # input tables and caches them for subsequent get_aabb() calls. We don't keep
+        # these locally — the only readers are inside RigidBodyViewAPI.
+        RigidBodyViewAPI.prepare_aabb_kernel_inputs(
+            th.tensor(prim_body_idx, dtype=th.int32),
+            th.tensor(link_idx, dtype=th.int32),
+            th.tensor(base_link_body_idx, dtype=th.int32),
+            th.tensor(base_link_values_idx, dtype=th.int32),
+        )
+
         cls.STALE = th.zeros((S, O), dtype=th.bool)
 
         # Initialize new VALUE slots for objects that just appeared
@@ -118,29 +108,12 @@ class AABB(TensorizedValueState):
         values.fill_(float("inf"))
         values[:, :, 3:] = float("-inf")
 
-        values_flat_view = values.view(S * O, 6)
+        # Batched AABB for all rigid links (physx_tracked + physx_untracked kinematic).
+        # get_aabb() short-circuits internally when nothing is tracked — no guard needed.
+        # It runs both the per-(link, vertex) reduce kernel and the base-link fallback kernel.
+        RigidBodyViewAPI.get_aabb(values.view(S * O, 6))
 
-        # Batched AABB for all rigid links (physx_tracked + physx_untracked kinematic)
-        if cls.PRIM_BODY_IDX is not None and cls.PRIM_BODY_IDX.numel() > 0:
-            RigidBodyViewAPI.get_aabb(cls.PRIM_BODY_IDX, cls.LINK_IDX, values_flat_view)
-
-        # Cloth fallback — per-object, uses existing obj.aabb
-        for obj_idx in cls.CLOTH_OBJ_IDXS:
-            for s_idx, s_row in enumerate(cls.IDX_OBJS):
-                obj = s_row[obj_idx]
-                lo, hi = obj.aabb
-                values[s_idx, obj_idx, :3] = lo
-                values[s_idx, obj_idx, 3:] = hi
-
-        # Any rigid-object AABBs that still contain infinities (no collision geometry) fall back
-        # to a point AABB at the root link's position.
-        if cls.BASE_LINK_VALUES_IDX is not None and cls.BASE_LINK_VALUES_IDX.numel() > 0:
-            still_infinity_rigid = th.isinf(values_flat_view[cls.BASE_LINK_VALUES_IDX]).any(dim=1)  # (N_rigid,)
-            infinity_body_idxs = cls.BASE_LINK_BODY_IDX[still_infinity_rigid]
-            infinity_object_idxs = cls.BASE_LINK_VALUES_IDX[still_infinity_rigid]
-            base_link_pos = RigidBodyViewAPI._POSES_GPU[infinity_body_idxs, :3]  # (N_no_geom, 3)
-            values_flat_view[infinity_object_idxs, :3] = base_link_pos
-            values_flat_view[infinity_object_idxs, 3:] = base_link_pos  # hi = lo = position
+        # Cloth — disabled for now
 
     @classmethod
     def mark_stale(cls, obj):
