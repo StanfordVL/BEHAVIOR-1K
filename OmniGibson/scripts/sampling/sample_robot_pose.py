@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import omnigibson as og
+import torch as th
 from pathlib import Path
 from typing import Dict, List
 from omnigibson.macros import gm
@@ -12,6 +13,7 @@ from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 from gello.utils.og_teleop_utils import generate_robot_config
 from utils import get_scene_model
 from omnigibson.object_states import OnTop
+import omnigibson.utils.transform_utils as T
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 
@@ -35,6 +37,7 @@ parser.add_argument(
 )
 # Constants
 MAX_ATTEMPTS = 10
+MAX_UPRIGHT_TILT = 0.1
 
 gm.ENABLE_TRANSITION_RULES = False
 
@@ -71,6 +74,18 @@ def find_given_tasks(data_dir, activities: List[str] = []) -> List[Dict]:
         )
     print("tasks ", tasks)
     return tasks
+
+
+def is_robot_pose_upright(quat):
+    """
+    Test if the given quaternion orientation is approximately upright (i.e. z-axis aligned) within a certain tilt threshold.
+    """
+    z_angle = T.z_angle_from_quat(quat)
+    upright_euler = th.stack([quat.new_tensor(0.0), quat.new_tensor(0.0), z_angle])
+    upright_quat = T.euler2quat(upright_euler)
+    tilt_quat = T.quat_distance(quat, upright_quat)
+    tilt_angle = 2.0 * th.atan2(th.norm(tilt_quat[:3]), th.abs(tilt_quat[3]))
+    return tilt_angle <= MAX_UPRIGHT_TILT
 
 
 def sample_robot_poses(env) -> Dict[str, List[Dict]]:
@@ -114,9 +129,12 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
         fixed_base=False,
     )
 
-    # Add cylinder to scene
-    with og.sim.stopped():
-        env.scene.add_object(cylinder)
+    # Add cylinder to scene. Stopping the scene and playing it again causes a reset, so dump the state first.
+    state = og.sim.dump_state()
+    og.sim.stop()
+    env.scene.add_object(cylinder)
+    og.sim.play()
+    og.sim.load_state(state)
 
     # Sample pose using OnTop state
     sampled_cylinder_pose = None
@@ -127,9 +145,12 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
             for _ in range(10):
                 og.sim.step()
             sampled_cylinder_pose = cylinder.get_position_orientation()
+            if not is_robot_pose_upright(sampled_cylinder_pose[1]):
+                sampled_cylinder_pose = None
+                continue
             break
 
-    assert sampled_cylinder_pose is not None, "Failed to sample valid cylinder pose"
+    assert sampled_cylinder_pose is not None, "Failed to sample valid upright cylinder pose"
     # set z to the cylinder base
     sampled_cylinder_pose[0][2] -= cylinder.height / 2
     robot_poses = {
