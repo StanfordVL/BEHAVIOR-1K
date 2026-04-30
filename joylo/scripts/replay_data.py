@@ -8,6 +8,7 @@ import os
 import sys
 import torch as th
 import yaml
+from typing import Optional
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm
@@ -84,10 +85,14 @@ def get_episode_lengths(data_grp):
     Returns a numerically sorted list of (episode_id, key, num_samples) tuples for all saved demo groups.
     """
     episode_lengths = []
+    prefix = "demo_"
     for key in data_grp.keys():
-        if not key.startswith("demo_"):
+        if not key.startswith(prefix):
             continue
-        episode_id = int(key.removeprefix("demo_"))
+        try:
+            episode_id = int(key[len(prefix) :])
+        except ValueError:
+            continue
         episode_lengths.append((episode_id, key, data_grp[key].attrs["num_samples"]))
     return sorted(episode_lengths)
 
@@ -139,7 +144,7 @@ def replay_hdf5_to_video(
     task_name: str,
     flush_every_n_steps: int,
     run_qa: bool = False,
-    episode_id: int | None = None,
+    episode_id: Optional[int] = None,
 ) -> int:
     """
     Replays a single HDF5 file and generates videos.
@@ -318,7 +323,10 @@ def replay_hdf5_to_video(
     episode_lengths = get_episode_lengths(env.input_hdf5["data"])
     default_episode_id, _, _ = max(episode_lengths, key=lambda x: x[2])
     if run_qa:
-        print_episode_lengths(episode_lengths=episode_lengths, selected_episode_id=episode_id or default_episode_id)
+        print_episode_lengths(
+            episode_lengths=episode_lengths,
+            selected_episode_id=episode_id if episode_id is not None else default_episode_id,
+        )
     if episode_id is None:
         episode_id = select_episode_id(
             episode_lengths=episode_lengths,
