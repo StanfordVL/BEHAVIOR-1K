@@ -427,7 +427,6 @@ stages:
       cmd: python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/export_meshes.py
       deps:
       - b1k_pipeline/max/export_meshes.py
-      - artifacts/pipeline/sanitycheck.success
       - cad/${item}/processed.max
       outs:
       - cad/${item}/artifacts/meshes.zip
