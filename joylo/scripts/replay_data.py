@@ -25,6 +25,7 @@ gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
 OBS_CAMERA_RESOLUTION = 480
+EPISODE_SELECTION_SEPARATOR = "=" * 88
 
 
 class VideoPlaybackWrapper(DataPlaybackWrapper):
@@ -95,11 +96,16 @@ def print_episode_lengths(episode_lengths, selected_episode_id):
     """
     Prints a summary of all saved episodes and their trajectory lengths.
     """
-    print(" >>> Saved episodes:")
-    print("     order | episode | key      | trajectory length")
-    for order, (episode_id, key, num_samples) in enumerate(episode_lengths):
+    print()
+    print(EPISODE_SELECTION_SEPARATOR)
+    print("EPISODE SELECTION")
+    print(EPISODE_SELECTION_SEPARATOR)
+    print("Saved episodes:")
+    print("     episode | key      | trajectory length")
+    for episode_id, key, num_samples in episode_lengths:
         selected = "  < selected" if episode_id == selected_episode_id else ""
-        print(f"     {order:>5} | {episode_id:>7} | {key:<8} | {num_samples:>17}{selected}")
+        print(f"     {episode_id:>7} | {key:<8} | {num_samples:>17}{selected}")
+    print(EPISODE_SELECTION_SEPARATOR)
 
 
 def select_episode_id(episode_lengths, default_episode_id, prompt_user=False):
@@ -110,11 +116,10 @@ def select_episode_id(episode_lengths, default_episode_id, prompt_user=False):
         return default_episode_id
 
     episode_ids = {episode_id for episode_id, _, _ in episode_lengths}
-    order_to_episode_id = {order: episode_id for order, (episode_id, _, _) in enumerate(episode_lengths)}
 
     while True:
         choice = input(
-            f"Select episode id (ranked in order of saving) to replay [longest (default): episode {default_episode_id}]: "
+            f"Select episode id (ranked in order of saving)  to replay [longest default: episode {default_episode_id}]: "
         ).strip()
         if choice == "":
             return default_episode_id
@@ -126,9 +131,7 @@ def select_episode_id(episode_lengths, default_episode_id, prompt_user=False):
 
         if value in episode_ids:
             return value
-        if value in order_to_episode_id:
-            return order_to_episode_id[value]
-        print(f"Invalid selection {value}. Choose one of the listed episode ids or orders.")
+        print(f"Invalid selection {value}. Choose one of the listed episode ids.")
 
 
 def replay_hdf5_to_video(

@@ -131,6 +131,8 @@ After teleoperation succeeds, you should see a `hdf5` file at `HDF_PATH`. Run th
 OMNIGIBSON_HEADLESS=1 python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
 ```
 
+If the HDF5 contains multiple saved demos, the replay script prints an episode-selection table with each `demo_N` episode ID and its trajectory length. Press Enter to replay the longest trajectory, or enter an episode ID to replay a specific demo.
+
 Check the QA json file output. **All QA should pass unless for task-specific reasons** (e.g. one failed grasp is allowed for `turning_on_radio` because the gripper needs to close to poke the button). Also check mp4 to make sure the replay visual looks reasonable. For example, you shouldn't see a whole in the ground, which might indicates you forgot to put one room in the task misc csv. 
 
 If all outputs seems reasonable, share the generated MP4 file and QA result with the team for review.
