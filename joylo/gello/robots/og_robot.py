@@ -271,6 +271,7 @@ class OGRobotServer:
         # Take a single step
         action = self.get_action()
         self.env.step(action)
+        self.robot.keep_still()
 
         # Set up keyboard handlers
         self._setup_keyboard_handlers()
@@ -1098,22 +1099,25 @@ class OGRobotServer:
                         tro_state, serialized=False
                     )
 
-            # Try to ensure that all task-relevant objects are stable
-            # They should already be stable from the sampled instance, but there is some issue where loading the state
-            # causes some jitter (maybe for small mass / thin objects?)
-            for _ in range(25):
-                og.sim.step_physics()
-                for entity in self.env.task.object_scope.values():
-                    if entity is not None and not isinstance(entity, BaseSystem):
-                        entity.keep_still()
-            self.env.scene.update_initial_file()
             print(
                 f"\nLoading task {self.env.task.activity_name} instance id: {self.instance_id}\n"
             )
             utils.update_instance_id_label(self.instance_id_label, self.instance_id)
 
+
+        # Try to ensure that all task-relevant objects are stable
+        # They should already be stable from the sampled instance, but there is some issue where loading the state
+        # causes some jitter (maybe for small mass / thin objects?)
+        for _ in range(25):
+            og.sim.step_physics()
+            for entity in self.env.task.object_scope.values():
+                if entity is not None and not isinstance(entity, BaseSystem):
+                    entity.keep_still()
+        self.env.scene.update_initial_file()
+
         # Reset env
         self.env.reset()
+        self.robot.keep_still()
 
         # If we're recording, record the retroactively record the instance ID from the previous episode
         if (
