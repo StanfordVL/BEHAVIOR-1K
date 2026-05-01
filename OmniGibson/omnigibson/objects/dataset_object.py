@@ -25,6 +25,7 @@ from omnigibson.utils.constants import (
     PrimType,
 )
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import find_joint_prims
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -460,30 +461,39 @@ class DatasetObject(USDObject):
         """
         scales = {self.root_link.body_name: self.scale}
 
-        # We iterate through all links in this object, and check for any joint prims that exist
-        # We traverse manually this way instead of accessing the self._joints dictionary, because
-        # the dictionary only includes articulated joints and not fixed joints!
-        for link in self._links.values():
-            for prim in link.prim.GetChildren():
-                if "joint" in prim.GetTypeName().lower():
-                    # Grab relevant joint information
-                    parent_name = prim.GetProperty("physics:body0").GetTargets()[0].pathString.split("/")[-1]
-                    child_name = prim.GetProperty("physics:body1").GetTargets()[0].pathString.split("/")[-1]
-                    if parent_name in scales and child_name not in scales:
-                        scale_in_parent_lf = scales[parent_name]
-                        # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
-                            prim.GetAttribute("physics:localRot0").Get()
-                        )[[1, 2, 3, 0]]
-                        quat1 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
-                            prim.GetAttribute("physics:localRot1").Get()
-                        )[[1, 2, 3, 0]]
-                        # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-                        local_ori = T.quat_multiply(
-                            quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
-                        )
-                        jnt_frame_rot = T.quat2mat(local_ori)
-                        scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
-                        scales[child_name] = scale_in_child_lf
+        # Collect every joint prim under this object's prim. We traverse manually this way instead of
+        # accessing the self._joints dictionary, because the dictionary only includes articulated
+        # joints and not fixed joints! Joints may live anywhere under the object's prim (recent Isaac
+        # Sim exports place them in a flat /joints scope rather than under body0).
+        joint_prims = list(find_joint_prims(self.prim))
+
+        # Propagate scale outwards from the root link. Fixed-point loop handles arbitrary joint order.
+        progress = True
+        while progress:
+            progress = False
+            for prim in joint_prims:
+                body0_targets = prim.GetProperty("physics:body0").GetTargets()
+                body1_targets = prim.GetProperty("physics:body1").GetTargets()
+                if not body0_targets or not body1_targets:
+                    continue
+                parent_name = body0_targets[0].pathString.split("/")[-1]
+                child_name = body1_targets[0].pathString.split("/")[-1]
+                if parent_name in scales and child_name not in scales:
+                    scale_in_parent_lf = scales[parent_name]
+                    # The location of the joint frame is scaled using the scale in the parent frame
+                    quat0 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
+                        prim.GetAttribute("physics:localRot0").Get()
+                    )[[1, 2, 3, 0]]
+                    quat1 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
+                        prim.GetAttribute("physics:localRot1").Get()
+                    )[[1, 2, 3, 0]]
+                    # Invert the child link relationship, and multiply the two rotations together to get the final rotation
+                    local_ori = T.quat_multiply(
+                        quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
+                    )
+                    jnt_frame_rot = T.quat2mat(local_ori)
+                    scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
+                    scales[child_name] = scale_in_child_lf
+                    progress = True
 
         return scales
