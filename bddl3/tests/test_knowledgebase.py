@@ -611,3 +611,19 @@ class TestWildcardExpansion:
         ok, results = ct.check_goal(lambda cls, *e: False)
         assert isinstance(ok, bool)
         assert "satisfied" in results and "unsatisfied" in results
+
+    def test_wildcard_fails_with_zero_matched_instances(self, kb):
+        """A wildcard-only declaration should still require at least one matching scene object."""        
+        from bddl.wildcard import expand_wildcards
+        task = kb.get_task("carrying_in_groceries-0")
+        raw = (
+            task.definition
+            .replace(
+                "electric_refrigerator.n.01_1 electric_refrigerator.n.01_*",
+                "electric_refrigerator.n.01_*",
+            )
+            .replace("(inroom electric_refrigerator.n.01_1 kitchen)\n", "")
+        )
+        layout = {"kitchen": {}}
+        with pytest.raises(AssertionError, match="instance"):
+            expand_wildcards(raw, layout, kb)
