@@ -257,7 +257,6 @@ stages:
     - artifacts/og_dataset.zip
     - artifacts/pipeline/pack_dataset.success
     - b1k_pipeline/validate_scenes.py
-    - b1k_pipeline/validate_scenes_process.py
     outs:
     - artifacts/pipeline/validate_scenes.json
 
@@ -287,7 +286,6 @@ stages:
     - artifacts/pipeline/export_objs.success
     # - artifacts/pipeline/aggregate_metadata.success
     - b1k_pipeline/usd_conversion/usdify_objects.py
-    - b1k_pipeline/usd_conversion/usdify_objects_process.py
     outs:
     - artifacts/parallels/objects_usd.zip
     - artifacts/pipeline/usdify_objects.json
@@ -310,7 +308,6 @@ stages:
     - artifacts/pipeline/export_scenes.success
     - artifacts/pipeline/aggregate_metadata.success
     - b1k_pipeline/usd_conversion/usdify_scenes.py
-    - b1k_pipeline/usd_conversion/usdify_scenes_process.py
     - b1k_pipeline/usd_conversion/make_maps.py
     outs:
     - artifacts/parallels/scenes_json.zip

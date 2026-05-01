@@ -9297,29 +9297,25 @@ stages:
     deps:
     - path: artifacts/parallels/objects.zip
       hash: md5
-      md5: 4e9972811b9042041f83faa4c13abb8a
-      size: 28289303296
+      md5: 568b005f9a2ec3c7d3edf5958e41877f
+      size: 27899718612
     - path: artifacts/pipeline/export_objs.success
       hash: md5
       md5: d41d8cd98f00b204e9800998ecf8427e
       size: 0
     - path: b1k_pipeline/usd_conversion/usdify_objects.py
       hash: md5
-      md5: c9c8be8170a60bc81c029aaa377e0748
-      size: 6647
-    - path: b1k_pipeline/usd_conversion/usdify_objects_process.py
-      hash: md5
-      md5: 51d4d0e06a79f3729b3dabd69ee9e421
-      size: 5045
+      md5: 45da63e7f496ad125bdaad4d05a9b2ea
+      size: 8791
     outs:
     - path: artifacts/parallels/objects_usd.zip
       hash: md5
-      md5: 21aa924ee86d7b68beb04c1bf36f8675
-      size: 4831154698
+      md5: 17ea7e65bbeb3686d7be4a33147336cf
+      size: 2466766
     - path: artifacts/pipeline/usdify_objects.json
       hash: md5
-      md5: 4cb646f82a5c1d3d8db1d9c740a4b7e7
-      size: 51
+      md5: f26ac2af4b1c3335fac1848a633bf02f
+      size: 39
   export_scene@scenes/Beechwood_1_int:
     cmd: python -m b1k_pipeline.export_scene scenes/Beechwood_1_int
     deps:

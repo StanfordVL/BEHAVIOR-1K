@@ -12,11 +12,6 @@ import trimesh.resolvers
 import yaml
 import subprocess
 
-try:
-    import docker
-except ImportError:
-    pass
-
 PIPELINE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 TMP_DIR = PIPELINE_ROOT / "tmp"
 PARAMS_FILE = PIPELINE_ROOT / "params.yaml"
@@ -26,7 +21,6 @@ NAME_PATTERN = re.compile(
 PORTAL_PATTERN = re.compile(
     r"^portal(-(?P<partial_scene>[A-Za-z0-9_]+)(-(?P<portal_id>\d+))?)?$"
 )
-CLUSTER_MODE = "enroot"  # one of "docker", "slurm", "enroot"
 
 params = yaml.load(open(PARAMS_FILE, "r"), Loader=yaml.SafeLoader)
 
@@ -211,93 +205,165 @@ def save_mesh(mesh, out_fs, name, **kwargs):
         return mesh.export(f, resolver=FSResolver(out_fs), file_type=filetype, **kwargs)
 
 
-def create_docker_container(cl, hostname: str, i: int):
-    name = f"ig_pipeline_{i}"
+# Per-worker-subprocess state. ``_og_initializer`` populates this; tasks
+# read it via ``og_context()``. ``None`` in the parent process.
+_OG_CONTEXT = None
+
+
+class _OGContext:
+    def __init__(self, clear_kwargs):
+        self.clear_kwargs = clear_kwargs
+        self.cache = {}
+
+
+def og_context():
+    """Return the per-worker OmniGibson context. Only valid inside a task.
+
+    The returned object exposes ``clear_kwargs`` (the kwargs needed by
+    ``og.clear()`` after the URDF importer has swapped the stage) and
+    ``cache``, a plain dict that persists across tasks on the same worker.
+    """
+    if _OG_CONTEXT is None:
+        raise RuntimeError("og_context() called outside of an OG worker process")
+    return _OG_CONTEXT
+
+
+def _detect_visible_gpus():
+    """Return a list of GPU ids visible to this process.
+
+    Honors a pre-existing ``CUDA_VISIBLE_DEVICES`` if set; otherwise queries
+    ``nvidia-smi``. Returns an empty list if neither yields anything.
+    """
+    cvd = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if cvd is not None and cvd.strip():
+        return [g.strip() for g in cvd.split(",") if g.strip()]
     try:
-        ctr = cl.containers.get(name)
-    except:
-        gpu = i % 2
-        ctr = cl.containers.create(
-            name=name,
-            image="stanfordvl/ig_pipeline",
-            command=f"{hostname}:8786",
-            environment={
-                "OMNIGIBSON_HEADLESS": "1",
-                "DISPLAY": "",
-            },
-            mounts=[
-                docker.types.Mount(source="/scr", target="/scr", type="bind"),
-                docker.types.Mount(
-                    source="/scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker/data",
-                    target="/data",
-                    type="bind",
-                    read_only=True,
-                ),
-                docker.types.Mount(
-                    source="/scr/BEHAVIOR-1K/OmniGibson",
-                    target="/omnigibson-src",
-                    type="bind",
-                    read_only=True,
-                ),
-            ],
-            device_requests=[
-                docker.types.DeviceRequest(
-                    device_ids=[str(gpu)], capabilities=[["gpu"]]
-                )
-            ],
-        )
-
-    assert ctr.status != "running", f"Container {name} is already running"
-    return ctr
+        out = subprocess.check_output(["nvidia-smi", "-L"], text=True, timeout=5)
+    except Exception:
+        return []
+    return [str(i) for i, line in enumerate(out.splitlines()) if line.strip()]
 
 
-def launch_cluster(worker_count):
-    from dask.distributed import Client
+def _claim_worker_index(counter_path):
+    """Atomically increment a counter file and return the previous value.
 
-    dask_client = Client(n_workers=0, host="", scheduler_port=8786)
-    hostname = (
-        subprocess.run("hostname", shell=True, check=True, stdout=subprocess.PIPE)
-        .stdout.decode("utf-8")
-        .strip()
+    Used by ``_og_initializer`` to assign a stable monotonic index to each
+    worker (and re-spawned worker) without needing a shared
+    ``multiprocessing.Value`` — those can't be pickled across the loky spawn.
+    """
+    import fcntl
+
+    flags = os.O_RDWR | os.O_CREAT
+    fd = os.open(counter_path, flags, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            existing = os.read(fd, 64).decode().strip()
+            idx = int(existing) if existing else 0
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.ftruncate(fd, 0)
+            os.write(fd, str(idx + 1).encode())
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+    return idx
+
+
+def _og_initializer(og_macros, counter_path, gpus):
+    """Run once per worker subprocess at startup. Boots OG.
+
+    Atomically claims a worker index from a file-based counter and pins this
+    worker to one GPU (round-robin over ``gpus``) by setting
+    ``CUDA_VISIBLE_DEVICES`` *before* OmniGibson is imported.
+
+    Redirects fd 1/2 to per-worker files in :data:`TMP_DIR` so the OG launch
+    log (~thousands of lines) doesn't pollute the parent's stdout.
+    """
+    worker_idx = _claim_worker_index(counter_path)
+
+    if gpus:
+        os.environ["CUDA_VISIBLE_DEVICES"] = gpus[worker_idx % len(gpus)]
+
+    TMP_DIR.mkdir(exist_ok=True)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    log_fd = os.open(str(TMP_DIR / f"og-worker-{os.getpid()}.log"), flags)
+    err_fd = os.open(str(TMP_DIR / f"og-worker-{os.getpid()}.err"), flags)
+    os.dup2(log_fd, 1)
+    os.dup2(err_fd, 2)
+    os.close(log_fd)
+    os.close(err_fd)
+
+    print(
+        f"[og-worker {os.getpid()}] worker_idx={worker_idx}, "
+        f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES', '')}",
+        flush=True,
     )
-    if CLUSTER_MODE == "enroot":
-        subprocess.run(
-            f"cd /scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker; ./run_worker_local.sh {worker_count} {hostname}:8786",
-            shell=True,
-            check=True,
-        )
-    elif CLUSTER_MODE == "slurm":
-        subprocess.run(
-            'ssh sc.stanford.edu "cd /cvgl2/u/cgokmen/ig_pipeline/b1k_pipeline/docker; sbatch --parsable run_worker_slurm.sh {hostname}:8786"',
-            shell=True,
-            check=True,
-        )
-    elif CLUSTER_MODE == "docker":
-        rtdir = os.environ["XDG_RUNTIME_DIR"]
-        client = docker.DockerClient(base_url=f"unix://{rtdir}/docker.sock")
-        client.images.pull("stanfordvl/ig_pipeline")
-        ctrs = [
-            create_docker_container(client, hostname, i) for i in range(worker_count)
-        ]
-        for ctr in ctrs:
-            ctr.start()
-    else:
-        raise ValueError(f"Unknown cluster mode {CLUSTER_MODE}")
-    print("Waiting for workers")
-    dask_client.wait_for_workers(worker_count, timeout=30)
-    return dask_client
 
+    from omnigibson.macros import gm
 
-def run_in_env(python_cmd, omnigibson_env=False):
-    assert isinstance(python_cmd, list), "Command should be list"
-    env = "omnigibson" if omnigibson_env else "pipeline"
-    subcmd = " ".join(python_cmd)
-    if omnigibson_env:
-        subcmd = (
-            "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && "
-            + cmd
-        )
-    cmd = ["micromamba", "run", "-n", env, "/bin/bash", "-c", subcmd]
-    return subprocess.run(
-        cmd, capture_output=True, check=True, cwd="/scr/BEHAVIOR-1K/asset_pipeline"
+    for key, value in og_macros.items():
+        setattr(gm, key, value)
+
+    import omnigibson as og
+
+    og.launch()
+    clear_kwargs = dict(
+        gravity=og.sim.gravity,
+        physics_dt=og.sim.get_physics_dt(),
+        rendering_dt=og.sim.get_rendering_dt(),
+        sim_step_dt=og.sim.get_sim_step_dt(),
+        viewer_width=og.sim.viewer_width,
+        viewer_height=og.sim.viewer_height,
+        device=og.sim.device,
     )
+
+    global _OG_CONTEXT
+    _OG_CONTEXT = _OGContext(clear_kwargs=clear_kwargs)
+
+
+def _og_task_wrapper(fn, *args, **kwargs):
+    """Worker-side wrapper that calls ``og.clear()`` before invoking ``fn``."""
+    import omnigibson as og
+
+    og.clear(**_OG_CONTEXT.clear_kwargs)
+    return fn(*args, **kwargs)
+
+
+def launch_cluster(worker_count, og_macros=None):
+    """Launch a loky process pool.
+
+    If ``og_macros`` is provided, each worker subprocess runs
+    :func:`_og_initializer` at startup — applying the macros, calling
+    ``og.launch()``, and stashing ``og.clear`` kwargs for later use. Workers
+    are pinned to GPUs round-robin via ``CUDA_VISIBLE_DEVICES`` (re-pinned
+    each time loky respawns one). Use :func:`submit_og_task` to submit jobs
+    that should run with a freshly cleared simulator.
+    """
+    from loky import ProcessPoolExecutor
+    from loky.backend.context import get_context
+
+    ctx = get_context("loky")
+    if og_macros is None:
+        return ProcessPoolExecutor(max_workers=worker_count, context=ctx)
+
+    gpus = _detect_visible_gpus()
+    TMP_DIR.mkdir(exist_ok=True)
+    counter_path = str(TMP_DIR / f"og-worker-counter-{os.getpid()}")
+    # Ensure a fresh counter for this cluster.
+    with open(counter_path, "w") as f:
+        f.write("0")
+
+    return ProcessPoolExecutor(
+        max_workers=worker_count,
+        context=ctx,
+        initializer=_og_initializer,
+        initargs=(dict(og_macros), counter_path, gpus),
+    )
+
+
+def submit_og_task(executor, fn, *args, **kwargs):
+    """Submit ``fn`` so that ``og.clear()`` runs on the worker before it."""
+    return executor.submit(_og_task_wrapper, fn, *args, **kwargs)

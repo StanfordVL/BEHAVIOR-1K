@@ -1140,7 +1140,7 @@ def convert_urdf_to_usd(
     )
 
     # Pre-clear the scene.
-    og.sim.clear()
+    og.clear()
 
     model_root_path = pathlib.Path(dataset_root) / "objects" / obj_category / obj_model
     usd_dir = model_root_path / "usd"
@@ -1156,7 +1156,7 @@ def convert_urdf_to_usd(
     )
 
     # Also clear again to release the file.
-    og.sim.clear()
+    og.clear()
 
     # Find all the relevant files
     configuration_dir = usd_dir / "configuration"
@@ -1331,6 +1331,7 @@ def convert_urdf_to_usd(
 
             # Add the collision APIs
             if referrer_prim_path.name == "collisions":
+                lazy.pxr.UsdPhysics.CollisionAPI.Apply(mesh_prim)
                 mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(mesh_prim)
                 mesh_collision_api.GetApproximationAttr().Set("convexHull")
 
