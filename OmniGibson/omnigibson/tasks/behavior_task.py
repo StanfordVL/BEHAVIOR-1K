@@ -55,7 +55,7 @@ class BehaviorTask(BaseTask):
             mapping category name (e.g.: "breakfast_table") to a list of invalid models that should not be sampled from
             that category. During sampling, if a given synset is found in this blacklist, all specified
             models will not be used as options
-        unique_models_per_synset (bool): If True, ensures that each instance of the same synset is assigned a distinct
+        use_unique_models_per_synset (bool): If True, ensures that each instance of the same synset is assigned a distinct
             object model (sampling without replacement). Sampling fails if there are fewer valid models than instances
             for a given synset. Only applies when online_object_sampling is True.
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
@@ -80,7 +80,7 @@ class BehaviorTask(BaseTask):
         randomize_presampled_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
-        unique_models_per_synset=False,
+        use_unique_models_per_synset=False,
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
@@ -117,7 +117,7 @@ class BehaviorTask(BaseTask):
         self.randomize_presampled_pose = randomize_presampled_pose
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
-        self.unique_models_per_synset = unique_models_per_synset  # bool
+        self.use_unique_models_per_synset = use_unique_models_per_synset  # bool
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
         self.object_scope = None  # Maps str to sim object (BaseObject/BaseSystem) or None
         self.object_instance_to_category = None  # Maps str to str
@@ -466,7 +466,7 @@ class BehaviorTask(BaseTask):
             accept_scene, feedback = self.sampler.assign_objects(
                 sampling_whitelist=self.sampling_whitelist,
                 sampling_blacklist=self.sampling_blacklist,
-                unique_models_per_synset=self.unique_models_per_synset,
+                use_unique_models_per_synset=self.use_unique_models_per_synset,
             )
             if not accept_scene:
                 return accept_scene, feedback
