@@ -473,7 +473,7 @@ def process_link(
         joint_xml = ET.SubElement(tree_root, "joint")
         joint_xml.attrib = {
             "name": f"j_{child_node[3]}",
-            "type": {"P": "prismatic", "R": "revolute", "F": "fixed"}[joint_type],
+            "type": {"P": "prismatic", "R": "revolute", "F": "fixed", "C": "continuous"}[joint_type],
         }
 
         joint_parent_xml = ET.SubElement(joint_xml, "parent")
@@ -482,14 +482,14 @@ def process_link(
         joint_child_xml.attrib = {"link": child_node[3]}
 
         mesh_offset = np.zeros(3)
-        if joint_type in ("P", "R"):
+        if joint_type in ("P", "R", "C"):
             upper_canonical_points = transform_points(
                 G.nodes[child_node]["upper_points"],
                 base_link_center + rotated_parent_frame,
                 canonical_orientation,
             )
 
-            if joint_type == "R":
+            if joint_type in ("R", "C"):
                 # Revolute joint
                 num_v_lower = lower_canonical_points.shape[0]
                 num_v_upper = upper_canonical_points.shape[0]
@@ -572,8 +572,9 @@ def process_link(
             joint_axis_xml.attrib = {
                 "xyz": " ".join([str(item) for item in joint_axis])
             }
-            joint_limit_xml = ET.SubElement(joint_xml, "limit")
-            joint_limit_xml.attrib = {"lower": str(0.0), "upper": str(upper_limit)}
+            if joint_type != "C":  # Continuous joints do not have limits
+                joint_limit_xml = ET.SubElement(joint_xml, "limit")
+                joint_limit_xml.attrib = {"lower": str(0.0), "upper": str(upper_limit)}
         else:
             # Fixed joints are quite simple.
             joint_origin = child_center
