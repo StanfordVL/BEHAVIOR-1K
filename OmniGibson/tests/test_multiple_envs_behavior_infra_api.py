@@ -8,6 +8,7 @@ Covers:
   Section 2 – Step and reset
 """
 
+import pytest
 import torch as th
 
 import omnigibson as og
@@ -86,6 +87,32 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
     return env
 
 
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def behavior_env():
+    """Build the BehaviorTask env once per module and tear it down at the end.
+
+    Loading `house_double_floor_lower` x NUM_ENVS with a BehaviorTask is the
+    dominant CI cost; sharing one env across the module's tests is what keeps
+    the suite under the 30-minute timeout.
+    """
+    env = setup_behavior_environment()
+    try:
+        yield env
+    finally:
+        og.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_behavior_env(request):
+    """Restore a clean post-reset state before each test that uses behavior_env."""
+    if "behavior_env" in request.fixturenames:
+        request.getfixturevalue("behavior_env").reset()
+    yield
+
+
 # ===================================================================
 #  Section 1 – Environment construction
 # ===================================================================
@@ -94,10 +121,10 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
 class TestBehaviorEnvConstruction:
     """Basic BehaviorTask environment construction tests."""
 
-    def test_behavior_env_construction(self):
+    def test_behavior_env_construction(self, behavior_env):
         """BehaviorTask env with num_envs=2 creates correct structure."""
         _progress("TestBehaviorEnvConstruction::test_behavior_env_construction")
-        env = setup_behavior_environment(num_envs=NUM_ENVS)
+        env = behavior_env
 
         assert len(env.scenes) == NUM_ENVS
         assert env.num_envs == NUM_ENVS
@@ -106,32 +133,12 @@ class TestBehaviorEnvConstruction:
         assert isinstance(env.task, BehaviorTask)
         assert env.task.activity_name == ACTIVITY_NAME
 
-        og.clear()
         _passed("TestBehaviorEnvConstruction::test_behavior_env_construction")
 
-    def test_single_env_behavior(self):
-        """BehaviorTask with num_envs=1 works; scene property returns first scene."""
-        _progress("TestBehaviorEnvConstruction::test_single_env_behavior")
-        env = setup_behavior_environment(num_envs=1)
-        env.reset()
-
-        assert env.scene is env.scenes[0]
-        assert len(env.scenes) == 1
-        assert isinstance(env.task, BehaviorTask)
-
-        action = th.from_numpy(env.scenes[0].robots[0].action_space.sample()).float().unsqueeze(0)
-        obs_list, rewards, terminateds, truncateds, infos = env.step(action)
-
-        assert rewards.shape == (1,)
-        assert len(obs_list) == 1
-
-        og.clear()
-        _passed("TestBehaviorEnvConstruction::test_single_env_behavior")
-
-    def test_scenes_spatially_separated(self):
+    def test_scenes_spatially_separated(self, behavior_env):
         """BehaviorTask scenes occupy different spatial regions."""
         _progress("TestBehaviorEnvConstruction::test_scenes_spatially_separated")
-        env = setup_behavior_environment(num_envs=NUM_ENVS)
+        env = behavior_env
 
         scene_positions = [s.get_position_orientation()[0] for s in env.scenes]
         for i in range(len(scene_positions)):
@@ -140,7 +147,6 @@ class TestBehaviorEnvConstruction:
                 print(f"  Scene {i} <-> Scene {j} distance: {dist:.2f}")
                 assert dist > 1.0, f"Scenes {i} and {j} are too close: {dist:.2f}"
 
-        og.clear()
         _passed("TestBehaviorEnvConstruction::test_scenes_spatially_separated")
 
 
@@ -152,11 +158,10 @@ class TestBehaviorEnvConstruction:
 class TestBehaviorStepAndReset:
     """step() / reset() contract tests with BehaviorTask."""
 
-    def test_step_return_shapes(self):
+    def test_step_return_shapes(self, behavior_env):
         """step() returns tensors of shape (num_envs,) for rewards/terminateds/truncateds."""
         _progress("TestBehaviorStepAndReset::test_step_return_shapes")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         actions = th.stack(
             [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(NUM_ENVS)]
@@ -170,14 +175,12 @@ class TestBehaviorStepAndReset:
         assert truncateds.shape == (NUM_ENVS,) and truncateds.dtype == th.bool
         assert isinstance(infos, list) and len(infos) == NUM_ENVS
 
-        og.clear()
         _passed("TestBehaviorStepAndReset::test_step_return_shapes")
 
-    def test_selective_reset(self):
+    def test_selective_reset(self, behavior_env):
         """Resetting env_indices=[1] only resets scene 1, leaving scene 0 unchanged."""
         _progress("TestBehaviorStepAndReset::test_selective_reset")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         known_pos = th.tensor([1.0, 1.0, 0.5])
         env.scenes[0].robots[0].set_position_orientation(position=known_pos, frame="scene")
@@ -194,14 +197,12 @@ class TestBehaviorStepAndReset:
             pos_before, pos_after, atol=0.15
         ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
 
-        og.clear()
         _passed("TestBehaviorStepAndReset::test_selective_reset")
 
-    def test_per_env_step_counters(self):
+    def test_per_env_step_counters(self, behavior_env):
         """episode_steps is a (num_envs,) tensor that tracks steps independently."""
         _progress("TestBehaviorStepAndReset::test_per_env_step_counters")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         assert env.episode_steps.shape == (NUM_ENVS,)
         assert (env.episode_steps == 0).all()
@@ -219,5 +220,42 @@ class TestBehaviorStepAndReset:
         assert env.episode_steps[0] == 0
         assert env.episode_steps[1] == 1
 
-        og.clear()
         _passed("TestBehaviorStepAndReset::test_per_env_step_counters")
+
+
+# ===================================================================
+#  Section 1b – Single-env construction (kept separate; needs num_envs=1)
+# ===================================================================
+#
+# This test must run *after* every test that uses `behavior_env`, because it
+# tears down the shared module-scope env to build a 1-env one. Pytest collects
+# tests in source order, so keeping this class at the bottom of the file is
+# what guarantees the correct ordering.
+
+
+class TestBehaviorSingleEnv:
+    """BehaviorTask with num_envs=1. Cannot share the module-scope 2-env fixture."""
+
+    def test_single_env_behavior(self):
+        """BehaviorTask with num_envs=1 works; scene property returns first scene."""
+        _progress("TestBehaviorEnvConstruction::test_single_env_behavior")
+        # Tear down the module-scope `behavior_env` (built with num_envs=2) before constructing
+        # the num_envs=1 variant. _init_macros only stops the sim; without an explicit clear,
+        # the new env's object-state machinery references prims from the previous scenes and
+        # crashes during play() with `'NoneType' object has no attribute 'state_updated'`.
+        og.clear()
+        env = setup_behavior_environment(num_envs=1)
+        env.reset()
+
+        assert env.scene is env.scenes[0]
+        assert len(env.scenes) == 1
+        assert isinstance(env.task, BehaviorTask)
+
+        action = th.from_numpy(env.scenes[0].robots[0].action_space.sample()).float().unsqueeze(0)
+        obs_list, rewards, terminateds, truncateds, infos = env.step(action)
+
+        assert rewards.shape == (1,)
+        assert len(obs_list) == 1
+
+        og.clear()
+        _passed("TestBehaviorEnvConstruction::test_single_env_behavior")
