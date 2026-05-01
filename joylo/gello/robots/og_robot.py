@@ -1113,9 +1113,11 @@ class OGRobotServer:
             # They should already be stable from the sampled instance, but loading the state can cause jitter.
             for _ in range(25):
                 og.sim.step_physics()
+                self.robot.keep_still()
                 for entity in self.env.task.object_scope.values():
                     if entity is not None and not isinstance(entity, BaseSystem):
                         entity.keep_still()
+            self.robot.keep_still()
             self.env.scene.update_initial_file()
             self._needs_initial_file_update = False
 
