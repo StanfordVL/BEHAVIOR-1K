@@ -9,6 +9,7 @@ Covers:
   Section 5 – Robot getter/setter
 """
 
+import pytest
 import torch as th
 
 import omnigibson as og
@@ -91,6 +92,32 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
     return env
 
 
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def behavior_env():
+    """Build the BehaviorTask env once per module and tear it down at the end.
+
+    Loading `house_double_floor_lower` x NUM_ENVS with a BehaviorTask is the
+    dominant CI cost; sharing one env across the module's tests is what keeps
+    the suite under the 30-minute timeout.
+    """
+    env = setup_behavior_environment()
+    try:
+        yield env
+    finally:
+        og.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_behavior_env(request):
+    """Restore a clean post-reset state before each test that uses behavior_env."""
+    if "behavior_env" in request.fixturenames:
+        request.getfixturevalue("behavior_env").reset()
+    yield
+
+
 # ===================================================================
 #  Section 3 – Task / reward / termination tensor tests
 # ===================================================================
@@ -99,11 +126,10 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
 class TestBehaviorTaskTensors:
     """Verify BehaviorTask step outputs have correct tensor shapes."""
 
-    def test_task_step_tensors(self):
+    def test_task_step_tensors(self, behavior_env):
         """Task reward / done / success are (num_envs,) tensors."""
         _progress("TestBehaviorTaskTensors::test_task_step_tensors")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         actions = th.stack(
             [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(NUM_ENVS)]
@@ -115,14 +141,12 @@ class TestBehaviorTaskTensors:
         assert env.task.done.shape == (NUM_ENVS,)
         assert env.task.success.shape == (NUM_ENVS,)
 
-        og.clear()
         _passed("TestBehaviorTaskTensors::test_task_step_tensors")
 
-    def test_reward_tensor_returns(self):
+    def test_reward_tensor_returns(self, behavior_env):
         """PotentialReward returns (num_envs,) float tensor."""
         _progress("TestBehaviorTaskTensors::test_reward_tensor_returns")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         actions = th.stack(
             [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(NUM_ENVS)]
@@ -139,14 +163,12 @@ class TestBehaviorTaskTensors:
         assert "potential" in env.task._reward_functions
         assert isinstance(env.task._reward_functions["potential"], PotentialReward)
 
-        og.clear()
         _passed("TestBehaviorTaskTensors::test_reward_tensor_returns")
 
-    def test_termination_tensor_returns(self):
+    def test_termination_tensor_returns(self, behavior_env):
         """Timeout and PredicateGoal return (num_envs,) bool tensors."""
         _progress("TestBehaviorTaskTensors::test_termination_tensor_returns")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         actions = th.stack(
             [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(NUM_ENVS)]
@@ -166,7 +188,6 @@ class TestBehaviorTaskTensors:
         assert isinstance(env.task._termination_conditions["timeout"], Timeout)
         assert isinstance(env.task._termination_conditions["predicate"], PredicateGoal)
 
-        og.clear()
         _passed("TestBehaviorTaskTensors::test_termination_tensor_returns")
 
 
@@ -178,10 +199,10 @@ class TestBehaviorTaskTensors:
 class TestBehaviorSceneCoordinates:
     """Multi-scene position/orientation and state dump/load tests with BehaviorTask."""
 
-    def test_dump_load_states(self):
+    def test_dump_load_states(self, behavior_env):
         """Scene state can be saved and restored correctly with BehaviorTask."""
         _progress("TestBehaviorSceneCoordinates::test_dump_load_states")
-        env = setup_behavior_environment()
+        env = behavior_env
 
         pose_0 = (th.tensor([1, 1, 1], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32))
         pose_1 = (th.tensor([0, 2, 1], dtype=th.float32), th.tensor([0, 0, 0.7071, 0.7071], dtype=th.float32))
@@ -218,13 +239,12 @@ class TestBehaviorSceneCoordinates:
         assert th.allclose(initial_pos_0[1], post_pos_0[1], atol=1e-3)
         assert th.allclose(initial_pos_1[1], post_pos_1[1], atol=1e-3)
 
-        og.clear()
         _passed("TestBehaviorSceneCoordinates::test_dump_load_states")
 
-    def test_get_local_position(self):
+    def test_get_local_position(self, behavior_env):
         """Robot scene-frame position + scene origin equals world position."""
         _progress("TestBehaviorSceneCoordinates::test_get_local_position")
-        env = setup_behavior_environment()
+        env = behavior_env
 
         robot_local = env.scenes[1].robots[0].get_position_orientation(frame="scene")[0]
         robot_global = env.scenes[1].robots[0].get_position_orientation()[0]
@@ -233,13 +253,12 @@ class TestBehaviorSceneCoordinates:
         print(f"  local={robot_local}, global={robot_global}, scene_origin={scene_pos}")
         assert th.allclose(robot_global, scene_pos + robot_local, atol=1e-3)
 
-        og.clear()
         _passed("TestBehaviorSceneCoordinates::test_get_local_position")
 
-    def test_position_orientation_relative_to_scene(self):
+    def test_position_orientation_relative_to_scene(self, behavior_env):
         """set/get position in scene frame is consistent."""
         _progress("TestBehaviorSceneCoordinates::test_position_orientation_relative_to_scene")
-        env = setup_behavior_environment()
+        env = behavior_env
 
         robot = env.scenes[1].robots[0]
         new_relative_pos = th.tensor([1.0, 2.0, 0.5])
@@ -259,7 +278,6 @@ class TestBehaviorSceneCoordinates:
         expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
         assert th.allclose(global_ori, expected_global_ori, atol=1e-3)
 
-        og.clear()
         _passed("TestBehaviorSceneCoordinates::test_position_orientation_relative_to_scene")
 
 
@@ -271,10 +289,10 @@ class TestBehaviorSceneCoordinates:
 class TestBehaviorRobotGetterSetter:
     """Position/orientation getter and setter correctness for R1Pro with BehaviorTask."""
 
-    def test_getter(self):
+    def test_getter(self, behavior_env):
         """Position getter works in both world and scene frames."""
         _progress("TestBehaviorRobotGetterSetter::test_getter")
-        env = setup_behavior_environment()
+        env = behavior_env
 
         # Scene 0 robot: world == scene (scene 0 at origin)
         robot0 = env.scenes[0].robots[0]
@@ -296,13 +314,12 @@ class TestBehaviorRobotGetterSetter:
         assert th.allclose(r1_world_pos, combined_pos, atol=1e-3)
         assert th.allclose(r1_world_ori, combined_ori, atol=1e-3)
 
-        og.clear()
         _passed("TestBehaviorRobotGetterSetter::test_getter")
 
-    def test_setter(self):
+    def test_setter(self, behavior_env):
         """Position setter works in both world and scene frames."""
         _progress("TestBehaviorRobotGetterSetter::test_setter")
-        env = setup_behavior_environment()
+        env = behavior_env
 
         robot = env.scenes[1].robots[0]
 
@@ -334,5 +351,4 @@ class TestBehaviorRobotGetterSetter:
         got_world_pos2, _ = robot.get_position_orientation()
         assert not th.allclose(got_world_pos2, new_world_pos, atol=1e-3)
 
-        og.clear()
         _passed("TestBehaviorRobotGetterSetter::test_setter")

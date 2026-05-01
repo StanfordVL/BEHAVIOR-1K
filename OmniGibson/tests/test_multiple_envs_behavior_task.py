@@ -10,6 +10,7 @@ Uses the ``picking_up_trash`` activity on ``house_double_floor_lower``.
 Infrastructure tests live in ``test_multi_env_behavior_infra.py``.
 """
 
+import pytest
 import torch as th
 
 import omnigibson as og
@@ -87,6 +88,32 @@ def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True
     return env
 
 
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def behavior_env():
+    """Build the BehaviorTask env once per module and tear it down at the end.
+
+    Loading `house_double_floor_lower` x NUM_ENVS with a BehaviorTask is the
+    dominant CI cost; sharing one env across the module's tests is what keeps
+    the suite under the 30-minute timeout.
+    """
+    env = setup_behavior_environment()
+    try:
+        yield env
+    finally:
+        og.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_behavior_env(request):
+    """Restore a clean post-reset state before each test that uses behavior_env."""
+    if "behavior_env" in request.fixturenames:
+        request.getfixturevalue("behavior_env").reset()
+    yield
+
+
 # ===================================================================
 #  BehaviorTask-specific logic
 # ===================================================================
@@ -96,11 +123,10 @@ class TestBehaviorTaskLogic:
     """Tests for logic unique to BehaviorTask: BDDL scope, goal conditions,
     potential reward, task observations, presampled robot pose, and goal status."""
 
-    def test_object_scope_per_env(self):
+    def test_object_scope_per_env(self, behavior_env):
         """Each env has its own independent object scope."""
         _progress("TestBehaviorTaskLogic::test_object_scope_per_env")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         for env_idx in range(NUM_ENVS):
             scope = env.task.object_scope[env_idx]
@@ -115,14 +141,12 @@ class TestBehaviorTaskLogic:
         # Scopes are independent dict objects
         assert env.task.object_scope[0] is not env.task.object_scope[1]
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_object_scope_per_env")
 
-    def test_goal_conditions_per_env(self):
+    def test_goal_conditions_per_env(self, behavior_env):
         """Each env has its own goal conditions and ground goal state options."""
         _progress("TestBehaviorTaskLogic::test_goal_conditions_per_env")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         for env_idx in range(NUM_ENVS):
             goals = env.task.activity_goal_conditions[env_idx]
@@ -137,14 +161,12 @@ class TestBehaviorTaskLogic:
 
             print(f"  env {env_idx}: {len(goals)} goal conditions, {len(ggo)} ground goal state options")
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_goal_conditions_per_env")
 
-    def test_potential_reward_computation(self):
+    def test_potential_reward_computation(self, behavior_env):
         """get_potential returns a finite float for each env."""
         _progress("TestBehaviorTaskLogic::test_potential_reward_computation")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         for env_idx in range(NUM_ENVS):
             potential = env.task.get_potential(env, env_idx)
@@ -155,14 +177,12 @@ class TestBehaviorTaskLogic:
             assert potential <= 0.0, f"get_potential({env_idx}) = {potential}, expected <= 0"
             print(f"  env {env_idx}: potential={potential:.4f}")
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_potential_reward_computation")
 
-    def test_task_obs_per_env(self):
+    def test_task_obs_per_env(self, behavior_env):
         """Task observations are produced per env and contain expected keys."""
         _progress("TestBehaviorTaskLogic::test_task_obs_per_env")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         actions = th.stack(
             [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(NUM_ENVS)]
@@ -191,14 +211,12 @@ class TestBehaviorTaskLogic:
                 assert low_dim.shape[0] > 0
                 print(f"  env {env_idx}: low_dim obs dim={low_dim.shape[0]}")
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_task_obs_per_env")
 
-    def test_presampled_robot_pose(self):
+    def test_presampled_robot_pose(self, behavior_env):
         """Robot is positioned at a presampled pose after reset (verifies case-insensitive lookup)."""
         _progress("TestBehaviorTaskLogic::test_presampled_robot_pose")
-        env = setup_behavior_environment(use_presampled_robot_pose=True)
-        env.reset()
+        env = behavior_env
 
         for env_idx in range(NUM_ENVS):
             robot = env.scenes[env_idx].robots[0]
@@ -216,36 +234,12 @@ class TestBehaviorTaskLogic:
                 ori_norm, th.tensor(1.0), atol=1e-2
             ), f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_presampled_robot_pose")
 
-    def test_no_presampled_robot_pose(self):
-        """Robot has valid pose after reset without presampled pose."""
-        _progress("TestBehaviorTaskLogic::test_no_presampled_robot_pose")
-        env = setup_behavior_environment(use_presampled_robot_pose=False)
-        env.reset()
-
-        for env_idx in range(NUM_ENVS):
-            robot = env.scenes[env_idx].robots[0]
-            pos, ori = robot.get_position_orientation(frame="scene")
-            print(f"  env {env_idx}: robot pos={pos}, ori={ori}")
-
-            assert th.isfinite(pos).all(), f"Robot {env_idx} position has non-finite values"
-            assert th.isfinite(ori).all(), f"Robot {env_idx} orientation has non-finite values"
-
-            ori_norm = ori.norm()
-            assert th.allclose(
-                ori_norm, th.tensor(1.0), atol=1e-2
-            ), f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
-
-        og.clear()
-        _passed("TestBehaviorTaskLogic::test_no_presampled_robot_pose")
-
-    def test_goal_status_in_info(self):
+    def test_goal_status_in_info(self, behavior_env):
         """Step info contains goal_status from PredicateGoal termination condition."""
         _progress("TestBehaviorTaskLogic::test_goal_status_in_info")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         actions = th.stack(
             [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(NUM_ENVS)]
@@ -271,13 +265,12 @@ class TestBehaviorTaskLogic:
             assert "timeout" in done_info["termination_conditions"]
             assert "predicate" in done_info["termination_conditions"]
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_goal_status_in_info")
 
-    def test_activity_attributes(self):
+    def test_activity_attributes(self, behavior_env):
         """BehaviorTask has correct activity attributes after construction."""
         _progress("TestBehaviorTaskLogic::test_activity_attributes")
-        env = setup_behavior_environment()
+        env = behavior_env
 
         assert env.task.activity_name == ACTIVITY_NAME
         assert env.task.activity_definition_id == 0
@@ -299,14 +292,12 @@ class TestBehaviorTaskLogic:
         print(f"  task name: {env.task.name}")
         print(f"  NL goal conditions: {env.task.activity_natural_language_goal_conditions}")
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_activity_attributes")
 
-    def test_show_instruction(self):
+    def test_show_instruction(self, behavior_env):
         """show_instruction returns valid instruction data per env."""
         _progress("TestBehaviorTaskLogic::test_show_instruction")
-        env = setup_behavior_environment()
-        env.reset()
+        env = behavior_env
 
         # Need a step for goal evaluation to populate goal_status
         actions = th.stack(
@@ -331,5 +322,45 @@ class TestBehaviorTaskLogic:
         assert new_idx == expected_idx, f"iterate_instruction: expected idx {expected_idx}, got {new_idx}"
         print(f"  iterate_instruction: {initial_idx} -> {new_idx} (total={total_conditions})")
 
-        og.clear()
         _passed("TestBehaviorTaskLogic::test_show_instruction")
+
+
+# ===================================================================
+#  No-presample variant (kept separate; needs use_presampled_robot_pose=False)
+# ===================================================================
+#
+# This test must run *after* every test that uses `behavior_env`, because it
+# tears down the shared module-scope env to build one with a different config.
+# Pytest collects in source order, so keeping this class at the bottom of the
+# file is what guarantees the correct ordering.
+
+
+class TestBehaviorTaskNoPresample:
+    """BehaviorTask with use_presampled_robot_pose=False. Cannot share the module-scope env."""
+
+    def test_no_presampled_robot_pose(self):
+        """Robot has valid pose after reset without presampled pose."""
+        _progress("TestBehaviorTaskLogic::test_no_presampled_robot_pose")
+        # Tear down the module-scope `behavior_env` (built with use_presampled_robot_pose=True)
+        # before constructing the variant. _init_macros only stops the sim; without an explicit
+        # clear, the new env's object-state machinery references prims from the previous scenes
+        # and crashes during play() with `'NoneType' object has no attribute 'state_updated'`.
+        og.clear()
+        env = setup_behavior_environment(use_presampled_robot_pose=False)
+        env.reset()
+
+        for env_idx in range(NUM_ENVS):
+            robot = env.scenes[env_idx].robots[0]
+            pos, ori = robot.get_position_orientation(frame="scene")
+            print(f"  env {env_idx}: robot pos={pos}, ori={ori}")
+
+            assert th.isfinite(pos).all(), f"Robot {env_idx} position has non-finite values"
+            assert th.isfinite(ori).all(), f"Robot {env_idx} orientation has non-finite values"
+
+            ori_norm = ori.norm()
+            assert th.allclose(
+                ori_norm, th.tensor(1.0), atol=1e-2
+            ), f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
+
+        og.clear()
+        _passed("TestBehaviorTaskLogic::test_no_presampled_robot_pose")
