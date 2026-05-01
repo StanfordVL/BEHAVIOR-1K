@@ -5,8 +5,10 @@ import json
 import numpy as np
 import omnigibson as og
 import os
+import sys
 import torch as th
 import yaml
+from typing import Optional
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm
@@ -24,6 +26,7 @@ gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
 OBS_CAMERA_RESOLUTION = 480
+EPISODE_SELECTION_SEPARATOR = "=" * 88
 
 
 class VideoPlaybackWrapper(DataPlaybackWrapper):
@@ -77,11 +80,71 @@ def extract_arg_names(func):
     return list(inspect.signature(func).parameters.keys())
 
 
+def get_episode_lengths(data_grp):
+    """
+    Returns a numerically sorted list of (episode_id, key, num_samples) tuples for all saved demo groups.
+    """
+    episode_lengths = []
+    prefix = "demo_"
+    for key in data_grp.keys():
+        if not key.startswith(prefix):
+            continue
+        try:
+            episode_id = int(key[len(prefix) :])
+        except ValueError:
+            continue
+        episode_lengths.append((episode_id, key, data_grp[key].attrs["num_samples"]))
+    return sorted(episode_lengths)
+
+
+def print_episode_lengths(episode_lengths, selected_episode_id):
+    """
+    Prints a summary of all saved episodes and their trajectory lengths.
+    """
+    print()
+    print(EPISODE_SELECTION_SEPARATOR)
+    print("EPISODE SELECTION")
+    print(EPISODE_SELECTION_SEPARATOR)
+    print("Saved episodes:")
+    print("     episode | key      | trajectory length")
+    for episode_id, key, num_samples in episode_lengths:
+        selected = "  < selected" if episode_id == selected_episode_id else ""
+        print(f"     {episode_id:>7} | {key:<8} | {num_samples:>17}{selected}")
+    print(EPISODE_SELECTION_SEPARATOR)
+
+
+def select_episode_id(episode_lengths, default_episode_id, prompt_user=False):
+    """
+    Selects which episode to replay, optionally prompting the user.
+    """
+    if not prompt_user:
+        return default_episode_id
+
+    episode_ids = {episode_id for episode_id, _, _ in episode_lengths}
+
+    while True:
+        choice = input(
+            f"Select episode id (ranked in order of saving)  to replay [longest default: episode {default_episode_id}]: "
+        ).strip()
+        if choice == "":
+            return default_episode_id
+        try:
+            value = int(choice)
+        except ValueError:
+            print(f"Invalid selection '{choice}'. Please enter an integer episode id or order.")
+            continue
+
+        if value in episode_ids:
+            return value
+        print(f"Invalid selection {value}. Choose one of the listed episode ids.")
+
+
 def replay_hdf5_to_video(
     input_path: str,
     task_name: str,
     flush_every_n_steps: int,
     run_qa: bool = False,
+    episode_id: Optional[int] = None,
 ) -> int:
     """
     Replays a single HDF5 file and generates videos.
@@ -91,6 +154,7 @@ def replay_hdf5_to_video(
         task_name: Name of the task (also used for QA validation if run_qa is True)
         flush_every_n_steps: Number of steps to flush the data after
         run_qa: Whether to run QA metrics
+        episode_id: If specified, replay this episode instead of selecting the longest
 
     Returns:
         episode_id: ID of the episode
@@ -256,12 +320,24 @@ def replay_hdf5_to_video(
             metric = create_fcn(**init_kwargs)
             env.add_metric(name=metric_name, metric=metric)
 
-    num_samples = [
-        env.input_hdf5["data"][key].attrs["num_samples"]
-        for key in env.input_hdf5["data"].keys()
-    ]
-    episode_id = num_samples.index(max(num_samples))
-    print(f" >>> Replaying episode {episode_id} with {num_samples[episode_id]} steps")
+    episode_lengths = get_episode_lengths(env.input_hdf5["data"])
+    default_episode_id, _, _ = max(episode_lengths, key=lambda x: x[2])
+    if run_qa:
+        print_episode_lengths(
+            episode_lengths=episode_lengths,
+            selected_episode_id=episode_id if episode_id is not None else default_episode_id,
+        )
+    if episode_id is None:
+        episode_id = select_episode_id(
+            episode_lengths=episode_lengths,
+            default_episode_id=default_episode_id,
+            prompt_user=run_qa and sys.stdin.isatty(),
+        )
+    episode_lengths_by_id = {ep_id: num_samples for ep_id, _, num_samples in episode_lengths}
+    if episode_id not in episode_lengths_by_id:
+        raise ValueError(f"Invalid episode_id {episode_id}. Available episode ids: {sorted(episode_lengths_by_id)}")
+    n_steps = episode_lengths_by_id[episode_id]
+    print(f" >>> Replaying episode {episode_id} with {n_steps} steps")
 
     env.playback_episode(
         episode_id=episode_id,
@@ -310,6 +386,12 @@ def main():
     parser.add_argument(
         "--qa", action="store_true", help="Run QA metrics during replay"
     )
+    parser.add_argument(
+        "--episode_id",
+        type=int,
+        default=None,
+        help="Episode ID to replay. If omitted with --qa in an interactive shell, asks for a selection.",
+    )
 
     args = parser.parse_args()
 
@@ -318,6 +400,7 @@ def main():
         task_name=args.task,
         flush_every_n_steps=args.flush_every_n_steps,
         run_qa=args.qa,
+        episode_id=args.episode_id,
     )
 
     print("All done!")
