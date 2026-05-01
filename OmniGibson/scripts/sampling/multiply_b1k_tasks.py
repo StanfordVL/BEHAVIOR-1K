@@ -158,8 +158,10 @@ def main():
 
             task_final_state = env.scene.dump_state()
             task_scene_dict = {"state": task_final_state}
-            if not validate_task(env.task, task_scene_dict, default_scene_dict):
-                print(f"instance {activity_instance_id} trial {i} validation failed")
+            try:
+                validate_task(env.task, task_scene_dict, default_scene_dict)
+            except ValueError as e:
+                print(f"instance {activity_instance_id} trial {i} validation failed: {e}")
                 continue
 
             env.scene.load_state(task_final_state)

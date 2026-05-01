@@ -138,10 +138,6 @@ class RigidPrim(XFormPrim):
             for mesh in mesh_group.values():
                 mesh.initialize()
 
-        # Get contact info first
-        if self.contact_reporting_enabled:
-            og.sim.contact_sensor.get_rigid_body_raw_data(self.prim_path)
-
         # Grab handle to this rigid body and get name
         self.update_handles()
         self._body_name = self.prim_path.split("/")[-1]
