@@ -2469,6 +2469,7 @@ def activate_prim_and_children(prim_path):
     Args:
         prim_path (str): Path to the prim to activate
     """
+
     def _activate(path):
         current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(path)
         current_prim.SetActive(True)
