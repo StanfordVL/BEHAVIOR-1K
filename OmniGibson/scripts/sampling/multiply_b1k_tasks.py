@@ -5,7 +5,7 @@ from omnigibson.macros import gm, macros
 import json
 from omnigibson.objects import DatasetObject
 import numpy as np
-from utils import validate_task, get_scene_model
+from utils import validate_task, get_scene_model, get_scene_room_filter
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 
 parser = argparse.ArgumentParser()
@@ -88,7 +88,7 @@ def main():
             "scene_model": scene_model,
             "scene_file": task_scene_file,
             "seg_map_resolution": 0.1,
-            "load_room_types": TASK_CUSTOM_LISTS[args.activity]["room_types"],
+            **get_scene_room_filter(TASK_CUSTOM_LISTS[args.activity], scene_model),
         },
         "robots": [
             {

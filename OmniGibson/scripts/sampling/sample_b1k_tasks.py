@@ -13,13 +13,13 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.utils.bddl_utils import get_knowledge_base
 from omnigibson.utils.ui_utils import create_module_logger
 from utils import (
-    get_rooms,
     get_predicates,
     get_valid_tasks,
     hide_all_lights,
     UNSUPPORTED_PREDICATES,
     validate_task,
     get_scene_model,
+    get_scene_room_filter,
 )
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 from postprocess_sampled_task import postprocess_task
@@ -130,9 +130,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     # scene templates
     task_suffix = "partial_rooms"
     if args.room_types is not None:
-        cfg["scene"]["load_room_types"] = args.room_types.split(",")
+        loaded_room_types = args.room_types.split(",")
+        cfg["scene"]["load_room_types"] = loaded_room_types
     else:
-        cfg["scene"]["load_room_types"] = TASK_CUSTOM_LISTS[activity]["room_types"]
+        loaded_room_types = TASK_CUSTOM_LISTS[activity]["room_types"]
+        cfg["scene"].update(get_scene_room_filter(TASK_CUSTOM_LISTS[activity], scene_model))
 
     # Create the environment
     # Attempt to sample the activity
@@ -198,7 +200,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Attempt to sample
     if should_sample:
-        relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
+        relevant_rooms = set(loaded_room_types)
         log.info(f"relevant rooms: {relevant_rooms}")
         for obj in env.scene.objects:
             if isinstance(obj, DatasetObject):

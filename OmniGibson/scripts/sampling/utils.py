@@ -25,6 +25,16 @@ def get_scene_model(activity_entry):
     return next(k for k in activity_entry if k != "room_types")
 
 
+def get_scene_room_filter(activity_entry, scene_model=None):
+    """Return the saved room filter for a task_custom_lists activity entry."""
+    scene_model = scene_model or get_scene_model(activity_entry)
+    scene_entry = activity_entry.get(scene_model, {})
+    room_instances = scene_entry.get("room_instances")
+    if room_instances:
+        return {"load_room_instances": room_instances}
+    return {"load_room_types": activity_entry["room_types"]}
+
+
 def prune_unevaluatable_predicates(init_conditions):
     pruned_conditions = []
     for condition in init_conditions:
