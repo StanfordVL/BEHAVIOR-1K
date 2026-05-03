@@ -2,28 +2,31 @@
     (:domain behavior-1k)
 
     (:objects
-        paper.n.01_1 paper.n.01_2 paper.n.01_3 - paper.n.01
+        dixie_cup.n.01_1 - dixie_cup.n.01
+        sack.n.01_1 - sack.n.01
+        newspaper.n.03_1 - newspaper.n.03
         recycling_bin.n.01_1 - recycling_bin.n.01
-        floor.n.01_1 - floor.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
-    
-    (:init 
-        (ontop paper.n.01_1 floor.n.01_1) 
-        (ontop paper.n.01_2 floor.n.01_1) 
-        (ontop paper.n.01_3 floor.n.01_1)
-        (ontop recycling_bin.n.01_1 floor.n.01_1) 
-        (open recycling_bin.n.01_1) 
-        (inroom floor.n.01_1 corridor) 
+
+    (:init
+        (ontop dixie_cup.n.01_1 countertop.n.01_1)
+        (ontop sack.n.01_1 floor.n.01_1)
+        (ontop newspaper.n.03_1 countertop.n.01_1)
+        (ontop recycling_bin.n.01_1 floor.n.01_2)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen)
+        (inroom floor.n.01_2 garden)
         (ontop agent.n.01_1 floor.n.01_1)
     )
-    
-    (:goal 
-        (and 
-            (forall 
-                (?paper.n.01 - paper.n.01) 
-                (inside ?paper.n.01 ?recycling_bin.n.01_1)
-            )
+
+    (:goal
+        (and
+       	    (inside dixie_cup.n.01_1 ?recycling_bin.n.01_1)
+       	    (inside sack.n.01_1 ?recycling_bin.n.01_1)
+       	    (inside newspaper.n.03_1 ?recycling_bin.n.01_1)
             (not
                 (open ?recycling_bin.n.01_1)
             )

@@ -32,6 +32,9 @@ TASK_SPECIFIC_EXTRA_ROOMS = {
     "bringing_newspaper_in": {
         "house_double_floor_lower": ["corridor"],
     },
+    "bringing_paper_to_recycling": {
+        "house_double_floor_lower": ["corridor"],
+    },
     "chopping_wood": {
         "house_double_floor_lower": ["garage"],
     },
