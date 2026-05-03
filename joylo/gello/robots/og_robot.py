@@ -1121,17 +1121,6 @@ class OGRobotServer:
             self.env.scene.update_initial_file()
             self._needs_initial_file_update = False
 
-
-        # Try to ensure that all task-relevant objects are stable
-        # They should already be stable from the sampled instance, but there is some issue where loading the state
-        # causes some jitter (maybe for small mass / thin objects?)
-        for _ in range(25):
-            og.sim.step_physics()
-            for entity in self.env.task.object_scope.values():
-                if entity is not None and not isinstance(entity, BaseSystem):
-                    entity.keep_still()
-        self.env.scene.update_initial_file()
-
         # Reset env
         self.env.reset()
         self.robot.keep_still()
