@@ -189,14 +189,14 @@ def main():
         env = og.Environment(configs=cfg)
         table = env.scene.object_registry("name", "table")
         apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
-        knifes = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
+        knives = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
         if args.cloth:
             clothes = [env.scene.object_registry("name", f"cloth_{n}") for n in range(NUM_CLOTH)]
             for cloth in clothes:
                 cloth.root_link.mass = 1.0
         env.reset()
 
-        for n, knife in enumerate(knifes):
+        for n, knife in enumerate(knives):
             knife.set_position_orientation(
                 position=apples[n].get_position_orientation()[0] + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
                 orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32)),
