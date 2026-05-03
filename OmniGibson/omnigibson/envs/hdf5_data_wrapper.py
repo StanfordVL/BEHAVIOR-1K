@@ -211,6 +211,8 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
     dataset!
     """
 
+    _CALLBACK_NAME = "data_collection"
+
     def __init__(
         self,
         env: Environment,
@@ -260,6 +262,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         # Maps episode step ID to dictionary of systems and objects that should be added / removed to the simulator at
         # the given simulator step. See add_transition_info() for more info
         self.current_transitions = dict()
+        self._transitions_dirty_handles = False
 
         # Cached state to rollback to if requested
         self.checkpoint_states = []
@@ -273,16 +276,20 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
 
         # Add callbacks on import / remove objects and systems
         og.sim.add_callback_on_system_init(
-            name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=True)
+            name=self._CALLBACK_NAME,
+            callback=lambda system: self.add_transition_info(obj=system, add=True),
         )
         og.sim.add_callback_on_system_clear(
-            name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=False)
+            name=self._CALLBACK_NAME,
+            callback=lambda system: self.add_transition_info(obj=system, add=False),
         )
         og.sim.add_callback_on_add_obj(
-            name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=True)
+            name=self._CALLBACK_NAME,
+            callback=lambda obj: self.add_transition_info(obj=obj, add=True),
         )
         og.sim.add_callback_on_remove_obj(
-            name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=False)
+            name=self._CALLBACK_NAME,
+            callback=lambda obj: self.add_transition_info(obj=obj, add=False),
         )
 
         # Run super
@@ -311,6 +318,21 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         self.checkpoint_step_idxs.append(len(self.current_traj_history))
         if self._enable_dump_filters:
             self.enable_dump_filters()
+
+    def _remove_data_collection_callbacks(self) -> None:
+        if og.sim is None:
+            return
+
+        og.sim.remove_callback_on_system_init(self._CALLBACK_NAME)
+        og.sim.remove_callback_on_system_clear(self._CALLBACK_NAME)
+        og.sim.remove_callback_on_add_obj(self._CALLBACK_NAME)
+        og.sim.remove_callback_on_remove_obj(self._CALLBACK_NAME)
+
+    def close_dataset(self) -> None:
+        try:
+            super().close_dataset()
+        finally:
+            self._remove_data_collection_callbacks()
 
     def rollback_to_checkpoint(self, index: int = -1) -> None:
         """
@@ -436,8 +458,9 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         """
         # Disable all render products to save on speed
         # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6
-        for sensor in VisionSensor.SENSORS.values():
-            sensor.render_product.hydra_texture.set_updates_enabled(False)
+        with og.sim.editing_usd():
+            for sensor in VisionSensor.SENSORS.values():
+                sensor.render_product.hydra_texture.set_updates_enabled(False)
 
         # Use asynchronous rendering for faster performance
         # We have to do a super hacky workaround to avoid the GUI freezing, which is
@@ -466,11 +489,24 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         if self._enable_dump_filters:
             self.enable_dump_filters()
 
+    @staticmethod
+    def _should_dump_object_state(obj: USDObject) -> bool:
+        if not obj.initialized:
+            return False
+
+        if obj.n_joints > 0:
+            articulation_view = getattr(obj, "_articulation_view", None)
+            if articulation_view is None or not articulation_view.is_physics_handle_valid():
+                return False
+
+        prim = obj.prim
+        return prim is not None and prim.IsValid() and obj.is_active
+
     def enable_dump_filters(self) -> None:
         """
         Enables dump filters for optimized per-step state caching
         """
-        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active and obj.initialized)
+        self.env.scene.object_registry.set_dump_filter(dump_filter=self._should_dump_object_state)
 
     def disable_dump_filters(self) -> None:
         """
@@ -481,6 +517,9 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
     def reset(self) -> tuple[dict, dict]:
         # Call super first
         init_obs, init_info = super().reset()
+
+        if self._enable_dump_filters:
+            self.enable_dump_filters()
 
         # Make sure all objects are awake to begin to guarantee we save their initial states
         for obj in self.scene.objects:
@@ -513,6 +552,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         self.checkpoint_step_idxs = []
         if self.checkpoint_rollback_trajs is not None:
             self.checkpoint_rollback_trajs = dict()
+        self._transitions_dirty_handles = False
 
         return init_obs, init_info
 
@@ -527,6 +567,10 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
     ) -> dict:
         # Store dumped state, reward, terminated, truncated
         step_data = dict()
+        if self._transitions_dirty_handles:
+            og.sim.update_handles()
+            self._transitions_dirty_handles = False
+
         state = og.sim.dump_state(serialized=True)
         step_data["action"] = action
         step_data["state"] = state
@@ -602,6 +646,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         dic_key = "objects" if isinstance(obj, USDObject) else "systems"
         val_key = "add" if add else "remove"
         self.current_transitions[self.env.episode_steps][dic_key][val_key].append(info)
+        self._transitions_dirty_handles = True
 
 
 class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):

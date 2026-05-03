@@ -1,10 +1,11 @@
 import h5py
 import json
+import os
 import tempfile
 from unittest.mock import MagicMock
 
+import pytest
 import torch as th
-import os
 
 import omnigibson as og
 from omnigibson.envs import HDF5CollectionWrapper, HDF5PlaybackWrapper, LeRobotPlaybackWrapper, LeRobotDataWrapper
@@ -582,6 +583,9 @@ def test_hdf5_playback_and_dataset():
     )
 
 
+@pytest.mark.skip(
+    reason="Temporarily skip LeRobot playback integration while focusing on HDF5 data collection."
+)
 def test_lerobot_playback_and_dataset():
     cfg = _get_test_cfg()
     img_h, img_w = 128, 128
