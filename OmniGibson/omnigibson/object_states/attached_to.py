@@ -9,10 +9,18 @@ from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBre
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.prims.geom_prim import GeomPrim
+from omnigibson.prims.material_prim import OmniPBRMaterialPrim
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import RigidContactAPI, create_joint, delete_or_deactivate_prim
+from omnigibson.utils.usd_utils import (
+    RigidContactAPI,
+    absolute_prim_path_to_scene_relative,
+    create_joint,
+    create_primitive_mesh,
+    delete_or_deactivate_prim,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -28,6 +36,10 @@ m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([15.0])).item()  # 15 deg
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
 m.DEFAULT_BREAK_FORCE = 5000  # Newton
 m.DEFAULT_BREAK_TORQUE = 10000  # Newton-Meter
+m.ENABLE_ATTACHMENT_JOINT_VISUALS = False
+m.ATTACHMENT_JOINT_VISUAL_WIDTH = 0.008
+m.ATTACHMENT_JOINT_VISUAL_LENGTH = 0.15
+m.ATTACHMENT_JOINT_VISUAL_COLOR = th.tensor([0.0, 0.35, 1.0])
 
 
 # TODO: Make AttachedTo into a global state that manages all the attachments in the scene.
@@ -90,6 +102,10 @@ class AttachedTo(
         super()._initialize()
         self.initialize_link_mixin()
 
+        self.attachment_joint_visuals = defaultdict(list)
+        if m.ENABLE_ATTACHMENT_JOINT_VISUALS:
+            self._create_attachment_joint_visuals()
+
         # Reference to the parent object (DatasetObject)
         self.parent = None
 
@@ -106,6 +122,51 @@ class AttachedTo(
         # Cache of parent link candidates for other objects (Dict[DatasetObject, Dict[str, str]])
         # @other -> (the male meta link names of @self.obj -> the correspounding female meta link names of @other))
         self.parent_link_candidates = dict()
+
+    def _create_attachment_joint_visuals(self):
+        """
+        Creates a visual-only local +Z cue under each attachment meta link. The marker starts at the attachment point
+        and extends in the link's up direction so matching male and female cues is visually straightforward.
+        """
+        scene = self.obj.scene
+        mat_prim_path = f"{self.obj.prim_path}/Looks/attachment_joint_visual_up_mat"
+        mat = OmniPBRMaterialPrim(
+            relative_prim_path=absolute_prim_path_to_scene_relative(scene, mat_prim_path),
+            name=f"{self.obj.name}:attachment_joint_visual_up_mat",
+        )
+        mat.load(scene)
+        mat.diffuse_color_constant = m.ATTACHMENT_JOINT_VISUAL_COLOR
+
+        for link_name, link in self.links.items():
+            if not link.meta_link_id.endswith(("M", "F")):
+                continue
+
+            vis_prim_path = f"{link.prim_path}/attachment_joint_visual_up"
+            create_primitive_mesh(vis_prim_path, "Cylinder", extents=1.0)
+            visualizer = GeomPrim(
+                relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
+                name=f"{self.obj.name}:{link_name}:attachment_joint_visual_up",
+            )
+            visualizer.load(scene)
+            visualizer.material = mat
+            visualizer.scale = (
+                th.tensor(
+                    [
+                        m.ATTACHMENT_JOINT_VISUAL_WIDTH,
+                        m.ATTACHMENT_JOINT_VISUAL_WIDTH,
+                        m.ATTACHMENT_JOINT_VISUAL_LENGTH,
+                    ]
+                )
+                / link.scale
+            )
+            visualizer.set_position_orientation(
+                position=th.tensor([0.0, 0.0, m.ATTACHMENT_JOINT_VISUAL_LENGTH / 2.0]) / link.scale,
+                orientation=th.tensor([0.0, 0.0, 0.0, 1.0]),
+                frame="parent",
+            )
+            visualizer.visible = True
+
+            self.attachment_joint_visuals[link_name] = [visualizer]
 
     def on_joint_break(self, joint_prim_path):
         # Note that when this function is invoked when a joint break event happens, @self.obj is the parent of the

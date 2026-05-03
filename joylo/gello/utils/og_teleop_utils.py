@@ -27,6 +27,27 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--activity", type=str, required=True)
 
 
+def _contains_predicate(condition, predicate):
+    if isinstance(condition, (list, tuple)):
+        return any(_contains_predicate(entry, predicate) for entry in condition)
+    return condition == predicate
+
+
+def task_requires_attached_state(task_name):
+    if task_name is None:
+        return False
+
+    try:
+        conditions = get_knowledge_base().get_task(f"{task_name}-0").parse_base_scope()[0]
+    except Exception:
+        return False
+
+    return any(
+        _contains_predicate(condition, "attached")
+        for condition in conditions.parsed_initial_conditions + conditions.parsed_goal_conditions
+    )
+
+
 def get_task_relevant_room_types(activity_name):
     task_obj = get_knowledge_base().get_task(f"{activity_name}-0")
     conditions = task_obj.parse_base_scope()[0]
@@ -932,77 +953,6 @@ def setup_object_beacons(task_relevant_objects, scene):
         beacon.visible = False
 
     return object_beacons
-
-
-def setup_task_visualizers(task_relevant_objects, scene):
-    task_visualizers = {}
-
-    # Extract frame visualization settings
-    vis_geom_width = ATTACHMENT_FRAME_CONFIG["width"]
-    vis_geom_lengths = ATTACHMENT_FRAME_CONFIG["lengths"]
-    vis_geom_quat_offsets = ATTACHMENT_FRAME_CONFIG["quat_offsets"]
-    vis_geom_colors = ATTACHMENT_FRAME_CONFIG["colors"]
-
-    for obj in task_relevant_objects:
-        for link in obj.links.values():
-            if link.is_meta_link and link.meta_link_type == "attachment":
-                # Create frame visualizer for the attachment link
-                frame_visualizers = []
-
-                # Create materials for each axis
-                axis_materials = []
-                for axis, color in zip(("x", "y", "z"), vis_geom_colors):
-                    mat = OmniPBRMaterialPrim(
-                        relative_prim_path=absolute_prim_path_to_scene_relative(
-                            scene, f"{link.prim_path}/attachment_frame_mat_{axis}"
-                        ),
-                        name=f"{obj.name}:attachment_frame_mat_{axis}",
-                    )
-                    mat.load(scene)
-                    mat.diffuse_color_constant = color
-                    axis_materials.append(mat)
-
-                # Create cylinder for each axis (X, Y, Z)
-                for axis, length, mat, quat_offset in zip(
-                    ("x", "y", "z"),
-                    vis_geom_lengths,
-                    axis_materials,
-                    vis_geom_quat_offsets,
-                ):
-                    vis_prim_path = f"{link.prim_path}/attachment_frame_{axis}"
-                    vis_prim = create_primitive_mesh(
-                        vis_prim_path, "Cylinder", extents=1.0
-                    )
-                    visualizer = GeomPrim(
-                        relative_prim_path=absolute_prim_path_to_scene_relative(
-                            scene, vis_prim_path
-                        ),
-                        name=f"{obj.name}:attachment_frame_{axis}",
-                    )
-                    visualizer.load(scene)
-
-                    # Attach material
-                    visualizer.material = mat
-
-                    # Scale the cylinder and normalize with link scale
-                    visualizer.scale = (
-                        th.tensor([vis_geom_width, vis_geom_width, length]) / link.scale
-                    )
-
-                    # Set position and orientation relative to the attachment link
-                    visualizer.set_position_orientation(
-                        position=th.tensor([0, 0, 0]),
-                        orientation=quat_offset,
-                        frame="parent",
-                    )
-
-                    visualizer.visible = False  # Initially hidden
-                    frame_visualizers.append(visualizer)
-
-                # Store all three axis visualizers for this attachment
-                task_visualizers[obj] = frame_visualizers
-
-    return task_visualizers
 
 
 def setup_ghost_robot(scene, robot_type, task_cfg=None):
