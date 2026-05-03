@@ -39,6 +39,49 @@ SCENE_OFFSET = {
 }
 
 
+def _robot_articulation_ready(robot):
+    articulation_view = getattr(robot, "_articulation_view", None)
+    if articulation_view is None or not articulation_view.is_physics_handle_valid():
+        return False
+
+    try:
+        joint_positions = articulation_view.get_joint_positions()
+    except (AttributeError, RuntimeError):
+        return False
+
+    return joint_positions is not None
+
+
+def _assert_simulation_running(context):
+    if og.sim.is_stopped():
+        raise RuntimeError(f"Simulator stopped during {context}; check PhysX / CUDA errors above.")
+
+
+def _ensure_robot_articulations_ready(env, attempts=3):
+    """
+    Refresh and validate robot articulation handles before entering the measured loop.
+    """
+    if len(env.robots) == 0:
+        return
+
+    invalid_robot_names = []
+    for _ in range(attempts):
+        og.sim.update_handles()
+        invalid_robot_names = [robot.name for robot in env.robots if not _robot_articulation_ready(robot)]
+        if len(invalid_robot_names) == 0:
+            return
+
+        og.sim.step()
+        _assert_simulation_running("robot articulation warm-up")
+
+    raise RuntimeError("Robot articulation handles were not ready after warm-up for: " + ", ".join(invalid_robot_names))
+
+
+def _shutdown_og():
+    if og.app is not None:
+        og.shutdown()
+
+
 def main():
     args = parser.parse_args()
     # Modify macros settings
@@ -135,122 +178,130 @@ def main():
 
     load_start = time.time()
 
-    # Launch OG before setting up the profiler. If we don't do this then the carb profiler
-    # overtakes the profiler and we don't get any useful data.
-    og.launch()
+    try:
+        # Launch OG before setting up the profiler. If we don't do this then the carb profiler
+        # overtakes the profiler and we don't get any useful data.
+        og.launch()
 
-    if args.deep_profiling:
-        load_profiler = cProfile.Profile()
-        load_profiler.enable()
-    env = og.Environment(configs=cfg)
-    table = env.scene.object_registry("name", "table")
-    apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
-    knifes = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
-    if args.cloth:
-        clothes = [env.scene.object_registry("name", f"cloth_{n}") for n in range(NUM_CLOTH)]
-        for cloth in clothes:
-            cloth.root_link.mass = 1.0
-    env.reset()
+        if args.deep_profiling:
+            load_profiler = cProfile.Profile()
+            load_profiler.enable()
+        env = og.Environment(configs=cfg)
+        table = env.scene.object_registry("name", "table")
+        apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
+        knifes = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
+        if args.cloth:
+            clothes = [env.scene.object_registry("name", f"cloth_{n}") for n in range(NUM_CLOTH)]
+            for cloth in clothes:
+                cloth.root_link.mass = 1.0
+        env.reset()
 
-    for n, knife in enumerate(knifes):
-        knife.set_position_orientation(
-            position=apples[n].get_position_orientation()[0] + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
-            orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32)),
+        for n, knife in enumerate(knifes):
+            knife.set_position_orientation(
+                position=apples[n].get_position_orientation()[0] + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
+                orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32)),
+            )
+            knife.keep_still()
+        if args.fluids:
+            table.states[Covered].set_value(env.scene.get_system("water"), True)
+
+        output = []
+
+        # Update the simulator's viewer camera's pose so it points towards the robot
+        og.sim.viewer_camera.set_position_orientation(
+            position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1]
         )
-        knife.keep_still()
-    if args.fluids:
-        table.states[Covered].set_value(env.scene.get_system("water"), True)
+        _ensure_robot_articulations_ready(env)
 
-    output = []
+        # record total load time
+        if args.deep_profiling:
+            load_profiler.disable()
+            load_profiler.dump_stats("load.prof")
+        total_load_time = time.time() - load_start
 
-    # Update the simulator's viewer camera's pose so it points towards the robot
-    og.sim.viewer_camera.set_position_orientation(
-        position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1]
-    )
-    # record total load time
-    if args.deep_profiling:
-        load_profiler.disable()
-        load_profiler.dump_stats("load.prof")
-    total_load_time = time.time() - load_start
+        # Reset profiler counters so we only measure the benchmark loop
+        og.sim._step_profiler.reset()
+        og.sim._pre_physics_step_profiler.reset()
+        og.sim._post_physics_step_profiler.reset()
+        og.sim._non_physics_step_profiler.reset()
 
-    # Reset profiler counters so we only measure the benchmark loop
-    og.sim._step_profiler.reset()
-    og.sim._pre_physics_step_profiler.reset()
-    og.sim._post_physics_step_profiler.reset()
-    og.sim._non_physics_step_profiler.reset()
+        for i in range(300):
+            if args.robot:
+                action_lo, action_hi = -0.3, 0.3
+                env.step(
+                    th.stack(
+                        [
+                            th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo
+                            for i in range(args.robot)
+                        ]
+                    ).flatten()
+                )
+            else:
+                env.step(None)
+            _assert_simulation_running(f"profile step {i + 1}")
 
-    for i in range(300):
+        # Compute timing metrics from simulator profilers (convert to ms)
+        n_steps = og.sim._step_profiler.call_count
+        avg_total_ms = og.sim._step_profiler.average_time * 1e3
+        avg_og_ms = (
+            (
+                og.sim._pre_physics_step_profiler.total_time
+                + og.sim._post_physics_step_profiler.total_time
+                + og.sim._non_physics_step_profiler.total_time
+            )
+            / n_steps
+            * 1e3
+        )
+        avg_isaac_ms = avg_total_ms - avg_og_ms
+        memory_usage = psutil.Process(os.getpid()).memory_info().rss / 1024**3
+        vram_usage = get_vram_usage()
+
+        result_values = [avg_total_ms, avg_isaac_ms, avg_og_ms, memory_usage, vram_usage]
+
+        if n_steps % 100 == 0 or n_steps == 300:
+            print(
+                "total time: {:.3f} ms, Isaac time: {:.3f} ms, Non-Isaac time: {:.3f} ms, memory: {:.3f} GB, vram: {:.3f} GB.".format(
+                    *result_values
+                )
+            )
+
+        field = f"{args.scene}" if args.scene else "Empty scene"
         if args.robot:
-            action_lo, action_hi = -0.3, 0.3
-            env.step(
-                th.stack(
-                    [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
-                ).flatten()
-            )
-        else:
-            env.step(None)
-
-    # Compute timing metrics from simulator profilers (convert to ms)
-    n_steps = og.sim._step_profiler.call_count
-    avg_total_ms = og.sim._step_profiler.average_time * 1e3
-    avg_og_ms = (
-        (
-            og.sim._pre_physics_step_profiler.total_time
-            + og.sim._post_physics_step_profiler.total_time
-            + og.sim._non_physics_step_profiler.total_time
+            field += f", with {args.robot} Fetch"
+        if args.cloth:
+            field += ", cloth"
+        if args.fluids:
+            field += ", fluids"
+        if args.macro_particle_system:
+            field += ", macro particles"
+        output.append(
+            {"name": field, "unit": "time (ms)", "value": total_load_time, "extra": ["Loading time", "Loading time"]}
         )
-        / n_steps
-        * 1e3
-    )
-    avg_isaac_ms = avg_total_ms - avg_og_ms
-    memory_usage = psutil.Process(os.getpid()).memory_info().rss / 1024**3
-    vram_usage = get_vram_usage()
+        for i, title in enumerate(PROFILING_FIELDS):
+            unit = "time (ms)" if "time" in title else "GB"
+            value = result_values[i]
+            if title == "FPS":
+                value = 1000 / value
+                unit = "fps"
+            output.append({"name": field, "unit": unit, "value": value, "extra": [title, title]})
 
-    result_values = [avg_total_ms, avg_isaac_ms, avg_og_ms, memory_usage, vram_usage]
+        ret = []
+        if os.path.exists("output.json"):
+            with open("output.json", "r") as f:
+                ret = json.load(f)
+        ret.extend(output)
+        with open("output.json", "w") as f:
+            json.dump(ret, f, indent=4)
 
-    if n_steps % 100 == 0 or n_steps == 300:
-        print(
-            "total time: {:.3f} ms, Isaac time: {:.3f} ms, Non-Isaac time: {:.3f} ms, memory: {:.3f} GB, vram: {:.3f} GB.".format(
-                *result_values
-            )
-        )
+        # Save the simulation profilers
+        if args.deep_profiling:
+            og.sim._step_profiler.dump_stats("step.prof")
+            og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
+            og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
+            og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
 
-    field = f"{args.scene}" if args.scene else "Empty scene"
-    if args.robot:
-        field += f", with {args.robot} Fetch"
-    if args.cloth:
-        field += ", cloth"
-    if args.fluids:
-        field += ", fluids"
-    if args.macro_particle_system:
-        field += ", macro particles"
-    output.append(
-        {"name": field, "unit": "time (ms)", "value": total_load_time, "extra": ["Loading time", "Loading time"]}
-    )
-    for i, title in enumerate(PROFILING_FIELDS):
-        unit = "time (ms)" if "time" in title else "GB"
-        value = result_values[i]
-        if title == "FPS":
-            value = 1000 / value
-            unit = "fps"
-        output.append({"name": field, "unit": unit, "value": value, "extra": [title, title]})
-
-    ret = []
-    if os.path.exists("output.json"):
-        with open("output.json", "r") as f:
-            ret = json.load(f)
-    ret.extend(output)
-    with open("output.json", "w") as f:
-        json.dump(ret, f, indent=4)
-
-    # Save the simulation profilers
-    if args.deep_profiling:
-        og.sim._step_profiler.dump_stats("step.prof")
-        og.sim._pre_physics_step_profiler.dump_stats("pre_physics_step.prof")
-        og.sim._post_physics_step_profiler.dump_stats("post_physics_step.prof")
-        og.sim._non_physics_step_profiler.dump_stats("non_physics_step.prof")
-
-    og.shutdown()
+    finally:
+        _shutdown_og()
 
 
 if __name__ == "__main__":
