@@ -574,11 +574,6 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                     else getattr(lazy.pxr.UsdGeom, mesh_type).Define(stage, prim_path).GetPrim()
                 )
 
-            # _add_xform_properties already gives us the canonical
-            # translate/orient/scale ops on `prim`, so we don't need to wrap
-            # the prim in an XFormPrim here. (The Isaac Sim 5.1 XFormPrim is
-            # a view-based class with a different constructor and `.prims`
-            # accessor anyway.)
             _add_xform_properties(prim=prim)
 
             # Get the mesh/light pose in the parent link frame

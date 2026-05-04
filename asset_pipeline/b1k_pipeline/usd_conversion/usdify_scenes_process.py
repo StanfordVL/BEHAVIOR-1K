@@ -12,7 +12,6 @@ from omnigibson.macros import gm
 gm.HEADLESS = True
 gm.USE_GPU_DYNAMICS = False
 gm.USE_ENCRYPTED_ASSETS = True
-gm.DEBUG = True
 
 import omnigibson as og
 from omnigibson.utils.asset_conversion_utils import convert_scene_urdf_to_json

@@ -351,9 +351,7 @@ class ObjectExporter:
 
             if rt.classOf(child) == rt.Sphere:
                 size = np.array([child.radius, child.radius, child.radius]) * scale
-                metadata["meta_links"][meta_type][meta_id][meta_subid][
-                    "type"
-                ] = "sphere"
+                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = "sphere"
                 metadata["meta_links"][meta_type][meta_id][meta_subid]["size"] = list(
                     size
                 )
@@ -365,9 +363,7 @@ class ObjectExporter:
                 )
             elif rt.classOf(child) == rt.Cylinder:
                 size = np.array([child.radius, child.radius, child.height]) * scale
-                metadata["meta_links"][meta_type][meta_id][meta_subid][
-                    "type"
-                ] = "cylinder"
+                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = "cylinder"
                 metadata["meta_links"][meta_type][meta_id][meta_subid]["size"] = list(
                     size
                 )
@@ -406,7 +402,7 @@ class ObjectExporter:
         failures = {}
         for i, obj in enumerate(objs):
             try:
-                print(f"{i+1} / {len(objs)} total")
+                print(f"{i + 1} / {len(objs)} total")
 
                 obj.isHidden = False
                 for child in obj.children:

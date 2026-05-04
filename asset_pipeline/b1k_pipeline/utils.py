@@ -16,7 +16,7 @@ PIPELINE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 TMP_DIR = PIPELINE_ROOT / "tmp"
 PARAMS_FILE = PIPELINE_ROOT / "params.yaml"
 NAME_PATTERN = re.compile(
-    r"^(?P<mesh_basename>(?P<link_basename>(?P<obj_basename>(?P<bad>B-)?(?P<randomization_disabled>F-)?(?P<loose>[LC]-)?(?P<category>[a-z_]+)-(?P<model_id>[a-z0-9_]{6})-(?P<instance_id>[0-9]+))(?:-(?P<link_name>[a-z0-9_]+))?)(?:-(?P<parent_link_name>[a-z0-9_]+)-(?P<joint_type>[RPFA])-(?P<joint_side>lower|upper))?)(?:-L(?P<light_id>[0-9]+))?(?P<meta_info>-M(?P<meta_type>[a-z]+)(?:_(?P<meta_id>[A-Za-z0-9]+))?(?:_(?P<meta_subid>[0-9]+))?)?(?P<tag>(?:-T[a-z]+)*)$"
+    r"^(?P<mesh_basename>(?P<link_basename>(?P<obj_basename>(?P<bad>B-)?(?P<randomization_disabled>F-)?(?P<loose>[LC]-)?(?P<category>[a-z_]+)-(?P<model_id>[a-z0-9_]{6})-(?P<instance_id>[0-9]+))(?:-(?P<link_name>[a-z0-9_]+))?)(?:-(?P<parent_link_name>[a-z0-9_]+)-(?P<joint_type>[RPCFA])-(?P<joint_side>lower|upper))?)(?:-L(?P<light_id>[0-9]+))?(?P<meta_info>-M(?P<meta_type>[a-z]+)(?:_(?P<meta_id>[A-Za-z0-9]+))?(?:_(?P<meta_subid>[0-9]+))?)?(?P<tag>(?:-T[a-z]+)*)$"
 )
 PORTAL_PATTERN = re.compile(
     r"^portal(-(?P<partial_scene>[A-Za-z0-9_]+)(-(?P<portal_id>\d+))?)?$"
@@ -207,35 +207,6 @@ def save_mesh(mesh, out_fs, name, **kwargs):
 
 
 WORKER_APPDATA_ROOT = TMP_DIR / "worker-appdata"
-
-
-def launch_cluster(worker_count):
-    """Launch a dask LocalCluster with ``worker_count`` worker processes.
-
-    Each worker is its own process (one thread) so that subprocesses spawned
-    inside a task get an isolated CPython process to manage. Workers run in
-    the same conda env as the parent — there is no container layer — so
-    tasks can call ``python -m b1k_pipeline.<...>_process`` directly without
-    any ``micromamba run`` / ``source setup_conda_env.sh`` wrapping.
-
-    Wipes any leftover per-worker OmniGibson appdata directories from a
-    previous run (see :func:`worker_subprocess_env`) before bringing the
-    cluster up, so each dask worker boots a fresh OmniGibson cache.
-    """
-    from dask.distributed import Client, LocalCluster
-
-    if WORKER_APPDATA_ROOT.exists():
-        import shutil
-
-        shutil.rmtree(WORKER_APPDATA_ROOT, ignore_errors=True)
-    WORKER_APPDATA_ROOT.mkdir(parents=True, exist_ok=True)
-
-    cluster = LocalCluster(
-        n_workers=worker_count,
-        threads_per_worker=1,
-        processes=True,
-    )
-    return Client(cluster)
 
 
 def worker_subprocess_env():

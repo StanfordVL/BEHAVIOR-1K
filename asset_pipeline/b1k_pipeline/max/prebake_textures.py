@@ -286,11 +286,7 @@ class TextureBaker:
         # Get the existing baseobject children that use the same material as this one
         siblings = []
         for candidate in rt.objects:
-            if (
-                candidate.baseObject
-                == obj.baseObject
-                # and candidate.material == obj.material  # TODO: Is this too aggressive?
-            ):
+            if candidate.baseObject == obj.baseObject:
                 siblings.append(candidate)
 
         # Disconnect the existing baked material

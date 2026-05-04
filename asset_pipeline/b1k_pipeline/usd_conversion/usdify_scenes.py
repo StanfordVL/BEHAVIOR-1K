@@ -18,7 +18,7 @@ from b1k_pipeline.utils import (
     worker_subprocess_env,
 )
 
-WORKER_COUNT = 1
+WORKER_COUNT = 2
 MAX_TIME_PER_PROCESS = 60 * 60  # 1 hour
 
 
@@ -50,7 +50,7 @@ def run_on_scene(dataset_path, scene):
                 p.wait(timeout=MAX_TIME_PER_PROCESS)
             except:
                 ferr.write(
-                    f"\nTimeout for {basename} ({MAX_TIME_PER_PROCESS}s) expired. Killing\n"
+                    f"\n{basename} did not finish within {MAX_TIME_PER_PROCESS}s. Killing\n"
                 )
                 try:
                     os.killpg(os.getpgid(pid), signal.SIGKILL)
@@ -96,19 +96,8 @@ def main():
             print("Launching cluster...")
             with ProcessPoolExecutor(max_workers=WORKER_COUNT) as executor:
                 # Start the batched run. We remove the leading / so that pathlib can append it to dataset path correctly.
-                scenes_to_process = {
-                    "hall_arch_wood",
-                    "school_computer_lab_and_infirmary",
-                    "house_double_floor_lower",
-                    "house_single_floor",
-                    "Pomaria_0_garden",
-                    "Wainscott_0_garden",
-                }
-                scenes = [
-                    x.path[1:]
-                    for x in dataset_fs.glob("scenes/*/urdf/*_best.urdf")
-                    if pathlib.Path(x.path).parts[2] in scenes_to_process
-                ]
+                scenes = [x.path[1:] for x in dataset_fs.glob("scenes/*/urdf/*.urdf")]
+
                 print("Queueing scenes.")
                 print("Total count: ", len(scenes))
                 futures = {}

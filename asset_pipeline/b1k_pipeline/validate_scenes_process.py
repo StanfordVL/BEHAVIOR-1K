@@ -12,7 +12,6 @@ import torch as th
 from omnigibson.macros import gm
 
 gm.HEADLESS = True
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.USE_ENCRYPTED_ASSETS = True
 

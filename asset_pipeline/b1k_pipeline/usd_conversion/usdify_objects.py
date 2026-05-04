@@ -4,8 +4,8 @@ import os
 import signal
 import subprocess
 import sys
-from dask.distributed import as_completed
 import fs.copy
+from concurrent.futures import as_completed, ProcessPoolExecutor
 import fs.path
 from fs.tempfs import TempFS
 import tqdm
@@ -14,7 +14,6 @@ from b1k_pipeline.utils import (
     ParallelZipFS,
     PipelineFS,
     TMP_DIR,
-    launch_cluster,
     worker_subprocess_env,
 )
 
@@ -82,76 +81,77 @@ def main():
                 )
 
             print("Launching cluster...")
-            dask_client = launch_cluster(WORKER_COUNT)
 
-            # Start the batched run
-            object_glob = [x.path for x in dataset_fs.glob("objects/*/*/")]
-            print("Queueing batches.")
-            print("Total count: ", len(object_glob))
+            with ProcessPoolExecutor(max_workers=WORKER_COUNT) as executor:
+                # Start the batched run
+                object_glob = [x.path for x in dataset_fs.glob("objects/*/*/")]
+                print("Queueing batches.")
+                print("Total count: ", len(object_glob))
 
-            # Make sure workers don't idle by reducing batch size when possible.
-            batch_size = min(BATCH_SIZE, math.ceil(len(object_glob) / WORKER_COUNT))
+                # Make sure workers don't idle by reducing batch size when possible.
+                batch_size = min(BATCH_SIZE, math.ceil(len(object_glob) / WORKER_COUNT))
 
-            futures = {}
-            for start in range(0, len(object_glob), batch_size):
-                end = start + batch_size
-                batch = object_glob[start:end]
-                worker_future = dask_client.submit(
-                    run_on_batch, dataset_fs.getsyspath("/"), batch, pure=False
-                )
-                futures[worker_future] = batch
+                futures = {}
+                for start in range(0, len(object_glob), batch_size):
+                    end = start + batch_size
+                    batch = object_glob[start:end]
+                    worker_future = executor.submit(
+                        run_on_batch, dataset_fs.getsyspath("/"), batch
+                    )
+                    futures[worker_future] = batch
 
-            # Wait for all the workers to finish
-            print("Queued all batches. Waiting for them to finish...")
-            logs = []
-            while True:
-                for future in tqdm.tqdm(
-                    as_completed(futures.keys()), total=len(futures)
-                ):
-                    # Check the batch results.
-                    batch = futures[future]
-                    return_code = future.result()  # we dont use the return code since we check the output files directly
+                # Wait for all the workers to finish
+                print("Queued all batches. Waiting for them to finish...")
+                logs = []
+                while True:
+                    for future in tqdm.tqdm(
+                        as_completed(futures.keys()), total=len(futures)
+                    ):
+                        # Check the batch results.
+                        batch = futures[future]
+                        return_code = future.result()  # we dont use the return code since we check the output files directly
 
-                    # Remove everything that failed and make a new batch from them.
-                    new_batch = []
-                    for item in batch:
-                        item_dir = dataset_fs.opendir(item)
-                        if item_dir.glob("usd/*.encrypted.usd").count().files != 1:
-                            print("Could not find", item)
-                            print("Available items:", list(item_dir.walk.files()))
-                            new_batch.append(item)
-                            if item_dir.exists("usd"):
-                                item_dir.removetree("usd")
+                        # Remove everything that failed and make a new batch from them.
+                        new_batch = []
+                        for item in batch:
+                            item_dir = dataset_fs.opendir(item)
+                            if item_dir.glob("usd/*.encrypted.usd").count().files != 1:
+                                print("Could not find", item)
+                                print("Available items:", list(item_dir.walk.files()))
+                                new_batch.append(item)
+                                if item_dir.exists("usd"):
+                                    item_dir.removetree("usd")
 
-                    # If there's nothing to requeue, we are good!
-                    if not new_batch:
-                        continue
+                        # If there's nothing to requeue, we are good!
+                        if not new_batch:
+                            continue
 
-                    # Otherwise, decide if we are going to requeue or just skip.
-                    if len(batch) == 1:
-                        print(f"Failed on a single item {batch[0]}. Skipping.")
-                        failed_objects.add(batch[0])
+                        # Otherwise, decide if we are going to requeue or just skip.
+                        if len(batch) == 1:
+                            print(f"Failed on a single item {batch[0]}. Skipping.")
+                            failed_objects.add(batch[0])
+                        else:
+                            print(f"Subdividing batch of length {len(new_batch)}")
+                            batch_size = len(new_batch) // 2
+                            subbatches = [new_batch[:batch_size], new_batch[batch_size:]]
+                            for subbatch in subbatches:
+                                if not subbatch:
+                                    continue
+                                worker_future = executor.submit(
+                                    run_on_batch,
+                                    dataset_fs.getsyspath("/"),
+                                    subbatch,
+                                )
+                                futures[worker_future] = subbatch
+                            del futures[future]
+
+                            # Restart the for loop so that the counter can update
+                            break
                     else:
-                        print(f"Subdividing batch of length {len(new_batch)}")
-                        batch_size = len(new_batch) // 2
-                        subbatches = [new_batch[:batch_size], new_batch[batch_size:]]
-                        for subbatch in subbatches:
-                            if not subbatch:
-                                continue
-                            worker_future = dask_client.submit(
-                                run_on_batch,
-                                dataset_fs.getsyspath("/"),
-                                subbatch,
-                                pure=False,
-                            )
-                            futures[worker_future] = subbatch
-                        del futures[future]
-
-                        # Restart the for loop so that the counter can update
+                        # Completed successfully - break out of the while loop.
                         break
-                else:
-                    # Completed successfully - break out of the while loop.
-                    break
+
+                print("Finished processing. Shutting down executor...")
 
             # Move the USDs to the output FS
             print("Copying USDs to output FS...")
