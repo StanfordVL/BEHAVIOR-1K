@@ -18,8 +18,8 @@ from b1k_pipeline.utils import (
 )
 
 WORKER_COUNT = 6
-BATCH_SIZE = 64
-MAX_TIME_PER_PROCESS = 5 * 60  # 5 minutes
+BATCH_SIZE = 256
+MAX_TIME_PER_PROCESS = 10 * 60  # 10 minutes
 
 
 def run_on_batch(dataset_path, batch):
