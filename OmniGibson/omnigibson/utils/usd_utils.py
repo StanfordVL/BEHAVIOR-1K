@@ -2469,11 +2469,15 @@ def activate_prim_and_children(prim_path):
     Args:
         prim_path (str): Path to the prim to activate
     """
-    current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
-    current_prim.SetActive(True)
-    # Use GetAllChildren to also find those that are inactive
-    for child in current_prim.GetAllChildren():
-        activate_prim_and_children(child.GetPath().pathString)
+
+    def _activate(path):
+        current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(path)
+        current_prim.SetActive(True)
+        for child in current_prim.GetAllChildren():
+            _activate(child.GetPath().pathString)
+
+    with og.sim.editing_usd():
+        _activate(prim_path)
 
 
 def get_sdf_value_type_name(val):

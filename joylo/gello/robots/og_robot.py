@@ -266,6 +266,7 @@ class OGRobotServer:
         utils.optimize_sim_settings(vr_mode=(VIEWING_MODE == ViewingMode.VR))
 
         # Reset environment to initialize
+        self._needs_initial_file_update = True
         self.reset()
 
         # Take a single step
@@ -1048,10 +1049,12 @@ class OGRobotServer:
         self._joint_cmd["button_home"] = th.zeros(1)
         self._joint_cmd["button_left"] = th.zeros(1)
         self._joint_cmd["button_right"] = th.zeros(1)
+        should_update_initial_file = self._needs_initial_file_update
 
         # Update the instance id / initial state if the instance ID is specified
         # We will manually update the task relevant objects (TRO) state
         if self.instance_id is not None and increment_instance:
+            should_update_initial_file = True
             self.instance_id += 1
             scene_model = self.env.task.scene_name
             tro_filename = self.env.task.get_cached_activity_scene_filename(
@@ -1105,15 +1108,18 @@ class OGRobotServer:
             utils.update_instance_id_label(self.instance_id_label, self.instance_id)
 
 
-        # Try to ensure that all task-relevant objects are stable
-        # They should already be stable from the sampled instance, but there is some issue where loading the state
-        # causes some jitter (maybe for small mass / thin objects?)
-        for _ in range(25):
-            og.sim.step_physics()
-            for entity in self.env.task.object_scope.values():
-                if entity is not None and not isinstance(entity, BaseSystem):
-                    entity.keep_still()
-        self.env.scene.update_initial_file()
+        if should_update_initial_file:
+            # Try to ensure that all task-relevant objects are stable before caching a reset baseline.
+            # They should already be stable from the sampled instance, but loading the state can cause jitter.
+            for _ in range(25):
+                og.sim.step_physics()
+                self.robot.keep_still()
+                for entity in self.env.task.object_scope.values():
+                    if entity is not None and not isinstance(entity, BaseSystem):
+                        entity.keep_still()
+            self.robot.keep_still()
+            self.env.scene.update_initial_file()
+            self._needs_initial_file_update = False
 
         # Reset env
         self.env.reset()
