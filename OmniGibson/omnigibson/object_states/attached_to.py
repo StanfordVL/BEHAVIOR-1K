@@ -37,9 +37,33 @@ m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
 m.DEFAULT_BREAK_FORCE = 5000  # Newton
 m.DEFAULT_BREAK_TORQUE = 10000  # Newton-Meter
 m.ENABLE_ATTACHMENT_JOINT_VISUALS = False
-m.ATTACHMENT_JOINT_VISUAL_WIDTH = 0.008
-m.ATTACHMENT_JOINT_VISUAL_LENGTH = 0.15
-m.ATTACHMENT_JOINT_VISUAL_COLOR = th.tensor([0.0, 0.35, 1.0])
+
+# Frame visualizer cylinder configurations
+ATTACHMENT_FRAME_CONFIG = {
+    "width": 0.006,
+    "lengths": [0.15, 0.15, 0.15],
+    "directions": [
+        th.tensor([1.0, 0.0, 0.0]),  # X-axis
+        th.tensor([0.0, 1.0, 0.0]),  # Y-axis
+        th.tensor([0.0, 0.0, 1.0]),  # Z-axis
+    ],
+    "quat_offsets": [
+        T.euler2quat(th.tensor([0.0, th.pi / 2, 0.0])),  # X-axis
+        T.euler2quat(th.tensor([-th.pi / 2, 0.0, 0.0])),  # Y-axis
+        T.euler2quat(th.tensor([0.0, 0.0, 0.0])),  # Z-axis
+    ],
+    "colors": [
+        th.tensor([1.0, 0.0, 0.0]),  # Red for X-axis
+        th.tensor([0.0, 1.0, 0.0]),  # Green for Y-axis
+        th.tensor([0.0, 0.0, 1.0]),  # Blue for Z-axis
+    ],
+}
+m.ATTACHMENT_JOINT_VISUAL_WIDTH = ATTACHMENT_FRAME_CONFIG["width"]
+m.ATTACHMENT_JOINT_VISUAL_LENGTHS = ATTACHMENT_FRAME_CONFIG["lengths"]
+m.ATTACHMENT_JOINT_VISUAL_LENGTH = ATTACHMENT_FRAME_CONFIG["lengths"][0]
+m.ATTACHMENT_JOINT_VISUAL_DIRECTIONS = ATTACHMENT_FRAME_CONFIG["directions"]
+m.ATTACHMENT_JOINT_VISUAL_COLORS = ATTACHMENT_FRAME_CONFIG["colors"]
+m.ATTACHMENT_JOINT_VISUAL_ROTATIONS = ATTACHMENT_FRAME_CONFIG["quat_offsets"]
 
 
 # TODO: Make AttachedTo into a global state that manages all the attachments in the scene.
@@ -125,48 +149,66 @@ class AttachedTo(
 
     def _create_attachment_joint_visuals(self):
         """
-        Creates a visual-only local +Z cue under each attachment meta link. The marker starts at the attachment point
-        and extends in the link's up direction so matching male and female cues is visually straightforward.
+        Creates three visual-only axis cues (X, Y, Z) for each attachment meta link.
+        The markers start at the attachment point and extend in their respective directions:
+        X-axis (Red), Y-axis (Green), Z-axis (Blue).
         """
         scene = self.obj.scene
-        mat_prim_path = f"{self.obj.prim_path}/Looks/attachment_joint_visual_up_mat"
-        mat = OmniPBRMaterialPrim(
-            relative_prim_path=absolute_prim_path_to_scene_relative(scene, mat_prim_path),
-            name=f"{self.obj.name}:attachment_joint_visual_up_mat",
-        )
-        mat.load(scene)
-        mat.diffuse_color_constant = m.ATTACHMENT_JOINT_VISUAL_COLOR
+
+        # Create materials for each axis
+        axis_names = ("x", "y", "z")
+        axis_materials = []
+        for axis, color in zip(axis_names, m.ATTACHMENT_JOINT_VISUAL_COLORS):
+            mat_prim_path = f"{self.obj.prim_path}/Looks/attachment_joint_visual_{axis}_mat"
+            mat = OmniPBRMaterialPrim(
+                relative_prim_path=absolute_prim_path_to_scene_relative(scene, mat_prim_path),
+                name=f"{self.obj.name}:attachment_joint_visual_{axis}_mat",
+            )
+            mat.load(scene)
+            mat.diffuse_color_constant = color
+            axis_materials.append(mat)
 
         for link_name, link in self.links.items():
             if not link.meta_link_id.endswith(("M", "F")):
                 continue
 
-            vis_prim_path = f"{link.prim_path}/attachment_joint_visual_up"
-            create_primitive_mesh(vis_prim_path, "Cylinder", extents=1.0)
-            visualizer = GeomPrim(
-                relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
-                name=f"{self.obj.name}:{link_name}:attachment_joint_visual_up",
-            )
-            visualizer.load(scene)
-            visualizer.material = mat
-            visualizer.scale = (
-                th.tensor(
-                    [
-                        m.ATTACHMENT_JOINT_VISUAL_WIDTH,
-                        m.ATTACHMENT_JOINT_VISUAL_WIDTH,
-                        m.ATTACHMENT_JOINT_VISUAL_LENGTH,
-                    ]
-                )
-                / link.scale
-            )
-            visualizer.set_position_orientation(
-                position=th.tensor([0.0, 0.0, m.ATTACHMENT_JOINT_VISUAL_LENGTH / 2.0]) / link.scale,
-                orientation=th.tensor([0.0, 0.0, 0.0, 1.0]),
-                frame="parent",
-            )
-            visualizer.visible = True
+            frame_visualizers = []
 
-            self.attachment_joint_visuals[link_name] = [visualizer]
+            # Create three cylinders (X, Y, Z axes)
+            for axis, mat, direction, quat_offset, length in zip(
+                axis_names,
+                axis_materials,
+                m.ATTACHMENT_JOINT_VISUAL_DIRECTIONS,
+                m.ATTACHMENT_JOINT_VISUAL_ROTATIONS,
+                m.ATTACHMENT_JOINT_VISUAL_LENGTHS,
+            ):
+                vis_prim_path = f"{link.prim_path}/attachment_joint_visual_{axis}"
+                create_primitive_mesh(vis_prim_path, "Cylinder", extents=1.0)
+                visualizer = GeomPrim(
+                    relative_prim_path=absolute_prim_path_to_scene_relative(scene, vis_prim_path),
+                    name=f"{self.obj.name}:{link_name}:attachment_joint_visual_{axis}",
+                )
+                visualizer.load(scene)
+                visualizer.material = mat
+                visualizer.scale = (
+                    th.tensor(
+                        [
+                            m.ATTACHMENT_JOINT_VISUAL_WIDTH,
+                            m.ATTACHMENT_JOINT_VISUAL_WIDTH,
+                            length,
+                        ]
+                    )
+                    / link.scale
+                )
+                visualizer.set_position_orientation(
+                    position=direction * (length / 2.0) / link.scale,
+                    orientation=quat_offset,
+                    frame="parent",
+                )
+                visualizer.visible = True
+                frame_visualizers.append(visualizer)
+
+            self.attachment_joint_visuals[link_name] = frame_visualizers
 
     def on_joint_break(self, joint_prim_path):
         # Note that when this function is invoked when a joint break event happens, @self.obj is the parent of the
