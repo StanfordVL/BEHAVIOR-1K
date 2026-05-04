@@ -1,8 +1,11 @@
 import json
+import os
 import pathlib
+import signal
+import subprocess
+import sys
 import traceback
-
-from concurrent.futures import as_completed
+from concurrent.futures import as_completed, ProcessPoolExecutor
 import fs.copy
 from fs.multifs import MultiFS
 from fs.tempfs import TempFS
@@ -12,42 +15,59 @@ from b1k_pipeline.utils import (
     ParallelZipFS,
     PipelineFS,
     TMP_DIR,
-    launch_cluster,
-    submit_og_task,
+    worker_subprocess_env,
 )
 
-WORKER_COUNT = 2
-
-OG_MACROS = {
-    "HEADLESS": True,
-    "USE_GPU_DYNAMICS": False,
-    "USE_ENCRYPTED_ASSETS": True,
-}
+WORKER_COUNT = 1
+MAX_TIME_PER_PROCESS = 60 * 60  # 1 hour
 
 
-def process_scene(dataset_root, scene):
-    """Convert a scene URDF to JSON and (for *_best.urdf) generate maps."""
-    import time
+def run_on_scene(dataset_path, scene):
+    try:
+        basename = pathlib.Path(scene).stem
+        print("Running on scene:", basename)
+        cmd = [
+            sys.executable,
+            "-m",
+            "b1k_pipeline.usd_conversion.usdify_scenes_process",
+            dataset_path,
+            scene,
+        ]
+        os.makedirs("/scr/BEHAVIOR-1K/asset_pipeline/logs", exist_ok=True)
+        with (
+            open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{basename}.log", "w") as f,
+            open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{basename}.err", "w") as ferr,
+        ):
+            try:
+                p = subprocess.Popen(
+                    cmd,
+                    stdout=f,
+                    stderr=ferr,
+                    cwd="/scr/BEHAVIOR-1K/asset_pipeline",
+                    env=worker_subprocess_env(),
+                )
+                pid = p.pid
+                p.wait(timeout=MAX_TIME_PER_PROCESS)
+            except:
+                ferr.write(
+                    f"\nTimeout for {basename} ({MAX_TIME_PER_PROCESS}s) expired. Killing\n"
+                )
+                try:
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    ferr.write(f"Process {pid} already exited.\n")
+                p.wait()
 
-    from omnigibson.macros import gm
-    from omnigibson.utils.asset_conversion_utils import convert_scene_urdf_to_json
-    from b1k_pipeline.usd_conversion.make_maps import generate_maps_for_current_scene
+        # Check if the success file exists.
+        success_file = (pathlib.Path(dataset_path) / scene).with_suffix(".success")
+        if not success_file.exists():
+            raise ValueError(
+                f"Scene {scene} processing failed: no success file found. Check the logs."
+            )
 
-    gm.DATASET_PATH = str(dataset_root)
-
-    urdf_path = pathlib.Path(dataset_root) / scene
-    scene_basename = urdf_path.stem
-    json_path = urdf_path.parent.parent / "json" / f"{scene_basename}.json"
-
-    convert_scene_urdf_to_json(urdf=str(urdf_path), json_path=str(json_path))
-
-    if urdf_path.name.endswith("_best.urdf"):
-        print("Starting map generation")
-        map_start = time.time()
-        save_path = urdf_path.parent.parent / "layout"
-        generate_maps_for_current_scene(str(save_path))
-        map_end = time.time()
-        print("Generated maps in ", map_end - map_start, "seconds")
+        return None
+    except:
+        return traceback.format_exc()
 
 
 def main():
@@ -74,30 +94,41 @@ def main():
                 )
 
             print("Launching cluster...")
-            executor = launch_cluster(WORKER_COUNT, og_macros=OG_MACROS)
+            with ProcessPoolExecutor(max_workers=WORKER_COUNT) as executor:
+                # Start the batched run. We remove the leading / so that pathlib can append it to dataset path correctly.
+                scenes_to_process = {
+                    "hall_arch_wood",
+                    "school_computer_lab_and_infirmary",
+                    "house_double_floor_lower",
+                    "house_single_floor",
+                    "Pomaria_0_garden",
+                    "Wainscott_0_garden",
+                }
+                scenes = [
+                    x.path[1:]
+                    for x in dataset_fs.glob("scenes/*/urdf/*_best.urdf")
+                    if pathlib.Path(x.path).parts[2] in scenes_to_process
+                ]
+                print("Queueing scenes.")
+                print("Total count: ", len(scenes))
+                futures = {}
+                for scene in scenes:
+                    worker_future = executor.submit(
+                        run_on_scene,
+                        dataset_fs.getsyspath("/"),
+                        scene,
+                    )
+                    futures[worker_future] = scene
 
-            # Start the batched run. We remove the leading / so that pathlib can append it to dataset path correctly.
-            scenes = [x.path[1:] for x in dataset_fs.glob("scenes/*/urdf/*.urdf")]
-            print("Queueing scenes.")
-            print("Total count: ", len(scenes))
-            futures = {}
-            for scene in scenes:
-                worker_future = submit_og_task(
-                    executor,
-                    process_scene,
-                    dataset_fs.getsyspath("/"),
-                    scene,
-                )
-                futures[worker_future] = scene
+                # Wait for all the workers to finish
+                print("Queued all scenes. Waiting for them to finish...")
+                errors = {}
+                for future in tqdm.tqdm(as_completed(futures.keys()), total=len(futures)):
+                    exc = future.result()
+                    if exc:
+                        errors[futures[future]] = str(exc)
 
-            # Wait for all the workers to finish
-            print("Queued all scenes. Waiting for them to finish...")
-            errors = {}
-            for future in tqdm.tqdm(as_completed(futures.keys()), total=len(futures)):
-                try:
-                    future.result()
-                except Exception:
-                    errors[futures[future]] = traceback.format_exc()
+                print("Finished processing. Shutting down executor...")
 
             # Move the USDs to the output FS
             print("Copying scene JSONs to output FS...")

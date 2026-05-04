@@ -574,9 +574,12 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                     else getattr(lazy.pxr.UsdGeom, mesh_type).Define(stage, prim_path).GetPrim()
                 )
 
+            # _add_xform_properties already gives us the canonical
+            # translate/orient/scale ops on `prim`, so we don't need to wrap
+            # the prim in an XFormPrim here. (The Isaac Sim 5.1 XFormPrim is
+            # a view-based class with a different constructor and `.prims`
+            # accessor anyway.)
             _add_xform_properties(prim=prim)
-            # Make sure mesh_prim has XForm properties
-            xform_prim = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=prim_path)
 
             # Get the mesh/light pose in the parent link frame
             mesh_in_parent_link_pos, mesh_in_parent_link_orn = (
@@ -598,24 +601,24 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
             )
 
             if is_light:
-                xform_prim.prim.GetAttribute("inputs:color").Set(
+                prim.GetAttribute("inputs:color").Set(
                     lazy.pxr.Gf.Vec3f(*(th.tensor(mesh_info["color"]) / 255.0).tolist())
                 )
-                xform_prim.prim.GetAttribute("inputs:intensity").Set(mesh_info["intensity"])
+                prim.GetAttribute("inputs:intensity").Set(mesh_info["intensity"])
                 if light_type == "Rect":
-                    xform_prim.prim.GetAttribute("inputs:width").Set(mesh_info["length"])
-                    xform_prim.prim.GetAttribute("inputs:height").Set(mesh_info["width"])
+                    prim.GetAttribute("inputs:width").Set(mesh_info["length"])
+                    prim.GetAttribute("inputs:height").Set(mesh_info["width"])
                 elif light_type == "Disk":
-                    xform_prim.prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
+                    prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
                 elif light_type == "Sphere":
-                    xform_prim.prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
+                    prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
                 else:
                     raise ValueError(f"Invalid light type: {light_type}")
             else:
                 if mesh_type == "Cylinder":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("radius").Set(0.5)
-                        xform_prim.prim.GetAttribute("height").Set(1.0)
+                        prim.GetAttribute("radius").Set(0.5)
+                        prim.GetAttribute("height").Set(1.0)
                     if meta_link_type == "particlesource":
                         desired_radius = 0.0125
                         desired_height = 0.05
@@ -624,19 +627,19 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                         desired_radius = mesh_info["size"][0]
                         desired_height = mesh_info["size"][2]
                         height_offset = desired_height / 2.0
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(
+                    prim.GetAttribute("xformOp:scale").Set(
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_height)
                     )
                     # Offset the position by half the height because in 3dsmax the origin of the cylinder is at the center of the base
                     mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Cone":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("radius").Set(0.5)
-                        xform_prim.prim.GetAttribute("height").Set(1.0)
+                        prim.GetAttribute("radius").Set(0.5)
+                        prim.GetAttribute("height").Set(1.0)
                     desired_radius = mesh_info["size"][0]
                     desired_height = mesh_info["size"][2]
                     height_offset = -desired_height / 2.0
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(
+                    prim.GetAttribute("xformOp:scale").Set(
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_height)
                     )
                     # Flip the orientation of the z-axis because in 3dsmax the cone is pointing in the opposite direction
@@ -647,24 +650,25 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                     mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Cube":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("size").Set(1.0)
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3f(*mesh_info["size"]))
+                        prim.GetAttribute("size").Set(1.0)
+                    prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3f(*mesh_info["size"]))
                     height_offset = mesh_info["size"][2] / 2.0
                     mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Sphere":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("radius").Set(0.5)
+                        prim.GetAttribute("radius").Set(0.5)
                     desired_radius = mesh_info["size"][0]
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(
+                    prim.GetAttribute("xformOp:scale").Set(
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_radius * 2)
                     )
                 else:
                     raise ValueError(f"Invalid mesh type: {mesh_type}")
 
-            xform_prim.set_local_pose(
-                translation=mesh_in_meta_link_pos,
-                orientation=mesh_in_meta_link_orn[[3, 0, 1, 2]],
-            )
+            # Set local pose directly on the USD xform ops added by
+            # _add_xform_properties. Quaternion is reordered to (w, x, y, z)
+            # to match Gf.Quatd's constructor.
+            prim.GetAttribute("xformOp:translate").Set(lazy.pxr.Gf.Vec3d(*mesh_in_meta_link_pos.tolist()))
+            prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*mesh_in_meta_link_orn[[3, 0, 1, 2]].tolist()))
 
 
 def _process_glass_link(prim):
@@ -681,22 +685,18 @@ def _process_glass_link(prim):
     Raises:
         AssertionError: If no glass prim paths are found.
     """
-    # Update any glass parts to use the glass material instead
-    glass_prim_paths = []
-    for gchild in prim.GetChildren():
-        if gchild.GetTypeName() == "Mesh":
-            # check if has col api, if not, this is visual
-            if not gchild.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
-                glass_prim_paths.append(gchild.GetPath().pathString)
-        elif gchild.GetTypeName() == "Scope":
-            # contains multiple additional prims, check those
-            for ggchild in gchild.GetChildren():
-                if ggchild.GetTypeName() == "Mesh":
-                    # check if has col api, if not, this is visual
-                    if not ggchild.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
-                        glass_prim_paths.append(ggchild.GetPath().pathString)
+    # Update any glass parts to use the glass material instead. We walk all
+    # descendants because convert_urdf_to_usd nests visual meshes under a
+    # `visuals` Xform child (e.g. /{model}/{link}/visuals/<mesh_name>) — the
+    # old fixed-depth walk only matched meshes sitting directly under the
+    # link or under a Scope and missed those.
+    glass_prim_paths = [
+        descendant.GetPath().pathString
+        for descendant in lazy.pxr.Usd.PrimRange(prim)
+        if descendant.GetTypeName() == "Mesh" and not descendant.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
+    ]
 
-    assert glass_prim_paths
+    assert glass_prim_paths, f"No visual Mesh prims found under {prim.GetPath()}"
 
     stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     root_path = stage.GetDefaultPrim().GetPath().pathString
@@ -1309,6 +1309,17 @@ def convert_urdf_to_usd(
             ), f"Expected exactly one reference for {possible_referrer.GetPath()}, got {len(references)}"
             referrer_path = possible_referrer.GetPath()
             referee_path = references[0].primPath
+            # Isaac Sim's URDF importer emits a placeholder `visuals` /
+            # `collisions` reference on every link, even stub meta-links that
+            # have no geometry — those references are dangling. Just drop the
+            # empty referrer prim so we don't choke on it below.
+            if not side_stage.GetPrimAtPath(referee_path).IsValid():
+                del (
+                    side_stage.GetRootLayer()
+                    .GetPrimAtPath(referrer_path.GetParentPath())
+                    .nameChildren[referrer_path.name]
+                )
+                continue
             found_reference_prims[referrer_path] = referee_path
             del side_stage.GetRootLayer().GetPrimAtPath(referrer_path.GetParentPath()).nameChildren[referrer_path.name]
 
@@ -1683,16 +1694,18 @@ def convert_scene_urdf_to_json(urdf, json_path):
     """
     # First, load the requested objects from the URDF into OG
     _load_scene_from_urdf(urdf=urdf)
+    log.debug("Loaded scene from URDF")
 
     # Play the simulator, then save
     og.sim.play()
+    log.debug("Played simulator")
     Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
     og.sim.save(json_paths=[json_path])
+    log.debug("Saved scene to JSON")
 
     # Load the json, remove the init_info because we don't need it, then save it again
     with open(json_path, "r") as f:
         scene_info = json.load(f)
-
     scene_info.pop("init_info")
 
     with open(json_path, "w+") as f:
@@ -1736,6 +1749,7 @@ def _load_scene_from_urdf(urdf):
             ):
                 log.warning("Missing object", obj_name)
                 continue
+            log.debug(f"Loading object {obj_name}")
             obj = DatasetObject(
                 name=obj_name,
                 **obj_info["cfg"],
@@ -1744,10 +1758,6 @@ def _load_scene_from_urdf(urdf):
             obj.set_bbox_center_position_orientation(position=obj_info["bbox_pos"], orientation=obj_info["bbox_quat"])
         except Exception as e:
             raise ValueError(f"Failed to load object {obj_name}") from e
-
-    # Take a sim step
-    with og.sim.slowed():
-        og.sim.step()
 
 
 def _get_objects_config_from_scene_urdf(urdf):
