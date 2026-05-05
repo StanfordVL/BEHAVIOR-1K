@@ -4,7 +4,7 @@ import pathlib
 import signal
 import subprocess
 import sys
-from dask.distributed import as_completed
+from concurrent.futures import as_completed
 import fs.copy
 from fs.zipfs import ZipFS
 import fs.path
@@ -14,8 +14,7 @@ import tqdm
 from b1k_pipeline.utils import (
     PipelineFS,
     TMP_DIR,
-    get_targets,
-    launch_cluster,
+    make_og_pool_executor,
     worker_subprocess_env,
 )
 
@@ -38,12 +37,17 @@ def run_on_scene(dataset_path, scene, output_dir):
         open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.err", "w") as ferr,
     ):
         try:
+            # process_group=0 puts the subprocess in its OWN process group
+            # (so os.killpg below only reaches the subprocess and its
+            # descendants — not the pool worker that called us) but leaves
+            # it in the parent's session, so a terminal SIGHUP /
+            # head-process crash still tears it down.
             p = subprocess.Popen(
                 cmd,
                 stdout=f,
                 stderr=ferr,
                 cwd="/scr/BEHAVIOR-1K/asset_pipeline",
-                start_new_session=True,
+                process_group=0,
                 env=worker_subprocess_env(),
             )
             p.wait(timeout=MAX_TIME_PER_PROCESS)
@@ -52,7 +56,7 @@ def run_on_scene(dataset_path, scene, output_dir):
                 f"Timeout for {scene} ({MAX_TIME_PER_PROCESS}s) expired. Killing",
                 file=sys.stderr,
             )
-            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+            os.killpg(p.pid, signal.SIGKILL)
             p.wait()
 
     return {
@@ -84,37 +88,37 @@ def main():
             )
 
         print("Launching cluster...")
-        dask_client = launch_cluster(WORKER_COUNT)
+        with make_og_pool_executor(WORKER_COUNT) as executor:
+            # Start the batched run
+            scenes = list(dataset_fs.opendir("scenes").listdir("/"))
+            print("Queueing scenes.")
+            print("Total count: ", len(scenes))
+            futures = {}
+            for scene in scenes:
+                worker_future = executor.submit(
+                    run_on_scene,
+                    dataset_fs.getsyspath("/"),
+                    scene,
+                    out_temp_fs.getsyspath("/"),
+                )
+                futures[worker_future] = scene
 
-        # Start the batched run
-        scenes = list(dataset_fs.opendir("scenes").listdir("/"))
-        print("Queueing scenes.")
-        print("Total count: ", len(scenes))
-        futures = {}
-        for scene in scenes:
-            worker_future = dask_client.submit(
-                run_on_scene,
-                dataset_fs.getsyspath("/"),
-                scene,
-                out_temp_fs.getsyspath("/"),
-                pure=False,
-            )
-            futures[worker_future] = scene
+            # Wait for all the workers to finish
+            print("Queued all scenes. Waiting for them to finish...")
+            scene_results = {}
+            for future in tqdm.tqdm(as_completed(futures.keys()), total=len(futures)):
+                scene = futures[future]
+                scene_results[scene] = {"success": False, "issues": [], "logs": ""}
+                try:
+                    logs = future.result()
+                    scene_results[scene]["logs"] = logs
+                    with out_temp_fs.open(f"{scene}.json", "r") as f:
+                        scene_results[scene]["issues"] = json.load(f)
+                    scene_results[scene]["success"] = not scene_results[scene]["issues"]
+                except Exception as e:
+                    scene_results[scene]["logs"] = str(e)
 
-        # Wait for all the workers to finish
-        print("Queued all scenes. Waiting for them to finish...")
-        scene_results = {}
-        for future in tqdm.tqdm(as_completed(futures.keys()), total=len(futures)):
-            scene = futures[future]
-            scene_results[scene] = {"success": False, "issues": [], "logs": ""}
-            try:
-                logs = future.result()
-                scene_results[scene]["logs"] = logs
-                with out_temp_fs.open(f"{scene}.json", "r") as f:
-                    scene_results[scene]["issues"] = json.load(f)
-                scene_results[scene]["success"] = not scene_results[scene]["issues"]
-            except Exception as e:
-                scene_results[scene]["logs"] = str(e)
+            print("Finished processing. Shutting down executor...")
 
         # Save the logs
         results = {

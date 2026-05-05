@@ -15,7 +15,6 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
-from omnigibson.utils.render_utils import force_pbr_material_for_link
 from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints, find_joint_prims
 
 # Create settings for this module
@@ -257,10 +256,6 @@ class EntityPrim(XFormPrim):
                 link_cls = RigidKinematicPrim if is_kinematic else RigidDynamicPrim
             else:  # link_type == PrimType.CLOTH
                 link_cls = ClothPrim
-
-            # Apply the V-Ray to PBR material change if request by the macro
-            if gm.USE_PBR_MATERIALS:
-                force_pbr_material_for_link(self._prim, link_name)
 
             # Create and load the link
             self._links[link_name] = link_cls(

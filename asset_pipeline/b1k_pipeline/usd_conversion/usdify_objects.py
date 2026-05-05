@@ -5,7 +5,7 @@ import signal
 import subprocess
 import sys
 import fs.copy
-from concurrent.futures import as_completed, ProcessPoolExecutor
+from concurrent.futures import as_completed
 import fs.path
 from fs.tempfs import TempFS
 import tqdm
@@ -14,6 +14,7 @@ from b1k_pipeline.utils import (
     ParallelZipFS,
     PipelineFS,
     TMP_DIR,
+    make_og_pool_executor,
     worker_subprocess_env,
 )
 
@@ -36,12 +37,17 @@ def run_on_batch(dataset_path, batch):
         open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr,
     ):
         try:
+            # process_group=0 puts the subprocess in its OWN process group
+            # (so os.killpg below only reaches the subprocess and its
+            # descendants — not the pool worker that called us) but leaves
+            # it in the parent's session, so a terminal SIGHUP /
+            # head-process crash still tears it down.
             p = subprocess.Popen(
                 cmd,
                 stdout=f,
                 stderr=ferr,
                 cwd="/scr/BEHAVIOR-1K/asset_pipeline",
-                start_new_session=True,
+                process_group=0,
                 env=worker_subprocess_env(),
             )
             return p.wait(timeout=MAX_TIME_PER_PROCESS)
@@ -50,7 +56,7 @@ def run_on_batch(dataset_path, batch):
                 f"Timeout for {batch} ({MAX_TIME_PER_PROCESS}s) expired. Killing",
                 file=sys.stderr,
             )
-            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+            os.killpg(p.pid, signal.SIGKILL)
             return p.wait()
 
 
@@ -82,7 +88,7 @@ def main():
 
             print("Launching cluster...")
 
-            with ProcessPoolExecutor(max_workers=WORKER_COUNT) as executor:
+            with make_og_pool_executor(WORKER_COUNT) as executor:
                 # Start the batched run
                 object_glob = [x.path for x in dataset_fs.glob("objects/*/*/")]
                 print("Queueing batches.")

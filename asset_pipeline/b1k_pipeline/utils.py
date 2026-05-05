@@ -203,29 +203,95 @@ def load_mesh(fs, name, **kwargs):
 def save_mesh(mesh, out_fs, name, **kwargs):
     with out_fs.open(name, "wb") as f:
         filetype = fs.path.splitext(name)[1][1:]  # Get file extension without dot
-        return mesh.export(f, resolver=FSResolver(out_fs), file_type=filetype, **kwargs)
+        return mesh.export(f, resolver=FSResolver(out_fs), file_type=filetype, include_normals=False, include_color=False, **kwargs)
 
 
 WORKER_APPDATA_ROOT = TMP_DIR / "worker-appdata"
 
 
-def worker_subprocess_env():
-    """Build the env dict to hand to ``subprocess.Popen`` from a dask worker.
+def _detect_gpus():
+    """List GPU device ids to round-robin across.
 
-    Each dask worker process gets its own ``OMNIGIBSON_APPDATA_PATH`` under
+    If ``CUDA_VISIBLE_DEVICES`` is already set in the parent env, respect
+    that restriction. Otherwise enumerate via ``nvidia-smi``. Falls back to
+    ``["0"]`` if neither is available.
+    """
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible is not None and visible.strip():
+        return [g.strip() for g in visible.split(",") if g.strip()]
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        gpus = [line.strip() for line in out.stdout.splitlines() if line.strip()]
+        return gpus or ["0"]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return ["0"]
+
+
+def _og_pool_worker_init(counter, gpus):
+    """ProcessPoolExecutor initializer: pin this worker process to one GPU.
+
+    Each worker atomically claims the next index from a shared counter and
+    sets ``CUDA_VISIBLE_DEVICES`` to ``gpus[idx % len(gpus)]``. Subprocesses
+    spawned by this worker (via ``worker_subprocess_env``) inherit that env
+    var, so all OmniGibson work the worker triggers lands on the same GPU.
+    Within the visible set, ``OMNIGIBSON_GPU_ID`` is always ``"0"``.
+    """
+    with counter.get_lock():
+        idx = counter.value
+        counter.value += 1
+    gpu = gpus[idx % len(gpus)]
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu
+
+
+def make_og_pool_executor(worker_count, gpus=None):
+    """Build a ``ProcessPoolExecutor`` that pins workers round-robin to GPUs.
+
+    Workers run a tiny initializer that grabs an index from a shared atomic
+    counter and writes ``CUDA_VISIBLE_DEVICES`` for the worker process; any
+    subprocesses spawned by the worker then inherit that pinning through
+    :func:`worker_subprocess_env` (which copies ``os.environ`` and tacks on
+    a per-pid ``OMNIGIBSON_APPDATA_PATH``). The mapping is deterministic in
+    the worker→GPU direction (worker N → GPU N % len(gpus)), so an
+    even-allocation invariant holds even if individual tasks are scheduled
+    on whichever worker is free.
+    """
+    from concurrent.futures import ProcessPoolExecutor
+    from multiprocessing import Value
+
+    if gpus is None:
+        gpus = _detect_gpus()
+    counter = Value("i", 0)
+    return ProcessPoolExecutor(
+        max_workers=worker_count,
+        initializer=_og_pool_worker_init,
+        initargs=(counter, gpus),
+    )
+
+
+def worker_subprocess_env():
+    """Build the env dict to hand to ``subprocess.Popen`` from a pool worker.
+
+    Each pool worker process gets its own ``OMNIGIBSON_APPDATA_PATH`` under
     ``tmp/worker-appdata/pid-<pid>``. OmniGibson reads this env var in
     ``macros.py`` and routes both ``--portable-root`` and
     ``--/app/tokens/omni_global_cache`` to it, so concurrent OG subprocesses
     no longer fight over a single shared ``texturecache`` (which was
     accumulating to ~200GB and triggering ``LocalDataStore`` segfaults on
     block-load failures). Sequential subprocess invocations from the same
-    dask worker still reuse the cache, since the path is keyed on the
+    pool worker still reuse the cache, since the path is keyed on the
     worker PID, not per-task.
+
+    ``CUDA_VISIBLE_DEVICES`` and ``OMNIGIBSON_GPU_ID`` are *not* set here —
+    they're already set on the worker process by :func:`_og_pool_worker_init`,
+    and ``dict(os.environ)`` propagates that pinning to the subprocess.
     """
     appdata = WORKER_APPDATA_ROOT / f"pid-{os.getpid()}"
     appdata.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env["OMNIGIBSON_APPDATA_PATH"] = str(appdata.absolute())
-    env["OMNIGIBSON_GPU_ID"] = "0"
-    env["CUDA_VISIBLE_DEVICES"] = "0"
     return env

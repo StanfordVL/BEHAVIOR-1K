@@ -5,7 +5,7 @@ import signal
 import subprocess
 import sys
 import traceback
-from concurrent.futures import as_completed, ProcessPoolExecutor
+from concurrent.futures import as_completed
 import fs.copy
 from fs.multifs import MultiFS
 from fs.tempfs import TempFS
@@ -15,6 +15,7 @@ from b1k_pipeline.utils import (
     ParallelZipFS,
     PipelineFS,
     TMP_DIR,
+    make_og_pool_executor,
     worker_subprocess_env,
 )
 
@@ -39,23 +40,29 @@ def run_on_scene(dataset_path, scene):
             open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{basename}.err", "w") as ferr,
         ):
             try:
+                # process_group=0 puts the subprocess in its OWN process
+                # group (so os.killpg below only reaches the subprocess and
+                # its descendants — not the pool worker that called us) but
+                # leaves it in the parent's session, so a terminal SIGHUP /
+                # head-process crash still tears it down. Requires Python
+                # 3.11+ (we're on 3.11.x).
                 p = subprocess.Popen(
                     cmd,
                     stdout=f,
                     stderr=ferr,
                     cwd="/scr/BEHAVIOR-1K/asset_pipeline",
+                    process_group=0,
                     env=worker_subprocess_env(),
                 )
-                pid = p.pid
                 p.wait(timeout=MAX_TIME_PER_PROCESS)
-            except:
+            except subprocess.TimeoutExpired:
                 ferr.write(
                     f"\n{basename} did not finish within {MAX_TIME_PER_PROCESS}s. Killing\n"
                 )
                 try:
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                    os.killpg(p.pid, signal.SIGKILL)
                 except ProcessLookupError:
-                    ferr.write(f"Process {pid} already exited.\n")
+                    ferr.write(f"Process {p.pid} already exited.\n")
                 p.wait()
 
         # Check if the success file exists.
@@ -94,7 +101,7 @@ def main():
                 )
 
             print("Launching cluster...")
-            with ProcessPoolExecutor(max_workers=WORKER_COUNT) as executor:
+            with make_og_pool_executor(WORKER_COUNT) as executor:
                 # Start the batched run. We remove the leading / so that pathlib can append it to dataset path correctly.
                 scenes = [x.path[1:] for x in dataset_fs.glob("scenes/*/urdf/*.urdf")]
 

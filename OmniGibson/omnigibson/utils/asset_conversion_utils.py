@@ -44,8 +44,6 @@ _OBJECT_STATE_TEXTURES = {
     "toggledon",
 }
 
-USE_VRAY_MATERIAL = True
-
 _MTL_MAP_TYPE_MAPPINGS = {
     "map_Kd": "diffuse",
     "map_bump": "normal",
@@ -131,52 +129,6 @@ def _tensor_to_space_script(array):
         str: String equivalent of @array
     """
     return " ".join(["{}".format(x) for x in array.tolist()])
-
-
-def _set_omnipbr_mtl_diffuse(mtl_prim, texture):
-    mtl = "diffuse_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_omnipbr_mtl_normal(mtl_prim, texture):
-    mtl = "normalmap_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_omnipbr_mtl_metalness(mtl_prim, texture):
-    mtl = "metallic_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    lazy.omni.usd.create_material_input(mtl_prim, "metallic_texture_influence", 1.0, lazy.pxr.Sdf.ValueTypeNames.Float)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_omnipbr_mtl_opacity(mtl_prim, texture):
-    mtl = "opacity_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
-    lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity_texture", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
-
-    # Set the opacity to use the alpha channel for its mono-channel value.
-    # This defaults to some other value, which takes opaque black channels in the
-    # image to be fully transparent. This is not what we want.
-    lazy.omni.usd.create_material_input(mtl_prim, "opacity_mode", 0, lazy.pxr.Sdf.ValueTypeNames.Int)
-
-    # We also need to set an opacity threshold. Our objects can include continuous alpha values for opacity
-    # but the ray tracing renderer can only handle binary opacity values. The default threshold
-    # leaves most objects entirely transparent, so we try to avoid that here.
-    lazy.omni.usd.create_material_input(mtl_prim, "opacity_threshold", 0.1, lazy.pxr.Sdf.ValueTypeNames.Float)
-
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _rename_prim(prim, name):
@@ -335,68 +287,27 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
         )
         vray_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
 
-        # Create the OmniPBR material
-        pbr_material_name = mtl_name + "_pbr"
-        mtl_created_list = []
-        lazy.omni.kit.commands.execute(
-            "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name="OmniPBR.mdl",
-            mtl_name="OmniPBR",
-            mtl_created_list=mtl_created_list,
-        )
-        pbr_mat = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-        rendering_channel_mappings = {
-            "diffuse": _set_omnipbr_mtl_diffuse,
-            "normal": _set_omnipbr_mtl_normal,
-            "metalness": _set_omnipbr_mtl_metalness,
-        }
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
-            # First assign the Vray material channels. These are simple - all the channels
-            # are just named x_texture for channel x.
             lazy.omni.usd.create_material_input(
                 vray_mat, f"{mat_type}_texture", mat_file, lazy.pxr.Sdf.ValueTypeNames.Asset
             )
 
-            # Do the OmniPBR material next
-            # Use the alpha of the diffuse texture for opacity for trees etc.
-            if mat_type == "diffuse" and obj_category in _OPACITY_CATEGORIES:
-                _set_omnipbr_mtl_opacity(pbr_mat, mat_file)
-            render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
-            if render_channel_fcn is not None:
-                render_channel_fcn(pbr_mat, mat_file)
-            else:
-                # Warn user that we didn't find the correct rendering channel
-                log.debug(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
-
         # Rename material
-        pbr_mat = _rename_prim(prim=pbr_mat, name=pbr_material_name)
-        selected_mat = vray_mat if USE_VRAY_MATERIAL else pbr_mat
-        shade = lazy.pxr.UsdShade.Material(selected_mat)
+        shade = lazy.pxr.UsdShade.Material(vray_mat)
         shaders[mtl_name] = shade
-        log.debug(f"Created material {pbr_material_name}:", pbr_mat)
 
     # Bind each (visual) mesh to its appropriate material in the object
     # We'll loop over each link, create a list of 2-tuples each consisting of (mesh_prim_path, mtl_name) to be bound
     root_prim_path = obj_prim.GetPrimPath().pathString
     for link_name, mesh_mtl_names in link_mtl_files.items():
-        # Special case -- omni always calls the visuals "visuals" by default if there's only a single visual mesh for the
-        # given
-        if len(mesh_mtl_names) == 1:
-            mesh_mtl_infos = [
-                (
-                    f"{root_prim_path}/{link_name}/visuals",
-                    list(mesh_mtl_names.values())[0],
-                )
-            ]
-        else:
-            mesh_mtl_infos = []
-            for mesh_name, mtl_name in mesh_mtl_names.items():
-                # Omni only accepts a-z, A-Z as valid start characters for prim names
-                # So we check if there is an invalid character, and modify it as we know Omni does
-                if not ord("a") <= ord(mesh_name[0]) <= ord("z") and not ord("A") <= ord(mesh_name[0]) <= ord("Z"):
-                    mesh_name = "a_" + mesh_name[1:]
-                mesh_mtl_infos.append((f"{root_prim_path}/{link_name}/visuals/{mesh_name}", mtl_name))
+        mesh_mtl_infos = []
+        for mesh_name, mtl_name in mesh_mtl_names.items():
+            # Omni only accepts a-z, A-Z as valid start characters for prim names
+            # So we check if there is an invalid character, and modify it as we know Omni does
+            if not ord("a") <= ord(mesh_name[0]) <= ord("z") and not ord("A") <= ord(mesh_name[0]) <= ord("Z"):
+                mesh_name = "a_" + mesh_name[1:]
+            mesh_mtl_infos.append((f"{root_prim_path}/{link_name}/visuals/{mesh_name}", mtl_name))
         for mesh_prim_path, mtl_name in mesh_mtl_infos:
             visual_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
             assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
@@ -687,8 +598,8 @@ def _process_glass_link(prim):
     # link or under a Scope and missed those.
     glass_prim_paths = [
         descendant.GetPath().pathString
-        for descendant in lazy.pxr.Usd.PrimRange(prim)
-        if descendant.GetTypeName() == "Mesh" and not descendant.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
+        for descendant in lazy.pxr.Usd.PrimRange(prim.GetChild("visuals"))
+        if descendant.GetTypeName() == "Mesh"
     ]
 
     assert glass_prim_paths, f"No visual Mesh prims found under {prim.GetPath()}"
@@ -714,9 +625,7 @@ def _process_glass_link(prim):
         )
 
 
-def import_obj_metadata(
-    usd_path, obj_category, obj_model, dataset_root, keep_instanceable=True, force_asset_pipeline_materials=False
-):
+def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_asset_pipeline_materials=False):
     """
     Imports metadata for a given object model from the dataset. This metadata consist of information
     that is NOT included in the URDF file and instead included in the various JSON files shipped in
@@ -727,7 +636,6 @@ def import_obj_metadata(
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
-        keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
         force_asset_pipeline_materials (bool, optional): Flag to force the use of asset pipeline materials. Defaults to False.
 
     Raises:
@@ -744,19 +652,6 @@ def import_obj_metadata(
     lazy.isaacsim.core.utils.stage.open_stage(str(usd_path))
     stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     prim = stage.GetDefaultPrim()
-
-    # First traverse entire tree and modify the prims in place if not keeping instanceable
-    if not keep_instanceable:
-
-        def remove_instanceable_recursive(_root):
-            # See https://openusd.org/docs/api/_usd__page__scenegraph_instancing.html ("Traversing Into Instances with Instance Proxies")
-            children = _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies())
-            for child in children:
-                if child.IsInstanceable():
-                    child.SetInstanceable(False)
-                remove_instanceable_recursive(_root=child)
-
-        remove_instanceable_recursive(_root=prim)
 
     data = dict()
     for data_group in {"metadata", "mvbb_meta", "material_groups", "heights_per_link"}:
@@ -2211,7 +2106,6 @@ def get_collision_approximation_for_urdf(
                 collision_filenames_and_scales = []
                 for i, collision_mesh in enumerate(collision_meshes):
                     processed_collision_mesh = collision_mesh.copy()
-                    processed_collision_mesh._cache.cache["vertex_normals"] = processed_collision_mesh.vertex_normals
                     collision_filename = f"{link_name}_col_{idx}.obj"
 
                     # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
@@ -2506,7 +2400,6 @@ def import_og_asset_from_urdf(
     convex_links=None,
     no_decompose_links=None,
     visual_only_links=None,
-    keep_instanceable=True,
     merge_fixed_joints=False,
     import_inertia_tensor=True,
     hull_count=32,
@@ -2529,7 +2422,6 @@ def import_og_asset_from_urdf(
         no_decompose_links (None or list of str): If specified, links that should not have any special collision
             decomposition applied. This will only use the convex hull
         visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
-        keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
         merge_fixed_joints (bool): Whether to merge fixed joints or not
         import_inertia_tensor (bool): Whether to import the URDF's native inertia tensor or not
         dataset_name (str): Dataset name to which the USD will be written. Lives in get_dataset_path(dataset_name)
@@ -2593,7 +2485,6 @@ def import_og_asset_from_urdf(
         obj_category=category,
         obj_model=model,
         dataset_root=dataset_root,
-        keep_instanceable=keep_instanceable,
     )
     print(
         f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
