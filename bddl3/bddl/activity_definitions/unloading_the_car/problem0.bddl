@@ -23,22 +23,9 @@
         (and 
             (forall 
                 (?briefcase.n.01 - briefcase.n.01)
-                (not 
-                    (inside ?briefcase.n.01 ?car.n.01_1)
-                )
-            )
-            (forall
-                (?satchel.n.01 - satchel.n.01)
-                (not 
-                    (inside ?satchel.n.01 ?car.n.01_1)
-                )
-            )
-            (forall 
-                (?briefcase.n.01 - briefcase.n.01)
                 (nextto ?briefcase.n.01 ?sofa.n.01_1)
             )
             (forall
-
                 (?satchel.n.01 - satchel.n.01)
                 (nextto ?satchel.n.01 ?sofa.n.01_1)
             )
