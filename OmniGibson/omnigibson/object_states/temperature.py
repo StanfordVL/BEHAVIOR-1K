@@ -1,9 +1,27 @@
+import warp as wp
+
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty
+
+
+@wp.kernel
+def _temperature_decay_kernel(
+    values: wp.array2d(dtype=wp.float32),
+    default_temp: wp.float32,
+    decay_rate: wp.float32,
+    dt: wp.float32,
+):
+    """
+    In-place exponential decay toward `default_temp`. One thread per (scene, obj).
+    Equivalent to: values += (default_temp - values) * decay_rate * dt
+    """
+    s, o = wp.tid()
+    values[s, o] = values[s, o] + (default_temp - values[s, o]) * decay_rate * dt
+
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -65,8 +83,21 @@ class Temperature(TensorizedValueState):
 
     @classmethod
     def _update_values(cls, values):
-        # Apply temperature decay
-        values += (m.DEFAULT_TEMPERATURE - values) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_sim_step_dt()
+        # Apply temperature decay via Warp kernel
+        if cls.VALUES_WP is None:
+            return
+        S, O = cls.VALUES.shape[:2]
+        wp.launch(
+            kernel=_temperature_decay_kernel,
+            dim=(S, O),
+            inputs=[
+                cls.VALUES_WP,
+                wp.float32(m.DEFAULT_TEMPERATURE),
+                wp.float32(m.TEMPERATURE_DECAY_SPEED),
+                wp.float32(og.sim.get_sim_step_dt()),
+            ],
+            device="cuda",
+        )
 
     @classproperty
     def value_name(cls):

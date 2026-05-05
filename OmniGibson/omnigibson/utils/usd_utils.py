@@ -26,6 +26,96 @@ from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 log = create_module_logger(module_name=__name__)
 
 
+@wp.func
+def rigid_inverse_mat44(T: wp.mat44) -> wp.mat44:
+    """
+    Inverse of a rigid transform `T = [R | t; 0 | 1]` with R orthogonal.
+    Result: `[R^T | -R^T t; 0 | 1]`. Cheap to compute (transpose + dot products),
+    avoids a general 4x4 inverse and works correctly under wp.graph capture.
+
+    Used by _toggle_overlap_kernel (and any future kernel that needs to transform a world-space point into a link's
+    local frame).
+    """
+    R = wp.mat33(
+        T[0, 0],
+        T[0, 1],
+        T[0, 2],
+        T[1, 0],
+        T[1, 1],
+        T[1, 2],
+        T[2, 0],
+        T[2, 1],
+        T[2, 2],
+    )
+    t = wp.vec3(T[0, 3], T[1, 3], T[2, 3])
+    Rt = wp.transpose(R)
+    nt = -wp.mul(Rt, t)
+    return wp.mat44(
+        Rt[0, 0],
+        Rt[0, 1],
+        Rt[0, 2],
+        nt[0],
+        Rt[1, 0],
+        Rt[1, 1],
+        Rt[1, 2],
+        nt[1],
+        Rt[2, 0],
+        Rt[2, 1],
+        Rt[2, 2],
+        nt[2],
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    )
+
+
+@wp.kernel
+def _is_in_contact_batch_kernel(
+    query_masks: wp.array2d(dtype=wp.uint8),  # (N, R)
+    contact_matrix: wp.array2d(dtype=wp.uint8),  # (R, C)
+    col_filter: wp.array2d(dtype=wp.uint8),  # (N, C) — with-mask if mode=0, ignore-mask if mode=1, ignored if mode=2
+    mode: wp.int32,  # 0 = with_masks, 1 = ignore_masks, 2 = no filter
+    out: wp.array(dtype=wp.int32),  # (N,) — atomic-OR'd, int32 because uint8 atomics aren't supported
+):
+    """
+    Per (query, row, col) thread: full N*R*C parallelism. Each thread checks one cell:
+      if query_masks[i, r] AND contact_matrix[r, c] AND col_filter passes:
+          atomic-set out[i] to 1.
+
+    Output is int32 because Warp's atomic_max requires [u]int32, [u]int64, float32, or
+    float64 (CUDA doesn't expose 8-bit atomics natively). Same-value atomic_max writes
+    short-circuit on Pascal+ hardware, so contention on out[i] is bounded — only the
+    first hitting thread per query actually does meaningful work; subsequent writes are
+    NOPs at the memory subsystem.
+
+    Caller must zero `out` before launch (see is_in_contact_batch_warp). The atomic only
+    sets-to-1 on hits; cells with no hits remain at their initial value.
+    """
+    i, r, c = wp.tid()
+
+    # Column filter — early exit before touching query_masks/contact_matrix.
+    if mode == wp.int32(0):  # with-mask: only count if filter is True
+        if col_filter[i, c] == wp.uint8(0):
+            return
+    elif mode == wp.int32(1):  # ignore-mask: only count if filter is False
+        if col_filter[i, c] != wp.uint8(0):
+            return
+    # mode == 2: no filter, fall through
+
+    # Row mask — does query i include row r?
+    if query_masks[i, r] == wp.uint8(0):
+        return
+
+    # Contact lookup.
+    if contact_matrix[r, c] == wp.uint8(0):
+        return
+
+    # Hit. Set out[i] = 1. atomic_max because multiple (i, *, *) threads may converge
+    # on the same out[i]. Same-value short-circuit keeps contention cheap.
+    wp.atomic_max(out, i, wp.int32(1))
+
+
 def ensure_usd_api(prim, api):
     """
     Ensures that a USD API schema is applied to a prim. If the prim already has the API,
@@ -574,34 +664,32 @@ class RigidBodyViewAPI:
         poses = wp.from_torch(cls._POSES_GPU)  # (N_links_total, 7) float32
         out_arr = wp.from_torch(out_values)
 
-        with wp.ScopedStream(wp.stream_from_torch(th.cuda.current_stream())):
-            # get AABB from meshes
+        wp.launch(
+            kernel=_aabb_reduce_kernel,
+            dim=cls._aabb_links.shape[0],
+            inputs=[
+                pose_mats,
+                cls.LINK_MESH_IDS,
+                cls._aabb_links,
+                cls._aabb_vertices,
+                cls._aabb_objs,
+                out_arr,
+            ],
+            device="cuda",
+        )
+        # use base-link pose for meshes without boundry points
+        if cls._aabb_base_link_links is not None and cls._aabb_base_link_links.shape[0] > 0:
             wp.launch(
-                kernel=_aabb_reduce_kernel,
-                dim=cls._aabb_links.shape[0],
+                kernel=_aabb_baselink_fallback_kernel,
+                dim=cls._aabb_base_link_links.shape[0],
                 inputs=[
-                    pose_mats,
-                    cls.LINK_MESH_IDS,
-                    cls._aabb_links,
-                    cls._aabb_vertices,
-                    cls._aabb_objs,
+                    poses,
+                    cls._aabb_base_link_links,
+                    cls._aabb_base_link_objs,
                     out_arr,
                 ],
                 device="cuda",
             )
-            # use base-link pose for meshes without boundry points
-            if cls._aabb_base_link_links is not None and cls._aabb_base_link_links.shape[0] > 0:
-                wp.launch(
-                    kernel=_aabb_baselink_fallback_kernel,
-                    dim=cls._aabb_base_link_links.shape[0],
-                    inputs=[
-                        poses,
-                        cls._aabb_base_link_links,
-                        cls._aabb_base_link_objs,
-                        out_arr,
-                    ],
-                    device="cuda",
-                )
 
     @classmethod
     def invalidate_kinematic(cls, links):
@@ -679,6 +767,7 @@ class ArticulatedObjectViewAPI:
     _OBJ_TO_VIEW_IDX = {}
     _JOINT_POSITIONS = None  # GPU — written by async_copy_to_gpu()
     _JOINT_POSITIONS_CPU = None  # CPU — latest PhysX output, written by update_dof_cache()
+    JOINT_POSITIONS_WP = None  # wp.array view of _JOINT_POSITIONS, cached for use inside Warp kernels / wp.graph
 
     @classmethod
     def initialize_view(cls):
@@ -708,6 +797,7 @@ class ArticulatedObjectViewAPI:
         positions = cls._VIEW.get_dof_positions()
         cls._JOINT_POSITIONS_CPU = positions
         cls._JOINT_POSITIONS = cls._JOINT_POSITIONS_CPU.cuda()  # synchronous init so first read is valid
+        cls.JOINT_POSITIONS_WP = wp.from_torch(cls._JOINT_POSITIONS)
 
     @classmethod
     def update_dof_cache(cls):
@@ -744,6 +834,7 @@ class ArticulatedObjectViewAPI:
         cls._OBJ_TO_VIEW_IDX = {}
         cls._JOINT_POSITIONS = None
         cls._JOINT_POSITIONS_CPU = None
+        cls.JOINT_POSITIONS_WP = None
 
 
 class RigidContactAPIImpl:
@@ -784,10 +875,14 @@ class RigidContactAPIImpl:
         # (between consecutive update_contact_cache calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
         self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
+        # wp.array views over _CONTACT_MATRIX_GPU per scene; wrapped once after each (re-)allocation
+        # for use inside Warp kernels and graph capture.
+        self._CONTACT_MATRIX_GPU_WP = dict()
 
         # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
         self._CURRENT_CONTACT_MATRIX = dict()
         self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
+        self._CURRENT_CONTACT_MATRIX_GPU_WP = dict()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
@@ -972,6 +1067,16 @@ class RigidContactAPIImpl:
                 # Sync GPU mirrors from CPU matrices — carry-over may have updated the CPU tensors above.
                 self._CONTACT_MATRIX_GPU[scene_idx].copy_(self._CONTACT_MATRIX[scene_idx])
                 self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].copy_(self._CURRENT_CONTACT_MATRIX[scene_idx])
+
+                # Wrap the GPU contact matrices as wp.array views for use inside Warp kernels and
+                # graph capture. Re-wrap on every initialize_view because the underlying torch
+                # storage was just (re-)allocated above. Bool tensors → wp.uint8 (byte-per-bool).
+                self._CONTACT_MATRIX_GPU_WP[scene_idx] = wp.from_torch(
+                    self._CONTACT_MATRIX_GPU[scene_idx].view(th.uint8), dtype=wp.uint8
+                )
+                self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] = wp.from_torch(
+                    self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].view(th.uint8), dtype=wp.uint8
+                )
 
                 # Initialize pending accumulation lists for this scene
                 # Note that existing data in these lists will be lost when the view is rebuilt.
@@ -1388,6 +1493,69 @@ class RigidContactAPIImpl:
 
         return query_contacts.any(dim=1)
 
+    def is_in_contact_batch_warp(self, scene_idx, query_masks_wp, with_masks_wp, ignore_masks_wp, current_only, out_wp):
+        """
+        Warp-kernel variant of is_in_contact_batch. Same semantics, but takes pre-cached
+        wp.array inputs (uint8 masks) and writes to a caller-allocated output wp.array.
+        Designed to be safe to call inside wp.graph capture.
+
+        out_wp must be int32, NOT uint8.
+
+        Args:
+            scene_idx (int): Scene index.
+            query_masks_wp (wp.array): (N, R) uint8 — wp.from_torch wrapper of bool query masks.
+            with_masks_wp (wp.array | None): (N, C) uint8 — with-mask, mutually exclusive with ignore_masks_wp.
+            ignore_masks_wp (wp.array | None): (N, C) uint8 — ignore-mask.
+            current_only (bool): True → use _CURRENT_CONTACT_MATRIX_GPU_WP, else _CONTACT_MATRIX_GPU_WP.
+            out_wp (wp.array): (N,) **int32** — caller-allocated, must be pre-zeroed.
+
+        If the scene has no contact view yet (e.g. only kinematic bodies), no kernel is
+        launched and out_wp is left as-is.
+        """
+        assert (
+            with_masks_wp is None or ignore_masks_wp is None
+        ), "Provide either with_masks_wp or ignore_masks_wp, not both."
+        # Scene without a contact view: nothing to do; caller's out_wp is left as-is.
+        if scene_idx not in self._CONTACT_MATRIX_GPU_WP:
+            return
+
+        contact_matrix_wp = (
+            self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] if current_only else self._CONTACT_MATRIX_GPU_WP[scene_idx]
+        )
+
+        # Decide kernel mode + col_filter argument. The kernel always reads from col_filter,
+        # so when there's no real filter we substitute query_masks_wp as a dummy of compatible
+        # shape — mode=2 means the kernel ignores it.
+        if with_masks_wp is not None:
+            col_filter = with_masks_wp
+            mode = 0
+        elif ignore_masks_wp is not None:
+            col_filter = ignore_masks_wp
+            mode = 1
+        else:
+            # Dummy placeholder; kernel ignores when mode=2. Use query_masks_wp for matching device.
+            col_filter = query_masks_wp
+            mode = 2
+
+        N = query_masks_wp.shape[0]
+        R = contact_matrix_wp.shape[0]
+        C = contact_matrix_wp.shape[1]
+
+        # 3D launch: one thread per (query, row, col) cell. Each thread does at most a few
+        # reads + 1 atomic_max on hit. Maximum parallelism, no serial loops.
+        wp.launch(
+            kernel=_is_in_contact_batch_kernel,
+            dim=(N, R, C),
+            inputs=[
+                query_masks_wp,
+                contact_matrix_wp,
+                col_filter,
+                wp.int32(mode),
+                out_wp,
+            ],
+            device="cuda",
+        )
+
     def has_contact_view(self, scene_idx):
         """Returns True if a valid contact view has been initialized for @scene_idx."""
         return scene_idx in self._CONTACT_MATRIX
@@ -1407,8 +1575,10 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
         self._CONTACT_MATRIX = dict()
         self._CONTACT_MATRIX_GPU = dict()
+        self._CONTACT_MATRIX_GPU_WP = dict()
         self._CURRENT_CONTACT_MATRIX = dict()
         self._CURRENT_CONTACT_MATRIX_GPU = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU_WP = dict()
         self._INDEX_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
         self._PENDING_STEPS = 0

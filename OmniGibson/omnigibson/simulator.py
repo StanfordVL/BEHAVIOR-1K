@@ -15,6 +15,7 @@ from pathlib import Path
 from omnigibson.utils.profiling_utils import Profiler
 
 import torch as th
+import warp as wp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -548,6 +549,9 @@ def _launch_simulator(*args, **kwargs):
             for state in self.object_state_types_requiring_update:
                 if issubclass(state, TensorizedValueState):
                     state.global_initialize()
+
+            # Captured wp.Graph wrapping every TensorizedValueState's global_update().
+            self._state_graph = None
 
             # Now start rebuilding everything
             # Disable collision between root links of fixed base objects
@@ -1219,6 +1223,37 @@ def _launch_simulator(*args, **kwargs):
             ArticulatedObjectViewAPI.async_copy_to_gpu()
             th.cuda.synchronize()
 
+        def _capture_warp_graph(self, tensorized_states):
+            """
+            (Re-)capture the per-step TensorizedValueState global_update sequence into a wp.Graph
+            for replay each step. Called when `TensorizedValueState.graph_dirty` is True or
+            no graph exists.
+
+            Steps:
+              1. Refresh cross-state wp.array references (e.g. ToggledOn → Open.VALUES_WP) so the
+                 captured kernel launches see the live buffers.
+              2. If every state is empty (no objects), set the graph to None and skip capture.
+              3. Open a wp.ScopedCapture (which owns its capture stream) and run each state's
+                 global_update inside it.
+            """
+            for state_type in tensorized_states:
+                state_type._refresh_external_wp_handles()
+
+            # If every tensorized state is empty there's nothing to capture; clear the graph
+            # so the call site can skip wp.capture_launch.
+            if all(s.VALUES is None or s.VALUES.numel() == 0 for s in tensorized_states):
+                self._state_graph = None
+                return
+
+            # Let ScopedCapture create + own its capture stream. Inside the with-block,
+            # wp.get_stream() returns that stream and any wp.launch defaults to it.
+            # Each state's global_update launches Warp kernels via wp.launch(...) without
+            # specifying a stream, so they pick up the current capture stream.
+            with wp.ScopedCapture(device="cuda") as capture:
+                for state_type in tensorized_states:
+                    state_type.global_update()
+            self._state_graph = capture.graph
+
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
             """
@@ -1267,10 +1302,20 @@ def _launch_simulator(*args, **kwargs):
 
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
-                    # TensorizedValueState global_updates (GPU computation)
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedValueState):
-                            state_type.global_update()
+                    tensorized_states = [
+                        state
+                        for state in self.object_state_types_requiring_update
+                        if issubclass(state, TensorizedValueState)
+                    ]
+
+                    for state_type in tensorized_states:
+                        state_type.pre_update()
+
+                    if TensorizedValueState.graph_dirty:
+                        self._capture_warp_graph(tensorized_states)
+                        TensorizedValueState.graph_dirty = False
+                    if self._state_graph is not None:
+                        wp.capture_launch(self._state_graph)
 
                     th.cuda.synchronize()
 

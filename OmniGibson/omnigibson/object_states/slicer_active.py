@@ -1,6 +1,7 @@
 import math
 
 import torch as th
+import warp as wp
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
@@ -14,14 +15,69 @@ m = create_module_macros(module_path=__file__)
 m.REACTIVATION_DELAY = 2.0  # number of seconds to wait before reactivating the slicer
 
 
+@wp.kernel
+def _slicer_pre_clear_kernel(
+    values: wp.array2d(dtype=wp.uint8),  # (S, O) — public state, stays uint8
+    delay_counter: wp.array2d(dtype=wp.float32),  # (S, O)
+    prev_touching: wp.array2d(dtype=wp.int32),  # (S, O) — int32, see SlicerActive class doc
+):
+    """
+    Per (scene, obj) thread. Runs at the start of each step. For each cell where prev_touching
+    is nonzero, set values=0 (deactivated) and delay_counter=0 (cooldown restarted). Cells
+    where prev_touching is zero are left alone.
+    """
+    s, o = wp.tid()
+    if prev_touching[s, o] != wp.int32(0):
+        delay_counter[s, o] = 0.0
+        values[s, o] = wp.uint8(0)
+
+
+@wp.kernel
+def _slicer_post_update_kernel(
+    values: wp.array2d(dtype=wp.uint8),  # (S, O) — public state, stays uint8
+    delay_counter: wp.array2d(dtype=wp.float32),  # (S, O)
+    currently_touching: wp.array2d(dtype=wp.int32),  # (S, O) — int32, written by atomic in is_in_contact_batch_warp
+    prev_touching: wp.array2d(dtype=wp.int32),  # (S, O) — int32 to mirror currently_touching
+    steps_to_wait: wp.float32,
+):
+    """
+    Per (scene, obj) thread. Per thread does:
+      - If the slicer is currently active: leave delay_counter alone (it's not in cooldown).
+      - If the slicer is inactive AND not touching anything: advance delay_counter by 1.
+      - If the slicer is inactive AND still touching something: reset delay_counter to 0
+        (touching restarts the wait — the slicer doesn't reactivate while in contact).
+      - If delay_counter has hit `steps_to_wait`, reactivate the slicer.
+      - Finally, mirror currently_touching into prev_touching for the next step's pre-clear pass.
+    """
+    s, o = wp.tid()
+    is_active = values[s, o] != wp.uint8(0)
+    is_touching = currently_touching[s, o] != wp.int32(0)
+    if not is_active:
+        if not is_touching:
+            delay_counter[s, o] = delay_counter[s, o] + 1.0
+        else:
+            delay_counter[s, o] = 0.0
+    if delay_counter[s, o] >= steps_to_wait:
+        values[s, o] = wp.uint8(1)
+    prev_touching[s, o] = currently_touching[s, o]
+
+
 class SlicerActive(TensorizedValueState, BooleanStateMixin):
+    """
+    Slicer-active state.
+
+    Note on dtype: PREVIOUSLY_TOUCHING and _currently_touching are int32, NOT bool/uint8, because
+    they depend on`RigidContactAPI.is_in_contact_batch_warp` whose output is int32.
+    """
+
     # int: Keep track of how many steps each object is waiting for
     STEPS_TO_WAIT = None
 
     # th.tensor (scene_number, obj_number): Keep track of the current delay for a given slicer
     DELAY_COUNTER = None
 
-    # th.tensor (scene_number, obj_number): Keep track of whether we touched a sliceable in the previous timestep
+    # th.tensor (scene_number, obj_number) int32: Whether we touched a sliceable in the previous timestep.
+    # int32 (not bool) — see class docstring; mirrors _currently_touching's dtype.
     PREVIOUSLY_TOUCHING = None
 
     # S = number of scenes
@@ -31,12 +87,23 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
     # list[Tensor(O, R_s) | None] — row mask per slicer object per scene; len(list) = S; GPU
     _slicer_contact_query_masks = None
+    # Per-scene wp.array wrappers (uint8) of _slicer_contact_query_masks, cached for kernels.
+    _slicer_contact_query_masks_wp = None  # list[wp.array | None]
 
     # list[Tensor(1, C_s) | None] — col mask for all sliceable links per scene; len(list) = S; GPU
     _sliceable_contact_col_mask = None
+    _sliceable_contact_col_mask_wp = None  # list[wp.array | None]
 
-    # (S, O) bool — scratch buffer filled each step by _currently_touching_sliceables(); GPU
+    # (S, O) int32 — filled each step by _currently_touching_sliceables() via
+    # is_in_contact_batch_warp.
     _currently_touching = None
+
+    _currently_touching_wp = None  # wp.array int32 view
+    # Per-scene wp.array slice-views of _currently_touching, used as is_in_contact_batch_warp out=
+    _currently_touching_per_scene_wp = None  # list[wp.array | None]
+    # Cached wp.array wrappers of PREVIOUSLY_TOUCHING / DELAY_COUNTER (int32 / float32).
+    PREVIOUSLY_TOUCHING_WP = None
+    DELAY_COUNTER_WP = None
 
     @classmethod
     def get_dependencies(cls):
@@ -73,7 +140,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Allocate fresh tracking tensors; carry over values for surviving slicers so that
         # PREVIOUSLY_TOUCHING=True set during a slicing step is not lost when initialize_view()
         # is called again on the next step (e.g. when new objects are initialized).
-        cls.PREVIOUSLY_TOUCHING = th.zeros((S, O), dtype=th.bool, device="cuda")
+        cls.PREVIOUSLY_TOUCHING = th.zeros((S, O), dtype=th.int32, device="cuda")
         cls.DELAY_COUNTER = th.zeros((S, O), dtype=th.float32, device="cuda")
         if prev_previously_touching is not None and prev_previously_touching.numel() > 0:
             for rel_path, obj_idx_new in cls.OBJ_IDXS.items():
@@ -91,31 +158,52 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 cls.VALUES_CPU[:, obj_idx] = True
 
         # Pre-allocate scratch buffer for _currently_touching_sliceables(); same shape as PREVIOUSLY_TOUCHING
-        cls._currently_touching = th.zeros((S, O), dtype=th.bool, device="cuda")
+        cls._currently_touching = th.zeros((S, O), dtype=th.int32, device="cuda")
 
-        # Build per-scene contact masks for batch contact queries
+        # Wrap whole-class GPU tensors as wp.array handles. PREVIOUSLY_TOUCHING / _currently_touching
+        # are int32 (atomic_max constraint — see class docstring); contact masks below are bool → wp.uint8.
+        if cls.PREVIOUSLY_TOUCHING.numel() > 0:
+            cls.PREVIOUSLY_TOUCHING_WP = wp.from_torch(cls.PREVIOUSLY_TOUCHING)
+            cls.DELAY_COUNTER_WP = wp.from_torch(cls.DELAY_COUNTER)
+            cls._currently_touching_wp = wp.from_torch(cls._currently_touching)
+        else:
+            cls.PREVIOUSLY_TOUCHING_WP = None
+            cls.DELAY_COUNTER_WP = None
+            cls._currently_touching_wp = None
+
+        # Build per-scene contact masks (torch) and their wp.array wrappers in one pass.
         cls._slicer_contact_query_masks = []
         cls._sliceable_contact_col_mask = []
+        cls._slicer_contact_query_masks_wp = []
+        cls._sliceable_contact_col_mask_wp = []
+        cls._currently_touching_per_scene_wp = []
+
+        def _append_none_for_scene():
+            cls._slicer_contact_query_masks.append(None)
+            cls._sliceable_contact_col_mask.append(None)
+            cls._slicer_contact_query_masks_wp.append(None)
+            cls._sliceable_contact_col_mask_wp.append(None)
+            cls._currently_touching_per_scene_wp.append(None)
 
         for scene_idx, scene in enumerate(og.sim.scenes):
             if not RigidContactAPI.has_contact_view(scene_idx):
-                cls._slicer_contact_query_masks.append(None)
-                cls._sliceable_contact_col_mask.append(None)
+                _append_none_for_scene()
                 continue
 
             sliceable_objs = scene.object_registry("abilities", "sliceable", [])
-            # If there's no sliceable objects or slicer, append None
+            # No sliceable objects in this scene, or no slicers tracked anywhere.
             if not sliceable_objs or O == 0:
-                cls._slicer_contact_query_masks.append(None)
-                cls._sliceable_contact_col_mask.append(None)
+                _append_none_for_scene()
                 continue
 
-            # Col mask (1, C_s) for all sliceable links — shared across all O slicer queries
+            # Col mask (1, C_s) for all sliceable links — shared across all O slicer queries.
             sliceable_paths = [link.prim_path for obj in sliceable_objs for link in obj.links.values()]
             sliceable_col = RigidContactAPI.get_contact_col_mask(scene_idx, sliceable_paths)  # (C_s,) CPU
-            cls._sliceable_contact_col_mask.append(sliceable_col.unsqueeze(0).cuda())  # (1, C_s) GPU
+            with_mask_torch = sliceable_col.unsqueeze(0).cuda()  # (1, C_s) GPU
+            cls._sliceable_contact_col_mask.append(with_mask_torch)
 
-            # Row masks (O, R_s). N slicer objects form N queries
+            # Row masks (O, R_s) — one query per slicer object. If any slicer object isn't
+            # initialized yet, skip this scene; will be retried on the next initialize_view.
             slicer_masks = []
             any_uninitialized = False
             for obj_idx in range(O):
@@ -128,47 +216,84 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                     )
                 )  # (R_s,) CPU bool
             if any_uninitialized:
-                cls._slicer_contact_query_masks.append(None)
-            else:
-                cls._slicer_contact_query_masks.append(th.stack(slicer_masks).cuda())  # (O, R_s) GPU
+                # Already appended sliceable_col; keep the lists aligned by undoing it.
+                cls._sliceable_contact_col_mask.pop()
+                _append_none_for_scene()
+                continue
+            query_masks_torch = th.stack(slicer_masks).cuda()  # (O, R_s) GPU
+            cls._slicer_contact_query_masks.append(query_masks_torch)
+
+            # wp.array wrappers for the kernels (uint8 for bool masks, int32 row-view for the out=).
+            cls._slicer_contact_query_masks_wp.append(
+                wp.from_torch(query_masks_torch.contiguous().view(th.uint8), dtype=wp.uint8)
+            )
+            cls._sliceable_contact_col_mask_wp.append(
+                wp.from_torch(with_mask_torch.contiguous().view(th.uint8), dtype=wp.uint8)
+            )
+            cls._currently_touching_per_scene_wp.append(wp.from_torch(cls._currently_touching[scene_idx]))
+
+    @classmethod
+    def pre_update(cls):
+        """
+        CPU-side / outside-graph prep:
+          - super(): PREV_VALUES <- VALUES_CPU
+          - Zero _currently_touching here (PyTorch fill_) so the captured _update_values stays
+            Warp-only. The per-scene is_in_contact_batch_warp inside the graph only writes to
+            scenes that have a contact view; absent scenes need to be False from the start.
+        """
+        super().pre_update()
+        if cls._currently_touching is not None and cls._currently_touching.numel() > 0:
+            # int32 dtype now (atomic_max constraint); fill with 0.
+            cls._currently_touching.fill_(0)
 
     @classmethod
     def _update_values(cls, values):
-        # If we were touching a sliceable last step, deactivate now
-        cls.DELAY_COUNTER[cls.PREVIOUSLY_TOUCHING] = 0
-        values[cls.PREVIOUSLY_TOUCHING] = False
+        if cls.PREVIOUSLY_TOUCHING_WP is None:
+            return
+        S, O = values.shape[:2]
 
-        # Are we currently touching any sliceables? Result written into cls._currently_touching in-place
+        wp.launch(
+            kernel=_slicer_pre_clear_kernel,
+            dim=(S, O),
+            inputs=[cls.VALUES_WP, cls.DELAY_COUNTER_WP, cls.PREVIOUSLY_TOUCHING_WP],
+            device="cuda",
+        )
+
         cls._currently_touching_sliceables()
 
-        # Increment cooldown when not active and not touching anything sliceable
-        cls.DELAY_COUNTER[~values & ~cls._currently_touching] += 1
-
-        # Reset cooldown when not active but touching a sliceable (touching delays reactivation)
-        cls.DELAY_COUNTER[~values & cls._currently_touching] = 0
-
-        # Re-activate once the cooldown has elapsed
-        values[cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT] = True
-
-        # Record current contact state for the next step
-        cls.PREVIOUSLY_TOUCHING.copy_(cls._currently_touching)
+        wp.launch(
+            kernel=_slicer_post_update_kernel,
+            dim=(S, O),
+            inputs=[
+                cls.VALUES_WP,
+                cls.DELAY_COUNTER_WP,
+                cls._currently_touching_wp,
+                cls.PREVIOUSLY_TOUCHING_WP,
+                wp.float32(cls.STEPS_TO_WAIT),
+            ],
+            device="cuda",
+        )
 
     @classmethod
     def _currently_touching_sliceables(cls):
-        """Fills cls._currently_touching (S, O) bool tensor in-place."""
-        cls._currently_touching.fill_(False)
+        """
+        Per-scene Warp contact batch query into the corresponding row of _currently_touching.
+        Empty/missing scenes leave their row as the .fill_(False) value.
+        """
         for scene_idx in range(len(og.sim.scenes)):
-            query_masks = cls._slicer_contact_query_masks[scene_idx]  # (O, R_s) GPU | None
-            with_mask = cls._sliceable_contact_col_mask[scene_idx]  # (1, C_s) GPU | None
-            if query_masks is None or with_mask is None:
+            query_masks_wp = cls._slicer_contact_query_masks_wp[scene_idx]
+            with_mask_wp = cls._sliceable_contact_col_mask_wp[scene_idx]
+            out_wp = cls._currently_touching_per_scene_wp[scene_idx]
+            if query_masks_wp is None or with_mask_wp is None or out_wp is None:
                 continue
-            cls._currently_touching[scene_idx] = RigidContactAPI.is_in_contact_batch(
+            RigidContactAPI.is_in_contact_batch_warp(
                 scene_idx=scene_idx,
-                query_masks=query_masks,  # (O, R_s)
-                with_masks=with_mask,  # (1, C_s) — broadcasts to (O, C_s) inside the call
-                ignore_masks=None,
+                query_masks_wp=query_masks_wp,
+                with_masks_wp=with_mask_wp,
+                ignore_masks_wp=None,
                 current_only=False,
-            )  # (O,) bool
+                out_wp=out_wp,
+            )
 
     @classproperty
     def value_name(cls):

@@ -1,9 +1,26 @@
 import torch as th
+import warp as wp
 
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
 from omnigibson.utils.constants import PrimType
+
+
+@wp.kernel
+def _aabb_init_kernel(out_values: wp.array2d(dtype=wp.float32)):
+    """
+    Initialize the (S*O, 6) AABB output buffer to [+inf, +inf, +inf, -inf, -inf, -inf].
+    Replaces the PyTorch `values.fill_(inf); values[:, :, 3:] = -inf` so AABB._update_values
+    is fully Warp-only and capturable inside wp.graph.
+    """
+    i = wp.tid()
+    out_values[i, 0] = wp.float32(wp.inf)
+    out_values[i, 1] = wp.float32(wp.inf)
+    out_values[i, 2] = wp.float32(wp.inf)
+    out_values[i, 3] = wp.float32(-wp.inf)
+    out_values[i, 4] = wp.float32(-wp.inf)
+    out_values[i, 5] = wp.float32(-wp.inf)
 
 
 class AABB(TensorizedValueState):
@@ -104,14 +121,16 @@ class AABB(TensorizedValueState):
         S = values.shape[0]
         O = values.shape[1]
 
-        # Fill with infinite values for the lower bound and -infinite values for the upper bound
-        values.fill_(float("inf"))
-        values[:, :, 3:] = float("-inf")
+        # Init the (S*O, 6) output buffer to [+inf, +inf, +inf, -inf, -inf, -inf] via a Warp
+        # kernel (no PyTorch CUDA ops — keeps this method graph-capturable).
+        flat_view = values.view(S * O, 6)
+        out_arr = wp.from_torch(flat_view)
+        wp.launch(kernel=_aabb_init_kernel, dim=S * O, inputs=[out_arr], device="cuda")
 
         # Batched AABB for all rigid links (physx_tracked + physx_untracked kinematic).
         # get_aabb() short-circuits internally when nothing is tracked — no guard needed.
         # It runs both the per-(link, vertex) reduce kernel and the base-link fallback kernel.
-        RigidBodyViewAPI.get_aabb(values.view(S * O, 6))
+        RigidBodyViewAPI.get_aabb(flat_view)
 
         # Cloth — disabled for now
 

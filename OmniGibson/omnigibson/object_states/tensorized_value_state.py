@@ -1,6 +1,7 @@
 import math
 
 import torch as th
+import warp as wp
 
 import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
@@ -9,6 +10,16 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+
+def _wp_from_torch(t):
+    """
+    Wrap a torch tensor as a wp.array. Bool tensors are wrapped as wp.uint8
+    (storage is byte-per-bool in torch already).
+    """
+    if t.dtype == th.bool:
+        return wp.from_torch(t.view(th.uint8), dtype=wp.uint8)
+    return wp.from_torch(t)
 
 
 class TensorizedValueState(AbsoluteObjectState):
@@ -46,6 +57,29 @@ class TensorizedValueState(AbsoluteObjectState):
 
     # Int representing per-object state size
     STATE_SIZE = None
+
+    # wp.array views over VALUES / VALUES_CPU for use inside Warp kernels and graph capture.
+    # Wrapped once in initialize_view; never re-created per call. Re-wrapped on every
+    # initialize_view because torch storage is reallocated there.
+    VALUES_WP = None
+    VALUES_CPU_WP = None
+
+    # Set to True any time this base class's initialize_view runs, signalling that the
+    # captured wp.graph holds stale pointers/shapes and must be re-captured. The simulator
+    # checks-and-resets this before each step. update_handles() always calls the view APIs'
+    # initialize_view before every TensorizedValueState's initialize_view, so any viewAPI
+    # buffer reallocation is automatically covered.
+    graph_dirty = True
+
+    @classmethod
+    def _refresh_external_wp_handles(cls):
+        """
+        Hook for subclasses that read OTHER states' wp.array handles (e.g. MaxTemperature
+        reads Temperature.VALUES_WP, ToggledOn reads Open.VALUES_WP). Called by the
+        simulator immediately before wp.ScopedCapture so cross-state references are current
+        at capture time. Default no-op.
+        """
+        pass
 
     @classmethod
     def global_initialize(cls):
@@ -131,12 +165,45 @@ class TensorizedValueState(AbsoluteObjectState):
         # PREV_VALUES mirrors VALUES_CPU on CPU; seed so first post_update() fires no spurious state_updated().
         cls.PREV_VALUES = cls.VALUES_CPU.clone()
 
+        # Wrap VALUES / VALUES_CPU as wp.array handles for use inside Warp kernels and graph capture.
+        # Wrappers cached at the class level; never recreated per call.
+        if cls.VALUES.numel() > 0:
+            cls.VALUES_WP = _wp_from_torch(cls.VALUES)
+            cls.VALUES_CPU_WP = _wp_from_torch(cls.VALUES_CPU)
+        else:
+            cls.VALUES_WP = None
+            cls.VALUES_CPU_WP = None
+
+        # Mark the captured wp.graph as stale — the simulator will re-capture before the next step.
+        # update_handles() always calls the view APIs' initialize_view BEFORE this, so any
+        # RigidContactAPI / RigidBodyViewAPI / ArticulatedObjectViewAPI buffer reallocations
+        # are already covered by the time this fires.
+        TensorizedValueState.graph_dirty = True
+
+    @classmethod
+    def pre_update(cls):
+        """
+        CPU-side prep run BEFORE global_update each step. Snapshots VALUES_CPU into
+        PREV_VALUES so post_update() can detect changes after the warp work completes.
+
+        Lives outside the captured wp.graph.
+
+        Subclasses may override to add per-state CPU prep (e.g. ToggledOn refreshing
+        marker world poses).
+        """
+        if cls.VALUES_CPU is None or cls.VALUES_CPU.numel() == 0:
+            return
+        cls.PREV_VALUES.copy_(cls.VALUES_CPU)
+
     @classmethod
     def global_update(cls):
         """
         Globally update all values via _update_values() and async-copy to VALUES_CPU.
         Change detection and post_update() are called separately by the simulator after synchronize().
         Skips if there are no tracked objects.
+
+        Should be capturable inside wp.graph: only emits CUDA work via Warp
+        kernel launches and Warp memcpy.
         """
         if cls.VALUES is None or cls.VALUES.numel() == 0:
             return
@@ -144,9 +211,13 @@ class TensorizedValueState(AbsoluteObjectState):
         if S == 0 or N == 0:
             return
 
-        cls.PREV_VALUES.copy_(cls.VALUES_CPU)
         cls._update_values(values=cls.VALUES)
-        cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
+        # Mirror VALUES → VALUES_CPU. Use wp.copy when both wp.array handles exist (graph-safe);
+        # fall back to torch's non-blocking copy otherwise (e.g. partial init).
+        if cls.VALUES_WP is not None and cls.VALUES_CPU_WP is not None:
+            wp.copy(cls.VALUES_CPU_WP, cls.VALUES_WP)
+        else:
+            cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
 
     @classmethod
     def post_update(cls):
