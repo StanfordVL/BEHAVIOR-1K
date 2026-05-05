@@ -367,22 +367,6 @@ VIS_CYLINDER_CONFIG = {
     ],
 }
 
-# Frame visualizer cylinder configurations
-ATTACHMENT_FRAME_CONFIG = {
-    "width": 0.008,
-    "lengths": [0.15, 0.15, 0.15],
-    "quat_offsets": [
-        T.euler2quat(th.tensor([0.0, th.pi / 2, 0.0])),  # X-axis (red)
-        T.euler2quat(th.tensor([-th.pi / 2, 0.0, 0.0])),  # Y-axis (green)
-        T.euler2quat(th.tensor([0.0, 0.0, 0.0])),  # Z-axis (blue)
-    ],
-    "colors": [
-        th.tensor([1.0, 0.0, 0.0]),  # Red for X-axis
-        th.tensor([0.0, 1.0, 0.0]),  # Green for Y-axis
-        th.tensor([0.0, 0.0, 1.0]),  # Blue for Z-axis
-    ],
-}
-
 # External camera parameters
 EXTERNAL_CAMERA_CONFIGS = {
     "external_sensor0": {
