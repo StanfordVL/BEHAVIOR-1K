@@ -725,9 +725,6 @@ def test_on_fire(env, plywood):
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
 
-@pytest.mark.skip(
-    reason="investigate why extra steps are needed for the contact to be registered beyond CAN_TOGGLE_STEPS"
-)
 def test_toggled_on(env, stove, robot):
     stove = env.scene.object_registry("name", "stove")
     robot = env.scene.robots[0]
@@ -786,6 +783,51 @@ def test_toggled_on(env, stove, robot):
     # Setter should work
     assert stove.states[ToggledOn].set_value(False)
     assert not stove.states[ToggledOn].get_value()
+
+
+def test_toggled_on_requires_closed(env, microwave):
+    """
+    Test when an object's ToggledOn has requires_closed=True and
+    its Open state is True, both:
+      (a) `_set_value` should refuse to flip on, and
+      (b) the `_check_requires_closed_kernel` should force VALUES=0 and steps=0
+          even if those were poked True/non-zero outside the kernel.
+    """
+    microwave = env.scene.object_registry("name", "microwave")
+    if not microwave.states[ToggledOn].requires_closed:
+        pytest.skip("Microwave asset does not have requires_closed=True; nothing to test.")
+
+    # Open the microwave door.
+    microwave.states[Open].set_value(True)
+    for _ in range(3):
+        og.sim.step()
+    assert microwave.states[Open].get_value(), "Failed to open microwave door"
+
+    # (a) Python short-circuit: set_value(True) returns False, value stays False.
+    assert not microwave.states[ToggledOn].set_value(True)
+    assert not microwave.states[ToggledOn].get_value()
+
+    # (b) Kernel knockdown: bypass set_value, force VALUES and steps directly, then step
+    # the sim once. The requires_closed kernel should zero both because Open is True.
+    s = microwave.scene.idx
+    obj_idx = ToggledOn.OBJ_IDXS[microwave.relative_prim_path]
+    ToggledOn.VALUES[s, obj_idx] = 1
+    ToggledOn._robots_can_toggle_steps[s, obj_idx] = 100.0
+    og.sim.step()
+    assert not microwave.states[
+        ToggledOn
+    ].get_value(), "requires_closed kernel should knock VALUES back to 0 while Open is True"
+    assert (
+        ToggledOn._robots_can_toggle_steps[s, obj_idx].item() == 0.0
+    ), "requires_closed kernel should reset step counter to 0"
+
+    # Close the door — set_value should now succeed.
+    microwave.states[Open].set_value(False)
+    for _ in range(3):
+        og.sim.step()
+    assert not microwave.states[Open].get_value()
+    assert microwave.states[ToggledOn].set_value(True)
+    assert microwave.states[ToggledOn].get_value()
 
 
 def test_particle_source(env, furniture_sink):
