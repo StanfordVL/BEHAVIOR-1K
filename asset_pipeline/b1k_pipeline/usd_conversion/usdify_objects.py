@@ -19,13 +19,14 @@ from b1k_pipeline.utils import (
 )
 
 WORKER_COUNT = 6
-BATCH_SIZE = 256
+BATCH_SIZE = 64
 MAX_TIME_PER_PROCESS = 10 * 60  # 10 minutes
 
 
 def run_on_batch(dataset_path, batch):
     cmd = [
         sys.executable,
+        "-u",
         "-m",
         "b1k_pipeline.usd_conversion.usdify_objects_process",
         dataset_path,
@@ -162,7 +163,7 @@ def main():
             # Move the USDs to the output FS
             print("Copying USDs to output FS...")
             usd_glob = [
-                x.path for x in dataset_fs.glob("objects/*/*/usd/*.encrypted.usd")
+                x.path for x in dataset_fs.glob("objects/*/*/usd/*.usd")
             ]
             for item in tqdm.tqdm(usd_glob):
                 itemdir = fs.path.dirname(item)

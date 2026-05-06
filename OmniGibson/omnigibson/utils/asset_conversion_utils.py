@@ -167,13 +167,20 @@ def _get_visual_objs_from_urdf(urdf_path):
     for ele in root:
         if ele.tag == "link":
             name = ele.get("name").replace("-", "_")
+            if name.startswith("meta__"):
+                continue
             visual_objs[name] = OrderedDict()
             for sub_ele in ele:
                 if sub_ele.tag == "visual":
-                    visual_mesh_name = sub_ele.get("name", "visuals").replace("-", "_")
+                    visual_mesh_name = sub_ele.get("name", "").replace("-", "_")
+                    if not visual_mesh_name:
+                        visual_mesh_name = None
                     obj_file = None if sub_ele.find(".//mesh") is None else sub_ele.find(".//mesh").get("filename")
                     if obj_file is None:
                         log.debug(f"Warning: No obj file found associated with {name}/{visual_mesh_name}!")
+                    assert (
+                        visual_mesh_name not in visual_objs[name]
+                    ), f"Visual mesh name {visual_mesh_name} already exists for link {name}!"
                     visual_objs[name][visual_mesh_name] = obj_file
 
     return visual_objs
@@ -181,7 +188,7 @@ def _get_visual_objs_from_urdf(urdf_path):
 
 def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path, dataset_root):
     """
-    Updates the object to use V-Ray and PBR materials rendered through the asset pipeline instead of
+    Updates the object to use V-Ray materials rendered through the asset pipeline instead of
     its currently assigned materials.
 
     This function performs the following steps:
@@ -274,11 +281,12 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
 
                     print("Found material file:", mtl_name, mtl_infos[mtl_name])
 
-    # Next, for each material information, we create a new OmniPBR material
+    # Next, for each material information, we create a new material
     shaders = OrderedDict()  # maps mtl name to shader prim
     for mtl_name, mtl_info in mtl_infos.items():
         # Create the Vray material
         mtl_created_list = []
+        print(f"Creating Vray material {mtl_name}...")
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
             mdl_name="omnigibson_vray_mtl.mdl",
@@ -301,18 +309,26 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
     # We'll loop over each link, create a list of 2-tuples each consisting of (mesh_prim_path, mtl_name) to be bound
     root_prim_path = obj_prim.GetPrimPath().pathString
     for link_name, mesh_mtl_names in link_mtl_files.items():
-        mesh_mtl_infos = []
         for mesh_name, mtl_name in mesh_mtl_names.items():
-            # Omni only accepts a-z, A-Z as valid start characters for prim names
-            # So we check if there is an invalid character, and modify it as we know Omni does
-            if not ord("a") <= ord(mesh_name[0]) <= ord("z") and not ord("A") <= ord(mesh_name[0]) <= ord("Z"):
-                mesh_name = "a_" + mesh_name[1:]
-            mesh_mtl_infos.append((f"{root_prim_path}/{link_name}/visuals/{mesh_name}", mtl_name))
-        for mesh_prim_path, mtl_name in mesh_mtl_infos:
-            visual_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
-            assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
+            if mesh_name is not None:
+                # Omni only accepts a-z, A-Z as valid start characters for prim names
+                # So we check if there is an invalid character, and modify it as we know Omni does
+                if not ord("a") <= ord(mesh_name[0]) <= ord("z") and not ord("A") <= ord(mesh_name[0]) <= ord("Z"):
+                    mesh_name = "a_" + mesh_name[1:]
+                mesh_prim_path = f"{root_prim_path}/{link_name}/visuals/{mesh_name}"
+                visual_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
+                assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
+            else:
+                visuals_scope_prim_path = f"{root_prim_path}/{link_name}/visuals"
+                visuals_scope_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(visuals_scope_prim_path)
+                assert visuals_scope_prim, f"Error: Did not find valid visuals scope prim at {visuals_scope_prim_path}!"
+                (visual_prim,) = visuals_scope_prim.GetChildren()
+                assert visual_prim, f"Error: Did not find valid visual prim at {visuals_scope_prim_path}!"
+
             # Bind the created link material to the visual prim
-            log.debug(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
+            log.debug(
+                f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {visual_prim.GetPath().pathString}..."
+            )
             lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(
                 shaders[mtl_name], lazy.pxr.UsdShade.Tokens.strongerThanDescendants
             )
@@ -617,6 +633,7 @@ def _process_glass_link(prim):
         )
 
     for glass_prim_path in glass_prim_paths:
+        print(f"Applying glass material {glass_mtl_prim_path} to {glass_prim_path}")
         lazy.omni.kit.commands.execute(
             "BindMaterialCommand",
             prim_path=glass_prim_path,

@@ -103,7 +103,7 @@ def main():
             print("Launching cluster...")
             with make_og_pool_executor(WORKER_COUNT) as executor:
                 # Start the batched run. We remove the leading / so that pathlib can append it to dataset path correctly.
-                scenes = [x.path[1:] for x in dataset_fs.glob("scenes/*/urdf/*.urdf")]
+                scenes = [x.path[1:] for x in dataset_fs.glob("scenes/*/urdf/*_best.urdf")]
 
                 print("Queueing scenes.")
                 print("Total count: ", len(scenes))

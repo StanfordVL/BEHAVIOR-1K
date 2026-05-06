@@ -13,7 +13,7 @@ from omnigibson.macros import gm
 
 # Set some macros. Is this kosher?
 gm.HEADLESS = True
-gm.USE_GPU_DYNAMICS = True
+# gm.USE_GPU_DYNAMICS = True
 gm.USE_ENCRYPTED_ASSETS = True
 gm.FORCE_LIGHT_INTENSITY = None
 gm.ENABLE_TRANSITION_RULES = False

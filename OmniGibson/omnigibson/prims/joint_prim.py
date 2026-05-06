@@ -548,7 +548,10 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        return self.get_attribute("physics:axis")
+        axis = self.get_attribute("physics:axis")
+        if axis == "":
+            return "X"
+        return axis
 
     @axis.setter
     def axis(self, axis):
