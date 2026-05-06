@@ -10433,7 +10433,7 @@ stages:
     deps:
     - path: VERSION
       hash: md5
-      md5: b973300ae3caf51561fb7f7ea13a9dde
+      md5: 97ab39d33a440e1bf76837cc80979621
       size: 9
     - path: artifacts/parallels/metadata.zip
       hash: md5
@@ -10449,8 +10449,8 @@ stages:
       size: 4752449045
     - path: artifacts/parallels/scenes_json.zip
       hash: md5
-      md5: c43ffe4ff442c913c7aea3ffb14381c4
-      size: 1382296
+      md5: 2506fda46be3a56537e2c0f7f2689035
+      size: 1382374
     - path: artifacts/parallels/systems.zip
       hash: md5
       md5: 7019910289d18e7a1622dc173145917f
@@ -10478,8 +10478,8 @@ stages:
     outs:
     - path: artifacts/og_dataset.zip
       hash: md5
-      md5: 6453b1b67faadf4d8b4d1bee21d4eaad
-      size: 30805096803
+      md5: 732ecfb00bb3b12dad85770f8017dcf5
+      size: 30805096881
     - path: artifacts/pipeline/pack_dataset.json
       hash: md5
       md5: 2ad066aadc9c024dff5e8d3c6587590d
@@ -10530,8 +10530,8 @@ stages:
     outs:
     - path: artifacts/parallels/scenes_json.zip
       hash: md5
-      md5: c43ffe4ff442c913c7aea3ffb14381c4
-      size: 1382296
+      md5: 2506fda46be3a56537e2c0f7f2689035
+      size: 1382374
     - path: artifacts/pipeline/usdify_scenes.json
       hash: md5
       md5: 664e2cb0fc4ca688ad97e1a8a3d8095a
