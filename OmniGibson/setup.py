@@ -85,7 +85,7 @@ setup(
             "msgpack>=1.1.0",
             "gspread>=6.2.1",
             "open3d>=0.19.0",
-        ],
+        ]
     },
     tests_require=[],
     python_requires=">=3",
