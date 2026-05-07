@@ -1647,15 +1647,12 @@ def _load_scene_from_urdf(urdf):
 
     for obj_name, obj_info in objs_info.items():
         try:
-            if obj_info["cfg"]["category"] in ["ceilings", "roof"]:
-                continue
             if not os.path.exists(
                 DatasetObject.get_usd_path(obj_info["cfg"]["category"], obj_info["cfg"]["model"]).replace(
                     ".usd", ".encrypted.usd"
                 )
             ):
-                log.warning("Missing object", obj_name)
-                continue
+                raise FileNotFoundError(f"Missing USD asset for object {obj_name}")
             log.debug(f"Loading object {obj_name}")
             obj = DatasetObject(
                 name=obj_name,
