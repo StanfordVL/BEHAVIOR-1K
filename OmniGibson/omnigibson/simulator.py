@@ -1230,15 +1230,10 @@ def _launch_simulator(*args, **kwargs):
             no graph exists.
 
             Steps:
-              1. Refresh cross-state wp.array references (e.g. ToggledOn → Open.VALUES_WP) so the
-                 captured kernel launches see the live buffers.
-              2. If every state is empty (no objects), set the graph to None and skip capture.
-              3. Open a wp.ScopedCapture (which owns its capture stream) and run each state's
+              1. If every state is empty (no objects), set the graph to None and skip capture.
+              2. Open a wp.ScopedCapture (which owns its capture stream) and run each state's
                  global_update inside it.
             """
-            for state_type in tensorized_states:
-                state_type._refresh_external_wp_handles()
-
             # If every tensorized state is empty there's nothing to capture; clear the graph
             # so the call site can skip wp.capture_launch.
             if all(s.VALUES is None or s.VALUES.numel() == 0 for s in tensorized_states):

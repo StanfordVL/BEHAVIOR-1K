@@ -1,5 +1,5 @@
 import omnigibson as og
-from omnigibson.object_states.adjacency import VerticalAdjacency
+from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
@@ -11,7 +11,7 @@ class Under(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.add(VerticalAdjacency)
+        deps.add(Adjacency)
         return deps
 
     def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
@@ -39,10 +39,9 @@ class Under(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         if other.prim_type == PrimType.CLOTH:
             raise ValueError("Cannot detect if an object is under a cloth object.")
 
-        adjacency = self.obj.states[VerticalAdjacency].get_value()
-        other_adjacency = other.states[VerticalAdjacency].get_value()
-        return (
-            other not in adjacency.negative_neighbors
-            and other in adjacency.positive_neighbors
-            and self.obj not in other_adjacency.positive_neighbors
-        )
+        # Adjacency axis layout: k=0 is +Z (other above self), k=1 is -Z (other below self).
+        # Under(self, other) is true when `other` is above self (and not below), and self is
+        # not above `other` either (otherwise both could see each other on +Z, ambiguous).
+        adj = self.obj.states[Adjacency].get_value(other)
+        adj_other = other.states[Adjacency].get_value(self.obj)
+        return bool(adj[0]) and not bool(adj[1]) and not bool(adj_other[0])

@@ -67,16 +67,6 @@ class TensorizedState:
     graph_dirty = True
 
     @classmethod
-    def _refresh_external_wp_handles(cls):
-        """
-        Hook for subclasses that read OTHER states' wp.array handles (e.g. MaxTemperature
-        reads Temperature.VALUES_WP, ToggledOn reads Open.VALUES_WP). Called by the
-        simulator immediately before wp.ScopedCapture so cross-state references are current
-        at capture time. Default no-op.
-        """
-        pass
-
-    @classmethod
     def pre_update(cls):
         """
         CPU-side prep run BEFORE global_update each step. Snapshots VALUES_CPU into

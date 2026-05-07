@@ -1,5 +1,5 @@
 import omnigibson as og
-from omnigibson.object_states.adjacency import VerticalAdjacency
+from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.touching import Touching
@@ -12,7 +12,7 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.update({Touching, VerticalAdjacency})
+        deps.update({Touching, Adjacency})
         return deps
 
     def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
@@ -44,5 +44,7 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         if not touching:
             return False
 
-        adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors
+        # Adjacency axis layout: k=0 is +Z (other above self), k=1 is -Z (other below self).
+        # OnTop(self, other) is true when `other` is below self (and not above): self is sitting on other.
+        adj = self.obj.states[Adjacency].get_value(other)
+        return bool(adj[1]) and not bool(adj[0])

@@ -4,6 +4,7 @@ import networkx as nx
 
 from omnigibson.object_states import (
     REGISTERED_OBJECT_STATES,
+    Adjacency,
     AttachedTo,
     Burnt,
     Contains,
@@ -73,6 +74,7 @@ _ABILITY_DEPENDENCIES = {
 
 _DEFAULT_STATE_SET = frozenset(
     [
+        Adjacency,
         Inside,
         NextTo,
         OnTop,

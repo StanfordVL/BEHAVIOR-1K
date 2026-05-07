@@ -75,10 +75,10 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`VerticalAdjacency`** / **`HorizontalAdjacency`**](../reference/object_states/adjacency.md)<br><br>  
-            The nearby objects that are considered adjacent to the object, either in the +/- global Z axis or +/- global XY plane.<br><br>
+            [**`Adjacency`**](../reference/object_states/adjacency.md)<br><br>  
+            Pairwise relation indicating whether `other` is reachable from `self`'s AABB center via a ray in any of 22 directions: 2 vertical (+Z, −Z) and 20 horizontal (5 equally-spaced coordinate planes × 2 orthogonal axes × +/− signs).<br><br>
             <ul>
-                <li>`get_value()`: returns `AxisAdjacencyList`, a namedtuple with `positive_neighbors` and `negative_neighbors` each of which are lists of nearby objects</li>
+                <li>`get_value(other)`: returns a 22-element bool tensor; `value[k]` is True iff `other` is hit when ray-casting from `self`'s AABB center along direction `k`. Layout: `k=0` is +Z, `k=1` is −Z, `k=2..11` are the 10 horizontal axes' positive directions, `k=12..21` are the 10 horizontal axes' negative directions.</li>
                 <li>`set_value()`: Not supported.</li>
             </ul>
         </td>
@@ -369,7 +369,7 @@ These are object states that are computed with respect to other entities in the 
     <tr>
         <td valign="top" width="60%">
             [**`NextTo`**](../reference/object_states/next_to.md)<br><br>  
-            Defines whether this object is considered next to `other`. This checks to make sure this object is relatively close to `other` and that `other` is in either of this object's `HorizontalAdjacency` neighbor lists.<br><br>
+            Defines whether this object is considered next to `other`. This checks to make sure this object is relatively close to `other` and that `other` fires at least one horizontal axis in this object's `Adjacency` (or vice-versa).<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
                 <li>`set_value(other, new_value)`: Not supported.</li>
@@ -382,7 +382,7 @@ These are object states that are computed with respect to other entities in the 
     <tr>
         <td valign="top" width="60%">
             [**`OnTop`**](../reference/object_states/on_top.md)<br><br>  
-            Defines whether this object is considered on top of `other`. This checks to make sure that this object is touching `other` and that `other` is in this object's `VerticalAdjacency` `negative_neighbors` list.<br><br>
+            Defines whether this object is considered on top of `other`. This checks to make sure that this object is touching `other` and that `other` is below this object via this object's `Adjacency` −Z slot (and not above via the +Z slot).<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
                 <li>`set_value(other, new_value)`: Only supported for `True`, which will sample poses for this object such that `get_value(other)=True`</li>
@@ -434,7 +434,7 @@ These are object states that are computed with respect to other entities in the 
     <tr>
         <td valign="top" width="60%">
             [**`Under`**](../reference/object_states/under.md)<br><br>  
-            Defines whether this object is considered under `other`. This checks to make sure that this object is touching `other` and that `other` is in this object's `VerticalAdjacency` `positive_neighbors` list.<br><br>
+            Defines whether this object is considered under `other`. This checks that `other` is above this object via this object's `Adjacency` +Z slot (and not below), and that this object is not above `other` either.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
                 <li>`set_value(other, new_value)`: Only supported for `True`, which will sample poses for this object such that `get_value(other)=True`</li>

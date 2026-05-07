@@ -1,7 +1,7 @@
 import torch as th
 
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.adjacency import HorizontalAdjacency, flatten_planes
+from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 
@@ -10,7 +10,7 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.add(HorizontalAdjacency)
+        deps.add(Adjacency)
         return deps
 
     def _get_value(self, other):
@@ -39,20 +39,11 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         if distance > avg_aabb_length * (1.0 / 6.0):
             return False
 
-        # Otherwise, check if the other object shows up in the adjacency list.
-        adjacency_this = self.obj.states[HorizontalAdjacency].get_value()
-        in_any_horizontal_adjacency_of_this = any(
-            (other in adjacency_list.positive_neighbors or other in adjacency_list.negative_neighbors)
-            for adjacency_list in flatten_planes(adjacency_this)
-        )
-        if in_any_horizontal_adjacency_of_this:
+        # Check if `other` shows up on any of self's horizontal axes (k=2..21 in Adjacency).
+        adj_self = self.obj.states[Adjacency].get_value(other)
+        if bool(adj_self[2:].any()):
             return True
 
-        # If not, check in the adjacency lists of `other`. Maybe it's shorter than us etc.
-        adjacency_other = other.states[HorizontalAdjacency].get_value()
-        in_any_horizontal_adjacency_of_other = any(
-            (self.obj in adjacency_list.positive_neighbors or self.obj in adjacency_list.negative_neighbors)
-            for adjacency_list in flatten_planes(adjacency_other)
-        )
-
-        return in_any_horizontal_adjacency_of_other
+        # Otherwise check the symmetric direction from `other` (it may be shorter than us etc.).
+        adj_other = other.states[Adjacency].get_value(self.obj)
+        return bool(adj_other[2:].any())

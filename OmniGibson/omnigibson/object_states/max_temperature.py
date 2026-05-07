@@ -30,8 +30,6 @@ class MaxTemperature(TensorizedAbsoluteState):
     # wp.array(int32) on CUDA: maps each MaxTemperature N index to the matching Temperature N index.
     # Built directly as a wp.array (no torch view) — only the kernel reads it.
     TEMPERATURE_IDXS_WP = None
-    # Reference to Temperature.VALUES_WP grabbed in _refresh_external_wp_handles().
-    TEMPERATURE_VALUES_WP = None
 
     @classmethod
     def get_dependencies(cls):
@@ -63,29 +61,17 @@ class MaxTemperature(TensorizedAbsoluteState):
                         cls.VALUES_CPU[s_idx, obj_idx] = -float("inf")
 
     @classmethod
-    def _refresh_external_wp_handles(cls):
-        """
-        Snapshot the current Temperature.VALUES_WP reference. Called by the simulator
-        immediately before wp.ScopedCapture so the captured graph kernels read from the
-        live Temperature buffer (Temperature.initialize_view may have re-wrapped its
-        VALUES_WP since the last graph capture).
-        """
-        cls.TEMPERATURE_VALUES_WP = Temperature.VALUES_WP
-
-    @classmethod
     def _update_values(cls, values):
         # Value is max between stored values and current temperature values.
         # Temperature.VALUES is (S, N_temp); cls.TEMPERATURE_IDXS maps MaxTemp N → Temperature N,
         # so Temperature.VALUES[:, cls.TEMPERATURE_IDXS] has shape (S, N_max).
-
-        # cls.TEMPERATURE_VALUES_WP is refreshed by the simulator.
-        if cls.VALUES_WP is None or cls.TEMPERATURE_IDXS_WP is None or cls.TEMPERATURE_VALUES_WP is None:
+        if cls.VALUES_WP is None or cls.TEMPERATURE_IDXS_WP is None or Temperature.VALUES_WP is None:
             return
         S, O = cls.VALUES.shape[:2]
         wp.launch(
             kernel=_max_temperature_kernel,
             dim=(S, O),
-            inputs=[cls.VALUES_WP, cls.TEMPERATURE_VALUES_WP, cls.TEMPERATURE_IDXS_WP],
+            inputs=[cls.VALUES_WP, Temperature.VALUES_WP, cls.TEMPERATURE_IDXS_WP],
             device="cuda",
         )
 
