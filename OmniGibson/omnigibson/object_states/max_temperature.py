@@ -1,7 +1,7 @@
 import warp as wp
 
 from omnigibson.object_states.temperature import Temperature
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.utils.python_utils import classproperty
 
 
@@ -22,7 +22,7 @@ def _max_temperature_kernel(
         max_values[s, o] = t
 
 
-class MaxTemperature(TensorizedValueState):
+class MaxTemperature(TensorizedAbsoluteState):
     """
     This state remembers the highest temperature reached by an object.
     """

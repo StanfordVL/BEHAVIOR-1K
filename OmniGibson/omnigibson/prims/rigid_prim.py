@@ -509,7 +509,7 @@ class RigidPrim(XFormPrim):
 
         The link's world scale is baked into the stored points so that the kernel can
         transform points to world frame using just the link's pose-matrix (rotation +
-        translation, no scale) — matching what RigidBodyViewAPI._POSE_MATRICES provides.
+        translation, no scale) — matching what RigidBodyViewAPI.POSE_MATRICES provides.
         """
         scale = self.get_world_scale().to(th.float32)  # link's world scale; usd returns float64
         pts_concat, idx_concat, point_offset = [], [], 0

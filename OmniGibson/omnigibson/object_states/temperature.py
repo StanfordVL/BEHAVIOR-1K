@@ -4,7 +4,7 @@ import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.utils.python_utils import classproperty
 
 
@@ -34,7 +34,7 @@ m.DEFAULT_TEMPERATURE = 23.0  # degrees Celsius
 m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps later.
 
 
-class Temperature(TensorizedValueState):
+class Temperature(TensorizedAbsoluteState):
     @classmethod
     def initialize_view(cls):
         # Snapshot which relative paths existed before the rebuild

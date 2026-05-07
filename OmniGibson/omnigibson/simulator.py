@@ -22,7 +22,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.usd_object import USDObject
@@ -526,7 +526,7 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_requiring_update = [
                 state
                 for state in self.object_state_types
-                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedValueState))
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedState))
             ]
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
@@ -547,10 +547,10 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
 
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, TensorizedValueState):
+                if issubclass(state, TensorizedState):
                     state.global_initialize()
 
-            # Captured wp.Graph wrapping every TensorizedValueState's global_update().
+            # Captured wp.Graph wrapping every TensorizedState's global_update().
             self._state_graph = None
 
             # Now start rebuilding everything
@@ -1210,7 +1210,7 @@ def _launch_simulator(*args, **kwargs):
 
             if gm.ENABLE_OBJECT_STATES:
                 for state_type in og.sim.object_state_types_requiring_update:
-                    if issubclass(state_type, TensorizedValueState):
+                    if issubclass(state_type, TensorizedState):
                         state_type.initialize_view()
 
         def _update_view_apis(self):
@@ -1225,8 +1225,8 @@ def _launch_simulator(*args, **kwargs):
 
         def _capture_warp_graph(self, tensorized_states):
             """
-            (Re-)capture the per-step TensorizedValueState global_update sequence into a wp.Graph
-            for replay each step. Called when `TensorizedValueState.graph_dirty` is True or
+            (Re-)capture the per-step TensorizedState global_update sequence into a wp.Graph
+            for replay each step. Called when `TensorizedState.graph_dirty` is True or
             no graph exists.
 
             Steps:
@@ -1305,23 +1305,23 @@ def _launch_simulator(*args, **kwargs):
                     tensorized_states = [
                         state
                         for state in self.object_state_types_requiring_update
-                        if issubclass(state, TensorizedValueState)
+                        if issubclass(state, TensorizedState)
                     ]
 
                     for state_type in tensorized_states:
                         state_type.pre_update()
 
-                    if TensorizedValueState.graph_dirty:
+                    if TensorizedState.graph_dirty:
                         self._capture_warp_graph(tensorized_states)
-                        TensorizedValueState.graph_dirty = False
+                        TensorizedState.graph_dirty = False
                     if self._state_graph is not None:
                         wp.capture_launch(self._state_graph)
 
                     th.cuda.synchronize()
 
-                    # TensorizedValueState post_updates (CPU change detection + state_updated())
+                    # TensorizedState post_updates (CPU change detection + state_updated())
                     for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedValueState):
+                        if issubclass(state_type, TensorizedState):
                             state_type.post_update()
 
                     # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
@@ -2073,7 +2073,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, TensorizedValueState):
+                if issubclass(state, TensorizedState):
                     state.global_initialize()
 
             # Clear all materials

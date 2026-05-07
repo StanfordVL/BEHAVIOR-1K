@@ -6,7 +6,7 @@ import warp as wp
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidContactAPI
 
@@ -62,7 +62,7 @@ def _slicer_post_update_kernel(
     prev_touching[s, o] = currently_touching[s, o]
 
 
-class SlicerActive(TensorizedValueState, BooleanStateMixin):
+class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
     """
     Slicer-active state.
 

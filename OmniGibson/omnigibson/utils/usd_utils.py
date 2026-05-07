@@ -343,7 +343,7 @@ def _aabb_reduce_kernel(
 
 @wp.kernel
 def _aabb_baselink_fallback_kernel(
-    poses: wp.array2d(dtype=wp.float32),  # _POSES_GPU as (N_links_total, 7)
+    poses: wp.array2d(dtype=wp.float32),  # POSES_GPU as (N_links_total, 7)
     base_link_links: wp.array(dtype=wp.int32),  # (N_rigid,) flat body idx of each rigid obj's base link
     base_link_objs: wp.array(dtype=wp.int32),  # (N_rigid,) output row in out_values
     out_values: wp.array2d(dtype=wp.float32),  # (S*O, 6) — populated by _aabb_reduce_kernel
@@ -380,7 +380,7 @@ class RigidBodyViewAPI:
       - physx_untracked: kinematic-only articulated objects' links not tracked by physx's rigid body view.
                          Poses seeded once at initialize_view() and refreshed only by invalidate_kinematic().
 
-    Flat index layout in _POSE_MATRICES (N_links_total, 4, 4):
+    Flat index layout in POSE_MATRICES (N_links_total, 4, 4):
       [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked links across all scenes]
 
     Also exposes LINK_MESH_IDS / LINK_VERTEX_COUNTS so the _aabb_reduce_kernel can read each
@@ -397,15 +397,15 @@ class RigidBodyViewAPI:
 
     # Position + quaternion pose of all links in the scene, indexed by flat index.
     # shape: (N_links_total, 7) — [px, py, pz, qx, qy, qz, qw]
-    _POSES = None  # CPU — written by update_pose_cache() / invalidate_kinematic()
-    _POSES_GPU = None  # GPU — written by async_copy_to_gpu()
+    POSES = None  # CPU — written by update_pose_cache() / invalidate_kinematic()
+    POSES_GPU = None  # GPU — written by async_copy_to_gpu()
 
     # Cached 4x4 transformation matrices — flat, covers physx_tracked + physx_untracked.
     # shape: (N_links_total, 4, 4)
     # physx_untracked slice is appended after all physx_tracked entries and never
     # overwritten by update_pose_cache(); refreshed only by invalidate_kinematic().
-    _POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
-    _POSE_MATRICES_CPU = None  # CPU — written by update_pose_cache()
+    POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
+    POSE_MATRICES_CPU = None  # CPU — written by update_pose_cache()
 
     # Per-link wp.Mesh ids (0 if link has no collision geometry), kernel input for
     # wp.mesh_get_point(mesh_ids[body], v). Built in initialize_view from
@@ -438,7 +438,7 @@ class RigidBodyViewAPI:
         Initializes the rigid body view. Note: Can only be done when sim is playing!
 
         Builds a flat layout keyed by absolute prim path so each scene can have an
-        independent link count. Layout of _POSE_MATRICES (N_links_total, 4, 4):
+        independent link count. Layout of POSE_MATRICES (N_links_total, 4, 4):
           [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked across all scenes]
 
         Also collects each registered link's wp.Mesh id and vertex count into
@@ -452,7 +452,7 @@ class RigidBodyViewAPI:
 
         # Snapshot existing kinematic-link poses ton reuse them below
         prev_path_to_idx = dict(cls._PATH_TO_IDX)  # snapshot before clear()
-        prev_poses = cls._POSES  # None on very first call; CPU tensor otherwise
+        prev_poses = cls.POSES  # None on very first call; CPU tensor otherwise
 
         # Reset
         cls.clear()
@@ -512,10 +512,10 @@ class RigidBodyViewAPI:
                     if abs_path in cls._PATH_TO_IDX:
                         link_by_idx[cls._PATH_TO_IDX[abs_path]] = link
 
-        cls._POSES = th.cat(poses_list, dim=0).pin_memory()  # (N_links_total, 7), CPU
-        cls._POSES_GPU = cls._POSES.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
-        cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
-        cls._POSE_MATRICES = cls._POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
+        cls.POSES = th.cat(poses_list, dim=0).pin_memory()  # (N_links_total, 7), CPU
+        cls.POSES_GPU = cls.POSES.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
+        cls.POSE_MATRICES_CPU = cls._poses_to_matrices(cls.POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
+        cls.POSE_MATRICES = cls.POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
 
         # Collect each link's wp.Mesh id and vertex count. Mesh ownership stays on the link
         # (link.collision_mesh_warp is a @cached_property); we just record handles here.
@@ -557,8 +557,8 @@ class RigidBodyViewAPI:
             return
 
         N_physx_tracked = transforms.shape[0]
-        cls._POSES[:N_physx_tracked] = transforms
-        cls._POSE_MATRICES_CPU[:N_physx_tracked] = cls._poses_to_matrices(transforms)
+        cls.POSES[:N_physx_tracked] = transforms
+        cls.POSE_MATRICES_CPU[:N_physx_tracked] = cls._poses_to_matrices(transforms)
 
     @staticmethod
     def _poses_to_matrices(poses):
@@ -579,7 +579,7 @@ class RigidBodyViewAPI:
     @classmethod
     def get_flat_idx(cls, abs_prim_path):
         """
-        Return the flat index into _POSE_MATRICES for a link's absolute prim path, or None.
+        Return the flat index into POSE_MATRICES for a link's absolute prim path, or None.
 
         Args:
             abs_prim_path (str): Absolute prim path of the link (e.g. /World/scene_0/obj/link).
@@ -660,8 +660,8 @@ class RigidBodyViewAPI:
         """
         if cls._aabb_links is None or cls._aabb_links.shape[0] == 0:
             return
-        pose_mats = wp.from_torch(cls._POSE_MATRICES, dtype=wp.mat44)
-        poses = wp.from_torch(cls._POSES_GPU)  # (N_links_total, 7) float32
+        pose_mats = wp.from_torch(cls.POSE_MATRICES, dtype=wp.mat44)
+        poses = wp.from_torch(cls.POSES_GPU)  # (N_links_total, 7) float32
         out_arr = wp.from_torch(out_values)
 
         wp.launch(
@@ -703,28 +703,28 @@ class RigidBodyViewAPI:
         Args:
             links: iterable of RigidPrim link objects whose poses should be refreshed.
         """
-        if cls._POSE_MATRICES is None:
+        if cls.POSE_MATRICES is None:
             return
         for link in links:
             idx = cls._PATH_TO_IDX.get(link.prim_path)
             if idx is None:
                 continue  # not registered (e.g. particle templates not in scene.objects)
             pos, quat_xyzw = link.get_position_orientation()
-            cls._POSES[idx][:3] = pos  # _POSES[idx]: (7,)
-            cls._POSES[idx][3:] = quat_xyzw
-            cls._POSES_GPU[idx] = cls._POSES[idx].cuda()
+            cls.POSES[idx][:3] = pos  # POSES[idx]: (7,)
+            cls.POSES[idx][3:] = quat_xyzw
+            cls.POSES_GPU[idx] = cls.POSES[idx].cuda()
             # unsqueeze(0): (7,) -> (1, 7) so _poses_to_matrices gets its expected (N, 7) input;
-            # [0]: (1, 4, 4) -> (4, 4) to match _POSE_MATRICES_CPU[idx] slot
-            cls._POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls._POSES[idx].unsqueeze(0))[0]
-            cls._POSE_MATRICES[idx] = cls._POSE_MATRICES_CPU[idx].cuda()  # (4, 4), GPU
+            # [0]: (1, 4, 4) -> (4, 4) to match POSE_MATRICES_CPU[idx] slot
+            cls.POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls.POSES[idx].unsqueeze(0))[0]
+            cls.POSE_MATRICES[idx] = cls.POSE_MATRICES_CPU[idx].cuda()  # (4, 4), GPU
 
     @classmethod
     def async_copy_to_gpu(cls):
-        """Issue non-blocking bulk copy of _POSES/_POSE_MATRICES CPU → GPU."""
-        if cls._POSE_MATRICES_CPU is None:
+        """Issue non-blocking bulk copy of POSES/POSE_MATRICES CPU → GPU."""
+        if cls.POSE_MATRICES_CPU is None:
             return
-        cls._POSES_GPU.copy_(cls._POSES, non_blocking=True)
-        cls._POSE_MATRICES.copy_(cls._POSE_MATRICES_CPU, non_blocking=True)
+        cls.POSES_GPU.copy_(cls.POSES, non_blocking=True)
+        cls.POSE_MATRICES.copy_(cls.POSE_MATRICES_CPU, non_blocking=True)
 
     @classmethod
     def clear(cls):
@@ -732,10 +732,10 @@ class RigidBodyViewAPI:
         cls._RIGID_BODY_VIEW = None
         cls._PATH_TO_IDX = {}
         cls._IDX_TO_PATH = []
-        cls._POSES = None
-        cls._POSES_GPU = None
-        cls._POSE_MATRICES = None
-        cls._POSE_MATRICES_CPU = None
+        cls.POSES = None
+        cls.POSES_GPU = None
+        cls.POSE_MATRICES = None
+        cls.POSE_MATRICES_CPU = None
         cls.LINK_MESH_IDS = None
         cls.LINK_VERTEX_COUNTS = None
         cls._aabb_links = None

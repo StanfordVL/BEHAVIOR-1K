@@ -8,7 +8,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.open_state import Open
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
@@ -31,7 +31,7 @@ m.CAN_TOGGLE_STEPS = 5
 
 @wp.kernel
 def _check_overlap_kernel(
-    pose_matrices: wp.array(dtype=wp.mat44),  # RigidBodyViewAPI._POSE_MATRICES (N_links,)
+    pose_matrices: wp.array(dtype=wp.mat44),  # RigidBodyViewAPI.POSE_MATRICES (N_links,)
     mesh_ids: wp.array(dtype=wp.uint64),  # RigidBodyViewAPI.LINK_MESH_IDS  (N_links,)
     marker_parent_link_idx: wp.array(dtype=wp.int32),  # (n_markers,) flat link idx of marker's parent rigid body
     marker_local_offset: wp.array(dtype=wp.vec3),  # (n_markers,) marker center in its parent link's local frame
@@ -136,7 +136,7 @@ def _set_toggle_value_kernel(
         values[s, o] = wp.uint8(1) - values[s, o]
 
 
-class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
+class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin):
     """
     Boolean state representing whether an object has been toggled on.
     """
@@ -182,7 +182,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
     # === Marker info — filled in initialize_view from USD reads. ===
     # Marker is a static visual child of the togglebutton meta link, so its local offset and
     # radius never change. Per-step world center is derived inside the overlap kernel from the
-    # parent link's current pose matrix in RigidBodyViewAPI._POSE_MATRICES.
+    # parent link's current pose matrix in RigidBodyViewAPI.POSE_MATRICES.
     _marker_parent_link_idx_gpu = None  # (n_markers,) int32 — flat link idx in RigidBodyViewAPI
     _marker_parent_link_idx_wp = None
     _marker_local_offset_gpu = None  # (n_markers, 3) float32 — marker center in parent link's local frame
@@ -419,7 +419,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
         Init marker info for check_overlap_kernel
           - cls.visual_markers[s][o]: GeomPrim handle (for color updates in post_update).
           - marker_to_obj_idx_flat: m → flat (s*O + o) for the atomic_max target.
-          - marker_parent_link_idx: m → flat link idx in RigidBodyViewAPI._POSE_MATRICES.
+          - marker_parent_link_idx: m → flat link idx in RigidBodyViewAPI.POSE_MATRICES.
           - marker_local_offset: m → marker center expressed in parent link's local frame.
           - marker_radii: m → BVH query radius (scale * min mesh extent).
           - cls._marker_finger_pair: (P,) wp.vec2i wrapping the (marker, finger) pair list
@@ -632,7 +632,7 @@ class ToggledOn(TensorizedValueState, BooleanStateMixin, LinkBasedStateMixin):
                 kernel=_check_overlap_kernel,
                 dim=cls._marker_finger_pair.shape[0],
                 inputs=[
-                    wp.from_torch(RigidBodyViewAPI._POSE_MATRICES, dtype=wp.mat44),
+                    wp.from_torch(RigidBodyViewAPI.POSE_MATRICES, dtype=wp.mat44),
                     RigidBodyViewAPI.LINK_MESH_IDS,
                     cls._marker_parent_link_idx_wp,
                     cls._marker_local_offset_wp,

@@ -1,7 +1,7 @@
 import torch as th
 import warp as wp
 
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
 from omnigibson.utils.constants import PrimType
@@ -23,12 +23,12 @@ def _aabb_init_kernel(out_values: wp.array2d(dtype=wp.float32)):
     out_values[i, 5] = wp.float32(-wp.inf)
 
 
-class AABB(TensorizedValueState):
+class AABB(TensorizedAbsoluteState):
     """
     Axis-aligned bounding box state, computed in bulk across all objects and scenes.
 
     For rigid objects, batched AABB computation is delegated to RigidBodyViewAPI.get_aabb(),
-    which uses each link's wp.Mesh (collision_mesh_warp) plus _POSE_MATRICES. AABB-tracking
+    which uses each link's wp.Mesh (collision_mesh_warp) plus POSE_MATRICES. AABB-tracking
     config (which links to track, where their AABBs go) is handed off once per
     initialize_view() via RigidBodyViewAPI.prepare_aabb_kernel_inputs(...).
 
