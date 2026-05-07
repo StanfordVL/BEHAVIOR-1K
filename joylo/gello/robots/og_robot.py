@@ -7,6 +7,7 @@ import json
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs import HDF5CollectionWrapper
+from omnigibson.macros import macros
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
@@ -38,6 +39,7 @@ class OGRobotServer:
         partial_load: bool = True,
         instance_id: Optional[int] = None,
         ghosting: bool = True,
+        attachment_joint_visuals: Optional[bool] = None,
     ):
         if task_name is not None:
             available_tasks = utils.load_available_tasks()
@@ -62,6 +64,14 @@ class OGRobotServer:
             self.task_name = None
             self.task_cfg = None
             self.instance_id = None
+
+        enable_attachment_joint_visuals = (
+            utils.task_requires_attached_state(self.task_name)
+            if attachment_joint_visuals is None
+            else attachment_joint_visuals
+        )
+        with macros.unlocked():
+            macros.object_states.attached_to.ENABLE_ATTACHMENT_JOINT_VISUALS = enable_attachment_joint_visuals
 
         utils.apply_omnigibson_macros()
 
@@ -346,16 +356,15 @@ class OGRobotServer:
                 and obj.category != "agent"
                 and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES
             ]
-            
+
             # Setup object beacons
             self.object_beacons = utils.setup_object_beacons(
                 self.task_relevant_objects, self.env.scene
             )
 
-            # Setup task-specific visualizers
-            self.task_visualizers = utils.setup_task_visualizers(
-                self.task_relevant_objects, self.env.scene
-            )
+            # Attachment guides are owned by the AttachedTo object state. Keep this as a placeholder for future
+            # JoyLo-specific task visualizers.
+            self.task_visualizers = {}
 
             # Get task-irrelevant objects
             self.task_irrelevant_objects = [
@@ -372,6 +381,7 @@ class OGRobotServer:
             self.task_relevant_objects = []
             self.task_irrelevant_objects = []
             self.object_beacons = {}
+            self.task_visualizers = {}
 
     def _setup_keyboard_handlers(self):
         """Set up keyboard event handlers"""
