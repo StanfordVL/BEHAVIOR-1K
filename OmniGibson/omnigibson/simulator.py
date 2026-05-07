@@ -621,6 +621,11 @@ def _launch_simulator(*args, **kwargs):
 
         def _set_renderer_settings(self):
             settings = lazy.carb.settings.get_settings()
+            settings.set_bool("/rtx/rtx/modes/rt/enabled", True)  # real-time 2.0 requires rt to be enabled as well
+            settings.set_bool("/rtx/rtx/modes/rt2/enabled", True)
+            settings.set("/rtx/rendermode", "RealTimePathTracing")
+            settings.set_bool("/rtx/raytracing/fractionalCutoutOpacity", True)
+
             settings.set_bool("/rtx/reflections/enabled", True)
             settings.set_bool("/rtx/indirectDiffuse/enabled", True)
             settings.set_int(
