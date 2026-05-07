@@ -106,14 +106,12 @@ class TensorizedAbsoluteState(AbsoluteObjectState, TensorizedState):
         # PREV_VALUES mirrors VALUES_CPU on CPU; seed so first post_update() fires no spurious state_updated().
         cls.PREV_VALUES = cls.VALUES_CPU.clone()
 
-        # Wrap VALUES / VALUES_CPU as wp.array handles for use inside Warp kernels and graph capture.
+        # Wrap VALUES as wp.array handles for use inside Warp kernels and graph capture.
         # Wrappers cached at the class level; never recreated per call.
         if cls.VALUES.numel() > 0:
             cls.VALUES_WP = _wp_from_torch(cls.VALUES)
-            cls.VALUES_CPU_WP = _wp_from_torch(cls.VALUES_CPU)
         else:
             cls.VALUES_WP = None
-            cls.VALUES_CPU_WP = None
 
         # Mark the captured wp.graph as stale — the simulator will re-capture before the next step.
         # update_handles() always calls the view APIs' initialize_view BEFORE this, so any

@@ -382,18 +382,6 @@ class XFormPrim(BasePrim):
         min_corner, max_corner = self.aabb
         return max_corner - min_corner
 
-    def get_world_scale(self):
-        """
-        Gets prim's scale with respect to the world's frame.
-
-        Returns:
-            th.tensor: scale applied to the prim's dimensions in the world frame. shape is (3, ).
-        """
-        prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
-        transform = lazy.pxr.Gf.Transform()
-        transform.SetMatrix(prim_tf)
-        return th.tensor(transform.GetScale())
-
     @property
     def scaled_transform(self):
         """

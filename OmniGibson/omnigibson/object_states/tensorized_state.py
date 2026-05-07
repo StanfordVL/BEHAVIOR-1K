@@ -53,11 +53,10 @@ class TensorizedState:
     # Int representing per-object state size (flattened size of value_shape)
     STATE_SIZE = None
 
-    # wp.array views over VALUES / VALUES_CPU for use inside Warp kernels and graph capture.
+    # wp.array views over VALUES for use inside Warp kernels and graph capture.
     # Wrapped once in initialize_view; never re-created per call. Re-wrapped on every
     # initialize_view because torch storage is reallocated there.
     VALUES_WP = None
-    VALUES_CPU_WP = None
 
     # Set to True any time any subclass's initialize_view runs, signalling that the
     # captured wp.graph holds stale pointers/shapes and must be re-captured. The simulator
@@ -97,10 +96,7 @@ class TensorizedState:
         cls._update_values(values=cls.VALUES)
         # Mirror VALUES → VALUES_CPU. Use wp.copy when both wp.array handles exist (graph-safe);
         # fall back to torch's non-blocking copy otherwise (e.g. partial init).
-        if cls.VALUES_WP is not None and cls.VALUES_CPU_WP is not None:
-            wp.copy(cls.VALUES_CPU_WP, cls.VALUES_WP)
-        else:
-            cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
+        cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
 
     @classmethod
     def post_update(cls):
