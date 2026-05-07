@@ -201,7 +201,6 @@ def create_stable_scene_json(scene_model):
     og.sim.stop()
     og.clear()
 
-    
     print(f"\n\nSuccessfully created stable scene json at path: {path}\n\n")
 
     og.shutdown()
