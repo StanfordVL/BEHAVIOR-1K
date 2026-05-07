@@ -1,32 +1,19 @@
 import math
 
 import torch as th
-import warp as wp
 
 import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.tensorized_state import TensorizedState, _wp_from_torch
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.ui_utils import create_module_logger
-
-# Create module logger
-log = create_module_logger(module_name=__name__)
 
 
-def _wp_from_torch(t):
+class TensorizedAbsoluteState(AbsoluteObjectState, TensorizedState):
     """
-    Wrap a torch tensor as a wp.array. Bool tensors are wrapped as wp.uint8
-    (storage is byte-per-bool in torch already).
-    """
-    if t.dtype == th.bool:
-        return wp.from_torch(t.view(th.uint8), dtype=wp.uint8)
-    return wp.from_torch(t)
+    Tensorized state-mixin for ABSOLUTE (single-object) values.
 
-
-class TensorizedValueState(AbsoluteObjectState):
-    """
-    A state-mixin that implements optimized global value updates across all object state instances
-    of this type, i.e.: all values across all object state instances are updated at once, rather than per
-    individual instance update() call.
+    All values across all object state instances are updated at once via _update_values(),
+    rather than per individual instance update() call.
 
     Multi-scene layout
     ------------------
@@ -37,49 +24,6 @@ class TensorizedValueState(AbsoluteObjectState):
     Registration and tensor allocation are handled exclusively by ``initialize_view()``,
     which is called from ``simulator.py`` after scene changes.
     """
-
-    # Tensor of raw internally tracked values — GPU-resident during computation
-    # Shape is (S, N, ...), where S = scenes, N = object types, ... = value_shape
-    VALUES = None
-
-    # Pinned CPU mirror of VALUES — updated via async DMA after each global_update pass.
-    # _get_value() always reads from here to avoid GPU stalls for Python callers.
-    VALUES_CPU = None
-
-    # CPU tensor to store VALUES_CPU from the previous step — used for change detection.
-    PREV_VALUES = None
-
-    # Dictionary mapping relative prim path to index in the N dimension of VALUES
-    OBJ_IDXS = None
-
-    # 2-D list: IDX_OBJS[scene_idx][obj_idx] = object instance (or None if absent in that scene)
-    IDX_OBJS = None
-
-    # Int representing per-object state size
-    STATE_SIZE = None
-
-    # wp.array views over VALUES / VALUES_CPU for use inside Warp kernels and graph capture.
-    # Wrapped once in initialize_view; never re-created per call. Re-wrapped on every
-    # initialize_view because torch storage is reallocated there.
-    VALUES_WP = None
-    VALUES_CPU_WP = None
-
-    # Set to True any time this base class's initialize_view runs, signalling that the
-    # captured wp.graph holds stale pointers/shapes and must be re-captured. The simulator
-    # checks-and-resets this before each step. update_handles() always calls the view APIs'
-    # initialize_view before every TensorizedValueState's initialize_view, so any viewAPI
-    # buffer reallocation is automatically covered.
-    graph_dirty = True
-
-    @classmethod
-    def _refresh_external_wp_handles(cls):
-        """
-        Hook for subclasses that read OTHER states' wp.array handles (e.g. MaxTemperature
-        reads Temperature.VALUES_WP, ToggledOn reads Open.VALUES_WP). Called by the
-        simulator immediately before wp.ScopedCapture so cross-state references are current
-        at capture time. Default no-op.
-        """
-        pass
 
     @classmethod
     def global_initialize(cls):
@@ -108,9 +52,6 @@ class TensorizedValueState(AbsoluteObjectState):
         # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)
         prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
         prev_values = cls.VALUES.clone() if cls.VALUES is not None and cls.VALUES.numel() > 0 else None
-
-        # Check that every scene has the same number of objects,
-        # and the same object at the same relative prim path has same state settings.
 
         # Reset
         cls.global_initialize()
@@ -178,98 +119,7 @@ class TensorizedValueState(AbsoluteObjectState):
         # update_handles() always calls the view APIs' initialize_view BEFORE this, so any
         # RigidContactAPI / RigidBodyViewAPI / ArticulatedObjectViewAPI buffer reallocations
         # are already covered by the time this fires.
-        TensorizedValueState.graph_dirty = True
-
-    @classmethod
-    def pre_update(cls):
-        """
-        CPU-side prep run BEFORE global_update each step. Snapshots VALUES_CPU into
-        PREV_VALUES so post_update() can detect changes after the warp work completes.
-
-        Lives outside the captured wp.graph.
-
-        Subclasses may override to add per-state CPU prep (e.g. ToggledOn refreshing
-        marker world poses).
-        """
-        if cls.VALUES_CPU is None or cls.VALUES_CPU.numel() == 0:
-            return
-        cls.PREV_VALUES.copy_(cls.VALUES_CPU)
-
-    @classmethod
-    def global_update(cls):
-        """
-        Globally update all values via _update_values() and async-copy to VALUES_CPU.
-        Change detection and post_update() are called separately by the simulator after synchronize().
-        Skips if there are no tracked objects.
-
-        Should be capturable inside wp.graph: only emits CUDA work via Warp
-        kernel launches and Warp memcpy.
-        """
-        if cls.VALUES is None or cls.VALUES.numel() == 0:
-            return
-        S, N = cls.VALUES.shape[:2]
-        if S == 0 or N == 0:
-            return
-
-        cls._update_values(values=cls.VALUES)
-        # Mirror VALUES → VALUES_CPU. Use wp.copy when both wp.array handles exist (graph-safe);
-        # fall back to torch's non-blocking copy otherwise (e.g. partial init).
-        if cls.VALUES_WP is not None and cls.VALUES_CPU_WP is not None:
-            wp.copy(cls.VALUES_CPU_WP, cls.VALUES_WP)
-        else:
-            cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
-
-    @classmethod
-    def post_update(cls):
-        """
-        Called by the simulator after th.cuda.synchronize(). Compares VALUES_CPU with PREV_VALUES
-        (both CPU) to detect changes, fires state_updated() for affected objects, then updates PREV_VALUES.
-        """
-        if cls.VALUES_CPU is None or cls.VALUES_CPU.numel() == 0:
-            return
-        S = cls.VALUES_CPU.shape[0]
-
-        diff = cls.VALUES_CPU != cls.PREV_VALUES
-        changed_mask = th.any(diff, dim=tuple(range(2, diff.ndim))) if diff.ndim > 2 else diff
-        for s_idx in range(S):
-            for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
-                obj = cls.IDX_OBJS[s_idx][obj_idx]
-                obj.state_updated()
-
-    @classmethod
-    def _update_values(cls, values):
-        """
-        Updates all internally tracked @values for this object state. Should be implemented by subclass.
-        Mutates @values in-place. Must not return anything.
-
-        Args:
-            values (th.tensor): Tensorized value array of shape (S, N, *value_shape)
-        """
-        raise NotImplementedError
-
-    @classproperty
-    def value_shape(cls):
-        """
-        Returns:
-            tuple: Expected shape of the per-object state instance value. Default is () (scalar).
-        """
-        return ()
-
-    @classproperty
-    def value_type(cls):
-        """
-        Returns:
-            type: Type of the internal value array, e.g., bool, th.uint, th.float32, etc. Default is th.float32
-        """
-        return th.float32
-
-    @classproperty
-    def value_name(cls):
-        """
-        Returns:
-            str: Name of the value key to assign when dumping / loading the state. Should be implemented by subclass
-        """
-        raise NotImplementedError
+        TensorizedState.graph_dirty = True
 
     def _get_value(self):
         # Read from the pinned CPU mirror — no GPU stall for Python callers
@@ -288,11 +138,6 @@ class TensorizedValueState(AbsoluteObjectState):
         self.VALUES[s, obj_idx] = new_value
         self.VALUES_CPU[s, obj_idx] = new_value
         return True
-
-    @property
-    def state_size(self):
-        # This is merely the class state size
-        return self.STATE_SIZE
 
     def _dump_state(self):
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
@@ -320,5 +165,5 @@ class TensorizedValueState(AbsoluteObjectState):
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
-        classes.add("TensorizedValueState")
+        classes.add("TensorizedAbsoluteState")
         return classes
