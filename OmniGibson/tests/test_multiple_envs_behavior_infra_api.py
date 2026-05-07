@@ -233,6 +233,8 @@ class TestBehaviorStepAndReset:
 # what guarantees the correct ordering.
 
 
+# TODO(vector): Clean up all of these multiple envs tests to not use the weird progress/passed/etc. helpers.
+# Also read through everything to make sure they're not doing anything weird.
 class TestBehaviorSingleEnv:
     """BehaviorTask with num_envs=1. Cannot share the module-scope 2-env fixture."""
 

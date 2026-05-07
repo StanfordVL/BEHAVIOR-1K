@@ -119,6 +119,9 @@ def _reset_behavior_env(request):
 # ===================================================================
 
 
+# TODO(vector): Add the actual BEHAVIOR tests - start a task, move the objects to the goal state,
+# check that the task is successful, and that the reward is correct (also that they are not complete
+# before you move them etc.) - do this for various combinations of none/some/all scenes in the env
 class TestBehaviorTaskLogic:
     """Tests for logic unique to BehaviorTask: BDDL scope, goal conditions,
     potential reward, task observations, presampled robot pose, and goal status."""

@@ -118,7 +118,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Scene list
         self._scenes = []
 
-        # Sensor registry for obs-key-first iteration (built in post_play_load)
+        # Sensor registry for obs-key-first iteration (built in load)
         self._robot_sensor_map = {}  # (robot_name, sensor_name) -> [sensor_per_env]
         self._robot_has_proprio = {}  # robot_name -> bool
         self._ext_sensor_map = {}  # sensor_name -> [sensor_per_env]
@@ -130,10 +130,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Load this environment
         self.load()
-
-        # Play and complete loading
-        og.sim.play()
-        self.post_play_load()
 
     def reload(self, configs, overwrite_old=True):
         """
@@ -465,8 +461,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_task()
         self._load_external_sensors()
 
-    def post_play_load(self):
-        """Complete loading tasks that require the simulator to be playing."""
+        # Play and complete loading
+        og.sim.play()
         # Run any additional task post-loading behavior
         self.task.post_play_load(env=self)
 
@@ -488,28 +484,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             builder.start(scene)
 
         # Denote that the scene is loaded
-        self._loaded = True
-
-    def update_task(self, task_config):
-        """
-        Updates the internal task using @task_config. NOTE: This will internally reset the environment as well!
-
-        Args:
-            task_config (dict): Task configuration for updating the new task
-        """
-        # Make sure sim is playing
-        assert og.sim.is_playing(), "Update task should occur while sim is playing!"
-
-        # Denote scene as not loaded yet
-        self._loaded = False
-        og.sim.stop()
-        self._load_task(task_config=task_config)
-        og.sim.play()
-
-        # Run post play logic again
-        self.post_play_load()
-
-        # Scene is now loaded again
         self._loaded = True
 
     def close(self):
@@ -690,14 +664,28 @@ class Environment(gym.Env, GymObservable, Recreatable):
             return action
         return action
 
-    def _pre_step(self, action):
-        """Apply the pre-sim-step part of an environment step, i.e. apply the robot actions.
+    def step(self, action, n_render_iterations=1):
+        """
+        Apply robot's action and return the next state, reward, done and info,
+        following OpenAI Gym's convention
 
         Args:
-            action (th.Tensor or list[dict]): Robot actions, already converted by _convert_action_to_tensor.
-                For tensors, shape is (num_envs, action_dim).
-                For dicts, a list of dicts (one per env), each mapping robot name to action.
+            action (gym.spaces.Dict or dict or list[dict] or th.tensor): robot actions. If a dict is specified,
+                each entry should map robot name to corresponding action. If a th.tensor, it should be the flattened,
+                concatenated set of actions. For multi-env, should be (num_envs, action_dim) shaped for tensors,
+                or a list of dicts (one per env) for dict actions.
+            n_render_iterations (int): Number of rendering iterations to use before returning observations
+
+        Returns:
+            5-tuple:
+                - list[dict]: states, i.e. next observations per env
+                - th.Tensor: (num_envs,) rewards, i.e. reward at this current timestep
+                - th.Tensor: (num_envs,) terminated bool, i.e. whether this episode ended due to a failure or success
+                - th.Tensor: (num_envs,) truncated bool, i.e. whether this episode ended due to a time limit etc.
+                - list[dict]: info per env, i.e. dictionary with any useful information
         """
+        # Pre-processing before stepping simulation
+        action = self._convert_action_to_tensor(action)
         if action is None:
             return
         for env_idx in range(self.num_envs):
@@ -721,8 +709,13 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for robot in scene.robots:
                 robot.apply_action(action_dict[robot.name])
 
-    def _post_step(self, action):
-        """Apply the post-sim-step part of an environment step, i.e. grab observations and return the step results."""
+        # Step simulation
+        og.sim.step()
+
+        # Render any additional times requested
+        for _ in range(n_render_iterations - 1):
+            og.sim.render()
+
         # Grab observations
         obs_list, obs_info_list = self.get_obs()
 
@@ -763,40 +756,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Increment step
         self._current_steps += 1
         return obs_list, rewards, terminateds, truncateds, infos
-
-    def step(self, action, n_render_iterations=1):
-        """
-        Apply robot's action and return the next state, reward, done and info,
-        following OpenAI Gym's convention
-
-        Args:
-            action (gym.spaces.Dict or dict or list[dict] or th.tensor): robot actions. If a dict is specified,
-                each entry should map robot name to corresponding action. If a th.tensor, it should be the flattened,
-                concatenated set of actions. For multi-env, should be (num_envs, action_dim) shaped for tensors,
-                or a list of dicts (one per env) for dict actions.
-            n_render_iterations (int): Number of rendering iterations to use before returning observations
-
-        Returns:
-            5-tuple:
-                - list[dict]: states, i.e. next observations per env
-                - th.Tensor: (num_envs,) rewards, i.e. reward at this current timestep
-                - th.Tensor: (num_envs,) terminated bool, i.e. whether this episode ended due to a failure or success
-                - th.Tensor: (num_envs,) truncated bool, i.e. whether this episode ended due to a time limit etc.
-                - list[dict]: info per env, i.e. dictionary with any useful information
-        """
-        # Pre-processing before stepping simulation
-        action = self._convert_action_to_tensor(action)
-        self._pre_step(action)
-
-        # Step simulation
-        og.sim.step()
-
-        # Render any additional times requested
-        for _ in range(n_render_iterations - 1):
-            og.sim.render()
-
-        # Run final post-processing
-        return self._post_step(action)
 
     def render(self):
         """Render the environment for debug viewing."""
@@ -923,6 +882,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Returns:
             Scene: Active scene in this environment (first scene, for backward compatibility)
         """
+        assert (
+            len(self._scenes) == 1
+        ), "The legacy 'env.scene' property is only supported for single-scene environments!"
         return self._scenes[0]
 
     @property
