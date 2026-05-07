@@ -28,6 +28,7 @@ ENTRYPOINTS = {
     "instance_select.py": "Select all instances of objects.",
     "match_links.py": "Match the links on all instances of the selected object.",
     "merge_collision.py": "Merge collision objects into a single object and parent them.",
+    "create_collision_from_self.py": "Create a collision object from the selected object.",
     "new_sanity_check.py": "Run a number of sanity checks.",
     "next_failed.py": "Open the next object file that has failed sanity check.",
     "qa_next_failed.py": "Open the next object file that has unprocessed QA comments.",
@@ -49,6 +50,8 @@ ENTRYPOINTS = {
     "switch_metalink.py": "Switch type of selected metalinks",
     "toggle_meta_visibility.py": "Toggle visibility of meta links.",
     "translate_ig_dataset.py": "Update names of iG2 objects to new format.",
+    "two_room_assignment.py": "Assign objects to a combined layer for two rooms.",
+    "three_room_assignment.py": "Assign objects to a combined layer for three rooms.",
     "view_complaints.py": "View QA complaints for this file.",
     "resolve_complaints.py": "Resolve QA complaints for this file.",
     "wensi_view_complaints.py": "View Wensi's TODO complaints for this file.",
@@ -80,35 +83,37 @@ def main():
         ]
         subMenu = subMenuItem.getSubMenu()
 
-        this_dir = pathlib.Path(__file__).parent
+    this_dir = pathlib.Path(__file__).parent
 
-        for entrypoint, tooltip in ENTRYPOINTS.items():
-            script_name = entrypoint.replace(".py", "")
-            script_human_readable_name = script_name.replace("_", " ").title()
+    for entrypoint, tooltip in ENTRYPOINTS.items():
+        script_name = entrypoint.replace(".py", "")
+        script_human_readable_name = script_name.replace("_", " ").title()
 
-            # Create the script
-            entrypoint_fullname = str((this_dir / entrypoint).absolute())
-            script = f'Python.ExecuteFile @"{entrypoint_fullname}"'
-            rt.macros.new(
-                "SVL_Tools", script_name, tooltip, script_human_readable_name, script
-            )
+        # Create the script
+        entrypoint_fullname = str((this_dir / entrypoint).absolute())
+        script = f'Python.ExecuteFile @"{entrypoint_fullname}"'
+        rt.macros.new(
+            "SVL_Tools", script_name, tooltip, script_human_readable_name, script
+        )
 
-            # Check if it already exists
-            existing_menu_items_with_name = [
-                x
-                for x in range(subMenu.numItems())
-                if subMenu.getItem(x + 1).getTitle() == script_human_readable_name
-            ]
-            if existing_menu_items_with_name:
-                continue
+        # Check if it already exists
+        existing_menu_items_with_name = [
+            x
+            for x in range(subMenu.numItems())
+            if subMenu.getItem(x + 1).getTitle() == script_human_readable_name
+        ]
+        if existing_menu_items_with_name:
+            for i in reversed(existing_menu_items_with_name):
+                print("Removing existing menu item at position", i + 1)
+                subMenu.removeItemByPosition(i + 1)
 
-            # Create a menu item that calls the sample macroScript
-            actionItem = rt.menuMan.createActionItem(script_name, "SVL_Tools")
-            assert actionItem, (
-                "Failed to create action item " + script_human_readable_name
-            )
-            # Add the item to the menu
-            subMenu.addItem(actionItem, -1)
+        # Create a menu item that calls the sample macroScript
+        actionItem = rt.menuMan.createActionItem(script_name, "SVL_Tools")
+        assert actionItem, (
+            "Failed to create action item " + script_human_readable_name
+        )
+        # Add the item to the menu
+        subMenu.addItem(actionItem, -1)
 
         # Redraw the menu bar with the new item
         rt.menuMan.updateMenuBar()

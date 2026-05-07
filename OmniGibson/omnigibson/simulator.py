@@ -179,7 +179,9 @@ def _launch_app():
     # Otherwise it will inherit the arguments of the entrypoint script.
     _saved_argv = sys.argv[:]
     try:
-        sys.argv = []
+        sys.argv = [
+            _saved_argv[0]
+        ]  # The script filename needs to be included - otherwise the first arg will get skipped.
 
         # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
         if not gm.DEBUG:
@@ -831,7 +833,8 @@ def _launch_simulator(*args, **kwargs):
                 sim_step_dt (float, optional): Internal simulation step timestep
                     If None, will default to the current value
             """
-            self._sim_context.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+            with self.editing_usd():
+                self._sim_context.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
             current_physics_dt = self.get_physics_dt()
             current_rendering_dt = self.get_rendering_dt()
 

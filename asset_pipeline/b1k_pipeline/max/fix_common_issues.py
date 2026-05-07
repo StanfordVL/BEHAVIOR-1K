@@ -387,7 +387,9 @@ def merge_preexisting_fillable_meshes():
 def run_bad_object_replacement_for_legacy_scenes(filename):
     target_name = filename.parts[-2]
     if target_name.endswith("_int") or target_name.endswith("_garden"):
-        comparison_data = b1k_pipeline.max.replace_bad_object.replace_all_bad_legacy_objects_in_open_file()
+        comparison_data = (
+            b1k_pipeline.max.replace_bad_object.replace_all_bad_legacy_objects_in_open_file()
+        )
         print(f"Replaced {len(comparison_data)} bad objects in {filename}")
         with open(
             filename.parent / "artifacts" / "replaced_bad_objects.json", "w"
@@ -653,7 +655,9 @@ def update_texture_paths():
 
                 # Use os.path.abspath which normalizes + absolutifies the paths but does not resolve symlinks unlike pathlib (problem with dvc)
                 map_path = pathlib.Path(os.path.abspath(sub_texmap.filename))
-                assert map_path.exists(), f"Object {obj.name} baked material map {sub_texmap_slot_name} does not exist at {map_path}"
+                assert (
+                    map_path.exists()
+                ), f"Object {obj.name} baked material map {sub_texmap_slot_name} does not exist at {map_path}"
                 bakery_path = b1k_pipeline.utils.PIPELINE_ROOT / "bakery"
 
                 if bakery_path in map_path.parents:
@@ -747,7 +751,9 @@ def convert_baked_material_to_vray_and_add_ior():
 
         # Check that we have ALL of the maps we need
         missing_keys = set(MAP_TRANSLATION.values()) - set(maps.keys())
-        assert not missing_keys, f"Missing maps {missing_keys} for object {obj.name}. Found only {set(maps.keys())}"
+        assert (
+            not missing_keys
+        ), f"Missing maps {missing_keys} for object {obj.name}. Found only {set(maps.keys())}"
 
         # Start converting to the new material
         new_mtl = rt.VRayMtl()

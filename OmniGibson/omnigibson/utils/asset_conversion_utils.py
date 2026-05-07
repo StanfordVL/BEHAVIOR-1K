@@ -44,8 +44,6 @@ _OBJECT_STATE_TEXTURES = {
     "toggledon",
 }
 
-USE_VRAY_MATERIAL = True
-
 _MTL_MAP_TYPE_MAPPINGS = {
     "map_Kd": "diffuse",
     "map_bump": "normal",
@@ -133,52 +131,6 @@ def _tensor_to_space_script(array):
     return " ".join(["{}".format(x) for x in array.tolist()])
 
 
-def _set_omnipbr_mtl_diffuse(mtl_prim, texture):
-    mtl = "diffuse_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_omnipbr_mtl_normal(mtl_prim, texture):
-    mtl = "normalmap_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_omnipbr_mtl_metalness(mtl_prim, texture):
-    mtl = "metallic_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    lazy.omni.usd.create_material_input(mtl_prim, "metallic_texture_influence", 1.0, lazy.pxr.Sdf.ValueTypeNames.Float)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_omnipbr_mtl_opacity(mtl_prim, texture):
-    mtl = "opacity_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
-    lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity_texture", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
-
-    # Set the opacity to use the alpha channel for its mono-channel value.
-    # This defaults to some other value, which takes opaque black channels in the
-    # image to be fully transparent. This is not what we want.
-    lazy.omni.usd.create_material_input(mtl_prim, "opacity_mode", 0, lazy.pxr.Sdf.ValueTypeNames.Int)
-
-    # We also need to set an opacity threshold. Our objects can include continuous alpha values for opacity
-    # but the ray tracing renderer can only handle binary opacity values. The default threshold
-    # leaves most objects entirely transparent, so we try to avoid that here.
-    lazy.omni.usd.create_material_input(mtl_prim, "opacity_threshold", 0.1, lazy.pxr.Sdf.ValueTypeNames.Float)
-
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
 def _rename_prim(prim, name):
     """
     Renames a given prim to a new name.
@@ -215,13 +167,20 @@ def _get_visual_objs_from_urdf(urdf_path):
     for ele in root:
         if ele.tag == "link":
             name = ele.get("name").replace("-", "_")
+            if name.startswith("meta__"):
+                continue
             visual_objs[name] = OrderedDict()
             for sub_ele in ele:
                 if sub_ele.tag == "visual":
-                    visual_mesh_name = sub_ele.get("name", "visuals").replace("-", "_")
+                    visual_mesh_name = sub_ele.get("name", "").replace("-", "_")
+                    if not visual_mesh_name:
+                        visual_mesh_name = None
                     obj_file = None if sub_ele.find(".//mesh") is None else sub_ele.find(".//mesh").get("filename")
                     if obj_file is None:
                         log.debug(f"Warning: No obj file found associated with {name}/{visual_mesh_name}!")
+                    assert (
+                        visual_mesh_name not in visual_objs[name]
+                    ), f"Visual mesh name {visual_mesh_name} already exists for link {name}!"
                     visual_objs[name][visual_mesh_name] = obj_file
 
     return visual_objs
@@ -229,7 +188,7 @@ def _get_visual_objs_from_urdf(urdf_path):
 
 def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path, dataset_root):
     """
-    Updates the object to use V-Ray and PBR materials rendered through the asset pipeline instead of
+    Updates the object to use V-Ray materials rendered through the asset pipeline instead of
     its currently assigned materials.
 
     This function performs the following steps:
@@ -322,11 +281,12 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
 
                     print("Found material file:", mtl_name, mtl_infos[mtl_name])
 
-    # Next, for each material information, we create a new OmniPBR material
+    # Next, for each material information, we create a new material
     shaders = OrderedDict()  # maps mtl name to shader prim
     for mtl_name, mtl_info in mtl_infos.items():
         # Create the Vray material
         mtl_created_list = []
+        print(f"Creating Vray material {mtl_name}...")
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
             mdl_name="omnigibson_vray_mtl.mdl",
@@ -335,73 +295,40 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
         )
         vray_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
 
-        # Create the OmniPBR material
-        pbr_material_name = mtl_name + "_pbr"
-        mtl_created_list = []
-        lazy.omni.kit.commands.execute(
-            "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name="OmniPBR.mdl",
-            mtl_name="OmniPBR",
-            mtl_created_list=mtl_created_list,
-        )
-        pbr_mat = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-        rendering_channel_mappings = {
-            "diffuse": _set_omnipbr_mtl_diffuse,
-            "normal": _set_omnipbr_mtl_normal,
-            "metalness": _set_omnipbr_mtl_metalness,
-        }
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
-            # First assign the Vray material channels. These are simple - all the channels
-            # are just named x_texture for channel x.
             lazy.omni.usd.create_material_input(
                 vray_mat, f"{mat_type}_texture", mat_file, lazy.pxr.Sdf.ValueTypeNames.Asset
             )
 
-            # Do the OmniPBR material next
-            # Use the alpha of the diffuse texture for opacity for trees etc.
-            if mat_type == "diffuse" and obj_category in _OPACITY_CATEGORIES:
-                _set_omnipbr_mtl_opacity(pbr_mat, mat_file)
-            render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
-            if render_channel_fcn is not None:
-                render_channel_fcn(pbr_mat, mat_file)
-            else:
-                # Warn user that we didn't find the correct rendering channel
-                log.debug(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
-
         # Rename material
-        pbr_mat = _rename_prim(prim=pbr_mat, name=pbr_material_name)
-        selected_mat = vray_mat if USE_VRAY_MATERIAL else pbr_mat
-        shade = lazy.pxr.UsdShade.Material(selected_mat)
+        shade = lazy.pxr.UsdShade.Material(vray_mat)
         shaders[mtl_name] = shade
-        log.debug(f"Created material {pbr_material_name}:", pbr_mat)
 
     # Bind each (visual) mesh to its appropriate material in the object
     # We'll loop over each link, create a list of 2-tuples each consisting of (mesh_prim_path, mtl_name) to be bound
     root_prim_path = obj_prim.GetPrimPath().pathString
     for link_name, mesh_mtl_names in link_mtl_files.items():
-        # Special case -- omni always calls the visuals "visuals" by default if there's only a single visual mesh for the
-        # given
-        if len(mesh_mtl_names) == 1:
-            mesh_mtl_infos = [
-                (
-                    f"{root_prim_path}/{link_name}/visuals",
-                    list(mesh_mtl_names.values())[0],
-                )
-            ]
-        else:
-            mesh_mtl_infos = []
-            for mesh_name, mtl_name in mesh_mtl_names.items():
+        for mesh_name, mtl_name in mesh_mtl_names.items():
+            if mesh_name is not None:
                 # Omni only accepts a-z, A-Z as valid start characters for prim names
                 # So we check if there is an invalid character, and modify it as we know Omni does
                 if not ord("a") <= ord(mesh_name[0]) <= ord("z") and not ord("A") <= ord(mesh_name[0]) <= ord("Z"):
                     mesh_name = "a_" + mesh_name[1:]
-                mesh_mtl_infos.append((f"{root_prim_path}/{link_name}/visuals/{mesh_name}", mtl_name))
-        for mesh_prim_path, mtl_name in mesh_mtl_infos:
-            visual_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
-            assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
+                mesh_prim_path = f"{root_prim_path}/{link_name}/visuals/{mesh_name}"
+                visual_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
+                assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
+            else:
+                visuals_scope_prim_path = f"{root_prim_path}/{link_name}/visuals"
+                visuals_scope_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(visuals_scope_prim_path)
+                assert visuals_scope_prim, f"Error: Did not find valid visuals scope prim at {visuals_scope_prim_path}!"
+                (visual_prim,) = visuals_scope_prim.GetChildren()
+                assert visual_prim, f"Error: Did not find valid visual prim at {visuals_scope_prim_path}!"
+
             # Bind the created link material to the visual prim
-            log.debug(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
+            log.debug(
+                f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {visual_prim.GetPath().pathString}..."
+            )
             lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(
                 shaders[mtl_name], lazy.pxr.UsdShade.Tokens.strongerThanDescendants
             )
@@ -575,8 +502,6 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                 )
 
             _add_xform_properties(prim=prim)
-            # Make sure mesh_prim has XForm properties
-            xform_prim = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=prim_path)
 
             # Get the mesh/light pose in the parent link frame
             mesh_in_parent_link_pos, mesh_in_parent_link_orn = (
@@ -598,24 +523,24 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
             )
 
             if is_light:
-                xform_prim.prim.GetAttribute("inputs:color").Set(
+                prim.GetAttribute("inputs:color").Set(
                     lazy.pxr.Gf.Vec3f(*(th.tensor(mesh_info["color"]) / 255.0).tolist())
                 )
-                xform_prim.prim.GetAttribute("inputs:intensity").Set(mesh_info["intensity"])
+                prim.GetAttribute("inputs:intensity").Set(mesh_info["intensity"])
                 if light_type == "Rect":
-                    xform_prim.prim.GetAttribute("inputs:width").Set(mesh_info["length"])
-                    xform_prim.prim.GetAttribute("inputs:height").Set(mesh_info["width"])
+                    prim.GetAttribute("inputs:width").Set(mesh_info["length"])
+                    prim.GetAttribute("inputs:height").Set(mesh_info["width"])
                 elif light_type == "Disk":
-                    xform_prim.prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
+                    prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
                 elif light_type == "Sphere":
-                    xform_prim.prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
+                    prim.GetAttribute("inputs:radius").Set(mesh_info["length"])
                 else:
                     raise ValueError(f"Invalid light type: {light_type}")
             else:
                 if mesh_type == "Cylinder":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("radius").Set(0.5)
-                        xform_prim.prim.GetAttribute("height").Set(1.0)
+                        prim.GetAttribute("radius").Set(0.5)
+                        prim.GetAttribute("height").Set(1.0)
                     if meta_link_type == "particlesource":
                         desired_radius = 0.0125
                         desired_height = 0.05
@@ -624,19 +549,19 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                         desired_radius = mesh_info["size"][0]
                         desired_height = mesh_info["size"][2]
                         height_offset = desired_height / 2.0
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(
+                    prim.GetAttribute("xformOp:scale").Set(
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_height)
                     )
                     # Offset the position by half the height because in 3dsmax the origin of the cylinder is at the center of the base
                     mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Cone":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("radius").Set(0.5)
-                        xform_prim.prim.GetAttribute("height").Set(1.0)
+                        prim.GetAttribute("radius").Set(0.5)
+                        prim.GetAttribute("height").Set(1.0)
                     desired_radius = mesh_info["size"][0]
                     desired_height = mesh_info["size"][2]
                     height_offset = -desired_height / 2.0
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(
+                    prim.GetAttribute("xformOp:scale").Set(
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_height)
                     )
                     # Flip the orientation of the z-axis because in 3dsmax the cone is pointing in the opposite direction
@@ -647,24 +572,25 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                     mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Cube":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("size").Set(1.0)
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3f(*mesh_info["size"]))
+                        prim.GetAttribute("size").Set(1.0)
+                    prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3f(*mesh_info["size"]))
                     height_offset = mesh_info["size"][2] / 2.0
                     mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Sphere":
                     if not is_mesh:
-                        xform_prim.prim.GetAttribute("radius").Set(0.5)
+                        prim.GetAttribute("radius").Set(0.5)
                     desired_radius = mesh_info["size"][0]
-                    xform_prim.prim.GetAttribute("xformOp:scale").Set(
+                    prim.GetAttribute("xformOp:scale").Set(
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_radius * 2)
                     )
                 else:
                     raise ValueError(f"Invalid mesh type: {mesh_type}")
 
-            xform_prim.set_local_pose(
-                translation=mesh_in_meta_link_pos,
-                orientation=mesh_in_meta_link_orn[[3, 0, 1, 2]],
-            )
+            # Set local pose directly on the USD xform ops added by
+            # _add_xform_properties. Quaternion is reordered to (w, x, y, z)
+            # to match Gf.Quatd's constructor.
+            prim.GetAttribute("xformOp:translate").Set(lazy.pxr.Gf.Vec3d(*mesh_in_meta_link_pos.tolist()))
+            prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*mesh_in_meta_link_orn[[3, 0, 1, 2]].tolist()))
 
 
 def _process_glass_link(prim):
@@ -681,22 +607,18 @@ def _process_glass_link(prim):
     Raises:
         AssertionError: If no glass prim paths are found.
     """
-    # Update any glass parts to use the glass material instead
-    glass_prim_paths = []
-    for gchild in prim.GetChildren():
-        if gchild.GetTypeName() == "Mesh":
-            # check if has col api, if not, this is visual
-            if not gchild.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
-                glass_prim_paths.append(gchild.GetPath().pathString)
-        elif gchild.GetTypeName() == "Scope":
-            # contains multiple additional prims, check those
-            for ggchild in gchild.GetChildren():
-                if ggchild.GetTypeName() == "Mesh":
-                    # check if has col api, if not, this is visual
-                    if not ggchild.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
-                        glass_prim_paths.append(ggchild.GetPath().pathString)
+    # Update any glass parts to use the glass material instead. We walk all
+    # descendants because convert_urdf_to_usd nests visual meshes under a
+    # `visuals` Xform child (e.g. /{model}/{link}/visuals/<mesh_name>) — the
+    # old fixed-depth walk only matched meshes sitting directly under the
+    # link or under a Scope and missed those.
+    glass_prim_paths = [
+        descendant.GetPath().pathString
+        for descendant in lazy.pxr.Usd.PrimRange(prim.GetChild("visuals"))
+        if descendant.GetTypeName() == "Mesh"
+    ]
 
-    assert glass_prim_paths
+    assert glass_prim_paths, f"No visual Mesh prims found under {prim.GetPath()}"
 
     stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     root_path = stage.GetDefaultPrim().GetPath().pathString
@@ -711,6 +633,7 @@ def _process_glass_link(prim):
         )
 
     for glass_prim_path in glass_prim_paths:
+        print(f"Applying glass material {glass_mtl_prim_path} to {glass_prim_path}")
         lazy.omni.kit.commands.execute(
             "BindMaterialCommand",
             prim_path=glass_prim_path,
@@ -719,9 +642,7 @@ def _process_glass_link(prim):
         )
 
 
-def import_obj_metadata(
-    usd_path, obj_category, obj_model, dataset_root, keep_instanceable=True, force_asset_pipeline_materials=False
-):
+def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_asset_pipeline_materials=False):
     """
     Imports metadata for a given object model from the dataset. This metadata consist of information
     that is NOT included in the URDF file and instead included in the various JSON files shipped in
@@ -732,7 +653,6 @@ def import_obj_metadata(
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
-        keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
         force_asset_pipeline_materials (bool, optional): Flag to force the use of asset pipeline materials. Defaults to False.
 
     Raises:
@@ -749,19 +669,6 @@ def import_obj_metadata(
     lazy.isaacsim.core.utils.stage.open_stage(str(usd_path))
     stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     prim = stage.GetDefaultPrim()
-
-    # First traverse entire tree and modify the prims in place if not keeping instanceable
-    if not keep_instanceable:
-
-        def remove_instanceable_recursive(_root):
-            # See https://openusd.org/docs/api/_usd__page__scenegraph_instancing.html ("Traversing Into Instances with Instance Proxies")
-            children = _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies())
-            for child in children:
-                if child.IsInstanceable():
-                    child.SetInstanceable(False)
-                remove_instanceable_recursive(_root=child)
-
-        remove_instanceable_recursive(_root=prim)
 
     data = dict()
     for data_group in {"metadata", "mvbb_meta", "material_groups", "heights_per_link"}:
@@ -1140,7 +1047,7 @@ def convert_urdf_to_usd(
     )
 
     # Pre-clear the scene.
-    og.sim.clear()
+    og.clear()
 
     model_root_path = pathlib.Path(dataset_root) / "objects" / obj_category / obj_model
     usd_dir = model_root_path / "usd"
@@ -1156,7 +1063,7 @@ def convert_urdf_to_usd(
     )
 
     # Also clear again to release the file.
-    og.sim.clear()
+    og.clear()
 
     # Find all the relevant files
     configuration_dir = usd_dir / "configuration"
@@ -1309,6 +1216,17 @@ def convert_urdf_to_usd(
             ), f"Expected exactly one reference for {possible_referrer.GetPath()}, got {len(references)}"
             referrer_path = possible_referrer.GetPath()
             referee_path = references[0].primPath
+            # Isaac Sim's URDF importer emits a placeholder `visuals` /
+            # `collisions` reference on every link, even stub meta-links that
+            # have no geometry — those references are dangling. Just drop the
+            # empty referrer prim so we don't choke on it below.
+            if not side_stage.GetPrimAtPath(referee_path).IsValid():
+                del (
+                    side_stage.GetRootLayer()
+                    .GetPrimAtPath(referrer_path.GetParentPath())
+                    .nameChildren[referrer_path.name]
+                )
+                continue
             found_reference_prims[referrer_path] = referee_path
             del side_stage.GetRootLayer().GetPrimAtPath(referrer_path.GetParentPath()).nameChildren[referrer_path.name]
 
@@ -1331,6 +1249,7 @@ def convert_urdf_to_usd(
 
             # Add the collision APIs
             if referrer_prim_path.name == "collisions":
+                lazy.pxr.UsdPhysics.CollisionAPI.Apply(mesh_prim)
                 mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(mesh_prim)
                 mesh_collision_api.GetApproximationAttr().Set("convexHull")
 
@@ -1682,16 +1601,18 @@ def convert_scene_urdf_to_json(urdf, json_path):
     """
     # First, load the requested objects from the URDF into OG
     _load_scene_from_urdf(urdf=urdf)
+    log.debug("Loaded scene from URDF")
 
     # Play the simulator, then save
     og.sim.play()
+    log.debug("Played simulator")
     Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
     og.sim.save(json_paths=[json_path])
+    log.debug("Saved scene to JSON")
 
     # Load the json, remove the init_info because we don't need it, then save it again
     with open(json_path, "r") as f:
         scene_info = json.load(f)
-
     scene_info.pop("init_info")
 
     with open(json_path, "w+") as f:
@@ -1726,15 +1647,13 @@ def _load_scene_from_urdf(urdf):
 
     for obj_name, obj_info in objs_info.items():
         try:
-            if obj_info["cfg"]["category"] in ["ceilings", "roof"]:
-                continue
             if not os.path.exists(
                 DatasetObject.get_usd_path(obj_info["cfg"]["category"], obj_info["cfg"]["model"]).replace(
                     ".usd", ".encrypted.usd"
                 )
             ):
-                log.warning("Missing object", obj_name)
-                continue
+                raise FileNotFoundError(f"Missing USD asset for object {obj_name}")
+            log.debug(f"Loading object {obj_name}")
             obj = DatasetObject(
                 name=obj_name,
                 **obj_info["cfg"],
@@ -1743,10 +1662,6 @@ def _load_scene_from_urdf(urdf):
             obj.set_bbox_center_position_orientation(position=obj_info["bbox_pos"], orientation=obj_info["bbox_quat"])
         except Exception as e:
             raise ValueError(f"Failed to load object {obj_name}") from e
-
-    # Take a sim step
-    with og.sim.slowed():
-        og.sim.step()
 
 
 def _get_objects_config_from_scene_urdf(urdf):
@@ -2205,7 +2120,6 @@ def get_collision_approximation_for_urdf(
                 collision_filenames_and_scales = []
                 for i, collision_mesh in enumerate(collision_meshes):
                     processed_collision_mesh = collision_mesh.copy()
-                    processed_collision_mesh._cache.cache["vertex_normals"] = processed_collision_mesh.vertex_normals
                     collision_filename = f"{link_name}_col_{idx}.obj"
 
                     # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
@@ -2500,7 +2414,6 @@ def import_og_asset_from_urdf(
     convex_links=None,
     no_decompose_links=None,
     visual_only_links=None,
-    keep_instanceable=True,
     merge_fixed_joints=False,
     import_inertia_tensor=True,
     hull_count=32,
@@ -2523,7 +2436,6 @@ def import_og_asset_from_urdf(
         no_decompose_links (None or list of str): If specified, links that should not have any special collision
             decomposition applied. This will only use the convex hull
         visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
-        keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
         merge_fixed_joints (bool): Whether to merge fixed joints or not
         import_inertia_tensor (bool): Whether to import the URDF's native inertia tensor or not
         dataset_name (str): Dataset name to which the USD will be written. Lives in get_dataset_path(dataset_name)
@@ -2587,7 +2499,6 @@ def import_og_asset_from_urdf(
         obj_category=category,
         obj_model=model,
         dataset_root=dataset_root,
-        keep_instanceable=keep_instanceable,
     )
     print(
         f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
