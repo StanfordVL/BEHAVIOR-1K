@@ -175,6 +175,7 @@ class BehaviorTask(BaseTask):
 
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
         # PredicateGoal calls check_goal_fn(env_idx); thread env_idx through to the predicate evaluator.
+        # TODO(vector): This needs to be extensively tested.
         terminations["predicate"] = PredicateGoal(
             check_goal_fn=lambda env_idx: self.compiled_task[env_idx].check_goal(
                 lambda predicate_name, *entities: self._evaluate_predicate(env_idx, predicate_name, *entities)
@@ -463,13 +464,11 @@ class BehaviorTask(BaseTask):
 
         for env_idx in range(env.num_envs):
             # Create sampler for this env's scene/scope.
-            # `backend` is a vestigial param kept by BDDLSampler.__init__ post-#2040 BDDLBackend removal — pass None.
             self.sampler[env_idx] = BDDLSampler(
                 env=env,
                 env_idx=env_idx,
                 activity_conditions=self._base_conditions,
                 object_scope=self.object_scope[env_idx],
-                backend=None,
             )
 
             if self.online_object_sampling:

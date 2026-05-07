@@ -742,9 +742,6 @@ def test_on_fire(env, plywood):
 
 
 def test_toggled_on(env, stove, robot):
-    stove = env.scene.object_registry("name", "stove")
-    robot = env.scene.robots[0]
-
     stove.set_position_orientation([1.487, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, math.pi], dtype=th.float32)))
     robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
 

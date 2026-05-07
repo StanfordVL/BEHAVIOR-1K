@@ -463,7 +463,7 @@ def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
 
 
 class BDDLSampler:
-    def __init__(self, env, env_idx, activity_conditions, object_scope, backend):
+    def __init__(self, env, env_idx, activity_conditions, object_scope):
         # Avoid circular imports here
         from omnigibson.scenes.traversable_scene import TraversableScene
 
