@@ -172,8 +172,8 @@ def create_stable_scene_json(scene_model):
         },
     }
 
-    # Disable sleeping
-    macros.prims.entity_prim.DEFAULT_SLEEP_THRESHOLD = 0.0
+    with macros.unlocked():
+        macros.prims.entity_prim.DEFAULT_SLEEP_THRESHOLD = 0.0
 
     # Create the environment
     env = og.Environment(configs=copy.deepcopy(cfg))
@@ -200,6 +200,11 @@ def create_stable_scene_json(scene_model):
 
     og.sim.stop()
     og.clear()
+
+    
+    print(f"\n\nSuccessfully created stable scene json at path: {path}\n\n")
+
+    og.shutdown()
 
 
 def validate_task(task, task_scene_dict, default_scene_dict):
