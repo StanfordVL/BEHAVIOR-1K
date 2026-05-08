@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - vector
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       set_as_baseline:
@@ -19,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -105,80 +102,6 @@ jobs:
           - name: "10env-render-navigation-states"
             args: "--n-envs 10 --rendering --task-type navigation --object-states"
             label: "10 envs, render, navigation, states on"
-          # 50 envs
-          - name: "50env-norender-simple-nostates"
-            args: "--n-envs 50"
-            label: "50 envs, no render, simple, states off"
-          - name: "50env-norender-simple-states"
-            args: "--n-envs 50 --object-states"
-            label: "50 envs, no render, simple, states on"
-          - name: "50env-norender-behavior-nostates"
-            args: "--n-envs 50 --task-type behavior"
-            label: "50 envs, no render, behavior, states off"
-          - name: "50env-norender-behavior-states"
-            args: "--n-envs 50 --task-type behavior --object-states"
-            label: "50 envs, no render, behavior, states on"
-          - name: "50env-render-simple-nostates"
-            args: "--n-envs 50 --rendering"
-            label: "50 envs, render, simple, states off"
-          - name: "50env-render-simple-states"
-            args: "--n-envs 50 --rendering --object-states"
-            label: "50 envs, render, simple, states on"
-          - name: "50env-render-behavior-nostates"
-            args: "--n-envs 50 --rendering --task-type behavior"
-            label: "50 envs, render, behavior, states off"
-          - name: "50env-render-behavior-states"
-            args: "--n-envs 50 --rendering --task-type behavior --object-states"
-            label: "50 envs, render, behavior, states on"
-          - name: "50env-norender-navigation-nostates"
-            args: "--n-envs 50 --task-type navigation"
-            label: "50 envs, no render, navigation, states off"
-          - name: "50env-norender-navigation-states"
-            args: "--n-envs 50 --task-type navigation --object-states"
-            label: "50 envs, no render, navigation, states on"
-          - name: "50env-render-navigation-nostates"
-            args: "--n-envs 50 --rendering --task-type navigation"
-            label: "50 envs, render, navigation, states off"
-          - name: "50env-render-navigation-states"
-            args: "--n-envs 50 --rendering --task-type navigation --object-states"
-            label: "50 envs, render, navigation, states on"
-          # 100 envs
-          - name: "100env-norender-simple-nostates"
-            args: "--n-envs 100"
-            label: "100 envs, no render, simple, states off"
-          - name: "100env-norender-simple-states"
-            args: "--n-envs 100 --object-states"
-            label: "100 envs, no render, simple, states on"
-          - name: "100env-norender-behavior-nostates"
-            args: "--n-envs 100 --task-type behavior"
-            label: "100 envs, no render, behavior, states off"
-          - name: "100env-norender-behavior-states"
-            args: "--n-envs 100 --task-type behavior --object-states"
-            label: "100 envs, no render, behavior, states on"
-          - name: "100env-render-simple-nostates"
-            args: "--n-envs 100 --rendering"
-            label: "100 envs, render, simple, states off"
-          - name: "100env-render-simple-states"
-            args: "--n-envs 100 --rendering --object-states"
-            label: "100 envs, render, simple, states on"
-          - name: "100env-render-behavior-nostates"
-            args: "--n-envs 100 --rendering --task-type behavior"
-            label: "100 envs, render, behavior, states off"
-          - name: "100env-render-behavior-states"
-            args: "--n-envs 100 --rendering --task-type behavior --object-states"
-            label: "100 envs, render, behavior, states on"
-          - name: "100env-norender-navigation-nostates"
-            args: "--n-envs 100 --task-type navigation"
-            label: "100 envs, no render, navigation, states off"
-          - name: "100env-norender-navigation-states"
-            args: "--n-envs 100 --task-type navigation --object-states"
-            label: "100 envs, no render, navigation, states on"
-          - name: "100env-render-navigation-nostates"
-            args: "--n-envs 100 --rendering --task-type navigation"
-            label: "100 envs, render, navigation, states off"
-          - name: "100env-render-navigation-states"
-            args: "--n-envs 100 --rendering --task-type navigation --object-states"
-            label: "100 envs, render, navigation, states on"
           # 200 envs
           - name: "200env-norender-simple-nostates"
             args: "--n-envs 200"
@@ -290,6 +213,9 @@ jobs:
           set_as_baseline = os.environ.get("SET_AS_BASELINE", "false").lower() == "true"
 
           if set_as_baseline:
+              if len(merged) == 0:
+                  print("No profiling artifacts found; refusing to overwrite baseline with an empty file.", file=sys.stderr)
+                  sys.exit(1)
               baseline_path = "OmniGibson/tests/benchmark/vector_baseline.json"
               with open(baseline_path, "w") as f:
                   json.dump(merged, f, indent=4)
@@ -326,7 +252,7 @@ jobs:
               "Vram usage": "VRAM (GB)",
           }
           HIGHER_IS_BETTER = {"FPS"}
-          N_ENV_GROUPS = ["1 env", "10 envs", "50 envs", "100 envs", "200 envs"]
+          N_ENV_GROUPS = ["1 env", "10 envs", "200 envs"]
 
           def fmt(metric, value):
               if value is None:
@@ -385,12 +311,10 @@ jobs:
           print(report)
           PYEOF
         env:
-          SET_AS_BASELINE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'true' || (github.event.inputs.set_as_baseline == 'true' && 'true' || 'false') }}
+          SET_AS_BASELINE: ${{ github.event.inputs.set_as_baseline == 'true' && 'true' || 'false' }}
 
       - name: Commit updated baseline
-        if: |
-          github.event_name == 'push' && github.ref == 'refs/heads/main' ||
-          github.event.inputs.set_as_baseline == 'true'
+        if: github.event.inputs.set_as_baseline == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

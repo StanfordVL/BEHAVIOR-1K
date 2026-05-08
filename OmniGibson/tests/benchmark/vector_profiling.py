@@ -121,7 +121,7 @@ def main():
     memory_gb = psutil.Process(os.getpid()).memory_info().rss / 1024**3
     vram_gb = get_vram_usage()
 
-    label = f"{args.n_envs} envs"
+    label = f"{args.n_envs} {'env' if args.n_envs == 1 else 'envs'}"
     label += ", rendering" if args.rendering else ", no rendering"
     label += f", {args.task_type} task"
     label += ", states on" if args.object_states else ", states off"
