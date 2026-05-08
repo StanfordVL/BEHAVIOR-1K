@@ -36,9 +36,9 @@ class VideoPlaybackWrapper(DataPlaybackWrapper):
         """
         fpath = os.path.join(self.video_output_dir, f"{video_keys['aggregated']}.mp4")
         container, stream = create_video_writer(
-            fpath=fpath, 
-            resolution=(OBS_CAMERA_RESOLUTION * 3, OBS_CAMERA_RESOLUTION * 3), 
-            rate=self.fps, 
+            fpath=fpath,
+            resolution=(OBS_CAMERA_RESOLUTION * 3, OBS_CAMERA_RESOLUTION * 3),
+            rate=self.fps,
             stream_options={"crf": "30"},
         )
         self.video_writers.append((container, stream, "video"))
@@ -181,7 +181,7 @@ def replay_hdf5_to_video(
         },
     }
     available_tasks = {}
-    # 2026 task instances has precedence over 2025. 
+    # 2026 task instances has precedence over 2025.
     with open(
         f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/available_tasks.yaml",
         "r",
@@ -275,8 +275,9 @@ def replay_hdf5_to_video(
     env.load_observation_space()
     # Set robot base mass to 250kg to match data collection for r1/r1pro
     if env.robots[0].model in ("r1", "r1pro"):
-        with og.sim.stopped():
-            env.robots[0].base_footprint_link.mass = 250.0
+        og.sim.stop()
+        env.robots[0].base_footprint_link.mass = 250.0
+        og.sim.play()
 
     if run_qa:
         metric_kwargs = dict(
