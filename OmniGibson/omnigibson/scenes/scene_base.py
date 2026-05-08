@@ -7,6 +7,7 @@ from abc import ABC
 from pathlib import Path
 
 import torch as th
+from packaging.version import InvalidVersion, Version
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -117,6 +118,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     scene_info = json.load(f)
             else:
                 scene_info = self.scene_file
+
+            # Verify the saved component versions are compatible with the currently-installed versions.
+            # We require each saved version to be <= the currently-installed version.
+            self._check_versions_compatible(scene_info.get("versions", {}))
+
             init_info = scene_info["objects_info"]["init_info"]
             # TODO: Remove this backwards-compatibility once newer RC is released
             self._init_state = (
@@ -770,22 +776,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Dump saved current state and also scene init info
         scene_info = {
-            # TODO: Use these to verify compatibility at load time.
-            "versions": {
-                "omnigibson": {
-                    "version": omnigibson.utils.asset_utils.get_omnigibson_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_git_hash(),
-                },
-                "bddl": {
-                    "version": omnigibson.utils.asset_utils.get_bddl_version(),
-                },
-                "behavior-1k-assets": {
-                    "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
-                },
-                "omnigibson-robot-assets": {
-                    "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
-                },
-            },
+            "versions": self._get_current_versions(),
             "metadata": {"task": self._task_metadata},
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),
@@ -802,6 +793,71 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 json.dump(scene_info, f, cls=TorchEncoder, indent=4)
 
             log.info(f"Scene {self.idx} saved to {json_path}.")
+
+    @staticmethod
+    def _get_current_versions():
+        """
+        Returns:
+            dict: Dictionary of currently-installed component versions, in the same shape that is stored
+                under the "versions" key of a saved scene file.
+        """
+        return {
+            "omnigibson": {
+                "version": omnigibson.utils.asset_utils.get_omnigibson_version(),
+                "git_hash": omnigibson.utils.asset_utils.get_omnigibson_git_hash(),
+            },
+            "bddl": {
+                "version": omnigibson.utils.asset_utils.get_bddl_version(),
+            },
+            "behavior-1k-assets": {
+                "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
+            },
+            "omnigibson-robot-assets": {
+                "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
+            },
+        }
+
+    @staticmethod
+    def _check_versions_compatible(saved_versions):
+        """
+        Validates that each component version saved in @saved_versions is less than or equal to the
+        currently-installed version. This prevents loading a scene that was saved against newer
+        components than what is currently available.
+
+        Args:
+            saved_versions (dict): The "versions" sub-dictionary from a saved scene file.
+
+        Raises:
+            ValueError: If any saved version is strictly newer than the currently-installed version.
+        """
+        if not saved_versions:
+            log.warning("Scene file does not contain version information; skipping version compatibility check.")
+            return
+
+        current_versions = Scene._get_current_versions()
+        for component, current_info in current_versions.items():
+            saved_info = saved_versions.get(component)
+            if not saved_info:
+                continue
+            saved_version_str = saved_info.get("version")
+            current_version_str = current_info.get("version")
+            if saved_version_str is None or current_version_str is None:
+                continue
+            try:
+                saved_version = Version(saved_version_str)
+                current_version = Version(current_version_str)
+            except InvalidVersion:
+                log.warning(
+                    f"Could not parse version for {component} (saved={saved_version_str}, "
+                    f"current={current_version_str}); skipping comparison for this component."
+                )
+                continue
+            if saved_version > current_version:
+                raise ValueError(
+                    f"Scene file was saved with {component} version {saved_version_str}, which is newer than "
+                    f"the currently-installed version {current_version_str}. Please update {component} before "
+                    f"loading this scene."
+                )
 
     def restore(self, scene_file, update_initial_file=False):
         """
@@ -825,6 +881,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 scene_info = json.load(f)
         else:
             scene_info = scene_file
+
+        # Verify the saved component versions are compatible with the currently-installed versions.
+        # We require each saved version to be <= the currently-installed version.
+        self._check_versions_compatible(scene_info.get("versions", {}))
+
         init_info = scene_info["init_info"]
         # The saved state are lists, convert them to torch tensors
         state = recursively_convert_to_torch(scene_info["state"])
