@@ -632,7 +632,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 kernel=_check_overlap_kernel,
                 dim=cls._marker_finger_pair.shape[0],
                 inputs=[
-                    wp.from_torch(RigidBodyViewAPI.POSE_MATRICES, dtype=wp.mat44),
+                    RigidBodyViewAPI.POSE_MATRICES,
                     RigidBodyViewAPI.LINK_MESH_IDS,
                     cls._marker_parent_link_idx_wp,
                     cls._marker_local_offset_wp,

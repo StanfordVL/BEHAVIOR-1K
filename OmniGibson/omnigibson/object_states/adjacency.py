@@ -17,47 +17,12 @@ m = create_module_macros(module_path=__file__)
 m.MAX_DISTANCE_VERTICAL = 5.0
 m.MAX_DISTANCE_HORIZONTAL = 5.0
 
-# How many 2-D bases to try during horizontal adjacency check. When 1, only the standard axes will be considered.
-# When 2, standard axes + 45 degree rotated will be considered. The tried axes will be equally spaced. The higher
-# this number, the lower the possibility of false negatives in Inside and NextTo.
-m.HORIZONTAL_AXIS_COUNT = 5
+# Number of horizontal directions, evenly spaced around the XY plane at angles k * 360/N.
+m.HORIZONTAL_DIRECTION_COUNT = 10
 
 # Per-direction adjacency neighbors found during a ray cast (used by compute_adjacencies, which
 # remains alive as the stale-AABB fallback path inside Adjacency._get_value).
 AxisAdjacencyList = namedtuple("AxisAdjacencyList", ("positive_neighbors", "negative_neighbors"))
-
-
-def get_equidistant_coordinate_planes(n_planes):
-    """Given a number, sample that many equally spaced coordinate planes.
-
-    The samples will cover all 360 degrees (although rotational symmetry
-    is assumed, e.g. if you take into account the axis index and the
-    positive/negative directions, only 1/4 of the possible coordinate (1 quadrant, math.pi / 2.0)
-    planes will be sampled: the ones where the first axis' positive direction
-    is in the first quadrant).
-
-    Args:
-        n_planes (int): number of planes to sample
-
-    Returns:
-        3D-array: (n_planes, 2, 3) array where the first dimension
-            is the sampled plane index, the second dimension is the axis index
-            (0/1), and the third dimension is the 3-D world-coordinate vector
-            corresponding to the axis.
-    """
-    # Compute the positive directions of the 1st axis of each plane.
-    first_axis_angles = th.linspace(0, math.pi / 2, n_planes)
-    first_axes = th.stack(
-        [th.cos(first_axis_angles), th.sin(first_axis_angles), th.zeros_like(first_axis_angles)], dim=1
-    )
-
-    # Compute the positive directions of the 2nd axes. These axes are
-    # orthogonal to both their corresponding first axes and to the Z axis.
-    constant_vector = th.tensor([0.0, 0.0, 1.0]).unsqueeze(0).expand(first_axes.size(0), -1)
-    second_axes = th.linalg.cross(constant_vector, first_axes, dim=1)
-
-    # Return the axes in the shape (n_planes, 2, 3)
-    return th.stack([first_axes[:, None, :], second_axes[:, None, :]], dim=1)
 
 
 def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
@@ -158,22 +123,54 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
 
 # Tensorized Adjacency state
 #
-# VALUE is (S, N, N, 22) bool tensor populated by Warp ray casts against per-link wp.Mesh.
+# VALUE is (S, N, N, 12) bool tensor populated by Warp ray casts against per-link wp.Mesh.
 #
 # Axis layout:
 #   k=0       : +Z   (other above self)
 #   k=1       : -Z   (other below self)
-#   k=2..11   : horizontal axes 0..9, +direction
-#   k=12..21  : horizontal axes 0..9, -direction
+#   k=2..11   : 10 horizontal directions evenly spaced on the XY plane,
+#               direction k has angle (k-2) * 2π / 10 (so k=2 is +X, k=7 is -X).
 #
 # VALUES[s, a, b, k] = True iff a ray from object a's AABB center in direction k
 # hits any collision-link of object b within max_distances[k]. Self pairs and
 # cross-scene pairs are False.
 #
-# Cloth is skipped via is_compatible — cloth has no collision_mesh_warp. TODO(andi) verrify this
+# Cloth is skipped via is_compatible — cloth has no collision_mesh_cpu_data. TODO(andi) verrify this
 
-# Total number of axis directions (2 vertical + 10 horizontal × 2 signs)
-_ADJ_AXIS_COUNT = 2 + 2 * m.HORIZONTAL_AXIS_COUNT * 2  # = 22
+# Total number of axis directions (2 vertical + 10 horizontal)
+_ADJ_AXIS_COUNT = 2 + m.HORIZONTAL_DIRECTION_COUNT  # = 12
+
+
+@wp.func
+def _ray_aabb_hit(origin: wp.vec3, dir: wp.vec3, t_max: wp.float32, lo: wp.vec3, hi: wp.vec3) -> wp.bool:
+    """Slab test: returns True iff the ray (origin, dir, t in [0, t_max]) intersects the AABB."""
+    eps = wp.float32(1.0e-9)
+    tmin = wp.float32(0.0)
+    tmax = t_max
+    for i in range(3):
+        di = dir[i]
+        oi = origin[i]
+        loi = lo[i]
+        hii = hi[i]
+        if wp.abs(di) < eps:
+            # Ray parallel to slab i — miss if origin lies outside [lo_i, hi_i]
+            if oi < loi or oi > hii:
+                return False
+        else:
+            inv_d = wp.float32(1.0) / di
+            t1 = (loi - oi) * inv_d
+            t2 = (hii - oi) * inv_d
+            if t1 > t2:
+                tmp = t1
+                t1 = t2
+                t2 = tmp
+            if t1 > tmin:
+                tmin = t1
+            if t2 < tmax:
+                tmax = t2
+            if tmin > tmax:
+                return False
+    return True
 
 
 @wp.kernel
@@ -222,6 +219,25 @@ def _adjacency_ray_cast_kernel(
     hi_z = aabb_values[s, aabb_idx, 5]
     origin_w = wp.vec3((lo_x + hi_x) * 0.5, (lo_y + hi_y) * 0.5, (lo_z + hi_z) * 0.5)
     dir_w = wp.vec3(directions[k, 0], directions[k, 1], directions[k, 2])
+    t_max = max_distances[k]
+
+    # Broad-phase cull: skip the full BVH traversal if the target object's AABB doesn't
+    # intersect the ray segment. Only applies when the target has a tracked AABB; otherwise
+    # we fall through to the per-link BVH query.
+    b_aabb_idx = aabb_obj_idxs[b]
+    if b_aabb_idx >= 0:
+        b_lo = wp.vec3(
+            aabb_values[s, b_aabb_idx, 0],
+            aabb_values[s, b_aabb_idx, 1],
+            aabb_values[s, b_aabb_idx, 2],
+        )
+        b_hi = wp.vec3(
+            aabb_values[s, b_aabb_idx, 3],
+            aabb_values[s, b_aabb_idx, 4],
+            aabb_values[s, b_aabb_idx, 5],
+        )
+        if not _ray_aabb_hit(origin_w, dir_w, t_max, b_lo, b_hi):
+            return
 
     # Transform ray into target link's local frame.
     # transform_point applies translation; transform_vector is rotation-only (correct for direction).
@@ -229,9 +245,7 @@ def _adjacency_ray_cast_kernel(
     origin_local = wp.transform_point(inv, origin_w)
     dir_local = wp.transform_vector(inv, dir_w)
 
-    t_max = max_distances[k]
-    query = wp.mesh_query_ray(mesh_id, origin_local, dir_local, t_max)
-    if query.result:
+    if wp.mesh_query_ray_anyhit(mesh_id, origin_local, dir_local, t_max):
         wp.atomic_max(output, s, a, b, k, wp.int32(1))
 
 
@@ -249,19 +263,20 @@ def _adjacency_finalize_kernel(
 
 
 def _build_adjacency_axis_tables():
-    """Build the (22, 3) directions table and (22,) max-distance table.
+    """Build the (12, 3) directions table and (12,) max-distance table.
 
     Layout matches the kernel's k axis:
-      [+Z, -Z, h0+, h1+, ..., h9+, h0-, h1-, ..., h9-]
+      [+Z, -Z, h_0, h_1, ..., h_(N-1)]
+    where N = m.HORIZONTAL_DIRECTION_COUNT and h_k = (cos(k·2π/N), sin(k·2π/N), 0).
     """
-    horizontal_axes = get_equidistant_coordinate_planes(m.HORIZONTAL_AXIS_COUNT).reshape(-1, 3)  # (10, 3)
-    n_horizontal = horizontal_axes.shape[0]
+    n_horizontal = m.HORIZONTAL_DIRECTION_COUNT
+    angles = th.arange(n_horizontal, dtype=th.float32) * (2.0 * math.pi / n_horizontal)
+    horizontal_dirs = th.stack([th.cos(angles), th.sin(angles), th.zeros_like(angles)], dim=1)  # (N, 3)
 
     directions = th.zeros((_ADJ_AXIS_COUNT, 3), dtype=th.float32)
     directions[0] = th.tensor([0.0, 0.0, 1.0])
     directions[1] = th.tensor([0.0, 0.0, -1.0])
-    directions[2 : 2 + n_horizontal] = horizontal_axes.to(th.float32)
-    directions[2 + n_horizontal : 2 + 2 * n_horizontal] = (-horizontal_axes).to(th.float32)
+    directions[2:] = horizontal_dirs
 
     max_distances = th.full((_ADJ_AXIS_COUNT,), m.MAX_DISTANCE_HORIZONTAL, dtype=th.float32)
     max_distances[0] = m.MAX_DISTANCE_VERTICAL
@@ -281,9 +296,6 @@ class Adjacency(TensorizedRelativeState):
     Diagonal and cross-scene cells are always False.
     Cloth is excluded via is_compatible (no collision mesh to ray-cast against).
     """
-
-    # RigidBodyViewAPI.POSE_MATRICES wp wrapper
-    LINK_POSE_MATRICES_WP = None
 
     # wp kernel input
     AABB_OBJ_IDXS_WP = None  # (N_adj,) int32
@@ -324,7 +336,7 @@ class Adjacency(TensorizedRelativeState):
         compatible, reason = super().is_compatible(obj, **kwargs)
         if not compatible:
             return compatible, reason
-        # Cloth has no collision_mesh_warp — exclude as both origin and target.
+        # Cloth has no collision_mesh_cpu_data — exclude as both origin and target.
         # TODO: revisit when cloth gains a queryable mesh proxy.
         if obj.prim_type == PrimType.CLOTH:
             return False, "Adjacency does not support cloth objects"
@@ -392,12 +404,6 @@ class Adjacency(TensorizedRelativeState):
             cls._output = None
             cls.OUTPUT_WP = None
 
-        # Wrap RigidBodyViewAPI.POSE_MATRICES (torch (L, 4, 4)) once as wp.array(mat44)
-        if RigidBodyViewAPI.POSE_MATRICES is not None:
-            cls.LINK_POSE_MATRICES_WP = wp.from_torch(RigidBodyViewAPI.POSE_MATRICES, dtype=wp.mat44)
-        else:
-            cls.LINK_POSE_MATRICES_WP = None
-
     def _get_value(self, other):
         """Read the (22,) bool adjacency vector from self to other.
 
@@ -420,13 +426,11 @@ class Adjacency(TensorizedRelativeState):
         return super()._get_value(other)
 
     def _compute_on_demand(self, other):
-        """Fallback: legacy on-demand ray cast for self in all 22 directions; returns bool vector for `other`.
+        """Fallback: legacy on-demand ray cast for self in all 12 directions; returns bool vector for `other`.
 
         Used when cached VALUES are known stale (post-sample_kinematics, pre-next-sim.step).
         Reuses compute_adjacencies which reads fresh AABB via AABB.STALE bypass.
         """
-        horizontal_axes = get_equidistant_coordinate_planes(m.HORIZONTAL_AXIS_COUNT).reshape(-1, 3)
-
         # Vertical: k=0 (+Z), k=1 (-Z). Use the surface-finding pre-step (use_aabb_center=False)
         # to match legacy VerticalAdjacency.
         vertical_axis_lists = compute_adjacencies(
@@ -434,8 +438,13 @@ class Adjacency(TensorizedRelativeState):
         )
         vertical_pair = vertical_axis_lists[0]
 
-        # Horizontal: k=2..11 (+axes), k=12..21 (-axes). use_aabb_center=True per legacy
-        # HorizontalAdjacency.
+        # Horizontal: 10 evenly-spaced directions at angles k·2π/10 (k=0..9), populating k=2..11.
+        # compute_adjacencies probes each axis in both +/- directions, so we pass the first half
+        # (5 axes at 0°..144°) and read positive_neighbors → k=2..6, negative_neighbors → k=7..11.
+        n_horizontal = m.HORIZONTAL_DIRECTION_COUNT
+        half = n_horizontal // 2
+        angles = th.arange(half, dtype=th.float32) * (2.0 * math.pi / n_horizontal)
+        horizontal_axes = th.stack([th.cos(angles), th.sin(angles), th.zeros_like(angles)], dim=1)
         horizontal_axis_lists = compute_adjacencies(
             self.obj, horizontal_axes, m.MAX_DISTANCE_HORIZONTAL, use_aabb_center=True
         )
@@ -443,10 +452,9 @@ class Adjacency(TensorizedRelativeState):
         out = th.zeros(_ADJ_AXIS_COUNT, dtype=th.bool)
         out[0] = other in vertical_pair.positive_neighbors
         out[1] = other in vertical_pair.negative_neighbors
-        n_horizontal = len(horizontal_axis_lists)
         for axis_idx, pair in enumerate(horizontal_axis_lists):
             out[2 + axis_idx] = other in pair.positive_neighbors
-            out[2 + n_horizontal + axis_idx] = other in pair.negative_neighbors
+            out[2 + half + axis_idx] = other in pair.negative_neighbors
         return out
 
     @classmethod
@@ -458,7 +466,7 @@ class Adjacency(TensorizedRelativeState):
             or AABB.VALUES_WP is None
             or cls.AABB_OBJ_IDXS_WP is None
             or RigidBodyViewAPI.LINK_MESH_IDS is None
-            or cls.LINK_POSE_MATRICES_WP is None
+            or RigidBodyViewAPI.POSE_MATRICES is None
             or cls.LINK_TO_OBJ_IDX_WP is None
             or cls.LINK_TO_SCENE_IDX_WP is None
         ):
@@ -484,7 +492,7 @@ class Adjacency(TensorizedRelativeState):
                 cls.DIRECTIONS_WP,
                 cls.MAX_DISTANCES_WP,
                 RigidBodyViewAPI.LINK_MESH_IDS,
-                cls.LINK_POSE_MATRICES_WP,
+                RigidBodyViewAPI.POSE_MATRICES,
                 cls.LINK_TO_OBJ_IDX_WP,
                 cls.LINK_TO_SCENE_IDX_WP,
                 cls.OUTPUT_WP,

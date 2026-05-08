@@ -58,6 +58,11 @@ class TensorizedState:
     # initialize_view because torch storage is reallocated there.
     VALUES_WP = None
 
+    # wp.array view over the (pinned) VALUES_CPU mirror. Used so that the GPU→CPU mirror
+    # copy inside the captured wp.graph runs as a wp.copy (graph-safe), not as torch's
+    # .copy_ which uses the legacy stream and is forbidden during capture.
+    VALUES_CPU_WP = None
+
     # Set to True any time any subclass's initialize_view runs, signalling that the
     # captured wp.graph holds stale pointers/shapes and must be re-captured. The simulator
     # checks-and-resets this before each step. update_handles() always calls the view APIs'
@@ -96,7 +101,10 @@ class TensorizedState:
         cls._update_values(values=cls.VALUES)
         # Mirror VALUES → VALUES_CPU. Use wp.copy when both wp.array handles exist (graph-safe);
         # fall back to torch's non-blocking copy otherwise (e.g. partial init).
-        cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
+        if cls.VALUES_WP is not None and cls.VALUES_CPU_WP is not None:
+            wp.copy(cls.VALUES_CPU_WP, cls.VALUES_WP)
+        else:
+            cls.VALUES_CPU.copy_(cls.VALUES, non_blocking=True)
 
     @classmethod
     def post_update(cls):

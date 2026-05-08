@@ -39,7 +39,7 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         if distance > avg_aabb_length * (1.0 / 6.0):
             return False
 
-        # Check if `other` shows up on any of self's horizontal axes (k=2..21 in Adjacency).
+        # Check if `other` shows up on any of self's horizontal axes (k=2..11 in Adjacency).
         adj_self = self.obj.states[Adjacency].get_value(other)
         if bool(adj_self[2:].any()):
             return True

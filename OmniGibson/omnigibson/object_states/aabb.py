@@ -28,7 +28,7 @@ class AABB(TensorizedAbsoluteState):
     Axis-aligned bounding box state, computed in bulk across all objects and scenes.
 
     For rigid objects, batched AABB computation is delegated to RigidBodyViewAPI.get_aabb(),
-    which uses each link's wp.Mesh (collision_mesh_warp) plus POSE_MATRICES. AABB-tracking
+    which uses each link's wp.Mesh (built from collision_mesh_cpu_data) plus POSE_MATRICES. AABB-tracking
     config (which links to track, where their AABBs go) is handed off once per
     initialize_view() via RigidBodyViewAPI.prepare_aabb_kernel_inputs(...).
 

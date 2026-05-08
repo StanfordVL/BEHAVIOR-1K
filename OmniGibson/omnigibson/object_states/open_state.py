@@ -317,14 +317,14 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
     def _update_values(cls, values):
         if cls.OPENABLE_MASK_WP is None or cls._MAX_DOF == 0:
             return
-        if ArticulatedObjectViewAPI.JOINT_POSITIONS_WP is None:
+        if ArticulatedObjectViewAPI._JOINT_POSITIONS is None:
             return
         S, O = values.shape[:2]
         wp.launch(
             kernel=_open_update_kernel,
             dim=(S, O),
             inputs=[
-                ArticulatedObjectViewAPI.JOINT_POSITIONS_WP,
+                ArticulatedObjectViewAPI._JOINT_POSITIONS,
                 cls.OBJ_IDXES_IN_ARTICULATION_VIEW_WP,
                 cls.OPENABLE_MASK_WP,
                 cls.THRESHOLDS_S1_WP,

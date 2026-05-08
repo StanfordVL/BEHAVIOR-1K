@@ -1214,25 +1214,20 @@ def _launch_simulator(*args, **kwargs):
                         state_type.initialize_view()
 
         def _update_view_apis(self):
-            """Flush physics caches and sync CPU→GPU. Called after every physics step batch."""
+            """Flush physics caches from PhysX into view API's pinned-CPU staging buffers."""
             RigidContactAPI.update_contact_cache()
             RigidBodyViewAPI.update_pose_cache()
             ArticulatedObjectViewAPI.update_dof_cache()
 
-            RigidBodyViewAPI.async_copy_to_gpu()
-            ArticulatedObjectViewAPI.async_copy_to_gpu()
-            th.cuda.synchronize()
-
         def _capture_warp_graph(self, tensorized_states):
             """
-            (Re-)capture the per-step TensorizedState global_update sequence into a wp.Graph
-            for replay each step. Called when `TensorizedState.graph_dirty` is True or
-            no graph exists.
+            (Re-)capture the per-step graph:
+            view-API H2D + tensorized state global_updates.
 
             Steps:
               1. If every state is empty (no objects), set the graph to None and skip capture.
-              2. Open a wp.ScopedCapture (which owns its capture stream) and run each state's
-                 global_update inside it.
+              2. Open a wp.ScopedCapture; record the view-API enqueue_to_graph() ops first
+                 (POSES H2D + pose-to-mat, DOF positions H2D), then each state's global_update.
             """
             # If every tensorized state is empty there's nothing to capture; clear the graph
             # so the call site can skip wp.capture_launch.
@@ -1241,10 +1236,13 @@ def _launch_simulator(*args, **kwargs):
                 return
 
             # Let ScopedCapture create + own its capture stream. Inside the with-block,
-            # wp.get_stream() returns that stream and any wp.launch defaults to it.
-            # Each state's global_update launches Warp kernels via wp.launch(...) without
-            # specifying a stream, so they pick up the current capture stream.
+            # wp.get_stream() returns that stream and any wp.launch / wp.copy defaults to it.
             with wp.ScopedCapture(device="cuda") as capture:
+                # View-API H2D + derived kernels (formerly the eager async_copy_to_gpu calls).
+                RigidBodyViewAPI.enqueue_to_graph()
+                ArticulatedObjectViewAPI.enqueue_to_graph()
+                # Tensorized state kernels read POSE_MATRICES / joint positions written above —
+                # stream ordering on the capture stream guarantees they see fresh values.
                 for state_type in tensorized_states:
                     state_type.global_update()
             self._state_graph = capture.graph

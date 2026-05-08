@@ -110,8 +110,10 @@ class TensorizedAbsoluteState(AbsoluteObjectState, TensorizedState):
         # Wrappers cached at the class level; never recreated per call.
         if cls.VALUES.numel() > 0:
             cls.VALUES_WP = _wp_from_torch(cls.VALUES)
+            cls.VALUES_CPU_WP = _wp_from_torch(cls.VALUES_CPU)
         else:
             cls.VALUES_WP = None
+            cls.VALUES_CPU_WP = None
 
         # Mark the captured wp.graph as stale — the simulator will re-capture before the next step.
         # update_handles() always calls the view APIs' initialize_view BEFORE this, so any

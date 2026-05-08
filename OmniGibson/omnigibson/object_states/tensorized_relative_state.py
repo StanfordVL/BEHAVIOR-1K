@@ -136,8 +136,10 @@ class TensorizedRelativeState(RelativeObjectState, TensorizedState):
         # Wrap as wp.array for kernel consumption
         if cls.VALUES.numel() > 0:
             cls.VALUES_WP = _wp_from_torch(cls.VALUES)
+            cls.VALUES_CPU_WP = _wp_from_torch(cls.VALUES_CPU)
         else:
             cls.VALUES_WP = None
+            cls.VALUES_CPU_WP = None
 
         # Mark the captured wp.graph as stale — the simulator will re-capture before the next step.
         TensorizedState.graph_dirty = True
