@@ -8,7 +8,6 @@ import psutil
 import torch as th
 
 import omnigibson as og
-from omnigibson.envs.vec_env_base import VectorEnvironment
 from omnigibson.macros import gm
 from omnigibson.utils.profiling_utils import get_vram_usage
 
@@ -84,11 +83,12 @@ def main():
     og.launch()
 
     cfg = make_config(args)
+    cfg["env"]["num_envs"] = args.n_envs
     if args.deep_profiling:
         load_profiler = cProfile.Profile()
         load_profiler.enable()
-    vec_env = VectorEnvironment(args.n_envs, cfg)
-    vec_env.reset()
+    env = og.Environment(configs=cfg)
+    env.reset()
     if args.deep_profiling:
         load_profiler.disable()
         load_profiler.dump_stats("load.prof")
@@ -100,10 +100,10 @@ def main():
     og.sim._non_physics_step_profiler.reset()
 
     action_lo, action_hi = -0.3, 0.3
-    action_dims = [env.robots[0].action_dim for env in vec_env.envs]
+    action_dims = [scene.robots[0].action_dim for scene in env.scenes]
     for _ in range(NUM_STEPS):
-        actions = [th.rand(d) * (action_hi - action_lo) + action_lo for d in action_dims]
-        vec_env.step(actions)
+        actions = th.stack([th.rand(d) * (action_hi - action_lo) + action_lo for d in action_dims])
+        env.step(actions)
 
     n_steps = og.sim._step_profiler.call_count
     avg_total_ms = og.sim._step_profiler.average_time * 1e3
