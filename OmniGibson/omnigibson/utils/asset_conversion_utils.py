@@ -1728,7 +1728,7 @@ def _get_objects_config_from_element(element, model_pose_info):
                 log.debug(name)
                 assert name in model_pose_info, f"Did not find {name} in current model pose info!"
                 model_pose_info[name]["cfg"]["category"] = ele.get("category")
-                model_pose_info[name]["cfg"]["visual_only"] = True  # ele.get("category") in _VISUAL_ONLY_CATEGORIES
+                model_pose_info[name]["cfg"]["visual_only"] = ele.get("category") in _VISUAL_ONLY_CATEGORIES
                 model_pose_info[name]["cfg"]["model"] = ele.get("model")
                 model_pose_info[name]["cfg"]["bounding_box"] = (
                     _space_string_to_tensor(ele.get("bounding_box")) if "bounding_box" in ele.keys() else None
