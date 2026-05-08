@@ -79,7 +79,7 @@ class LeRobotDataWrapper(DataWrapper):
         self.lerobot_dataset_kwargs = {
             "repo_id": repo_id,
             "root": f"{root_dir}/{repo_id}",
-            "robot_type": env.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
+            "robot_type": env.scene.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
             "use_videos": True,
             "streaming_encoding": True,
             "depth_map_encoding_fn": encode_depth_frame,
@@ -193,9 +193,10 @@ class LeRobotDataWrapper(DataWrapper):
         return obs_mapping, obs_features
 
     def _process_obs(self, obs: dict[str, th.Tensor], info: dict) -> dict[str, th.Tensor]:
-        # Add tfs to flattened obs
-        robot_tf_inv = T.pose_inv(T.pose2mat(self.env.robots[0].get_position_orientation()))
-        for sensor_group in (self.env.external_sensors, self.env.robots[0].sensors):
+        # Add tfs to flattened obs (single-env wrapper: scene index 0)
+        robot_tf_inv = T.pose_inv(T.pose2mat(self.env.scene.robots[0].get_position_orientation()))
+        external_sensors = self.env.external_sensors[0] if self.env.external_sensors is not None else None
+        for sensor_group in (external_sensors, self.env.scene.robots[0].sensors):
             if sensor_group is None:
                 continue
             for name, sensor in sensor_group.items():
@@ -251,9 +252,11 @@ class LeRobotDataWrapper(DataWrapper):
                 resume = True
                 log.info(f"Resuming from existing LeRobot dataset at: {abs_output_path}")
 
-        # For now, we only support a single robot for the sake of deterministic mapping ofrobot obs
-        assert len(env.robots) == 1, "Only one robot supported for LeRobot dataset storage!"
-        robot = env.robots[0]
+        # For now, we only support a single scene with a single robot for the sake of deterministic mapping of robot obs
+        assert (
+            len(env.scenes) == 1 and len(env.scene.robots) == 1
+        ), "Only one scene with one robot supported for LeRobot dataset storage!"
+        robot = env.scene.robots[0]
 
         # Create LeRobot dataset, define features to store
         # Define standard features (RL-related entries, language instructions)
@@ -301,11 +304,12 @@ class LeRobotDataWrapper(DataWrapper):
         # Add in camera K matrices
         cam_intrinsics = dict()
 
-        for sensor_name, sensor in env.external_sensors.items():
+        external_sensors = env.external_sensors[0] if env.external_sensors is not None else {}
+        for sensor_name, sensor in external_sensors.items():
             if isinstance(sensor, VisionSensor):
                 K = sensor.intrinsic_matrix.cpu()
                 cam_intrinsics[sensor_name] = K.numpy().tolist()
-        for sensor_name, sensor in env.robots[0].sensors.items():
+        for sensor_name, sensor in env.scene.robots[0].sensors.items():
             if isinstance(sensor, VisionSensor):
                 # Remove robot naming prefix
                 sensor_name = "_".join(sensor_name.split(":")[1:]).lower()

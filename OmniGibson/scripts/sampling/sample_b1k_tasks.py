@@ -247,7 +247,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         task_final_state = env.scene.dump_state()
         task_scene_dict = {"state": task_final_state}
         # from IPython import embed; print("validate_task"); embed()
-        for obj in env.task.object_scope.values():
+        for obj in env.task.object_scope[0].values():
             if isinstance(obj, DatasetObject):
                 obj.wake()
         assert validate_task(env.task, task_scene_dict, default_scene_dict)

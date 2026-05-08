@@ -286,7 +286,7 @@ def _run_ag_roundtrip(robot_model):
     og.sim.play()
     og.sim.step()
 
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     obj = env.scene.object_registry("name", "apple")
     arm = robot.arm_names[0]
     params = _force_ag_grasp(robot, arm, obj, _LEFT_FRAME)

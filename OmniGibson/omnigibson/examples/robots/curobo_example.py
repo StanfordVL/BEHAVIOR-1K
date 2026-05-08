@@ -205,7 +205,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     env = og.Environment(configs=cfg)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     eef_markers = [env.scene.object_registry("name", f"eef_marker_{i}") for i in range(2)]
 
     # Create CuRobo instance

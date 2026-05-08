@@ -36,7 +36,7 @@ from omnigibson.learning.utils.obs_utils import (
 )
 from omnigibson.macros import gm, create_module_macros, macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
-from omnigibson.robots import BaseRobot
+from omnigibson.robots import Robot
 from omnigibson.utils.asset_utils import get_task_instance_path
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
@@ -156,11 +156,11 @@ class Evaluator:
         env = instantiate(env_wrapper, env=env)
         return env
 
-    def load_robot(self) -> BaseRobot:
+    def load_robot(self) -> Robot:
         """
         Loads and returns the robot instance from the environment.
         Returns:
-            BaseRobot: The robot instance loaded from the environment.
+            Robot: The robot instance loaded from the environment.
         """
         robot = self.env.scene.object_registry("name", "robot_r1")
         return robot
@@ -285,14 +285,14 @@ class Evaluator:
                 # Write robot poses to scene metadata
                 self.env.scene.write_task_metadata(key=tro_key, data=tro_state)
             else:
-                self.env.task.object_scope[tro_key].load_state(tro_state, serialized=False)
+                self.env.task.object_scope[0][tro_key].load_state(tro_state, serialized=False)
 
         # Try to ensure that all task-relevant objects are stable
         # They should already be stable from the sampled instance, but there is some issue where loading the state
         # causes some jitter (maybe for small mass / thin objects?)
         for _ in range(25):
             og.sim.step_physics()
-            for inst, entity in self.env.task.object_scope.items():
+            for inst, entity in self.env.task.object_scope[0].items():
                 if not is_system_bddl_inst(inst) and entity is not None:
                     entity.keep_still()
 

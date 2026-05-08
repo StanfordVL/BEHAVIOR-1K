@@ -463,14 +463,15 @@ def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
 
 
 class BDDLSampler:
-    def __init__(self, env, activity_conditions, object_scope):
+    def __init__(self, env, env_idx, activity_conditions, object_scope):
         # Avoid circular imports here
         from omnigibson.scenes.traversable_scene import TraversableScene
 
         # Store internal variables from inputs
         self._env = env
-        self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, TraversableScene) else None
-        self._agent = self._env.robots[0]
+        self._scene = env.scenes[env_idx]
+        self._scene_model = self._scene.scene_model if isinstance(self._scene, TraversableScene) else None
+        self._agent = self._scene.robots[0]
 
         self._compiled_task = None
         self._activity_conditions = activity_conditions
@@ -600,8 +601,8 @@ class BDDLSampler:
         # Auto-initialize all sampleable objects
         with og.sim.playing():
             # Update the scene to include the latest robots / objects
-            self._env.scene.update_initial_file()
-            self._env.scene.reset()
+            self._scene.update_initial_file()
+            self._scene.reset()
 
             error_msg = self._sample_initial_conditions()
             if error_msg:
@@ -619,7 +620,7 @@ class BDDLSampler:
                 log.error(error_msg)
                 return False, error_msg
 
-            self._env.scene.update_initial_file()
+            self._scene.update_initial_file()
 
         return True, None
 
@@ -640,7 +641,7 @@ class BDDLSampler:
                         f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. "
                         f"Only non-sampleable (scene) objects can have room assignment."
                     )
-                if self._scene_model is not None and room_type not in self._env.scene.seg_map.room_sem_name_to_ins_name:
+                if self._scene_model is not None and room_type not in self._scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
@@ -891,13 +892,11 @@ class BDDLSampler:
                     }
 
                 room_insts = (
-                    [None]
-                    if self._scene_model is None
-                    else self._env.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                    [None] if self._scene_model is None else self._scene.seg_map.room_sem_name_to_ins_name[room_type]
                 )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
-                    room_objs = self._env.scene.object_registry("in_rooms", room_inst, default_val=[])
+                    room_objs = self._scene.object_registry("in_rooms", room_inst, default_val=[])
                     scene_objs = [
                         obj
                         for obj in room_objs
@@ -1179,7 +1178,7 @@ class BDDLSampler:
                     ps.name for s in [_so] + sorted(_so.descendants, key=lambda x: x.name) for ps in s.particle_systems
                 ][0]
                 self._object_scope[obj_inst] = (
-                    None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
+                    None if obj_inst in self._future_obj_instances else self._scene.get_system(system_name)
                 )
             else:
                 _so = get_knowledge_base().get_synset(obj_synset)
@@ -1269,7 +1268,7 @@ class BDDLSampler:
                 from omnigibson.objects.dataset_object import DatasetObject
 
                 simulator_obj = DatasetObject(
-                    name=f"{category}_{len(self._env.scene.objects)}",
+                    name=f"{category}_{len(self._scene.objects)}",
                     category=category,
                     model=model,
                     prim_type=(
@@ -1282,7 +1281,7 @@ class BDDLSampler:
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                self._env.scene.add_object(simulator_obj)
+                self._scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
                 simulator_obj.set_position_orientation(
@@ -1314,9 +1313,9 @@ class BDDLSampler:
         Returns:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
-        ground_goal_state_options = self._compiled_task.ground_goal_state_options
-        num_options = ground_goal_state_options.size(0)
-        ground_goal_state_options = ground_goal_state_options[random.sample(range(num_options), num_options)]
+        # ground_goal_state_options is list[list[HEAD]] post-#2040; shuffle a copy of the outer list
+        ground_goal_state_options = list(self._compiled_task.ground_goal_state_options)
+        random.shuffle(ground_goal_state_options)
         log.debug(("number of ground_goal_state_options", len(ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
 
@@ -1442,11 +1441,11 @@ class BDDLSampler:
                                 break
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
-                            self._env.scene.object_registry.update(keys=["in_rooms"])
+                            self._scene.object_registry.update(keys=["in_rooms"])
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # Update object registry because we just assigned in_rooms to newly imported objects
-        self._env.scene.object_registry.update(keys=["in_rooms"])
+        self._scene.object_registry.update(keys=["in_rooms"])
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
