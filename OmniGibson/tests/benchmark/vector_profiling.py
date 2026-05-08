@@ -100,9 +100,9 @@ def main():
     og.sim._non_physics_step_profiler.reset()
 
     action_lo, action_hi = -0.3, 0.3
-    action_dims = [scene.robots[0].action_dim for scene in env.scenes]
+    action_dim = env.scenes[0].robots[0].action_dim
     for _ in range(NUM_STEPS):
-        actions = th.stack([th.rand(d) * (action_hi - action_lo) + action_lo for d in action_dims])
+        actions = th.rand(args.n_envs, action_dim) * (action_hi - action_lo) + action_lo
         env.step(actions)
 
     n_steps = og.sim._step_profiler.call_count

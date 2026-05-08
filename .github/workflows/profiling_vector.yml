@@ -12,8 +12,7 @@ on:
         default: false
 
 permissions:
-  pull-requests: write
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
@@ -176,17 +175,15 @@ jobs:
     name: Compile Vector Profiling Report
     runs-on: ubuntu-latest
     needs: [profile]
-    if: always()
+    if: always() && github.event_name == 'pull_request'
     permissions:
       pull-requests: write
-      contents: write
 
     steps:
       - name: Checkout vector branch
         uses: actions/checkout@v4
         with:
           ref: vector
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download all profiling results
         uses: actions/download-artifact@v4
@@ -195,10 +192,10 @@ jobs:
           path: pr-results
           pattern: vec-profiling-*
 
-      - name: Merge results and compare or set baseline
+      - name: Merge results and build comparison report
         run: |
           python3 << 'PYEOF'
-          import json, os, sys
+          import json, os
 
           # Merge all downloaded artifacts into one list
           merged = []
@@ -209,18 +206,6 @@ jobs:
                       if fname == "vector_output.json":
                           with open(os.path.join(dirpath, fname)) as f:
                               merged.extend(json.load(f))
-
-          set_as_baseline = os.environ.get("SET_AS_BASELINE", "false").lower() == "true"
-
-          if set_as_baseline:
-              if len(merged) == 0:
-                  print("No profiling artifacts found; refusing to overwrite baseline with an empty file.", file=sys.stderr)
-                  sys.exit(1)
-              baseline_path = "OmniGibson/tests/benchmark/vector_baseline.json"
-              with open(baseline_path, "w") as f:
-                  json.dump(merged, f, indent=4)
-              print(f"Wrote {len(merged)} entries to {baseline_path}")
-              sys.exit(0)
 
           # Build lookup: label -> metric -> value
           def build_lookup(entries):
@@ -310,21 +295,63 @@ jobs:
               f.write(report)
           print(report)
           PYEOF
-        env:
-          SET_AS_BASELINE: ${{ github.event.inputs.set_as_baseline == 'true' && 'true' || 'false' }}
+
+      - name: Post PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: vector-profiling-report
+          path: profiling-vector-report.md
+
+  commit_baseline:
+    name: Commit Vector Profiling Baseline
+    runs-on: ubuntu-latest
+    needs: [profile]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.set_as_baseline == 'true'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout vector branch
+        uses: actions/checkout@v4
+        with:
+          ref: vector
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download all profiling results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: pr-results
+          pattern: vec-profiling-*
+
+      - name: Merge results into baseline
+        run: |
+          python3 << 'PYEOF'
+          import json, os, sys
+
+          merged = []
+          results_dir = "pr-results"
+          if os.path.isdir(results_dir):
+              for dirpath, _, filenames in os.walk(results_dir):
+                  for fname in filenames:
+                      if fname == "vector_output.json":
+                          with open(os.path.join(dirpath, fname)) as f:
+                              merged.extend(json.load(f))
+
+          if len(merged) == 0:
+              print("No profiling artifacts found; refusing to overwrite baseline with an empty file.", file=sys.stderr)
+              sys.exit(1)
+
+          baseline_path = "OmniGibson/tests/benchmark/vector_baseline.json"
+          with open(baseline_path, "w") as f:
+              json.dump(merged, f, indent=4)
+          print(f"Wrote {len(merged)} entries to {baseline_path}")
+          PYEOF
 
       - name: Commit updated baseline
-        if: github.event.inputs.set_as_baseline == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add OmniGibson/tests/benchmark/vector_baseline.json
           git diff --cached --quiet || git commit -m "chore: update vector profiling baseline [skip ci]"
           git push origin vector
-
-      - name: Post PR comment
-        if: github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: vector-profiling-report
-          path: profiling-vector-report.md
