@@ -19,8 +19,9 @@ class HeavyRobotWrapper(EnvironmentWrapper):
         # For a complete list of available modalities, see VisionSensor.ALL_MODALITIES
         # We also change the robot base mass to 250kg to match the configuration during data collection.
         robot = env.robots[0]
-        with og.sim.stopped():
-            robot.base_footprint_link.mass = 250.0  # increase base mass to 250kg
+        og.sim.stop()
+        robot.base_footprint_link.mass = 250.0  # increase base mass to 250kg
+        og.sim.play()
         # Update robot sensors:
         for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
             sensor_name = camera_name.split("::")[1]
