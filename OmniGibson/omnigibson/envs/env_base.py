@@ -686,28 +686,27 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Pre-processing before stepping simulation
         action = self._convert_action_to_tensor(action)
-        if action is None:
-            return
-        for env_idx in range(self.num_envs):
-            env_action = action[env_idx]
+        if action is not None:
+            for env_idx in range(self.num_envs):
+                env_action = action[env_idx]
 
-            scene = self._scenes[env_idx]
+                scene = self._scenes[env_idx]
 
-            # If the action is not a dictionary, convert into a dictionary
-            if not isinstance(env_action, dict) and not isinstance(env_action, gym.spaces.Dict):
-                action_dict = dict()
-                idx = 0
+                # If the action is not a dictionary, convert into a dictionary
+                if not isinstance(env_action, dict) and not isinstance(env_action, gym.spaces.Dict):
+                    action_dict = dict()
+                    idx = 0
+                    for robot in scene.robots:
+                        action_dim = robot.action_dim
+                        action_dict[robot.name] = env_action[idx : idx + action_dim]
+                        idx += action_dim
+                else:
+                    # Our inputted action is the action dictionary
+                    action_dict = env_action
+
+                # Iterate over all robots and apply actions
                 for robot in scene.robots:
-                    action_dim = robot.action_dim
-                    action_dict[robot.name] = env_action[idx : idx + action_dim]
-                    idx += action_dim
-            else:
-                # Our inputted action is the action dictionary
-                action_dict = env_action
-
-            # Iterate over all robots and apply actions
-            for robot in scene.robots:
-                robot.apply_action(action_dict[robot.name])
+                    robot.apply_action(action_dict[robot.name])
 
         # Step simulation
         og.sim.step()
