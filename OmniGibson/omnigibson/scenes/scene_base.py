@@ -118,6 +118,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     scene_info = json.load(f)
             else:
                 scene_info = self.scene_file
+
+            # Verify the saved component versions are compatible with the currently-installed versions.
+            # We require each saved version to be <= the currently-installed version.
+            self._check_versions_compatible(scene_info.get("versions", {}))
+
             init_info = scene_info["objects_info"]["init_info"]
             # TODO: Remove this backwards-compatibility once newer RC is released
             self._init_state = (
