@@ -227,36 +227,39 @@ class OGRobotServer:
                 "upper": qpos_max[self.robot.arm_control_idx[arm]],
             }
 
-        with og.sim.stopped():
-            # # Set lower position iteration count for faster sim speed
-            # og.sim._physics_context._physx_scene_api.GetMaxPositionIterationCountAttr().Set(8)
-            # og.sim._physics_context._physx_scene_api.GetMaxVelocityIterationCountAttr().Set(1)
-            isregistry = lazy.carb.settings.acquire_settings_interface()
-            isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 0)
-            # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, int(1 / og.sim.get_physics_dt()))
-            # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, 30)
+        og.sim.stop()
 
-            # Enable CCD for all task-relevant objects
-            if isinstance(self.env.task, BehaviorTask):
-                from omnigibson.systems.system_base import BaseSystem
+        # # Set lower position iteration count for faster sim speed
+        # og.sim._physics_context._physx_scene_api.GetMaxPositionIterationCountAttr().Set(8)
+        # og.sim._physics_context._physx_scene_api.GetMaxVelocityIterationCountAttr().Set(1)
+        isregistry = lazy.carb.settings.acquire_settings_interface()
+        isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 0)
+        # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, int(1 / og.sim.get_physics_dt()))
+        # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, 30)
 
-                for bddl_obj in self.env.task.object_scope.values():
-                    if bddl_obj is not None and not isinstance(bddl_obj, BaseSystem):
-                        for link in bddl_obj.links.values():
-                            link.ccd_enabled = True
-            # Postprocessing robot and objects
-            for obj in self.env.scene.objects:
-                if obj != self.robot:
-                    if obj.category in VISUAL_ONLY_CATEGORIES:
-                        obj.visual_only = True
-                else:
-                    if isinstance(obj, Robot) and obj.model in ("r1", "r1pro"):
-                        obj.base_footprint_link.mass = 250.0
+        # Enable CCD for all task-relevant objects
+        if isinstance(self.env.task, BehaviorTask):
+            from omnigibson.systems.system_base import BaseSystem
 
-            # Update ghost robot's masses to be uniform to avoid orthonormal errors
-            if self.ghosting:
-                for link in self.ghost.links.values():
-                    link.mass = 0.1
+            for bddl_obj in self.env.task.object_scope.values():
+                if bddl_obj is not None and not isinstance(bddl_obj, BaseSystem):
+                    for link in bddl_obj.links.values():
+                        link.ccd_enabled = True
+        # Postprocessing robot and objects
+        for obj in self.env.scene.objects:
+            if obj != self.robot:
+                if obj.category in VISUAL_ONLY_CATEGORIES:
+                    obj.visual_only = True
+            else:
+                if isinstance(obj, Robot) and obj.model in ("r1", "r1pro"):
+                    obj.base_footprint_link.mass = 250.0
+
+        # Update ghost robot's masses to be uniform to avoid orthonormal errors
+        if self.ghosting:
+            for link in self.ghost.links.values():
+                link.mass = 0.1
+
+        og.sim.play()
 
         # Make sure robot fingers are extra grippy
         if APPLY_EXTRA_GRIP:
