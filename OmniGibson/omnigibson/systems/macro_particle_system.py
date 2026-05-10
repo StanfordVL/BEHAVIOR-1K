@@ -615,6 +615,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             # "carpet" is in GROUND_CATEGORIES for navigation but rugs are movable furnishings, not structural floors
             is_ground = obj.category in GROUND_CATEGORIES and obj.category != "carpet"
             reachability_context = get_reachability_sampling_context(obj, predicate="onTop") if is_ground else None
+
+            # TODO: hacky fix to the problem of dust appearing half on the object half outside
+            # while default hit proportion is 0.8, we made it 0.4 because it was hard to sample
+            # dust etc. on small objects like ring. We need a better fix for this
+            hit_proportion = 0.8 if is_ground and self.name == "dust" else self._SAMPLING_HIT_PROPORTION
+
             # Sample locations for all particles
             results = sample_cuboid_on_object_symmetric_bimodal_distribution(
                 obj=obj,
@@ -628,7 +634,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 aabb_offset=self._SAMPLING_AABB_OFFSET,
                 max_sampling_attempts=self._SAMPLING_MAX_ATTEMPTS,
                 refuse_downwards=True,
-                hit_proportion=self._SAMPLING_HIT_PROPORTION,
+                hit_proportion=hit_proportion,
             )
 
             # Use sampled points
