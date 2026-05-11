@@ -1,28 +1,12 @@
 import torch as th
 import warp as wp
 
-from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidContactAPI
-
-
-def _aabb_stale_for_pair(obj_a, obj_b):
-    """True if either object's AABB is marked stale since the last global_update — i.e.,
-    sample_kinematics or another external mutation has moved an object without a full sim step
-    bringing the tensorized state caches up to date.
-    """
-    if AABB.STALE is None or AABB.OBJ_IDXS is None:
-        return False
-    s = obj_a.scene.idx
-    a_idx = AABB.OBJ_IDXS.get(obj_a.relative_prim_path, -1)
-    b_idx = AABB.OBJ_IDXS.get(obj_b.relative_prim_path, -1)
-    a_stale = a_idx >= 0 and bool(AABB.STALE[s, a_idx].item())
-    b_stale = b_idx >= 0 and bool(AABB.STALE[s, b_idx].item())
-    return a_stale or b_stale
 
 
 # Tensorized Touching state.
@@ -133,25 +117,6 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     def _check_cloth_contact(cloth_obj, other_obj):
         other_link_paths = set(other_obj.link_prim_paths)
         return any(contact_prim_path in other_link_paths for contact_prim_path, _ in cloth_obj.root_link.get_contacts())
-
-    @staticmethod
-    def _check_rigid_contact_direct(obj_a, obj_b):
-        """Stale-cache fallback: direct per-call RigidContactAPI check, no tensor read.
-        Mirrors the pre-tensorized two-direction symmetry to match the contact-matrix asymmetry
-        between row-side (non-kinematic) and col-side (any) bodies.
-        """
-        if obj_a.kinematic_only and obj_b.kinematic_only:
-            return False
-        # Pick the kinematic side (if any) for the with_set; query the other.
-        kinematic_obj = obj_a if obj_a.kinematic_only else obj_b
-        non_kinematic_obj = obj_b if obj_a.kinematic_only else obj_a
-        return RigidContactAPI.is_in_contact(
-            scene_idx=kinematic_obj.scene.idx,
-            query_set=[non_kinematic_obj],
-            with_set=[kinematic_obj],
-            ignore_set=None,
-            current_only=True,
-        )
 
     @classmethod
     def global_initialize(cls):
@@ -293,13 +258,5 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             return self._check_cloth_contact(self.obj, other)
         if other_is_cloth:
             return self._check_cloth_contact(other, self.obj)
-
-        # Stale-cache fallback: if either AABB is marked stale (e.g. after sample_kinematics's
-        # step_physics-only loop), VALUES_CPU hasn't caught up — do a direct contact query
-        # against the freshest contact matrix. Match the symmetric semantics of the original code.
-        if _aabb_stale_for_pair(self.obj, other):
-            return self._check_rigid_contact_direct(other, self.obj) and self._check_rigid_contact_direct(
-                self.obj, other
-            )
 
         return super()._get_value(other)

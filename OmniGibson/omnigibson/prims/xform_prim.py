@@ -246,6 +246,13 @@ class XFormPrim(BasePrim):
 
         og.sim.fabric_hierarchy.update_world_xforms()
 
+        # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+        # that are now one frame behind. Flag them as stale so the next state read forces a
+        # refresh via the lazy-refresh gate in TensorizedState._get_value.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.caches_dirty = True
+
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """
         Gets prim's pose with respect to the specified frame.

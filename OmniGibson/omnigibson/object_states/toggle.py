@@ -9,6 +9,7 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
+from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
@@ -672,6 +673,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
     def _get_value(self):
         # Return toggle boolean from the (scene_idx, obj_idx, 0) entry of the shared VALUES tensor.
+        TensorizedState.maybe_refresh_caches()
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         return bool(self.VALUES[s, obj_idx].item())

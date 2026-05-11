@@ -2,6 +2,7 @@ import torch as th
 import warp as wp
 
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
+from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
 from omnigibson.utils.constants import PrimType
@@ -37,11 +38,6 @@ class AABB(TensorizedAbsoluteState):
     VALUES shape: (S, O, 6) — [lo_x, lo_y, lo_z, hi_x, hi_y, hi_z]
     """
 
-    # (S, O) bool CPU — True where cached AABB may be stale since last global_update()
-    # Often caused by sample_kinematics()
-    # TODO(vector): We will remove this mechanism after we implement our cache invalidation scheme.
-    STALE = None
-
     @classproperty
     def value_shape(cls):
         return (6,)
@@ -62,7 +58,6 @@ class AABB(TensorizedAbsoluteState):
         O = len(cls.OBJ_IDXS)
 
         if S == 0 or O == 0:
-            cls.STALE = th.zeros((0, 0), dtype=th.bool)
             empty = th.zeros((0,), dtype=th.int32)
             RigidBodyViewAPI.prepare_aabb_kernel_inputs(empty, empty, empty, empty)
             return
@@ -107,8 +102,6 @@ class AABB(TensorizedAbsoluteState):
             th.tensor(base_link_values_idx, dtype=th.int32),
         )
 
-        cls.STALE = th.zeros((S, O), dtype=th.bool)
-
         # Initialize new VALUE slots for objects that just appeared
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
             if rel_path not in prev_rel_paths:
@@ -134,23 +127,13 @@ class AABB(TensorizedAbsoluteState):
 
         # Cloth — disabled for now
 
-    @classmethod
-    def mark_stale(cls, obj):
-        """Mark obj's cached AABB as stale; _get_value() will recompute fresh until next global_update()."""
-        if obj.relative_prim_path not in cls.OBJ_IDXS:
-            return
-        cls.STALE[obj.scene.idx, cls.OBJ_IDXS[obj.relative_prim_path]] = True
-
-    @classmethod
-    def post_update(cls):
-        super().post_update()
-        cls.STALE.fill_(False)
-
     def _get_value(self):
+        # Bring VALUES_CPU back in sync if caches are dirty (e.g. since the last
+        # set_position_orientation / step_physics), then unpack the (6,) row into (lo, hi)
+        # to match EntityPrim.aabb's return shape.
+        TensorizedState.maybe_refresh_caches()
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        if self.STALE[s, obj_idx].item():
-            return self.obj.aabb  # fresh recompute via EntityPrim property
         v = self.VALUES_CPU[s, obj_idx]  # (6,) — CPU mirror, no GPU stall
         return v[:3], v[3:]  # (lo, hi) — matches EntityPrim.aabb return type
 

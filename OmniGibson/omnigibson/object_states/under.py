@@ -6,7 +6,6 @@ from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
-from omnigibson.object_states.touching import _aabb_stale_for_pair
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.object_state_utils import sample_kinematics
@@ -104,13 +103,6 @@ class Under(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     def _get_value(self, other):
         if other.prim_type == PrimType.CLOTH:
             raise ValueError("Cannot detect if an object is under a cloth object.")
-
-        # Stale-cache fallback: defer to Adjacency.get_value, which has its own on-demand
-        # raycast path when AABBs are stale (post-sample_kinematics, pre-next-sim.step).
-        if _aabb_stale_for_pair(self.obj, other):
-            adj = self.obj.states[Adjacency].get_value(other)
-            adj_other = other.states[Adjacency].get_value(self.obj)
-            return bool(adj[0]) and not bool(adj[1]) and not bool(adj_other[0])
 
         return super()._get_value(other)
 

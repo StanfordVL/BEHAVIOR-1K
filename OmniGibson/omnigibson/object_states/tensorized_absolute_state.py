@@ -122,6 +122,11 @@ class TensorizedAbsoluteState(AbsoluteObjectState, TensorizedState):
         TensorizedState.graph_dirty = True
 
     def _get_value(self):
+        # If something has mutated the world since the last refresh (physics step,
+        # set_position_orientation, joint set, etc.), bring all tensorized caches back in
+        # sync before reading. Re-entrance guard inside maybe_refresh_caches avoids
+        # recursing if a refresh is already mid-flight.
+        TensorizedState.maybe_refresh_caches()
         # Read from the pinned CPU mirror — no GPU stall for Python callers
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]

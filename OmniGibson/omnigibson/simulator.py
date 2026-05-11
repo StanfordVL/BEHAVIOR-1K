@@ -1214,10 +1214,70 @@ def _launch_simulator(*args, **kwargs):
                         state_type.initialize_view()
 
         def _update_view_apis(self):
-            """Flush physics caches from PhysX into view API's pinned-CPU staging buffers."""
+            """Flush physics caches from PhysX into view API's pinned-CPU staging buffers.
+
+            Also flips ``TensorizedState.caches_dirty`` so the next tensorized-state read
+            triggers ``_refresh_state_caches`` (or the next `_non_physics_step` clears it
+            via the same call).
+            """
             RigidContactAPI.update_contact_cache()
             RigidBodyViewAPI.update_pose_cache()
             ArticulatedObjectViewAPI.update_dof_cache()
+            TensorizedState.caches_dirty = True
+
+        def _refresh_state_caches(self):
+            """
+            Run a full tensorized-state refresh outside the normal step path.
+
+            This is the same pre/global/post pass that ``_non_physics_step`` runs once per
+            sim step, factored out so that callers which mutate poses/joints between sim
+            steps (``sample_kinematics``, ``Inside._set_value``, ad-hoc
+            ``set_position_orientation`` / ``JointPrim.set_pos``) can bring caches back into
+            sync without waiting for the next ``sim.step()``.
+
+            Triggered automatically from ``TensorizedAbsoluteState._get_value`` /
+            ``TensorizedRelativeState._get_value`` when ``TensorizedState.caches_dirty`` is
+            set, so callers don't have to remember to call it.
+
+            Always clears ``TensorizedState.caches_dirty`` on completion.
+            """
+            if not gm.ENABLE_OBJECT_STATES or len(self.scenes) == 0 or not self.is_playing():
+                TensorizedState.caches_dirty = False
+                return
+
+            tensorized_states = [
+                state for state in self.object_state_types_requiring_update if issubclass(state, TensorizedState)
+            ]
+            if not tensorized_states:
+                TensorizedState.caches_dirty = False
+                return
+
+            # Re-entrance guard: a nested _get_value during this refresh should read the
+            # cache directly rather than recursively triggering another refresh.
+            TensorizedState._refresh_in_progress = True
+            try:
+                # Flush PhysX → CPU pinned staging buffers so the captured graph's H2D copies
+                # see the latest poses / joint positions. step_physics() already does this,
+                # but lazy refreshes triggered by ad-hoc set_position_orientation /
+                # JointPrim.set_pos (no physics step) need this flush too.
+                self._update_view_apis()
+
+                for state_type in tensorized_states:
+                    state_type.pre_update()
+
+                if TensorizedState.graph_dirty:
+                    self._capture_warp_graph(tensorized_states)
+                    TensorizedState.graph_dirty = False
+                if self._state_graph is not None:
+                    wp.capture_launch(self._state_graph)
+
+                th.cuda.synchronize()
+
+                for state_type in tensorized_states:
+                    state_type.post_update()
+            finally:
+                TensorizedState._refresh_in_progress = False
+                TensorizedState.caches_dirty = False
 
         def _capture_warp_graph(self, tensorized_states):
             """
@@ -1295,27 +1355,8 @@ def _launch_simulator(*args, **kwargs):
 
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
-                    tensorized_states = [
-                        state
-                        for state in self.object_state_types_requiring_update
-                        if issubclass(state, TensorizedState)
-                    ]
-
-                    for state_type in tensorized_states:
-                        state_type.pre_update()
-
-                    if TensorizedState.graph_dirty:
-                        self._capture_warp_graph(tensorized_states)
-                        TensorizedState.graph_dirty = False
-                    if self._state_graph is not None:
-                        wp.capture_launch(self._state_graph)
-
-                    th.cuda.synchronize()
-
-                    # TensorizedState post_updates (CPU change detection + state_updated())
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedState):
-                            state_type.post_update()
+                    # Pre/global/post tensorized state refresh.
+                    self._refresh_state_caches()
 
                     # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
                     for state_type in self.object_state_types_requiring_update:

@@ -6,6 +6,7 @@ import warp as wp
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
+from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
@@ -88,23 +89,6 @@ def _compute_joint_threshold(joint, joint_direction):
     open_end = joint.upper_limit if joint_direction == 1 else joint.lower_limit
     threshold = (1 - f) * closed_end + f * open_end
     return threshold, open_end, closed_end
-
-
-def _is_in_range(position, threshold, range_end):
-    """
-    Calculates whether a joint's position @position is in its opening / closing range
-
-    Args:
-        position (float): Joint value
-        threshold (float): Joint value at which closed <--> open
-        range_end (float): Extreme joint value for being opened / closed
-
-    Returns:
-        bool: Whether the joint position is past @threshold in the direction of @range_end
-    """
-    # Note that we are unable to do an actual range check here because the joint positions can actually go
-    # slightly further than the denoted joint limits.
-    return position > threshold if range_end > threshold else position < threshold
 
 
 def _get_relevant_joints(obj):
@@ -339,6 +323,7 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
         )
 
     def _get_value(self):
+        TensorizedState.maybe_refresh_caches()
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         return bool(self.VALUES_CPU[s, obj_idx])
@@ -397,27 +382,11 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
                     # Sample a position.
                     joint_pos = (th.rand(1) * (high - low) + low).item()
 
-                # Save sampled position.
+                # Save sampled position. JointPrim.set_pos flips TensorizedState.caches_dirty,
+                # so the next get_value() below will trigger a refresh and observe the new pose.
                 joint.set_pos(joint_pos)
 
-            # Check success from joint positions (VALUES is stale here)
-            # TODO(vector): When cache invalidation works, we can just call _update_values() here instead of recomputing everything.
-            sides_open = []
-            for check_side in sides:
-                joint_thresholds = (
-                    _compute_joint_threshold(joint, direction * check_side)
-                    for joint, direction in zip(relevant_joints, joint_directions)
-                )
-                joint_positions = [joint.get_state()[0] for joint in relevant_joints]
-                joint_openness = (
-                    _is_in_range(pos, threshold, open_end)
-                    for pos, (threshold, open_end, _) in zip(joint_positions, joint_thresholds)
-                )
-                sides_open.append(any(joint_openness))
-
-            if all(sides_open) == new_value:
-                # Write result into VALUES immediately so get_value() is correct before next global_update()
-                super()._set_value(new_value)
+            if self.get_value() == new_value:
                 return True
 
         # We exhausted our attempts and could not find a working sample.

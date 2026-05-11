@@ -10,7 +10,6 @@ from omnigibson.object_states.contains import m as contains_m
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
-from omnigibson.object_states.touching import _aabb_stale_for_pair
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import (
     m as os_m,
@@ -581,20 +580,6 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         if other.prim_type == PrimType.CLOTH:
             raise ValueError("Cannot detect if an object is inside a cloth object.")
 
-        # Stale-cache fallback: after sample_kinematics, VALUES_CPU is one step behind.
-        if _aabb_stale_for_pair(self.obj, other):
-            aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
-            inner_object_pos = (aabb_lower + aabb_upper) / 2.0
-            outer_lo, outer_hi = other.states[AABB].get_value()
-            if not (th.le(outer_lo, inner_object_pos).all() and th.le(inner_object_pos, outer_hi).all()):
-                return False
-            points = inner_object_pos.reshape(1, 3)
-            in_volume = th.zeros(points.shape[0], dtype=th.bool)
-            for link in other.links.values():
-                if link.is_meta_link and link.meta_link_type in macros.object_states.contains.CONTAINER_META_LINK_TYPES:
-                    in_volume |= link.check_points_in_volume(points)
-            return th.any(in_volume).item()
-
         return super()._get_value(other)
 
     def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
@@ -784,8 +769,8 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                     og.sim.load_state(state, serialized=False)
                     continue
 
-            # Rejection sampling #6: Verify object is still inside after settling and within reach if using trav map
-            AABB.mark_stale(self.obj)
+            # Rejection sampling #6: Verify object is still inside after settling and within reach if using trav map.
+            # The lazy-refresh gate in TensorizedState._get_value brings VALUES_CPU back in sync before this read.
             if self.get_value(other):
                 if use_trav_map:
                     settled_pos, _ = self.obj.get_position_orientation()

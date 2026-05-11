@@ -1,5 +1,4 @@
 import math
-from collections import namedtuple
 
 import torch as th
 import warp as wp
@@ -9,7 +8,6 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.sampling_utils import raytest, raytest_batch
 from omnigibson.utils.usd_utils import RigidBodyViewAPI, rigid_inverse_mat44
 
 # Create settings for this module
@@ -19,106 +17,6 @@ m.MAX_DISTANCE_HORIZONTAL = 5.0
 
 # Number of horizontal directions, evenly spaced around the XY plane at angles k * 360/N.
 m.HORIZONTAL_DIRECTION_COUNT = 10
-
-# Per-direction adjacency neighbors found during a ray cast (used by compute_adjacencies, which
-# remains alive as the stale-AABB fallback path inside Adjacency._get_value).
-AxisAdjacencyList = namedtuple("AxisAdjacencyList", ("positive_neighbors", "negative_neighbors"))
-
-
-def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
-    """
-    Given an object and a list of axes, find the adjacent objects in the axes'
-    positive and negative directions.
-
-    If @obj is of PrimType.CLOTH, then adjacent objects are found with respect to the
-    @obj's centroid particle position
-
-    Args:
-        obj (StatefulObject): The object to check adjacencies of.
-        axes (2D-array): (n_axes, 3) array defining the axes to check in.
-            Note that each axis will be checked in both its positive and negative direction.
-        use_aabb_center (bool): If True and @obj is not of PrimType.CLOTH, will shoot rays from @obj's aabb center.
-            Otherwise, will dynamically compute starting points based on the requested @axes
-
-    Returns:
-        list of AxisAdjacencyList: List of length len(axes) containing the adjacencies.
-    """
-    # Get vectors for each of the axes' directions.
-    # The ordering is axes1+, axis1-, axis2+, axis2- etc.
-    directions = th.empty((len(axes) * 2, 3))
-    directions[0::2] = axes
-    directions[1::2] = -axes
-
-    # Prepare this object's info for ray casting.
-    if obj.prim_type == PrimType.CLOTH:
-        ray_starts = th.tile(obj.root_link.centroid_particle_position, (len(directions), 1))
-
-    else:
-        aabb_lower, aabb_higher = obj.states[AABB].get_value()
-        object_position = (aabb_lower + aabb_higher) / 2.0
-        ray_starts = th.tile(object_position, (len(directions), 1))
-
-        if not use_aabb_center:
-            # Dynamically compute start points by iterating over the directions and pre-shooting rays from
-            # which to shoot back from
-            # For a given direction, we go in the negative (opposite) direction to the edge of the object extent,
-            # and then proceed with an additional offset before shooting rays
-            shooting_offset = 0.01
-
-            direction_half_extent = directions * (aabb_higher - aabb_lower).reshape(1, 3) / 2.0
-            pre_start = object_position.reshape(1, 3) + (direction_half_extent + directions * shooting_offset)
-            pre_end = object_position.reshape(1, 3) - direction_half_extent
-
-            idx = 0
-            obj_link_paths = {link.prim_path for link in obj.links.values()}
-
-            def _ray_callback(hit):
-                # Check for self-hit -- if so, record the position and terminate early
-                should_continue = True
-                if hit.rigid_body in obj_link_paths:
-                    ray_starts[idx] = th.tensor(hit.position)
-                    should_continue = False
-                return should_continue
-
-            for ray_start, ray_end in zip(pre_start, pre_end):
-                raytest(
-                    start_point=ray_start,
-                    end_point=ray_end,
-                    only_closest=False,
-                    callback=_ray_callback,
-                )
-                idx += 1
-
-    # Prepare the rays to cast.
-    ray_endpoints = ray_starts + (directions * max_distance)
-
-    # Cast time.
-    prim_paths = obj.link_prim_paths
-    ray_results = raytest_batch(
-        ray_starts, ray_endpoints, only_closest=False, ignore_bodies=prim_paths, ignore_collisions=prim_paths
-    )
-
-    # Add the results to the appropriate lists
-    # For now, we keep our result in the dimensionality of (direction, hit_object_order).
-    # We convert the hit link into unique objects encountered
-    objs_by_direction = []
-    for results in ray_results:
-        unique_objs = set()
-        for result in results:
-            # Check if the inferred hit object is not None, we add it to our set
-            obj_prim_path = "/".join(result["rigidBody"].split("/")[:-1])
-            hit_obj = obj.scene.object_registry("prim_path", obj_prim_path, None)
-            if hit_obj is not None:
-                unique_objs.add(hit_obj)
-        objs_by_direction.append(unique_objs)
-
-    # Reshape so that these have the following indices:
-    # (axis_idx, direction-one-or-zero, hit_idx)
-    objs_by_axis = [
-        AxisAdjacencyList(positive_neighbors, negative_neighbors)
-        for positive_neighbors, negative_neighbors in zip(objs_by_direction[::2], objs_by_direction[1::2])
-    ]
-    return objs_by_axis
 
 
 # Tensorized Adjacency state
@@ -403,59 +301,6 @@ class Adjacency(TensorizedRelativeState):
         else:
             cls._output = None
             cls.OUTPUT_WP = None
-
-    def _get_value(self, other):
-        """Read the (22,) bool adjacency vector from self to other.
-
-        If AABB is stale for either side (typically right after sample_kinematics
-        between full sim.step() calls), fall back to a per-object on-demand ray cast
-        via the legacy compute_adjacencies. This mirrors the legacy
-        VerticalAdjacency / HorizontalAdjacency behavior, which was always on-demand.
-        """
-        s = self.obj.scene.idx
-
-        # TODO(andi) change caching mechanism
-        # Staleness check via AABB.STALE — same trigger the legacy code used.
-        self_aabb_idx = AABB.OBJ_IDXS.get(self.obj.relative_prim_path, -1) if AABB.OBJ_IDXS else -1
-        other_aabb_idx = AABB.OBJ_IDXS.get(other.relative_prim_path, -1) if AABB.OBJ_IDXS else -1
-        self_stale = AABB.STALE is not None and self_aabb_idx >= 0 and bool(AABB.STALE[s, self_aabb_idx].item())
-        other_stale = AABB.STALE is not None and other_aabb_idx >= 0 and bool(AABB.STALE[s, other_aabb_idx].item())
-        if self_stale or other_stale:
-            return self._compute_on_demand(other)
-
-        return super()._get_value(other)
-
-    def _compute_on_demand(self, other):
-        """Fallback: legacy on-demand ray cast for self in all 12 directions; returns bool vector for `other`.
-
-        Used when cached VALUES are known stale (post-sample_kinematics, pre-next-sim.step).
-        Reuses compute_adjacencies which reads fresh AABB via AABB.STALE bypass.
-        """
-        # Vertical: k=0 (+Z), k=1 (-Z). Use the surface-finding pre-step (use_aabb_center=False)
-        # to match legacy VerticalAdjacency.
-        vertical_axis_lists = compute_adjacencies(
-            self.obj, th.tensor([[0.0, 0.0, 1.0]]), m.MAX_DISTANCE_VERTICAL, use_aabb_center=False
-        )
-        vertical_pair = vertical_axis_lists[0]
-
-        # Horizontal: 10 evenly-spaced directions at angles k·2π/10 (k=0..9), populating k=2..11.
-        # compute_adjacencies probes each axis in both +/- directions, so we pass the first half
-        # (5 axes at 0°..144°) and read positive_neighbors → k=2..6, negative_neighbors → k=7..11.
-        n_horizontal = m.HORIZONTAL_DIRECTION_COUNT
-        half = n_horizontal // 2
-        angles = th.arange(half, dtype=th.float32) * (2.0 * math.pi / n_horizontal)
-        horizontal_axes = th.stack([th.cos(angles), th.sin(angles), th.zeros_like(angles)], dim=1)
-        horizontal_axis_lists = compute_adjacencies(
-            self.obj, horizontal_axes, m.MAX_DISTANCE_HORIZONTAL, use_aabb_center=True
-        )
-
-        out = th.zeros(_ADJ_AXIS_COUNT, dtype=th.bool)
-        out[0] = other in vertical_pair.positive_neighbors
-        out[1] = other in vertical_pair.negative_neighbors
-        for axis_idx, pair in enumerate(horizontal_axis_lists):
-            out[2 + axis_idx] = other in pair.positive_neighbors
-            out[2 + half + axis_idx] = other in pair.negative_neighbors
-        return out
 
     @classmethod
     def _update_values(cls, values):

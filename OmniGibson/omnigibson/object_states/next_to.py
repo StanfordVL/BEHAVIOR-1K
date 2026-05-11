@@ -6,7 +6,6 @@ from omnigibson.object_states.adjacency import Adjacency, _ADJ_AXIS_COUNT
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
-from omnigibson.object_states.touching import _aabb_stale_for_pair
 from omnigibson.utils.python_utils import classproperty
 
 
@@ -163,26 +162,3 @@ class NextTo(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             ],
             device="cuda",
         )
-
-    def _get_value(self, other):
-        # Stale-cache fallback: AABB.get_value and Adjacency.get_value both handle their own
-        # stale paths, so re-run the original distance + horizontal-adjacency computation.
-        if _aabb_stale_for_pair(self.obj, other):
-            objA_lower, objA_upper = self.obj.states[AABB].get_value()
-            objB_lower, objB_upper = other.states[AABB].get_value()
-            distance_vec = []
-            for dim in range(3):
-                glb = max(objA_lower[dim], objB_lower[dim])
-                lub = min(objA_upper[dim], objB_upper[dim])
-                distance_vec.append(max(0, glb - lub))
-            distance = th.norm(th.tensor(distance_vec, dtype=th.float32))
-            avg_aabb_length = th.mean(objA_upper - objA_lower + objB_upper - objB_lower)
-            if distance > avg_aabb_length * (1.0 / 6.0):
-                return False
-            adj_self = self.obj.states[Adjacency].get_value(other)
-            if bool(adj_self[2:].any()):
-                return True
-            adj_other = other.states[Adjacency].get_value(self.obj)
-            return bool(adj_other[2:].any())
-
-        return super()._get_value(other)

@@ -6,7 +6,7 @@ from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
-from omnigibson.object_states.touching import Touching, _aabb_stale_for_pair
+from omnigibson.object_states.touching import Touching
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.object_state_utils import sample_kinematics
@@ -129,14 +129,6 @@ class OnTop(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     def _get_value(self, other):
         if other.prim_type == PrimType.CLOTH:
             raise ValueError("Cannot detect if an object is on top of a cloth object.")
-
-        # Stale-cache fallback: Touching / Adjacency .get_value both have their own
-        # post-sample_kinematics stale fallbacks, so we just re-derive on the fly.
-        if _aabb_stale_for_pair(self.obj, other):
-            if not self.obj.states[Touching].get_value(other):
-                return False
-            adj = self.obj.states[Adjacency].get_value(other)
-            return bool(adj[1]) and not bool(adj[0])
 
         return super()._get_value(other)
 

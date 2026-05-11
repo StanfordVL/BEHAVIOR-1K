@@ -70,6 +70,29 @@ class TensorizedState:
     # buffer reallocation is automatically covered.
     graph_dirty = True
 
+    # Set to True whenever something has happened that could leave VALUES_CPU one frame
+    # behind the live world: a physics step, a direct pose mutation, a joint mutation, etc.
+    # Cleared by ``og.sim._refresh_state_caches()``. The lazy-refresh gate in
+    # ``TensorizedAbsoluteState._get_value`` / ``TensorizedRelativeState._get_value`` checks
+    # this flag and triggers a refresh on first read so callers always observe fresh state
+    # without having to know about the cache lifecycle.
+    caches_dirty = False
+
+    # Re-entrance guard for the lazy refresh: while `_refresh_state_caches` is running, any
+    # nested `_get_value` should read the (now-being-recomputed) cache directly without
+    # re-triggering a refresh. Set/cleared inside the simulator helper.
+    _refresh_in_progress = False
+
+    @classmethod
+    def maybe_refresh_caches(cls):
+        """Helper for `_get_value` overrides: if caches are dirty (and we're not already
+        mid-refresh), run the lazy refresh so the upcoming read sees fresh values.
+        """
+        if cls.caches_dirty and not cls._refresh_in_progress:
+            import omnigibson as og  # local import to avoid module-level cycle
+
+            og.sim._refresh_state_caches()
+
     @classmethod
     def pre_update(cls):
         """
