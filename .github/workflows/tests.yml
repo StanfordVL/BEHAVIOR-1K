@@ -86,6 +86,7 @@ jobs:
           - test_snapshots
           - test_transition_rules
           - test_2026_tasks
+          - test_replay_data
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
@@ -138,7 +139,7 @@ jobs:
         run: printenv
 
       - name: Checkout 2026 challenge task instances
-        if: matrix.test_file == 'test_2026_tasks'
+        if: matrix.test_file == 'test_2026_tasks' || matrix.test_file == 'test_replay_data'
         env:
           DEPLOY_KEY: ${{ secrets.DATASET_2026_DEPLOY_KEY }}
         run: |
