@@ -85,6 +85,7 @@ jobs:
           - test_transform_utils
           - test_snapshots
           - test_transition_rules
+          - test_2026_tasks
         include:
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
@@ -135,6 +136,24 @@ jobs:
 
       - name: Print env
         run: printenv
+
+      - name: Checkout 2026 challenge task instances
+        if: matrix.test_file == 'test_2026_tasks'
+        env:
+          DEPLOY_KEY: ${{ secrets.DATASET_2026_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/2026_dataset_deploy_key
+          chmod 600 ~/.ssh/2026_dataset_deploy_key
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/2026_dataset_deploy_key -o IdentitiesOnly=yes"
+          DATA_PATH=$(python -c "from omnigibson.macros import gm; print(gm.DATA_PATH)")
+          DEST="$DATA_PATH/2026-challenge-task-instances"
+          if [ -d "$DEST/.git" ]; then
+            git -C "$DEST" pull --ff-only
+          else
+            rm -rf "$DEST"
+            git clone git@github.com:wensi-ai/2026-challenge-task-instances.git "$DEST"
+          fi
 
       - name: Run tests
         run: >
