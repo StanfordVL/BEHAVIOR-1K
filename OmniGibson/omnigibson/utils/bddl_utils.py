@@ -573,6 +573,16 @@ class BDDLSampler:
         log.info("Sampling states...")
         self._compiled_task = compiled_task
 
+        self._activity_conditions = compiled_task.conditions
+        error_msg = self._parse_inroom_object_room_assignment()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+        error_msg = self._build_inroom_object_scope()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+
         error_msg = self._build_sampling_order()
         if error_msg:
             log.error(error_msg)
@@ -632,6 +642,13 @@ class BDDLSampler:
         """
         self._room_type_to_object_instance = dict()
         self._inroom_object_instances = set()
+        self._object_instance_to_synset.update(
+            {
+                obj_inst: obj_cat
+                for obj_cat in self._activity_conditions.parsed_objects
+                for obj_inst in self._activity_conditions.parsed_objects[obj_cat]
+            }
+        )
         for cond in self._activity_conditions.parsed_initial_conditions:
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
@@ -914,6 +931,16 @@ class BDDLSampler:
         if error_msg:
             return error_msg
         self._inroom_object_scope = room_type_to_scene_objs
+
+        # Tentatively assign the first candidate for each inroom object so that _object_scope
+        # is populated before _maximum_bipartite_matching runs (e.g. for _determine_room_instances).
+        # MBM will overwrite these with the properly matched assignments.
+        for obj_to_rooms in self._inroom_object_scope.values():
+            for obj_inst, room_inst_to_objs in obj_to_rooms.items():
+                for objs in room_inst_to_objs.values():
+                    if objs:
+                        self._object_scope[obj_inst] = objs[0]
+                        break
 
     def _filter_object_scope(self, input_object_scope, conditions, condition_type):
         """
