@@ -2,34 +2,29 @@
     (:domain behavior-1k)
 
     (:objects
-        lawn.n.01_1 - lawn.n.01
         floor.n.01_1 - floor.n.01
-        grill.n.02_1 - grill.n.02
-        branch.n.02_1 branch.n.02_2 branch.n.02_3 - branch.n.02
+        branch.n.02_1 branch.n.02_2 branch.n.02_3 branch.n.02_4 - branch.n.02
         ashcan.n.01_1 - ashcan.n.01
-        pruner.n.02_1 - pruner.n.02
         agent.n.01_1 - agent.n.01
     )
-    
+
     (:init
-        (ontop branch.n.02_1 grill.n.02_1) 
-        (ontop branch.n.02_2 lawn.n.01_1) 
-        (ontop branch.n.02_3 lawn.n.01_1)
-        (ontop ashcan.n.01_1 lawn.n.01_1) 
-        (ontop pruner.n.02_1 lawn.n.01_1) 
-        (ontop agent.n.01_1 floor.n.01_1) 
+        (ontop branch.n.02_1 floor.n.01_1)
+        (ontop branch.n.02_2 floor.n.01_1)
+        (ontop branch.n.02_3 floor.n.01_1)
+        (ontop branch.n.02_4 floor.n.01_1)
+        (ontop ashcan.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
         (inroom floor.n.01_1 garden)
-        (inroom lawn.n.01_1 garden)
-        (inroom grill.n.02_1 garden)
     )
-    
-    (:goal 
-        (and 
-            (forall 
+
+    (:goal
+        (and
+            (forall
                 (?branch.n.02 - branch.n.02)
                 (inside ?branch.n.02 ?ashcan.n.01_1)
             )
-            (ontop ?ashcan.n.01_1 ?lawn.n.01_1)
+            (ontop ?ashcan.n.01_1 ?floor.n.01_1)
         )
     )
 )
