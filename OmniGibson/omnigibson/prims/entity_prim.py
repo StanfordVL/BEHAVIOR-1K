@@ -125,7 +125,6 @@ class EntityPrim(XFormPrim):
                 lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
 
         self.update_links()
-        self._exclude_non_physical_joints_from_gpu_articulations()
         self._compute_articulation_tree()
 
         # Prepare the articulation view.
@@ -265,32 +264,6 @@ class EntityPrim(XFormPrim):
                 load_config=link_load_config,
             )
             self._links[link_name].load(self.scene)
-
-    def _exclude_non_physical_joints_from_gpu_articulations(self):
-        """
-        Keep visual-only / semantic marker links out of GPU articulation constraint solving.
-
-        These links are still represented as rigid prims so their transforms remain available, but GPU dynamics is
-        less tolerant of articulation bodies that intentionally have no physical collision response.
-        """
-        if not gm.USE_GPU_DYNAMICS or self._prim_type != PrimType.RIGID:
-            return
-
-        non_physical_link_paths = {
-            link.prim_path
-            for link in self._links.values()
-            if link.visual_only or (link.is_meta_link and not link.has_collision_meshes)
-        }
-        if not non_physical_link_paths:
-            return
-
-        with og.sim.editing_usd():
-            for joint_prim in find_joint_prims(self._prim):
-                body0_targets = joint_prim.GetRelationship("physics:body0").GetTargets()
-                body1_targets = joint_prim.GetRelationship("physics:body1").GetTargets()
-                joint_body_paths = {target.pathString for target in (*body0_targets, *body1_targets)}
-                if joint_body_paths & non_physical_link_paths:
-                    joint_prim.GetAttribute("physics:excludeFromArticulation").Set(True)
 
     def update_joints(self):
         """

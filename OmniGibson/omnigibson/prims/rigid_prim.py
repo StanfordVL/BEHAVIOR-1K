@@ -30,6 +30,8 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_CONTACT_OFFSET = 0.001
 m.DEFAULT_REST_OFFSET = 0.0
+m.DEFAULT_COLLISIONLESS_LINK_MASS = 1e-4
+m.DEFAULT_COLLISIONLESS_LINK_INERTIA = 1e-5
 m.LEGACY_META_LINK_PATTERN = re.compile(r".*:(\w+)_([A-Za-z0-9]+)_(\d+)_link")
 
 
@@ -91,7 +93,7 @@ class RigidPrim(XFormPrim):
         # Apply rigid body and mass APIs
         ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.RigidBodyAPI)
         ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxRigidBodyAPI)
-        ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
+        mass_api = ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
 
         # Check if it's part of an articulation view
         self._belongs_to_articulation = (
@@ -117,9 +119,14 @@ class RigidPrim(XFormPrim):
 
         # Possibly set the mass / density
         if not self.has_collision_meshes:
-            # A meta (virtual) link has no collision meshes; set a negligible mass and a zero density (ignored)
-            self.mass = 1e-6
+            # A collisionless link still needs non-singular mass properties if it participates in an articulation.
+            self.mass = m.DEFAULT_COLLISIONLESS_LINK_MASS
             self.density = 0.0
+            with og.sim.editing_usd():
+                mass_api.GetDiagonalInertiaAttr().Set(
+                    lazy.pxr.Gf.Vec3f(*([m.DEFAULT_COLLISIONLESS_LINK_INERTIA] * 3))
+                )
+                mass_api.GetPrincipalAxesAttr().Set(lazy.pxr.Gf.Quatf(1.0, 0.0, 0.0, 0.0))
         elif "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
         if "density" in self._load_config and self._load_config["density"] is not None:
