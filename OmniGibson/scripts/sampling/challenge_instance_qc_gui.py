@@ -100,6 +100,7 @@ class TaskReport:
 
 # File and metadata loading
 
+
 def yes_no(value):
     return "Yes" if value else "No"
 
@@ -215,6 +216,7 @@ def parse_instance_id(path, prefix):
 
 
 # Pose extraction
+
 
 def instance_state_path(paths, instance_id):
     return paths.instance_dir / f"{paths.prefix}_0_{instance_id}_template-tro_state.json"
@@ -431,6 +433,7 @@ def load_room_categories():
 
 # Floor-plan rendering
 
+
 @dataclass
 class FloorPlan:
     image_uri: str
@@ -581,6 +584,7 @@ def make_floor_plan(scene, chosen_rooms, floor=0, target_size=1200, crop_margin_
 
 # QC checks
 
+
 def validate_templates(paths):
     issues = []
     for path, label in [(paths.template_path, "template"), (paths.partial_rooms_path, "partial rooms")]:
@@ -638,9 +642,7 @@ def analyze_task(paths, task_id, rooms, args):
     valid_json_count = 0
     try:
         template_data = (
-            read_json(paths.template_path)
-            if paths.template_path is not None and paths.template_path.exists()
-            else {}
+            read_json(paths.template_path) if paths.template_path is not None and paths.template_path.exists() else {}
         )
     except Exception:
         template_data = {}
@@ -731,9 +733,8 @@ def format_object_std_detail(object_stats, min_xy_std):
     if not values:
         return "not enough repeated object poses"
     low = [name for name, stats in object_stats.items() if stats.count >= 2 and stats.std_xy < min_xy_std]
-    return (
-        f"min {min(values):.3f} m, median {float(np.median(values)):.3f} m, max {max(values):.3f} m"
-        + (f"; low: {format_list([short_object_label(name) for name in low], max_items=5)}" if low else "")
+    return f"min {min(values):.3f} m, median {float(np.median(values)):.3f} m, max {max(values):.3f} m" + (
+        f"; low: {format_list([short_object_label(name) for name in low], max_items=5)}" if low else ""
     )
 
 
@@ -777,9 +778,7 @@ def validate_dataset_shape(dataset_dir, discovered_paths, expected_instances):
         allowed_files.add(paths.template_path.relative_to(dataset_dir))
         allowed_files.add(paths.partial_rooms_path.relative_to(dataset_dir))
         for instance_id in range(1, expected_instances + 1):
-            allowed_files.add(
-                instance_state_path(paths, instance_id).relative_to(dataset_dir)
-            )
+            allowed_files.add(instance_state_path(paths, instance_id).relative_to(dataset_dir))
 
     extras = []
     for path in sorted(dataset_dir.rglob("*")):
@@ -1089,10 +1088,7 @@ def check_by_text(report, text):
 
 def task_to_gui(report, index):
     object_names = sorted(report.object_points)
-    object_colors = {
-        name: DEFAULT_PALETTE[i % len(DEFAULT_PALETTE)]
-        for i, name in enumerate(object_names)
-    }
+    object_colors = {name: DEFAULT_PALETTE[i % len(DEFAULT_PALETTE)] for i, name in enumerate(object_names)}
     checks = [{"text": check.text, "ok": check.ok, "detail": check.detail} for check in report.checks]
     object_stats = {
         name: {
@@ -1933,8 +1929,7 @@ def run_gui(result, args):
         "datasetDir": str(result["dataset_dir"]),
         "expectedInstances": args.expected_instances,
         "globalChecks": [
-            {"text": check.text, "ok": check.ok, "detail": check.detail}
-            for check in result["global_checks"]
+            {"text": check.text, "ok": check.ok, "detail": check.detail} for check in result["global_checks"]
         ],
         "tasks": [task_to_gui(report, index) for index, report in enumerate(result["reports"])],
     }
