@@ -204,7 +204,8 @@ class TextureBaker:
         u.height = 1024
         u.preview = False
 
-        assert u.unwrap(), f"Unwrapping error w/ {obj.name}: {u.error}"
+        u.unwrap()
+        assert u.success, f"Unwrapping error w/ {obj.name}: {u.error}"
 
     def uv_unwrapping_native(self, obj):
         rt.select(obj)
