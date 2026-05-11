@@ -1412,10 +1412,11 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths, filtering out kinematic-only bodies that are not rows
+        # Otherwise, convert to prim paths, filtering out kinematic-only bodies that are not rows.
+        # dtype=long so an empty result (all paths kinematic-only) is still safe to use as an index.
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
         row_map = self._PATH_TO_ROW_IDX.get(scene_idx, {})
-        return th.tensor([row_map[path] for path in prim_paths if path in row_map])
+        return th.tensor([row_map[path] for path in prim_paths if path in row_map], dtype=th.long)
 
     def get_contact_col_indices(self, scene_idx, objects_links_or_prim_paths):
         """
@@ -1434,9 +1435,9 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths
+        # Otherwise, convert to prim paths. dtype=long so an empty result is safe to use as an index.
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths])
+        return th.tensor([self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths], dtype=th.long)
 
     def get_contact_pairs(self, scene_idx, query_set, with_set, current_only):
         """
@@ -1674,6 +1675,34 @@ class RigidContactAPIImpl:
     def has_contact_view(self, scene_idx):
         """Returns True if a valid contact view has been initialized for @scene_idx."""
         return scene_idx in self._CONTACT_MATRIX
+
+    def get_contact_matrix_shape(self, scene_idx):
+        """
+        Returns:
+            tuple(int, int) | None: (R, C) shape of the contact matrix for @scene_idx, or None
+            if no contact view exists for that scene.
+        """
+        if scene_idx not in self._CONTACT_MATRIX:
+            return None
+        return tuple(self._CONTACT_MATRIX[scene_idx].shape)
+
+    def get_contact_matrix_wp(self, scene_idx, current_only):
+        """
+        Get the wp.array view of the GPU contact matrix for use inside Warp kernels (e.g. inside
+        a captured wp.graph). Same view that ``is_in_contact_batch_warp`` consumes internally.
+
+        Args:
+            scene_idx (int): Scene index.
+            current_only (bool): True → "current step only" matrix, False → "any recent step" matrix.
+
+        Returns:
+            wp.array(uint8) | None: (R, C) uint8 view, or None if no contact view exists for @scene_idx.
+        """
+        if scene_idx not in self._CONTACT_MATRIX_GPU_WP:
+            return None
+        return (
+            self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] if current_only else self._CONTACT_MATRIX_GPU_WP[scene_idx]
+        )
 
     def clear(self):
         """
