@@ -273,7 +273,7 @@ class EntityPrim(XFormPrim):
         These links are still represented as rigid prims so their transforms remain available, but GPU dynamics is
         less tolerant of articulation bodies that intentionally have no physical collision response.
         """
-        if not gm.USE_GPU_DYNAMICS:
+        if not gm.USE_GPU_DYNAMICS or self._prim_type != PrimType.RIGID:
             return
 
         non_physical_link_paths = {
