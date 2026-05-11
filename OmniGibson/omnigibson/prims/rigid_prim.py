@@ -123,9 +123,7 @@ class RigidPrim(XFormPrim):
             self.mass = m.DEFAULT_COLLISIONLESS_LINK_MASS
             self.density = 0.0
             with og.sim.editing_usd():
-                mass_api.GetDiagonalInertiaAttr().Set(
-                    lazy.pxr.Gf.Vec3f(*([m.DEFAULT_COLLISIONLESS_LINK_INERTIA] * 3))
-                )
+                mass_api.GetDiagonalInertiaAttr().Set(lazy.pxr.Gf.Vec3f(*([m.DEFAULT_COLLISIONLESS_LINK_INERTIA] * 3)))
                 mass_api.GetPrincipalAxesAttr().Set(lazy.pxr.Gf.Quatf(1.0, 0.0, 0.0, 0.0))
         elif "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
