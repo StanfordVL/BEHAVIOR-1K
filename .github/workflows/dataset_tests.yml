@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 jobs:
   run_dataset_test:
     name: Run Dataset Tests
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
 
     strategy:
       fail-fast: false
