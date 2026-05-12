@@ -466,7 +466,7 @@ class BehaviorTask(BaseTask):
             # Compile a wildcard-stripped base task.
             self.compiled_task = self._task_def.compile_base()
             self._finalize_compiled_task()
-            
+
             # Phase 2: sample states using compiled conditions
             accept_scene, feedback = self.sampler.sample_states(self.compiled_task)
             if not accept_scene:
@@ -505,6 +505,7 @@ class BehaviorTask(BaseTask):
 
     def _assign_wildcard_instances(self, env, room_instances):
         """Assign each unbound wildcard instance to a scene object in its matched room, in numeric-suffix order."""
+
         def numeric_suffix(name):
             try:
                 return int(name.rsplit("_", 1)[1])
@@ -513,20 +514,14 @@ class BehaviorTask(BaseTask):
 
         # Collect unbound slots in suffix order and track already-claimed scene objects
         unbound = sorted(
-            (
-                inst
-                for inst, entity in self.object_scope.items()
-                if entity is None and "agent.n." not in inst
-            ),
+            (inst for inst, entity in self.object_scope.items() if entity is None and "agent.n." not in inst),
             key=numeric_suffix,
         )
         used = {obj for obj in self.object_scope.values() if obj is not None}
 
         # Resolve each inroom-constrained instance to its matched room instance
         inroom_assignments = {
-            cond[1]: cond[2]
-            for cond in self.compiled_task.conditions.parsed_initial_conditions
-            if cond[0] == "inroom"
+            cond[1]: cond[2] for cond in self.compiled_task.conditions.parsed_initial_conditions if cond[0] == "inroom"
         }
 
         # Bind each slot to a free, category-matching object in its matched room
