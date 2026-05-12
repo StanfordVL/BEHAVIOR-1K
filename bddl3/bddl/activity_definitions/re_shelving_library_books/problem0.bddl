@@ -4,7 +4,7 @@
     (:objects
      	book.n.02_1 book.n.02_2 book.n.02_3 - book.n.02
     	table.n.02_1 - table.n.02
-    	bookcase.n.01_* - bookcase.n.01
+    	bookcase.n.01_1 bookcase.n.01_* - bookcase.n.01
     	floor.n.01_1 - floor.n.01
     	agent.n.01_1 - agent.n.01
     )
@@ -14,6 +14,7 @@
         (ontop book.n.02_2 table.n.02_1) 
         (ontop book.n.02_3 table.n.02_1) 
         (inroom table.n.02_1 living_room)
+        (inroom bookcase.n.01_1 living_room)
         (inroom bookcase.n.01_* living_room)
         (inroom floor.n.01_1 living_room) 
         (ontop agent.n.01_1 floor.n.01_1)
