@@ -27,57 +27,60 @@ def _load_tasks_one_per_scene():
     return [(task, scene) for scene, task in sorted(seen_scenes.items())]
 
 
-# Evaluated at collection time; module-level skip above guards against missing file.
 TASKS_2026 = _load_tasks_one_per_scene() if os.path.exists(_AVAILABLE_TASKS_PATH) else []
 
 
-@pytest.mark.parametrize("task_name,scene_model", TASKS_2026, ids=[t[0] for t in TASKS_2026])
-def test_2026_task_loads(task_name, scene_model):
+def test_2026_tasks_load():
+    """Load one task per 2026-dataset scene in a single sim session."""
     import omnigibson as og
 
     gm.ENABLE_OBJECT_STATES = True
     gm.ENABLE_TRANSITION_RULES = True
     gm.HEADLESS = True
 
-    config = {
-        "scene": {
-            "type": "InteractiveTraversableScene",
-            "scene_model": scene_model,
-            "include_robots": False,
-        },
-        "task": {
-            "type": "BehaviorTask",
-            "activity_name": task_name,
-            "activity_definition_id": 0,
-            "activity_instance_id": 0,
-            "online_object_sampling": False,
-            "use_presampled_robot_pose": True,
-            "include_obs": False,
-        },
-        "robots": [
-            {
-                "model": "r1pro",
-                "obs_modalities": [],
-            }
-        ],
-    }
-    try:
-        env = og.Environment(configs=config)
-        env.reset()
-        env.step(env.action_space.sample())
-        print(
-            f"Task {task_name!r} in {scene_model!r} loaded successfully. "
-            f"Goal state options: {len(env.task.ground_goal_state_options)}"
-        )
-    except Exception:
-        import traceback
+    failed = []
+    for task_name, scene_model in TASKS_2026:
+        config = {
+            "scene": {
+                "type": "InteractiveTraversableScene",
+                "scene_model": scene_model,
+                "include_robots": False,
+            },
+            "task": {
+                "type": "BehaviorTask",
+                "activity_name": task_name,
+                "activity_definition_id": 0,
+                "activity_instance_id": 0,
+                "online_object_sampling": False,
+                "use_presampled_robot_pose": True,
+                "include_obs": False,
+            },
+            "robots": [
+                {
+                    "model": "r1pro",
+                    "obs_modalities": [],
+                }
+            ],
+        }
+        try:
+            env = og.Environment(configs=config)
+            env.reset()
+            env.step(env.action_space.sample())
+            print(
+                f"Task {task_name!r} in {scene_model!r} loaded successfully. "
+                f"Goal state options: {len(env.task.ground_goal_state_options)}"
+            )
+        except Exception:
+            import traceback
 
-        traceback.print_exc()
+            traceback.print_exc()
+            failed.append(task_name)
+        finally:
+            og.clear()
+
+    if failed:
         sys.exit(1)
-    finally:
-        og.clear()
 
 
 if __name__ == "__main__":
-    for task_name, scene_model in TASKS_2026:
-        test_2026_task_loads(task_name, scene_model)
+    test_2026_tasks_load()
