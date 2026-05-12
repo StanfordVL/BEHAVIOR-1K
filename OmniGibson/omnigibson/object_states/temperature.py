@@ -1,26 +1,37 @@
+import torch as th
 import warp as wp
 
-import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
+from omnigibson.object_states.tensorized_state import _wp_from_torch
 from omnigibson.utils.python_utils import classproperty
 
 
 @wp.kernel
 def _temperature_decay_kernel(
     values: wp.array2d(dtype=wp.float32),
+    incoming_heat_rate: wp.array2d(dtype=wp.float32),
     default_temp: wp.float32,
     decay_rate: wp.float32,
     dt: wp.array(dtype=wp.float32),
 ):
     """
-    In-place exponential decay toward `default_temp`. One thread per (scene, obj).
-    Equivalent to: values += (default_temp - values) * decay_rate * dt[0]
+    Fused exponential decay toward `default_temp` plus consumption of the per-step
+    incoming heat rate scratch buffer. One thread per (scene, obj).
+        values += (default_temp - values) * decay_rate * dt[0] + incoming_heat_rate * dt[0]
+    Then zero the consumed entry so the buffer is fresh for the next-step writers
+    (HSS at the start of the next step plus any lag-1 writes from OnFire / cloth
+    post-pass that happen after this kernel).
+
+    `dt` is a single-element warp array (read as `dt[0]`) rather than a scalar so the
+    per-frame value written in pre_update is visible inside the captured graph without
+    re-capturing it (time-dependent-state mechanism).
     """
     s, o = wp.tid()
-    values[s, o] = values[s, o] + (default_temp - values[s, o]) * decay_rate * dt[0]
+    values[s, o] = values[s, o] + (default_temp - values[s, o]) * decay_rate * dt[0] + incoming_heat_rate[s, o] * dt[0]
+    incoming_heat_rate[s, o] = wp.float32(0.0)
 
 
 # Create settings for this module
@@ -35,6 +46,29 @@ m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps
 
 
 class Temperature(TensorizedAbsoluteState):
+    # (S, N) float32 — per-step rate accumulator. HeatSourceOrSink (and cloth post-pass)
+    # atomic_add into this; the decay kernel consumes it and zeros it at the end of the same
+    # kernel so contributions from later-running states (OnFire, cloth post-pass) accumulate
+    # for the *next* step's consumption (lag-1, matches the pre-tensorized behavior).
+    INCOMING_HEAT_RATE = None
+    INCOMING_HEAT_RATE_WP = None
+
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(AABB)
+        return deps
+
+    @classmethod
+    def get_optional_dependencies(cls):
+        deps = super().get_optional_dependencies()
+        # HSS stays *optional*: the topo sort still places it before Temperature (so the
+        # captured graph runs HSS's atomic_add into INCOMING_HEAT_RATE before this kernel
+        # reads it), but objects without HSS on them (e.g. cookable food items) are still
+        # eligible to receive a Temperature state.
+        deps.add(HeatSourceOrSink)
+        return deps
+
     @classmethod
     def initialize_view(cls):
         # Snapshot which relative paths existed before the rebuild
@@ -51,42 +85,21 @@ class Temperature(TensorizedAbsoluteState):
                         cls.VALUES[s_idx, obj_idx] = m.DEFAULT_TEMPERATURE
                         cls.VALUES_CPU[s_idx, obj_idx] = m.DEFAULT_TEMPERATURE
 
-    @classmethod
-    def update_temperature_from_heatsource_or_sink(cls, objs, temperature, rate):
-        """
-        Updates @objs' internal temperatures based on @temperature and @rate
-
-        Args:
-            objs (Iterable of StatefulObject): Objects whose temperatures should be updated
-            temperature (float): Heat source / sink temperature
-            rate (float): Heating rate of the source / sink
-        """
-        # Get (scene, obj) index pairs for the affected objects
-        s_idxs = [obj.scene.idx for obj in objs]
-        n_idxs = [cls.OBJ_IDXS[obj.relative_prim_path] for obj in objs]
-        cls.VALUES[s_idxs, n_idxs] += (temperature - cls.VALUES[s_idxs, n_idxs]) * rate * og.sim.get_sim_step_dt()
-        # Mirror to CPU immediately — this runs in Pass 2 (after the async sync point), so
-        # VALUES_CPU would otherwise lag by one step for heatsource contributions.
-        cls.VALUES_CPU[s_idxs, n_idxs] = cls.VALUES[s_idxs, n_idxs].cpu()
-
-    @classmethod
-    def get_dependencies(cls):
-        deps = super().get_dependencies()
-        deps.add(AABB)
-        return deps
-
-    @classmethod
-    def get_optional_dependencies(cls):
-        deps = super().get_optional_dependencies()
-        deps.add(HeatSourceOrSink)
-        return deps
+        # Allocate the per-step heat-rate scratch buffer. No carry-over: a partial step from
+        # the previous configuration would be applied to the wrong indices.
+        if cls.VALUES.numel() > 0:
+            cls.INCOMING_HEAT_RATE = th.zeros(cls.VALUES.shape, dtype=th.float32, device="cuda")
+            cls.INCOMING_HEAT_RATE_WP = _wp_from_torch(cls.INCOMING_HEAT_RATE)
+        else:
+            cls.INCOMING_HEAT_RATE = None
+            cls.INCOMING_HEAT_RATE_WP = None
 
     @classmethod
     def _update_values(cls, values):
-        # Apply temperature decay via Warp kernel. dt is read from cls._dt at kernel-launch
-        # time inside the captured graph, so the per-frame value written in pre_update is
-        # visible without re-capturing the graph.
-        if cls.VALUES_WP is None:
+        # Apply temperature decay + incoming heat rate consumption via Warp kernel. dt is read
+        # from cls._dt at kernel-launch time inside the captured graph, so the per-frame value
+        # written in pre_update is visible without re-capturing the graph.
+        if cls.VALUES_WP is None or cls.INCOMING_HEAT_RATE_WP is None:
             return
         S, O = cls.VALUES.shape[:2]
         wp.launch(
@@ -94,6 +107,7 @@ class Temperature(TensorizedAbsoluteState):
             dim=(S, O),
             inputs=[
                 cls.VALUES_WP,
+                cls.INCOMING_HEAT_RATE_WP,
                 wp.float32(m.DEFAULT_TEMPERATURE),
                 wp.float32(m.TEMPERATURE_DECAY_SPEED),
                 cls._dt,
