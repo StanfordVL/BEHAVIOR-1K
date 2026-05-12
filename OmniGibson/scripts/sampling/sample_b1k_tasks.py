@@ -192,10 +192,10 @@ def main(random_selection=False, headless=False, short_exec=False):
         whitelist, blacklist = None, None
     env.task_config["sampling_whitelist"] = whitelist
     env.task_config["sampling_blacklist"] = blacklist
-    env.task_config["unique_models_per_synset"] = args.unique_models
+    env.task_config["use_unique_models_per_synset"] = args.unique_models
     log.info(f"white_list: {whitelist}")
     log.info(f"black_list: {blacklist}")
-    log.info(f"unique_models_per_synset: {args.unique_models}")
+    log.info(f"use_unique_models_per_synset: {args.unique_models}")
     assert whitelist is not None, "whitelist should not be None for manual sampling"
     BehaviorTask.get_cached_activity_scene_filename(
         scene_model=scene_model,
