@@ -191,13 +191,13 @@ class TextureBaker:
     def uv_unwrapping_unwrella(self, obj):
         u = rt.Unwrella()
         rt.addmodifier(obj, u)
-        u.stretch = 0.15
+        u.stretch = 1  # We allow for any amount of stretching. This was originally 0.15.
         u.rescale = True
         u.prerotate = True
-        u.packmode = 1  # Efficient
+        u.packmode = 0  # Classic. Go 1 for Efficient and 2 for High Quality.
         u.map_channel = NEW_UV_CHANNEL
         u.keep_seams = False
-        u.unwrap_mode = 0
+        u.unwrap_mode = 1  # 0 for organic. 1 is for hard-edge objects which most of ours are.
 
         u.padding = 2
         u.width = 1024
@@ -205,14 +205,10 @@ class TextureBaker:
         u.preview = False
 
         u.unwrap()
+        time.sleep(2)
         assert u.success, f"Unwrapping error w/ {obj.name}: {u.error}"
 
     def uv_unwrapping_native(self, obj):
-        rt.select(obj)
-
-        # Select all faces in preparation for uv unwrap
-        rt.polyop.setFaceSelection(obj, rt.name("all"))
-
         modifier = rt.unwrap_uvw()
         rt.addmodifier(obj, modifier)
 
@@ -223,11 +219,16 @@ class TextureBaker:
         modifier.unwrap2.flattenMapNoParams()
 
     def uv_unwrapping(self, obj):
+        rt.select(obj)
+
+        # Select all faces in preparation for uv unwrap
+        rt.polyop.setFaceSelection(obj, rt.name("all"))
+
         # Check if the object is already unwrapped with the same geometry
         current_hash = hash_object(obj)
         recorded_hash = get_recorded_uv_unwrapping_hash(obj)
         if rt.polyop.getMapSupport(obj, 99) and recorded_hash == current_hash:
-            print(f"Skipping unwrapping for {obj.name} as it has not changed.")
+            # print(f"Skipping unwrapping for {obj.name} as it has not changed.")
             return
 
         start_time = time.time()
@@ -239,10 +240,13 @@ class TextureBaker:
             obj, 99
         ), f"Failed to clear UV channel 99 for {obj.name} prior to unwrapping"
         if USE_UNWRELLA:
-            self.uv_unwrapping_unwrella(obj)
-            if not rt.polyop.getMapSupport(obj, 99):
+            try:
+                self.uv_unwrapping_unwrella(obj)
+                if not rt.polyop.getMapSupport(obj, 99):
+                    raise ValueError("Unwrella failed to unwrap the object.")
+            except Exception as e:
                 print(
-                    f"Unwrella failed for {obj.name}, falling back to native unwrapping."
+                    f"Unwrella failed for {obj.name} with error {e}, falling back to native unwrapping."
                 )
                 self.uv_unwrapping_native(obj)
         else:
@@ -250,6 +254,7 @@ class TextureBaker:
         assert rt.polyop.getMapSupport(
             obj, 99
         ), f"Could not unwrap UVs for object {obj.name}"
+        rt.polyop.setFaceSelection(obj, rt.name("all"))
 
         # Flatten the modifier stack
         rt.maxOps.collapseNodeTo(obj, 1, True)
@@ -276,7 +281,7 @@ class TextureBaker:
             rt.classOf(obj.material) == rt.Shell_Material
             and obj.material.renderMtlIndex == 1
         ):
-            print(f"Skipping baking for {obj.name} as it is already baked.")
+            # print(f"Skipping baking for {obj.name} as it is already baked.")
             return
 
         # Also skip objects whose material is not some kind of a Vray material
@@ -294,7 +299,7 @@ class TextureBaker:
         if rt.classOf(obj.material) == rt.Shell_Material:
             obj.material = obj.material.originalMaterial
 
-        print("prepare_texture_baking", obj.name)
+        # print("prepare_texture_baking", obj.name)
 
         for i, map_name in enumerate(CHANNEL_MAPPING.keys()):
             texture_map = btt.addMapByClassId(obj, self.MAP_NAME_TO_IDS[map_name])
@@ -366,9 +371,8 @@ class TextureBaker:
         start_time = time.time()
         print("start baking")
         assert btt.bake(), "baking failed"
-        print("finish baking")
         end_time = time.time()
-        print(f"baking took {end_time - start_time} seconds")
+        print(f"finish baking. baking took {end_time - start_time} seconds")
 
         # Clear the baking list again.
         btt.deleteAllMaps()
@@ -387,7 +391,7 @@ class TextureBaker:
         print(f"Found {len(objs)} objects to process.")
         postprocessing = []  # (obj, siblings)
         for i, obj in enumerate(objs):
-            print(f"{(i + 1)} / {len(objs)}: {obj.name}")
+            # print(f"{(i + 1)} / {len(objs)}: {obj.name}")
 
             rt.select([obj])
             rt.IsolateSelection.EnterIsolateSelectionMode()
