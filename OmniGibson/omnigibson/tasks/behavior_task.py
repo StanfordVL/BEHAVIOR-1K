@@ -382,19 +382,20 @@ class BehaviorTask(BaseTask):
                         break
         return room_instances
 
-    def _compile_with_rooms(self, env):
+    def _compile_with_rooms(self, env, room_instances):
         """Compile the wildcard task using the specific room instances from assigned objects.
 
         After object scope has been assigned (via cache or sampling), this
-        determines which room instances are being used, counts objects in those
-        rooms, and compiles the task with proper wildcard expansion.
+        counts objects in the matched rooms and compiles the task with proper
+        wildcard expansion.
 
         Args:
             env: The environment with the active scene.
+            room_instances: Dict mapping room_type -> room_instance_name. Must
+                be computed from the base inroom anchors BEFORE wildcard-synset
+                bases are unbound, or rooms anchored only by a wildcard synset
+                will drop out of the scene layout.
         """
-        # Determine which room instances the assigned objects are in
-        room_instances = self._determine_room_instances(env)
-
         # Build scene layout from those specific rooms
         scene_layout = self._build_scene_layout_from_rooms(env.scene, room_instances)
 
@@ -471,11 +472,13 @@ class BehaviorTask(BaseTask):
             if not accept_scene:
                 return accept_scene, feedback
 
-            # Wildcards expand AFTER matching rooms
+            # Snapshot rooms before unbinding — otherwise rooms anchored only
+            # by a wildcard-synset base instance drop from the scene layout.
             if self._task_def.has_wildcards:
+                room_instances = self._determine_room_instances(env)
                 self._unbind_wildcard_synset_bases()
-                self._compile_with_rooms(env)
-                self._assign_wildcard_instances(env)
+                self._compile_with_rooms(env, room_instances)
+                self._assign_wildcard_instances(env, room_instances)
         else:
             inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
             self.compiled_task = self._task_def.compile_from_inst_to_name(inst_to_name)
@@ -500,7 +503,7 @@ class BehaviorTask(BaseTask):
             if synset in wildcard_synsets:
                 self.object_scope[inst] = None
 
-    def _assign_wildcard_instances(self, env):
+    def _assign_wildcard_instances(self, env, room_instances):
         """Assign each unbound wildcard instance to a scene object in its matched room, in numeric-suffix order."""
         def numeric_suffix(name):
             try:
@@ -520,7 +523,6 @@ class BehaviorTask(BaseTask):
         used = {obj for obj in self.object_scope.values() if obj is not None}
 
         # Resolve each inroom-constrained instance to its matched room instance
-        room_instances = self._determine_room_instances(env)
         inroom_assignments = {
             cond[1]: cond[2]
             for cond in self.compiled_task.conditions.parsed_initial_conditions
