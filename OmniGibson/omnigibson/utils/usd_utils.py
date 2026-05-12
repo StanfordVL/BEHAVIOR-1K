@@ -1435,9 +1435,12 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths. dtype=long so an empty result is safe to use as an index.
+        # Otherwise, convert to prim paths, filtering out bodies without contact reporting
+        # (e.g. visual-only links) that are not columns. dtype=long so an empty result is safe
+        # to use as an index.
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths], dtype=th.long)
+        col_map = self._PATH_TO_COL_IDX.get(scene_idx, {})
+        return th.tensor([col_map[path] for path in prim_paths if path in col_map], dtype=th.long)
 
     def get_contact_pairs(self, scene_idx, query_set, with_set, current_only):
         """
