@@ -23,6 +23,11 @@ NUM_STEPS = 300
 
 
 def apply_macros(args):
+    # BehaviorTask relies on object states (and transition rules) to evaluate its
+    # symbolic conditions, so it cannot run with them disabled.
+    if args.task_type == "behavior" and not args.object_states:
+        print("[vector_profiling] --task-type behavior requires object states; enabling them.")
+        args.object_states = True
     gm.ENABLE_OBJECT_STATES = args.object_states
     gm.ENABLE_TRANSITION_RULES = args.object_states
     gm.USE_GPU_DYNAMICS = args.gpu_dynamics
