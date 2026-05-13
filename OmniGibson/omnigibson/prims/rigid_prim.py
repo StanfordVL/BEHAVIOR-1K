@@ -497,7 +497,6 @@ class RigidPrim(XFormPrim):
             return None
         return self.transform_local_points_to_world(local_points)
 
-    @cached_property
     def collision_mesh_cpu_data(self):
         """
         Returns:
@@ -529,8 +528,8 @@ class RigidPrim(XFormPrim):
         if not pts_concat:
             return None
 
-        pts_cpu = th.cat(pts_concat, dim=0).to(th.float32).contiguous()
-        faces_cpu = th.cat(idx_concat, dim=0).to(th.int32).contiguous()
+        pts_cpu = th.cat(pts_concat, dim=0).to(th.float32)
+        faces_cpu = th.cat(idx_concat, dim=0).to(th.int32)
         return pts_cpu, faces_cpu
 
     @property

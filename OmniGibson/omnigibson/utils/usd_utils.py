@@ -615,11 +615,8 @@ class RigidBodyViewAPI:
                 pts_offsets.append(pts_offsets[-1] + p.shape[0])
                 faces_offsets.append(faces_offsets[-1] + f.shape[0])
 
-            # pin_memory + cuda(non_blocking=True) makes the H2D actually async, so it can
-            # overlap with the next CPU iteration / BVH-build dispatch.
-            pts_gpu_buf = th.cat(pts_segments, dim=0).pin_memory().cuda(non_blocking=True).contiguous()
-            faces_gpu_buf = th.cat(faces_segments, dim=0).pin_memory().cuda(non_blocking=True).contiguous()
-            th.cuda.synchronize()  # ensure H2D is visible before BVH builds
+            pts_gpu_buf = th.cat(pts_segments, dim=0).cuda()
+            faces_gpu_buf = th.cat(faces_segments, dim=0).cuda()
 
             for i, (idx, abs_path, link, pts_cpu, _) in enumerate(new_links):
                 p0, p1 = pts_offsets[i], pts_offsets[i + 1]
