@@ -104,7 +104,13 @@ def main():
     og.sim._post_physics_step_profiler.reset()
     og.sim._non_physics_step_profiler.reset()
 
-    action_lo, action_hi = -0.3, 0.3
+    # Use small random actions so the controllers/physics still run with non-trivial motion
+    # but joint velocities stay in a safe regime. Larger commands (e.g. +/- 0.3) probabilistically
+    # drive r1pro into a physics divergence (NaN base_link), and with many envs the dice rolls
+    # add up to a near-certain failure within ~tens of steps. Profiling cost is dominated by the
+    # per-step pipeline (controllers, physics solver, contacts, state/obs reads), which all run
+    # regardless of action magnitude.
+    action_lo, action_hi = -0.02, 0.02
     action_dim = env.scenes[0].robots[0].action_dim
     for _ in range(NUM_STEPS):
         actions = th.rand(args.n_envs, action_dim) * (action_hi - action_lo) + action_lo
