@@ -1234,6 +1234,7 @@ class RigidContactAPIImpl:
                 continue
 
             # Get the body transforms for this scene
+            # TODO: Replace this with a wp.copy.
             self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
                 self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
             )
@@ -1241,8 +1242,6 @@ class RigidContactAPIImpl:
         # Increment once per physics step
         if scene_idx_list:
             self._PENDING_STEPS += 1
-
-        th.cuda.synchronize()
 
     def update(self):
         """
