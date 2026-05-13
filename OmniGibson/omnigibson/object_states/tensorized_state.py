@@ -124,6 +124,7 @@ class TensorizedState:
         cls._update_values(values=cls.VALUES)
         # Mirror VALUES → VALUES_CPU. Use wp.copy when both wp.array handles exist (graph-safe);
         # fall back to torch's non-blocking copy otherwise (e.g. partial init).
+        # TODO(vector): Why would one (torch) exist and not the other (wp)?
         if cls.VALUES_WP is not None and cls.VALUES_CPU_WP is not None:
             wp.copy(cls.VALUES_CPU_WP, cls.VALUES_WP)
         else:

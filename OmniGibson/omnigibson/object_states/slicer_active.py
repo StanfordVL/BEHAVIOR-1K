@@ -16,6 +16,22 @@ m.REACTIVATION_DELAY = 2.0  # number of seconds to wait before reactivating the 
 
 
 @wp.kernel
+def _slicer_zero_currently_touching_kernel(
+    currently_touching: wp.array2d(dtype=wp.int32),  # (S, O)
+):
+    """
+    Per (scene, obj) thread. Zeroes `currently_touching` so the subsequent per-scene
+    is_in_contact_batch_warp atomic_max only needs to set-on-hit.
+
+    Lives inside the captured wp.graph so the zero is stream-ordered with the contact
+    queries that consume it — replaces an out-of-graph torch fill_() that relied on
+    legacy-default-stream semantics for cross-stream ordering with Warp's capture stream.
+    """
+    s, o = wp.tid()
+    currently_touching[s, o] = wp.int32(0)
+
+
+@wp.kernel
 def _slicer_pre_clear_kernel(
     values: wp.array2d(dtype=wp.uint8),  # (S, O) — public state, stays uint8
     delay_counter: wp.array2d(dtype=wp.float32),  # (S, O)
@@ -233,20 +249,6 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
             cls._currently_touching_per_scene_wp.append(wp.from_torch(cls._currently_touching[scene_idx]))
 
     @classmethod
-    def pre_update(cls):
-        """
-        CPU-side / outside-graph prep:
-          - super(): PREV_VALUES <- VALUES_CPU
-          - Zero _currently_touching here (PyTorch fill_) so the captured _update_values stays
-            Warp-only. The per-scene is_in_contact_batch_warp inside the graph only writes to
-            scenes that have a contact view; absent scenes need to be False from the start.
-        """
-        super().pre_update()
-        if cls._currently_touching is not None and cls._currently_touching.numel() > 0:
-            # int32 dtype now (atomic_max constraint); fill with 0.
-            cls._currently_touching.fill_(0)
-
-    @classmethod
     def _update_values(cls, values):
         if cls.PREVIOUSLY_TOUCHING_WP is None:
             return
@@ -256,6 +258,16 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
             kernel=_slicer_pre_clear_kernel,
             dim=(S, O),
             inputs=[cls.VALUES_WP, cls.DELAY_COUNTER_WP, cls.PREVIOUSLY_TOUCHING_WP],
+            device="cuda",
+        )
+
+        # Zero _currently_touching inside the graph so it's stream-ordered with the per-scene
+        # is_in_contact_batch_warp calls below (which atomic_max set-on-hit and require a
+        # pre-zeroed output). Absent scenes have no kernel launched, so their rows stay 0.
+        wp.launch(
+            kernel=_slicer_zero_currently_touching_kernel,
+            dim=(S, O),
+            inputs=[cls._currently_touching_wp],
             device="cuda",
         )
 
@@ -278,7 +290,8 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
     def _currently_touching_sliceables(cls):
         """
         Per-scene Warp contact batch query into the corresponding row of _currently_touching.
-        Empty/missing scenes leave their row as the .fill_(False) value.
+        Caller must have pre-zeroed _currently_touching (see _slicer_zero_currently_touching_kernel);
+        empty/missing scenes have no kernel launched and leave their row at 0.
         """
         for scene_idx in range(len(og.sim.scenes)):
             query_masks_wp = cls._slicer_contact_query_masks_wp[scene_idx]

@@ -451,10 +451,10 @@ class RigidBodyViewAPI:
     _IDX_TO_PATH = []  # list[link_absolute_prim_path]
 
     # Position + quaternion pose of all links in the scene, indexed by flat index.
-    # POSES (CPU pinned): where update_pose_cache() copies PhysX output;
+    # POSES (CPU pinned): where read_from_physx() copies PhysX output;
     # POSES_GPU: GPU mirror;
     # POSE_MATRICES: the derived (N,) wp.mat44 transform table.
-    # All three are populated inside the captured wp.graph each step via enqueue_to_graph().
+    # All three are populated inside the captured wp.graph each step via update().
     POSES = None  # wp.array, device="cpu", pinned=True, shape=(N_links_total, 7), float32
     POSES_GPU = None  # wp.array, device="cuda", shape=(N_links_total, 7), float32
     POSE_MATRICES = None  # wp.array, device="cuda", shape=(N_links_total,), wp.mat44
@@ -655,12 +655,12 @@ class RigidBodyViewAPI:
         cls._aabb_base_link_objs = None
 
     @classmethod
-    def update_pose_cache(cls):
+    def read_from_physx(cls):
         """
         Read the latest PhysX transforms into the pinned-CPU staging buffer (cls.POSES).
         Stays on the host: PhysX returns a CPU torch tensor, and graph capture freezes the
         call (see scripts/test_physx_in_warp_graph.py). The H2D copy + pose2mat kernel run
-        inside the captured wp.graph via enqueue_to_graph().
+        inside the captured wp.graph via update().
 
         physx_untracked links are never touched here; they are updated only by invalidate_kinematic().
         """
@@ -678,6 +678,7 @@ class RigidBodyViewAPI:
         # Copy PhysX output into the fixed pinned wp.array via a torch view
         N_physx_tracked = transforms.shape[0]
         wp.to_torch(cls.POSES)[:N_physx_tracked] = transforms
+        wp.copy(cls.POSES_GPU, cls.POSES)
 
     @classmethod
     def get_flat_idx(cls, abs_prim_path):
@@ -798,7 +799,7 @@ class RigidBodyViewAPI:
         Refresh the pinned-CPU pose staging buffer for kinematic links after an explicit move.
 
         For physx_untracked links (no physics:RigidBodyAPI) this is the only update path.
-        For physx_tracked kinematic links this write is harmless — update_pose_cache() will
+        For physx_tracked kinematic links this write is harmless — read_from_physx() will
         re-read from PhysX on the next step.
 
         Only POSES (pinned CPU) is touched here. POSES_GPU and POSE_MATRICES are
@@ -821,7 +822,7 @@ class RigidBodyViewAPI:
             poses_torch[idx, 3:] = quat_xyzw
 
     @classmethod
-    def enqueue_to_graph(cls):
+    def update(cls):
         """
         Enqueue the per-step H2D + pose-to-mat work onto the current Warp stream. Called
         inside wp.ScopedCapture so the captured graph replays the H2D + kernel together with
@@ -832,7 +833,6 @@ class RigidBodyViewAPI:
         N = cls.POSES_GPU.shape[0]
         if N == 0:
             return
-        wp.copy(cls.POSES_GPU, cls.POSES)
         wp.launch(
             _poses_to_matrices_kernel,
             dim=N,
@@ -879,8 +879,6 @@ class ArticulatedObjectViewAPI:
 
     _VIEW = None
     _OBJ_TO_VIEW_IDX = {}
-    # pinned staging buffer that update_dof_cache() copies PhysX output into
-    _JOINT_POSITIONS_CPU = None  # wp.array, device="cpu", pinned=True, shape=(N_art, max_dof), float32
     # GPU mirror, refreshed via wp.copy inside the captured graph each step
     _JOINT_POSITIONS = None  # wp.array, device="cuda", shape=(N_art, max_dof), float32
 
@@ -911,20 +909,18 @@ class ArticulatedObjectViewAPI:
         # Allocate fixed pinned-CPU and CUDA wp.arrays of the right shape.
         seed_positions = cls._VIEW.get_dof_positions().contiguous()  # torch CPU, used only to seed
         N, max_dof = seed_positions.shape
-        cls._JOINT_POSITIONS_CPU = wp.empty(shape=(N, max_dof), dtype=wp.float32, device="cpu", pinned=True)
         cls._JOINT_POSITIONS = wp.zeros(shape=(N, max_dof), dtype=wp.float32, device="cuda")
-        wp.copy(cls._JOINT_POSITIONS_CPU, wp.from_torch(seed_positions))
-        wp.copy(cls._JOINT_POSITIONS, cls._JOINT_POSITIONS_CPU)
+        wp.copy(cls._JOINT_POSITIONS, wp.from_torch(seed_positions))
 
     @classmethod
-    def update_dof_cache(cls):
+    def read_from_physx(cls):
         """Pull latest DOF positions from PhysX into the pinned CPU staging buffer.
         Stays on the host (PhysX returns CPU torch tensor). H2D happens inside the captured
-        wp.graph via enqueue_to_graph()."""
-        if cls._VIEW is None or cls._JOINT_POSITIONS_CPU is None:
+        wp.graph via update()."""
+        if cls._VIEW is None or cls._JOINT_POSITIONS is None:
             return
         positions = cls._VIEW.get_dof_positions()  # torch CPU
-        wp.copy(cls._JOINT_POSITIONS_CPU, wp.from_torch(positions.contiguous()))
+        wp.copy(cls._JOINT_POSITIONS, wp.from_torch(positions.contiguous()))
 
     @classmethod
     def get_view_row(cls, abs_prim_path):
@@ -937,19 +933,10 @@ class ArticulatedObjectViewAPI:
         return cls._JOINT_POSITIONS.shape[1] if cls._JOINT_POSITIONS is not None else 0
 
     @classmethod
-    def enqueue_to_graph(cls):
-        """Enqueue H2D copy of joint positions onto the current Warp stream (called INSIDE
-        wp.ScopedCapture so it's part of the captured per-step graph)."""
-        if cls._JOINT_POSITIONS is None or cls._JOINT_POSITIONS_CPU is None:
-            return
-        wp.copy(cls._JOINT_POSITIONS, cls._JOINT_POSITIONS_CPU)
-
-    @classmethod
     def clear(cls):
         cls._VIEW = None
         cls._OBJ_TO_VIEW_IDX = {}
         cls._JOINT_POSITIONS = None
-        cls._JOINT_POSITIONS_CPU = None
 
 
 class RigidContactAPIImpl:
@@ -987,16 +974,16 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
 
         # Contact matrix tracking contacts that occurred at any point during the last N physics steps
-        # (between consecutive update_contact_cache calls). Shape: (R, C)
+        # (between consecutive update calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
-        self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
+        self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update()
         # wp.array views over _CONTACT_MATRIX_GPU per scene; wrapped once after each (re-)allocation
         # for use inside Warp kernels and graph capture.
         self._CONTACT_MATRIX_GPU_WP = dict()
 
         # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
         self._CURRENT_CONTACT_MATRIX = dict()
-        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update()
         self._CURRENT_CONTACT_MATRIX_GPU_WP = dict()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
@@ -1007,7 +994,7 @@ class RigidContactAPIImpl:
         self._BODY_TRANSFORMS = dict()
 
         # Accumulated impulse matrices and transforms from individual physics steps,
-        # collected between consecutive update_contact_cache calls.
+        # collected between consecutive update calls.
         self._PENDING_STEPS = 0
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
@@ -1216,14 +1203,14 @@ class RigidContactAPIImpl:
                     device="cuda",
                 )
 
-    def add_contacts_from_physics_step(self):
+    def read_from_physx(self):
         """
         Fetches contact impulse matrices and body transforms from the current physics step
         and appends them to pending lists. Should be called by the simulator after every
         individual physics step. The accumulated data is later processed in bulk by
-        update_contact_cache.
+        update().
         """
-        assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
+        assert og.sim.currently_stepping, "read_from_physx must be called during a physics step"
         assert self._PENDING_STEPS < og.sim.n_physics_timesteps_per_render, "Pending steps buffer is full"
 
         scene_idx_list = list(self._CONTACT_VIEW.keys())
@@ -1257,9 +1244,9 @@ class RigidContactAPIImpl:
 
         th.cuda.synchronize()
 
-    def update_contact_cache(self):
+    def update(self):
         """
-        Processes all accumulated physics-step data (collected via add_contacts_from_physics_step)
+        Processes all accumulated physics-step data (collected via read_from_physx)
         to update both the "recent" contact matrix (any contact in the last N steps) and the
         "current" contact matrix (contact at only the most recent step).
 
@@ -1360,7 +1347,7 @@ class RigidContactAPIImpl:
 
             # Copy updated GPU matrices back to CPU mirrors so is_in_contact()
             # can read them without a GPU stall.
-            # This will be synced in simulator._update_view_apis()
+            # This will be synced in simulator._refresh_state_caches()
             self._CONTACT_MATRIX[scene_idx].copy_(self._CONTACT_MATRIX_GPU[scene_idx], non_blocking=True)
             self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
                 self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True

@@ -1213,18 +1213,6 @@ def _launch_simulator(*args, **kwargs):
                     if issubclass(state_type, TensorizedState):
                         state_type.initialize_view()
 
-        def _update_view_apis(self):
-            """Flush physics caches from PhysX into view API's pinned-CPU staging buffers.
-
-            Also flips ``TensorizedState.caches_dirty`` so the next tensorized-state read
-            triggers ``_refresh_state_caches`` (or the next `_non_physics_step` clears it
-            via the same call).
-            """
-            RigidContactAPI.update_contact_cache()
-            RigidBodyViewAPI.update_pose_cache()
-            ArticulatedObjectViewAPI.update_dof_cache()
-            TensorizedState.caches_dirty = True
-
         def _refresh_state_caches(self):
             """
             Run a full tensorized-state refresh outside the normal step path.
@@ -1260,18 +1248,22 @@ def _launch_simulator(*args, **kwargs):
                 # see the latest poses / joint positions. step_physics() already does this,
                 # but lazy refreshes triggered by ad-hoc set_position_orientation /
                 # JointPrim.set_pos (no physics step) need this flush too.
-                self._update_view_apis()
+                RigidBodyViewAPI.read_from_physx()
+                ArticulatedObjectViewAPI.read_from_physx()
+                wp.synchronize()
+                TensorizedState.caches_dirty = True
 
                 for state_type in tensorized_states:
                     state_type.pre_update()
 
                 if TensorizedState.graph_dirty:
+                    # Capturing the graph also executes it, so we don't need to launch it separately
                     self._capture_warp_graph(tensorized_states)
                     TensorizedState.graph_dirty = False
-                if self._state_graph is not None:
+                elif self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
 
-                th.cuda.synchronize()
+                wp.synchronize()
 
                 for state_type in tensorized_states:
                     state_type.post_update()
@@ -1286,7 +1278,7 @@ def _launch_simulator(*args, **kwargs):
 
             Steps:
               1. If every state is empty (no objects), set the graph to None and skip capture.
-              2. Open a wp.ScopedCapture; record the view-API enqueue_to_graph() ops first
+              2. Open a wp.ScopedCapture; record the view-API update() ops first
                  (POSES H2D + pose-to-mat, DOF positions H2D), then each state's global_update.
             """
             # If every tensorized state is empty there's nothing to capture; clear the graph
@@ -1298,9 +1290,10 @@ def _launch_simulator(*args, **kwargs):
             # Let ScopedCapture create + own its capture stream. Inside the with-block,
             # wp.get_stream() returns that stream and any wp.launch / wp.copy defaults to it.
             with wp.ScopedCapture(device="cuda") as capture:
-                # View-API H2D + derived kernels (formerly the eager async_copy_to_gpu calls).
-                RigidBodyViewAPI.enqueue_to_graph()
-                ArticulatedObjectViewAPI.enqueue_to_graph()
+                # View-API kernels.
+                RigidBodyViewAPI.update()
+                RigidContactAPI.update()
+
                 # Tensorized state kernels read POSE_MATRICES / joint positions written above —
                 # stream ordering on the capture stream guarantees they see fresh values.
                 for state_type in tensorized_states:
@@ -1318,9 +1311,6 @@ def _launch_simulator(*args, **kwargs):
 
             # If we're playing we, also run additional logic
             if self.is_playing():
-                # Update persistent rigid contact and body pose caches from the latest step
-                self._update_view_apis()
-
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
                 if n_objects_to_initialize > 0 and self.is_playing():
@@ -1514,7 +1504,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Accumulate contact data from this physics step and then flush to cache.
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-            self._update_view_apis()
+            self._refresh_state_caches()
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
@@ -1553,7 +1543,8 @@ def _launch_simulator(*args, **kwargs):
                     ControllableObjectViewAPI.post_physics_step()
 
                 # Pull the contact sensor data
-                RigidContactAPI.add_contacts_from_physics_step()
+                RigidContactAPI.read_from_physx()
+                wp.synchronize()
 
                 if self._deferred_joint_breaks:
                     # Copy the current deferred joint breaks and clear the shared list
