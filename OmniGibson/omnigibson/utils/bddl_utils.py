@@ -1267,8 +1267,13 @@ class BDDLSampler:
                 # Create the object. This is imported here to avoid a circular import.
                 from omnigibson.objects.dataset_object import DatasetObject
 
+                # Derive the object's name from the BDDL instance (e.g. "pruner.n.01_1") instead
+                # of "<category>_<scene.objects count>". so every scene uses the same name for
+                # the same object even when its sampled category/model differ.
+                slot_name = obj_inst.replace(".", "_")
+
                 simulator_obj = DatasetObject(
-                    name=f"{category}_{len(self._scene.objects)}",
+                    name=slot_name,
                     category=category,
                     model=model,
                     prim_type=(
