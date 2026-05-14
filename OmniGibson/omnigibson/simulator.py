@@ -1265,6 +1265,10 @@ def _launch_simulator(*args, **kwargs):
 
                 wp.synchronize()
 
+                # Reset the read_from_physx pending-step counter for the next batch of
+                # physics sub-steps.
+                RigidContactAPI._PENDING_STEPS = 0
+
                 for state_type in tensorized_states:
                     state_type.post_update()
             finally:
