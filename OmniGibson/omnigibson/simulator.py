@@ -1234,80 +1234,85 @@ def _launch_simulator(*args, **kwargs):
 
             Always clears ``TensorizedState.caches_dirty`` on completion.
             """
-            if not gm.ENABLE_OBJECT_STATES or len(self.scenes) == 0 or not self.is_playing():
+            if len(self.scenes) == 0 or not self.is_playing():
                 TensorizedState.caches_dirty = False
                 return
 
-            tensorized_states = [
-                state for state in self.object_state_types_requiring_update if issubclass(state, TensorizedState)
-            ]
+            RigidBodyViewAPI.read_from_physx()
+            ArticulatedObjectViewAPI.read_from_physx()
+            wp.synchronize()
+
+            self._capture_warp_graph()
+
+        def _capture_warp_graph(self):
+            """
+            Manage the per-step warp graph end-to-end (gating, pre/post bookkeeping, capture,
+            and launch all live here so ``_refresh_state_caches`` stays thin).
+
+            Steps:
+              1. Compute the list of tensorized states, gated on ``gm.ENABLE_OBJECT_STATES``.
+                 If the list is empty (object states disabled or none registered), run the
+                 view-API ``update()``s directly and return — there is no pre/global/post
+                 pipeline to drive.
+              2. Otherwise, run ``pre_update`` for each state, then either (re-)capture or
+                 replay the per-step graph (view-API H2D + tensorized state global_updates).
+                 ``wp.ScopedCapture`` only RECORDS ops — the captured graph must be launched
+                 explicitly via ``wp.capture_launch`` for its kernels to run this frame.
+              3. After ``wp.synchronize()``, run ``post_update`` for each state for change
+                 detection.
+
+            Always clears ``TensorizedState.caches_dirty`` on completion.
+            """
+            tensorized_states = (
+                [state for state in self.object_state_types_requiring_update if issubclass(state, TensorizedState)]
+                if gm.ENABLE_OBJECT_STATES
+                else []
+            )
+
             if not tensorized_states:
+                # No tensorized-state pipeline → still refresh GPU view-API mirrors so
+                # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
+                RigidBodyViewAPI.update()
+                RigidContactAPI.update()
+                wp.synchronize()
                 TensorizedState.caches_dirty = False
                 return
 
-            # Re-entrance guard: a nested _get_value during this refresh should read the
-            # cache directly rather than recursively triggering another refresh.
+            # Nested _get_value during this refresh should read the cache directly rather
+            # than recursively triggering another refresh.
             TensorizedState._refresh_in_progress = True
             try:
-                # Flush PhysX → CPU pinned staging buffers so the captured graph's H2D copies
-                # see the latest poses / joint positions. step_physics() already does this,
-                # but lazy refreshes triggered by ad-hoc set_position_orientation /
-                # JointPrim.set_pos (no physics step) need this flush too.
-                RigidBodyViewAPI.read_from_physx()
-                ArticulatedObjectViewAPI.read_from_physx()
-                wp.synchronize()
                 TensorizedState.caches_dirty = True
 
                 for state_type in tensorized_states:
                     state_type.pre_update()
 
                 if TensorizedState.graph_dirty:
-                    # Capturing the graph also executes it, so we don't need to launch it separately
-                    self._capture_warp_graph(tensorized_states)
-                    TensorizedState.graph_dirty = False
-                elif self._state_graph is not None:
+                    if all(s.VALUES is None or s.VALUES.numel() == 0 for s in tensorized_states):
+                        # Nothing to capture; leave _state_graph as None.
+                        self._state_graph = None
+                    else:
+                        # ScopedCapture creates + owns its capture stream. Inside the with-block,
+                        # wp.get_stream() returns that stream and any wp.launch / wp.copy defaults
+                        # to it. Tensorized-state kernels read POSE_MATRICES / joint positions
+                        # written by the view-API kernels above — stream ordering on the capture
+                        # stream guarantees they see fresh values.
+                        with wp.ScopedCapture(device="cuda") as capture:
+                            RigidBodyViewAPI.update()
+                            RigidContactAPI.update()
+                            for state_type in tensorized_states:
+                                state_type.global_update()
+                        self._state_graph = capture.graph
+                if self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
 
                 wp.synchronize()
-
-                # Reset the read_from_physx pending-step counter for the next batch of
-                # physics sub-steps.
-                RigidContactAPI._PENDING_STEPS = 0
 
                 for state_type in tensorized_states:
                     state_type.post_update()
             finally:
                 TensorizedState._refresh_in_progress = False
                 TensorizedState.caches_dirty = False
-
-        def _capture_warp_graph(self, tensorized_states):
-            """
-            (Re-)capture the per-step graph:
-            view-API H2D + tensorized state global_updates.
-
-            Steps:
-              1. If every state is empty (no objects), set the graph to None and skip capture.
-              2. Open a wp.ScopedCapture; record the view-API update() ops first
-                 (POSES H2D + pose-to-mat, DOF positions H2D), then each state's global_update.
-            """
-            # If every tensorized state is empty there's nothing to capture; clear the graph
-            # so the call site can skip wp.capture_launch.
-            if all(s.VALUES is None or s.VALUES.numel() == 0 for s in tensorized_states):
-                self._state_graph = None
-                return
-
-            # Let ScopedCapture create + own its capture stream. Inside the with-block,
-            # wp.get_stream() returns that stream and any wp.launch / wp.copy defaults to it.
-            with wp.ScopedCapture(device="cuda") as capture:
-                # View-API kernels.
-                RigidBodyViewAPI.update()
-                RigidContactAPI.update()
-
-                # Tensorized state kernels read POSE_MATRICES / joint positions written above —
-                # stream ordering on the capture stream guarantees they see fresh values.
-                for state_type in tensorized_states:
-                    state_type.global_update()
-            self._state_graph = capture.graph
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1352,11 +1357,11 @@ def _launch_simulator(*args, **kwargs):
                     for system in scene.active_systems.values():
                         system.update()
 
+                # Update view API data and tensorized states
+                self._refresh_state_caches()
+
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
-                    # Pre/global/post tensorized state refresh.
-                    self._refresh_state_caches()
-
                     # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
                     for state_type in self.object_state_types_requiring_update:
                         if issubclass(state_type, UpdateStateMixin):
@@ -1377,6 +1382,8 @@ def _launch_simulator(*args, **kwargs):
                 if gm.ENABLE_TRANSITION_RULES:
                     for scene in self.scenes:
                         scene.transition_rule_api.step()
+
+            RigidContactAPI._PENDING_STEPS = 0
 
         def play(self):
             if not self.is_playing():
@@ -1515,6 +1522,8 @@ def _launch_simulator(*args, **kwargs):
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
             self._refresh_state_caches()
 
+            RigidContactAPI._PENDING_STEPS = 0
+
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
             try:
@@ -1551,9 +1560,15 @@ def _launch_simulator(*args, **kwargs):
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
 
-                # Pull the contact sensor data
+                # Pull the contact sensor data — must run while currently_stepping is True,
+                # since RigidContactAPI.read_from_physx asserts on it.
                 RigidContactAPI.read_from_physx()
                 wp.synchronize()
+
+                # Record that we are done with the step context. Joint-break callbacks below
+                # are post-step user code: they may call update_handles() / read Fabric, which
+                # is forbidden while currently_stepping=True.
+                self.currently_stepping = False
 
                 if self._deferred_joint_breaks:
                     # Copy the current deferred joint breaks and clear the shared list
@@ -1563,9 +1578,6 @@ def _launch_simulator(*args, **kwargs):
                     self._deferred_joint_breaks.clear()
                     for obj, state_type, joint_path in deferred_breaks:
                         obj.states[state_type].on_joint_break(joint_path)
-
-                # Record that we are done with the step context.
-                self.currently_stepping = False
             except Exception as e:
                 self.currently_in_isaac_step = False
                 self.currently_stepping = False

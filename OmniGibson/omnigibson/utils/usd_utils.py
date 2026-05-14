@@ -763,7 +763,7 @@ class RigidBodyViewAPI:
                 vertex_count_list[idx] = cached["n_pts"]
                 new_cache[abs_path] = cached
                 continue
-            data = link.collision_mesh_cpu_data()
+            data = link.collision_mesh_cpu_data
             if data is None:
                 continue
             pts_cpu, faces_cpu = data

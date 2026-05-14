@@ -497,6 +497,7 @@ class RigidPrim(XFormPrim):
             return None
         return self.transform_local_points_to_world(local_points)
 
+    @cached_property
     def collision_mesh_cpu_data(self):
         """
         Returns:
