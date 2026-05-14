@@ -39,32 +39,19 @@ m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_ROTATION = math.radians(1)  # 1 degre
 # Inside is NOT symmetric (VALUES[s, a, b] != VALUES[s, b, a] in general).
 # Diagonal and cross-scene cells are always False.
 #
-# Volume containment is per visual mesh, with type dispatch:
-#   - USD Mesh    → convex-hull halfspace test (loop over face_centroid/face_normal,
-#                   all `(p - centroid) · normal < 0`). Equivalent to scipy.spatial.Delaunay
-#                   .find_simplex(p) >= 0 when points form a convex set (which the existing
-#                   non-tensorized Inside silently assumes).
-#   - USD Sphere/Cube/Cylinder/Cone → closed-form primitive check.
+# Only USD Mesh-typed container visual meshes are supported. Primitive-typed visual meshes
+# (Sphere/Cube/Cylinder/Cone) are skipped at initialize_view; container hulls are expected
+# to be authored as a merged convex Mesh per asset_pipeline/guide/fillable.md.
 #
-# All meshes across all containers are flattened into a single global table (length M).
-# Per step we recompute each mesh's world to local-w-scale inverse from its parent link's
-# current world pose; everything else is precomputed once in initialize_view.
-
-
-# Mesh-type encoding (must match the kernel dispatch below).
-_TYPE_CONVEX_HULL = 0
-_TYPE_SPHERE = 1
-_TYPE_CYLINDER = 2
-_TYPE_CONE = 3
-_TYPE_CUBE = 4
-
-_USD_TYPE_TO_INT = {
-    "Mesh": _TYPE_CONVEX_HULL,
-    "Sphere": _TYPE_SPHERE,
-    "Cylinder": _TYPE_CYLINDER,
-    "Cone": _TYPE_CONE,
-    "Cube": _TYPE_CUBE,
-}
+# Volume check is a convex-hull halfspace test per visual mesh — point is inside iff
+# `(p - face_centroid) · face_normal < 0` for every face. The halfspace tests are
+# parallelized across (scene, inner, face) and reduced per (scene, inner, mesh) — see
+# _inside_halfspace_test_kernel / _inside_mesh_reduce_kernel.
+#
+# All meshes across all containers are flattened into a single global table (length M),
+# all faces into a single global table (length F_total). Per step we recompute each mesh's
+# world to local-w-scale inverse from its parent link's current world pose; everything else
+# is precomputed once in initialize_view.
 
 
 @wp.kernel
@@ -118,28 +105,27 @@ def _inside_aabb_prefilter_kernel(
 
 
 @wp.kernel
-def _inside_volume_check_kernel(
+def _inside_halfspace_test_kernel(
     aabb_values: wp.array3d(dtype=wp.float32),  # (S, N_aabb, 6)
     aabb_idx: wp.array(dtype=wp.int32),  # (N,) Inside-N → AABB-N
     prefilter: wp.array3d(dtype=wp.int32),  # (S, N, N)
     inv_world: wp.array(dtype=wp.mat44),  # (M,) per-mesh world → mesh-local-unscaled
+    face_to_mesh: wp.array(dtype=wp.int32),  # (F_total,) face → owning mesh index
     mesh_container_idx: wp.array(dtype=wp.int32),  # (M,) Inside-N container idx, -1 if untracked
     mesh_scene_idx: wp.array(dtype=wp.int32),  # (M,)
-    mesh_type: wp.array(dtype=wp.int32),  # (M,)
-    mesh_param: wp.array2d(dtype=wp.float32),  # (M, 3)
-    mesh_face_offset: wp.array(dtype=wp.int32),  # (M,) face_centroid/normal slice start
-    mesh_face_count: wp.array(dtype=wp.int32),  # (M,)
     face_centroid: wp.array(dtype=wp.vec3),  # (F_total,)
     face_normal: wp.array(dtype=wp.vec3),  # (F_total,)
-    pair_scratch: wp.array3d(dtype=wp.int32),  # (S, N, N) atomic_max target
+    outside_flag: wp.array3d(dtype=wp.int32),  # (S, N, M) atomic_max target — 1 means "saw a failing face"
 ):
     """
-    Per (scene, inner_i, mesh m):
-    test inner_i's AABB center against mesh m's volume;
-    on hit atomic_max into pair_scratch[s, i, container(m)].
+    Per (scene, inner_i, face f):
+    test inner_i's AABB center against face f's halfspace; on fail (`>= 0`),
+    atomic_max outside_flag[s, i, mesh(f)] to 1. The atomic is idempotent so contention
+    is bounded — at most one transition per mesh per (s, i).
     """
-    s, i, m = wp.tid()
+    s, i, f = wp.tid()
 
+    m = face_to_mesh[f]
     container_j = mesh_container_idx[m]
     if container_j < 0:
         return
@@ -164,50 +150,42 @@ def _inside_volume_check_kernel(
     # change from world to mesh-local-unscaled
     p_local = wp.transform_point(inv_world[m], p_world)
 
-    t = mesh_type[m]
-    # `in_volume` is declared via `int(0)` (not `wp.int32(0)`) so warp treats it as a
-    # dynamic variable — required to mutate it inside the dynamic-range face loop below.
-    in_volume = int(0)
+    if wp.dot(p_local - face_centroid[f], face_normal[f]) >= wp.float32(0.0):
+        wp.atomic_max(outside_flag, s, i, m, wp.int32(1))
 
-    if t == wp.int32(_TYPE_CONVEX_HULL):
-        f_start = mesh_face_offset[m]
-        f_end = f_start + mesh_face_count[m]
-        # Count failing halfspaces inside the dynamic loop; the post-loop check turns that
-        # into an "all faces passed" boolean.
-        n_outside = int(0)
-        for f in range(f_start, f_end):
-            centroid = face_centroid[f]
-            normal = face_normal[f]
-            if wp.dot(p_local - centroid, normal) >= wp.float32(0.0):
-                n_outside = n_outside + 1
-        if mesh_face_count[m] > wp.int32(0) and n_outside == 0:
-            in_volume = 1
-    elif t == wp.int32(_TYPE_SPHERE):
-        radius = mesh_param[m, 0]
-        if wp.length(p_local) < radius:
-            in_volume = 1
-    elif t == wp.int32(_TYPE_CYLINDER):
-        radius = mesh_param[m, 0]
-        height = mesh_param[m, 1]
-        if wp.abs(p_local[2]) < height * wp.float32(0.5):
-            r_xy = wp.sqrt(p_local[0] * p_local[0] + p_local[1] * p_local[1])
-            if r_xy < radius:
-                in_volume = 1
-    elif t == wp.int32(_TYPE_CONE):
-        radius = mesh_param[m, 0]
-        height = mesh_param[m, 1]
-        z = p_local[2]
-        if wp.abs(z) < height * wp.float32(0.5):
-            radial_limit = radius * (wp.float32(1.0) - (z + height * wp.float32(0.5)) / height)
-            r_xy = wp.sqrt(p_local[0] * p_local[0] + p_local[1] * p_local[1])
-            if r_xy < radial_limit:
-                in_volume = 1
-    elif t == wp.int32(_TYPE_CUBE):
-        half = mesh_param[m, 0] * wp.float32(0.5)
-        if wp.abs(p_local[0]) < half and wp.abs(p_local[1]) < half and wp.abs(p_local[2]) < half:
-            in_volume = 1
 
-    if in_volume == 1:
+@wp.kernel
+def _inside_mesh_reduce_kernel(
+    aabb_idx: wp.array(dtype=wp.int32),  # (N,) Inside-N → AABB-N
+    prefilter: wp.array3d(dtype=wp.int32),  # (S, N, N)
+    mesh_container_idx: wp.array(dtype=wp.int32),  # (M,)
+    mesh_scene_idx: wp.array(dtype=wp.int32),  # (M,)
+    outside_flag: wp.array3d(dtype=wp.int32),  # (S, N, M) 1 iff some face said outside
+    pair_scratch: wp.array3d(dtype=wp.int32),  # (S, N, N) atomic_max target
+):
+    """
+    Per (scene, inner_i, mesh m):
+    if all the halfspace tests passed (outside_flag == 0) and the same gates as the test
+    kernel hold, atomic_max pair_scratch[s, i, container(m)] to 1.
+    """
+    s, i, m = wp.tid()
+
+    container_j = mesh_container_idx[m]
+    if container_j < 0:
+        return
+    if mesh_scene_idx[m] != s:
+        return
+    if i == container_j:
+        return
+
+    a_i = aabb_idx[i]
+    if a_i < 0:
+        return
+
+    if prefilter[s, i, container_j] == wp.int32(0):
+        return
+
+    if outside_flag[s, i, m] == wp.int32(0):
         wp.atomic_max(pair_scratch, s, i, container_j, wp.int32(1))
 
 
@@ -227,8 +205,8 @@ def _inside_finalize_kernel(
 
 
 class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
-    # Used by _inside_aabb_prefilter_kernel and volume check kernel to read inner AABB centers
-    # and container AABBs from AABB.VALUES_WP.
+    # Used by _inside_aabb_prefilter_kernel and the halfspace_test/mesh_reduce kernels to read
+    # inner AABB centers and container AABBs from AABB.VALUES_WP.
     _aabb_idx = None  # (N,) int32 torch  — keep-alive owner of the GPU storage
     _aabb_idx_wp = None  # (N,) int32 wp.array view — kernel input
 
@@ -237,13 +215,13 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
 
     # Which *container* object that owns this mesh, or -1 if
     # the parent object isn't Inside-tracked.
-    # volume_check_kernel uses this to pick the column
-    # (s, _, container_j) into which it atomically writes.
+    # halfspace_test/mesh_reduce kernels use this to pick the column
+    # (s, _, container_j) into which mesh_reduce atomically writes.
     _mesh_container_idx = None  # (M,) int32 torch
     _mesh_container_idx_wp = None
 
     # Scene index of the container that owns this mesh.
-    # volume_check_kernel skips meshes in other scenes.
+    # halfspace_test/mesh_reduce kernels skip meshes in other scenes.
     _mesh_scene_idx = None  # (M,) int32 torch
     _mesh_scene_idx_wp = None
 
@@ -258,33 +236,14 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     _mesh_inv_local_w_scale = None  # (M, 4, 4) float32 torch
     _mesh_inv_local_w_scale_wp = None
 
-    # Mesh shape tag — one of _TYPE_CONVEX_HULL / SPHERE / CYLINDER / CONE / CUBE.
-    # volume_check_kernel use this to pick the containment formula.
-    _mesh_type = None  # (M,) int32 torch
-    _mesh_type_wp = None
+    # Reverse lookup: which mesh does each face belong to. halfspace_test_kernel uses this to
+    # resolve face f → mesh m → all per-mesh state (inv_world, container, scene).
+    _face_to_mesh = None  # (F_total,) int32 torch
+    _face_to_mesh_wp = None
 
-    # Shape parameters, type-dependent:
-    #   Sphere   → param[0]=radius
-    #   Cube     → param[0]=size
-    #   Cylinder → param[0]=radius, param[1]=height
-    #   Cone     → param[0]=radius, param[1]=height
-    #   Convex hull → unused (face data drives the check instead)
-    # volume_check_kernel reads these.
-    _mesh_param = None  # (M, 3) float32 torch
-    _mesh_param_wp = None
-
-    # Slice descriptors into the flat (face_centroid / face_normal) arrays for
-    # this mesh's convex-hull faces. Both are 0 for non-Mesh-type entries.
-    # volume_check_kernel's convex-hull branch loops face_offset[m] .. face_offset[m] + face_count[m].
-    _mesh_face_offset = None  # (M,) int32 torch
-    _mesh_face_offset_wp = None
-    _mesh_face_count = None  # (M,) int32 torch
-    _mesh_face_count_wp = None
-
-    # Flat per-face data for all convex-hull meshes, concatenated end-to-end and
-    # indexed by face_offset[m] + f. Both are in mesh-local-unscaled frame (the
-    # frame volume_check_kernel transforms its query point into via inv_world[m]).
-    # volume_check_kernel's convex-hull halfspace test: (p_local - centroid) · normal < 0 for all faces.
+    # Flat per-face data for all container meshes, concatenated end-to-end. Both are in
+    # mesh-local-unscaled frame (the frame halfspace_test_kernel transforms its query point
+    # into via inv_world[m]). The halfspace test is (p_local - centroid) · normal < 0.
     _face_centroid = None  # (F_total, 3) float32 torch (wrapped as wp.vec3)
     _face_centroid_wp = None
     _face_normal = None  # (F_total, 3) float32 torch (wrapped as wp.vec3)
@@ -294,18 +253,23 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
 
     # Scratch used by inv_world_kernel
     # Per-mesh inverse "world → mesh-local-unscaled" transform.
-    # Written by inv_world_kernel each step; consumed by volume_check_kernel.
+    # Written by inv_world_kernel each step; consumed by halfspace_test_kernel.
     _inv_world = None  # (M, 4, 4) float32 torch (wrapped as wp.mat44)
     _inv_world_wp = None
 
     # Scratch written by aabb_prefilter_kernel (1 if inner_i's AABB center
-    # lies inside container_j's AABB, else 0). Consumed by volume_check_kernel as an early-exit
-    # gate. meshes whose container failed the AABB check are skipped entirely.
+    # lies inside container_j's AABB, else 0). Consumed by halfspace_test/mesh_reduce kernels
+    # as an early-exit gate. Meshes whose container failed the AABB check are skipped entirely.
     _prefilter = None  # (S, N, N) int32 torch
     _prefilter_wp = None
 
+    # Per-mesh "saw at least one failing halfspace" flag, atomic_max target for halfspace_test_kernel.
+    # Zeroed each step; mesh_reduce_kernel reads `outside_flag == 0` as "inner_i is inside mesh m".
+    _outside_flag = None  # (S, N, M) int32 torch
+    _outside_flag_wp = None
+
     # atomic_max target for "any mesh of container_j contains inner_i's center".
-    # Zeroed at the top of _update_values, written by volume_check_kernel, read by finalize_kernel
+    # Zeroed at the top of _update_values, written by mesh_reduce_kernel, read by finalize_kernel
     # which converts it (int32 → uint8) into VALUES.
     _pair_scratch = None  # (S, N, N) int32 torch
     _pair_scratch_wp = None
@@ -341,14 +305,8 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         cls._mesh_parent_link_wp = None
         cls._mesh_inv_local_w_scale = None
         cls._mesh_inv_local_w_scale_wp = None
-        cls._mesh_type = None
-        cls._mesh_type_wp = None
-        cls._mesh_param = None
-        cls._mesh_param_wp = None
-        cls._mesh_face_offset = None
-        cls._mesh_face_offset_wp = None
-        cls._mesh_face_count = None
-        cls._mesh_face_count_wp = None
+        cls._face_to_mesh = None
+        cls._face_to_mesh_wp = None
         cls._face_centroid = None
         cls._face_centroid_wp = None
         cls._face_normal = None
@@ -357,6 +315,8 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         cls._inv_world_wp = None
         cls._prefilter = None
         cls._prefilter_wp = None
+        cls._outside_flag = None
+        cls._outside_flag_wp = None
         cls._pair_scratch = None
         cls._pair_scratch_wp = None
 
@@ -382,10 +342,11 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         cls._aabb_idx_wp = wp.from_torch(cls._aabb_idx)
 
         # Walk every Inside-tracked object's container meta-links and collect each visual mesh.
+        # Only USD Mesh-typed visual meshes are supported; primitive types are skipped.
         mesh_records = []  # list of dicts; rolled into the flat tables below.
         face_centroids_list = []  # CPU torch tensors, concatenated at the end
         face_normals_list = []
-        running_face_offset = 0
+        face_to_mesh_list = []  # CPU ints; for each face f appends the index of its owning mesh in mesh_records.
 
         for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
             for container_idx, container_obj in enumerate(scene_row):
@@ -407,36 +368,23 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                     link_world_inv_init = th.linalg.inv(link_world_init)
 
                     for mesh in link.visual_meshes.values():
-                        usd_type = mesh._mesh_type
-                        if usd_type not in _USD_TYPE_TO_INT:
+                        if mesh._mesh_type != "Mesh":
+                            continue
+
+                        centroids = mesh.mesh_face_centroids  # (F, 3) local-unscaled
+                        normals = mesh.mesh_face_normals  # (F, 3) local-unscaled
+                        face_count = centroids.shape[0]
+                        if face_count == 0:
                             continue
 
                         mesh_scaled_world_init = mesh.scaled_transform
                         local_w_scale = link_world_inv_init @ mesh_scaled_world_init
                         inv_local_w_scale = th.linalg.inv(local_w_scale)
 
-                        face_offset = 0
-                        face_count = 0
-                        params = [0.0, 0.0, 0.0]
-
-                        if usd_type == "Mesh":
-                            centroids = mesh.mesh_face_centroids  # (F, 3) local-unscaled
-                            normals = mesh.mesh_face_normals  # (F, 3) local-unscaled
-                            face_offset = running_face_offset
-                            face_count = centroids.shape[0]
-                            face_centroids_list.append(centroids.to(th.float32))
-                            face_normals_list.append(normals.to(th.float32))
-                            running_face_offset += face_count
-                        elif usd_type == "Sphere":
-                            params[0] = float(mesh.get_attribute("radius"))
-                        elif usd_type == "Cylinder":
-                            params[0] = float(mesh.get_attribute("radius"))
-                            params[1] = float(mesh.get_attribute("height"))
-                        elif usd_type == "Cone":
-                            params[0] = float(mesh.get_attribute("radius"))
-                            params[1] = float(mesh.get_attribute("height"))
-                        elif usd_type == "Cube":
-                            params[0] = float(mesh.get_attribute("size"))
+                        mesh_idx = len(mesh_records)
+                        face_centroids_list.append(centroids.to(th.float32))
+                        face_normals_list.append(normals.to(th.float32))
+                        face_to_mesh_list.extend([mesh_idx] * face_count)
 
                         mesh_records.append(
                             {
@@ -444,10 +392,6 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                                 "scene": scene_idx,
                                 "parent_link": parent_flat,
                                 "inv_local_w_scale": inv_local_w_scale.to(th.float32),
-                                "type": _USD_TYPE_TO_INT[usd_type],
-                                "param": params,
-                                "face_offset": face_offset,
-                                "face_count": face_count,
                             }
                         )
 
@@ -457,50 +401,41 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             cls._mesh_scene_idx_wp = None
             cls._mesh_parent_link_wp = None
             cls._mesh_inv_local_w_scale_wp = None
-            cls._mesh_type_wp = None
-            cls._mesh_param_wp = None
-            cls._mesh_face_offset_wp = None
-            cls._mesh_face_count_wp = None
+            cls._face_to_mesh_wp = None
             cls._face_centroid_wp = None
             cls._face_normal_wp = None
             cls._inv_world_wp = None
+            cls._outside_flag_wp = None
         else:
             cls._mesh_container_idx = th.tensor([r["container"] for r in mesh_records], dtype=th.int32, device="cuda")
             cls._mesh_scene_idx = th.tensor([r["scene"] for r in mesh_records], dtype=th.int32, device="cuda")
             cls._mesh_parent_link = th.tensor([r["parent_link"] for r in mesh_records], dtype=th.int32, device="cuda")
             inv_local_stack = th.stack([r["inv_local_w_scale"] for r in mesh_records]).cuda()
             cls._mesh_inv_local_w_scale = inv_local_stack
-            cls._mesh_type = th.tensor([r["type"] for r in mesh_records], dtype=th.int32, device="cuda")
-            cls._mesh_param = th.tensor([r["param"] for r in mesh_records], dtype=th.float32, device="cuda")
-            cls._mesh_face_offset = th.tensor([r["face_offset"] for r in mesh_records], dtype=th.int32, device="cuda")
-            cls._mesh_face_count = th.tensor([r["face_count"] for r in mesh_records], dtype=th.int32, device="cuda")
 
             cls._mesh_container_idx_wp = wp.from_torch(cls._mesh_container_idx)
             cls._mesh_scene_idx_wp = wp.from_torch(cls._mesh_scene_idx)
             cls._mesh_parent_link_wp = wp.from_torch(cls._mesh_parent_link)
             cls._mesh_inv_local_w_scale_wp = wp.from_torch(cls._mesh_inv_local_w_scale, dtype=wp.mat44)
-            cls._mesh_type_wp = wp.from_torch(cls._mesh_type)
-            cls._mesh_param_wp = wp.from_torch(cls._mesh_param)
-            cls._mesh_face_offset_wp = wp.from_torch(cls._mesh_face_offset)
-            cls._mesh_face_count_wp = wp.from_torch(cls._mesh_face_count)
 
-            # Flat face arrays (may be empty if no Mesh-type entries)
-            if running_face_offset > 0:
-                face_centroids_flat = th.cat(face_centroids_list, dim=0).cuda().contiguous()
-                face_normals_flat = th.cat(face_normals_list, dim=0).cuda().contiguous()
-            else:
-                # Allocate a single dummy row so wp.from_torch has a non-empty array; never read
-                # because mesh_face_count[m] is 0 for all m.
-                face_centroids_flat = th.zeros((1, 3), dtype=th.float32, device="cuda")
-                face_normals_flat = th.zeros((1, 3), dtype=th.float32, device="cuda")
+            # Flat face arrays. M > 0 here and every retained mesh contributed at least one
+            # face (zero-face meshes are filtered above), so F_total > 0.
+            face_centroids_flat = th.cat(face_centroids_list, dim=0).cuda().contiguous()
+            face_normals_flat = th.cat(face_normals_list, dim=0).cuda().contiguous()
             cls._face_centroid = face_centroids_flat
             cls._face_normal = face_normals_flat
             cls._face_centroid_wp = wp.from_torch(face_centroids_flat, dtype=wp.vec3)
             cls._face_normal_wp = wp.from_torch(face_normals_flat, dtype=wp.vec3)
 
+            cls._face_to_mesh = th.tensor(face_to_mesh_list, dtype=th.int32, device="cuda")
+            cls._face_to_mesh_wp = wp.from_torch(cls._face_to_mesh)
+
             # Per-step scratch
             cls._inv_world = th.zeros((M, 4, 4), dtype=th.float32, device="cuda")
             cls._inv_world_wp = wp.from_torch(cls._inv_world, dtype=wp.mat44)
+
+            cls._outside_flag = th.zeros((S, N, M), dtype=th.int32, device="cuda")
+            cls._outside_flag_wp = wp.from_torch(cls._outside_flag)
 
         cls._prefilter = th.zeros((S, N, N), dtype=th.int32, device="cuda")
         cls._prefilter_wp = wp.from_torch(cls._prefilter)
@@ -547,22 +482,37 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
 
         if cls._mesh_container_idx_wp is not None:
             M = cls._mesh_parent_link.shape[0]
+            F_total = cls._face_centroid.shape[0]
+
+            # Each face independently votes "outside" via atomic_max into outside_flag.
+            # Mesh "contains" iff no face voted outside → reduce kernel writes pair_scratch.
+            cls._outside_flag_wp.zero_()
             wp.launch(
-                kernel=_inside_volume_check_kernel,
-                dim=(S, N, M),
+                kernel=_inside_halfspace_test_kernel,
+                dim=(S, N, F_total),
                 inputs=[
                     AABB.VALUES_WP,
                     cls._aabb_idx_wp,
                     cls._prefilter_wp,
                     cls._inv_world_wp,
+                    cls._face_to_mesh_wp,
                     cls._mesh_container_idx_wp,
                     cls._mesh_scene_idx_wp,
-                    cls._mesh_type_wp,
-                    cls._mesh_param_wp,
-                    cls._mesh_face_offset_wp,
-                    cls._mesh_face_count_wp,
                     cls._face_centroid_wp,
                     cls._face_normal_wp,
+                    cls._outside_flag_wp,
+                ],
+                device="cuda",
+            )
+            wp.launch(
+                kernel=_inside_mesh_reduce_kernel,
+                dim=(S, N, M),
+                inputs=[
+                    cls._aabb_idx_wp,
+                    cls._prefilter_wp,
+                    cls._mesh_container_idx_wp,
+                    cls._mesh_scene_idx_wp,
+                    cls._outside_flag_wp,
                     cls._pair_scratch_wp,
                 ],
                 device="cuda",
