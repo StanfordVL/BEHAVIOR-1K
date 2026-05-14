@@ -999,7 +999,8 @@ def fix_common_issues_in_all_files():
         'scenes/Pomaria_0_garden',
         'scenes/hotel_suite_large',
         'scenes/house_double_floor_lower',
-        'scenes/office_cubicles_right'
+        'scenes/office_cubicles_right',
+        'scenes/commercial_kitchen_fire_extinguisher',
     }
     candidates = [pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / x / "processed.max" for x in targets_to_do]
 

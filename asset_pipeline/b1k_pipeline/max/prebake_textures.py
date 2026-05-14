@@ -35,6 +35,7 @@ IMG_SIZE = 1024
 HQ_IMG_SIZE = 4096
 HQ_IMG_CATEGORIES = {"floors", "lawn", "driveway", "walls"}
 NEW_UV_CHANNEL = 99
+USE_NATIVE_UNWRAPPING_ON_ERROR = True
 
 # PBRMetalRough
 # CHANNEL_MAPPING = {
@@ -193,9 +194,10 @@ class TextureBaker:
         rt.addmodifier(obj, u)
         u.stretch = 1  # We allow for any amount of stretching. This was originally 0.15.
         u.rescale = True
+        u.combine = False
         u.prerotate = True
         u.packmode = 0  # Classic. Go 1 for Efficient and 2 for High Quality.
-        u.map_channel = NEW_UV_CHANNEL
+        u.map_channel = 99
         u.keep_seams = False
         u.unwrap_mode = 1  # 0 for organic. 1 is for hard-edge objects which most of ours are.
 
@@ -204,8 +206,13 @@ class TextureBaker:
         u.height = 1024
         u.preview = False
 
+        rt.modPanel.setCurrentObject(u)
+        rt.completeRedraw()
+        rt.windows.processPostedMessages()
+        time.sleep(3)
+
         u.unwrap()
-        time.sleep(2)
+        time.sleep(3)
         assert u.success, f"Unwrapping error w/ {obj.name}: {u.error}"
 
     def uv_unwrapping_native(self, obj):
@@ -245,10 +252,13 @@ class TextureBaker:
                 if not rt.polyop.getMapSupport(obj, 99):
                     raise ValueError("Unwrella failed to unwrap the object.")
             except Exception as e:
-                print(
-                    f"Unwrella failed for {obj.name} with error {e}, falling back to native unwrapping."
-                )
-                self.uv_unwrapping_native(obj)
+                if USE_NATIVE_UNWRAPPING_ON_ERROR:
+                    print(
+                        f"Unwrella failed for {obj.name} with error {e}, falling back to native unwrapping."
+                    )
+                    self.uv_unwrapping_native(obj)
+                else:
+                    raise e
         else:
             self.uv_unwrapping_native(obj)
         assert rt.polyop.getMapSupport(
