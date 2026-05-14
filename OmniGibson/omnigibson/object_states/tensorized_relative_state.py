@@ -145,8 +145,6 @@ class TensorizedRelativeState(RelativeObjectState, TensorizedState):
         TensorizedState.graph_dirty = True
 
     def _get_value(self, other):
-        # See TensorizedAbsoluteState._get_value for the lazy-refresh rationale.
-        TensorizedState.maybe_refresh_caches()
         # Read from the pinned CPU mirror — no GPU stall for Python callers.
         s = self.obj.scene.idx
         idx_self = self.OBJ_IDXS[self.obj.relative_prim_path]

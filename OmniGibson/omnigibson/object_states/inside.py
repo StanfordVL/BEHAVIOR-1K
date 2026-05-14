@@ -720,7 +720,6 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                     continue
 
             # Rejection sampling #6: Verify object is still inside after settling and within reach if using trav map.
-            # The lazy-refresh gate in TensorizedState._get_value brings VALUES_CPU back in sync before this read.
             if self.get_value(other):
                 if use_trav_map:
                     settled_pos, _ = self.obj.get_position_orientation()

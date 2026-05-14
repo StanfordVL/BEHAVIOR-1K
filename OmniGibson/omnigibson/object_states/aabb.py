@@ -2,7 +2,6 @@ import torch as th
 import warp as wp
 
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
-from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
 from omnigibson.utils.constants import PrimType
@@ -95,6 +94,8 @@ class AABB(TensorizedAbsoluteState):
         # Hand off the index tensors to RigidBodyViewAPI. It builds the K-length kernel
         # input tables and caches them for subsequent get_aabb() calls. We don't keep
         # these locally — the only readers are inside RigidBodyViewAPI.
+        # TODO(vector): Find out if we absolutely need to do this thing where we store this
+        # info in the RigidBodyViewAPI. Why can't we just pass it in as an argument to get_aabb?
         RigidBodyViewAPI.prepare_aabb_kernel_inputs(
             th.tensor(prim_body_idx, dtype=th.int32),
             th.tensor(link_idx, dtype=th.int32),
@@ -128,10 +129,6 @@ class AABB(TensorizedAbsoluteState):
         # Cloth — disabled for now
 
     def _get_value(self):
-        # Bring VALUES_CPU back in sync if caches are dirty (e.g. since the last
-        # set_position_orientation / step_physics), then unpack the (6,) row into (lo, hi)
-        # to match EntityPrim.aabb's return shape.
-        TensorizedState.maybe_refresh_caches()
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         v = self.VALUES_CPU[s, obj_idx]  # (6,) — CPU mirror, no GPU stall

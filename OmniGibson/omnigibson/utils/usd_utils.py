@@ -956,7 +956,7 @@ class RigidBodyViewAPI:
     @classmethod
     def invalidate_kinematic(cls, links):
         """
-        Refresh the pinned-CPU pose staging buffer for kinematic links after an explicit move.
+        Refresh the CPU pose staging buffer for kinematic links after an explicit move.
 
         For physx_untracked links (no physics:RigidBodyAPI) this is the only update path.
         For physx_tracked kinematic links this write is harmless — read_from_physx() will
@@ -1039,7 +1039,6 @@ class ArticulatedObjectViewAPI:
 
     _VIEW = None
     _OBJ_TO_VIEW_IDX = {}
-    # GPU mirror, refreshed via wp.copy inside the captured graph each step
     _JOINT_POSITIONS = None  # wp.array, device="cuda", shape=(N_art, max_dof), float32
 
     @classmethod
@@ -1476,7 +1475,7 @@ class RigidContactAPIImpl:
                 continue
 
             # Get the body transforms for this scene
-            # TODO: Replace this with a wp.copy.
+            # TODO(vector): Replace this with a wp.copy.
             self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
                 self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
             )

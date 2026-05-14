@@ -6,7 +6,6 @@ import warp as wp
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
-from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
@@ -323,7 +322,6 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
         )
 
     def _get_value(self):
-        TensorizedState.maybe_refresh_caches()
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         return bool(self.VALUES_CPU[s, obj_idx])
