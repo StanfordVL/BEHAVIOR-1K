@@ -1213,6 +1213,11 @@ def _launch_simulator(*args, **kwargs):
                     if issubclass(state_type, TensorizedState):
                         state_type.initialize_view()
 
+        # TODO(vector) Calling this actually makes most time-sensitive states
+        # (temperature, toggle, sliceractive...) think a new step has happened.
+        # should update all of those states to track last-updated-time, and
+        # compare it against og.sim.current_timestep to compute how much delta
+        # should be applied to things
         def _refresh_state_caches(self):
             """
             Run a full tensorized-state refresh outside the normal step path.

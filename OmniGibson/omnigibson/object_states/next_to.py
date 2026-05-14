@@ -2,19 +2,15 @@ import torch as th
 import warp as wp
 
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.adjacency import Adjacency, _ADJ_AXIS_COUNT
+from omnigibson.object_states.adjacency import Adjacency, _HORIZONTAL_K_END, _HORIZONTAL_K_START
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
 from omnigibson.utils.python_utils import classproperty
 
 
-# Adjacency axis layout: k=0..1 vertical (+Z, -Z), k=2..(K-1) horizontal.
 # NextTo(self, other) is true when AABBs are close enough AND other lies on any of self's
 # horizontal Adjacency axes (or, symmetrically, self lies on any of other's).
-_HORIZONTAL_K_START = 2
-_HORIZONTAL_K_END = _ADJ_AXIS_COUNT  # exclusive
-
 # Distance / size threshold ratio: NextTo iff (axis-aligned gap norm) ≤ (sum of dims of both AABBs) / 18.
 # That equals avg_aabb_length / 6 where avg_aabb_length = mean over 3 dims of (dim_a + dim_b).
 _DISTANCE_RATIO = 1.0 / 6.0

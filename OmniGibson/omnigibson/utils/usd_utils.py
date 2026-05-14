@@ -884,6 +884,12 @@ class RigidBodyViewAPI:
             # K-length tables are what the AABB kernel reads, one per thread.
             #
             # All ops on CPU; n_tracked_links is small.
+            #
+            # TODO(vector): reconsider this approach. K = sum(vertex_counts) can be large, and we
+            # keep three K-length device arrays (_aabb_links, _aabb_vertices, _aabb_objs)
+            # resident for the lifetime of the view. A more memory-efficient alternative is
+            # to launch the AABB kernel over (n_tracked_links, max_verts) and have each
+            # thread derive (link, vertex) from its tid + a small per-link cumsum table.
 
             verts_per_link = cls.LINK_VERTEX_COUNTS[prim_body_idx]  # (n_tracked_links,)
             K = int(verts_per_link.sum().item())
@@ -922,25 +928,28 @@ class RigidBodyViewAPI:
             out_values (th.Tensor): (S*O, 6) float32 CUDA — caller pre-fills with +/-inf,
                                     written in-place.
         """
-        if cls._aabb_links is None or cls._aabb_links.shape[0] == 0:
+        has_reduce = cls._aabb_links is not None and cls._aabb_links.shape[0] > 0
+        has_fallback = cls._aabb_base_link_links is not None and cls._aabb_base_link_links.shape[0] > 0
+        if not has_reduce and not has_fallback:
             return
         out_arr = wp.from_torch(out_values)
 
-        wp.launch(
-            kernel=_aabb_reduce_kernel,
-            dim=cls._aabb_links.shape[0],
-            inputs=[
-                cls.POSE_MATRICES,
-                cls.LINK_MESH_IDS,
-                cls._aabb_links,
-                cls._aabb_vertices,
-                cls._aabb_objs,
-                out_arr,
-            ],
-            device="cuda",
-        )
+        if has_reduce:
+            wp.launch(
+                kernel=_aabb_reduce_kernel,
+                dim=cls._aabb_links.shape[0],
+                inputs=[
+                    cls.POSE_MATRICES,
+                    cls.LINK_MESH_IDS,
+                    cls._aabb_links,
+                    cls._aabb_vertices,
+                    cls._aabb_objs,
+                    out_arr,
+                ],
+                device="cuda",
+            )
         # use base-link pose for meshes without boundry points
-        if cls._aabb_base_link_links is not None and cls._aabb_base_link_links.shape[0] > 0:
+        if has_fallback:
             wp.launch(
                 kernel=_aabb_baselink_fallback_kernel,
                 dim=cls._aabb_base_link_links.shape[0],

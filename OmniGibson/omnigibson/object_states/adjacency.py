@@ -38,37 +38,9 @@ m.HORIZONTAL_DIRECTION_COUNT = 10
 # Total number of axis directions (2 vertical + 10 horizontal)
 _ADJ_AXIS_COUNT = 2 + m.HORIZONTAL_DIRECTION_COUNT  # = 12
 
-
-@wp.func
-def _ray_aabb_hit(origin: wp.vec3, dir: wp.vec3, t_max: wp.float32, lo: wp.vec3, hi: wp.vec3) -> wp.bool:
-    """Slab test: returns True iff the ray (origin, dir, t in [0, t_max]) intersects the AABB."""
-    eps = wp.float32(1.0e-9)
-    tmin = wp.float32(0.0)
-    tmax = t_max
-    for i in range(3):
-        di = dir[i]
-        oi = origin[i]
-        loi = lo[i]
-        hii = hi[i]
-        if wp.abs(di) < eps:
-            # Ray parallel to slab i — miss if origin lies outside [lo_i, hi_i]
-            if oi < loi or oi > hii:
-                return False
-        else:
-            inv_d = wp.float32(1.0) / di
-            t1 = (loi - oi) * inv_d
-            t2 = (hii - oi) * inv_d
-            if t1 > t2:
-                tmp = t1
-                t1 = t2
-                t2 = tmp
-            if t1 > tmin:
-                tmin = t1
-            if t2 < tmax:
-                tmax = t2
-            if tmin > tmax:
-                return False
-    return True
+# Horizontal-direction slice into the K axis: range(_HORIZONTAL_K_START, _HORIZONTAL_K_END).
+_HORIZONTAL_K_START = 2
+_HORIZONTAL_K_END = _ADJ_AXIS_COUNT  # exclusive
 
 
 @wp.kernel
@@ -118,24 +90,6 @@ def _adjacency_ray_cast_kernel(
     origin_w = wp.vec3((lo_x + hi_x) * 0.5, (lo_y + hi_y) * 0.5, (lo_z + hi_z) * 0.5)
     dir_w = wp.vec3(directions[k, 0], directions[k, 1], directions[k, 2])
     t_max = max_distances[k]
-
-    # Broad-phase cull: skip the full BVH traversal if the target object's AABB doesn't
-    # intersect the ray segment. Only applies when the target has a tracked AABB; otherwise
-    # we fall through to the per-link BVH query.
-    b_aabb_idx = aabb_obj_idxs[b]
-    if b_aabb_idx >= 0:
-        b_lo = wp.vec3(
-            aabb_values[s, b_aabb_idx, 0],
-            aabb_values[s, b_aabb_idx, 1],
-            aabb_values[s, b_aabb_idx, 2],
-        )
-        b_hi = wp.vec3(
-            aabb_values[s, b_aabb_idx, 3],
-            aabb_values[s, b_aabb_idx, 4],
-            aabb_values[s, b_aabb_idx, 5],
-        )
-        if not _ray_aabb_hit(origin_w, dir_w, t_max, b_lo, b_hi):
-            return
 
     # Transform ray into target link's local frame.
     # transform_point applies translation; transform_vector is rotation-only (correct for direction).

@@ -450,6 +450,7 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             or cls._prefilter_wp is None
             or cls._pair_scratch_wp is None
             or AABB.VALUES_WP is None
+            or RigidBodyViewAPI.POSE_MATRICES is None
         ):
             return
         S, N, _ = values.shape
@@ -457,21 +458,6 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             return
 
         cls._pair_scratch_wp.zero_()
-
-        # refresh per-mesh world→local inverse from current link poses.
-        if cls._mesh_parent_link_wp is not None and RigidBodyViewAPI.POSE_MATRICES is not None:
-            M = cls._mesh_parent_link.shape[0]
-            wp.launch(
-                kernel=_inside_inv_world_kernel,
-                dim=M,
-                inputs=[
-                    RigidBodyViewAPI.POSE_MATRICES,
-                    cls._mesh_parent_link_wp,
-                    cls._mesh_inv_local_w_scale_wp,
-                    cls._inv_world_wp,
-                ],
-                device="cuda",
-            )
 
         wp.launch(
             kernel=_inside_aabb_prefilter_kernel,
@@ -483,6 +469,19 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         if cls._mesh_container_idx_wp is not None:
             M = cls._mesh_parent_link.shape[0]
             F_total = cls._face_centroid.shape[0]
+
+            # refresh per-mesh world→local inverse from current link poses.
+            wp.launch(
+                kernel=_inside_inv_world_kernel,
+                dim=M,
+                inputs=[
+                    RigidBodyViewAPI.POSE_MATRICES,
+                    cls._mesh_parent_link_wp,
+                    cls._mesh_inv_local_w_scale_wp,
+                    cls._inv_world_wp,
+                ],
+                device="cuda",
+            )
 
             # Each face independently votes "outside" via atomic_max into outside_flag.
             # Mesh "contains" iff no face voted outside → reduce kernel writes pair_scratch.
