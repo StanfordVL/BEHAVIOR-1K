@@ -8,7 +8,7 @@ from omnigibson.object_states.tensorized_state import TensorizedState, _wp_from_
 from omnigibson.utils.python_utils import classproperty
 
 
-class TensorizedRelativeState(RelativeObjectState, TensorizedState):
+class TensorizedRelativeState(TensorizedState, RelativeObjectState):
     """
     Tensorized state-mixin for RELATIVE (pairwise) values.
 
@@ -145,9 +145,6 @@ class TensorizedRelativeState(RelativeObjectState, TensorizedState):
         TensorizedState.graph_dirty = True
 
     def _get_value(self, other):
-        # Have to be put here instead of TensorizedState because super()
-        # goes to BaseObject.get_value instead of TensorizedState's
-        TensorizedState.maybe_refresh_caches()
         # Read from the pinned CPU mirror — no GPU stall for Python callers.
         s = self.obj.scene.idx
         idx_self = self.OBJ_IDXS[self.obj.relative_prim_path]

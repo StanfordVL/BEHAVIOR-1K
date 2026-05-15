@@ -85,13 +85,17 @@ class TensorizedState:
 
     @classmethod
     def maybe_refresh_caches(cls):
-        """Helper for `_get_value` overrides: if caches are dirty (and we're not already
+        """Helper for `get_value`: if caches are dirty (and we're not already
         mid-refresh), run the lazy refresh so the upcoming read sees fresh values.
         """
         if cls.caches_dirty and not cls._refresh_in_progress:
             import omnigibson as og  # local import to avoid module-level cycle
 
             og.sim._refresh_state_caches()
+
+    def get_value(self, *args, **kwargs):
+        self.maybe_refresh_caches()
+        return super().get_value(*args, **kwargs)
 
     @classmethod
     def pre_update(cls):
