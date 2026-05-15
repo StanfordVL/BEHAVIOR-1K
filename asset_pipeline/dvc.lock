@@ -18270,17 +18270,17 @@ stages:
     deps:
     - path: b1k_pipeline/max/check_collisions.py
       hash: md5
-      md5: 72694447d9799e1a550df8676be35ad0
-      size: 12964
+      md5: aa5c0704f848656651d1062bb2f75c82
+      size: 14796
     - path: cad/scenes/commercial_kitchen_pans/processed.max
       hash: md5
-      md5: 5224156ef767522a419b288da30e8f59
-      size: 89287448
+      md5: 8f28db5ffda6bb19d85b39ae7ec973a5
+      size: 92857336
     outs:
     - path: cad/scenes/commercial_kitchen_pans/artifacts/check_collisions.json
       hash: md5
-      md5: 491960eee9a4df4b08389fad9e368fb7
-      size: 287
+      md5: 680ed8b24751a2e8f1909874c7c6d5c7
+      size: 339
   check_collisions@scenes/hall_glass_ceiling:
     cmd: python b1k_pipeline/batch_3dsmax.py 
       cad/scenes/hall_glass_ceiling/processed.max 
