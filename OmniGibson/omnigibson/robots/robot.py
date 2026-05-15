@@ -2031,11 +2031,15 @@ class Robot(USDObject, GymObservable):
         assert self.is_manipulation
         arm = self.default_arm if arm == "default" else arm
 
-        # Remove filtered collision pairs between finger links and the grasped link
+        # Defer collision filter removal to the next step boundary (same reason as add).
+        finger_links = list(self.finger_links[arm])
         target_link = self._ag_obj_in_hand[arm].links[self._ag_obj_constraint_params[arm]["target_link_name"]]
-        with og.sim.editing_usd():
-            for finger_link in self.finger_links[arm]:
+
+        def _remove_filtered_pairs():
+            for finger_link in finger_links:
                 finger_link.remove_filtered_collision_pair(prim=target_link)
+
+        og.sim._deferred_usd_actions.append(_remove_filtered_pairs)
 
         # Remove joint constraint
         delete_or_deactivate_prim(self._ag_obj_constraints[arm].GetPath().pathString)
@@ -3594,13 +3598,16 @@ class Robot(USDObject, GymObservable):
         self._ag_obj_in_hand[arm] = constraint_params["target_obj"]
         self._ag_obj_constraint_params[arm] = constraint_params
 
-        # Filter collisions between finger links and the grasped link to prevent the joint
-        # constraint and collision forces from fighting each other.
+        # Defer collision filtering to the next step boundary to avoid invalidating
+        # tensor views inside the pre-physics-step callback.
+        finger_links = list(self.finger_links[arm])
         target_link = constraint_params["target_obj"].links[constraint_params["target_link_name"]]
-        with og.sim.editing_usd():
-            for finger_link in self.finger_links[arm]:
+
+        def _add_filtered_pairs():
+            for finger_link in finger_links:
                 finger_link.add_filtered_collision_pair(prim=target_link)
-        og.sim.update_handles()
+
+        og.sim._deferred_usd_actions.append(_add_filtered_pairs)
 
     def _convert_to_math_pi(self, ele):
         """
