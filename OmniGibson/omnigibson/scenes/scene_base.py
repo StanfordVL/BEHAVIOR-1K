@@ -929,11 +929,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
             for obj_to_add in objs_to_add
         ]
+        # Add new physics prims while stopped, then reuse play() to rebuild handles before loading poses.
+        restart_sim = objects_to_add and og.sim.is_playing()
+        if restart_sim:
+            og.sim.stop()
         og.sim.batch_add_objects(objects_to_add, scenes=[self] * len(objects_to_add))
-
-        # Rebuilding physics after re-adding objects lets PhysX-Fabric bind before state poses load.
-        if objects_to_add and og.sim.is_playing():
-            og.sim.refresh_physics_after_stage_update()
+        if restart_sim:
+            og.sim.play()
 
         # Load state
         self.load_state(state, serialized=False)
