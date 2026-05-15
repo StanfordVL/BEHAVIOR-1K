@@ -978,6 +978,7 @@ def _launch_simulator(*args, **kwargs):
             """
             playing = self.is_playing()
             if playing:
+                self.update_handles()
                 state = self.dump_state()
 
                 # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
@@ -1184,6 +1185,35 @@ def _launch_simulator(*args, **kwargs):
             # Finally update any unified views
             RigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+
+        def refresh_physics_after_stage_update(self):
+            """
+            Refresh PhysX / Fabric state after physics prims have been added or removed while the simulator is running.
+            """
+            if not self.is_playing():
+                return
+
+            assert not self.currently_stepping, "Cannot refresh physics state during a physics step!"
+
+            channels = ["omni.usd", "omni.physicsschema.plugin", "omni.physx.plugin", "omni.physx.tensors.plugin"]
+            with suppress_omni_log(channels=channels):
+                self._in_sim_lifecycle += 1
+                try:
+                    self._sim_context.stop()
+                    self._sim_context.play()
+                finally:
+                    self._in_sim_lifecycle -= 1
+
+            self.render()
+            self.update_handles()
+
+            for scene in self.scenes:
+                for robot in scene.robots:
+                    if robot.initialized:
+                        robot.update_controller_mode()
+
+                if gm.ENABLE_TRANSITION_RULES:
+                    scene.transition_rule_api.refresh_all_rules()
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
