@@ -15,13 +15,14 @@ from pathlib import Path
 from omnigibson.utils.profiling_utils import Profiler
 
 import torch as th
+import warp as wp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.usd_object import USDObject
@@ -525,7 +526,7 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_requiring_update = [
                 state
                 for state in self.object_state_types
-                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedValueState))
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedState))
             ]
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
@@ -546,8 +547,11 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
 
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, TensorizedValueState):
+                if issubclass(state, TensorizedState):
                     state.global_initialize()
+
+            # Captured wp.Graph wrapping every TensorizedState's global_update().
+            self._state_graph = None
 
             # Now start rebuilding everything
             # Disable collision between root links of fixed base objects
@@ -1206,18 +1210,111 @@ def _launch_simulator(*args, **kwargs):
 
             if gm.ENABLE_OBJECT_STATES:
                 for state_type in og.sim.object_state_types_requiring_update:
-                    if issubclass(state_type, TensorizedValueState):
+                    if issubclass(state_type, TensorizedState):
                         state_type.initialize_view()
 
-        def _update_view_apis(self):
-            """Flush physics caches and sync CPU→GPU. Called after every physics step batch."""
-            RigidContactAPI.update_contact_cache()
-            RigidBodyViewAPI.update_pose_cache()
-            ArticulatedObjectViewAPI.update_dof_cache()
+        # TODO(vector) Calling this actually makes most time-sensitive states
+        # (temperature, toggle, sliceractive...) think a new step has happened.
+        # should update all of those states to track last-updated-time, and
+        # compare it against og.sim.current_timestep to compute how much delta
+        # should be applied to things
+        def _refresh_state_caches(self):
+            """
+            Run a full tensorized-state refresh outside the normal step path.
 
-            RigidBodyViewAPI.async_copy_to_gpu()
-            ArticulatedObjectViewAPI.async_copy_to_gpu()
-            th.cuda.synchronize()
+            This is the same pre/global/post pass that ``_non_physics_step`` runs once per
+            sim step, factored out so that callers which mutate poses/joints between sim
+            steps (``sample_kinematics``, ``Inside._set_value``, ad-hoc
+            ``set_position_orientation`` / ``JointPrim.set_pos``) can bring caches back into
+            sync without waiting for the next ``sim.step()``.
+
+            Triggered automatically from ``TensorizedAbsoluteState._get_value`` /
+            ``TensorizedRelativeState._get_value`` when ``TensorizedState.caches_dirty`` is
+            set, so callers don't have to remember to call it.
+
+            Always clears ``TensorizedState.caches_dirty`` on completion.
+            """
+            if len(self.scenes) == 0 or not self.is_playing():
+                TensorizedState.caches_dirty = False
+                return
+
+            RigidBodyViewAPI.read_from_physx()
+            ArticulatedObjectViewAPI.read_from_physx()
+            wp.synchronize()
+
+            self._capture_warp_graph()
+
+            RigidContactAPI._PENDING_STEPS = 0
+
+        def _capture_warp_graph(self):
+            """
+            Manage the per-step warp graph end-to-end (gating, pre/post bookkeeping, capture,
+            and launch all live here so ``_refresh_state_caches`` stays thin).
+
+            Steps:
+              1. Compute the list of tensorized states, gated on ``gm.ENABLE_OBJECT_STATES``.
+                 If the list is empty (object states disabled or none registered), run the
+                 view-API ``update()``s directly and return — there is no pre/global/post
+                 pipeline to drive.
+              2. Otherwise, run ``pre_update`` for each state, then either (re-)capture or
+                 replay the per-step graph (view-API H2D + tensorized state global_updates).
+                 ``wp.ScopedCapture`` only RECORDS ops — the captured graph must be launched
+                 explicitly via ``wp.capture_launch`` for its kernels to run this frame.
+              3. After ``wp.synchronize()``, run ``post_update`` for each state for change
+                 detection.
+
+            Always clears ``TensorizedState.caches_dirty`` on completion.
+            """
+            tensorized_states = (
+                [state for state in self.object_state_types_requiring_update if issubclass(state, TensorizedState)]
+                if gm.ENABLE_OBJECT_STATES
+                else []
+            )
+
+            if not tensorized_states:
+                # No tensorized-state pipeline → still refresh GPU view-API mirrors so
+                # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
+                RigidBodyViewAPI.update()
+                RigidContactAPI.update()
+                wp.synchronize()
+                TensorizedState.caches_dirty = False
+                return
+
+            # Nested _get_value during this refresh should read the cache directly rather
+            # than recursively triggering another refresh.
+            TensorizedState._refresh_in_progress = True
+            try:
+                TensorizedState.caches_dirty = True
+
+                for state_type in tensorized_states:
+                    state_type.pre_update()
+
+                if TensorizedState.graph_dirty:
+                    if all(s.VALUES is None or s.VALUES.numel() == 0 for s in tensorized_states):
+                        # Nothing to capture; leave _state_graph as None.
+                        self._state_graph = None
+                    else:
+                        # ScopedCapture creates + owns its capture stream. Inside the with-block,
+                        # wp.get_stream() returns that stream and any wp.launch / wp.copy defaults
+                        # to it. Tensorized-state kernels read POSE_MATRICES / joint positions
+                        # written by the view-API kernels above — stream ordering on the capture
+                        # stream guarantees they see fresh values.
+                        with wp.ScopedCapture(device="cuda") as capture:
+                            RigidBodyViewAPI.update()
+                            RigidContactAPI.update()
+                            for state_type in tensorized_states:
+                                state_type.global_update()
+                        self._state_graph = capture.graph
+                if self._state_graph is not None:
+                    wp.capture_launch(self._state_graph)
+
+                wp.synchronize()
+
+                for state_type in tensorized_states:
+                    state_type.post_update()
+            finally:
+                TensorizedState._refresh_in_progress = False
+                TensorizedState.caches_dirty = False
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1230,9 +1327,6 @@ def _launch_simulator(*args, **kwargs):
 
             # If we're playing we, also run additional logic
             if self.is_playing():
-                # Update persistent rigid contact and body pose caches from the latest step
-                self._update_view_apis()
-
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
                 if n_objects_to_initialize > 0 and self.is_playing():
@@ -1265,20 +1359,11 @@ def _launch_simulator(*args, **kwargs):
                     for system in scene.active_systems.values():
                         system.update()
 
+                # Update view API data and tensorized states
+                self._refresh_state_caches()
+
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
-                    # TensorizedValueState global_updates (GPU computation)
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedValueState):
-                            state_type.global_update()
-
-                    th.cuda.synchronize()
-
-                    # TensorizedValueState post_updates (CPU change detection + state_updated())
-                    for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedValueState):
-                            state_type.post_update()
-
                     # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
                     for state_type in self.object_state_types_requiring_update:
                         if issubclass(state_type, UpdateStateMixin):
@@ -1435,7 +1520,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Accumulate contact data from this physics step and then flush to cache.
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-            self._update_view_apis()
+            self._refresh_state_caches()
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
@@ -1473,8 +1558,15 @@ def _launch_simulator(*args, **kwargs):
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
 
-                # Pull the contact sensor data
-                RigidContactAPI.add_contacts_from_physics_step()
+                # Pull the contact sensor data — must run while currently_stepping is True,
+                # since RigidContactAPI.read_from_physx asserts on it.
+                RigidContactAPI.read_from_physx()
+                wp.synchronize()
+
+                # Record that we are done with the step context. Joint-break callbacks below
+                # are post-step user code: they may call update_handles() / read Fabric, which
+                # is forbidden while currently_stepping=True.
+                self.currently_stepping = False
 
                 if self._deferred_joint_breaks:
                     # Copy the current deferred joint breaks and clear the shared list
@@ -1484,9 +1576,6 @@ def _launch_simulator(*args, **kwargs):
                     self._deferred_joint_breaks.clear()
                     for obj, state_type, joint_path in deferred_breaks:
                         obj.states[state_type].on_joint_break(joint_path)
-
-                # Record that we are done with the step context.
-                self.currently_stepping = False
             except Exception as e:
                 self.currently_in_isaac_step = False
                 self.currently_stepping = False
@@ -2028,7 +2117,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, TensorizedValueState):
+                if issubclass(state, TensorizedState):
                     state.global_initialize()
 
             # Clear all materials

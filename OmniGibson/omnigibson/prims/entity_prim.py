@@ -661,6 +661,13 @@ class EntityPrim(XFormPrim):
                 self._articulation_view.set_joint_positions(positions, joint_indices=indices)
             og.sim.sync_physx_to_fabric()
 
+        # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+        # that are now one frame behind. Flag them as stale so the next state read forces a
+        # refresh via the lazy-refresh gate in TensorizedState._get_value.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.caches_dirty = True
+
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
         Set the joint velocities (both actual value and target values) in simulation. Note: only works if the simulator
@@ -1066,6 +1073,13 @@ class EntityPrim(XFormPrim):
                     positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
                 )
                 og.sim.sync_physx_to_fabric()
+
+                # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+                # that are now one frame behind. Flag them as stale so the next state read forces a
+                # refresh via the lazy-refresh gate in TensorizedState._get_value.
+                from omnigibson.object_states.tensorized_state import TensorizedState
+
+                TensorizedState.caches_dirty = True
             else:
                 self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
 

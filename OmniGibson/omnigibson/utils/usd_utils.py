@@ -7,6 +7,7 @@ from typing import Tuple
 import numpy as np
 import torch as th
 import trimesh
+import warp as wp
 from numba import jit, prange
 
 import omnigibson as og
@@ -23,6 +24,259 @@ from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+
+@wp.func
+def rigid_inverse_mat44(T: wp.mat44) -> wp.mat44:
+    """
+    Inverse of a rigid transform `T = [R | t; 0 | 1]` with R orthogonal.
+    Result: `[R^T | -R^T t; 0 | 1]`. Cheap to compute (transpose + dot products),
+    avoids a general 4x4 inverse and works correctly under wp.graph capture.
+
+    Used by _toggle_overlap_kernel (and any future kernel that needs to transform a world-space point into a link's
+    local frame).
+    """
+    R = wp.mat33(
+        T[0, 0],
+        T[0, 1],
+        T[0, 2],
+        T[1, 0],
+        T[1, 1],
+        T[1, 2],
+        T[2, 0],
+        T[2, 1],
+        T[2, 2],
+    )
+    t = wp.vec3(T[0, 3], T[1, 3], T[2, 3])
+    Rt = wp.transpose(R)
+    nt = -wp.mul(Rt, t)
+    return wp.mat44(
+        Rt[0, 0],
+        Rt[0, 1],
+        Rt[0, 2],
+        nt[0],
+        Rt[1, 0],
+        Rt[1, 1],
+        Rt[1, 2],
+        nt[1],
+        Rt[2, 0],
+        Rt[2, 1],
+        Rt[2, 2],
+        nt[2],
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    )
+
+
+@wp.kernel
+def _is_in_contact_batch_kernel(
+    query_masks: wp.array2d(dtype=wp.uint8),  # (N, R)
+    contact_matrix: wp.array2d(dtype=wp.uint8),  # (R, C)
+    col_filter: wp.array2d(dtype=wp.uint8),  # (N, C) — with-mask if mode=0, ignore-mask if mode=1, ignored if mode=2
+    mode: wp.int32,  # 0 = with_masks, 1 = ignore_masks, 2 = no filter
+    out: wp.array(dtype=wp.int32),  # (N,) — atomic-OR'd, int32 because uint8 atomics aren't supported
+):
+    """
+    Per (query, row, col) thread: full N*R*C parallelism. Each thread checks one cell:
+      if query_masks[i, r] AND contact_matrix[r, c] AND col_filter passes:
+          atomic-set out[i] to 1.
+
+    Output is int32 because Warp's atomic_max requires [u]int32, [u]int64, float32, or
+    float64 (CUDA doesn't expose 8-bit atomics natively). Same-value atomic_max writes
+    short-circuit on Pascal+ hardware, so contention on out[i] is bounded — only the
+    first hitting thread per query actually does meaningful work; subsequent writes are
+    NOPs at the memory subsystem.
+
+    Caller must zero `out` before launch (see is_in_contact_batch_warp). The atomic only
+    sets-to-1 on hits; cells with no hits remain at their initial value.
+    """
+    i, r, c = wp.tid()
+
+    # Column filter — early exit before touching query_masks/contact_matrix.
+    if mode == wp.int32(0):  # with-mask: only count if filter is True
+        if col_filter[i, c] == wp.uint8(0):
+            return
+    elif mode == wp.int32(1):  # ignore-mask: only count if filter is False
+        if col_filter[i, c] != wp.uint8(0):
+            return
+    # mode == 2: no filter, fall through
+
+    # Row mask — does query i include row r?
+    if query_masks[i, r] == wp.uint8(0):
+        return
+
+    # Contact lookup.
+    if contact_matrix[r, c] == wp.uint8(0):
+        return
+
+    # Hit. Set out[i] = 1. atomic_max because multiple (i, *, *) threads may converge
+    # on the same out[i]. Same-value short-circuit keeps contention cheap.
+    wp.atomic_max(out, i, wp.int32(1))
+
+
+@wp.func
+def _body_awake_at_step(
+    i: wp.int32,
+    b: wp.int32,
+    all_transforms: wp.array3d(dtype=wp.float32),
+    prev_transforms: wp.array2d(dtype=wp.float32),
+    body_to_row: wp.array(dtype=wp.int32),
+    net_forces: wp.array3d(dtype=wp.float32),
+    pos_eps: wp.float32,
+    ori_eps: wp.float32,
+) -> wp.bool:
+    """
+    Returns True iff body ``b`` was awake at physics-step ``i``.
+
+    A body is awake if either its position/orientation changed since the previous step,
+    or — for bodies that map to a contact-matrix row — its net contact force is nonzero.
+    For step ``i == 0`` the predecessor is the cached ``prev_transforms`` (the
+    ``_BODY_TRANSFORMS`` snapshot from the previous update), otherwise it's
+    ``all_transforms[i-1, b]``.
+
+    Shared by ``_update_contact_matrices_kernel`` and ``_update_body_transforms_kernel``
+    so both kernels see the exact same awakeness predicate.
+    """
+    if i == 0:
+        px0 = prev_transforms[b, 0]
+        py0 = prev_transforms[b, 1]
+        pz0 = prev_transforms[b, 2]
+        qx0 = prev_transforms[b, 3]
+        qy0 = prev_transforms[b, 4]
+        qz0 = prev_transforms[b, 5]
+        qw0 = prev_transforms[b, 6]
+    else:
+        px0 = all_transforms[i - 1, b, 0]
+        py0 = all_transforms[i - 1, b, 1]
+        pz0 = all_transforms[i - 1, b, 2]
+        qx0 = all_transforms[i - 1, b, 3]
+        qy0 = all_transforms[i - 1, b, 4]
+        qz0 = all_transforms[i - 1, b, 5]
+        qw0 = all_transforms[i - 1, b, 6]
+    px1 = all_transforms[i, b, 0]
+    py1 = all_transforms[i, b, 1]
+    pz1 = all_transforms[i, b, 2]
+    qx1 = all_transforms[i, b, 3]
+    qy1 = all_transforms[i, b, 4]
+    qz1 = all_transforms[i, b, 5]
+    qw1 = all_transforms[i, b, 6]
+
+    pos_changed = wp.abs(px1 - px0) > pos_eps or wp.abs(py1 - py0) > pos_eps or wp.abs(pz1 - pz0) > pos_eps
+    qdot = qx0 * qx1 + qy0 * qy1 + qz0 * qz1 + qw0 * qw1
+    ori_changed = wp.abs(qdot) < (wp.float32(1.0) - ori_eps)
+    awake = pos_changed or ori_changed
+
+    r = body_to_row[b]
+    if r >= 0:
+        fx = net_forces[i, r, 0]
+        fy = net_forces[i, r, 1]
+        fz = net_forces[i, r, 2]
+        if fx != 0.0 or fy != 0.0 or fz != 0.0:
+            awake = True
+    return awake
+
+
+@wp.kernel
+def _update_contact_matrices_kernel(
+    all_transforms: wp.array3d(dtype=wp.float32),  # (N, B, 7)
+    prev_transforms: wp.array2d(dtype=wp.float32),  # (B, 7) — cached BODY_TRANSFORMS
+    net_forces: wp.array3d(dtype=wp.float32),  # (N, R, 3)
+    body_to_row: wp.array(dtype=wp.int32),  # (B,) -1 if body is not a row body
+    impulses: wp.array4d(dtype=wp.float32),  # (N, R, C, 3)
+    row_to_rigid: wp.array(dtype=wp.int32),  # (R,) row index → body index
+    col_to_rigid: wp.array(dtype=wp.int32),  # (C,) col index → body index, -1 = kinematic
+    n_steps_arr: wp.array(dtype=wp.int32),  # (1,) read at runtime, NOT a captured constant
+    pos_eps: wp.float32,
+    ori_eps: wp.float32,
+    contact_matrix: wp.array2d(dtype=wp.uint8),  # (R, C) in/out — "any contact during recent steps"
+    current_contact_matrix: wp.array2d(dtype=wp.uint8),  # (R, C) in/out — "contact at most recent awake step"
+):
+    """
+    Per (r, c) thread: walks ``n_steps_arr[0]`` physics sub-steps, evaluating pair awakeness
+    inline via ``_body_awake_at_step``. Replaces the entire torch pipeline in the old
+    ``RigidContactAPIImpl.update()``:
+
+      - ``th.cat`` of prev+all_transforms → folded into the i==0 base case in _body_awake_at_step.
+      - ``th.where(per_step_awake, idx, -1).max(dim=0)`` → tracked as a scalar ``last_awake`` per thread.
+      - ``th.any(impulses != 0, dim=-1)`` and the masked indexed writes →
+        scalar OR over the awake sub-steps, single write at the end.
+
+    ``n_steps`` comes from ``n_steps_arr[0]`` (a 1-element GPU array refreshed from Python
+    before each graph launch) rather than a captured constant. This matches the old code's
+    ``all_impulses[:self._PENDING_STEPS]`` slicing — when ``og.sim.step_physics()`` is used
+    (e.g. inside ``sample_kinematics``), only 1 < n_physics_timesteps_per_render sub-step
+    has actually run, and the remaining pending slots hold stale data from previous frames.
+
+    Pairs that were never awake retain ``current_contact_matrix[r, c]`` and copy it into
+    ``contact_matrix[r, c]``, matching the torch behavior at the end of the original update().
+    """
+    r, c = wp.tid()
+    n_steps = n_steps_arr[0]
+    row_b = row_to_rigid[r]
+    col_b = col_to_rigid[c]
+    has_col_b = col_b >= 0
+
+    last_awake = wp.int32(-1)
+    any_contact = wp.uint8(0)
+    for i in range(n_steps):
+        row_awake = _body_awake_at_step(
+            i, row_b, all_transforms, prev_transforms, body_to_row, net_forces, pos_eps, ori_eps
+        )
+        col_awake = False
+        if has_col_b:
+            col_awake = _body_awake_at_step(
+                i, col_b, all_transforms, prev_transforms, body_to_row, net_forces, pos_eps, ori_eps
+            )
+        if row_awake or col_awake:
+            last_awake = i
+            if impulses[i, r, c, 0] != 0.0 or impulses[i, r, c, 1] != 0.0 or impulses[i, r, c, 2] != 0.0:
+                any_contact = wp.uint8(1)
+
+    if last_awake >= 0:
+        cur = wp.uint8(0)
+        if (
+            impulses[last_awake, r, c, 0] != 0.0
+            or impulses[last_awake, r, c, 1] != 0.0
+            or impulses[last_awake, r, c, 2] != 0.0
+        ):
+            cur = wp.uint8(1)
+        current_contact_matrix[r, c] = cur
+        contact_matrix[r, c] = any_contact
+    else:
+        # Pair was never awake — both matrices collapse to the (carried-over) current value.
+        contact_matrix[r, c] = current_contact_matrix[r, c]
+
+
+@wp.kernel
+def _update_body_transforms_kernel(
+    all_transforms: wp.array3d(dtype=wp.float32),  # (N, B, 7)
+    prev_transforms: wp.array2d(dtype=wp.float32),  # (B, 7) — same buffer as body_transforms below
+    net_forces: wp.array3d(dtype=wp.float32),  # (N, R, 3)
+    body_to_row: wp.array(dtype=wp.int32),  # (B,)
+    n_steps_arr: wp.array(dtype=wp.int32),  # (1,) read at runtime, shared with the contact kernel
+    pos_eps: wp.float32,
+    ori_eps: wp.float32,
+    body_transforms: wp.array2d(dtype=wp.float32),  # (B, 7) in/out — snapshot of last awake step per body
+):
+    """
+    Per (b,) thread: snapshots each body's transform from its last awake step.
+
+    MUST be launched *after* ``_update_contact_matrices_kernel`` because both kernels
+    use ``body_transforms`` as the ``prev_transforms`` ``_body_awake_at_step`` reads for
+    ``i == 0``, and this kernel writes to it in-place. Same-stream ordering inside the
+    captured graph guarantees this.
+    """
+    b = wp.tid()
+    n_steps = n_steps_arr[0]
+    last_awake = wp.int32(-1)
+    for i in range(n_steps):
+        if _body_awake_at_step(i, b, all_transforms, prev_transforms, body_to_row, net_forces, pos_eps, ori_eps):
+            last_awake = i
+    if last_awake >= 0:
+        for k in range(7):
+            body_transforms[b, k] = all_transforms[last_awake, b, k]
 
 
 def ensure_usd_api(prim, api):
@@ -213,6 +467,123 @@ def create_joint(
     return joint_prim
 
 
+@wp.kernel
+def _aabb_reduce_kernel(
+    pose_matrices: wp.array(dtype=wp.mat44),  # (N_links_total,)
+    mesh_ids: wp.array(dtype=wp.uint64),  # (N_links_total,) — 0 if link has no mesh
+    aabb_links: wp.array(dtype=wp.int32),  # (K,) k → which link this thread belongs to
+    aabb_vertices: wp.array(dtype=wp.int32),  # (K,) k → which vertex within that link's mesh
+    aabb_objs: wp.array(dtype=wp.int32),  # (K,) k → output row (= s*O + obj_idx)
+    out_values: wp.array2d(dtype=wp.float32),  # (S*O, 6)
+):
+    # K = total number of link vertices that have AABB state = total number of threads.
+    # Each thread processes ONE (link, vertex) pair. Three K-length lookup tables tell
+    # thread k where to read the point from and where to write its contribution.
+    #
+    # Example with K = 5, two tracked links A (3 verts → object 5) and B (2 verts → object 7):
+    #
+    #   thread index k:    0    1    2    3    4
+    #                     ─────────────────────────
+    #   aabb_links:      [ A ,  A ,  A ,  B ,  B ]   ← which link I belong to
+    #   aabb_vertices:   [ 0 ,  1 ,  2 ,  0 ,  1 ]   ← which vertex within that link
+    #   aabb_objs:       [ 5 ,  5 ,  5 ,  7 ,  7 ]   ← which object's AABB I write to
+    k = wp.tid()
+    body = aabb_links[k]
+    # NOTE: wp.mesh_get_point(id, i) is a *face-vertex* lookup (returns mesh.points[mesh.indices[i]]),
+    # not a vertex lookup. We want vertex i directly, so we read mesh.points[i] via wp.mesh_get(id).
+    mesh = wp.mesh_get(mesh_ids[body])
+    pt3 = mesh.points[aabb_vertices[k]]
+    pt4 = wp.vec4(pt3[0], pt3[1], pt3[2], 1.0)
+    world = wp.mul(pose_matrices[body], pt4)
+    obj = aabb_objs[k]
+    wp.atomic_min(out_values, obj, 0, world[0])
+    wp.atomic_min(out_values, obj, 1, world[1])
+    wp.atomic_min(out_values, obj, 2, world[2])
+    wp.atomic_max(out_values, obj, 3, world[0])
+    wp.atomic_max(out_values, obj, 4, world[1])
+    wp.atomic_max(out_values, obj, 5, world[2])
+
+
+@wp.kernel
+def _aabb_baselink_fallback_kernel(
+    poses: wp.array2d(dtype=wp.float32),  # POSES_GPU as (N_links_total, 7)
+    base_link_links: wp.array(dtype=wp.int32),  # (N_rigid,) flat body idx of each rigid obj's base link
+    base_link_objs: wp.array(dtype=wp.int32),  # (N_rigid,) output row in out_values
+    out_values: wp.array2d(dtype=wp.float32),  # (S*O, 6) — populated by _aabb_reduce_kernel
+):
+    # Each thread = one rigid object's base link. If the main kernel never touched this
+    # obj's row (still +inf at lo_x), no link had collision geometry — write a point AABB
+    # at the base link's world position. Each rigid object has exactly one base link, so
+    # threads never share an obj — non-atomic writes are safe.
+    n = wp.tid()
+    obj = base_link_objs[n]
+    if wp.isinf(out_values[obj, 0]):
+        body = base_link_links[n]
+        x = poses[body, 0]
+        y = poses[body, 1]
+        z = poses[body, 2]
+        out_values[obj, 0] = x
+        out_values[obj, 1] = y
+        out_values[obj, 2] = z
+        out_values[obj, 3] = x
+        out_values[obj, 4] = y
+        out_values[obj, 5] = z
+
+
+@wp.kernel
+def _poses_to_matrices_kernel(
+    poses: wp.array2d(dtype=wp.float32),  # (N, 7) — [px, py, pz, qx, qy, qz, qw]
+    matrices: wp.array(dtype=wp.mat44),  # (N,)
+):
+    """Convert (N, 7) pose tensor (xyz + xyzw quat) into (N,) wp.mat44 rigid transforms."""
+    i = wp.tid()
+    px = poses[i, 0]
+    py = poses[i, 1]
+    pz = poses[i, 2]
+    qx = poses[i, 3]
+    qy = poses[i, 4]
+    qz = poses[i, 5]
+    qw = poses[i, 6]
+
+    # Normalize the quaternion defensively (PhysX usually returns unit quats, but matching
+    # transform_utils.quat2mat behavior keeps results bit-for-bit consistent with the legacy CPU path).
+    n = wp.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+    inv_n = wp.float32(1.0) / n
+    qx = qx * inv_n
+    qy = qy * inv_n
+    qz = qz * inv_n
+    qw = qw * inv_n
+
+    xx = qx * qx
+    yy = qy * qy
+    zz = qz * qz
+    xy = qx * qy
+    xz = qx * qz
+    yz = qy * qz
+    xw = qx * qw
+    yw = qy * qw
+    zw = qz * qw
+
+    matrices[i] = wp.mat44(
+        wp.float32(1.0) - wp.float32(2.0) * (yy + zz),
+        wp.float32(2.0) * (xy - zw),
+        wp.float32(2.0) * (xz + yw),
+        px,
+        wp.float32(2.0) * (xy + zw),
+        wp.float32(1.0) - wp.float32(2.0) * (xx + zz),
+        wp.float32(2.0) * (yz - xw),
+        py,
+        wp.float32(2.0) * (xz - yw),
+        wp.float32(2.0) * (yz + xw),
+        wp.float32(1.0) - wp.float32(2.0) * (xx + yy),
+        pz,
+        wp.float32(0.0),
+        wp.float32(0.0),
+        wp.float32(0.0),
+        wp.float32(1.0),
+    )
+
+
 class RigidBodyViewAPI:
     """
     Batched rigid-body pose cache for all rigid bodies across all scenes.
@@ -226,10 +597,13 @@ class RigidBodyViewAPI:
       - physx_untracked: kinematic-only articulated objects' links not tracked by physx's rigid body view.
                          Poses seeded once at initialize_view() and refreshed only by invalidate_kinematic().
 
-    Flat index layout in _POSE_MATRICES (N_links_total, 4, 4):
+    Flat index layout in POSE_MATRICES (N_links_total, 4, 4):
       [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked links across all scenes]
 
-    Also stores LOCAL_POINTS / POINTS_MASK for batched AABB computation via get_aabb().
+    Also exposes LINK_MESH_IDS / LINK_VERTEX_COUNTS so the _aabb_reduce_kernel can read each
+    link's collision mesh via wp.mesh_get_point. Each link's wp.Mesh is owned by this view
+    (built once in initialize_view from link.collision_mesh_cpu_data with batched H2D copies),
+    and stored in cls._link_meshes alongside the GPU-resident points/faces backing tensors.
     """
 
     # Rigid body view for batched pose reads (one per scene)
@@ -240,25 +614,43 @@ class RigidBodyViewAPI:
     _IDX_TO_PATH = []  # list[link_absolute_prim_path]
 
     # Position + quaternion pose of all links in the scene, indexed by flat index.
-    # shape: (N_links_total, 7) — [px, py, pz, qx, qy, qz, qw]
-    _POSES = None  # CPU — written by update_pose_cache() / invalidate_kinematic()
-    _POSES_GPU = None  # GPU — written by async_copy_to_gpu()
+    # POSES (CPU pinned): where read_from_physx() copies PhysX output;
+    # POSES_GPU: GPU mirror;
+    # POSE_MATRICES: the derived (N,) wp.mat44 transform table.
+    # All three are populated inside the captured wp.graph each step via update().
+    POSES = None  # wp.array, device="cpu", pinned=True, shape=(N_links_total, 7), float32
+    POSES_GPU = None  # wp.array, device="cuda", shape=(N_links_total, 7), float32
+    POSE_MATRICES = None  # wp.array, device="cuda", shape=(N_links_total,), wp.mat44
 
-    # Cached 4x4 transformation matrices — flat, covers physx_tracked + physx_untracked.
-    # shape: (N_links_total, 4, 4)
-    # physx_untracked slice is appended after all physx_tracked entries and never
-    # overwritten by update_pose_cache(); refreshed only by invalidate_kinematic().
-    _POSE_MATRICES = None  # GPU — written by async_copy_to_gpu()
-    _POSE_MATRICES_CPU = None  # CPU — written by update_pose_cache()
+    # Per-link wp.Mesh ids (0 if link has no collision geometry), kernel input for
+    # wp.mesh_get_point(mesh_ids[body], v). Built in initialize_view via batched H2D copies of
+    # link.collision_mesh_cpu_data, with each per-link wp.Mesh viewing a slice of the shared
+    # GPU points/faces tensors.
+    LINK_MESH_IDS = None  # wp.array(dtype=wp.uint64) on CUDA, shape (N_links_total,)
 
-    # Local homogeneous collision points for every rigid link, indexed by flat pose index.
-    # shape: (N_links_total, V_max, 4)
-    # V_max is a global maximum across all links/scenes; may be wasteful when one scene
-    # has unusually dense collision geometry — acceptable for now.
-    LOCAL_POINTS = None
+    # Per-link vertex count. Used by prepare_aabb_kernel_inputs to vectorize the K-length
+    # thread-table expansion. CPU is fine (small, no transfer needed during expansion).
+    LINK_VERTEX_COUNTS = None  # th.Tensor on CPU, shape (N_links_total,) int32
 
-    # Valid-point mask; True for non-padded slots. shape: (N_links_total, V_max) bool
-    POINTS_MASK = None
+    # Per-link wp.Mesh cache, keyed by absolute prim path. Keeps wp.Mesh objects (and their
+    # backing GPU points/faces tensors) alive across initialize_view() calls so re-init only
+    # rebuilds meshes for newly-registered links. Reuse is gated by Python id(link), so a
+    # rebuild also happens if a path is registered to a different RigidPrim instance.
+    # Each entry: {"link_id": int, "mesh": wp.Mesh, "n_pts": int,
+    #              "pts_buffer": th.Tensor, "faces_buffer": th.Tensor}.
+    _link_mesh_cache = {}
+
+    # K = total number links' vertices of objects with AABB states
+    # Cached K-length kernel inputs for the main AABB kernel. Built by
+    # prepare_aabb_kernel_inputs from the (PRIM_BODY_IDX, LINK_IDX) pair AABB.initialize_view
+    # provides. Reset to None on every initialize_view().
+    _aabb_links = None  # wp.array(dtype=wp.int32) on CUDA, shape (K,)
+    _aabb_vertices = None  # wp.array(dtype=wp.int32) on CUDA, shape (K,)
+    _aabb_objs = None  # wp.array(dtype=wp.int32) on CUDA, shape (K,)
+
+    # Cached fallback-kernel inputs for meshes without boundry points (one entry per rigid object's base link).
+    _aabb_base_link_links = None  # wp.array(dtype=wp.int32) on CUDA, shape (N_rigid,)
+    _aabb_base_link_objs = None  # wp.array(dtype=wp.int32) on CUDA, shape (N_rigid,)
 
     # Tolerances for change detection
     _POS_EPS = 1e-4
@@ -270,14 +662,23 @@ class RigidBodyViewAPI:
         Initializes the rigid body view. Note: Can only be done when sim is playing!
 
         Builds a flat layout keyed by absolute prim path so each scene can have an
-        independent link count. Layout of _POSE_MATRICES (N_links_total, 4, 4):
+        independent link count. Layout of POSE_MATRICES (N_links_total, 4, 4):
           [scene_0 physx_tracked] [scene_1 physx_tracked] ... [physx_untracked across all scenes]
+
+        Also collects each registered link's wp.Mesh id and vertex count into
+        LINK_MESH_IDS / LINK_VERTEX_COUNTS for the AABB Warp kernel.
         """
         assert og.sim.is_playing(), "Cannot create rigid body view while sim is not playing!"
 
-        # Snapshot existing kinematic-link poses ton reuse them below
+        # Ensure Warp's runtime is up before any kernel launches in get_aabb. Idempotent —
+        # subsequent calls are no-ops once the runtime has been constructed.
+        wp.init()
+
+        # Snapshot existing kinematic-link poses ton reuse them below.
+        # cls.POSES is now a wp.array, convert to a torch view for the per-row
+        # indexing/unsqueeze below.
         prev_path_to_idx = dict(cls._PATH_TO_IDX)  # snapshot before clear()
-        prev_poses = cls._POSES  # None on very first call; CPU tensor otherwise
+        prev_poses = wp.to_torch(cls.POSES) if cls.POSES is not None else None
 
         # Reset
         cls.clear()
@@ -303,8 +704,9 @@ class RigidBodyViewAPI:
                 cls._IDX_TO_PATH.append(abs_path)
             poses_list.append(cls._RIGID_BODY_VIEW.get_transforms().clone())
 
-        # Add physx_untracked kinematic links and collect collision_boundary_points_local
-        raw_local_points = {}  # {flat_idx: (V, 3) tensor}
+        # Add physx_untracked kinematic links and remember each registered link object so
+        # we can pull its wp.Mesh after _PATH_TO_IDX is finalized below.
+        link_by_idx = {}  # {flat_idx: link object}
 
         for _, scene in enumerate(og.sim.scenes):
             for obj in scene.objects:
@@ -333,42 +735,99 @@ class RigidBodyViewAPI:
                             pose = th.cat([pos, quat_xyzw]).unsqueeze(0)
                         poses_list.append(pose)
 
-                    # Collect local collision points for AABB (for all registered links)
                     if abs_path in cls._PATH_TO_IDX:
-                        pts = link.collision_boundary_points_local  # (V, 3) or None
-                        if pts is not None:
-                            scale = link.get_world_scale()
-                            raw_local_points[cls._PATH_TO_IDX[abs_path]] = pts * scale
+                        link_by_idx[cls._PATH_TO_IDX[abs_path]] = link
 
-        cls._POSES = th.cat(poses_list, dim=0).pin_memory()  # (N_links_total, 7), CPU
-        cls._POSES_GPU = cls._POSES.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
-        cls._POSE_MATRICES_CPU = cls._poses_to_matrices(cls._POSES).pin_memory()  # (N_links_total, 4, 4) — CPU
-        cls._POSE_MATRICES = cls._POSE_MATRICES_CPU.cuda()  # GPU — will be kept in sync via async_copy_to_gpu()
+        initial_poses = th.cat(poses_list, dim=0).contiguous()  # (N, 7) torch CPU, used only to seed
+        N = initial_poses.shape[0]
+        cls.POSES = wp.empty(shape=(N, 7), dtype=wp.float32, device="cpu", pinned=True)
+        cls.POSES_GPU = wp.zeros(shape=(N, 7), dtype=wp.float32, device="cuda")
+        cls.POSE_MATRICES = wp.zeros(shape=(N,), dtype=wp.mat44, device="cuda")
+        # Seed POSES via the zero-copy torch view (same memory as the wp.array).
+        wp.to_torch(cls.POSES)[:] = initial_poses
 
-        # Build LOCAL_POINTS and POINTS_MASK tensors.
+        # Build / reuse per-link wp.Mesh objects. Cached entries (same prim path + same RigidPrim
+        # instance) are reused as-is; only newly-registered links flow through a single batched
+        # H2D copy + BVH-build pass. Drop cache entries for paths no longer registered.
         N_total = len(cls._PATH_TO_IDX)
-        V_max = max((p.shape[0] for p in raw_local_points.values()), default=1)
-        local_points = th.zeros(N_total, V_max, 4)
-        local_points[:, :, 3] = 1.0
-        points_mask = th.zeros(N_total, V_max, dtype=th.bool)
-        for path_idx, pts in raw_local_points.items():
-            V = pts.shape[0]
-            local_points[path_idx, :V, :3] = pts
-            points_mask[path_idx, :V] = True
-        cls.LOCAL_POINTS = local_points.cuda()
-        cls.POINTS_MASK = points_mask.cuda()
+        mesh_id_list = [0] * N_total
+        vertex_count_list = [0] * N_total
+
+        new_cache = {}
+        new_links = []  # (idx, abs_path, link, pts_cpu, faces_cpu) for paths needing a rebuild
+        for idx, link in link_by_idx.items():
+            abs_path = link.prim_path
+            cached = cls._link_mesh_cache.get(abs_path)
+            if cached is not None and cached["link_id"] == id(link):
+                mesh_id_list[idx] = cached["mesh"].id
+                vertex_count_list[idx] = cached["n_pts"]
+                new_cache[abs_path] = cached
+                continue
+            data = link.collision_mesh_cpu_data
+            if data is None:
+                continue
+            pts_cpu, faces_cpu = data
+            new_links.append((idx, abs_path, link, pts_cpu, faces_cpu))
+
+        if new_links:
+            pts_segments = [item[3] for item in new_links]
+            faces_segments = [item[4] for item in new_links]
+            pts_offsets = [0]
+            faces_offsets = [0]
+            for p, f in zip(pts_segments, faces_segments):
+                pts_offsets.append(pts_offsets[-1] + p.shape[0])
+                faces_offsets.append(faces_offsets[-1] + f.shape[0])
+
+            pts_gpu_buf = th.cat(pts_segments, dim=0).cuda()
+            faces_gpu_buf = th.cat(faces_segments, dim=0).cuda()
+
+            for i, (idx, abs_path, link, pts_cpu, _) in enumerate(new_links):
+                p0, p1 = pts_offsets[i], pts_offsets[i + 1]
+                f0, f1 = faces_offsets[i], faces_offsets[i + 1]
+                pts_view = pts_gpu_buf[p0:p1]
+                faces_view = faces_gpu_buf[f0:f1]
+                mesh = wp.Mesh(
+                    points=wp.from_torch(pts_view, dtype=wp.vec3),
+                    indices=wp.from_torch(faces_view),
+                )
+                mesh_id_list[idx] = mesh.id
+                vertex_count_list[idx] = pts_cpu.shape[0]
+                # Hold strong refs to the batch buffers in the cache entry so the wp.array
+                # views into them stay valid for the lifetime of `mesh`.
+                new_cache[abs_path] = {
+                    "link_id": id(link),
+                    "mesh": mesh,
+                    "n_pts": pts_cpu.shape[0],
+                    "pts_buffer": pts_gpu_buf,
+                    "faces_buffer": faces_gpu_buf,
+                }
+
+        cls._link_mesh_cache = new_cache
+        cls.LINK_MESH_IDS = wp.array(mesh_id_list, dtype=wp.uint64, device="cuda")
+        cls.LINK_VERTEX_COUNTS = th.tensor(vertex_count_list, dtype=th.int32)
+
+        # Invalidate any previously cached AABB kernel inputs — AABB.initialize_view() must
+        # call prepare_aabb_kernel_inputs() again before the next get_aabb() call.
+        cls._aabb_links = None
+        cls._aabb_vertices = None
+        cls._aabb_objs = None
+        cls._aabb_base_link_links = None
+        cls._aabb_base_link_objs = None
 
     @classmethod
-    def update_pose_cache(cls):
+    def read_from_physx(cls):
         """
-        Updates pose cache from the latest physics step.
-        Only recomputes 4x4 matrices for bodies whose pose has changed.
+        Read the latest PhysX transforms into the pinned-CPU staging buffer (cls.POSES).
+        Stays on the host: PhysX returns a CPU torch tensor, and graph capture freezes the
+        call (see scripts/test_physx_in_warp_graph.py). The H2D copy + pose2mat kernel run
+        inside the captured wp.graph via update().
+
         physx_untracked links are never touched here; they are updated only by invalidate_kinematic().
         """
         if not cls._RIGID_BODY_VIEW:
             return
         try:
-            transforms = cls._RIGID_BODY_VIEW.get_transforms()
+            transforms = cls._RIGID_BODY_VIEW.get_transforms()  # torch CPU tensor
         except Exception:
             log.warning(
                 "RigidBodyViewAPI cannot fetch transforms because the physics sim view is invalid. "
@@ -376,30 +835,15 @@ class RigidBodyViewAPI:
             )
             return
 
+        # Copy PhysX output into the fixed pinned wp.array via a torch view
         N_physx_tracked = transforms.shape[0]
-        cls._POSES[:N_physx_tracked] = transforms
-        cls._POSE_MATRICES_CPU[:N_physx_tracked] = cls._poses_to_matrices(transforms)
-
-    @staticmethod
-    def _poses_to_matrices(poses):
-        """
-        Convert poses tensor to 4x4 transformation matrices.
-
-        Args:
-            poses (th.Tensor): (N, 7) — [px, py, pz, qx, qy, qz, qw]
-
-        Returns:
-            th.Tensor: (N, 4, 4)
-        """
-        pos = poses[:, :3]  # (N, 3)
-        quat_xyzw = poses[:, 3:]  # (N, 4) — PhysX returns wxyz, T.pose2mat expects xyzw
-        result = TT.pose2mat((pos, quat_xyzw))
-        return result.unsqueeze(0) if result.ndim == 2 else result  # shape is (N, 4, 4)
+        wp.to_torch(cls.POSES)[:N_physx_tracked] = transforms
+        wp.copy(cls.POSES_GPU, cls.POSES)
 
     @classmethod
     def get_flat_idx(cls, abs_prim_path):
         """
-        Return the flat index into _POSE_MATRICES for a link's absolute prim path, or None.
+        Return the flat index into POSE_MATRICES for a link's absolute prim path, or None.
 
         Args:
             abs_prim_path (str): Absolute prim path of the link (e.g. /World/scene_0/obj/link).
@@ -410,71 +854,160 @@ class RigidBodyViewAPI:
         return cls._PATH_TO_IDX.get(abs_prim_path)
 
     @classmethod
-    def get_aabb(cls, prim_body_idx, link_idx, out_values):
+    def prepare_aabb_kernel_inputs(cls, prim_body_idx, link_idx, base_link_body_idx, base_link_values_idx):
         """
-        Compute per-link world-space AABB mins/maxes and scatter into per-object scratch buffers.
+        Build and cache the K-length kernel input tables for the AABB kernel and the
+        N_rigid-length tables for the base-link fallback kernel. Called once by
+        AABB.initialize_view() after it builds its (PRIM_BODY_IDX, LINK_IDX,
+        BASE_LINK_BODY_IDX, BASE_LINK_VALUES_IDX) tensors.
 
         Args:
-            prim_body_idx (th.Tensor): (N,) int64 — flat indices into _POSE_MATRICES / LOCAL_POINTS
-            link_idx (th.Tensor):      (N,) int64 — pre-computed s*O + obj_idx for each link
-            out_values (th.Tensor):    (S*O, 6) — caller pre-fills with +/-inf, written in-place
+            prim_body_idx (th.Tensor):       (n_tracked_links,) int32 CPU — flat idx per AABB-tracked link
+            link_idx (th.Tensor):            (n_tracked_links,) int32 CPU — output row (s*O + obj_idx) per tracked link
+            base_link_body_idx (th.Tensor):  (n_rigid_objs,) int32 CPU — flat idx of each rigid object's base link
+            base_link_values_idx (th.Tensor):(n_rigid_objs,) int32 CPU — output row per rigid object
         """
-        poses = cls._POSE_MATRICES[prim_body_idx]  # (N, 4, 4)
-        local_pts = cls.LOCAL_POINTS[prim_body_idx]  # (N, V, 4)
-        mask = cls.POINTS_MASK[prim_body_idx]  # (N, V)
+        # Always reset the cache; we rebuild what we can below.
+        cls._aabb_links = None
+        cls._aabb_vertices = None
+        cls._aabb_objs = None
+        cls._aabb_base_link_links = None
+        cls._aabb_base_link_objs = None
 
-        # Transform local homogeneous points to world frame
-        world_pts = th.einsum("nij,nvj->nvi", poses, local_pts)[..., :3]  # (N, V, 3)
+        # Nothing to prepare if no rigid bodies are registered.
+        if cls.LINK_VERTEX_COUNTS is None:
+            return
 
-        # Mask padding slots so they don't affect min/max
-        world_pts_min = world_pts.clone()
-        world_pts_max = world_pts.clone()
-        world_pts_min[~mask] = float("inf")
-        world_pts_max[~mask] = float("-inf")
+        if prim_body_idx.numel() > 0:
+            # Goal: expand from "one entry per tracked link" (length = n_tracked_links) to
+            # "one entry per (link, vertex) pair" (length K = sum of vertex counts). The
+            # K-length tables are what the AABB kernel reads, one per thread.
+            #
+            # All ops on CPU; n_tracked_links is small.
+            #
+            # TODO(vector): reconsider this approach. K = sum(vertex_counts) can be large, and we
+            # keep three K-length device arrays (_aabb_links, _aabb_vertices, _aabb_objs)
+            # resident for the lifetime of the view. A more memory-efficient alternative is
+            # to launch the AABB kernel over (n_tracked_links, max_verts) and have each
+            # thread derive (link, vertex) from its tid + a small per-link cumsum table.
 
-        # Compute per-link AABBs
-        min_p = world_pts_min.min(dim=1).values  # (N, 3)
-        max_p = world_pts_max.max(dim=1).values  # (N, 3)
+            verts_per_link = cls.LINK_VERTEX_COUNTS[prim_body_idx]  # (n_tracked_links,)
+            K = int(verts_per_link.sum().item())
 
-        # Scatter into per-object AABBs
-        idx_exp = link_idx.unsqueeze(1).expand(-1, 3)  # (N, 3)
-        out_values[:, :3].scatter_reduce_(0, idx_exp, min_p, reduce="amin", include_self=True)
-        out_values[:, 3:].scatter_reduce_(0, idx_exp, max_p, reduce="amax", include_self=True)
+            # Repeat each link's body / obj index by its vertex count so each thread that
+            # belongs to that link sees the same body and obj.
+            aabb_links = th.repeat_interleave(prim_body_idx, verts_per_link)  # (K,)
+            aabb_objs = th.repeat_interleave(link_idx, verts_per_link)  # (K,)
+
+            # Compute for each link, the index of the first thread that run the link's vertex
+            link_thread_starts = th.cat([th.zeros(1, dtype=verts_per_link.dtype), verts_per_link.cumsum(0)])
+            thread_idx = th.arange(K, dtype=verts_per_link.dtype)
+            # for thread k, find the smallest i such that k < link_thread_starts[1:][i]
+            tracked_link_per_thread = th.searchsorted(link_thread_starts[1:], thread_idx, right=True)
+            aabb_vertices = (thread_idx - link_thread_starts[tracked_link_per_thread]).to(th.int32)
+
+            cls._aabb_links = wp.from_torch(aabb_links.cuda())
+            cls._aabb_vertices = wp.from_torch(aabb_vertices.cuda())
+            cls._aabb_objs = wp.from_torch(aabb_objs.cuda())
+
+        if base_link_body_idx.numel() > 0:
+            cls._aabb_base_link_links = wp.from_torch(base_link_body_idx.cuda())
+            cls._aabb_base_link_objs = wp.from_torch(base_link_values_idx.cuda())
+
+    @classmethod
+    def get_aabb(cls, out_values):
+        """
+        Compute per-object world-space AABBs by launching two Warp kernels back-to-back on
+        torch's current CUDA stream:
+          1. _aabb_reduce_kernel: per-(link, vertex) thread, transforms one local point and
+             atomically narrows the owning object's (lo, hi) row of out_values.
+          2. _aabb_baselink_fallback_kernel: per-rigid-object thread, writes base-link
+             position as a point AABB for any object whose row was untouched (still +inf).
+
+        Args:
+            out_values (th.Tensor): (S*O, 6) float32 CUDA — caller pre-fills with +/-inf,
+                                    written in-place.
+        """
+        has_reduce = cls._aabb_links is not None and cls._aabb_links.shape[0] > 0
+        has_fallback = cls._aabb_base_link_links is not None and cls._aabb_base_link_links.shape[0] > 0
+        if not has_reduce and not has_fallback:
+            return
+        out_arr = wp.from_torch(out_values)
+
+        if has_reduce:
+            wp.launch(
+                kernel=_aabb_reduce_kernel,
+                dim=cls._aabb_links.shape[0],
+                inputs=[
+                    cls.POSE_MATRICES,
+                    cls.LINK_MESH_IDS,
+                    cls._aabb_links,
+                    cls._aabb_vertices,
+                    cls._aabb_objs,
+                    out_arr,
+                ],
+                device="cuda",
+            )
+        # use base-link pose for meshes without boundry points
+        if has_fallback:
+            wp.launch(
+                kernel=_aabb_baselink_fallback_kernel,
+                dim=cls._aabb_base_link_links.shape[0],
+                inputs=[
+                    cls.POSES_GPU,
+                    cls._aabb_base_link_links,
+                    cls._aabb_base_link_objs,
+                    out_arr,
+                ],
+                device="cuda",
+            )
 
     @classmethod
     def invalidate_kinematic(cls, links):
         """
-        Refresh cached pose matrices for kinematic links after an explicit move.
+        Refresh the CPU pose staging buffer for kinematic links after an explicit move.
 
         For physx_untracked links (no physics:RigidBodyAPI) this is the only update path.
-        For physx_tracked kinematic links this write is harmless — update_pose_cache() will
+        For physx_tracked kinematic links this write is harmless — read_from_physx() will
         re-read from PhysX on the next step.
+
+        Only POSES (pinned CPU) is touched here. POSES_GPU and POSE_MATRICES are
+        refreshed by the next captured-graph replay — every consumer reads them inside the
+        graph (or post-synchronize via UpdateStateMixin), so no eager H2D / kernel is needed.
 
         Args:
             links: iterable of RigidPrim link objects whose poses should be refreshed.
         """
-        if cls._POSE_MATRICES is None:
+        if cls.POSES is None:
             return
+        # Zero-copy torch view over the pinned wp.array — same memory.
+        poses_torch = wp.to_torch(cls.POSES)
         for link in links:
             idx = cls._PATH_TO_IDX.get(link.prim_path)
             if idx is None:
                 continue  # not registered (e.g. particle templates not in scene.objects)
             pos, quat_xyzw = link.get_position_orientation()
-            cls._POSES[idx][:3] = pos  # _POSES[idx]: (7,)
-            cls._POSES[idx][3:] = quat_xyzw
-            cls._POSES_GPU[idx] = cls._POSES[idx].cuda()
-            # unsqueeze(0): (7,) -> (1, 7) so _poses_to_matrices gets its expected (N, 7) input;
-            # [0]: (1, 4, 4) -> (4, 4) to match _POSE_MATRICES_CPU[idx] slot
-            cls._POSE_MATRICES_CPU[idx] = cls._poses_to_matrices(cls._POSES[idx].unsqueeze(0))[0]
-            cls._POSE_MATRICES[idx] = cls._POSE_MATRICES_CPU[idx].cuda()  # (4, 4), GPU
+            poses_torch[idx, :3] = pos
+            poses_torch[idx, 3:] = quat_xyzw
 
     @classmethod
-    def async_copy_to_gpu(cls):
-        """Issue non-blocking bulk copy of _POSES/_POSE_MATRICES CPU → GPU."""
-        if cls._POSE_MATRICES_CPU is None:
+    def update(cls):
+        """
+        Enqueue the per-step H2D + pose-to-mat work onto the current Warp stream. Called
+        inside wp.ScopedCapture so the captured graph replays the H2D + kernel together with
+        the tensorized-state global_updates each step.
+        """
+        if cls.POSES is None or cls.POSES_GPU is None or cls.POSE_MATRICES is None:
             return
-        cls._POSES_GPU.copy_(cls._POSES, non_blocking=True)
-        cls._POSE_MATRICES.copy_(cls._POSE_MATRICES_CPU, non_blocking=True)
+        N = cls.POSES_GPU.shape[0]
+        if N == 0:
+            return
+        wp.launch(
+            _poses_to_matrices_kernel,
+            dim=N,
+            inputs=[cls.POSES_GPU, cls.POSE_MATRICES],
+            device="cuda",
+        )
 
     @classmethod
     def clear(cls):
@@ -482,12 +1015,17 @@ class RigidBodyViewAPI:
         cls._RIGID_BODY_VIEW = None
         cls._PATH_TO_IDX = {}
         cls._IDX_TO_PATH = []
-        cls._POSES = None
-        cls._POSES_GPU = None
-        cls._POSE_MATRICES = None
-        cls._POSE_MATRICES_CPU = None
-        cls.LOCAL_POINTS = None
-        cls.POINTS_MASK = None
+        cls.POSES = None
+        cls.POSES_GPU = None
+        cls.POSE_MATRICES = None
+        cls.LINK_MESH_IDS = None
+        cls.LINK_VERTEX_COUNTS = None
+        cls._link_mesh_cache = {}
+        cls._aabb_links = None
+        cls._aabb_vertices = None
+        cls._aabb_objs = None
+        cls._aabb_base_link_links = None
+        cls._aabb_base_link_objs = None
 
 
 class ArticulatedObjectViewAPI:
@@ -510,8 +1048,7 @@ class ArticulatedObjectViewAPI:
 
     _VIEW = None
     _OBJ_TO_VIEW_IDX = {}
-    _JOINT_POSITIONS = None  # GPU — written by async_copy_to_gpu()
-    _JOINT_POSITIONS_CPU = None  # CPU — latest PhysX output, written by update_dof_cache()
+    _JOINT_POSITIONS = None  # wp.array, device="cuda", shape=(N_art, max_dof), float32
 
     @classmethod
     def initialize_view(cls):
@@ -537,17 +1074,21 @@ class ArticulatedObjectViewAPI:
             obj.articulation_root_path for obj in articulation_objs
         ), "Articulation view prim paths mismatch!"
         cls._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(cls._VIEW.prim_paths)}
-        # Pre-allocate _JOINT_POSITIONS on GPU; _JOINT_POSITIONS_CPU holds the latest PhysX output.
-        positions = cls._VIEW.get_dof_positions()
-        cls._JOINT_POSITIONS_CPU = positions
-        cls._JOINT_POSITIONS = cls._JOINT_POSITIONS_CPU.cuda()  # synchronous init so first read is valid
+        # Allocate fixed pinned-CPU and CUDA wp.arrays of the right shape.
+        seed_positions = cls._VIEW.get_dof_positions().contiguous()  # torch CPU, used only to seed
+        N, max_dof = seed_positions.shape
+        cls._JOINT_POSITIONS = wp.zeros(shape=(N, max_dof), dtype=wp.float32, device="cuda")
+        wp.copy(cls._JOINT_POSITIONS, wp.from_torch(seed_positions))
 
     @classmethod
-    def update_dof_cache(cls):
-        """Fetch latest DOF positions from PhysX into CPU staging buffer. Called every step."""
-        if cls._VIEW is None:
+    def read_from_physx(cls):
+        """Pull latest DOF positions from PhysX into the pinned CPU staging buffer.
+        Stays on the host (PhysX returns CPU torch tensor). H2D happens inside the captured
+        wp.graph via update()."""
+        if cls._VIEW is None or cls._JOINT_POSITIONS is None:
             return
-        cls._JOINT_POSITIONS_CPU = cls._VIEW.get_dof_positions()
+        positions = cls._VIEW.get_dof_positions()  # torch CPU
+        wp.copy(cls._JOINT_POSITIONS, wp.from_torch(positions.contiguous()))
 
     @classmethod
     def get_view_row(cls, abs_prim_path):
@@ -560,23 +1101,10 @@ class ArticulatedObjectViewAPI:
         return cls._JOINT_POSITIONS.shape[1] if cls._JOINT_POSITIONS is not None else 0
 
     @classmethod
-    def get_articulation_positions(cls, position_rows):
-        """Return GPU tensor containing the DOF positions for the given row indices."""
-        return cls._JOINT_POSITIONS[position_rows]
-
-    @classmethod
-    def async_copy_to_gpu(cls):
-        """Issue non-blocking copy of _JOINT_POSITIONS_CPU → _JOINT_POSITIONS."""
-        if cls._JOINT_POSITIONS_CPU is None:
-            return
-        cls._JOINT_POSITIONS.copy_(cls._JOINT_POSITIONS_CPU, non_blocking=True)
-
-    @classmethod
     def clear(cls):
         cls._VIEW = None
         cls._OBJ_TO_VIEW_IDX = {}
         cls._JOINT_POSITIONS = None
-        cls._JOINT_POSITIONS_CPU = None
 
 
 class RigidContactAPIImpl:
@@ -613,14 +1141,30 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
 
+        # int32 wp.array mirrors of the row/col→rigid-body index maps, consumed by
+        # the warp kernels in update(). Kept alongside the torch versions to avoid
+        # type-casting inside the captured graph.
+        self._ROW_TO_RIGID_WP = dict()
+        self._COL_TO_RIGID_WP = dict()
+
+        # Body → row index map (B,), -1 if body is not a contact-matrix row body.
+        # Inverse of _CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS. Used by _body_awake_at_step
+        # to apply net-force-awake inline, eliminating the separate per-step OR pass.
+        self._BODY_TO_ROW = dict()
+        self._BODY_TO_ROW_WP = dict()
+
         # Contact matrix tracking contacts that occurred at any point during the last N physics steps
-        # (between consecutive update_contact_cache calls). Shape: (R, C)
+        # (between consecutive update calls). Shape: (R, C)
         self._CONTACT_MATRIX = dict()
-        self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
+        self._CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update()
+        # wp.array views over _CONTACT_MATRIX_GPU per scene; wrapped once after each (re-)allocation
+        # for use inside Warp kernels and graph capture.
+        self._CONTACT_MATRIX_GPU_WP = dict()
 
         # Contact matrix tracking contacts at only the most recent physics step. Shape: (R, C)
         self._CURRENT_CONTACT_MATRIX = dict()
-        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update_contact_cache()
+        self._CURRENT_CONTACT_MATRIX_GPU = dict()  # GPU primary — updated directly in update()
+        self._CURRENT_CONTACT_MATRIX_GPU_WP = dict()
 
         # A matrix of indices for the contact matrix. This can be indexed the same way as the contact matrix
         # to obtain row and column indices to map back to prim paths. Shape: (R, C, 2)
@@ -628,13 +1172,37 @@ class RigidContactAPIImpl:
 
         # Cached body transforms used for change detection. Shape: (N, 7) [pos(3), quat(4)]
         self._BODY_TRANSFORMS = dict()
+        # wp.array view over _BODY_TRANSFORMS for the contact-matrix and body-transform kernels.
+        self._BODY_TRANSFORMS_WP = dict()
 
         # Accumulated impulse matrices and transforms from individual physics steps,
-        # collected between consecutive update_contact_cache calls.
+        # collected between consecutive update calls.
         self._PENDING_STEPS = 0
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
         self._PENDING_NET_FORCES = dict()
+
+        # wp.array views over _PENDING_* for use inside the captured warp graph.
+        # Re-wrapped on every initialize_view because the underlying torch storage is
+        # (re-)allocated there.
+        self._PENDING_IMPULSES_WP = dict()
+        self._PENDING_TRANSFORMS_WP = dict()
+        self._PENDING_NET_FORCES_WP = dict()
+
+        # Pinned-CPU wp.array views over the pinned torch CPU mirrors. The captured
+        # update() does `wp.copy(host_wp, gpu_wp)` after the kernels to refresh them
+        # each replay — replaces the old sync_cpu_mirrors method that ran outside the
+        # captured region.
+        self._CONTACT_MATRIX_HOST_WP = dict()
+        self._CURRENT_CONTACT_MATRIX_HOST_WP = dict()
+
+        # 1-element GPU buffer holding _PENDING_STEPS — the number of physics sub-steps
+        # the captured contact kernels should iterate via `n_steps_arr[0]`.
+        # Must be a wp.array (not a scalar kernel arg) because scalar args get baked into
+        # the captured graph at capture time, but this count varies between replays
+        # (``og.sim.step()`` = N sub-steps, ``og.sim.step_physics()`` = 1).
+        self._N_STEPS_TORCH = None  # torch.Tensor on cuda, shape (1,), int32
+        self._N_STEPS_GPU = None  # wp.array view over _N_STEPS_TORCH
 
         # Position / orientation tolerances for deciding whether a pair should be updated
         self._POS_EPS = 1e-6
@@ -680,6 +1248,9 @@ class RigidContactAPIImpl:
 
         # Rebuild views from scratch to pick up any new/removed bodies.
         self.clear()
+
+        self._N_STEPS_TORCH = th.zeros(1, dtype=th.int32, device="cuda")
+        self._N_STEPS_GPU = wp.from_torch(self._N_STEPS_TORCH, dtype=wp.int32)
 
         body_filters = self.get_body_filters()
 
@@ -766,6 +1337,26 @@ class RigidContactAPIImpl:
                 self._INDEX_MATRIX[scene_idx] = th.stack([ii, jj], dim=-1)
                 self._BODY_TRANSFORMS[scene_idx] = self._RIGID_BODY_VIEW[scene_idx].get_transforms().cuda()
 
+                # int32 mirrors of the row/col→rigid-body maps for the warp kernels (wp.tid()
+                # returns int32; keeping these as int32 avoids per-launch casts inside the captured graph).
+                row_to_rigid_int32 = self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx].to(th.int32)
+                col_to_rigid_int32 = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx].to(th.int32)
+                self._ROW_TO_RIGID_WP[scene_idx] = wp.from_torch(row_to_rigid_int32, dtype=wp.int32)
+                self._COL_TO_RIGID_WP[scene_idx] = wp.from_torch(col_to_rigid_int32, dtype=wp.int32)
+
+                # Body → row map (B,), -1 if body is not a row body. Inverse scatter is safe
+                # without atomics because rows correspond to unique bodies (see initialize_view's
+                # dynamic-body iteration above).
+                num_bodies = self._BODY_TRANSFORMS[scene_idx].shape[0]
+                body_to_row = th.full((num_bodies,), -1, dtype=th.int32, device="cuda")
+                row_idxs = th.arange(len(row_paths), dtype=th.int32, device="cuda")
+                body_to_row[self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]] = row_idxs
+                self._BODY_TO_ROW[scene_idx] = body_to_row
+                self._BODY_TO_ROW_WP[scene_idx] = wp.from_torch(body_to_row, dtype=wp.int32)
+
+                # wp.array view over _BODY_TRANSFORMS for the contact kernels.
+                self._BODY_TRANSFORMS_WP[scene_idx] = wp.from_torch(self._BODY_TRANSFORMS[scene_idx], dtype=wp.float32)
+
                 # Build the new contact matrices. Start from current impulses (captures contacts
                 # for newly added bodies), then overwrite with previously cached values for
                 # every pair of bodies that already existed before the rebuild.
@@ -806,6 +1397,26 @@ class RigidContactAPIImpl:
                 self._CONTACT_MATRIX_GPU[scene_idx].copy_(self._CONTACT_MATRIX[scene_idx])
                 self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].copy_(self._CURRENT_CONTACT_MATRIX[scene_idx])
 
+                # Wrap the GPU contact matrices as wp.array views for use inside Warp kernels and
+                # graph capture. Re-wrap on every initialize_view because the underlying torch
+                # storage was just (re-)allocated above. Bool tensors → wp.uint8 (byte-per-bool).
+                self._CONTACT_MATRIX_GPU_WP[scene_idx] = wp.from_torch(
+                    self._CONTACT_MATRIX_GPU[scene_idx].view(th.uint8), dtype=wp.uint8
+                )
+                self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] = wp.from_torch(
+                    self._CURRENT_CONTACT_MATRIX_GPU[scene_idx].view(th.uint8), dtype=wp.uint8
+                )
+                # Pinned-host wp.array views over the pinned torch CPU mirrors. The captured
+                # ``wp.copy`` in update() refreshes these from the GPU each replay, so callers
+                # of is_in_contact / get_contact_pairs (which read the torch CPU tensors) see
+                # fresh data without a separate sync method.
+                self._CONTACT_MATRIX_HOST_WP[scene_idx] = wp.from_torch(
+                    self._CONTACT_MATRIX[scene_idx].view(th.uint8), dtype=wp.uint8
+                )
+                self._CURRENT_CONTACT_MATRIX_HOST_WP[scene_idx] = wp.from_torch(
+                    self._CURRENT_CONTACT_MATRIX[scene_idx].view(th.uint8), dtype=wp.uint8
+                )
+
                 # Initialize pending accumulation lists for this scene
                 # Note that existing data in these lists will be lost when the view is rebuilt.
                 # TODO: Assert here that this is not happening during a physics step, and that these buffers are empty.
@@ -829,14 +1440,27 @@ class RigidContactAPIImpl:
                     device="cuda",
                 )
 
-    def add_contacts_from_physics_step(self):
+                # wp.array views over the pending GPU buffers, consumed by the captured
+                # update() kernels. Re-wrap on every initialize_view because the underlying
+                # torch storage was just (re-)allocated above.
+                self._PENDING_IMPULSES_WP[scene_idx] = wp.from_torch(
+                    self._PENDING_IMPULSES[scene_idx], dtype=wp.float32
+                )
+                self._PENDING_TRANSFORMS_WP[scene_idx] = wp.from_torch(
+                    self._PENDING_TRANSFORMS[scene_idx], dtype=wp.float32
+                )
+                self._PENDING_NET_FORCES_WP[scene_idx] = wp.from_torch(
+                    self._PENDING_NET_FORCES[scene_idx], dtype=wp.float32
+                )
+
+    def read_from_physx(self):
         """
         Fetches contact impulse matrices and body transforms from the current physics step
         and appends them to pending lists. Should be called by the simulator after every
         individual physics step. The accumulated data is later processed in bulk by
-        update_contact_cache.
+        update().
         """
-        assert og.sim.currently_stepping, "add_contacts_from_physics_step must be called during a physics step"
+        assert og.sim.currently_stepping, "read_from_physx must be called during a physics step"
         assert self._PENDING_STEPS < og.sim.n_physics_timesteps_per_render, "Pending steps buffer is full"
 
         scene_idx_list = list(self._CONTACT_VIEW.keys())
@@ -860,127 +1484,81 @@ class RigidContactAPIImpl:
                 continue
 
             # Get the body transforms for this scene
+            # TODO(vector): Replace this with a wp.copy.
             self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
                 self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
             )
 
-        # Increment once per physics step
+        # Increment once per physics step and push the new count to GPU so the captured
+        # contact kernels see the right `n_steps` at replay time.
         if scene_idx_list:
             self._PENDING_STEPS += 1
+            self._N_STEPS_TORCH.fill_(self._PENDING_STEPS)
 
-        th.cuda.synchronize()
-
-    def update_contact_cache(self):
+    def update(self):
         """
-        Processes all accumulated physics-step data (collected via add_contacts_from_physics_step)
-        to update both the "recent" contact matrix (any contact in the last N steps) and the
-        "current" contact matrix (contact at only the most recent step).
+        Issue the per-step warp kernels that bring the GPU contact matrices and body-transform
+        snapshot up to date from the pending physics-step data ``read_from_physx`` staged.
+        Also issues the D2H ``wp.copy``s that mirror the GPU matrices into the pinned CPU
+        tensors ``is_in_contact`` / ``get_contact_pairs`` read — captured into the graph so
+        they replay each frame without a separate sync hook.
 
-        Awakeness is evaluated per individual physics step by prepending the previously cached
-        transforms and diffing consecutive frames.  Bodies that report any nonzero net contact
-        force are also treated as awake.  Contact matrices are only updated from awake steps.
+        Algorithm:
+          1. Per (r, c): walk the N physics sub-steps, marking each step's pair-awakeness
+             via ``_body_awake_at_step`` for both row and column bodies. Track the last awake
+             step + whether any awake step had a nonzero impulse. Write
+             ``current_contact_matrix`` from the last-awake-step impulse and
+             ``contact_matrix`` from the OR over all awake-step impulses. Pairs that were
+             never awake collapse both matrices to the carried-over current value.
+          2. Per (b,): snapshot each body's transform from its own last awake step into
+             ``_BODY_TRANSFORMS`` (also the ``prev_transforms`` next-frame baseline).
+          3. ``wp.copy`` GPU → pinned CPU for both contact matrices.
         """
-        if self._PENDING_STEPS == 0:
-            return
+        for scene_idx in self._CONTACT_VIEW.keys():
+            R, C = self._CONTACT_MATRIX_GPU[scene_idx].shape
+            B = self._BODY_TRANSFORMS[scene_idx].shape[0]
 
-        for scene_idx in list(self._CONTACT_VIEW.keys()):
-            # Stack the pending data for fast operations: (N, R, C, 3) and (N, num_bodies, 7)
-            all_impulses = self._PENDING_IMPULSES[scene_idx][: self._PENDING_STEPS]
-            all_transforms = self._PENDING_TRANSFORMS[scene_idx][: self._PENDING_STEPS]
-            all_net_forces = self._PENDING_NET_FORCES[scene_idx][: self._PENDING_STEPS]
-
-            # Get the previous body transforms for the cache
-            prev_transforms = self._BODY_TRANSFORMS[scene_idx]
-
-            # Apply the position-based sleep state approximation. Here we compute the delta between
-            # each physics step's transform with the previous physics step's transform (using the cached transform
-            # for the first physics step).
-            extended_transforms = th.cat([prev_transforms.unsqueeze(0), all_transforms], dim=0)  # (N+1, num_bodies, 7)
-            pos_changed = th.any(
-                th.abs(extended_transforms[1:, :, :3] - extended_transforms[:-1, :, :3]) > self._POS_EPS, dim=-1
-            )  # (N, num_bodies)
-            quat_dot = th.sum(
-                extended_transforms[1:, :, 3:7] * extended_transforms[:-1, :, 3:7], dim=-1
-            )  # (N, num_bodies)
-            ori_changed = th.abs(quat_dot) < (1.0 - self._ORI_EPS)  # (N, num_bodies)
-            per_step_awake = pos_changed | ori_changed  # (N, num_bodies)
-
-            # Other than the position change, we also know that an object cannot be asleep if the net contact force is nonzero.
-            row_to_rigid = self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx]
-            net_force_awake = th.any(all_net_forces != 0, dim=-1)  # (N, R)
-            per_step_awake[:, row_to_rigid] = per_step_awake[:, row_to_rigid] | net_force_awake
-
-            # Now we compute the last physics step that the body was awake. We need to do this because we want to use the
-            # data for all the indices where the object is not asleep.
-            body_step_indices = (
-                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda").unsqueeze(1).expand_as(per_step_awake)
-            )
-            last_awake_body_step = (
-                th.where(per_step_awake, body_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
-                .max(dim=0)
-                .values
-            )  # (num_bodies,)
-
-            # For each step, compute the rows that are awake
-            per_step_row_awake = per_step_awake[:, row_to_rigid]  # (N, R)
-
-            # For each step, compute the columns that are awake
-            col_to_rigid = self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS[scene_idx]
-            valid_col_mask = self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY[scene_idx]
-            per_step_col_awake = th.zeros(
-                self._PENDING_STEPS, len(col_to_rigid), dtype=th.bool, device="cuda"
-            )  # (N, C)
-            per_step_col_awake[:, valid_col_mask] = per_step_awake[:, col_to_rigid[valid_col_mask]]
-
-            # For each step, compute the pairs that are awake. This is an outer-OR of the row and column awake masks.
-            per_step_awake_pairs = per_step_row_awake[:, :, None] | per_step_col_awake[:, None, :]  # (N, R, C)
-
-            # What is the last step that the pair was awake?
-            pair_step_indices = (
-                th.arange(self._PENDING_STEPS, dtype=th.long, device="cuda")
-                .reshape(self._PENDING_STEPS, 1, 1)
-                .expand_as(per_step_awake_pairs)
-            )
-            last_awake_pair_step = (
-                th.where(per_step_awake_pairs, pair_step_indices, th.tensor(-1, dtype=th.long, device="cuda"))
-                .max(dim=0)
-                .values
-            )  # (R, C)
-            pair_was_awake = last_awake_pair_step >= 0  # (R, C)
-
-            # "Current" contact matrix: impulses from the last awake step per pair.
-            # Pairs that were never awake retain their previous value.
-            # All writes go directly to the GPU matrices; CPU mirrors are updated at the end.
-            awake_rc = th.where(pair_was_awake)
-            awake_pair_steps = last_awake_pair_step[pair_was_awake]
-            last_awake_impulses = all_impulses[awake_pair_steps, awake_rc[0], awake_rc[1]]  # (num_awake, 3)
-            self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = th.any(last_awake_impulses != 0, dim=-1)
-
-            # "Recent" contact matrix: any contact across awake steps for awake pairs,
-            # or the (now-updated) current contact value for non-awake pairs.
-            any_contact_per_step = th.any(all_impulses != 0, dim=-1)  # (N, R, C)
-            any_awake_contact = th.any(any_contact_per_step & per_step_awake_pairs, dim=0)  # (R, C)
-            self._CONTACT_MATRIX_GPU[scene_idx][pair_was_awake] = any_awake_contact[pair_was_awake]
-            self._CONTACT_MATRIX_GPU[scene_idx][~pair_was_awake] = self._CURRENT_CONTACT_MATRIX_GPU[scene_idx][
-                ~pair_was_awake
-            ]
-
-            # Update body transforms from each body's last awake step
-            awake_body_indices = th.where(last_awake_body_step >= 0)[0]
-            self._BODY_TRANSFORMS[scene_idx][awake_body_indices] = all_transforms[
-                last_awake_body_step[awake_body_indices], awake_body_indices
-            ]
-
-            # Copy updated GPU matrices back to CPU mirrors so is_in_contact()
-            # can read them without a GPU stall.
-            # This will be synced in simulator._update_view_apis()
-            self._CONTACT_MATRIX[scene_idx].copy_(self._CONTACT_MATRIX_GPU[scene_idx], non_blocking=True)
-            self._CURRENT_CONTACT_MATRIX[scene_idx].copy_(
-                self._CURRENT_CONTACT_MATRIX_GPU[scene_idx], non_blocking=True
+            # need to launch first because _update_body_transforms_kernel
+            # overwrites _BODY_TRANSFORMS, which read by both kernels
+            wp.launch(
+                kernel=_update_contact_matrices_kernel,
+                dim=(R, C),
+                inputs=[
+                    self._PENDING_TRANSFORMS_WP[scene_idx],
+                    self._BODY_TRANSFORMS_WP[scene_idx],
+                    self._PENDING_NET_FORCES_WP[scene_idx],
+                    self._BODY_TO_ROW_WP[scene_idx],
+                    self._PENDING_IMPULSES_WP[scene_idx],
+                    self._ROW_TO_RIGID_WP[scene_idx],
+                    self._COL_TO_RIGID_WP[scene_idx],
+                    self._N_STEPS_GPU,
+                    wp.float32(self._POS_EPS),
+                    wp.float32(self._ORI_EPS),
+                    self._CONTACT_MATRIX_GPU_WP[scene_idx],
+                    self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx],
+                ],
+                device="cuda",
             )
 
-        # Clear pending step counter once after all scenes are processed
-        self._PENDING_STEPS = 0
+            wp.launch(
+                kernel=_update_body_transforms_kernel,
+                dim=B,
+                inputs=[
+                    self._PENDING_TRANSFORMS_WP[scene_idx],
+                    self._BODY_TRANSFORMS_WP[scene_idx],
+                    self._PENDING_NET_FORCES_WP[scene_idx],
+                    self._BODY_TO_ROW_WP[scene_idx],
+                    self._N_STEPS_GPU,
+                    wp.float32(self._POS_EPS),
+                    wp.float32(self._ORI_EPS),
+                    self._BODY_TRANSFORMS_WP[scene_idx],
+                ],
+                device="cuda",
+            )
+
+            # so `is_in_contact` reads stay fresh each replay.
+            wp.copy(self._CONTACT_MATRIX_HOST_WP[scene_idx], self._CONTACT_MATRIX_GPU_WP[scene_idx])
+            wp.copy(self._CURRENT_CONTACT_MATRIX_HOST_WP[scene_idx], self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx])
 
     def _get_prim_paths(self, objects_links_or_prim_paths):
         """
@@ -1025,10 +1603,11 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths, filtering out kinematic-only bodies that are not rows
+        # Otherwise, convert to prim paths, filtering out kinematic-only bodies that are not rows.
+        # dtype=long so an empty result (all paths kinematic-only) is still safe to use as an index.
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
         row_map = self._PATH_TO_ROW_IDX.get(scene_idx, {})
-        return th.tensor([row_map[path] for path in prim_paths if path in row_map])
+        return th.tensor([row_map[path] for path in prim_paths if path in row_map], dtype=th.long)
 
     def get_contact_col_indices(self, scene_idx, objects_links_or_prim_paths):
         """
@@ -1047,9 +1626,12 @@ class RigidContactAPIImpl:
         if isinstance(objects_links_or_prim_paths, th.Tensor):
             return objects_links_or_prim_paths
 
-        # Otherwise, convert to prim paths
+        # Otherwise, convert to prim paths, filtering out bodies without contact reporting
+        # (e.g. visual-only links) that are not columns. dtype=long so an empty result is safe
+        # to use as an index.
         prim_paths = self._get_prim_paths(objects_links_or_prim_paths)
-        return th.tensor([self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths])
+        col_map = self._PATH_TO_COL_IDX.get(scene_idx, {})
+        return th.tensor([col_map[path] for path in prim_paths if path in col_map], dtype=th.long)
 
     def get_contact_pairs(self, scene_idx, query_set, with_set, current_only):
         """
@@ -1221,9 +1803,100 @@ class RigidContactAPIImpl:
 
         return query_contacts.any(dim=1)
 
+    def is_in_contact_batch_warp(self, scene_idx, query_masks_wp, with_masks_wp, ignore_masks_wp, current_only, out_wp):
+        """
+        Warp-kernel variant of is_in_contact_batch. Same semantics, but takes pre-cached
+        wp.array inputs (uint8 masks) and writes to a caller-allocated output wp.array.
+        Designed to be safe to call inside wp.graph capture.
+
+        out_wp must be int32, NOT uint8.
+
+        Args:
+            scene_idx (int): Scene index.
+            query_masks_wp (wp.array): (N, R) uint8 — wp.from_torch wrapper of bool query masks.
+            with_masks_wp (wp.array | None): (N, C) uint8 — with-mask, mutually exclusive with ignore_masks_wp.
+            ignore_masks_wp (wp.array | None): (N, C) uint8 — ignore-mask.
+            current_only (bool): True → use _CURRENT_CONTACT_MATRIX_GPU_WP, else _CONTACT_MATRIX_GPU_WP.
+            out_wp (wp.array): (N,) **int32** — caller-allocated, must be pre-zeroed.
+
+        If the scene has no contact view yet (e.g. only kinematic bodies), no kernel is
+        launched and out_wp is left as-is.
+        """
+        assert (
+            with_masks_wp is None or ignore_masks_wp is None
+        ), "Provide either with_masks_wp or ignore_masks_wp, not both."
+        # Scene without a contact view: nothing to do; caller's out_wp is left as-is.
+        if scene_idx not in self._CONTACT_MATRIX_GPU_WP:
+            return
+
+        contact_matrix_wp = (
+            self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] if current_only else self._CONTACT_MATRIX_GPU_WP[scene_idx]
+        )
+
+        # Decide kernel mode + col_filter argument. The kernel always reads from col_filter,
+        # so when there's no real filter we substitute query_masks_wp as a dummy of compatible
+        # shape — mode=2 means the kernel ignores it.
+        if with_masks_wp is not None:
+            col_filter = with_masks_wp
+            mode = 0
+        elif ignore_masks_wp is not None:
+            col_filter = ignore_masks_wp
+            mode = 1
+        else:
+            # Dummy placeholder; kernel ignores when mode=2. Use query_masks_wp for matching device.
+            col_filter = query_masks_wp
+            mode = 2
+
+        N = query_masks_wp.shape[0]
+        R = contact_matrix_wp.shape[0]
+        C = contact_matrix_wp.shape[1]
+
+        # 3D launch: one thread per (query, row, col) cell. Each thread does at most a few
+        # reads + 1 atomic_max on hit. Maximum parallelism, no serial loops.
+        wp.launch(
+            kernel=_is_in_contact_batch_kernel,
+            dim=(N, R, C),
+            inputs=[
+                query_masks_wp,
+                contact_matrix_wp,
+                col_filter,
+                wp.int32(mode),
+                out_wp,
+            ],
+            device="cuda",
+        )
+
     def has_contact_view(self, scene_idx):
         """Returns True if a valid contact view has been initialized for @scene_idx."""
         return scene_idx in self._CONTACT_MATRIX
+
+    def get_contact_matrix_shape(self, scene_idx):
+        """
+        Returns:
+            tuple(int, int) | None: (R, C) shape of the contact matrix for @scene_idx, or None
+            if no contact view exists for that scene.
+        """
+        if scene_idx not in self._CONTACT_MATRIX:
+            return None
+        return tuple(self._CONTACT_MATRIX[scene_idx].shape)
+
+    def get_contact_matrix_wp(self, scene_idx, current_only):
+        """
+        Get the wp.array view of the GPU contact matrix for use inside Warp kernels (e.g. inside
+        a captured wp.graph). Same view that ``is_in_contact_batch_warp`` consumes internally.
+
+        Args:
+            scene_idx (int): Scene index.
+            current_only (bool): True → "current step only" matrix, False → "any recent step" matrix.
+
+        Returns:
+            wp.array(uint8) | None: (R, C) uint8 view, or None if no contact view exists for @scene_idx.
+        """
+        if scene_idx not in self._CONTACT_MATRIX_GPU_WP:
+            return None
+        return (
+            self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] if current_only else self._CONTACT_MATRIX_GPU_WP[scene_idx]
+        )
 
     def clear(self):
         """
@@ -1238,16 +1911,28 @@ class RigidContactAPIImpl:
         self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
+        self._ROW_TO_RIGID_WP = dict()
+        self._COL_TO_RIGID_WP = dict()
+        self._BODY_TO_ROW = dict()
+        self._BODY_TO_ROW_WP = dict()
         self._CONTACT_MATRIX = dict()
         self._CONTACT_MATRIX_GPU = dict()
+        self._CONTACT_MATRIX_GPU_WP = dict()
+        self._CONTACT_MATRIX_HOST_WP = dict()
         self._CURRENT_CONTACT_MATRIX = dict()
         self._CURRENT_CONTACT_MATRIX_GPU = dict()
+        self._CURRENT_CONTACT_MATRIX_GPU_WP = dict()
+        self._CURRENT_CONTACT_MATRIX_HOST_WP = dict()
         self._INDEX_MATRIX = dict()
         self._BODY_TRANSFORMS = dict()
+        self._BODY_TRANSFORMS_WP = dict()
         self._PENDING_STEPS = 0
         self._PENDING_IMPULSES = dict()
         self._PENDING_TRANSFORMS = dict()
         self._PENDING_NET_FORCES = dict()
+        self._PENDING_IMPULSES_WP = dict()
+        self._PENDING_TRANSFORMS_WP = dict()
+        self._PENDING_NET_FORCES_WP = dict()
 
 
 # Instantiate the RigidContactAPI

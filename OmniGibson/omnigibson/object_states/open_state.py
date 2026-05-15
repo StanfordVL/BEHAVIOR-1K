@@ -1,10 +1,11 @@
 import random
 
 import torch as th
+import warp as wp
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
@@ -12,6 +13,41 @@ from omnigibson.utils.usd_utils import ArticulatedObjectViewAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+
+@wp.kernel
+def _open_update_kernel(
+    joint_positions: wp.array2d(dtype=wp.float32),  # _JOINT_POSITIONS (N_art, max_dof)
+    obj_view_rows: wp.array2d(dtype=wp.int32),  # OBJ_IDXES_IN_ARTICULATION_VIEW (S, O)
+    openable_mask: wp.array3d(dtype=wp.uint8),  # (S, O, max_dof) bool packed as uint8
+    thresholds_s1: wp.array3d(dtype=wp.float32),  # (S, O, max_dof)
+    directions_s1: wp.array3d(dtype=wp.float32),
+    thresholds_s2: wp.array3d(dtype=wp.float32),
+    directions_s2: wp.array3d(dtype=wp.float32),
+    both_sides: wp.array2d(dtype=wp.uint8),  # (S, O)
+    max_dof: wp.int32,
+    out_values: wp.array2d(dtype=wp.uint8),  # (S, O) bool as uint8
+):
+    """
+    Per-(scene, object) thread. A kernel loops over one object's DOF and OR-accumulates
+    `any_s1` and `any_s2` openness.
+    """
+    s, o = wp.tid()
+    row = obj_view_rows[s, o]
+    any_s1 = wp.uint8(0)
+    any_s2 = wp.uint8(0)
+    for d in range(max_dof):
+        if openable_mask[s, o, d] != wp.uint8(0):
+            p = joint_positions[row, d]
+            if (p - thresholds_s1[s, o, d]) * directions_s1[s, o, d] > 0.0:
+                any_s1 = wp.uint8(1)
+            if (p - thresholds_s2[s, o, d]) * directions_s2[s, o, d] > 0.0:
+                any_s2 = wp.uint8(1)
+    if both_sides[s, o] != wp.uint8(0):
+        out_values[s, o] = any_s1 & any_s2
+    else:
+        out_values[s, o] = any_s1
+
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -52,23 +88,6 @@ def _compute_joint_threshold(joint, joint_direction):
     open_end = joint.upper_limit if joint_direction == 1 else joint.lower_limit
     threshold = (1 - f) * closed_end + f * open_end
     return threshold, open_end, closed_end
-
-
-def _is_in_range(position, threshold, range_end):
-    """
-    Calculates whether a joint's position @position is in its opening / closing range
-
-    Args:
-        position (float): Joint value
-        threshold (float): Joint value at which closed <--> open
-        range_end (float): Extreme joint value for being opened / closed
-
-    Returns:
-        bool: Whether the joint position is past @threshold in the direction of @range_end
-    """
-    # Note that we are unable to do an actual range check here because the joint positions can actually go
-    # slightly further than the denoted joint limits.
-    return position > threshold if range_end > threshold else position < threshold
 
 
 def _get_relevant_joints(obj):
@@ -118,7 +137,7 @@ def _get_relevant_joints(obj):
     return both_sides, relevant_joints, joint_directions
 
 
-class Open(TensorizedValueState, BooleanStateMixin):
+class Open(TensorizedAbsoluteState, BooleanStateMixin):
     """
     Tensorized Open state.
 
@@ -139,9 +158,20 @@ class Open(TensorizedValueState, BooleanStateMixin):
     # (S, O) bool — whether each object uses both-sides open logic
     BOTH_SIDES = None
 
-    # (S*O,) int64 — pre-built row indices into ArticulatedObjectViewAPI._JOINT_POSITIONS
-    # rows [obj_idx*S .. (obj_idx+1)*S-1] = scenes 0..S-1 for object obj_idx
+    # (S, O) int32 — row indices into ArticulatedObjectViewAPI._JOINT_POSITIONS for each (scene, obj).
+    # int32 (not long) so the Warp kernel can index with wp.int32.
     OBJ_IDXES_IN_ARTICULATION_VIEW = None
+
+    # wp.array views, wrapped once per initialize_view, used by the Warp kernel.
+    OPENABLE_MASK_WP = None
+    THRESHOLDS_S1_WP = None
+    DIRECTIONS_S1_WP = None
+    THRESHOLDS_S2_WP = None
+    DIRECTIONS_S2_WP = None
+    BOTH_SIDES_WP = None
+    OBJ_IDXES_IN_ARTICULATION_VIEW_WP = None
+    # Cached max_dof int (kernel input). Updated in initialize_view.
+    _MAX_DOF = 0
 
     @classproperty
     def value_name(cls):
@@ -204,10 +234,19 @@ class Open(TensorizedValueState, BooleanStateMixin):
             cls.THRESHOLDS_S2 = th.zeros((S, 0, 0), device="cuda")
             cls.DIRECTIONS_S2 = th.zeros((S, 0, 0), device="cuda")
             cls.BOTH_SIDES = th.zeros((S, 0), dtype=th.bool, device="cuda")
-            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros((0, 0), dtype=th.long, device="cuda")
+            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros((0, 0), dtype=th.int32, device="cuda")
+            cls._MAX_DOF = 0
+            cls.OPENABLE_MASK_WP = None
+            cls.THRESHOLDS_S1_WP = None
+            cls.DIRECTIONS_S1_WP = None
+            cls.THRESHOLDS_S2_WP = None
+            cls.DIRECTIONS_S2_WP = None
+            cls.BOTH_SIDES_WP = None
+            cls.OBJ_IDXES_IN_ARTICULATION_VIEW_WP = None
             return
 
         max_dof = ArticulatedObjectViewAPI.get_max_dof()
+        cls._MAX_DOF = int(max_dof)
 
         cls.OPENABLE_MASK = th.zeros((S, O, max_dof), dtype=th.bool, device="cuda")
         cls.THRESHOLDS_S1 = th.zeros((S, O, max_dof), device="cuda")
@@ -236,8 +275,9 @@ class Open(TensorizedValueState, BooleanStateMixin):
                             threshold_attr[scene_idx, obj_idx, dof_col] = threshold
                             direction_attr[scene_idx, obj_idx, dof_col] = 1.0 if open_end > threshold else -1.0
 
-        # Pre-build (S, O) row index into ArticulatedObjectViewAPI._JOINT_POSITIONS — built once, reused every step
-        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(S, O, dtype=th.long, device="cuda")
+        # Pre-build (S, O) row index into ArticulatedObjectViewAPI._JOINT_POSITIONS — built once, reused every step.
+        # int32 (not long) so the Warp kernel can index with wp.int32.
+        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(S, O, dtype=th.int32, device="cuda")
         for _, obj_idx in cls.OBJ_IDXS.items():
             for scene_idx, scene in enumerate(cls.IDX_OBJS):
                 obj = scene[obj_idx]
@@ -246,30 +286,43 @@ class Open(TensorizedValueState, BooleanStateMixin):
                 row = ArticulatedObjectViewAPI.get_view_row(obj.articulation_root_path)
                 cls.OBJ_IDXES_IN_ARTICULATION_VIEW[scene_idx, obj_idx] = row
 
+        # Wrap GPU tensors as wp.array handles for use in _update_values' Warp kernel.
+        # Bool tensors → wp.uint8 (byte-per-bool storage in torch).
+        cls.OPENABLE_MASK_WP = wp.from_torch(cls.OPENABLE_MASK.view(th.uint8), dtype=wp.uint8)
+        cls.THRESHOLDS_S1_WP = wp.from_torch(cls.THRESHOLDS_S1)
+        cls.DIRECTIONS_S1_WP = wp.from_torch(cls.DIRECTIONS_S1)
+        cls.THRESHOLDS_S2_WP = wp.from_torch(cls.THRESHOLDS_S2)
+        cls.DIRECTIONS_S2_WP = wp.from_torch(cls.DIRECTIONS_S2)
+        cls.BOTH_SIDES_WP = wp.from_torch(cls.BOTH_SIDES.view(th.uint8), dtype=wp.uint8)
+        cls.OBJ_IDXES_IN_ARTICULATION_VIEW_WP = wp.from_torch(cls.OBJ_IDXES_IN_ARTICULATION_VIEW)
+
     @classmethod
     def _update_values(cls, values):
-        O = values.shape[1]
-
-        # Early return
-        if O == 0:
+        if cls.OPENABLE_MASK_WP is None or cls._MAX_DOF == 0:
             return
-
-        # (S, O, max_dof)
-        pos = ArticulatedObjectViewAPI.get_articulation_positions(cls.OBJ_IDXES_IN_ARTICULATION_VIEW)
-
-        open_s1 = ((pos - cls.THRESHOLDS_S1) * cls.DIRECTIONS_S1 > 0) & cls.OPENABLE_MASK  # (S, O, max_dof)
-        any_s1 = open_s1.any(dim=2)  # (S, O)
-
-        open_s2 = ((pos - cls.THRESHOLDS_S2) * cls.DIRECTIONS_S2 > 0) & cls.OPENABLE_MASK
-        any_s2 = open_s2.any(dim=2)
-
-        is_open = th.where(cls.BOTH_SIDES, any_s1 & any_s2, any_s1)  # (S, O)
-        values.copy_(is_open)
+        if ArticulatedObjectViewAPI._JOINT_POSITIONS is None:
+            return
+        S, O = values.shape[:2]
+        wp.launch(
+            kernel=_open_update_kernel,
+            dim=(S, O),
+            inputs=[
+                ArticulatedObjectViewAPI._JOINT_POSITIONS,
+                cls.OBJ_IDXES_IN_ARTICULATION_VIEW_WP,
+                cls.OPENABLE_MASK_WP,
+                cls.THRESHOLDS_S1_WP,
+                cls.DIRECTIONS_S1_WP,
+                cls.THRESHOLDS_S2_WP,
+                cls.DIRECTIONS_S2_WP,
+                cls.BOTH_SIDES_WP,
+                wp.int32(cls._MAX_DOF),
+                cls.VALUES_WP,
+            ],
+            device="cuda",
+        )
 
     def _get_value(self):
-        s = self.obj.scene.idx
-        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        return bool(self.VALUES_CPU[s, obj_idx])
+        return bool(super()._get_value())
 
     def _set_value(self, new_value, fully=False):
         """
@@ -325,27 +378,11 @@ class Open(TensorizedValueState, BooleanStateMixin):
                     # Sample a position.
                     joint_pos = (th.rand(1) * (high - low) + low).item()
 
-                # Save sampled position.
+                # Save sampled position. JointPrim.set_pos flips TensorizedState.caches_dirty,
+                # so the next get_value() below will trigger a refresh and observe the new pose.
                 joint.set_pos(joint_pos)
 
-            # Check success from joint positions (VALUES is stale here)
-            # TODO(vector): When cache invalidation works, we can just call _update_values() here instead of recomputing everything.
-            sides_open = []
-            for check_side in sides:
-                joint_thresholds = (
-                    _compute_joint_threshold(joint, direction * check_side)
-                    for joint, direction in zip(relevant_joints, joint_directions)
-                )
-                joint_positions = [joint.get_state()[0] for joint in relevant_joints]
-                joint_openness = (
-                    _is_in_range(pos, threshold, open_end)
-                    for pos, (threshold, open_end, _) in zip(joint_positions, joint_thresholds)
-                )
-                sides_open.append(any(joint_openness))
-
-            if all(sides_open) == new_value:
-                # Write result into VALUES immediately so get_value() is correct before next global_update()
-                super()._set_value(new_value)
+            if self.get_value() == new_value:
                 return True
 
         # We exhausted our attempts and could not find a working sample.

@@ -325,11 +325,6 @@ def sample_kinematics(
             debug_breakpoint(f"sample_kinematics: {success}")
 
         if success:
-            # Mark this obj's AABB as stale, so that get_value won't fetch the wrong data
-            from omnigibson.object_states.aabb import AABB
-
-            if AABB in objA.states:
-                AABB.mark_stale(objA)
             break
         else:
             og.sim.load_state(state)

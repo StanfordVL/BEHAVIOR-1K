@@ -12,6 +12,7 @@ from omnigibson.object_states import (
     AttachedTo,
     Burnt,
     ContactParticles,
+    Adjacency,
     Contains,
     Cooked,
     Covered,
@@ -21,7 +22,6 @@ from omnigibson.object_states import (
     Frozen,
     Heated,
     HeatSourceOrSink,
-    HorizontalAdjacency,
     Inside,
     Joint,
     MaxTemperature,
@@ -41,7 +41,6 @@ from omnigibson.object_states import (
     Touching,
     Under,
     Unfolded,
-    VerticalAdjacency,
 )
 from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.physx_utils import apply_force_at_pos
@@ -355,37 +354,54 @@ def test_aabb(env, breakfast_table, dishtowel):
 
 
 def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
+    """Verifies the unified Adjacency state's per-axis behavior on stacked and side-by-side fixtures.
+
+    Axis layout for Adjacency.get_value(other) (shape (22,)):
+      k=0  : +Z (other above self)
+      k=1  : -Z (other below self)
+      k=2..11  : +dir of horizontal axes 0..9
+      k=12..21 : -dir of horizontal axes 0..9
+    """
     place_obj_on_floor_plane(bottom_cabinet)
-    for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
-        place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.4})
-        og.sim.step()
-
-        assert bottom_cabinet in set.union(
-            *(
-                axis.positive_neighbors | axis.negative_neighbors
-                for coordinate in obj.states[HorizontalAdjacency].get_value()
-                for axis in coordinate
-            )
-        )
-
-    bowl.set_position_orientation(position=[0.0, 0.0, 1.0])
-    dishtowel.set_position_orientation(position=[0.0, 0.0, 2.0])
-
-    # Need to take one sim step
+    place_obj_on_floor_plane(bowl, x_offset=0.4)
+    place_obj_on_floor_plane(dishtowel, y_offset=0.4)
     og.sim.step()
 
-    assert bowl in bottom_cabinet.states[VerticalAdjacency].get_value().positive_neighbors
-    # TODO: adjacency relies on raytest, which doesn't take particle systems into account
-    # assert dishtowel in bottom_cabinet.states[VerticalAdjacency].get_value().positive_neighbors
-    assert bottom_cabinet in bowl.states[VerticalAdjacency].get_value().negative_neighbors
-    # TODO: adjacency relies on raytest, which doesn't take particle systems into account
-    # assert dishtowel in bowl.states[VerticalAdjacency].get_value().positive_neighbors
-    assert bottom_cabinet in dishtowel.states[VerticalAdjacency].get_value().negative_neighbors
-    assert bowl in dishtowel.states[VerticalAdjacency].get_value().negative_neighbors
+    # Vertical: stack bowl above bottom_cabinet, dishtowel above both
+    bowl.set_position_orientation(position=[0.0, 0.0, 1.0])
+    dishtowel.set_position_orientation(position=[0.0, 0.0, 2.0])
+    og.sim.step()
 
+    # Self-pair is always False
+    self_adj = bottom_cabinet.states[Adjacency].get_value(bottom_cabinet)
+    assert not bool(self_adj.any()), "diagonal must be all False"
+
+    # bowl above bottom_cabinet: bottom_cabinet's +Z (k=0) cell for bowl is True
+    bc_to_bowl = bottom_cabinet.states[Adjacency].get_value(bowl)
+    bowl_to_bc = bowl.states[Adjacency].get_value(bottom_cabinet)
+    assert bool(bc_to_bowl[0]), "bowl should be above bottom_cabinet (k=0)"
+    assert bool(bowl_to_bc[1]), "bottom_cabinet should be below bowl (k=1)"
+
+    # dishtowel above both
+    bc_to_dt = bottom_cabinet.states[Adjacency].get_value(dishtowel)
+    dt_to_bc = dishtowel.states[Adjacency].get_value(bottom_cabinet)
+    assert bool(bc_to_dt[0]), "dishtowel should be above bottom_cabinet (k=0)"
+    assert bool(dt_to_bc[1]), "bottom_cabinet should be below dishtowel (k=1)"
+
+    # Horizontal: place objects side-by-side. The small object's side fires a horizontal axis
+    # because its AABB center is at the right height to ray onto the larger object's mesh.
+    place_obj_on_floor_plane(bottom_cabinet)
+    place_obj_on_floor_plane(bowl, x_offset=0.4)
+    og.sim.step()
+
+    bowl_to_bc_h = bowl.states[Adjacency].get_value(bottom_cabinet)
+    assert bool(
+        bowl_to_bc_h[2:].any()
+    ), "bowl placed beside bottom_cabinet should fire at least one horizontal axis from bowl's side"
+
+    # _set_value must raise on Adjacency
     with pytest.raises(NotImplementedError):
-        bottom_cabinet.states[HorizontalAdjacency].set_value(None)
-        bottom_cabinet.states[VerticalAdjacency].set_value(None)
+        bottom_cabinet.states[Adjacency].set_value(bowl, None)
 
 
 def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dishtowel):
@@ -725,9 +741,6 @@ def test_on_fire(env, plywood):
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
 
-@pytest.mark.skip(
-    reason="investigate why extra steps are needed for the contact to be registered beyond CAN_TOGGLE_STEPS"
-)
 def test_toggled_on(env, stove, robot):
     stove.set_position_orientation([1.487, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, math.pi], dtype=th.float32)))
     robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
@@ -783,6 +796,51 @@ def test_toggled_on(env, stove, robot):
     # Setter should work
     assert stove.states[ToggledOn].set_value(False)
     assert not stove.states[ToggledOn].get_value()
+
+
+def test_toggled_on_requires_closed(env, microwave):
+    """
+    Test when an object's ToggledOn has requires_closed=True and
+    its Open state is True, both:
+      (a) `_set_value` should refuse to flip on, and
+      (b) the `_check_requires_closed_kernel` should force VALUES=0 and steps=0
+          even if those were poked True/non-zero outside the kernel.
+    """
+    microwave = env.scene.object_registry("name", "microwave")
+    if not microwave.states[ToggledOn].requires_closed:
+        pytest.skip("Microwave asset does not have requires_closed=True; nothing to test.")
+
+    # Open the microwave door.
+    microwave.states[Open].set_value(True)
+    for _ in range(3):
+        og.sim.step()
+    assert microwave.states[Open].get_value(), "Failed to open microwave door"
+
+    # (a) Python short-circuit: set_value(True) returns False, value stays False.
+    assert not microwave.states[ToggledOn].set_value(True)
+    assert not microwave.states[ToggledOn].get_value()
+
+    # (b) Kernel knockdown: bypass set_value, force VALUES and steps directly, then step
+    # the sim once. The requires_closed kernel should zero both because Open is True.
+    s = microwave.scene.idx
+    obj_idx = ToggledOn.OBJ_IDXS[microwave.relative_prim_path]
+    ToggledOn.VALUES[s, obj_idx] = 1
+    ToggledOn._robots_can_toggle_steps[s, obj_idx] = 100.0
+    og.sim.step()
+    assert not microwave.states[
+        ToggledOn
+    ].get_value(), "requires_closed kernel should knock VALUES back to 0 while Open is True"
+    assert (
+        ToggledOn._robots_can_toggle_steps[s, obj_idx].item() == 0.0
+    ), "requires_closed kernel should reset step counter to 0"
+
+    # Close the door — set_value should now succeed.
+    microwave.states[Open].set_value(False)
+    for _ in range(3):
+        og.sim.step()
+    assert not microwave.states[Open].get_value()
+    assert microwave.states[ToggledOn].set_value(True)
+    assert microwave.states[ToggledOn].get_value()
 
 
 def test_particle_source(env, furniture_sink):
