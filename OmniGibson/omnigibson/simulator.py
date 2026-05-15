@@ -1524,54 +1524,6 @@ def _launch_simulator(*args, **kwargs):
             self._render_on_step = original_value
 
         @contextlib.contextmanager
-        def stopped(self):
-            """
-            A context scope for making sure the simulator is stopped during execution within this scope.
-            Upon leaving the scope, the prior simulator state is restored.
-            """
-            # Infer what state we're currently in, then stop, yield, and then restore the original state
-            sim_is_playing, sim_is_paused = self.is_playing(), self.is_paused()
-            if sim_is_playing or sim_is_paused:
-                self.stop()
-            yield
-            if sim_is_playing:
-                self.play()
-            elif sim_is_paused:
-                self.pause()
-
-        @contextlib.contextmanager
-        def playing(self):
-            """
-            A context scope for making sure the simulator is playing during execution within this scope.
-            Upon leaving the scope, the prior simulator state is restored.
-            """
-            # Infer what state we're currently in, then stop, yield, and then restore the original state
-            sim_is_stopped, sim_is_paused = self.is_stopped(), self.is_paused()
-            if sim_is_stopped or sim_is_paused:
-                self.play()
-            yield
-            if sim_is_stopped:
-                self.stop()
-            elif sim_is_paused:
-                self.pause()
-
-        @contextlib.contextmanager
-        def paused(self):
-            """
-            A context scope for making sure the simulator is paused during execution within this scope.
-            Upon leaving the scope, the prior simulator state is restored.
-            """
-            # Infer what state we're currently in, then stop, yield, and then restore the original state
-            sim_is_stopped, sim_is_playing = self.is_stopped(), self.is_playing()
-            if sim_is_stopped or sim_is_playing:
-                self.pause()
-            yield
-            if sim_is_stopped:
-                self.stop()
-            elif sim_is_playing:
-                self.play()
-
-        @contextlib.contextmanager
         def slowed(self, slow_dt=1e-6):
             """
             A context scope for making the simulator simulation dt slowed, e.g.: for taking micro-steps for propagating

@@ -1,4 +1,5 @@
 import csv
+import datetime
 import hashlib
 import json
 import os
@@ -33,11 +34,16 @@ from b1k_pipeline.max.merge_collision import merge_collision
 
 rt = pymxs.runtime
 
-PASS_FILENAME = "done-vrayconversionagain.success"
+PASS_FILENAME = "done-reunwrapbad.success"
 VRAY_LOG_FILENAME = pathlib.Path(r"D:/BEHAVIOR-1K/asset_pipeline/mtlconvert.log")
 RENDER_PRESET_FILENAME = str(
     (b1k_pipeline.utils.PIPELINE_ROOT / "render_presets" / "objrender.rps").absolute()
 )
+
+# Any baked map with an mtime newer than this cutoff is considered "recently
+# (re)uploaded" and the corresponding object should be re-unwrapped and re-baked.
+# Use a naive local-time datetime to match os.path.getmtime semantics.
+RECENT_BAKE_CUTOFF_TS = datetime.datetime(2026, 1, 1).timestamp()
 
 from bddl.knowledge_base import KnowledgeBase
 
@@ -780,6 +786,74 @@ def convert_baked_material_to_vray_and_add_ior():
         mtl.bakedMaterial = new_mtl
 
 
+def mark_recently_baked_objects_for_rebake() -> int:
+    """Force re-unwrap (and thus re-bake) for every object whose baked material has
+    at least one bitmap whose mtime is newer than RECENT_BAKE_CUTOFF_TS.
+
+    We clear the recorded UV-unwrap hash so prebake_textures.uv_unwrapping no longer
+    short-circuits. That function then switches the object back to its unbaked
+    material, which cascades into a fresh bake inside prebake_textures.process_open_file.
+    """
+    n_marked = 0
+    for obj in rt.objects:
+        if rt.classOf(obj) != rt.Editable_Poly:
+            continue
+        parsed_name = b1k_pipeline.utils.parse_name(obj.name)
+        if not parsed_name:
+            continue
+        if parsed_name.group("meta_type"):
+            continue
+        if parsed_name.group("instance_id") != "0":
+            continue
+        if parsed_name.group("bad"):
+            continue
+        if parsed_name.group("joint_side") == "upper":
+            continue
+
+        mtl = obj.material
+        if not mtl or rt.classOf(mtl) != rt.Shell_Material:
+            continue
+        baked_mtl = mtl.bakedMaterial
+        if baked_mtl is None:
+            continue
+
+        recent_map = None
+        for map_idx in range(rt.getNumSubTexmaps(baked_mtl)):
+            sub_texmap = rt.getSubTexmap(baked_mtl, map_idx + 1)
+            if sub_texmap is None:
+                continue
+            if rt.classOf(sub_texmap) != rt.Bitmaptexture:
+                continue
+            # Use os.path.abspath (not pathlib.resolve) so we don't follow symlinks
+            # into the DVC cache -- the mtime we care about is the one of the file
+            # in the bakery directory (which is itself a symlink whose target was
+            # touched by fix_bakery_mtimes.py).
+            map_path = os.path.abspath(sub_texmap.filename)
+            try:
+                mtime = os.path.getmtime(map_path)
+            except OSError:
+                continue
+            if mtime > RECENT_BAKE_CUTOFF_TS:
+                recent_map = (map_path, mtime)
+                break
+
+        if recent_map is None:
+            continue
+
+        when = datetime.datetime.fromtimestamp(recent_map[1]).isoformat(timespec="seconds")
+        print(
+            f"Marking {obj.name} for re-unwrap/re-bake "
+            f"(recent map {recent_map[0]} @ {when})"
+        )
+        # Empty hash digest causes get_recorded_uv_unwrapping_hash to return None,
+        # which never matches the current geometry hash -> forces an unwrap.
+        b1k_pipeline.max.prebake_textures.set_recorded_uv_unwrapping_hash(obj, "")
+        n_marked += 1
+
+    print(f"Marked {n_marked} objects for re-unwrap/re-bake.")
+    return n_marked
+
+
 def processFile(filename: pathlib.Path):
     # Load file, fixing the units
     print(f"\n\nProcessing {filename}")
@@ -797,10 +871,10 @@ def processFile(filename: pathlib.Path):
     remove_nested_shell_materials(filename)
 
     # Fix any bad materials
-    convert_materials_to_vray(filename)
+    # convert_materials_to_vray(filename)
 
     # Remove root_level meta links
-    remove_root_level_meta_links(filename)
+    # remove_root_level_meta_links(filename)
 
     # Apply renames
     apply_renames(filename)
@@ -875,6 +949,11 @@ def processFile(filename: pathlib.Path):
     #         # baked_mtls_by_object[obj] = obj.material.bakedMaterial
     #         obj.material = obj.material.originalMaterial
     #         assert rt.classOf(obj.material) != rt.Shell_Material, f"{obj} material should not be shell material before baking"
+
+    # Mark objects whose baked maps were re-uploaded recently (per their mtimes) as
+    # needing a fresh unwrap. prebake_textures.process_open_file below will then
+    # re-unwrap and re-bake all of them.
+    mark_recently_baked_objects_for_rebake()
     b1k_pipeline.max.prebake_textures.process_open_file()
     # for obj, old_baked_mtl in baked_mtls_by_object.items():
     #     # Make sure it got baked again
@@ -907,12 +986,23 @@ def processFile(filename: pathlib.Path):
 
 
 def fix_common_issues_in_all_files():
-    candidates = [
-        x
-        for x in pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline").glob(
-            "cad/*/*/processed.max"
-        )
-    ]
+    # candidates = [
+    #     x
+    #     for x in pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline").glob(
+    #         "cad/*/*/processed.max"
+    #     )
+    # ]
+
+    targets_to_do = {
+        'objects/batch-01',
+        'objects/legacy_batch-06',
+        'scenes/Pomaria_0_garden',
+        'scenes/hotel_suite_large',
+        'scenes/house_double_floor_lower',
+        'scenes/office_cubicles_right',
+        'scenes/commercial_kitchen_fire_extinguisher',
+    }
+    candidates = [pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / x / "processed.max" for x in targets_to_do]
 
     for i, f in enumerate(tqdm.tqdm(candidates)):
         if (f.parent / PASS_FILENAME).exists():
