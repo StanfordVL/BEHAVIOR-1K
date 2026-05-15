@@ -198,6 +198,12 @@ class RigidPrim(XFormPrim):
 
         _find_geom_prims(self._prim)
 
+        # Set default contact/rest offsets on all PhysxCollisionAPIs
+        with og.sim.editing_usd():
+            for api in self._physx_collision_apis:
+                api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
+                api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
+
         coms, vols = [], []
         for prim, is_collision in geom_prims:
             mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
@@ -243,16 +249,6 @@ class RigidPrim(XFormPrim):
                     ):
                         # Make sure particlesource, particlesink and fillable meshes are not visible
                         mesh.purpose = "guide"
-
-        # Override contact/rest offsets for thin links (any collision mesh min dimension
-        # below gm.THIN_OBJECT_THRESHOLD) where PhysX's auto value would be too small.
-        if self._collision_meshes and any(
-            th.min(mesh.aabb_extent).item() < gm.THIN_OBJECT_THRESHOLD for mesh in self._collision_meshes.values()
-        ):
-            with og.sim.editing_usd():
-                for api in self._physx_collision_apis:
-                    api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
-                    api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
 
         # If we have any collision meshes, compute the center of mass from collision geometry
         if len(coms) > 0:
