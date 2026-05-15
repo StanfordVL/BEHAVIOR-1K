@@ -930,7 +930,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for obj_to_add in objs_to_add
         ]
         og.sim.batch_add_objects(objects_to_add, scenes=[self] * len(objects_to_add))
-        
+
         # Rebuilding physics after re-adding objects lets PhysX-Fabric bind before state poses load.
         if objects_to_add and og.sim.is_playing():
             og.sim.refresh_physics_after_stage_update()
