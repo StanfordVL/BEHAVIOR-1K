@@ -26,6 +26,13 @@ def status_color(state):
     return color_map.get(state, "light")
 
 
+def format_size(value):
+    """Format a size value: 2 decimal places, but 1 sig fig if it would round to 0.00."""
+    if round(value, 2) == 0.0 and value != 0.0:
+        return f"{value:.1g}"
+    return f"{value:.2f}"
+
+
 def status_color_transition_rule(state):
     """Convert a TransitionRule state to a Bootstrap color class (for static generator)."""
     # For now, using the same mapping as status_color

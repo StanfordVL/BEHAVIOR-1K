@@ -477,7 +477,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # If there is a file hash already in the init info, compare against it to see if the file has changed
         if self._expected_file_hash is not None:
             if file_hash != self._expected_file_hash:
-                log.warn(
+                log.debug(
                     f"Object {self.name} was expected to have USD file hash {self._expected_file_hash} but loaded with {file_hash}. The saved state might be incompatible."
                 )
         else:
