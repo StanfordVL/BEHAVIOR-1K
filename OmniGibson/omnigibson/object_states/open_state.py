@@ -322,9 +322,7 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
         )
 
     def _get_value(self):
-        s = self.obj.scene.idx
-        obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        return bool(self.VALUES_CPU[s, obj_idx])
+        return bool(super()._get_value())
 
     def _set_value(self, new_value, fully=False):
         """

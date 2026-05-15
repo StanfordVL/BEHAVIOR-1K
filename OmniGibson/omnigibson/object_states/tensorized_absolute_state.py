@@ -122,6 +122,9 @@ class TensorizedAbsoluteState(AbsoluteObjectState, TensorizedState):
         TensorizedState.graph_dirty = True
 
     def _get_value(self):
+        # Have to be put here instead of TensorizedState because super()
+        # goes to BaseObject.get_value instead of TensorizedState's
+        TensorizedState.maybe_refresh_caches()
         # Read from the pinned CPU mirror — no GPU stall for Python callers
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]

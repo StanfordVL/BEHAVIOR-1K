@@ -1244,6 +1244,8 @@ def _launch_simulator(*args, **kwargs):
 
             self._capture_warp_graph()
 
+            RigidContactAPI._PENDING_STEPS = 0
+
         def _capture_warp_graph(self):
             """
             Manage the per-step warp graph end-to-end (gating, pre/post bookkeeping, capture,
@@ -1383,8 +1385,6 @@ def _launch_simulator(*args, **kwargs):
                     for scene in self.scenes:
                         scene.transition_rule_api.step()
 
-            RigidContactAPI._PENDING_STEPS = 0
-
         def play(self):
             if not self.is_playing():
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
@@ -1521,8 +1521,6 @@ def _launch_simulator(*args, **kwargs):
             # Accumulate contact data from this physics step and then flush to cache.
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
             self._refresh_state_caches()
-
-            RigidContactAPI._PENDING_STEPS = 0
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):

@@ -93,10 +93,6 @@ class TensorizedState:
 
             og.sim._refresh_state_caches()
 
-    def get_value(self):
-        self.maybe_refresh_caches()
-        return super().get_value()
-
     @classmethod
     def pre_update(cls):
         """
