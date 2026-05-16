@@ -845,6 +845,7 @@ def main(config):
     urdf_path, usd_path, prim = import_og_asset_from_urdf(
         category="robot",
         model=cfg.name,
+        dataset_name=cfg.dataset_root,
         urdf_path=cfg.urdf_path,
         collision_method=cfg.collision.decompose_method,
         coacd_links=cfg.collision.coacd_links,
