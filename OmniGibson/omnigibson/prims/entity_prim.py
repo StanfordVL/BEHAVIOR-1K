@@ -15,8 +15,7 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
-from omnigibson.utils.render_utils import force_pbr_material_for_link
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints, find_joint_prims
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -197,7 +196,6 @@ class EntityPrim(XFormPrim):
         """
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
-        joint_children = set()
         # Keep track of all the links we will create. We can't create that just yet because we need to find
         # the base link first.
         links_to_create = {}
@@ -211,19 +209,19 @@ class EntityPrim(XFormPrim):
                 # Mark this as a link to create (we'll determine exact class later)
                 links_to_create[link_name] = (PrimType.RIGID, prim)
 
-                # Also iterate through all children to infer joints and determine the children of those joints
-                # We will use this info to infer which link is the base link!
-                for child_prim in prim.GetChildren():
-                    if "joint" in child_prim.GetPrimTypeInfo().GetTypeName().lower():
-                        # Store the child target of this joint
-                        relationships = {r.GetName(): r for r in child_prim.GetRelationships()}
-                        # Only record if this is NOT a fixed link tying us to the world (i.e.: no target for body0)
-                        if len(relationships["physics:body0"].GetTargets()) > 0:
-                            joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
-
             elif self._prim_type == PrimType.CLOTH and prim_type_name == "Mesh":
                 # For cloth objects, process Meshes as cloth links
                 links_to_create[link_name] = (PrimType.CLOTH, prim)
+
+        # Find the children of all joints so we can determine which link is the root.
+        # Joints can live anywhere under self._prim (recent Isaac Sim exports place them in a flat
+        # /joints scope rather than under their body0 link), so traverse the full subtree.
+        joint_children = set()
+        for joint_prim in find_joint_prims(self._prim):
+            relationships = {r.GetName(): r for r in joint_prim.GetRelationships()}
+            # Only record if this is NOT a fixed link tying us to the world (i.e.: no target for body0)
+            if len(relationships["physics:body0"].GetTargets()) > 0:
+                joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
@@ -258,10 +256,6 @@ class EntityPrim(XFormPrim):
                 link_cls = RigidKinematicPrim if is_kinematic else RigidDynamicPrim
             else:  # link_type == PrimType.CLOTH
                 link_cls = ClothPrim
-
-            # Apply the V-Ray to PBR material change if request by the macro
-            if gm.USE_PBR_MATERIALS:
-                force_pbr_material_for_link(self._prim, link_name)
 
             # Create and load the link
             self._links[link_name] = link_cls(

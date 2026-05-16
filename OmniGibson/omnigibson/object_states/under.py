@@ -3,6 +3,7 @@ from omnigibson.object_states.adjacency import VerticalAdjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.object_state_utils import get_reachability_sampling_context
 from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.object_state_utils import sample_kinematics
 
@@ -27,8 +28,11 @@ class Under(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         if reset_before_sampling:
             self.obj.reset()
 
+        reachability_context = get_reachability_sampling_context(other, "under", use_trav_map=use_trav_map)
         for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
-            if sample_kinematics("under", self.obj, other, use_trav_map=use_trav_map) and self.get_value(other):
+            if sample_kinematics(
+                "under", self.obj, other, use_trav_map=use_trav_map, reachability_context=reachability_context
+            ) and self.get_value(other):
                 return True
             else:
                 og.sim.load_state(state, serialized=False)

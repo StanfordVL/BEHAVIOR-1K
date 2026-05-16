@@ -7,6 +7,7 @@ import json
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs import HDF5CollectionWrapper
+from omnigibson.macros import macros
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
@@ -38,6 +39,7 @@ class OGRobotServer:
         partial_load: bool = True,
         instance_id: Optional[int] = None,
         ghosting: bool = True,
+        attachment_joint_visuals: Optional[bool] = None,
     ):
         if task_name is not None:
             available_tasks = utils.load_available_tasks()
@@ -62,6 +64,14 @@ class OGRobotServer:
             self.task_name = None
             self.task_cfg = None
             self.instance_id = None
+
+        enable_attachment_joint_visuals = (
+            utils.task_requires_attached_state(self.task_name)
+            if attachment_joint_visuals is None
+            else attachment_joint_visuals
+        )
+        with macros.unlocked():
+            macros.object_states.attached_to.ENABLE_ATTACHMENT_JOINT_VISUALS = enable_attachment_joint_visuals
 
         utils.apply_omnigibson_macros()
 
@@ -217,36 +227,39 @@ class OGRobotServer:
                 "upper": qpos_max[self.robot.arm_control_idx[arm]],
             }
 
-        with og.sim.stopped():
-            # # Set lower position iteration count for faster sim speed
-            # og.sim._physics_context._physx_scene_api.GetMaxPositionIterationCountAttr().Set(8)
-            # og.sim._physics_context._physx_scene_api.GetMaxVelocityIterationCountAttr().Set(1)
-            isregistry = lazy.carb.settings.acquire_settings_interface()
-            isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 0)
-            # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, int(1 / og.sim.get_physics_dt()))
-            # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, 30)
+        og.sim.stop()
 
-            # Enable CCD for all task-relevant objects
-            if isinstance(self.env.task, BehaviorTask):
-                from omnigibson.systems.system_base import BaseSystem
+        # # Set lower position iteration count for faster sim speed
+        # og.sim._physics_context._physx_scene_api.GetMaxPositionIterationCountAttr().Set(8)
+        # og.sim._physics_context._physx_scene_api.GetMaxVelocityIterationCountAttr().Set(1)
+        isregistry = lazy.carb.settings.acquire_settings_interface()
+        isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 0)
+        # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, int(1 / og.sim.get_physics_dt()))
+        # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, 30)
 
-                for bddl_obj in self.env.task.object_scope.values():
-                    if bddl_obj is not None and not isinstance(bddl_obj, BaseSystem):
-                        for link in bddl_obj.links.values():
-                            link.ccd_enabled = True
-            # Postprocessing robot and objects
-            for obj in self.env.scene.objects:
-                if obj != self.robot:
-                    if obj.category in VISUAL_ONLY_CATEGORIES:
-                        obj.visual_only = True
-                else:
-                    if isinstance(obj, Robot) and obj.model in ("r1", "r1pro"):
-                        obj.base_footprint_link.mass = 250.0
+        # Enable CCD for all task-relevant objects
+        if isinstance(self.env.task, BehaviorTask):
+            from omnigibson.systems.system_base import BaseSystem
 
-            # Update ghost robot's masses to be uniform to avoid orthonormal errors
-            if self.ghosting:
-                for link in self.ghost.links.values():
-                    link.mass = 0.1
+            for bddl_obj in self.env.task.object_scope.values():
+                if bddl_obj is not None and not isinstance(bddl_obj, BaseSystem):
+                    for link in bddl_obj.links.values():
+                        link.ccd_enabled = True
+        # Postprocessing robot and objects
+        for obj in self.env.scene.objects:
+            if obj != self.robot:
+                if obj.category in VISUAL_ONLY_CATEGORIES:
+                    obj.visual_only = True
+            else:
+                if isinstance(obj, Robot) and obj.model in ("r1", "r1pro"):
+                    obj.base_footprint_link.mass = 250.0
+
+        # Update ghost robot's masses to be uniform to avoid orthonormal errors
+        if self.ghosting:
+            for link in self.ghost.links.values():
+                link.mass = 0.1
+
+        og.sim.play()
 
         # Make sure robot fingers are extra grippy
         if APPLY_EXTRA_GRIP:
@@ -266,6 +279,7 @@ class OGRobotServer:
         utils.optimize_sim_settings(vr_mode=(VIEWING_MODE == ViewingMode.VR))
 
         # Reset environment to initialize
+        self._needs_initial_file_update = True
         self.reset()
 
         # Take a single step
@@ -345,16 +359,15 @@ class OGRobotServer:
                 and obj.category != "agent"
                 and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES
             ]
-            
+
             # Setup object beacons
             self.object_beacons = utils.setup_object_beacons(
                 self.task_relevant_objects, self.env.scene
             )
 
-            # Setup task-specific visualizers
-            self.task_visualizers = utils.setup_task_visualizers(
-                self.task_relevant_objects, self.env.scene
-            )
+            # Attachment guides are owned by the AttachedTo object state. Keep this as a placeholder for future
+            # JoyLo-specific task visualizers.
+            self.task_visualizers = {}
 
             # Get task-irrelevant objects
             self.task_irrelevant_objects = [
@@ -371,6 +384,7 @@ class OGRobotServer:
             self.task_relevant_objects = []
             self.task_irrelevant_objects = []
             self.object_beacons = {}
+            self.task_visualizers = {}
 
     def _setup_keyboard_handlers(self):
         """Set up keyboard event handlers"""
@@ -1048,10 +1062,12 @@ class OGRobotServer:
         self._joint_cmd["button_home"] = th.zeros(1)
         self._joint_cmd["button_left"] = th.zeros(1)
         self._joint_cmd["button_right"] = th.zeros(1)
+        should_update_initial_file = self._needs_initial_file_update
 
         # Update the instance id / initial state if the instance ID is specified
         # We will manually update the task relevant objects (TRO) state
         if self.instance_id is not None and increment_instance:
+            should_update_initial_file = True
             self.instance_id += 1
             scene_model = self.env.task.scene_name
             tro_filename = self.env.task.get_cached_activity_scene_filename(
@@ -1105,15 +1121,18 @@ class OGRobotServer:
             utils.update_instance_id_label(self.instance_id_label, self.instance_id)
 
 
-        # Try to ensure that all task-relevant objects are stable
-        # They should already be stable from the sampled instance, but there is some issue where loading the state
-        # causes some jitter (maybe for small mass / thin objects?)
-        for _ in range(25):
-            og.sim.step_physics()
-            for entity in self.env.task.object_scope.values():
-                if entity is not None and not isinstance(entity, BaseSystem):
-                    entity.keep_still()
-        self.env.scene.update_initial_file()
+        if should_update_initial_file:
+            # Try to ensure that all task-relevant objects are stable before caching a reset baseline.
+            # They should already be stable from the sampled instance, but loading the state can cause jitter.
+            for _ in range(25):
+                og.sim.step_physics()
+                self.robot.keep_still()
+                for entity in self.env.task.object_scope.values():
+                    if entity is not None and not isinstance(entity, BaseSystem):
+                        entity.keep_still()
+            self.robot.keep_still()
+            self.env.scene.update_initial_file()
+            self._needs_initial_file_update = False
 
         # Reset env
         self.env.reset()

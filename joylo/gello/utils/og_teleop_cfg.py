@@ -23,6 +23,12 @@ ROOM_DEPENDENCIES = {
         "garage": ["corridor"],
     },
     "house_double_floor_upper": {},
+    "restaurant_diner": {
+        "dining_room": ["bar", "corridor"],
+        "bar": ["dining_room", "corridor", "kitchen"]
+    },
+    "hotel_suite_large": {},
+    "office_right_cubicles": {},
 }
 
 TASK_SPECIFIC_EXTRA_ROOMS = {
@@ -30,6 +36,9 @@ TASK_SPECIFIC_EXTRA_ROOMS = {
         "house_double_floor_lower": ["corridor"],
     },
     "bringing_newspaper_in": {
+        "house_double_floor_lower": ["corridor"],
+    },
+    "bringing_paper_to_recycling": {
         "house_double_floor_lower": ["corridor"],
     },
     "chopping_wood": {
@@ -361,22 +370,6 @@ VIS_CYLINDER_CONFIG = {
         T.euler2quat(th.tensor([0.0, th.pi / 2, 0.0])),
         T.euler2quat(th.tensor([-th.pi / 2, 0.0, 0.0])),
         T.euler2quat(th.tensor([0.0, 0.0, 0.0])),
-    ],
-}
-
-# Frame visualizer cylinder configurations
-ATTACHMENT_FRAME_CONFIG = {
-    "width": 0.008,
-    "lengths": [0.15, 0.15, 0.15],
-    "quat_offsets": [
-        T.euler2quat(th.tensor([0.0, th.pi / 2, 0.0])),  # X-axis (red)
-        T.euler2quat(th.tensor([-th.pi / 2, 0.0, 0.0])),  # Y-axis (green)
-        T.euler2quat(th.tensor([0.0, 0.0, 0.0])),  # Z-axis (blue)
-    ],
-    "colors": [
-        th.tensor([1.0, 0.0, 0.0]),  # Red for X-axis
-        th.tensor([0.0, 1.0, 0.0]),  # Green for Y-axis
-        th.tensor([0.0, 0.0, 1.0]),  # Blue for Z-axis
     ],
 }
 

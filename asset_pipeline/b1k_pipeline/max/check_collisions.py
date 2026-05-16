@@ -115,8 +115,8 @@ def import_bad_model_originals(model_id):
         else:
             visual_objects[link_name] = obj
 
-    assert (
-        set(visual_objects.keys()) == set(collision_objects.keys())
+    assert set(visual_objects.keys()) == set(
+        collision_objects.keys()
     ), f"Visual and collision objects should match in source for {model_id}. Currently: {visual_objects.keys()} vs {collision_objects.keys()}"
 
     objects_to_import = sorted(
@@ -136,9 +136,10 @@ def import_bad_model_originals(model_id):
     )
     assert success, f"Failed to import {model_id}."
     imported_objs_by_name = {obj.name: obj for obj in imported_meshes}
-    assert set(objects_to_import) == set(imported_objs_by_name.keys()), (
-        "Not all objects were imported. Missing: "
-        + str(set(objects_to_import) - set(imported_objs_by_name.keys()))
+    assert set(objects_to_import) == set(
+        imported_objs_by_name.keys()
+    ), "Not all objects were imported. Missing: " + str(
+        set(objects_to_import) - set(imported_objs_by_name.keys())
     )
 
     # Make sure the objects all have the right parents
@@ -415,6 +416,7 @@ def main():
         "collisions": collisions,
         "error": error,
     }
+    print(results)
     with open(filename, "w") as f:
         json.dump(results, f, indent=4)
 

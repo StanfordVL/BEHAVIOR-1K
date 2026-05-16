@@ -589,8 +589,6 @@ def replace_all_bad_legacy_objects_in_open_file():
         # Check that the provider is legacy_
         model_id = parsed_name.group("model_id")
         provider = providers[model_id]
-        if "legacy_" not in provider:
-            continue
 
         # Check that we havent picked an object for this model ID yet.
         assert (
@@ -619,6 +617,7 @@ def replace_all_bad_legacy_objects_in_open_file():
 
 def main():
     replace_object_instances(rt.selection[0], respect_aspect_ratio=False)
+    # replace_all_bad_legacy_objects_in_open_file()
 
 
 if __name__ == "__main__":
