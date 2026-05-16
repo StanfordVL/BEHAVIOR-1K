@@ -1157,8 +1157,14 @@ def convert_urdf_to_usd(
         referenced_wrapper_prim = side_stage.GetPrimAtPath(referenced_wrapper_path_str)
         assert referenced_wrapper_prim.IsValid()
 
-        child_prim = referenced_wrapper_prim.GetChild("World").GetChild("mesh")
-        assert child_prim.IsValid()
+        xform_children = [c for c in referenced_wrapper_prim.GetChildren() if c.IsA(lazy.pxr.UsdGeom.Xform)]
+        if len(xform_children) != 1:
+            del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
+            continue
+        child_prim = xform_children[0].GetChild("mesh")
+        if not child_prim.IsValid():
+            del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
+            continue
         child_path = child_prim.GetPath()
 
         # Duplicate the properties on the parent prim onto the child.
@@ -1178,11 +1184,7 @@ def convert_urdf_to_usd(
         # Delete the parent prim
         del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
 
-        # Move the child prim to the parent's path.
         assert lazy.pxr.Sdf.CopySpec(side_stage.GetRootLayer(), child_path, side_stage.GetRootLayer(), parent_path)
-
-        # Delete the child's original path
-        del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
 
     # Migrate materials from /meshes to /Looks before deleting the meshes hierarchy
     # This is necessary for IsaacSim 5.1+ where materials are now placed under /meshes
