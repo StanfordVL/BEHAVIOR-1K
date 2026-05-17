@@ -978,7 +978,6 @@ def _launch_simulator(*args, **kwargs):
             """
             playing = self.is_playing()
             if playing:
-                self.update_handles()
                 state = self.dump_state()
 
                 # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with

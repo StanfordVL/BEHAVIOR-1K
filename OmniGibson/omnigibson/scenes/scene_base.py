@@ -920,6 +920,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         objs_to_remove = current_obj_names - load_obj_names
         objs_to_add = load_obj_names - current_obj_names
 
+        restart_sim = (objs_to_add or objs_to_remove) and og.sim.is_playing()
+
+        if restart_sim:
+            og.sim.stop()
+
         # Delete any extra objects that currently exist in the scene stage
         objects_to_remove = [self.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove]
         og.sim.batch_remove_objects(objects_to_remove)
@@ -930,10 +935,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for obj_to_add in objs_to_add
         ]
         # Add new physics prims while stopped, then reuse play() to rebuild handles before loading poses.
-        restart_sim = objects_to_add and og.sim.is_playing()
-        if restart_sim:
-            og.sim.stop()
+
         og.sim.batch_add_objects(objects_to_add, scenes=[self] * len(objects_to_add))
+        
         if restart_sim:
             og.sim.play()
 
