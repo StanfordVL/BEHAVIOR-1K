@@ -937,7 +937,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Add new physics prims while stopped, then reuse play() to rebuild handles before loading poses.
 
         og.sim.batch_add_objects(objects_to_add, scenes=[self] * len(objects_to_add))
-        
+
         if restart_sim:
             og.sim.play()
 
