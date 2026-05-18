@@ -113,6 +113,11 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
     # Per-scene wp row slice views of _currently_touching, used as is_in_contact_batch_warp out=.
     _currently_touching_per_scene = None  # list[wp.array | None]
 
+    # Index of the last og.sim.step() call during which _update_values ran. The gate in
+    # _update_values uses this to skip ticking during lazy refreshes triggered between
+    # real sim steps (e.g. by sample_kinematics).
+    _LAST_UPDATE_STEP_INDEX = -1
+
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
@@ -144,6 +149,8 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
 
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
         super().initialize_view()
+
+        cls._LAST_UPDATE_STEP_INDEX = -1
 
         S = len(cls.IDX_OBJS)
         O = len(cls.OBJ_IDXS)
@@ -239,6 +246,11 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
     def _update_values(cls, values):
         if cls.PREVIOUSLY_TOUCHING is None:
             return
+        # Out-of-step update
+        step = og.sim.step_call_index
+        if step == cls._LAST_UPDATE_STEP_INDEX:
+            return
+        cls._LAST_UPDATE_STEP_INDEX = step
         S, O = values.shape[:2]
 
         wp.launch(
