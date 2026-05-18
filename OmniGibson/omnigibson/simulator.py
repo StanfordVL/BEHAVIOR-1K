@@ -455,6 +455,11 @@ def _launch_simulator(*args, **kwargs):
             self.pre_step_exception = None
             self.post_step_exception = None
 
+            # Monotonically advances exactly once per og.sim.step() call.
+            # Time-dependent tensorized states gate on this so their
+            # _update_values doesn't tick during step_physics(). Reset to 0 in stop().
+            self._step_call_index = 0
+
             self._step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
             self._pre_physics_step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
             self._post_physics_step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
@@ -1213,24 +1218,15 @@ def _launch_simulator(*args, **kwargs):
                     if issubclass(state_type, TensorizedState):
                         state_type.initialize_view()
 
-        # TODO(vector) Calling this actually makes most time-sensitive states
-        # (temperature, toggle, sliceractive...) think a new step has happened.
-        # should update all of those states to track last-updated-time, and
-        # compare it against og.sim.current_timestep to compute how much delta
-        # should be applied to things
         def _refresh_state_caches(self):
             """
-            Run a full tensorized-state refresh outside the normal step path.
+            Run a full update for tensorized object state and view API.
 
-            This is the same pre/global/post pass that ``_non_physics_step`` runs once per
-            sim step, factored out so that callers which mutate poses/joints between sim
-            steps (``sample_kinematics``, ``Inside._set_value``, ad-hoc
-            ``set_position_orientation`` / ``JointPrim.set_pos``) can bring caches back into
-            sync without waiting for the next ``sim.step()``.
-
-            Triggered automatically from ``TensorizedAbsoluteState._get_value`` /
-            ``TensorizedRelativeState._get_value`` when ``TensorizedState.caches_dirty`` is
-            set, so callers don't have to remember to call it.
+            This function will be called in the following cases:
+            - in usual step, in ``_non_physics_step``
+            - anywhere that poses/joints are set between sim steps (sample_kinematics,
+            Inside._set_value, set_position_orientation / JointPrim.set_pos) and
+            any TensorizedAbsoluteState need to get_value
 
             Always clears ``TensorizedState.caches_dirty`` on completion.
             """
@@ -1447,9 +1443,23 @@ def _launch_simulator(*args, **kwargs):
                 finally:
                     self._in_sim_lifecycle -= 1
 
+            self._step_call_index = 0
+
             # Run all callbacks
             for callback in self._callbacks_on_stop.values():
                 callback()
+
+        @property
+        def step_call_index(self):
+            """
+            Monotonically increasing counter of og.sim.step() calls since the last stop().
+
+            Distinct from current_time_step_index: that one advances on every physics callback
+            (including step_physics()), while this only advances on logical step() invocations.
+            Time-dependent tensorized states (Temperature, ToggledOn, SlicerActive) gate on this
+            so their _update_values doesn't tick during step_physics() / sample_kinematics().
+            """
+            return self._step_call_index
 
         @property
         def n_physics_timesteps_per_render(self):
@@ -1470,6 +1480,8 @@ def _launch_simulator(*args, **kwargs):
             """
             self._check_usd_guard()
             assert self.is_playing(), "Simulator must be playing to step"
+
+            self._step_call_index += 1
 
             render = self._render_on_step
             if self.stage is None:
@@ -1559,7 +1571,10 @@ def _launch_simulator(*args, **kwargs):
                     ControllableObjectViewAPI.post_physics_step()
 
                 # Pull the contact sensor data — must run while currently_stepping is True,
-                # since RigidContactAPI.read_from_physx asserts on it.
+                # since RigidContactAPI.read_from_physx asserts on it. Unlike the pose/DOF
+                # view APIs (snapshot-only, drained once per render-step in
+                # _refresh_state_caches), contacts accumulate per sub-step into pending
+                # buffers that update() later walks, so they must be drained here.
                 RigidContactAPI.read_from_physx()
                 wp.synchronize()
 

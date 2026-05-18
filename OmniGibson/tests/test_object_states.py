@@ -43,6 +43,7 @@ from omnigibson.object_states import (
     Under,
     Unfolded,
 )
+from omnigibson.object_states.slicer_active import SlicerActive
 from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.physx_utils import apply_force_at_pos
 from omnigibson.utils.usd_utils import RigidContactAPI
@@ -843,6 +844,67 @@ def test_toggled_on_requires_closed(env, microwave):
     assert not microwave.states[Open].get_value()
     assert microwave.states[ToggledOn].set_value(True)
     assert microwave.states[ToggledOn].get_value()
+
+
+def test_out_of_step_refresh_freezes_time_dependent_states(env, microwave, table_knife):
+    """
+    Time-dependent tensorized states
+    (Temperature, ToggledOn._robots_can_toggle_steps, SlicerActive.DELAY_COUNTER) must
+    not advance during lazy cache refreshes or step_physics() calls between real sim
+    steps — those events represent sampling / settling, not elapsed task time.
+    """
+    microwave = env.scene.object_registry("name", "microwave")
+    table_knife = env.scene.object_registry("name", "table_knife")
+
+    # One real step so all tensorized state views are fully initialized.
+    og.sim.step()
+
+    s_mw = microwave.scene.idx
+    temp_idx = Temperature.OBJ_IDXS[microwave.relative_prim_path]
+    toggle_idx = ToggledOn.OBJ_IDXS[microwave.relative_prim_path]
+    s_knife = table_knife.scene.idx
+    slicer_idx = SlicerActive.OBJ_IDXS[table_knife.relative_prim_path]
+
+    # Seed non-default values so any spurious tick would be visible.
+    Temperature.VALUES[s_mw, temp_idx] = 100.0
+    ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx] = 3.0
+    SlicerActive.DELAY_COUNTER[s_knife, slicer_idx] = 7.0
+
+    snap_temp = Temperature.VALUES[s_mw, temp_idx].clone()
+    snap_toggle = ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx].clone()
+    snap_slicer = SlicerActive.DELAY_COUNTER[s_knife, slicer_idx].clone()
+
+    step_idx_before = og.sim.step_call_index
+
+    # Five lazy refreshes followed by five step_physics() calls — neither path runs
+    # og.sim.step(), so step_call_index must be unchanged and all counters frozen.
+    for _ in range(5):
+        og.sim._refresh_state_caches()
+    for _ in range(5):
+        og.sim.step_physics()
+
+    assert (
+        og.sim.step_call_index == step_idx_before
+    ), f"step_call_index advanced unexpectedly: {step_idx_before} -> {og.sim.step_call_index}"
+    assert th.equal(Temperature.VALUES[s_mw, temp_idx], snap_temp), (
+        f"Temperature drifted on out-of-step refresh: "
+        f"{snap_temp.item()} -> {Temperature.VALUES[s_mw, temp_idx].item()}"
+    )
+    assert th.equal(ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx], snap_toggle), (
+        f"ToggledOn counter drifted on out-of-step refresh: "
+        f"{snap_toggle.item()} -> {ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx].item()}"
+    )
+    assert th.equal(SlicerActive.DELAY_COUNTER[s_knife, slicer_idx], snap_slicer), (
+        f"SlicerActive counter drifted on out-of-step refresh: "
+        f"{snap_slicer.item()} -> {SlicerActive.DELAY_COUNTER[s_knife, slicer_idx].item()}"
+    )
+
+    # One real step must advance the gate counter and unfreeze the kernels.
+    og.sim.step()
+    assert og.sim.step_call_index == step_idx_before + 1
+    assert (
+        Temperature.VALUES[s_mw, temp_idx].item() < 100.0
+    ), "Temperature should decay toward DEFAULT_TEMPERATURE after a real step"
 
 
 def test_particle_source(env, furniture_sink):

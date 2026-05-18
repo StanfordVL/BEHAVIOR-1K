@@ -186,6 +186,11 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
     COLOR_ON = th.tensor([0, 1.0, 0])  # green  — toggle is on
     COLOR_OFF = th.tensor([1.0, 0, 0])  # red    — toggle is off
 
+    # Index of the last og.sim.step() call during which _update_values ran. The gate in
+    # _update_values uses this to skip ticking during lazy refreshes triggered between
+    # real sim steps (e.g. by sample_kinematics / settling loops).
+    _LAST_UPDATE_STEP_INDEX = -1
+
     @classproperty
     def value_type(cls):
         return th.bool
@@ -227,6 +232,19 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         super().initialize_view()
 
         S, O = len(cls.IDX_OBJS), len(cls.OBJ_IDXS)
+
+        cls._LAST_UPDATE_STEP_INDEX = -1
+
+        # Carry over _can_toggle_steps for surviving objects
+        cls._robots_can_toggle_steps = th.zeros((S, O), dtype=th.float32, device="cuda")
+        if prev_steps is not None:
+            for relative_prim_path, obj_idx_old in prev_obj_idxs.items():
+                if relative_prim_path not in cls.OBJ_IDXS:
+                    continue
+                obj_idx = cls.OBJ_IDXS[relative_prim_path]
+                for scene_idx in range(min(prev_steps.shape[0], S)):
+                    cls._robots_can_toggle_steps[scene_idx, obj_idx] = prev_steps[scene_idx, obj_idx_old]
+        cls._robots_can_toggle_steps_wp = wp.from_torch(cls._robots_can_toggle_steps)
 
         cls._init_requires_closed_logic(O)
 
@@ -570,6 +588,11 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         """
         if cls._mask_can_toggle_flat is None:
             return
+        # Out-of-step update
+        step = og.sim.step_call_index
+        if step == cls._LAST_UPDATE_STEP_INDEX:
+            return
+        cls._LAST_UPDATE_STEP_INDEX = step
         S, O = values.shape[:2]
 
         mask_flat = cls._mask_can_toggle_flat

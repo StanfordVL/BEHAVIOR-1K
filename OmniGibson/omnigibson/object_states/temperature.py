@@ -35,6 +35,11 @@ m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps
 
 
 class Temperature(TensorizedAbsoluteState):
+    # Index of the last og.sim.step() call during which _update_values ran. The gate in
+    # _update_values uses this to skip ticking during lazy refreshes triggered between
+    # real sim steps (e.g. by sample_kinematics).
+    _LAST_UPDATE_STEP_INDEX = -1
+
     @classmethod
     def initialize_view(cls):
         # Snapshot which relative paths existed before the rebuild
@@ -42,6 +47,8 @@ class Temperature(TensorizedAbsoluteState):
 
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
         super().initialize_view()
+
+        cls._LAST_UPDATE_STEP_INDEX = -1
 
         # Initialize new VALUE slots (not carried over) to DEFAULT_TEMPERATURE
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -86,6 +93,11 @@ class Temperature(TensorizedAbsoluteState):
         # Apply temperature decay via Warp kernel
         if cls.VALUES_WP is None:
             return
+        # Out-of-step update
+        step = og.sim.step_call_index
+        if step == cls._LAST_UPDATE_STEP_INDEX:
+            return
+        cls._LAST_UPDATE_STEP_INDEX = step
         S, O = cls.VALUES.shape[:2]
         wp.launch(
             kernel=_temperature_decay_kernel,
