@@ -5,7 +5,7 @@ from omnigibson.macros import gm, macros
 import json
 from omnigibson.objects import DatasetObject
 import numpy as np
-from utils import validate_task, get_scene_model, get_scene_room_filter
+from utils import validate_task, get_scene_model
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 
 parser = argparse.ArgumentParser()
@@ -88,7 +88,7 @@ def main():
             "scene_model": scene_model,
             "scene_file": task_scene_file,
             "seg_map_resolution": 0.1,
-            **get_scene_room_filter(TASK_CUSTOM_LISTS[args.activity], scene_model),
+            "load_room_types": TASK_CUSTOM_LISTS[args.activity]["room_types"],
         },
         "robots": [
             {
@@ -159,7 +159,12 @@ def main():
             task_final_state = env.scene.dump_state()
             task_scene_dict = {"state": task_final_state}
             try:
-                validate_task(env.task, task_scene_dict, default_scene_dict)
+                validate_task(
+                    env.task,
+                    task_scene_dict,
+                    default_scene_dict,
+                    active_room_instances=env.scene.load_room_instances,
+                )
             except ValueError as e:
                 print(f"instance {activity_instance_id} trial {i} validation failed: {e}")
                 continue

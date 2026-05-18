@@ -3,13 +3,11 @@ import json
 import yaml
 import torch as th
 import omnigibson.utils.transform_utils as T
-from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from constants import DATASET_2026_PATH
 
 
 def main():
     scenes_dir = os.path.join(DATASET_2026_PATH, "scenes")
-    with open(TASK_CUSTOM_LIST_PATH, "r") as f:
-        task_custom_lists = json.load(f)
 
     # Create a new empty dictionary to store tasks
     tasks_data = {}
@@ -43,15 +41,13 @@ def main():
                 base_joints = obj_state["joint_pos"]
                 robot_start_position = [root_pos[i] + base_joints[i] for i in range(3)]
                 robot_start_orientation = T.euler2quat(th.tensor(base_joints[3:6])).tolist()
-                task_instance_data = {
-                    "scene_model": scene_model,
-                    "robot_start_position": robot_start_position,
-                    "robot_start_orientation": robot_start_orientation,
+                tasks_data[task_name] = {
+                    0: {
+                        "scene_model": scene_model,
+                        "robot_start_position": robot_start_position,
+                        "robot_start_orientation": robot_start_orientation,
+                    }
                 }
-                room_instances = task_custom_lists.get(task_name, {}).get(scene_model, {}).get("room_instances")
-                if room_instances:
-                    task_instance_data["load_room_instances"] = room_instances
-                tasks_data[task_name] = {0: task_instance_data}
                 print(f"Processed instance 0 from: {os.path.basename(template_file)}")
                 print(f"  Robot start position: {robot_start_position}")
                 print(f"  Robot start orientation: {robot_start_orientation}")

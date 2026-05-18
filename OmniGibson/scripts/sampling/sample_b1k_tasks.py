@@ -19,7 +19,6 @@ from utils import (
     UNSUPPORTED_PREDICATES,
     validate_task,
     get_scene_model,
-    get_scene_room_filter,
 )
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 from postprocess_sampled_task import postprocess_task
@@ -130,11 +129,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     # scene templates
     task_suffix = "partial_rooms"
     if args.room_types is not None:
-        loaded_room_types = args.room_types.split(",")
-        cfg["scene"]["load_room_types"] = loaded_room_types
+        cfg["scene"]["load_room_types"] = args.room_types.split(",")
     else:
-        loaded_room_types = TASK_CUSTOM_LISTS[activity]["room_types"]
-        cfg["scene"].update(get_scene_room_filter(TASK_CUSTOM_LISTS[activity], scene_model))
+        cfg["scene"]["load_room_types"] = TASK_CUSTOM_LISTS[activity]["room_types"]
 
     # Create the environment
     # Attempt to sample the activity
@@ -200,12 +197,16 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Attempt to sample
     if should_sample:
-        relevant_rooms = set(loaded_room_types)
-        log.info(f"relevant rooms: {relevant_rooms}")
+        active_room_instances = env.scene.load_room_instances
+        log.info(f"relevant room instances: {active_room_instances}")
+        relevant_room_instances = set(active_room_instances) if active_room_instances is not None else None
         for obj in env.scene.objects:
             if isinstance(obj, DatasetObject):
-                obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
-                active = len(relevant_rooms.intersection(obj_rooms)) > 0 or obj.category in {"floors", "walls"}
+                active = (
+                    relevant_room_instances is None
+                    or len(relevant_room_instances.intersection(obj.in_rooms)) > 0
+                    or obj.category in {"floors", "walls"}
+                )
                 obj.visual_only = not active
                 obj.visible = active
 
@@ -252,7 +253,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         for obj in env.task.object_scope.values():
             if isinstance(obj, DatasetObject):
                 obj.wake()
-        assert validate_task(env.task, task_scene_dict, default_scene_dict)
+        assert validate_task(
+            env.task,
+            task_scene_dict,
+            default_scene_dict,
+            active_room_instances=active_room_instances,
+        )
         # BREAKPOINT: Validation failed - inspect the task state to understand why
         # At this breakpoint, you can:
         # - Run: for _ in range(1000): og.sim.render()

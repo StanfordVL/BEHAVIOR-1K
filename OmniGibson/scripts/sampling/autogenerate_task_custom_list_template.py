@@ -1,5 +1,6 @@
 import json
 import argparse
+import csv
 import glob
 import os
 import textwrap
@@ -12,6 +13,7 @@ from floor_plan_visualization import get_floor_plan_data
 
 
 SYNSET_BASE_URL = "https://behavior.stanford.edu/knowledgebase/synsets"
+TASK_MISC_HEADER = ["Task ID", "Task", "Rooms to inlcude"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-t", "--activity", type=str, required=True)
@@ -109,6 +111,38 @@ def _load_scene_object_locations(scene, category_to_synsets):
             for synset in category_to_synsets[category]:
                 locations[room][synset] += 1
     return {room: dict(counts) for room, counts in locations.items()}
+
+
+def _write_task_misc_rooms(activity_name, room_instances):
+    if not room_instances:
+        raise ValueError("At least one room must be selected before writing B100_task_misc.csv.")
+
+    task_misc_path = os.path.join(DATASET_2026_PATH, "metadata", "B100_task_misc.csv")
+    rows = []
+    if os.path.exists(task_misc_path):
+        with open(task_misc_path, newline="", encoding="utf-8") as f:
+            rows = list(csv.reader(f, delimiter=",", quotechar='"'))
+
+    if not rows:
+        rows = [TASK_MISC_HEADER]
+
+    room_cell = "\n".join(room_instances)
+    max_task_id = -1
+    updated = False
+    for row in rows[1:]:
+        if len(row) >= 1 and row[0].isdigit():
+            max_task_id = max(max_task_id, int(row[0]))
+        if len(row) >= 2 and row[1] == activity_name:
+            row[:] = [row[0], activity_name, room_cell]
+            updated = True
+
+    if not updated:
+        rows.append([str(max_task_id + 1), activity_name, room_cell])
+
+    with open(task_misc_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, delimiter=",", quotechar='"')
+        writer.writerows(rows)
+    print(f"Wrote selected rooms for '{activity_name}' to {task_misc_path}")
 
 
 def _room_type_from_instance(room_instance):
@@ -342,6 +376,12 @@ def _select_room_instances_with_gui(
     done_button.on_clicked(lambda _: plt.close(fig))
     plt.show()
 
+    if not selected:
+        if default_rooms:
+            print(f"\nNo rooms selected; using default rooms: {', '.join(sorted(default_rooms))}")
+            return sorted(default_rooms)
+        raise ValueError("At least one room must be selected.")
+
     return sorted(selected)
 
 
@@ -459,9 +499,6 @@ def autogenerate_task_custom_list(activity_name, use_room_gui=True, floor=0):
             },
         }
     }
-    if room_instances is not None:
-        task_entry[activity_name][scene]["room_instances"] = room_instances
-
     # Load, update, and write back
     with open(TASK_CUSTOM_LIST_PATH, "r") as f:
         existing = json.load(f)
@@ -472,6 +509,8 @@ def autogenerate_task_custom_list(activity_name, use_room_gui=True, floor=0):
         json.dump(existing, f, indent=4)
 
     print(f"\nWrote entry for '{activity_name}' to {TASK_CUSTOM_LIST_PATH}")
+    if room_instances is not None:
+        _write_task_misc_rooms(activity_name, room_instances)
 
 
 if __name__ == "__main__":
