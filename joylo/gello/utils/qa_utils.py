@@ -1025,7 +1025,7 @@ def check_robot_nonarm_nonground_collision(env):
             env.scene.idx,
             non_arm_links,
             with_set=None,
-            ignore_set=ground_objects + [robot],
+            ignore_set=[obj for obj in ground_objects if obj.visual_only == False] + [robot],
             current_only=False,
         ):
             return True
