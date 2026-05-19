@@ -233,7 +233,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
         S, O = len(cls.IDX_OBJS), len(cls.OBJ_IDXS)
 
-        cls._LAST_UPDATE_STEP_INDEX = -1
+        cls._LAST_UPDATE_STEP_INDEX = og.sim.step_call_index
 
         # Carry over _can_toggle_steps for surviving objects
         cls._robots_can_toggle_steps = th.zeros((S, O), dtype=th.float32, device="cuda")

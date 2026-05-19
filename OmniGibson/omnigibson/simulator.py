@@ -1502,8 +1502,6 @@ def _launch_simulator(*args, **kwargs):
             self._check_usd_guard()
             assert self.is_playing(), "Simulator must be playing to step"
 
-            self._step_call_index += 1
-
             render = self._render_on_step
             if self.stage is None:
                 raise Exception("There is no stage currently opened, init_stage needed before calling this func")
@@ -1529,6 +1527,10 @@ def _launch_simulator(*args, **kwargs):
                             self._report_step_exceptions()
             finally:
                 self._in_sim_lifecycle -= 1
+
+            # Bump the logical step counter after a successful physics step but before non-physics updates,
+            # so time-dependent states observe the new index during _non_physics_step().
+            self._step_call_index += 1
 
             # Additionally run non physics things
             self._non_physics_step()
