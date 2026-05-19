@@ -197,7 +197,7 @@ class TextureBaker:
         u.combine = False
         u.prerotate = True
         u.packmode = 0  # Classic. Go 1 for Efficient and 2 for High Quality.
-        u.map_channel = 99
+        u.map_channel = NEW_UV_CHANNEL
         u.keep_seams = False
         u.unwrap_mode = 1  # 0 for organic. 1 is for hard-edge objects which most of ours are.
 
