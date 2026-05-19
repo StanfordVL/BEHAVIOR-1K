@@ -21,7 +21,7 @@ class TaskMetric(MetricBase):
         self.timesteps = 0
         self.render_timestep = og.sim.get_rendering_dt()
         self.initial_predicate_states = [
-            [pred.evaluate() for pred in option] for option in env.task.ground_goal_state_options[0]
+            [pred.evaluate() for pred in option] for option in env.task.ground_goal_state_options
         ]
 
     def _compute_step_metrics(self, env, action, obs, reward, terminated, truncated, info):
@@ -43,7 +43,7 @@ class TaskMetric(MetricBase):
                 )
                 / len(option)
                 for option, option_previous_state in zip(
-                    env.task.ground_goal_state_options[0], self.initial_predicate_states
+                    env.task.ground_goal_state_options, self.initial_predicate_states
                 )
             )
 
