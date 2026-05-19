@@ -150,7 +150,7 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
         super().initialize_view()
 
-        cls._LAST_UPDATE_STEP_INDEX = -1
+        cls._LAST_UPDATE_STEP_INDEX = og.sim.step_call_index
 
         S = len(cls.IDX_OBJS)
         O = len(cls.OBJ_IDXS)

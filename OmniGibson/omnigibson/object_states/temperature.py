@@ -48,7 +48,7 @@ class Temperature(TensorizedAbsoluteState):
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
         super().initialize_view()
 
-        cls._LAST_UPDATE_STEP_INDEX = -1
+        cls._LAST_UPDATE_STEP_INDEX = og.sim.step_call_index
 
         # Initialize new VALUE slots (not carried over) to DEFAULT_TEMPERATURE
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
