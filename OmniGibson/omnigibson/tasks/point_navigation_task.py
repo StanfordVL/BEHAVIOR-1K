@@ -114,10 +114,10 @@ class PointNavigationTask(BaseTask):
         self._current_robot_pos = None  # list of (3,) tensors per env
         self._geodesic_dist = None  # th.Tensor (num_envs,)
 
-        # Visualization markers (only for first scene)
-        self._initial_pos_marker = None
-        self._goal_pos_marker = None
-        self._waypoint_markers = None
+        # Visualization markers (per-env; one set per scene when enabled)
+        self._initial_pos_markers = None  # list of PrimitiveObject per env
+        self._goal_pos_markers = None  # list of PrimitiveObject per env
+        self._waypoint_markers = None  # list of list of PrimitiveObject: outer per-env, inner per-waypoint
 
         # Run super
         super().__init__(termination_config=termination_config, reward_config=reward_config, include_obs=include_obs)
@@ -175,53 +175,57 @@ class PointNavigationTask(BaseTask):
 
     def _load_visualization_markers(self, env):
         """
-        Load visualization, such as initial and target position, shortest path, etc
+        Load visualization, such as initial and target position, shortest path, etc.
+        One set of markers is created per scene so multi-env runs each see their own goal/path.
 
         Args:
             env (Environment): Active environment instance
         """
         if self._visualize_goal:
-            self._initial_pos_marker = PrimitiveObject(
-                relative_prim_path="/task_initial_pos_marker",
-                primitive_type="Cylinder",
-                name="task_initial_pos_marker",
-                radius=self._goal_tolerance,
-                height=self._goal_height,
-                visual_only=True,
-                rgba=th.tensor([1, 0, 0, 0.3]),
-            )
-            self._goal_pos_marker = PrimitiveObject(
-                relative_prim_path="/task_goal_pos_marker",
-                primitive_type="Cylinder",
-                name="task_goal_pos_marker",
-                radius=self._goal_tolerance,
-                height=self._goal_height,
-                visual_only=True,
-                rgba=th.tensor([0, 0, 1, 0.3]),
-            )
-
-            # Load the objects into the first scene
-            env.scenes[0].add_object(self._initial_pos_marker)
-            env.scenes[0].add_object(self._goal_pos_marker)
+            self._initial_pos_markers = []
+            self._goal_pos_markers = []
+            for env_idx in range(env.num_envs):
+                initial_marker = PrimitiveObject(
+                    relative_prim_path="/task_initial_pos_marker",
+                    primitive_type="Cylinder",
+                    name=f"task_initial_pos_marker_{env_idx}",
+                    radius=self._goal_tolerance,
+                    height=self._goal_height,
+                    visual_only=True,
+                    rgba=th.tensor([1, 0, 0, 0.3]),
+                )
+                goal_marker = PrimitiveObject(
+                    relative_prim_path="/task_goal_pos_marker",
+                    primitive_type="Cylinder",
+                    name=f"task_goal_pos_marker_{env_idx}",
+                    radius=self._goal_tolerance,
+                    height=self._goal_height,
+                    visual_only=True,
+                    rgba=th.tensor([0, 0, 1, 0.3]),
+                )
+                env.scenes[env_idx].add_object(initial_marker)
+                env.scenes[env_idx].add_object(goal_marker)
+                self._initial_pos_markers.append(initial_marker)
+                self._goal_pos_markers.append(goal_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if self._visualize_path:
-            waypoints = []
-            for i in range(self._n_vis_waypoints):
-                waypoint = PrimitiveObject(
-                    relative_prim_path=f"/task_waypoint_marker{i}",
-                    primitive_type="Cylinder",
-                    name=f"task_waypoint_marker{i}",
-                    radius=self._waypoint_width,
-                    height=self._waypoint_height,
-                    visual_only=True,
-                    rgba=th.tensor([0, 1, 0, 0.3]),
-                )
-                env.scenes[0].add_object(waypoint)
-                waypoints.append(waypoint)
-
-            # Store waypoints
-            self._waypoint_markers = waypoints
+            self._waypoint_markers = []
+            for env_idx in range(env.num_envs):
+                env_waypoints = []
+                for i in range(self._n_vis_waypoints):
+                    waypoint = PrimitiveObject(
+                        relative_prim_path=f"/task_waypoint_marker{i}",
+                        primitive_type="Cylinder",
+                        name=f"task_waypoint_marker_{env_idx}_{i}",
+                        radius=self._waypoint_width,
+                        height=self._waypoint_height,
+                        visual_only=True,
+                        rgba=th.tensor([0, 1, 0, 0.3]),
+                    )
+                    env.scenes[env_idx].add_object(waypoint)
+                    env_waypoints.append(waypoint)
+                self._waypoint_markers.append(env_waypoints)
 
     def _sample_initial_pose_and_goal_pos(self, env, env_idx, max_trials=100):
         """
@@ -351,10 +355,10 @@ class PointNavigationTask(BaseTask):
             self._initial_quat[env_idx] = initial_quat
             self._goal_pos[env_idx] = goal_pos
 
-            # Update visuals if requested (only for first env)
-            if env_idx == 0 and self._visualize_goal:
-                self._initial_pos_marker.set_position_orientation(position=self._initial_pos[0])
-                self._goal_pos_marker.set_position_orientation(position=self._goal_pos[0])
+            # Update this env's start/goal visuals if requested
+            if self._visualize_goal:
+                self._initial_pos_markers[env_idx].set_position_orientation(position=self._initial_pos[env_idx])
+                self._goal_pos_markers[env_idx].set_position_orientation(position=self._goal_pos[env_idx])
 
     def _reset_variables(self, env, env_indices):
         # Run super first
@@ -472,15 +476,16 @@ class PointNavigationTask(BaseTask):
             env (Environment): Environment instance
         """
         if self._visualize_path:
-            shortest_path, _ = self.get_shortest_path_to_goal(env=env, env_idx=0, entire_path=True)
-            floor_height = env.scenes[0].get_floor_height(self._floor)
-            num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
-            for i in range(num_nodes):
-                self._waypoint_markers[i].set_position_orientation(
-                    position=th.tensor([shortest_path[i][0], shortest_path[i][1], floor_height])
-                )
-            for i in range(num_nodes, self._n_vis_waypoints):
-                self._waypoint_markers[i].set_position_orientation(position=th.tensor([0.0, 0.0, 100.0]))
+            for env_idx in range(self._num_envs):
+                shortest_path, _ = self.get_shortest_path_to_goal(env=env, env_idx=env_idx, entire_path=True)
+                floor_height = env.scenes[env_idx].get_floor_height(self._floor)
+                num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
+                for i in range(num_nodes):
+                    self._waypoint_markers[env_idx][i].set_position_orientation(
+                        position=th.tensor([shortest_path[i][0], shortest_path[i][1], floor_height])
+                    )
+                for i in range(num_nodes, self._n_vis_waypoints):
+                    self._waypoint_markers[env_idx][i].set_position_orientation(position=th.tensor([0.0, 0.0, 100.0]))
 
     def step(self, env, action):
         # Run super method first
