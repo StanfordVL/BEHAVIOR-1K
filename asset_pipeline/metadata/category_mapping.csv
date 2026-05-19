@@ -56,7 +56,7 @@ ID,category,board link,synset,approved,has_system,mass estimate ig2,google/gemin
 54,toilet,toilet,toilet.n.02,1,FALSE,33.815,30,36,30,25,1.440,33.815,,30.000,,
 55,top_cabinet,top_cabinet,cabinet.n.01,1,FALSE,22.441,25,25,21.83,25,1.145,12.247,,25.000,,
 56,towel_rack,towel_rack,towel_rack.n.01,1,FALSE,0.907,1.5,2.083,3.5,0.5,7.000,0.907,,1.792,,
-57,trash_can,trash_can,ashcan.n.01,1,FALSE,3.175,9.32,0.5,2.5,5,18.640,3.175,,3.750,,
+57,trash_can,trash_can,ashcan.n.01,1,FALSE,3.175,9.32,0.5,2.5,5,18.640,3.175,9.500,9.500,,
 58,treadmill,treadmill,treadmill.n.01,1,FALSE,73.482,86.18,151,80,50,3.020,73.482,,83.090,,
 59,wall_clock,wall_clock,wall_clock.n.01,1,FALSE,0.572,1.5,1.5,1.35,2.5,1.852,0.572,,1.500,,
 60,wall_mounted_tv,wall_mounted_tv,television_receiver.n.01,1,FALSE,17.554,15,7.3,7.5,15,2.055,17.554,,11.250,,
