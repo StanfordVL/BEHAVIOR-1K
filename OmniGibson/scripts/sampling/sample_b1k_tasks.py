@@ -20,6 +20,7 @@ from utils import (
     UNSUPPORTED_PREDICATES,
     validate_task,
     get_scene_model,
+    resolve_scene_model,
 )
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 from postprocess_sampled_task import postprocess_task
@@ -81,7 +82,8 @@ logging.getLogger().setLevel(logging.INFO)
 def main(random_selection=False, headless=False, short_exec=False):
     args = parser.parse_args()
 
-    scene_model = get_scene_model(TASK_CUSTOM_LISTS[args.activity])
+    scene_model_key = get_scene_model(TASK_CUSTOM_LISTS[args.activity])
+    scene_model = resolve_scene_model(scene_model_key, os.path.join(DATASET_2026_PATH, "scenes"))
 
     if args.output_dir is None:
         args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
@@ -176,9 +178,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         reason = f"Unsupported predicate(s): {unsupported_predicates}"
 
     env.task_config["activity_name"] = activity
-    if activity in TASK_CUSTOM_LISTS and scene_model in TASK_CUSTOM_LISTS[activity]:
-        whitelist = TASK_CUSTOM_LISTS[activity][scene_model]["whitelist"]
-        blacklist = TASK_CUSTOM_LISTS[activity][scene_model]["blacklist"]
+    if activity in TASK_CUSTOM_LISTS and scene_model_key in TASK_CUSTOM_LISTS[activity]:
+        whitelist = TASK_CUSTOM_LISTS[activity][scene_model_key]["whitelist"]
+        blacklist = TASK_CUSTOM_LISTS[activity][scene_model_key]["blacklist"]
     else:
         whitelist, blacklist = None, None
     env.task_config["sampling_whitelist"] = whitelist
