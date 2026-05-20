@@ -211,7 +211,8 @@ class BehaviorTask(BaseTask):
         success, self.feedback = self.initialize_activity(env=env)
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
-        # Store the scene name
+        # Store the scene name. All envs are clones of the same scene model
+        # (same invariant as _compiled_rooms), so reading from scenes[0] is canonical.
         self.scene_name = env.scenes[0].scene_model if isinstance(env.scenes[0], TraversableScene) else None
 
         # Highlight any task relevant objects if requested

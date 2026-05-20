@@ -16,7 +16,10 @@ class TaskMetric(MetricBase):
             }
 
     def reset(self, env):
-        # Single-env metric (used by eval.py / eval_with_jobqueue.py): scene index 0
+        # Single-env metric (used by eval.py / eval_with_jobqueue.py): scene index 0.
+        # _compute_step_metrics' scalar reward/terminated/truncated params and the
+        # env.task.success[0] read assume one env.
+        assert env.num_envs == 1, f"TaskMetric is single-env only; got num_envs={env.num_envs}."
         self.state[env.scene] = dict()
         self.timesteps = 0
         self.render_timestep = og.sim.get_rendering_dt()

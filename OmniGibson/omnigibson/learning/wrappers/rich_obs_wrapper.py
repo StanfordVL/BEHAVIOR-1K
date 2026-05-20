@@ -15,6 +15,12 @@ class RichObservationWrapper(EnvironmentWrapper):
 
     def __init__(self, env: Environment):
         super().__init__(env=env)
+        # This wrapper is single-env / single-robot only: it mutates exactly one robot's
+        # camera resolutions and observation modalities.
+        assert env.num_envs == 1, f"RichObservationWrapper requires num_envs=1; got num_envs={env.num_envs}."
+        assert len(env.scene.robots) == 1, (
+            f"RichObservationWrapper requires exactly one robot per scene; " f"got {len(env.scene.robots)}."
+        )
         # Note that from eval.py we already set the robot to include rgb + depth + seg_instance_id modalities
         robot = env.scene.robots[0]
         # Here, we change the camera resolution and head camera aperture to match the one we used in data collection

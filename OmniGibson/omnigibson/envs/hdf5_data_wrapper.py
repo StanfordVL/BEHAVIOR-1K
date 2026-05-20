@@ -52,6 +52,10 @@ class HDF5DataWrapper(DataWrapper):
                 For more information, check out https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline
                 Example: {"compression": "gzip", "compression_opts": 9} for gzip with level 9 compression
         """
+        # HDF5 data wrapper is single-env by design: create_dataset saves env.scene and writes
+        # task metadata at scene index 0. Fail fast before super().__init__ triggers create_dataset.
+        assert env.num_envs == 1, f"HDF5DataWrapper is single-env only; got num_envs={env.num_envs}."
+
         self.compression = dict() if compression is None else compression
         self.hdf5_file = None
 
