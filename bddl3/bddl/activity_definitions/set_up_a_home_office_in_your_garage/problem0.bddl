@@ -12,7 +12,7 @@
     )
     
     (:init 
-        (inside table_lamp.n.01_1 carton.n.02_1) 
+        (ontop table_lamp.n.01_1 carton.n.02_1) 
         (inside computer.n.01_1 carton.n.02_1) 
         (inside router.n.02_1 carton.n.02_1) 
         (ontop carton.n.02_1 floor.n.01_1)
