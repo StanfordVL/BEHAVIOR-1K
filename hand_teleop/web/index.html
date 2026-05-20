@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sharpa VR Teleop</title>
+  <style>
+    body { margin: 0; font-family: monospace; background: #111; color: #eee; }
+    #info { position: absolute; top: 10px; left: 10px; z-index: 10; font-size: 14px; }
+    #status { color: #6f6; }
+    canvas { display: block; }
+    .err { color: #f66; }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <div>Sharpa VR Teleop client</div>
+    <div id="status">connecting...</div>
+    <div id="rate"></div>
+  </div>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+    const HAND_JOINT_NAMES = [
+      "wrist",
+      "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
+      "index-finger-metacarpal", "index-finger-phalanx-proximal",
+      "index-finger-phalanx-intermediate", "index-finger-phalanx-distal", "index-finger-tip",
+      "middle-finger-metacarpal", "middle-finger-phalanx-proximal",
+      "middle-finger-phalanx-intermediate", "middle-finger-phalanx-distal", "middle-finger-tip",
+      "ring-finger-metacarpal", "ring-finger-phalanx-proximal",
+      "ring-finger-phalanx-intermediate", "ring-finger-phalanx-distal", "ring-finger-tip",
+      "pinky-finger-metacarpal", "pinky-finger-phalanx-proximal",
+      "pinky-finger-phalanx-intermediate", "pinky-finger-phalanx-distal", "pinky-finger-tip",
+    ];
+
+    const statusEl = document.getElementById('status');
+    const rateEl = document.getElementById('rate');
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 50);
+    camera.position.set(0, 1.6, 0.5);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+    document.body.appendChild(VRButton.createButton(renderer, {
+      requiredFeatures: ['hand-tracking'],
+      optionalFeatures: ['local-floor', 'bounded-floor', 'layers'],
+    }));
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
+    const grid = new THREE.GridHelper(4, 8, 0x444444, 0x222222);
+    scene.add(grid);
+
+    // Hand visualization (small dots at each joint).
+    const sphereGeo = new THREE.SphereGeometry(0.005, 6, 6);
+    const matLeft = new THREE.MeshBasicMaterial({ color: 0x6cf });
+    const matRight = new THREE.MeshBasicMaterial({ color: 0xfc6 });
+    const handMeshes = { left: [], right: [] };
+    for (const side of ['left', 'right']) {
+      for (let i = 0; i < HAND_JOINT_NAMES.length; i++) {
+        const m = new THREE.Mesh(sphereGeo, side === 'left' ? matLeft : matRight);
+        m.visible = false;
+        scene.add(m);
+        handMeshes[side].push(m);
+      }
+    }
+
+    const hand0 = renderer.xr.getHand(0);
+    const hand1 = renderer.xr.getHand(1);
+    const handSide = { hand0: null, hand1: null };
+    hand0.addEventListener('connected', (e) => { handSide.hand0 = e.data.handedness; });
+    hand1.addEventListener('connected', (e) => { handSide.hand1 = e.data.handedness; });
+    hand0.addEventListener('disconnected', () => { handSide.hand0 = null; });
+    hand1.addEventListener('disconnected', () => { handSide.hand1 = null; });
+    scene.add(hand0); scene.add(hand1);
+
+    // WebSocket back to the python teleop server.
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}/ws`);
+    ws.onopen = () => { statusEl.textContent = 'connected'; statusEl.className = ''; };
+    ws.onclose = () => { statusEl.textContent = 'disconnected'; statusEl.className = 'err'; };
+    ws.onerror = () => { statusEl.textContent = 'ws error'; statusEl.className = 'err'; };
+
+    function readHandPoses(hand) {
+      if (!hand || !hand.joints) return null;
+      const wristJoint = hand.joints['wrist'];
+      if (!wristJoint || !wristJoint.visible) return null;
+
+      const wristArr = [
+        wristJoint.position.x, wristJoint.position.y, wristJoint.position.z,
+        wristJoint.quaternion.w, wristJoint.quaternion.x,
+        wristJoint.quaternion.y, wristJoint.quaternion.z,
+      ];
+      const joints = {};
+      for (const jname of HAND_JOINT_NAMES) {
+        const j = hand.joints[jname];
+        if (!j || !j.visible) continue;
+        joints[jname] = [
+          j.position.x, j.position.y, j.position.z,
+          j.quaternion.w, j.quaternion.x, j.quaternion.y, j.quaternion.z,
+        ];
+      }
+      return { wrist: wristArr, joints };
+    }
+
+    let lastSent = 0;
+    let lastFpsAt = performance.now();
+    let frames = 0;
+
+    function tick() {
+      frames += 1;
+      const now = performance.now();
+      if (now - lastFpsAt > 1000) {
+        rateEl.textContent = `${frames} send/s`;
+        frames = 0; lastFpsAt = now;
+      }
+
+      // Visualize joints in the page.
+      for (const [obj, sideKey] of [[hand0, 'hand0'], [hand1, 'hand1']]) {
+        const side = handSide[sideKey];
+        if (!side) continue;
+        const meshes = handMeshes[side];
+        for (let i = 0; i < HAND_JOINT_NAMES.length; i++) {
+          const j = obj.joints[HAND_JOINT_NAMES[i]];
+          if (j && j.visible) {
+            meshes[i].visible = true;
+            meshes[i].position.copy(j.position);
+          } else {
+            meshes[i].visible = false;
+          }
+        }
+      }
+
+      // Throttle network at ~60Hz independent of render rate.
+      if (ws.readyState === WebSocket.OPEN && now - lastSent > 16) {
+        const left = handSide.hand0 === 'left' ? readHandPoses(hand0)
+                   : handSide.hand1 === 'left' ? readHandPoses(hand1)
+                   : null;
+        const right = handSide.hand0 === 'right' ? readHandPoses(hand0)
+                    : handSide.hand1 === 'right' ? readHandPoses(hand1)
+                    : null;
+        if (left || right) {
+          ws.send(JSON.stringify({ type: 'hands', left, right }));
+          lastSent = now;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    renderer.setAnimationLoop(tick);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

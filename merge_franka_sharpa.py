@@ -36,11 +36,11 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 FRANKA_URDF = os.path.join(
     SCRIPT_DIR,
-    "datasets/omnigibson-robot-assets/models/franka/franka_mounted/urdf/franka_mounted.urdf",
+    "datasets/omnigibson-robot-assets/models/franka_mounted/urdf/franka_mounted.urdf",
 )
 FRANKA_MESH_DIR = os.path.join(
     SCRIPT_DIR,
-    "datasets/omnigibson-robot-assets/models/franka/franka_mounted/urdf/meshes",
+    "datasets/omnigibson-robot-assets/models/franka_mounted/urdf/meshes",
 )
 
 SHARPA_RIGHT_URDF = os.path.join(

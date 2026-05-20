@@ -1,0 +1,71 @@
+# hand_teleop configuration. Tuned for the Franka + SharpaWave-right robot
+# in the ARAT scene. Mirrors the knobs in the original mujoco-vr-teleop
+# stack but with PhysX/OmniGibson-specific defaults.
+
+control:
+  control_hz: 60.0          # WebXR client throttles to ~60Hz; this matches it.
+
+bridge:
+  # User stands behind the robot (default). Other presets:
+  #   user faces +Y (in front of robot looking at +Y): [0.0, 0.0, 0.7071, 0.7071]
+  #   user faces -Y (default):                         [0.7071, 0.0, 0.0, 0.7071]
+  #   user faces +X:                                   [0.5, 0.5, 0.5, 0.5]
+  #   user faces -X:                                   [0.5, 0.5, -0.5, -0.5]
+  vr_to_world_quat_xyzw: [0.7071067811865476, 0.0, 0.0, 0.7071067811865476]
+  position_sensitivity: 1.0   # >1 = arm moves more per cm of hand motion.
+
+  # Orientation mode:
+  #   absolute  (default): wrist orientation directly drives EEF orientation
+  #                        via `target_orn = orn_align × wrist_q`. EEF jumps
+  #                        to match wrist at t=0 — palm-down user → palm-down
+  #                        robot from the moment you enter VR.
+  #   delta:               EEF stays at its current pose at t=0; only wrist
+  #                        deltas move it. Use when you want the EEF anchored.
+  orientation_mode: absolute
+
+  # Constant alignment from (vr_to_world-mapped) wrist to SharpaWave palm.
+  # If palm-down user produces palm-up robot, try the next preset:
+  #   identity:           [0.0, 0.0, 0.0, 1.0]
+  #   180° X (default):   [1.0, 0.0, 0.0, 0.0]   ← matches old YAML offset
+  #   180° Y:             [0.0, 1.0, 0.0, 0.0]
+  #   180° Z:             [0.0, 0.0, 1.0, 0.0]
+  #   90° X:              [0.7071, 0.0, 0.0, 0.7071]
+  #   -90° X:             [-0.7071, 0.0, 0.0, 0.7071]
+  #   90° Z:              [0.0, 0.0, 0.7071, 0.7071]
+  orn_align_quat_xyzw: [1.0, 0.0, 0.0, 0.0]
+
+  skip_pinky: true            # Pinky chain runaway in PhysX; keep at home.
+  close_target_clamp: 0.85    # Cap retargeted finger angles at 85% of URDF upper limit.
+  workspace_box:              # Clamp arm IK target xyz in robot base frame (m).
+    # Wide enough to include the Franka's EEF home pose (~0.226, 0, 1.38).
+    # The hard reach-sphere clamp on the Robot side handles the actual physical
+    # reach; this box just rejects targets that are wildly out of plausible space.
+    min: [-0.4, -0.6, 0.05]
+    max: [ 0.9,  0.9, 1.50]
+
+# Geometric WebXR → SharpaWave finger retargeter.
+retargeter:
+  finger_flex_gain: 1.0       # multiplies index/middle/ring/pinky MCP/PIP/DIP.
+  thumb_flex_gain: 1.5        # Quest under-reads thumb flex.
+  thumb_opp_gain: 2.0         # CMC_FE: thumb folding toward palm-front.
+  thumb_aa_gain: 1.5          # CMC_AA: thumb tucking across palm.
+  pinky_cmc_gain: 0.5         # palm-cupping fraction.
+  abduction_gain: 1.0         # MCP_AA lateral spread gain.
+  # Per-side sign flips for SharpaWave's mirrored joint axes.
+  finger_abduction_sign_left:  1.0
+  finger_abduction_sign_right: -1.0
+  thumb_cmc_fe_sign_left:  -1.0
+  thumb_cmc_fe_sign_right:  1.0
+  thumb_cmc_aa_sign_left:   1.0
+  thumb_cmc_aa_sign_right: -1.0
+
+# Smoothing + rate-limiting on commanded action vectors. Same shape as
+# safety.py from the source mujoco teleop.
+safety:
+  enabled: true
+  smoothing_alpha: 0.85       # 1.0 = no smoothing; 0.6-0.9 smooths VR jitter.
+  max_arm_velocity: 2.0       # rad/s on IK target's pos/orn axisangle.
+  max_hand_velocity: 6.0
+  max_arm_delta_per_tick: 0.10    # ~5.7° per tick.
+  max_hand_delta_per_tick: 0.20   # ~11.5° per tick.
+  log_clips: true

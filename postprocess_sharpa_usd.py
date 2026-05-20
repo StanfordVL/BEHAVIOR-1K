@@ -63,7 +63,7 @@ HAND_CONFIGS = {
         ),
         "urdf": os.path.join(
             SCRIPT_DIR,
-            "datasets/omnigibson-robot-assets/models/franka/franka_mounted_sharpa_right/urdf/franka_mounted_sharpa_right.urdf",
+            "datasets/omnigibson-robot-assets/models/franka_mounted_sharpa_right/urdf/franka_mounted_sharpa_right.urdf",
         ),
     },
     "left": {
@@ -73,7 +73,7 @@ HAND_CONFIGS = {
         ),
         "urdf": os.path.join(
             SCRIPT_DIR,
-            "datasets/omnigibson-robot-assets/models/franka/franka_mounted_sharpa_left/urdf/franka_mounted_sharpa_left.urdf",
+            "datasets/omnigibson-robot-assets/models/franka_mounted_sharpa_left/urdf/franka_mounted_sharpa_left.urdf",
         ),
     },
 }

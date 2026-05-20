@@ -17,8 +17,8 @@ gm.ENABLE_FLATCACHE = False  # Flatcache can desync visual transforms for comple
 gm.USE_PBR_MATERIALS = True
 
 HAND_TO_ROBOT_CLASS = {
-    "right": "FrankaMountedSharpaRight",
-    "left": "FrankaMountedSharpaLeft",
+    "right": "franka_mounted_sharpa_right",
+    "left": "franka_mounted_sharpa_left",
 }
 
 
@@ -42,11 +42,12 @@ def main():
         },
         "robots": [
             {
-                "type": robot_class,
+                "model": robot_class,
                 "name": f"franka_sharpa_{args.hand}",
                 "obs_modalities": [],
                 "fixed_base": True,
                 "self_collisions": False,
+                "grasping_direction": "upper",
                 "load_config": {
                     "xform_props_pre_loaded": False,
                 },
@@ -56,6 +57,9 @@ def main():
 
     env = og.Environment(configs=cfg)
     robot = env.robots[0]
+    # right/left_hand_C_MC is the physical palm — restore visibility hidden by robot._initialize()
+    for arm in robot.arm_names:
+        robot.links[robot.eef_link_names[arm]].visible = True
 
     # Switch to RTX-Real Time renderer (avoids path-tracing noise)
     try:

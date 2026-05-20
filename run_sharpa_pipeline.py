@@ -49,11 +49,11 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONVERSION_CONFIGS = {
     "right": os.path.join(
         SCRIPT_DIR,
-        "datasets/omnigibson-robot-assets/models/franka/franka_mounted_sharpa_right/franka_mounted_sharpa_right.yaml",
+        "datasets/omnigibson-robot-assets/models/franka_mounted_sharpa_right/franka_mounted_sharpa_right.import.yaml",
     ),
     "left": os.path.join(
         SCRIPT_DIR,
-        "datasets/omnigibson-robot-assets/models/franka/franka_mounted_sharpa_left/franka_mounted_sharpa_left.yaml",
+        "datasets/omnigibson-robot-assets/models/franka_mounted_sharpa_left/franka_mounted_sharpa_left.import.yaml",
     ),
 }
 
