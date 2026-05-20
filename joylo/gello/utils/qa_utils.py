@@ -584,18 +584,12 @@ class FailedGraspMetric(MetricBase):
     """Metric for detecting failed grasp attempts.
 
     Tracks when fingers close completely without successful object grasping.
-    A failed grasp is a fingers-closed window that never overlaps with either
-    inferred grasping or an active assisted-grasp constraint before the gripper
-    opens again.
+    A failed grasp is a fingers-closed window that never overlaps with the
+    robot's grasping state before the gripper opens again.
     """
 
     FINGERS_CLOSED_ATOL = 1e-2
     FINGERS_OPEN_ATOL = 1e-2
-
-    @staticmethod
-    def _is_assisted_grasping(robot, arm):
-        ag_params = getattr(robot, "_ag_obj_constraint_params", None)
-        return ag_params is not None and ag_params.get(arm) is not None
 
     def _compute_step_metrics(
         self, env, action, obs, reward, terminated, truncated, info
@@ -603,9 +597,13 @@ class FailedGraspMetric(MetricBase):
         step_metrics = dict()
         for i, robot in enumerate(env.robots):
             for arm in robot.arm_names:
-                gripper_group_key, gripper_ci = robot.controllers[f"gripper_{arm}"]
                 gripper_control_idx = robot.gripper_control_idx[arm]
                 gripper_joint_positions = robot.get_joint_positions()[gripper_control_idx]
+                gripper_closed_positions = (
+                    robot.joint_lower_limits[gripper_control_idx]
+                    if robot._grasping_direction == "lower"
+                    else robot.joint_upper_limits[gripper_control_idx]
+                )
                 gripper_open_positions = (
                     robot.joint_upper_limits[gripper_control_idx]
                     if robot._grasping_direction == "lower"
@@ -613,7 +611,7 @@ class FailedGraspMetric(MetricBase):
                 )
                 step_metrics[f"robot{i}::arm_{arm}::fingers_closed"] = th.allclose(
                     gripper_joint_positions,
-                    th.zeros_like(gripper_joint_positions),
+                    gripper_closed_positions,
                     atol=self.FINGERS_CLOSED_ATOL,
                 )
                 step_metrics[f"robot{i}::arm_{arm}::fingers_open"] = th.allclose(
@@ -621,12 +619,7 @@ class FailedGraspMetric(MetricBase):
                     gripper_open_positions,
                     atol=self.FINGERS_OPEN_ATOL,
                 )
-                step_metrics[f"robot{i}::arm_{arm}::is_grasping"] = (
-                    ControllerView.is_grasping(gripper_group_key, gripper_ci) > 0
-                )
-                step_metrics[f"robot{i}::arm_{arm}::assisted_grasping"] = (
-                    self._is_assisted_grasping(robot=robot, arm=arm)
-                )
+                step_metrics[f"robot{i}::arm_{arm}::is_grasping"] = robot.is_grasping(arm) > 0
         return step_metrics
 
     @staticmethod
@@ -634,10 +627,8 @@ class FailedGraspMetric(MetricBase):
         fingers_closed,
         fingers_open,
         is_grasping,
-        assisted_grasping,
     ):
         failed_grasp_count = 0
-        successful_grasping = is_grasping | assisted_grasping
         was_closed = th.cat([th.tensor([False]), fingers_closed[:-1]])
         close_steps = th.nonzero(fingers_closed & ~was_closed).flatten()
         for close_step in close_steps.tolist():
@@ -647,7 +638,7 @@ class FailedGraspMetric(MetricBase):
                 if len(reopened_steps) == 0
                 else close_step + reopened_steps[0].item()
             )
-            if not th.any(successful_grasping[close_step:reopen_step]).item():
+            if not th.any(is_grasping[close_step:reopen_step]).item():
                 failed_grasp_count += 1
         return failed_grasp_count
 
@@ -659,12 +650,10 @@ class FailedGraspMetric(MetricBase):
                 fingers_closed = th.tensor(episode_info[f"{pf}::fingers_closed"])
                 fingers_open = th.tensor(episode_info[f"{pf}::fingers_open"])
                 is_grasping = th.tensor(episode_info[f"{pf}::is_grasping"])
-                assisted_grasping = th.tensor(episode_info[f"{pf}::assisted_grasping"])
                 episode_metrics[f"{pf}::failed_grasp_count"] = self._count_failed_grasps(
                     fingers_closed=fingers_closed,
                     fingers_open=fingers_open,
                     is_grasping=is_grasping,
-                    assisted_grasping=assisted_grasping,
                 )
 
         return episode_metrics
