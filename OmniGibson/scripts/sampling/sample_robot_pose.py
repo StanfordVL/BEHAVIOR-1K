@@ -11,7 +11,7 @@ from omnigibson.macros import gm
 from omnigibson.objects.primitive_object import PrimitiveObject
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 from gello.utils.og_teleop_utils import generate_robot_config
-from utils import get_scene_model
+from utils import get_scene_model, resolve_scene_model
 from omnigibson.object_states import OnTop
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
@@ -275,6 +275,7 @@ def main():
     with open(TASK_CUSTOM_LIST_PATH) as f:
         task_custom_lists = json.load(f)
     scene_model = get_scene_model(task_custom_lists[args.activity])
+    scene_model = resolve_scene_model(scene_model, os.path.join(DATASET_2026_PATH, "scenes"))
 
     if args.output_dir is None:
         args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")

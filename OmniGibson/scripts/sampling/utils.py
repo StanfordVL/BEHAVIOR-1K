@@ -25,6 +25,16 @@ def get_scene_model(activity_entry):
     return next(k for k in activity_entry if k != "room_types")
 
 
+def resolve_scene_model(scene_model, scenes_dir):
+    """Return the actual directory name for scene_model, resolving case mismatches (e.g. rs_int → Rs_int)."""
+    if os.path.isdir(os.path.join(scenes_dir, scene_model)):
+        return scene_model
+    for entry in os.listdir(scenes_dir):
+        if entry.lower() == scene_model.lower() and os.path.isdir(os.path.join(scenes_dir, entry)):
+            return entry
+    return scene_model
+
+
 def prune_unevaluatable_predicates(init_conditions):
     pruned_conditions = []
     for condition in init_conditions:
