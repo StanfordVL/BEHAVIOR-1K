@@ -6,9 +6,9 @@ import logging
 import os
 import traceback
 import xml.etree.ElementTree as ET
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from xml.dom import minidom
 
-from dask.distributed import LocalCluster, as_completed
 import fs.copy
 from fs.tempfs import TempFS
 from fs.osfs import OSFS
@@ -27,7 +27,7 @@ from b1k_pipeline.utils import (
     save_mesh,
 )
 
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 
 logger = logging.getLogger("trimesh")
 logger.setLevel(logging.ERROR)
@@ -67,11 +67,13 @@ LOG_SURFACE_AREA_RANGE = (-6, 4)
 LOG_TEXTURE_RANGE = (4, 11)
 
 
-def get_required_meta_links(object_taxonomy, category):
-    synset = object_taxonomy.get_synset_from_category_or_substance(category)
+def get_required_meta_links(kb, category):
+    cat = kb.get_category(category)
+    ps = kb.get_particle_system(category)
+    synset = cat.synset if cat else (ps.synset if ps else None)
     if synset is None:
         raise ValueError(f"Category {category} not found in taxonomy.")
-    return object_taxonomy.get_required_meta_links_for_synset(synset)
+    return synset.required_meta_links
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -471,7 +473,7 @@ def process_link(
         joint_xml = ET.SubElement(tree_root, "joint")
         joint_xml.attrib = {
             "name": f"j_{child_node[3]}",
-            "type": {"P": "prismatic", "R": "revolute", "F": "fixed"}[joint_type],
+            "type": {"P": "prismatic", "R": "revolute", "F": "fixed", "C": "continuous"}[joint_type],
         }
 
         joint_parent_xml = ET.SubElement(joint_xml, "parent")
@@ -480,14 +482,14 @@ def process_link(
         joint_child_xml.attrib = {"link": child_node[3]}
 
         mesh_offset = np.zeros(3)
-        if joint_type in ("P", "R"):
+        if joint_type in ("P", "R", "C"):
             upper_canonical_points = transform_points(
                 G.nodes[child_node]["upper_points"],
                 base_link_center + rotated_parent_frame,
                 canonical_orientation,
             )
 
-            if joint_type == "R":
+            if joint_type in ("R", "C"):
                 # Revolute joint
                 num_v_lower = lower_canonical_points.shape[0]
                 num_v_upper = upper_canonical_points.shape[0]
@@ -570,8 +572,9 @@ def process_link(
             joint_axis_xml.attrib = {
                 "xyz": " ".join([str(item) for item in joint_axis])
             }
-            joint_limit_xml = ET.SubElement(joint_xml, "limit")
-            joint_limit_xml.attrib = {"lower": str(0.0), "upper": str(upper_limit)}
+            if joint_type != "C":  # Continuous joints do not have limits
+                joint_limit_xml = ET.SubElement(joint_xml, "limit")
+                joint_limit_xml.attrib = {"lower": str(0.0), "upper": str(upper_limit)}
         else:
             # Fixed joints are quite simple.
             joint_origin = child_center
@@ -855,7 +858,7 @@ def process_object(root_node, target, relevant_nodes, requried_meta_types, outpu
             json.dump(out_metadata, f, cls=NumpyEncoder)
 
 
-def process_target(target, objects_path, object_taxonomy, model_whitelist, dask_client):
+def process_target(target, objects_path, kb, model_whitelist, executor):
     object_futures = {}
 
     # Build the mesh tree using our mesh tree library. The scene code also uses this system.
@@ -889,12 +892,12 @@ def process_target(target, objects_path, object_taxonomy, model_whitelist, dask_
         output_dirname_abs = os.path.join(objects_path, output_dirname)
         os.makedirs(output_dirname_abs, exist_ok=True)
         object_futures[
-            dask_client.submit(
+            executor.submit(
                 process_object,
                 root_node,
                 target,
                 relevant_nodes,
-                get_required_meta_links(object_taxonomy, obj_cat),
+                get_required_meta_links(kb, obj_cat),
                 output_dirname_abs,
             )
         ] = str(root_node)
@@ -903,7 +906,7 @@ def process_target(target, objects_path, object_taxonomy, model_whitelist, dask_
 
 
 def main():
-    object_taxonomy = ObjectTaxonomy()
+    kb = KnowledgeBase(populate=True)
 
     # If this variable is set, we will only export the models in this list. This is useful for quickly
     # iterating on scenes (usdify otherwise takes 8+ hours). If this list is empty, we will export all models.
@@ -942,30 +945,28 @@ def main():
         # Load the mesh list from the object list json.
         errors = {}
 
-        cluster = LocalCluster()
-        dask_client = cluster.get_client()
-
         targets = get_targets("combined")
 
         obj_futures = {}
 
-        for target in tqdm.tqdm(targets, desc="Processing targets to queue objects"):
-            obj_futures.update(
-                process_target(
-                    target, objects_dir, object_taxonomy, model_whitelist, dask_client
+        with ProcessPoolExecutor() as executor:
+            for target in tqdm.tqdm(targets, desc="Processing targets to queue objects"):
+                obj_futures.update(
+                    process_target(
+                        target, objects_dir, kb, model_whitelist, executor
+                    )
                 )
-            )
 
-        for future in tqdm.tqdm(
-            as_completed(obj_futures.keys()),
-            total=len(obj_futures),
-            desc="Processing objects",
-        ):
-            try:
-                future.result()
-            except:
-                name = obj_futures[future]
-                errors[name] = traceback.format_exc()
+            for future in tqdm.tqdm(
+                as_completed(obj_futures.keys()),
+                total=len(obj_futures),
+                desc="Processing objects",
+            ):
+                try:
+                    future.result()
+                except:
+                    name = obj_futures[future]
+                    errors[name] = traceback.format_exc()
 
         print("Finished processing")
 

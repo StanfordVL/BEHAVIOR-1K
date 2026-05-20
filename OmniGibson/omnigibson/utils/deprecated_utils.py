@@ -10,7 +10,6 @@ import numpy as np
 import omni
 import omni.timeline
 import torch
-import usdrt
 import warp as wp
 from isaacsim.core.prims import Articulation as _ArticulationView
 from isaacsim.core.prims import RigidPrim as _RigidPrimView
@@ -20,8 +19,7 @@ from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformComman
 from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
-from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
-from scipy.spatial.transform import Rotation as R
+from pxr import Gf, PhysxSchema, UsdPhysics
 
 DEG2RAD = math.pi / 180.0
 
@@ -1042,7 +1040,7 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
         semantic_id_list.append(bbox_2d[0])
         bbox_2d_list.append(bbox_2d)
     semantic_id_list_np = np.unique(np.array(semantic_id_list))
-    color_list = random_colours(len(semantic_id_list_np.tolist()), True, num_channels)
+    color_list = random_colours(len(semantic_id_list_np.tolist()), False, num_channels)
     for bbox_2d in bbox_2d_list:
         index = np.where(semantic_id_list_np == bbox_2d[0])[0][0]
         bbox_color = color_list[index]
@@ -1057,56 +1055,3 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
         rgb_img_draw.rectangle([(bbox_2d[1], bbox_2d[2]), (bbox_2d[3], bbox_2d[4])], outline=outline, width=2)
     bboxes_2d_rgb = np.array(rgb_img)
     return bboxes_2d_rgb
-
-
-# This is a faster version than the native implementation, as it avoids pre-processing initially
-def _get_world_pose_transform_w_scale(fabric_prim):
-    # This will return a transformation matrix with translation as the last row and scale included
-    xformable_prim = usdrt.Rt.Xformable(fabric_prim)
-    if xformable_prim.HasWorldXform():
-        world_pos_attr = xformable_prim.GetWorldPositionAttr()
-        if not world_pos_attr.IsValid():
-            world_pos = usdrt.Gf.Vec3d(0)
-        else:
-            world_pos = world_pos_attr.Get(usdrt.Usd.TimeCode.Default())
-        world_orientation_attr = xformable_prim.GetWorldOrientationAttr()
-        if not world_orientation_attr.IsValid():
-            world_orientation = usdrt.Gf.Quatf(1)
-        else:
-            world_orientation = world_orientation_attr.Get(usdrt.Usd.TimeCode.Default())
-        world_scale_attr = xformable_prim.GetWorldScaleAttr()
-        if not world_scale_attr.IsValid():
-            world_scale = usdrt.Gf.Vec3d(1)
-        else:
-            world_scale = world_scale_attr.Get(usdrt.Usd.TimeCode.Default())
-        scale = usdrt.Gf.Matrix4d()
-        rot = usdrt.Gf.Matrix4d()
-        scale.SetScale(usdrt.Gf.Vec3d(world_scale))
-        rot.SetRotate(usdrt.Gf.Quatd(world_orientation))
-        result = scale * rot
-        result.SetTranslateOnly(world_pos)
-        return result
-    elif xformable_prim.HasLocalXform():
-        local_transform = xformable_prim.GetLocalMatrixAttr().Get(usdrt.Usd.TimeCode.Default())
-        parent_prim = fabric_prim.GetParent()
-        parent_world_transform = usdrt.Gf.Matrix4d(1.0)
-        if parent_prim:
-            parent_world_transform = _get_world_pose_transform_w_scale(parent_prim)
-        return local_transform * parent_world_transform
-    else:
-        usd_prim = get_prim_at_path(prim_path=fabric_prim.GetPrimPath().pathString, fabric=False)
-        local_transform = usdrt.Gf.Matrix4d(UsdGeom.Xformable(usd_prim).GetLocalTransformation(Usd.TimeCode.Default()))
-        parent_prim = fabric_prim.GetParent()
-        parent_world_transform = usdrt.Gf.Matrix4d(1.0)
-        if parent_prim:
-            parent_world_transform = _get_world_pose_transform_w_scale(parent_prim)
-        return local_transform * parent_world_transform
-
-
-# This is a faster version than the native implementation, as it avoids pre-processing initially and also avoids
-# re-ordering the quaternion
-def get_world_pose(fabric_prim):
-    result_transform = _get_world_pose_transform_w_scale(fabric_prim)
-    result_transform.Orthonormalize()
-    result_transform = np.transpose(result_transform)
-    return result_transform[:3, 3], R.from_matrix(result_transform[:3, :3]).as_quat()

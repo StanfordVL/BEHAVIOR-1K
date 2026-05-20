@@ -26,7 +26,6 @@ import fs.path
 
 gm.HEADLESS = False
 gm.USE_ENCRYPTED_ASSETS = True
-gm.ENABLE_FLATCACHE = False
 gm.DATASET_PATH = r"D:\fillable-10-21"
 
 ASSIGNMENT_FILE = os.path.join(gm.DATASET_PATH, "fillable_assignments_2.json")
@@ -862,11 +861,12 @@ def main():
     print("Fillable annotator version 11.6.0")
 
     # Get all the models that are fillable-annotated
-    from bddl.knowledge_base import Object
+    from bddl.knowledge_base import KnowledgeBase
 
+    kb = KnowledgeBase(populate=True)
     fillables = sorted(
         o.name.split("-")
-        for o in Object.all_objects()
+        for o in kb.all_objects()
         if any(p.name == "fillable" for p in o.category.synset.properties)
     )
     assert (

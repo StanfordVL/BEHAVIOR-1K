@@ -162,7 +162,8 @@ class TextureBaker:
 
     def get_process_objs(self):
         objs = []
-        for obj in rt.objects if not rt.selection else rt.selection:
+        candidates = rt.objects if len(rt.selection) == 0 else rt.selection
+        for obj in candidates:
             if rt.classOf(obj) != rt.Editable_Poly:
                 continue
             if allow_list and all(
@@ -285,10 +286,7 @@ class TextureBaker:
         # Get the existing baseobject children that use the same material as this one
         siblings = []
         for candidate in rt.objects:
-            if (
-                candidate.baseObject == obj.baseObject
-                # and candidate.material == obj.material  # TODO: Is this too aggressive?
-            ):
+            if candidate.baseObject == obj.baseObject:
                 siblings.append(candidate)
 
         # Disconnect the existing baked material
@@ -385,6 +383,7 @@ class TextureBaker:
         btt.deleteAllMaps()
 
         objs = self.get_process_objs()
+        print(f"Found {len(objs)} objects to process.")
         postprocessing = []  # (obj, siblings)
         for i, obj in enumerate(objs):
             print(f"{(i + 1)} / {len(objs)}: {obj.name}")

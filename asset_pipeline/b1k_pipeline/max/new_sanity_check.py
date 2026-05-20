@@ -27,9 +27,9 @@ from b1k_pipeline.max.prebake_textures import (
     hash_object,
 )
 
-from bddl.object_taxonomy import ObjectTaxonomy
+from bddl.knowledge_base import KnowledgeBase
 
-OBJECT_TAXONOMY = ObjectTaxonomy()
+kb = KnowledgeBase(populate=True)
 
 rt = pymxs.runtime
 
@@ -94,12 +94,12 @@ with open(b1k_pipeline.utils.PIPELINE_ROOT / "metadata/deletion_queue.csv", "r")
 
 
 def get_required_meta_links(category):
-    synset = OBJECT_TAXONOMY.get_synset_from_category(category)
-    if synset is not None:
-        return OBJECT_TAXONOMY.get_required_meta_links_for_synset(synset)
+    cat = kb.get_category(category)
+    if cat is not None:
+        return cat.synset.required_meta_links
 
-    substance_synset = OBJECT_TAXONOMY.get_synset_from_substance(category)
-    if substance_synset is not None:
+    ps = kb.get_particle_system(category)
+    if ps is not None:
         return set()
 
     raise ValueError(f"Category {category} not found in taxonomy.")
@@ -365,17 +365,17 @@ class SanityCheck:
             renamed_category = self.maybe_rename_category(
                 row.name_category, row.name_model_id
             )
-            synset = OBJECT_TAXONOMY.get_synset_from_category(renamed_category)
-            substance_synset = OBJECT_TAXONOMY.get_synset_from_substance(
-                renamed_category
-            )
+            cat_obj = kb.get_category(renamed_category)
+            synset = cat_obj.synset.name if cat_obj else None
+            ps_obj = kb.get_particle_system(renamed_category)
+            substance_synset = ps_obj.synset.name if ps_obj else None
             self.expect(
                 synset is not None or substance_synset is not None,
                 f"Cannot perform cloth/particle checks: category {renamed_category} not found in taxonomy.",
             )
 
             if synset is not None:
-                obj_is_cloth = "cloth" in OBJECT_TAXONOMY.get_abilities(synset)
+                obj_is_cloth = "cloth" in kb.get_synset(synset).abilities
                 if obj_is_cloth:
                     self.validate_cloth(row)
 
@@ -755,11 +755,23 @@ class SanityCheck:
                         f"{obj.name} element {i} has too many vertices ({len(m.vertices)} > {max_vertices_per_element})",
                     )
                 self.expect(m.is_volume, f"{obj.name} element {i} is not a volume")
-                # self.expect(m.is_convex, f"{obj.name} element {i} may be non-convex. The checker says so, but it's not 100% accurate, so please verify that all elements are indeed convex.", level="WARNING")
                 self.expect(
                     len(m.split()) == 1,
                     f"{obj.name} element {i} has elements trimesh still finds splittable e.g. are not watertight / connected",
                 )
+
+                # Check that the volume of the mesh and the volume of the convex hull are close.
+                hull = m.convex_hull
+                self.expect(
+                    hull.volume > 0,
+                    f"{obj.name} element {i} has non-positive volume convex hull, which likely indicates a problem with the mesh.",
+                )
+                if hull.volume > 0:
+                    volume_ratio = m.volume / hull.volume
+                    self.expect(
+                        volume_ratio > 0.99,
+                        f"{obj.name} element {i} has volume {m.volume} that is very different from the volume of its convex hull {hull.volume} (ratio {volume_ratio}), which indicates that the mesh is not close to convex.",
+                    )
 
         except Exception as e:
             self.expect(False, str(e))
@@ -1162,7 +1174,7 @@ class SanityCheck:
             # Check that there is a base link row
             assert (
                 "base_link" in group["name_link_name"].unique()
-            ), f"Model ID {model_id} instance {instance_id} is missing base link."
+            ), f"Model ID {model_id} instance {instance_id} is missing base link. Found: {group['name_link_name'].unique()}"
             base_link_row = group[group["name_link_name"] == "base_link"].iloc[0]
             base_link_transform = base_link_row.object.objecttransform
             inverse_base_link_transform = rt.inverse(base_link_transform)

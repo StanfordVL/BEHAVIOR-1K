@@ -1,5 +1,5 @@
 (define (problem buy_basic_garden_tools-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         shovel.n.01_1 - shovel.n.01

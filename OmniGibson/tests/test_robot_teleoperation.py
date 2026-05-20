@@ -14,7 +14,7 @@ def test_teleop():
         "scene": {"type": "Scene"},
         "robots": [
             {
-                "type": "Fetch",
+                "model": "fetch",
                 "action_normalize": False,
                 "controller_config": {
                     "arm_0": {
@@ -27,9 +27,8 @@ def test_teleop():
     }
 
     if og.sim is None:
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
         gm.USE_GPU_DYNAMICS = False
-        gm.ENABLE_FLATCACHE = False
     else:
         # Make sure sim is stopped
         og.sim.stop()

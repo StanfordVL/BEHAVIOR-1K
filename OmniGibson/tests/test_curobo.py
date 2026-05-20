@@ -8,8 +8,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
 from omnigibson.macros import gm
-from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 
 def test_curobo():
@@ -61,7 +60,31 @@ def test_curobo():
 
     robot_cfgs = [
         {
-            "type": "FrankaPanda",
+            "model": "a1",
+            "obs_modalities": "rgb",
+            "position": [0.6, -0.65, 0.0],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+            "action_normalize": False,
+            "controller_config": {
+                "arm_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+            },
+        },
+        {
+            "model": "franka",
             "obs_modalities": "rgb",
             "position": [0.7, -0.55, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
@@ -85,9 +108,9 @@ def test_curobo():
             },
         },
         {
-            "type": "R1",
+            "model": "r1",
             "obs_modalities": "rgb",
-            "position": [0.7, -0.7, 0.056],
+            "position": [0.7, -0.7, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
@@ -136,7 +159,7 @@ def test_curobo():
             },
         },
         {
-            "type": "Tiago",
+            "model": "tiago",
             "obs_modalities": "rgb",
             "position": [0.7, -0.85, 0],
             "orientation": [0, 0, 0.707, 0.707],
@@ -194,9 +217,9 @@ def test_curobo():
             },
         },
         {
-            "type": "R1Pro",
+            "model": "r1pro",
             "obs_modalities": "rgb",
-            "position": [0.7, -0.75, 0.056],
+            "position": [0.7, -0.75, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
@@ -246,6 +269,16 @@ def test_curobo():
         },
     ]
     for robot_cfg in robot_cfgs:
+        if th.cuda.is_available() and th.cuda.get_device_capability(0) == (12, 0):
+            # TODO [Wensi]: Check whether this is still true for future releases.
+            # Currently (v3.8.0), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
+            #     will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues.
+            # Therefore, we remove R1Pro for testing if we detect such GPU is being used.
+            if robot_cfg["model"] == "r1pro":
+                print(
+                    f"Skipping testing for {robot_cfg['model']} on cuda architecture 12.0 GPU due to cuRobo embodiment compatibility issues."
+                )
+                continue
         cfg["robots"] = [robot_cfg]
 
         env = og.Environment(configs=cfg)
@@ -255,7 +288,7 @@ def test_curobo():
 
         floor_touching_base_link_prim_paths = (
             [os.path.join(robot.prim_path, link_name) for link_name in robot.floor_touching_base_link_names]
-            if isinstance(robot, LocomotionRobot)
+            if robot.is_locomotion
             else []
         )
 
@@ -286,14 +319,14 @@ def test_curobo():
             debug=False,
             use_cuda_graph=True,
             collision_activation_distance=0.075,  # Use larger activation distance for better reproducibility
-            use_default_embodiment_only=True,
+            use_default_embodiment_only=False,
         )
 
         # Sample values for robot
         th.manual_seed(1)
         lo, hi = robot.joint_lower_limits.clone().view(1, -1), robot.joint_upper_limits.clone().view(1, -1)
 
-        if isinstance(robot, HolonomicBaseRobot):
+        if robot.is_holonomic_base:
             lo[0, :2] = -0.1
             lo[0, 2:5] = 0.0
             lo[0, 5] = -math.pi
@@ -321,7 +354,7 @@ def test_curobo():
             og.sim.step_physics()
 
             # To debug
-            # cmg.save_visualization(robot.get_joint_positions(), "/scr/chengshu/Downloads/test.obj")
+            # cmg.save_visualization(robot.get_joint_positions(), "test.obj")
 
             # Sanity check in the GUI that the robot pose makes sense
             for _ in range(10):
@@ -333,19 +366,21 @@ def test_curobo():
             wheel_contact_pairs = set()
             obj_contact_pairs = set()
 
-            for contact in robot.contact_list():
-                assert contact.body0 in robot.link_prim_paths
-                if contact.body1 in robot.link_prim_paths:
-                    self_collision_pairs.add((contact.body0, contact.body1))
-                elif contact.body1 in floor_plane_prim_paths:
-                    if contact.body0 not in floor_touching_base_link_prim_paths:
-                        floor_contact_pairs.add((contact.body0, contact.body1))
+            for body0, body1 in RigidContactAPI.get_contact_pairs(
+                env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+            ):
+                assert body0 in robot.link_prim_paths
+                if body1 in robot.link_prim_paths:
+                    self_collision_pairs.add((body0, body1))
+                elif body1 in floor_plane_prim_paths:
+                    if body0 not in floor_touching_base_link_prim_paths:
+                        floor_contact_pairs.add((body0, body1))
                     else:
-                        wheel_contact_pairs.add((contact.body0, contact.body1))
-                elif contact.body1 in obj.link_prim_paths:
-                    obj_contact_pairs.add((contact.body0, contact.body1))
+                        wheel_contact_pairs.add((body0, body1))
+                elif body1 in obj.link_prim_paths:
+                    obj_contact_pairs.add((body0, body1))
                 else:
-                    assert False, f"Unexpected contact pair: {contact.body0}, {contact.body1}"
+                    assert False, f"Unexpected contact pair: {body0}, {body1}"
 
             touching_itself = len(self_collision_pairs) > 0
             touching_floor = len(floor_contact_pairs) > 0
@@ -446,19 +481,14 @@ def test_curobo():
                         robot.set_joint_positions(q)
                         robot.keep_still()
                         og.sim.step()
-                        for contact in robot.contact_list():
-                            assert contact.body0 in robot.link_prim_paths
-                            if (
-                                contact.body1 in floor_plane_prim_paths
-                                and contact.body0 in floor_touching_base_link_prim_paths
-                            ):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+                        ):
+                            assert body0 in robot.link_prim_paths
+                            if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
-                            if th.tensor(list(contact.impulse)).norm() == 0:
-                                continue
-                            print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
-                            assert (
-                                False
-                            ), f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                            print(f"Unexpected contact pair during traj rollout: {body0}, {body1}")
+                            assert False, f"Unexpected contact pair during traj rollout: {body0}, {body1}"
                     else:
                         # Convert target joint positions to action
                         action = robot.q_to_action(q)
@@ -466,18 +496,15 @@ def test_curobo():
                         print(f"Executing waypoint {i}/{len(q_traj)}")
                         env.step(action)
 
-                        for contact in robot.contact_list():
-                            assert contact.body0 in robot.link_prim_paths
-                            if (
-                                contact.body1 in floor_plane_prim_paths
-                                and contact.body0 in floor_touching_base_link_prim_paths
-                            ):
+                        for body0, body1 in RigidContactAPI.get_contact_pairs(
+                            env.scene.idx, set(robot.links.values()), with_set=None, current_only=False
+                        ):
+                            assert body0 in robot.link_prim_paths
+                            if body1 in floor_plane_prim_paths and body0 in floor_touching_base_link_prim_paths:
                                 continue
-                            if th.tensor(list(contact.impulse)).norm() == 0:
-                                continue
-                            print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
+                            print(f"Unexpected contact pair during traj rollout: {body0}, {body1}")
                             # Controller is not perfect, so collisions might happen
-                            # assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                            # assert False, f"Unexpected contact pair during traj rollout: {body0}, {body1}"
 
         og.clear()
 

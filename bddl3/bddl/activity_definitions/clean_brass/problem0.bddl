@@ -1,5 +1,5 @@
 (define (problem clean_brass-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         brass.n.02_1 - brass.n.02

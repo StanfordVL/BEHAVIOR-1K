@@ -14,7 +14,6 @@ from addict import Dict
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.utils.asset_conversion_utils import (
     _add_xform_properties,
     _space_string_to_tensor,
@@ -23,9 +22,6 @@ from omnigibson.utils.asset_conversion_utils import (
 )
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import create_joint, create_primitive_mesh
-
-# Make sure flatcache is NOT used so we write directly to USD
-gm.ENABLE_FLATCACHE = False
 
 
 _DOCSTRING = """
@@ -833,14 +829,14 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
             yaml.dump({"robot_cfg": {"kinematics": arm_only_no_torso_cfg}}, f)
 
 
-@click.command(help=_DOCSTRING)
+@click.command(name="import-custom-robot", help=_DOCSTRING)
 @click.option(
     "--config",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
     help="Absolute path to robot config yaml file to import",
 )
-def import_custom_robot(config):
+def main(config):
     # Load config
     with open(config, "r") as f:
         cfg = Dict(yaml.load(f, yaml.Loader))
@@ -849,7 +845,7 @@ def import_custom_robot(config):
     urdf_path, usd_path, prim = import_og_asset_from_urdf(
         category="robot",
         model=cfg.name,
-        dataset_root=cfg.get("dataset_root", gm.DATA_PATH),
+        dataset_name=cfg.dataset_root,
         urdf_path=cfg.urdf_path,
         collision_method=cfg.collision.decompose_method,
         coacd_links=cfg.collision.coacd_links,
@@ -1033,4 +1029,4 @@ def import_custom_robot(config):
 
 
 if __name__ == "__main__":
-    import_custom_robot()
+    main()

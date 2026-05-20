@@ -1,6 +1,7 @@
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.geometry_utils import wrap_angle
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class HolonomicBaseJointController(JointController):
@@ -47,7 +48,7 @@ class HolonomicBaseJointController(JointController):
                 "has_limit": [...bool...]
 
                 Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+            dof_idx (Array[int]): specific dof indices controlled by this controller group. Used for inferring
                 controller-relevant values during control computations
             command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
                 if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
@@ -98,12 +99,17 @@ class HolonomicBaseJointController(JointController):
             compute_delta_in_quat_space=None,
         )
 
-    def _update_goal(self, command, control_dict):
+    def _update_goal(self, controller_idx, command):
         """
         Updates the goal command by transforming it from the robot's local frame to its canonical frame.
         """
-        base_pose = cb.T.pose2mat((control_dict["root_pos"], control_dict["root_quat"]))
-        canonical_pose = cb.T.pose2mat((control_dict["canonical_pos"], control_dict["canonical_quat"]))
+        prim_path = self._articulation_root_paths[controller_idx]
+
+        root_pos, root_quat = ControllableObjectViewAPI.get_position_orientation(prim_path)
+        canonical_pos, canonical_quat = ControllableObjectViewAPI.get_root_position_orientation(prim_path)
+
+        base_pose = cb.T.pose2mat((root_pos, root_quat))
+        canonical_pose = cb.T.pose2mat((canonical_pos, canonical_quat))
         canonical_to_base_pose = cb.T.pose_inv(canonical_pose) @ base_pose
 
         if self.motor_type == "position":
@@ -122,7 +128,7 @@ class HolonomicBaseJointController(JointController):
             # We just need to directly apply the command as delta to the current joint position of "base_footprint_rz_joint"
             # Note that the current joint position is guaranteed to be in the range of [-pi, pi] because
             # @HolonomicBaseRobot.apply_action explicitly wraps the joint position to [-pi, pi] if it's out of range
-            rz_joint_pos = control_dict["joint_position"][self.dof_idx][2:3]
+            rz_joint_pos = ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx][2:3]
 
             # Wrap the delta joint position to [-pi, pi]. In other words, we don't expect the commanded delta joint position
             # to have a magnitude greater than pi, because the robot can't reasonably rotate more than pi in a single step
@@ -152,12 +158,12 @@ class HolonomicBaseJointController(JointController):
 
             command = cb.cat([linear_velocity, angular_velocity])
 
-        return super()._update_goal(command=command, control_dict=control_dict)
+        return super()._update_goal(controller_idx=controller_idx, command=command)
 
     # For "position" control mode, this controller behaves similar to use_delta_commands=True,
     # where the command [dx, dy, drz] means the robot should move by [dx, dy] and rotate by drz (in the base link frame)
     # For "velocity" and "effort" control modes, this controller behaves similar to use_delta_commands=False,
     # where the command [vx, vy, vrz] means the robot should move with linear velocity [vx, vy] and angular velocity vrz (in the base link frame)
     # In all cases, no-op commands should be [0, 0, 0].
-    def _compute_no_op_command(self, control_dict):
+    def _compute_no_op_command(self, controller_idx):
         return cb.zeros(self.command_dim)

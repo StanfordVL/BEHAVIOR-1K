@@ -36,7 +36,7 @@ Once initialized, a `Prim` instance can be used as a direct interface with the c
     <tr>
         <td valign="top">
             [**`GeomPrim`**](../reference/prims/geom_prim.md#prims.geom_prim.GeomPrim)<br><br>
-            Encapsulates a prim defined by a geom (shape or mesh). It is an `XFormPrim` that can additionally owns geometry defined by its set of `points`. Its subclasses [`VisualGeomPrim`](../reference/prims/geom_prim.md) and [`CollisionGeomPrim`](../reference/prims/geom_prim.md#prims.geom_prim.CollisionGeomPrim) implement additional utility for dealing with those respective types of geometries (e.g.: `CollisionGeomPrim.set_collision_approximation(...)`).<br><br>
+            Encapsulates a prim defined by a geom (shape or mesh). It is an `XFormPrim` that additionally owns geometry defined by its set of `points`. Geom prims are not inherently distinguished as collision or visual at the class level; instead, they are tracked separately at the link level based on whether they appear under a "collisions" scope prim. Collision-related APIs can be set up on any geom prim via `setup_collision_apis(geom_prim)` from `usd_utils` (e.g.: `geom.set_collision_approximation(...)`).<br><br>
         </td>
     </tr>
     <tr>

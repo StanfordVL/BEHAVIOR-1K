@@ -8,10 +8,6 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitiveSet,
 )
 
-# Don't use GPU dynamics and use flatcache for performance boost
-# gm.USE_GPU_DYNAMICS = True
-# gm.ENABLE_FLATCACHE = True
-
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
@@ -38,7 +34,6 @@ def main():
         "activity_name": "picking_up_trash",
         "activity_definition_id": 0,
         "activity_instance_id": 0,
-        "predefined_problem": None,
         "online_object_sampling": False,
     }
 

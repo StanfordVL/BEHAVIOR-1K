@@ -1,5 +1,5 @@
 (define (problem putting_away_yard_equipment-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         floor.n.01_1 - floor.n.01

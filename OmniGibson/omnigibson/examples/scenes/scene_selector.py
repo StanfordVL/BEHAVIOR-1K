@@ -7,7 +7,6 @@ from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 
 # Configure macros for maximum performance
 gm.USE_GPU_DYNAMICS = True
-gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
 

@@ -1,5 +1,5 @@
 (define (problem clean_conch_shells-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         conch.n.01_1 conch.n.01_2 - conch.n.01

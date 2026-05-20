@@ -22,9 +22,8 @@ SCENES = dict(
     empty="Empty environment with no objects",
 )
 
-# Don't use GPU dynamics and use flatcache for performance boost
+# Don't use GPU dynamics for performance boost
 gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = True
 
 
 def choose_controllers(robot, random_selection=False):
@@ -74,10 +73,10 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
 
     # Choose robot to create
-    robot_name = "Fetch"
+    robot_name = "fetch"
     if not quickstart:
         robot_name = choose_from_options(
-            options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
+            options=list(sorted(REGISTERED_ROBOTS)), name="robot", random_selection=random_selection
         )
 
     scene_cfg = dict()
@@ -89,7 +88,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Add the robot we want to load
     robot0_cfg = dict()
-    robot0_cfg["type"] = robot_name
+    robot0_cfg["model"] = robot_name
     robot0_cfg["obs_modalities"] = ["rgb"]
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
@@ -168,6 +167,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
             action = random_action
         else:
             action = action_generator.get_teleop_action()
+
         env.step(action=action)
         step += 1
 

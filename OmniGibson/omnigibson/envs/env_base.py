@@ -10,7 +10,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
-from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import VisionSensor, create_sensor
@@ -73,9 +73,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._flatten_action_space = self.env_config["flatten_action_space"]
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
         self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
-        self._initial_pos_z_offset = self.env_config[
-            "initial_pos_z_offset"
-        ]  # how high to offset object placement to account for one action step of dropping
 
         physics_dt = 1.0 / self.env_config["physics_frequency"]
         rendering_dt = 1.0 / self.env_config["rendering_frequency"]
@@ -179,9 +176,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load variables from config
         """
-        # Store additional variables after config has been loaded fully
-        self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]
-
         # Reset bookkeeping variables
         self._reset_variables()
         self._current_episode = 0  # Manually set this to 0 since resetting actually increments this
@@ -197,15 +191,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             scene_cfg=self.scene_config,
             task_cfg=self.task_config,
         )
-
-        # - Additionally run some sanity checks on these values -
-
-        # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
-        # less than the offset we set (dist = 0.5 * gravity * (t^2))
-        drop_distance = 0.5 * 9.8 * (og.sim.get_sim_step_dt() ** 2)
-        assert (
-            drop_distance < self._initial_pos_z_offset
-        ), f"initial_pos_z_offset is too small for collision checking, must be greater than {drop_distance}"
 
     def _load_task(self, task_config=None):
         """
@@ -270,6 +255,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
                     robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
+                if "model" in robot_config:
+                    assert (
+                        "type" not in robot_config
+                    ), "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
+                elif "type" in robot_config:
+                    log.warning(
+                        "Robot config key 'type' is deprecated; use 'model' instead. "
+                        "Model IDs are lowercase (e.g. 'model': 'fetch'). "
+                    )
+                    robot_config["model"] = robot_config["type"].lower()
+                    del robot_config["type"]
+                assert robot_config["model"] in REGISTERED_ROBOTS, f"{robot_config['model']} is not a registered robot."
                 robot_config = deepcopy(robot_config)
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 pose_frame = robot_config.pop("pose_frame", "scene")
@@ -280,13 +277,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
                     )
 
-                # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
-                robot = create_class_from_registry_and_config(
-                    cls_name=robot_config["type"],
-                    cls_registry=REGISTERED_ROBOTS,
-                    cfg=robot_config,
-                    cls_type_descriptor="robot",
-                )
+                robot = Robot(**robot_config)
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
                 robot.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
@@ -751,14 +742,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self._current_step
 
     @property
-    def initial_pos_z_offset(self):
-        """
-        Returns:
-            float: how high to offset object placement to test valid pose & account for one action step of dropping
-        """
-        return self._initial_pos_z_offset
-
-    @property
     def task(self):
         """
         Returns:
@@ -864,7 +847,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "automatic_reset": False,
                 "flatten_action_space": False,
                 "flatten_obs_space": False,
-                "initial_pos_z_offset": 0.1,
                 "external_sensors": None,
             },
             # Rendering kwargs

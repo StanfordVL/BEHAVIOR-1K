@@ -1,5 +1,5 @@
 (define (problem make_hot_cocoa-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         cocoa.n.01_1 - cocoa.n.01

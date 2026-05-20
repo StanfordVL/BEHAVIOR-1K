@@ -1,5 +1,5 @@
 (define (problem make_seafood_stew-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bell_pepper.n.02_1 - bell_pepper.n.02

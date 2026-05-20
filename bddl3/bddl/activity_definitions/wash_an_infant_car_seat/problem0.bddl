@@ -1,5 +1,5 @@
 (define (problem wash_an_infant_car_seat-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         infant_car_seat.n.01_1 - infant_car_seat.n.01

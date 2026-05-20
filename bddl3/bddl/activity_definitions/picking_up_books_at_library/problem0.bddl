@@ -1,5 +1,5 @@
 (define (problem picking_up_books_at_library-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         paperback_book.n.01_1 paperback_book.n.01_2 - paperback_book.n.01

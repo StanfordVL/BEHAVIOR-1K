@@ -1,5 +1,5 @@
 (define (problem opening_doors-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         door.n.01_1 door.n.01_2 - door.n.01

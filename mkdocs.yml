@@ -154,6 +154,8 @@ nav:
       - Teleoperation: 
         - JoyLo: behavior_components/joylo.md
         - VR: behavior_components/vr.md
+        - Task Sampling: behavior_components/task_sampling.md
+        - Data Collection: behavior_components/data_collection.md
     - Other:
       - Speed Optimization: other/speed_optimization.md
       - Roadmap: other/roadmap.md

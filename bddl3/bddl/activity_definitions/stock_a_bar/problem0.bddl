@@ -1,5 +1,5 @@
 (define (problem stock_a_bar-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bottle__of__vodka.n.01_1 bottle__of__vodka.n.01_2 - bottle__of__vodka.n.01

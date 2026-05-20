@@ -1,5 +1,5 @@
 (define (problem make_chocolate_spread-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         butter.n.01_1 - butter.n.01

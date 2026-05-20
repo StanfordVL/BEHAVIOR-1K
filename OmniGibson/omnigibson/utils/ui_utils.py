@@ -7,6 +7,7 @@ import datetime
 import logging
 import math
 import random
+import sys
 from pathlib import Path
 
 import imageio
@@ -24,6 +25,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
+from omnigibson.controllers import ControllerView
 
 
 def print_icon():
@@ -53,10 +55,10 @@ def print_icon():
 def print_logo():
     raw_texts = [
         ("       ___                  _", "  ____ _ _                     "),
-        ("      / _ \ _ __ ___  _ __ (_)", "/ ___(_) |__  ___  ___  _ __  "),
-        ("     | | | | '_ ` _ \| '_ \| |", " |  _| | '_ \/ __|/ _ \| '_ \ "),
-        ("     | |_| | | | | | | | | | |", " |_| | | |_) \__ \ (_) | | | |"),
-        ("      \___/|_| |_| |_|_| |_|_|", "\____|_|_.__/|___/\___/|_| |_|"),
+        (r"      / _ \ _ __ ___  _ __ (_)", r"/ ___(_) |__  ___  ___  _ __  "),
+        (r"     | | | | '_ ` _ \| '_ \| |", r" |  _| | '_ \/ __|/ _ \| '_ \ "),
+        (r"     | |_| | | | | | | | | | |", r" |_| | | |_) \__ \ (_) | | | |"),
+        (r"      \___/|_| |_| |_|_| |_|_|", r"\____|_|_.__/|___/\___/|_| |_|"),
     ]
     for grey_text, red_text in raw_texts:
         grey_text = colored(grey_text, "light_grey", attrs=["bold", "dark"])
@@ -269,7 +271,7 @@ def debug_breakpoint(msg):
     embed()
 
 
-def choose_from_options(options, name, random_selection=False):
+def choose_from_options(options, name, random_selection=False, selected_option=None):
     """
     Prints out options from a list, and returns the requested option.
 
@@ -278,6 +280,7 @@ def choose_from_options(options, name, random_selection=False):
             explaining the individual options
         name (str): name of the options
         random_selection (bool): if the selection is random (for automatic demo execution). Default False
+        selected_option (str or None): if specified, directly return this option without prompting. Default None
 
     Returns:
         str: Requested option
@@ -290,7 +293,10 @@ def choose_from_options(options, name, random_selection=False):
         print("[{}] {}{}".format(k + 1, option, docstring))
     print()
 
-    if not random_selection:
+    if selected_option is not None:
+        assert selected_option in options, "selected_option '{}' is not a valid {}.".format(selected_option, name)
+        return selected_option
+    elif not random_selection:
         try:
             s = input("Choose a {} (enter a number from 1 to {}): ".format(name, len(options)))
             # parse input into a number within range
@@ -299,7 +305,12 @@ def choose_from_options(options, name, random_selection=False):
             k = 0
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
-        k = random.choice(range(len(options)))
+        if "pytest" in sys.modules:
+            local_rng = random.Random(0)
+            k = local_rng.choice(range(len(options)))
+        else:
+            k = random.choice(range(len(options)))
+        print("Choosing {}: {} randomly".format(k, list(options)[k]))
 
     # Return requested option
     return list(options)[k]
@@ -405,7 +416,7 @@ class CameraMover:
 
         # Make sure save path directory exists, and then save the image to that location
         Path(Path(fpath).parent).mkdir(parents=True, exist_ok=True)
-        Image.fromarray(self.get_image()).save(fpath)
+        Image.fromarray(self.get_image().cpu().numpy()).save(fpath)
         og.log.info(f"Saved current viewer camera image to {fpath}.")
 
     def record_trajectory(self, poses, fps, steps_per_frame=1, fpath=None):
@@ -438,7 +449,7 @@ class CameraMover:
             self.cam.set_position_orientation(position=pos, orientation=quat)
             og.sim.step()
             if i % steps_per_frame == 0:
-                video_writer.append_data(self.get_image())
+                video_writer.append_data(self.get_image().cpu().numpy())
 
         # Close writer
         video_writer.close()
@@ -470,7 +481,7 @@ class CameraMover:
 
         # Function help get arc derivative
         def arc_derivative(u):
-            return th.sqrt(th.sum([dspline(u) ** 2 for dspline in dsplines]))
+            return math.sqrt(sum(dspline(u) ** 2 for dspline in dsplines))
 
         # Function to help get interpolated positions
         def get_interpolated_positions(step):
@@ -480,7 +491,7 @@ class CameraMover:
             interpolated_points = th.zeros((path_length, 3))
             for i in range(path_length):
                 curr_step = step + (i / path_length)
-                interpolated_points[i, :] = th.tensor([spline(curr_step) for spline in splines])
+                interpolated_points[i, :] = th.tensor([float(spline(curr_step)) for spline in splines])
             return interpolated_points
 
         # Iterate over all waypoints and infer the resulting trajectory, recording the resulting poses
@@ -497,7 +508,7 @@ class CameraMover:
                 pan_angle = th.arctan2(-xy_direction[0], xy_direction[1])
                 tilt_angle = th.arcsin(z)
                 # Infer global quat orientation from these angles
-                quat = T.euler2quat([math.pi / 2 + tilt_angle, 0.0, pan_angle])
+                quat = T.euler2quat(th.tensor([math.pi / 2 + tilt_angle.item(), 0.0, pan_angle.item()]))
                 poses.append([positions[j], quat])
 
         # Record the generated trajectory
@@ -590,18 +601,19 @@ class KeyboardRobotController:
         self.robot = robot
         self.action_dim = robot.action_dim
         self.controller_info = dict()
-        self.joint_idx_to_controller = dict()
+        self.joint_idx_to_group_key = dict()
         idx = 0
-        for name, controller in robot._controllers.items():
+
+        for name, (group_key, _) in robot.controllers.items():
             self.controller_info[name] = {
-                "name": type(controller).__name__,
+                "name": ControllerView.get_controller_type_str(group_key),
                 "start_idx": idx,
-                "dofs": controller.dof_idx,
-                "command_dim": controller.command_dim,
+                "dofs": ControllerView.get_dof_idx(group_key),
+                "command_dim": ControllerView.get_command_dim(group_key),
             }
-            idx += controller.command_dim
-            for i in controller.dof_idx.tolist():
-                self.joint_idx_to_controller[i] = controller
+            idx += ControllerView.get_command_dim(group_key)
+            for i in ControllerView.get_dof_idx(group_key).tolist():
+                self.joint_idx_to_group_key[i] = group_key
 
         # Other persistent variables we need to keep track of
         self.joint_names = [name for name in robot.joints.keys()]  # Ordered list of joint names belonging to the robot
@@ -624,6 +636,7 @@ class KeyboardRobotController:
         self.keypress_mapping = None  # Maps omni keybindings to information for controlling various parts of the robot
         self.current_keypress = None  # Current key that is being pressed
         self.active_action = None  # Current action information based on the current keypress
+        self._pending_release_key = None  # Which key has a pending release (to handle batched events)
         self.toggling_gripper = False  # Whether we should toggle the gripper during the next action
         self.custom_keymapping = None  # Dictionary mapping custom keys to custom callback functions / info
 
@@ -640,7 +653,7 @@ class KeyboardRobotController:
         appwindow = lazy.omni.appwindow.get_default_app_window()
         input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
-        input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+        self._keyboard_sub = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
 
     def register_custom_keymapping(self, key, description, callback_fn):
         """
@@ -837,10 +850,9 @@ class KeyboardRobotController:
                 if event.input == lazy.carb.input.KeyboardInput.T:
                     self.toggling_gripper = True
 
-        # If we release a key, clear the active action and keypress
+        # If we release a key, mark release as pending (don't clear immediately to handle batched events)
         elif event.type == lazy.carb.input.KeyboardEventType.KEY_RELEASE:
-            self.active_action = None
-            self.current_keypress = None
+            self._pending_release_key = event.input
 
         # Callback always needs to return True
         return True
@@ -877,11 +889,11 @@ class KeyboardRobotController:
                     # Import here to avoid circular imports
                     from omnigibson.utils.constants import JointType
 
-                    controller = self.joint_idx_to_controller[joint_idx]
+                    gk = self.joint_idx_to_group_key[joint_idx]
                     if (
                         self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC
-                        and controller.use_delta_commands
-                        and controller.motor_type == "position"
+                        and ControllerView.get_use_delta_commands(gk)
+                        and ControllerView.get_motor_type(gk) == "position"
                     ):
                         val *= 0.2
 
@@ -917,6 +929,12 @@ class KeyboardRobotController:
         # print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
         # sys.stdout.write("\033[F")
 
+        # Clear action after consuming if a key release was pending for the current key
+        if self._pending_release_key is not None and self._pending_release_key == self.current_keypress:
+            self.active_action = None
+            self.current_keypress = None
+        self._pending_release_key = None
+
         # Return action
         return action
 
@@ -939,8 +957,8 @@ class KeyboardRobotController:
         print_command("[, ]", "move the joint backwards, forwards, respectively")
         print()
         print("Differential Drive Control")
-        print_command("i, k", "turn left, right")
-        print_command("l, j", "move forward, backwards")
+        print_command("j, l", "turn left, right")
+        print_command("i, k", "move forward, backwards")
         print()
         print("Inverse Kinematics Control")
         print_command("3, 4", "toggle between the different arm(s) to control")

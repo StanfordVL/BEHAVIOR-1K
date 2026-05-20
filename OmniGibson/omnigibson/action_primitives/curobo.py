@@ -9,7 +9,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import multi_dim_linspace
 
@@ -116,6 +115,27 @@ class CuRoboMotionGenerator:
             robot_cfg_path_dict = {
                 CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
             }
+        print("!" * 100)
+        # TODO [Wensi]: Check whether this is still true for future releases.
+        print(
+            """
+            NOTE: Currently (v3.8.0), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
+                will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues. 
+                Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used. 
+            """
+        )
+        if th.cuda.get_device_capability(device) == (12, 0):
+            if robot.model == "tiago":
+                print("Detected you are using Tiago with cuda architecture 12.0 GPU: excluding non-DEFAULT embodiment.")
+                robot_cfg_path_dict = {
+                    CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
+                }
+            elif robot.model == "r1pro":
+                print("Detected you are using R1Pro with cuda architecture 12.0 GPU: excluding DEFAULT embodiment.")
+                robot_cfg_path_dict = {
+                    k: v for k, v in robot_cfg_path_dict.items() if k != CuRoboEmbodimentSelection.DEFAULT
+                }
+        print("!" * 100)
         robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
 
         # This will be shared across all MotionGen instances
@@ -160,7 +180,7 @@ class CuRoboMotionGenerator:
 
             robot_cfg_obj = lazy.curobo.types.robot.RobotConfig.from_dict(robot_cfg_dict, self._tensor_args)
 
-            if isinstance(robot, HolonomicBaseRobot):
+            if robot.is_holonomic_base:
                 self.update_joint_limits(robot_cfg_obj, emb_sel)
 
             motion_kwargs = dict(
@@ -197,7 +217,12 @@ class CuRoboMotionGenerator:
             self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
 
         for mg in self.mg.values():
-            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size, warmup_joint_delta=0.0)
+            mg.warmup(
+                enable_graph=False,
+                warmup_js_trajopt=False,
+                batch=batch_size,
+                warmup_joint_delta=0.0,
+            )
 
             # Make sure all cuda graphs have been warmed up
             for solver in [mg.ik_solver, mg.trajopt_solver, mg.finetune_trajopt_solver]:
@@ -307,8 +332,8 @@ class CuRoboMotionGenerator:
                 Default is the current joint positions of the robot
             self_collision_check (bool): Whether to check self-collisions or not
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
-            attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
-                link names and the values are the corresponding BaseObject instances to attach to that link
+            attached_obj (None or Dict[str, USDObject]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding USDObject instances to attach to that link
             attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding scale to apply to the attached object
 
@@ -552,8 +577,8 @@ class CuRoboMotionGenerator:
             success_ratio (None or float): If set, specifies the fraction of successes necessary given self.batch_size.
                 If None, will automatically be the smallest ratio (1 / self.batch_size), i.e: any nonzero number of
                 successes
-            attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
-                link names and the values are the corresponding BaseObject instances to attach to that link
+            attached_obj (None or Dict[str, USDObject]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding USDObject instances to attach to that link
             attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding scale to apply to the attached object
             motion_constraint (None or List[float]): If specified, the motion constraint vector is a 6D vector controlling
@@ -886,7 +911,7 @@ class CuRoboMotionGenerator:
             orientation = poses.quaternion[:, [1, 2, 3, 0]]
 
             # If the robot is holonomic, we need to transform the poses to the base link frame
-            if isinstance(self.robot, HolonomicBaseRobot):
+            if self.robot.is_holonomic_base:
                 base_link_position = th.zeros_like(position)
                 base_link_position[:, 0] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_x_joint")]
                 base_link_position[:, 1] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_y_joint")]
@@ -922,8 +947,8 @@ class CuRoboMotionGenerator:
         Helper function to attach objects to the robot.
 
         Args:
-            attached_obj (None or Dict[str, BaseObject]): Dictionary mapping end-effector
-                link names to corresponding BaseObject instances
+            attached_obj (None or Dict[str, USDObject]): Dictionary mapping end-effector
+                link names to corresponding USDObject instances
             attached_obj_scale (None or Dict[str, float]): Dictionary mapping end-effector
                 link names to corresponding scale values
             cu_js_batch (JointState): CuRobo joint state object ordered according to kinematics

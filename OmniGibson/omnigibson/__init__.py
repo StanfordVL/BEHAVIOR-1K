@@ -41,15 +41,18 @@ class LogFormatter(logging.Formatter):
 
 
 formatter = LogFormatter("[%(relativeCreated_hms)s] [%(levelname)s] [%(name)s] %(message)s")
-logging.basicConfig()
-logging.root.handlers[0].setFormatter(formatter)
+_og_handler = logging.StreamHandler()
+_og_handler.setFormatter(formatter)
+_og_logger = logging.getLogger("omnigibson")
+_og_logger.addHandler(_og_handler)
+_og_logger.propagate = False  # prevent Isaac Sim's Carbonite handler from double-printing
 log = logging.getLogger(__name__)
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
 
-__version__ = "3.7.2"
+__version__ = "3.8.0"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -113,8 +116,16 @@ def clear(
         device=sim.device if device is None else device,
     )
 
+    # Stop the viewport menubar USD watcher before teardown. This revokes the TfNotice
+    # listener so that prim deletions during _partial_clear() don't queue deferred
+    # callbacks that later fire on an invalid stage and corrupt CUDA/PhysX state.
+    usd_watcher = lazy.omni.kit.viewport.menubar.core.utils.usd_watch
+    usd_watcher.stop()
+
     # First let the simulator clear everything it owns.
     sim._partial_clear()
+
+    usd_watcher.start()
 
     # Then close the stage and remove pointers to the simulator object.
     assert lazy.isaacsim.core.utils.stage.close_stage()
@@ -147,6 +158,8 @@ def shutdown(due_to_signal=False):
         # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
         # Manually call cleanup for now.
         cleanup()
+        if sim is not None:
+            sim._disable_usd_guard()
         app.close()
     else:
         # Otherwise, we do the cleanup here.

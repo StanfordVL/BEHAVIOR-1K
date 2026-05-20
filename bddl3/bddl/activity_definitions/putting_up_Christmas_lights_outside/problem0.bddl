@@ -1,5 +1,5 @@
 (define (problem putting_up_Christmas_lights_outside-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         rail_fence.n.01_1 - rail_fence.n.01

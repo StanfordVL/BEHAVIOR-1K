@@ -1,5 +1,5 @@
 (define (problem carrying_out_garden_furniture-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         lawn_chair.n.01_1 lawn_chair.n.01_2 - lawn_chair.n.01

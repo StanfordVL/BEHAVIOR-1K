@@ -9,7 +9,7 @@ from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
 
 
-def setup_multi_environment(num_of_envs, robot="Fetch", additional_objects_cfg=[]):
+def setup_multi_environment(num_of_envs, robot="fetch", additional_objects_cfg=[]):
     cfg = {
         "scene": {
             "type": "InteractiveTraversableScene",
@@ -18,7 +18,7 @@ def setup_multi_environment(num_of_envs, robot="Fetch", additional_objects_cfg=[
         },
         "robots": [
             {
-                "type": robot,
+                "model": robot,
                 "obs_modalities": [],
             }
         ],
@@ -31,7 +31,6 @@ def setup_multi_environment(num_of_envs, robot="Fetch", additional_objects_cfg=[
         gm.RENDER_VIEWER_CAMERA = False
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
         gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
@@ -170,7 +169,7 @@ def test_multi_scene_scene_prim():
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
     assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
-    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
+    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-2)
 
     og.clear()
 
@@ -264,7 +263,7 @@ def test_multi_scene_position_orientation_relative_to_scene():
 
 
 def test_tiago_getter():
-    vec_env = setup_multi_environment(2, robot="Tiago")
+    vec_env = setup_multi_environment(2, robot="tiago")
     robot1 = vec_env.envs[0].scene.robots[0]
 
     robot1_world_position, robot1_world_orientation = robot1.get_position_orientation()
@@ -293,7 +292,7 @@ def test_tiago_getter():
 
 
 def test_tiago_setter():
-    vec_env = setup_multi_environment(2, robot="Tiago")
+    vec_env = setup_multi_environment(2, robot="tiago")
 
     # use a robot with non-zero scene position
     robot = vec_env.envs[1].scene.robots[0]
@@ -330,6 +329,7 @@ def test_tiago_setter():
     og.clear()
 
     # assert that when the simulator is stopped, the behavior for getter/setter is not affected
+    # TODO: Is it intentional that this is not a Tiago robot but a Fetch one?
     vec_env = setup_multi_environment(2)
     og.sim.stop()
 

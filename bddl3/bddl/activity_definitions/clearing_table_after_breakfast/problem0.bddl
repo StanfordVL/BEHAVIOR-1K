@@ -1,5 +1,5 @@
 (define (problem clearing_table_after_breakfast-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         banana.n.02_1 - banana.n.02

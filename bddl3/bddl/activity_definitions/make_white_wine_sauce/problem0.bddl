@@ -1,5 +1,5 @@
 (define (problem make_white_wine_sauce-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         heavy_cream.n.01_1 - heavy_cream.n.01

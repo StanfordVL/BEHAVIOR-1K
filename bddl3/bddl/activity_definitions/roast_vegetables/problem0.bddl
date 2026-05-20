@@ -1,5 +1,5 @@
 (define (problem roast_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         brussels_sprouts.n.01_1 - brussels_sprouts.n.01

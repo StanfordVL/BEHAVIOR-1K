@@ -1,5 +1,5 @@
 (define (problem clean_seashells-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sand.n.04_1 - sand.n.04

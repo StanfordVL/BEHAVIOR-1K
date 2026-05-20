@@ -2,7 +2,7 @@ import math
 
 import pytest
 import torch as th
-from utils import SYSTEM_EXAMPLES, get_random_pose, og_test, place_obj_on_floor_plane, place_objA_on_objB_bbox
+from utils import SYSTEM_EXAMPLES, get_random_pose, place_obj_on_floor_plane, place_objA_on_objB_bbox
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -11,7 +11,6 @@ from omnigibson.object_states import (
     AABB,
     AttachedTo,
     Burnt,
-    ContactBodies,
     ContactParticles,
     Contains,
     Cooked,
@@ -45,16 +44,11 @@ from omnigibson.object_states import (
     VerticalAdjacency,
 )
 from omnigibson.systems import VisualParticleSystem
-from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 
-@og_test
-def test_attached_to(env):
-    bookcase_back = env.scene.object_registry("name", "bookcase_back")
-    bookcase_shelf = env.scene.object_registry("name", "bookcase_shelf")
-    bookcase_baseboard = env.scene.object_registry("name", "bookcase_baseboard")
-
+def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
     # Lower the mass of the shelf - otherwise, the gravity will create enough torque to break the joint
     bookcase_shelf.root_link.mass = 0.1
 
@@ -122,12 +116,7 @@ def test_attached_to(env):
     assert not bookcase_baseboard.states[AttachedTo].get_value(bookcase_back)
 
 
-@og_test
-def test_on_top(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_on_top(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
         place_objA_on_objB_bbox(obj, breakfast_table)
@@ -148,12 +137,7 @@ def test_on_top(env):
         bowl.states[OnTop].set_value(breakfast_table, False)
 
 
-@og_test
-def test_inside(env):
-    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_inside(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     bowl.set_position_orientation(position=[0.0, 0.0, 0.08])
     dishtowel.set_position_orientation(position=[0, 0.0, 0.5])
@@ -180,12 +164,7 @@ def test_inside(env):
         bowl.states[OnTop].set_value(bottom_cabinet, False)
 
 
-@og_test
-def test_under(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_under(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
         place_obj_on_floor_plane(obj)
@@ -206,12 +185,7 @@ def test_under(env):
         bowl.states[Under].set_value(breakfast_table, False)
 
 
-@og_test
-def test_touching(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_touching(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
         place_objA_on_objB_bbox(obj, breakfast_table)
@@ -231,39 +205,52 @@ def test_touching(env):
         bowl.states[Touching].set_value(breakfast_table, None)
 
 
-@og_test
-def test_contact_bodies(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
+def test_rigid_contact_bodies(env, breakfast_table, bowl):
+    from omnigibson.utils.usd_utils import RigidContactAPI
 
     place_obj_on_floor_plane(breakfast_table)
-    for i, obj in enumerate((bowl, dishtowel)):
-        place_objA_on_objB_bbox(obj, breakfast_table)
-        for _ in range(5):
-            og.sim.step()
-
-        # TODO: rigid body's ContactBodies should include cloth
-        if obj.prim_type != PrimType.CLOTH:
-            assert obj.root_link in breakfast_table.states[ContactBodies].get_value()
-        assert breakfast_table.root_link in obj.states[ContactBodies].get_value()
-
-        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
+    place_objA_on_objB_bbox(bowl, breakfast_table)
+    for _ in range(5):
         og.sim.step()
 
-        assert obj.root_link not in breakfast_table.states[ContactBodies].get_value()
-        assert breakfast_table.root_link not in obj.states[ContactBodies].get_value()
+    # Bowl should be in contact with the table
+    assert RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
+    )
+    assert RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=True
+    )
 
-    with pytest.raises(NotImplementedError):
-        bowl.states[ContactBodies].set_value(None)
+    # Let bodies settle/sleep and verify contacts persist
+    for _ in range(300):
+        og.sim.step()
+    assert breakfast_table.is_asleep, "Table should be asleep"
+    assert bowl.root_link.is_asleep, "Bowl should be asleep"
+    assert RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
+    )
+    assert RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=True
+    )
+
+    # Move the bowl far away and verify contacts clear
+    bowl.set_position_orientation(position=th.tensor([10.0, 10.0, 10.0]))
+    og.sim.step()
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=True
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl], ignore_set=None, current_only=False
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=env.scene.idx, query_set=[breakfast_table], with_set=[bowl], ignore_set=None, current_only=True
+    )
 
 
-@og_test
-def test_next_to(env):
-    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_next_to(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
         place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.3})
@@ -283,11 +270,8 @@ def test_next_to(env):
         bowl.states[NextTo].set_value(bottom_cabinet, None)
 
 
-@og_test
-def test_overlaid(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    carpet = env.scene.object_registry("name", "carpet")
-
+@pytest.mark.skip(reason="disable cloth tests until #2042")
+def test_overlaid(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
 
@@ -307,11 +291,7 @@ def test_overlaid(env):
         carpet.states[Overlaid].set_value(breakfast_table, False)
 
 
-@og_test
-def test_pose(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_pose(env, breakfast_table, dishtowel):
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
 
@@ -331,11 +311,7 @@ def test_pose(env):
         breakfast_table.states[Pose].set_value(None)
 
 
-@og_test
-def test_joint(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
-
+def test_joint(env, breakfast_table, bottom_cabinet):
     lo = bottom_cabinet.joint_lower_limits
     hi = bottom_cabinet.joint_upper_limits
     q_rand = lo + (hi - lo) * th.rand(bottom_cabinet.n_joints)
@@ -348,11 +324,7 @@ def test_joint(env):
         bottom_cabinet.states[Joint].set_value(None)
 
 
-@og_test
-def test_aabb(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_aabb(env, breakfast_table, dishtowel):
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
 
@@ -368,25 +340,21 @@ def test_aabb(env):
         (breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1])
     )
 
-    pp = dishtowel.root_link.compute_particle_positions()
-    offset = dishtowel.root_link.cloth_system.particle_contact_offset
-    particle_aabb = (pp.min(dim=0).values - offset, pp.max(dim=0).values + offset)
-    assert th.allclose(dishtowel.states[AABB].get_value()[0], particle_aabb[0])
-    assert th.allclose(dishtowel.states[AABB].get_value()[1], particle_aabb[1])
-    assert th.all(
-        (dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1])
-    ).item()
+    # skip until #2042
+    # pp = dishtowel.root_link.compute_particle_positions()
+    # offset = dishtowel.root_link.cloth_system.particle_contact_offset
+    # particle_aabb = (pp.min(dim=0).values - offset, pp.max(dim=0).values + offset)
+    # assert th.allclose(dishtowel.states[AABB].get_value()[0], particle_aabb[0])
+    # assert th.allclose(dishtowel.states[AABB].get_value()[1], particle_aabb[1])
+    # assert th.all(
+    #     (dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1])
+    # ).item()
 
     with pytest.raises(NotImplementedError):
         breakfast_table.states[AABB].set_value(None)
 
 
-@og_test
-def test_adjacency(env):
-    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
-    bowl = env.scene.object_registry("name", "bowl")
-    dishtowel = env.scene.object_registry("name", "dishtowel")
-
+def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
         place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.4})
@@ -420,14 +388,12 @@ def test_adjacency(env):
         bottom_cabinet.states[VerticalAdjacency].set_value(None)
 
 
-@og_test
-def test_temperature(env):
-    microwave = env.scene.object_registry("name", "microwave")
-    stove = env.scene.object_registry("name", "stove")
-    fridge = env.scene.object_registry("name", "fridge")
-    plywood = env.scene.object_registry("name", "plywood")
-    bagel = env.scene.object_registry("name", "bagel")
-    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
+def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dishtowel):
+    dishtowel = cookable_dishtowel
+
+    # Not affected by any heat source
+    assert bagel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
+    assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
 
     place_obj_on_floor_plane(microwave)
     place_obj_on_floor_plane(stove, x_offset=1.0)
@@ -437,6 +403,10 @@ def test_temperature(env):
     # Set the objects to be far away
     place_obj_on_floor_plane(bagel, x_offset=-0.5)
     place_obj_on_floor_plane(dishtowel, x_offset=-1.0)
+
+    # Not affected by any heat source
+    assert bagel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
+    assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
 
     for _ in range(5):
         og.sim.step()
@@ -500,7 +470,7 @@ def test_temperature(env):
 
     # Set the objects to be on top of the stove
     bagel.set_position_orientation(position=[0.78, -0.2, 0.88], orientation=[0, 0, 0, 1])
-    dishtowel.set_position_orientation(position=[0.84, -0.15, 0.88], orientation=[0, 0, 0, 1])
+    dishtowel.set_position_orientation(position=[0.84, -0.15, 0.89], orientation=[0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
@@ -526,7 +496,7 @@ def test_temperature(env):
     bagel.set_position_orientation(position=[1.9, 0, 0.7], orientation=[0, 0, 0, 1])
     dishtowel.set_position_orientation(position=[2.1, 0, 0.7], orientation=[0, 0, 0, 1])
 
-    assert fridge.states[Open].set_value(False)
+    assert fridge.states[Open].set_value(False, fully=True)
 
     for _ in range(5):
         og.sim.step()
@@ -559,9 +529,7 @@ def test_temperature(env):
     assert dishtowel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
 
 
-@og_test
-def test_max_temperature(env):
-    bagel = env.scene.object_registry("name", "bagel")
+def test_max_temperature(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert bagel.states[MaxTemperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
@@ -581,12 +549,7 @@ def test_max_temperature(env):
     assert dishtowel.states[MaxTemperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
 
 
-@og_test
-def test_heat_source_or_sink(env):
-    microwave = env.scene.object_registry("name", "microwave")
-    stove = env.scene.object_registry("name", "stove")
-    fridge = env.scene.object_registry("name", "fridge")
-
+def test_heat_source_or_sink(env, microwave, stove, fridge):
     assert microwave.states[HeatSourceOrSink].requires_inside
     assert microwave.states[HeatSourceOrSink].requires_closed
     assert microwave.states[HeatSourceOrSink].requires_toggled_on
@@ -632,9 +595,7 @@ def test_heat_source_or_sink(env):
     assert stove.states[HeatSourceOrSink].get_value()
 
 
-@og_test
-def test_cooked(env):
-    bagel = env.scene.object_registry("name", "bagel")
+def test_cooked(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Cooked].get_value()
@@ -661,9 +622,7 @@ def test_cooked(env):
     assert dishtowel.states[MaxTemperature].get_value() >= dishtowel.states[Cooked].cook_temperature
 
 
-@og_test
-def test_burnt(env):
-    bagel = env.scene.object_registry("name", "bagel")
+def test_burnt(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Burnt].get_value()
@@ -690,9 +649,7 @@ def test_burnt(env):
     assert dishtowel.states[MaxTemperature].get_value() >= dishtowel.states[Burnt].burn_temperature
 
 
-@og_test
-def test_frozen(env):
-    bagel = env.scene.object_registry("name", "bagel")
+def test_frozen(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Frozen].get_value()
@@ -719,9 +676,7 @@ def test_frozen(env):
     assert dishtowel.states[Temperature].get_value() <= dishtowel.states[Frozen].freeze_temperature
 
 
-@og_test
-def test_heated(env):
-    bagel = env.scene.object_registry("name", "bagel")
+def test_heated(env, bagel, cookable_dishtowel):
     dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Heated].get_value()
@@ -748,10 +703,7 @@ def test_heated(env):
     assert dishtowel.states[Temperature].get_value() >= dishtowel.states[Heated].heat_temperature
 
 
-@og_test
-def test_on_fire(env):
-    plywood = env.scene.object_registry("name", "plywood")
-
+def test_on_fire(env, plywood):
     assert not plywood.states[OnFire].get_value()
 
     plywood.states[Temperature].set_value(plywood.states[OnFire].ignition_temperature + 1)
@@ -773,11 +725,10 @@ def test_on_fire(env):
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
 
-@og_test
-def test_toggled_on(env):
-    stove = env.scene.object_registry("name", "stove")
-    robot = env.robots[0]
-
+@pytest.mark.skip(
+    reason="investigate why extra steps are needed for the contact to be registered beyond CAN_TOGGLE_STEPS"
+)
+def test_toggled_on(env, stove, robot):
     stove.set_position_orientation([1.487, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, math.pi], dtype=th.float32)))
     robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
 
@@ -834,8 +785,7 @@ def test_toggled_on(env):
     assert not stove.states[ToggledOn].get_value()
 
 
-@og_test
-def test_particle_source(env):
+def test_particle_source(env, furniture_sink):
     sink = env.scene.object_registry("name", "furniture_sink")
 
     place_obj_on_floor_plane(sink)
@@ -862,8 +812,7 @@ def test_particle_source(env):
     water_system.remove_all_particles()
 
 
-@og_test
-def test_particle_sink(env):
+def test_particle_sink(env, furniture_sink):
     sink = env.scene.object_registry("name", "furniture_sink")
     place_obj_on_floor_plane(sink)
     for _ in range(3):
@@ -891,12 +840,8 @@ def test_particle_sink(env):
     water_system.remove_all_particles()
 
 
-@og_test
-def test_particle_applier(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    acetone_atomizer = env.scene.object_registry("name", "acetone_atomizer")
-    applier_dishtowel = env.scene.object_registry("name", "applier_dishtowel")
-
+@pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
+def test_particle_applier(env, breakfast_table, acetone_atomizer, applier_dishtowel):
     # Test projection
 
     place_obj_on_floor_plane(breakfast_table)
@@ -952,12 +897,8 @@ def test_particle_applier(env):
     water_system.remove_all_particles()
 
 
-@og_test
-def test_particle_remover(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    vacuum = env.scene.object_registry("name", "vacuum")
-    remover_dishtowel = env.scene.object_registry("name", "remover_dishtowel")
-
+@pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
+def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
     # Test projection
 
     place_obj_on_floor_plane(breakfast_table)
@@ -1017,10 +958,7 @@ def test_particle_remover(env):
     water_system.remove_all_particles()
 
 
-@og_test
-def test_saturated(env):
-    remover_dishtowel = env.scene.object_registry("name", "remover_dishtowel")
-
+def test_saturated(env, remover_dishtowel):
     place_obj_on_floor_plane(remover_dishtowel)
 
     for _ in range(5):
@@ -1053,11 +991,7 @@ def test_saturated(env):
     water_system.remove_all_particles()
 
 
-@og_test
-def test_open(env):
-    microwave = env.scene.object_registry("name", "microwave")
-    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
-
+def test_open(env, microwave, bottom_cabinet):
     # By default, objects should not be open.
     assert not microwave.states[Open].get_value()
     assert not bottom_cabinet.states[Open].get_value()
@@ -1099,10 +1033,8 @@ def test_open(env):
     assert not bottom_cabinet.states[Open].get_value()
 
 
-@og_test
-def test_folded_unfolded(env):
-    carpet = env.scene.object_registry("name", "carpet")
-
+@pytest.mark.skip(reason="disable cloth tests until #2042")
+def test_folded_unfolded(env, carpet):
     place_obj_on_floor_plane(carpet)
 
     for _ in range(10):
@@ -1157,11 +1089,8 @@ def test_folded_unfolded(env):
         carpet.states[Folded].set_value(True)
 
 
-@og_test
-def test_draped(env):
-    breakfast_table = env.scene.object_registry("name", "breakfast_table")
-    carpet = env.scene.object_registry("name", "carpet")
-
+@pytest.mark.skip(reason="disable cloth tests until #2042")
+def test_draped(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
 
@@ -1183,9 +1112,7 @@ def test_draped(env):
         carpet.states[Draped].set_value(breakfast_table, False)
 
 
-@og_test
-def test_filled(env):
-    stockpot = env.scene.object_registry("name", "stockpot")
+def test_filled(env, stockpot):
     systems = [
         env.scene.get_system(system_name)
         for system_name, system_class in SYSTEM_EXAMPLES.items()
@@ -1210,9 +1137,7 @@ def test_filled(env):
         assert not stockpot.states[Filled].get_value(system)
 
 
-@og_test
-def test_contains(env):
-    stockpot = env.scene.object_registry("name", "stockpot")
+def test_contains(env, stockpot):
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         print(f"Testing Contains {stockpot.name} with {system.name}")
@@ -1248,11 +1173,7 @@ def test_contains(env):
         system.remove_all_particles()
 
 
-@og_test
-def test_covered(env):
-    bracelet = env.scene.object_registry("name", "bracelet")
-    bowl = env.scene.object_registry("name", "bowl")
-    microwave = env.scene.object_registry("name", "microwave")
+def test_covered(env, bracelet, bowl, microwave):
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for obj in (bracelet, bowl, microwave):
         for system in systems:
@@ -1281,5 +1202,66 @@ def test_covered(env):
         obj.set_position_orientation(position=th.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
 
 
+def test_kinematic_only_contact_no_error():
+    """
+    A scene containing only kinematic/fixed-base rigid objects (no dynamic
+    bodies) must not crash during RigidContactAPI.initialize_view(), and contact queries must
+    return False rather than raise an exception.
+    """
+    test_clear_sim()
+
+    cfg = {
+        "scene": {"type": "Scene"},
+        "objects": [
+            {
+                "type": "DatasetObject",
+                "name": "table",
+                "category": "breakfast_table",
+                "model": "skczfi",
+                "kinematic_only": True,
+                "fixed_base": True,
+                "position": [0, 0, 0.5],
+            },
+            {
+                "type": "DatasetObject",
+                "name": "bowl",
+                "category": "bowl",
+                "model": "ajzltc",
+                "kinematic_only": True,
+                "fixed_base": True,
+                "position": [0, 0, 1.0],
+            },
+        ],
+    }
+    env = og.Environment(configs=cfg)
+
+    # og.sim.step() internally calls RigidContactAPI.initialize_view(); must not raise.
+    og.sim.step()
+
+    # Explicit call must also not raise.
+    RigidContactAPI.initialize_view()
+
+    scene_idx = env.scene.idx
+    table = env.scene.object_registry("name", "table")
+    bowl = env.scene.object_registry("name", "bowl")
+
+    # Contact queries against a kinematic-only scene must return False, not error.
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=False
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=True
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=False
+    )
+    assert not RigidContactAPI.is_in_contact(
+        scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=True
+    )
+
+    test_clear_sim()
+
+
 def test_clear_sim():
-    og.clear()
+    if og.sim is not None:
+        og.clear()

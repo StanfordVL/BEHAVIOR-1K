@@ -11,3 +11,6 @@ SharpaWave_URDF/
 
 # CUDA installers
 *.deb
+
+__pycache__/
+.codex

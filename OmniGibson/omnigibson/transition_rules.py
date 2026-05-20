@@ -1,13 +1,10 @@
-import json
 import math
 import operator
-import os
 import random
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, namedtuple
 from copy import copy
 
-import bddl
 import networkx as nx
 import torch as th
 
@@ -33,7 +30,12 @@ from omnigibson.object_states import (
 )
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import get_all_object_category_models
-from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
+from bddl.knowledge_base import CookingRecipe, MachineRecipe, MixingRecipe, SubstanceCookingRecipe
+from omnigibson.utils.bddl_utils import (
+    get_knowledge_base,
+    translate_bddl_recipe_to_og_recipe,
+    translate_bddl_washer_rule_to_og_washer_rule,
+)
 from omnigibson.utils.python_utils import Registerable, classproperty, torch_delete
 from omnigibson.utils.registry_utils import Registry
 from omnigibson.utils.ui_utils import create_module_logger
@@ -63,15 +65,6 @@ ObjectAttrs = namedtuple("ObjectAttrs", _attrs_fields, defaults=(None,) * len(_a
 # Tuple of lists of objects to be added or removed returned from transitions, if not None
 TransitionResults = namedtuple("TransitionResults", ["add", "remove"], defaults=(None, None))
 
-# Mapping from transition rule json files to rule classe names
-_JSON_FILES_TO_RULES = {
-    "heat_cook.json": ["CookingObjectRule", "CookingSystemRule"],
-    "mixing_stick.json": ["MixingToolRule"],
-    "single_toggleable_machine.json": ["ToggleableMachineRule"],
-    "substance_cooking.json": ["CookingPhysicalParticleRule"],
-    "substance_watercooking.json": ["CookingPhysicalParticleRule"],
-    "washer.json": ["WasherRule"],
-}
 # Global dicts that will contain mappings
 REGISTERED_RULES = dict()
 
@@ -82,12 +75,15 @@ class TransitionRuleAPI:
     """
 
     def __init__(self, scene):
+        # Recipes and washer conditions come from the knowledge base; load once on first API use (not at import time).
+        import_recipes()
+
         self.scene = scene
 
         # Set of active rules
         self.active_rules = set()
 
-        # Maps BaseObject instances to dictionary with the following keys:
+        # Maps USDObject instances to dictionary with the following keys:
         # "states": None or dict mapping object states to arguments to set for that state when the object is initialized
         # "callback": None or function to execute when the object is initialized
         self.obj_init_info = dict()
@@ -100,7 +96,7 @@ class TransitionRuleAPI:
 
         Args:
             rule (BaseTransitionRule): Transition rule whose candidates should be computed
-            objects (list of BaseObject): List of objects that will be used to compute object candidates
+            objects (list of USDObject): List of objects that will be used to compute object candidates
 
         Returns:
             None or dict: None if no valid candidates are found, otherwise mapping from filter key to list of object
@@ -188,7 +184,7 @@ class TransitionRuleAPI:
         Executes the transition for the given added and removed objects.
 
         :param added_obj_attrs: List of ObjectAttrs instances to add to the scene
-        :param removed_objs: List of BaseObject instances to remove from the scene
+        :param removed_objs: List of USDObject instances to remove from the scene
         """
         # Process all transition results
         if len(removed_objs) > 0:
@@ -363,9 +359,9 @@ class TouchingAnyCondition(RuleCondition):
     Rule condition that prunes object candidates from @filter_1_name, only keeping any that are touching any object
     from @filter_2_name
 
-    Note that this condition uses the RigidContactAPI for contact checking. This is not a persistent contact check,
-    meaning that if objects get in contact for some time and both fall asleep, the contact will not be detected.
-    To get persistent contact checking, please use contact_sensor.
+    Note that this condition uses the RigidContactAPI for contact checking, which persists contact state
+    across physics steps even when both bodies fall asleep (current_only=False queries the "recent"
+    contact matrix that retains the last observed value for sleeping pairs).
     """
 
     def __init__(self, filter_1_name, filter_2_name):
@@ -379,44 +375,24 @@ class TouchingAnyCondition(RuleCondition):
         self._filter_1_name = filter_1_name
         self._filter_2_name = filter_2_name
 
-        # Will be filled in during self.initialize
-        # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 1
-        self._filter_1_idxs = None
-
-        # If optimized, filter_2_idxs will be used, otherwise filter_2_bodies will be used!
-        # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 2
-        self._filter_2_idxs = None
-
-    def refresh(self, object_candidates):
-        # Register idx mappings
-        self._filter_1_idxs = {
-            obj: [RigidContactAPI.get_body_row_idx(link.prim_path)[1] for link in obj.links.values()]
-            for obj in object_candidates[self._filter_1_name]
-        }
-        self._filter_2_idxs = {
-            obj: th.tensor(
-                [RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()],
-                dtype=th.float32,
-            )
-            for obj in object_candidates[self._filter_2_name]
-        }
-
     def __call__(self, object_candidates):
         # Keep any object that has non-zero impulses between itself and any of the @filter_2_name's objects
         objs = []
 
+        with_set_by_scene = defaultdict(list)
+        for obj in object_candidates[self._filter_2_name]:
+            with_set_by_scene[obj.scene].append(obj)
+
         # Batch check for each object
         for obj in object_candidates[self._filter_1_name]:
-            # Get all impulses between @obj and any object in @filter_2_name that are in the same scene
-            idxs_to_check = th.cat(
-                [
-                    self._filter_2_idxs[obj2]
-                    for obj2 in object_candidates[self._filter_2_name]
-                    if obj2.scene == obj.scene
-                ]
-            )
-            if th.any(
-                RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check.tolist()]
+            if obj.scene not in with_set_by_scene:
+                continue
+            if RigidContactAPI.is_in_contact(
+                scene_idx=obj.scene.idx,
+                query_set=[obj],
+                with_set=with_set_by_scene[obj.scene],
+                ignore_set=None,
+                current_only=False,
             ):
                 objs.append(obj)
 
@@ -675,7 +651,7 @@ class BaseTransitionRule(Registerable):
         this TransitionRule
 
         Args:
-            objects (list of BaseObject): Objects to filter for valid transition rule candidates
+            objects (list of USDObject): Objects to filter for valid transition rule candidates
 
         Returns:
             dict: Maps filter name to valid object(s) that satisfy that filter
@@ -1211,7 +1187,7 @@ class RecipeRule(BaseTransitionRule):
 
         Args:
             recipe (dict): Recipe whose systems should be checked
-            container (BaseObject): Container object that should contain all of @recipe's input systems
+            container (USDObject): Container object that should contain all of @recipe's input systems
 
         Returns:
             bool: True if all the input systems are contained
@@ -1228,7 +1204,7 @@ class RecipeRule(BaseTransitionRule):
 
         Args:
             recipe (dict): Recipe whose systems should be checked
-            container (BaseObject): Container object that should contain all of @recipe's input systems
+            container (USDObject): Container object that should contain all of @recipe's input systems
 
         Returns:
             bool: True if none of the non-relevant systems are contained
@@ -1336,7 +1312,7 @@ class RecipeRule(BaseTransitionRule):
             Return True/False, and a set of objects that belong to the subtree rooted at the current node
 
             Args:
-                obj (BaseObject): Subtree root node to check
+                obj (USDObject): Subtree root node to check
                 should_check_in_volume (bool): Whether to check if the object is in the volume or not
             Returns:
                 bool: True if the subtree rooted at the current node is satisfied
@@ -1736,7 +1712,7 @@ class RecipeRule(BaseTransitionRule):
         proportional to the number of items transformed.
 
         Args:
-            container (BaseObject): Container object which will have its contained elements transformed into
+            container (USDObject): Container object which will have its contained elements transformed into
                 @output_system
             recipe (dict): Recipe to execute. Should include, at the minimum, "input_objects", "input_systems",
                 "output_objects", and "output_systems" keys
@@ -2601,44 +2577,37 @@ class CookingSystemRule(CookingRule):
         return False
 
 
+_RECIPES_IMPORTED = False
+
+
 def import_recipes():
-    for json_file, rule_names in _JSON_FILES_TO_RULES.items():
-        recipe_fpath = os.path.join(
-            os.path.dirname(bddl.__file__), "generated_data", "transition_map", "tm_jsons", json_file
+    global _RECIPES_IMPORTED
+    if _RECIPES_IMPORTED:
+        return
+
+    # Import all recipes from the shared KnowledgeBase
+    for tr in get_knowledge_base().all_transition_rules():
+        if tr.recipe is None:
+            continue
+        og_recipe = translate_bddl_recipe_to_og_recipe(tr.recipe)
+
+        if isinstance(tr.recipe, CookingRecipe):
+            has_output_system = len(og_recipe["output_systems"]) > 0
+            if has_output_system:
+                CookingSystemRule.add_recipe(**og_recipe)
+            else:
+                CookingObjectRule.add_recipe(**og_recipe)
+        elif isinstance(tr.recipe, MixingRecipe):
+            MixingToolRule.add_recipe(**og_recipe)
+        elif isinstance(tr.recipe, MachineRecipe):
+            ToggleableMachineRule.add_recipe(**og_recipe)
+        elif isinstance(tr.recipe, SubstanceCookingRecipe):
+            CookingPhysicalParticleRule.add_recipe(**og_recipe)
+
+    # Washer rule
+    if get_knowledge_base().washer_rule is not None:
+        WasherRule.register_cleaning_conditions(
+            translate_bddl_washer_rule_to_og_washer_rule(get_knowledge_base().washer_rule)
         )
-        if not os.path.exists(recipe_fpath):
-            log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")
 
-        with open(recipe_fpath, "r") as f:
-            rule_recipes = json.load(f)
-
-        for rule_name in rule_names:
-            rule = REGISTERED_RULES[rule_name]
-            if rule == WasherRule:
-                rule.register_cleaning_conditions(translate_bddl_washer_rule_to_og_washer_rule(rule_recipes))
-            elif issubclass(rule, RecipeRule):
-                log.info(f"Adding recipes of rule {rule_name}...")
-                for recipe in rule_recipes:
-                    if "rule_name" in recipe:
-                        recipe["name"] = recipe.pop("rule_name")
-                    if "container" in recipe:
-                        recipe["fillable_synsets"] = set(recipe.pop("container").keys())
-                    if "heat_source" in recipe:
-                        recipe["heatsource_synsets"] = set(recipe.pop("heat_source").keys())
-                    if "machine" in recipe:
-                        recipe["fillable_synsets"] = set(recipe.pop("machine").keys())
-
-                    # Route the recipe to the correct rule: CookingObjectRule or CookingSystemRule
-                    satisfied = True
-                    og_recipe = translate_bddl_recipe_to_og_recipe(**recipe)
-                    has_output_system = len(og_recipe["output_systems"]) > 0
-                    if (rule == CookingObjectRule and has_output_system) or (
-                        rule == CookingSystemRule and not has_output_system
-                    ):
-                        satisfied = False
-                    if satisfied:
-                        rule.add_recipe(**og_recipe)
-                log.info(f"All recipes of rule {rule_name} imported successfully.")
-
-
-import_recipes()
+    _RECIPES_IMPORTED = True

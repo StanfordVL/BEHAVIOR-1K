@@ -1,5 +1,5 @@
 (define (problem clean_a_softball_bat-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         dirt.n.02_1 - dirt.n.02

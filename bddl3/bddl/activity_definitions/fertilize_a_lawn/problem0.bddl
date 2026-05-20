@@ -1,5 +1,5 @@
 (define (problem fertilize_a_lawn-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         fertilizer.n.01_1 - fertilizer.n.01

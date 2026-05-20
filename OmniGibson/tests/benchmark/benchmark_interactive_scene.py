@@ -9,7 +9,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
-from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.robots.robot import Robot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.utils.asset_utils import get_behavior_1k_assets_version
 from omnigibson.utils.constants import PrimType
@@ -22,7 +22,6 @@ NUM_STEPS = 2000
 gm.HEADLESS = False
 gm.GUI_VIEWPORT_ONLY = True
 gm.RENDER_VIEWER_CAMERA = False
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
@@ -46,7 +45,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     print(time.time() - start)
 
     if import_robot:
-        turtlebot = Turtlebot(relative_prim_path="/robot", name="agent", obs_modalities=["rgb"])
+        turtlebot = Robot(model="turtlebot", relative_prim_path="/robot", name="agent", obs_modalities=["rgb"])
         scene.add_object(turtlebot)
         og.sim.step()
 

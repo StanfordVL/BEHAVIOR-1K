@@ -1,5 +1,3 @@
-from bddl.activity import evaluate_goal_conditions
-
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
 
@@ -9,16 +7,16 @@ class PredicateGoal(SuccessCondition):
     Episode terminates if all the predicates are satisfied
 
     Args:
-        goal_fcn (method): function for calculating goal(s). Function signature should be:
+        check_goal_fn (method): function that checks goal satisfaction. Function signature should be:
 
-            goals = goal_fcn()
+            (all_satisfied, results) = check_goal_fn()
 
-            where @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
+            where @all_satisfied is a bool and @results maps "satisfied"/"unsatisfied" to lists of indices.
     """
 
-    def __init__(self, goal_fcn):
+    def __init__(self, check_goal_fn):
         # Store internal vars
-        self._goal_fcn = goal_fcn
+        self._check_goal_fn = check_goal_fn
         self._goal_status = None
 
         # Run super
@@ -33,7 +31,7 @@ class PredicateGoal(SuccessCondition):
 
     def _step(self, task, env, action):
         # Terminate if all goal conditions are met in the task
-        done, self._goal_status = evaluate_goal_conditions(self._goal_fcn())
+        done, self._goal_status = self._check_goal_fn()
         return done
 
     @property

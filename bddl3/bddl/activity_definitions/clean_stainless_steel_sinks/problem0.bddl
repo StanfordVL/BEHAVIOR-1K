@@ -1,5 +1,5 @@
 (define (problem clean_stainless_steel_sinks-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sodium_carbonate.n.01_1 - sodium_carbonate.n.01

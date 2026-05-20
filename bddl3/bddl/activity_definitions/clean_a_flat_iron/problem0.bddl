@@ -1,5 +1,5 @@
 (define (problem clean_a_flat_iron-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         iron.n.04_1 - iron.n.04

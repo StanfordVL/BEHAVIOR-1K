@@ -126,7 +126,7 @@ class MaterialPrim(BasePrim):
         self._shader = None
         self._shader_node = None
 
-        # Users of this material: should be a set of BaseObject and BaseSystem
+        # Users of this material: should be a set of USDObject and BaseSystem
         self._users = set()
 
         # Run super init
@@ -183,16 +183,17 @@ class MaterialPrim(BasePrim):
     def _load(self):
         # We create a new material at the specified path
         mtl_created = []
-        lazy.omni.kit.commands.execute(
-            "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name=self.mdl_name,
-            mtl_name=self.mtl_name,
-            mtl_created_list=mtl_created,
-        )
-        material_path = mtl_created[0]
+        with og.sim.editing_usd():
+            lazy.omni.kit.commands.execute(
+                "CreateAndBindMdlMaterialFromLibrary",
+                mdl_name=self.mdl_name,
+                mtl_name=self.mtl_name,
+                mtl_created_list=mtl_created,
+            )
+            material_path = mtl_created[0]
 
-        # Move prim to desired location
-        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
+            # Move prim to desired location
+            lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
         og.sim.update_handles()
 
         # Return generated material
@@ -205,26 +206,26 @@ class MaterialPrim(BasePrim):
     @property
     def users(self):
         """
-        Users of this material: should be a list of BaseObject and BaseSystem
+        Users of this material: should be a list of USDObject and BaseSystem
         """
         return self._users
 
     def add_user(self, user):
         """
-        Adds a user to the material. This can be a BaseObject or BaseSystem.
+        Adds a user to the material. This can be a USDObject or BaseSystem.
 
         Args:
-            user (BaseObject or BaseSystem): User to add to the material
+            user (USDObject or BaseSystem): User to add to the material
         """
         self._users.add(user)
 
     def remove_user(self, user):
         """
-        Removes a user from the material. This can be a BaseObject or BaseSystem.
+        Removes a user from the material. This can be a USDObject or BaseSystem.
         If there are no users left, the material will be removed.
 
         Args:
-            user (BaseObject or BaseSystem): User to remove from the material
+            user (USDObject or BaseSystem): User to remove from the material
         """
         self._users.remove(user)
         if len(self._users) == 0:
@@ -246,7 +247,7 @@ class MaterialPrim(BasePrim):
 
         # Generate shader reference
         self._shader = lazy.omni.usd.get_shader_from_material(self._prim)
-        self._shader_node = lazy.usd.mdl.RegistryUtils.GetShaderNodeForPrim(self._shader.GetPrim())
+        self._shader_node = lazy.omni.UsdMdl.RegistryUtils.GetShaderNodeForPrim(self._shader.GetPrim())
 
     def bind(self, target_prim_path):
         """
@@ -281,14 +282,15 @@ class MaterialPrim(BasePrim):
             inp (str): Name of the shader input whose value will be set
             val (any): Value to set for the input. This should be the valid type for that attribute.
         """
-        # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
-        if inp in self.shader_input_names:
-            self._shader.GetInput(inp).Set(val)
-        elif inp in self.shader_default_input_names:
-            input_type = get_sdf_value_type_name(val)
-            self._shader.CreateInput(inp, input_type).Set(val)
-        else:
-            raise ValueError(f"Got invalid shader input to set! Got: {inp}")
+        with og.sim.editing_usd():
+            # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
+            if inp in self.shader_input_names:
+                self._shader.GetInput(inp).Set(val)
+            elif inp in self.shader_default_input_names:
+                input_type = get_sdf_value_type_name(val)
+                self._shader.CreateInput(inp, input_type).Set(val)
+            else:
+                raise ValueError(f"Got invalid shader input to set! Got: {inp}")
 
     @property
     def shader(self):

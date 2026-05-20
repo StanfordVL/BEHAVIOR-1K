@@ -7,7 +7,7 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import classproperty
@@ -77,9 +77,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
     @classmethod
     def global_update(cls):
-        # Avoid circular imports
-        from omnigibson.robots.manipulation_robot import ManipulationRobot
-
         # Clear finger contact objects since it will be refreshed now
         cls._finger_contact_objs = set()
 
@@ -88,7 +85,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             {
                 link.prim_path
                 for robot in scene.robots
-                if isinstance(robot, ManipulationRobot)
+                if robot.is_manipulation
                 for finger_links in robot.finger_links.values()
                 for link in finger_links
             }
@@ -102,17 +99,15 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         for scene_idx, (scene, scene_robot_finger_paths) in enumerate(zip(og.sim.scenes, cls._robot_finger_paths)):
             if len(scene_robot_finger_paths) == 0:
                 continue
-            finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in scene_robot_finger_paths]
-            finger_impulses = RigidContactAPI.get_all_impulses(scene_idx)[:, finger_idxs, :]
-            n_bodies = len(finger_impulses)
-            touching_bodies = th.any(finger_impulses.reshape(n_bodies, -1), dim=-1)
-            touching_bodies_idxs = th.where(touching_bodies)[0]
-            if len(touching_bodies_idxs) > 0:
-                for idx in touching_bodies_idxs:
-                    body_prim_path = RigidContactAPI.get_row_idx_prim_path(scene_idx, idx=idx)
-                    obj = scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
-                    if obj is not None:
-                        cls._finger_contact_objs.add(obj)
+
+            # Get the robot finger prim paths' contacts
+            contact_pairs = RigidContactAPI.get_contact_pairs(
+                scene_idx, scene_robot_finger_paths, with_set=None, current_only=True
+            )
+            for contact_pair in contact_pairs:
+                obj = scene.object_registry("prim_path", "/".join(contact_pair[1].split("/")[:-1]))
+                if obj is not None:
+                    cls._finger_contact_objs.add(obj)
 
     @classproperty
     def meta_link_types(cls):
@@ -163,14 +158,13 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             )
         else:
             # Infer radius from mesh if not specified as an input
-            lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
+            with og.sim.editing_usd():
+                lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
             self.scale = vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
         relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)
-        self.visual_marker = VisualGeomPrim(
-            relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker"
-        )
+        self.visual_marker = GeomPrim(relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker")
         self.visual_marker.load(self.obj.scene)
         self.visual_marker.scale = self.scale
         self.visual_marker.initialize()
@@ -195,9 +189,10 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         def check_overlap():
             nonlocal valid_hit
             valid_hit = False
-            # TODO: This is a temporary fix for flatcache before we properly implement trigger volumes
+            # TODO: This is a temporary fix for fabric before we properly implement trigger volumes
+            # TODO(#2082): Investigate why overlap_shape doesn't work with fabric still. This is a poor approximation.
             og.sim.psqi.overlap_sphere(
-                radius=th.min(self.visual_marker.extent * self.scale).item(),
+                radius=th.min(self.visual_marker.extent * self.scale * self.link.scale).item(),
                 pos=self.visual_marker.get_position_orientation()[0].tolist(),
                 reportFn=overlap_callback,
             )

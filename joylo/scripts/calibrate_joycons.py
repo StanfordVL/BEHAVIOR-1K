@@ -1,11 +1,11 @@
-from pyjoycon import JoyCon, ButtonEventJoyCon, get_R_id, get_L_id
+from pyjoycon import JoyCon, get_R_id, get_L_id
 import sys, select, os
 import time
-import numpy as np
 import yaml
 from gello import REPO_DIR
 
 SAVE_DIR = f"{REPO_DIR}/configs"
+os.makedirs(SAVE_DIR, exist_ok=True)
 
 jc_id_left = get_L_id()
 jc_id_right = get_R_id()

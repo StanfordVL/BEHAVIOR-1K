@@ -1,5 +1,5 @@
 (define (problem repairs_to_furniture-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         table.n.02_1 - table.n.02

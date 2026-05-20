@@ -9,7 +9,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.constants import JointAxis, JointType
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.usd_utils import PoseAPI, create_joint
+from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.numpy_utils import gf_quat_to_torch, vtarray_to_torch
 
 # Create settings for this module
@@ -64,7 +64,7 @@ class JointPrim(BasePrim):
         articulation_view=None,
     ):
         # Grab dynamic control reference and set properties
-        self._articulation_view_direct = articulation_view
+        self._articulation_view = articulation_view
 
         # Other values that will be filled in at runtime
         self._joint_type = None
@@ -112,13 +112,6 @@ class JointPrim(BasePrim):
 
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
-        if self.is_single_dof:
-            # We MUST already have the joint state API defined beforehand in the USD
-            # This is because physx complains if we try to add physx APIs AFTER a simulation step occurs, which
-            # happens because joint prims are usually created externally during an EntityPrim's initialization phase
-            assert self._prim.HasAPI(
-                lazy.pxr.PhysxSchema.JointStateAPI
-            ), "Revolute or Prismatic joints must already have JointStateAPI added!"
 
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:
@@ -209,19 +202,6 @@ class JointPrim(BasePrim):
 
         # Update control type
         self._control_type = control_type
-
-    @property
-    def _articulation_view(self):
-        if self._articulation_view_direct is None:
-            return None
-
-        # Validate that the articulation view is initialized and that if physics is running, the
-        # view is valid.
-        if og.sim.is_playing() and self.initialized:
-            if not self._articulation_view_direct.is_physics_handle_valid():
-                og.sim.update_handles()
-
-        return self._articulation_view_direct
 
     @property
     def body0(self):
@@ -568,7 +548,10 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        return self.get_attribute("physics:axis")
+        axis = self.get_attribute("physics:axis")
+        if axis == "":
+            return "X"
+        return axis
 
     @axis.setter
     def axis(self, axis):
@@ -804,12 +787,12 @@ class JointPrim(BasePrim):
             else:
                 self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
                 self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
-                PoseAPI.invalidate()
+                og.sim.sync_physx_to_fabric()
         else:
             # Any other objects, e.g. furniture with passive joints
             # In this case, since we're not actively driven, just set instantaneous position
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
-            PoseAPI.invalidate()
+            og.sim.sync_physx_to_fabric()
 
     def set_vel(self, vel, normalized=False, drive=False):
         """

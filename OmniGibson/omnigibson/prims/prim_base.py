@@ -1,6 +1,7 @@
 import string
 from abc import ABC
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.python_utils import Recreatable, Serializable
 from omnigibson.utils.ui_utils import create_module_logger
@@ -228,12 +229,12 @@ class BasePrim(Serializable, Recreatable, ABC):
         Args:
             visible (bool): flag to set the visibility of the usd prim in stage.
         """
-        imageable = lazy.pxr.UsdGeom.Imageable(self.prim)
-        if visible:
-            imageable.MakeVisible()
-        else:
-            imageable.MakeInvisible()
-        return
+        with og.sim.editing_usd():
+            imageable = lazy.pxr.UsdGeom.Imageable(self.prim)
+            if visible:
+                imageable.MakeVisible()
+            else:
+                imageable.MakeInvisible()
 
     def is_valid(self):
         """
@@ -271,7 +272,8 @@ class BasePrim(Serializable, Recreatable, ABC):
             attr (str): Attribute to set
             val (any): Value to set for the attribute. This should be the valid type for that attribute.
         """
-        self._prim.GetAttribute(attr).Set(val)
+        with og.sim.editing_usd():
+            self._prim.GetAttribute(attr).Set(val)
 
     def create_attribute(self, attr, val):
         """
@@ -281,7 +283,8 @@ class BasePrim(Serializable, Recreatable, ABC):
             attr (str): Attribute to create
             val (any): Value to set for the attribute. This should be the valid type for that attribute.
         """
-        self._prim.CreateAttribute(attr, get_sdf_value_type_name(val))
+        with og.sim.editing_usd():
+            self._prim.CreateAttribute(attr, get_sdf_value_type_name(val))
 
     def get_property(self, prop):
         """
@@ -313,22 +316,3 @@ class BasePrim(Serializable, Recreatable, ABC):
             dict: Dictionary of any custom information
         """
         return self._prim.GetCustomData()
-
-    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
-        """
-        Generates a new instance of this prim's class with specified @relative_prim_path, @name, and @load_config, but otherwise
-        all other kwargs should be identical to this instance's values.
-
-        Args:
-            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
-            name (str): Name for the newly created prim
-            load_config (dict): Keyword-mapped kwargs to use to set specific attributes for the created prim's instance
-
-        Returns:
-            BasePrim: Generated prim object (not loaded, and not initialized!)
-        """
-        return self.__class__(
-            relative_prim_path=relative_prim_path,
-            name=name,
-            load_config=load_config,
-        )

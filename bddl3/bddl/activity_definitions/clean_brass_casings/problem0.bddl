@@ -1,5 +1,5 @@
 (define (problem clean_brass_casings-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         jacket.n.05_1 jacket.n.05_2 - jacket.n.05

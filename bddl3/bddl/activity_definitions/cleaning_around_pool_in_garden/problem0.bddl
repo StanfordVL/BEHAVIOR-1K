@@ -1,5 +1,5 @@
 (define (problem cleaning_around_pool_in_garden-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         pool.n.01_1 - pool.n.01

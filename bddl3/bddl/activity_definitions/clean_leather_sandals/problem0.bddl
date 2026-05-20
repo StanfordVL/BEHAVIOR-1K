@@ -1,5 +1,5 @@
 (define (problem clean_leather_sandals-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         saddle_soap.n.01_1 - saddle_soap.n.01

@@ -12,7 +12,6 @@ import torch as th
 from omnigibson.macros import gm
 
 gm.HEADLESS = True
-gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.USE_ENCRYPTED_ASSETS = True
 
@@ -29,7 +28,7 @@ if __name__ == "__main__":
     dataset_root = sys.argv[1]
     scene = sys.argv[2]
     out_path = os.path.join(sys.argv[3], f"{scene}.json")
-    gm.DATASET_PATH = str(dataset_root)
+    gm.DATA_PATH = str(dataset_root)
 
     # Load the sim and do stuff
     # If the scene type is interactive, also check if we want to quick load or full load the scene

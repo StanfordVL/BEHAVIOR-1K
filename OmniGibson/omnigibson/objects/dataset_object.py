@@ -1,10 +1,10 @@
 import math
 import os
 import random
-from enum import IntEnum
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -25,6 +25,7 @@ from omnigibson.utils.constants import (
     PrimType,
 )
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import find_joint_prims
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -86,7 +87,7 @@ class DatasetObject(USDObject):
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             kinematic_only (None or bool): Whether this object should be kinematic only (and not get affected by any
                 collisions). If None, then this value will be set to True if @fixed_base is True and some other criteria
-                are satisfied (see object_base.py post_load function), else False.
+                are satisfied (see usd_object.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
@@ -106,7 +107,7 @@ class DatasetObject(USDObject):
                 a list of room type(s) or a single room type
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
         """
         # Store variables
         if isinstance(in_rooms, str):
@@ -231,7 +232,8 @@ class DatasetObject(USDObject):
                 for child_child_prim in child_prim.GetChildren():
                     recursive_light_update(child_child_prim)
 
-            recursive_light_update(self._prim)
+            with og.sim.editing_usd():
+                recursive_light_update(self._prim)
 
         # Set the joint frictions based on joint type
         for joint in self._joints.values():
@@ -240,54 +242,62 @@ class DatasetObject(USDObject):
             elif joint.joint_type == JointType.JOINT_REVOLUTE:
                 joint.friction = DEFAULT_REVOLUTE_JOINT_FRICTION
 
+    def _get_preapply_scale(self, default_prim):
+        # If bounding_box is set, scale hasn't been computed yet (that happens in _post_load).
+        # Derive it here from ig:nativeBB so kinematic_only is computed correctly and
+        # PhysxArticulationAPI is pre-applied when needed.
+        bounding_box = self._load_config.get("bounding_box", None)
+        if bounding_box is not None and self._load_config.get("scale", None) is None:
+            native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
+            if native_bb_attr.IsValid():
+                native_bb = th.tensor(list(native_bb_attr.Get()))
+                bb = th.tensor(bounding_box, dtype=th.float32)
+                scale = th.ones(3)
+                valid_idxes = native_bb > 1e-4
+                scale[valid_idxes] = bb[valid_idxes] / native_bb[valid_idxes]
+                return scale
+        return super()._get_preapply_scale(default_prim)
+
     def _post_load(self):
-        # If manual bounding box is specified, scale based on ratio between that and the native bbox
-        if self._load_config["bounding_box"] is not None:
-            scale = th.ones(3)
-            valid_idxes = self.native_bbox > 1e-4
-            scale[valid_idxes] = (
-                th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
-            )
-        elif self._load_config["scale"] is not None:
-            scale = self._load_config["scale"]
-            scale = scale if th.is_tensor(scale) else th.tensor(scale, dtype=th.float32)
-        else:
-            scale = th.ones(3)
-
-        # Assert that the scale does not have too small dimensions
-        assert th.all(th.abs(scale) > 1e-4), f"Scale of {self.name} is too small: {scale}"
-
-        # Set this scale in the load config -- it will automatically scale the object during self.initialize()
-        self._load_config["scale"] = scale
-
+        # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
+        # If neither was provided, default to ones(3) (no scaling).
+        if self._load_config.get("scale", None) is None:
+            self._load_config["scale"] = th.ones(3)
+        assert th.all(
+            th.abs(self._load_config["scale"]) > 1e-4
+        ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
         # Run super last
         super()._post_load()
 
-        # Get the average mass/density for this object category
-        avg_specs = get_avg_category_specs()
-        if self.category in avg_specs:
-            category_mass = avg_specs[self.category]["mass"]
-            category_density = avg_specs[self.category]["density"]
-        else:
-            log.warning(
-                f"Category {self.category} not found in average object specs! Defaulting to unit mass or density."
-            )
-            category_mass = 1.0
-            category_density = 1.0
+        category_mass = None
+        category_density = None
+        if self._load_config["dataset_name"] == "behavior-1k-assets":
+            # Get the average mass/density for this object category
+            avg_specs = get_avg_category_specs()
+            if self.category in avg_specs:
+                category_mass = avg_specs[self.category]["mass"]
+                category_density = avg_specs[self.category]["density"]
+            else:
+                log.warning(
+                    f"Category {self.category} not found in average object specs! Defaulting to unit mass or density."
+                )
+                category_mass = 1.0
+                category_density = 1.0
 
         if self._prim_type == PrimType.RIGID:
-            total_volume = sum(link.volume for link in self._links.values())
-            for link in self._links.values():
-                # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
-                if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
-                    if gm.FORCE_CATEGORY_MASS:
-                        # Each link should get the appropriate fraction of the category mass
-                        # based on the link volume
-                        link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
-                        link.density = 0.0
-                    else:
-                        link.mass = 0.0
-                        link.density = category_density
+            if category_mass is not None:
+                total_volume = sum(link.volume for link in self._links.values())
+                for link in self._links.values():
+                    # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
+                    if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
+                        if gm.FORCE_CATEGORY_MASS:
+                            # Each link should get the appropriate fraction of the category mass
+                            # based on the link volume
+                            link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
+                            link.density = 0.0
+                        else:
+                            link.mass = 0.0
+                            link.density = category_density
 
             # If there exists a center of mass annotation, apply it now
             if self.prim.HasAttribute("ig:centerOfMass"):
@@ -305,21 +315,25 @@ class DatasetObject(USDObject):
 
             prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
             revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
-            for prismatic_joint in prismatic_joints:
-                prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
-                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
-                prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
-                prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
-            for revolute_joint in revolute_joints:
-                revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
-                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
-                revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
-                revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
+            with og.sim.editing_usd():
+                for prismatic_joint in prismatic_joints:
+                    prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
+                    prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
+                    prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
+                    prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
+                for revolute_joint in revolute_joints:
+                    revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
+                    revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
+                    revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
+                    revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
 
         elif self._prim_type == PrimType.CLOTH:
-            self.root_link.mass = category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
+            if category_mass is not None:
+                self.root_link.mass = (
+                    category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
+                )
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
         """
@@ -447,46 +461,39 @@ class DatasetObject(USDObject):
         """
         scales = {self.root_link.body_name: self.scale}
 
-        # We iterate through all links in this object, and check for any joint prims that exist
-        # We traverse manually this way instead of accessing the self._joints dictionary, because
-        # the dictionary only includes articulated joints and not fixed joints!
-        for link in self._links.values():
-            for prim in link.prim.GetChildren():
-                if "joint" in prim.GetTypeName().lower():
-                    # Grab relevant joint information
-                    parent_name = prim.GetProperty("physics:body0").GetTargets()[0].pathString.split("/")[-1]
-                    child_name = prim.GetProperty("physics:body1").GetTargets()[0].pathString.split("/")[-1]
-                    if parent_name in scales and child_name not in scales:
-                        scale_in_parent_lf = scales[parent_name]
-                        # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
-                            prim.GetAttribute("physics:localRot0").Get()
-                        )[[1, 2, 3, 0]]
-                        quat1 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
-                            prim.GetAttribute("physics:localRot1").Get()
-                        )[[1, 2, 3, 0]]
-                        # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-                        local_ori = T.quat_multiply(
-                            quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
-                        )
-                        jnt_frame_rot = T.quat2mat(local_ori)
-                        scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
-                        scales[child_name] = scale_in_child_lf
+        # Collect every joint prim under this object's prim. We traverse manually this way instead of
+        # accessing the self._joints dictionary, because the dictionary only includes articulated
+        # joints and not fixed joints! Joints may live anywhere under the object's prim (recent Isaac
+        # Sim exports place them in a flat /joints scope rather than under body0).
+        joint_prims = list(find_joint_prims(self.prim))
+
+        # Propagate scale outwards from the root link. Fixed-point loop handles arbitrary joint order.
+        progress = True
+        while progress:
+            progress = False
+            for prim in joint_prims:
+                body0_targets = prim.GetProperty("physics:body0").GetTargets()
+                body1_targets = prim.GetProperty("physics:body1").GetTargets()
+                if not body0_targets or not body1_targets:
+                    continue
+                parent_name = body0_targets[0].pathString.split("/")[-1]
+                child_name = body1_targets[0].pathString.split("/")[-1]
+                if parent_name in scales and child_name not in scales:
+                    scale_in_parent_lf = scales[parent_name]
+                    # The location of the joint frame is scaled using the scale in the parent frame
+                    quat0 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
+                        prim.GetAttribute("physics:localRot0").Get()
+                    )[[1, 2, 3, 0]]
+                    quat1 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
+                        prim.GetAttribute("physics:localRot1").Get()
+                    )[[1, 2, 3, 0]]
+                    # Invert the child link relationship, and multiply the two rotations together to get the final rotation
+                    local_ori = T.quat_multiply(
+                        quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
+                    )
+                    jnt_frame_rot = T.quat2mat(local_ori)
+                    scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
+                    scales[child_name] = scale_in_child_lf
+                    progress = True
 
         return scales
-
-    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
-        # Add additional kwargs (bounding_box is already captured in load_config)
-        return self.__class__(
-            relative_prim_path=relative_prim_path,
-            name=name,
-            category=self.category,
-            scale=self.scale,
-            visible=self.visible,
-            fixed_base=self.fixed_base,
-            visual_only=self._visual_only,
-            prim_type=self._prim_type,
-            load_config=load_config,
-            abilities=self._abilities,
-            in_rooms=self.in_rooms,
-        )

@@ -9,7 +9,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -17,7 +16,7 @@ from omnigibson.object_states.object_state_base import IntrinsicObjectState
 from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems import MicroParticleSystem
 from omnigibson.systems.system_base import PhysicalParticleSystem
@@ -158,7 +157,7 @@ def create_projection_visualization(
     prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
     create_primitive_mesh(prototype_path, primitive_type="Sphere")
     relative_prototype_path = absolute_prim_path_to_scene_relative(scene, prototype_path)
-    prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=f"{projection_name}_prototype")
+    prototype = GeomPrim(relative_prim_path=relative_prototype_path, name=f"{projection_name}_prototype")
     prototype.load(scene)
     prototype.initialize()
     # Set the scale (native scaling --> radius 0.5) and possibly update the material
@@ -324,7 +323,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         if self.requires_overlap:
             # Run sanity check to make sure compatibility with omniverse physx
             if self.method == ParticleModifyMethod.PROJECTION and not th.isclose(
-                self.obj.scale.max(), self.obj.scale.min(), atol=1e-04
+                self.obj.scale.max(), self.obj.scale.min(), atol=1e-02
             ):
                 raise ValueError(
                     f"{self.__class__.__name__} for obj {self.obj.name} using PROJECTION method cannot be "
@@ -403,7 +402,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     )
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
-            self.projection_mesh = VisualGeomPrim(
+            self.projection_mesh = GeomPrim(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path),
                 name=f"{name_prefix}_projection_mesh",
             )
@@ -424,6 +423,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             self.projection_mesh.scale = self._projection_mesh_params["extents"]
 
             # Make sure the object updates its meshes, and assert that there's only a single visual mesh
+            # TODO: This is a bad idea. It creates orphaned prims when the mesh lists get overwritten. Why do we need this?
             self.link.update_meshes()
             assert (
                 len(self.link.visual_meshes) == 1
@@ -444,38 +444,39 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             )
 
             # Store the projection mesh's IDs
-            projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
+            # projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
 
             # We also generate the function for checking overlaps at runtime
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                if gm.ENABLE_FLATCACHE:
-                    # When flatcache is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
-                    aabb = self.link.visual_aabb
-                    og.sim.psqi.overlap_box(
-                        halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
-                        pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
-                        rot=[0, 0, 0, 1.0],
-                        reportFn=overlap_callback,
-                    )
-                else:
-                    og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+                # When fabric is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
+                aabb = self.link.visual_aabb
+                og.sim.psqi.overlap_box(
+                    halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
+                    pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
+                    rot=[0, 0, 0, 1.0],
+                    reportFn=overlap_callback,
+                )
+
+                # TODO(#2082): Investigate why overlap_shape doesn't work with fabric still. This is a poor approximation.
+                # og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
             # Define direction indicator if requested
             if m.USE_PARTICLE_APPLIER_DIRECTION_INDICATOR:
                 indicator_mesh_path = f"{mesh_prim_path}_direction_indicator"
-                indicator_mesh_prim = (
-                    getattr(lazy.pxr.UsdGeom, self._projection_mesh_params["type"])
-                    .Define(og.sim.stage, indicator_mesh_path)
-                    .GetPrim()
-                )
-                property_names = set(indicator_mesh_prim.GetPropertyNames())
-                for shape_attr, default_val in shape_defaults.items():
-                    if shape_attr in property_names:
-                        indicator_mesh_prim.GetAttribute(shape_attr).Set(default_val)
-                indicator_mesh = VisualGeomPrim(
+                with og.sim.editing_usd():
+                    indicator_mesh_prim = (
+                        getattr(lazy.pxr.UsdGeom, self._projection_mesh_params["type"])
+                        .Define(og.sim.stage, indicator_mesh_path)
+                        .GetPrim()
+                    )
+                    property_names = set(indicator_mesh_prim.GetPropertyNames())
+                    for shape_attr, default_val in shape_defaults.items():
+                        if shape_attr in property_names:
+                            indicator_mesh_prim.GetAttribute(shape_attr).Set(default_val)
+                indicator_mesh = GeomPrim(
                     relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, indicator_mesh_path),
                     name=f"{name_prefix}_projection_mesh_direction_indicator",
                 )
@@ -723,7 +724,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     @classmethod
     def get_optional_dependencies(cls):
         deps = super().get_optional_dependencies()
-        deps.update({Covered, ToggledOn, ContactBodies, ContactParticles})
+        deps.update({Covered, ToggledOn, ContactParticles})
         return deps
 
     @classproperty
@@ -1128,7 +1129,7 @@ class ParticleApplier(ParticleModifier):
             relative_projection_source_path = absolute_prim_path_to_scene_relative(
                 self.obj.scene, projection_visualization_path
             )
-            self.projection_source_sphere = VisualGeomPrim(
+            self.projection_source_sphere = GeomPrim(
                 relative_prim_path=relative_projection_source_path, name=f"{name_prefix}_projection_source_sphere"
             )
             self.projection_source_sphere.load(self.obj.scene)

@@ -1,5 +1,5 @@
 (define (problem saute_vegetables-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         asparagus.n.02_1 asparagus.n.02_2 asparagus.n.02_3 asparagus.n.02_4 asparagus.n.02_5 asparagus.n.02_6 asparagus.n.02_7 asparagus.n.02_8 asparagus.n.02_9 - asparagus.n.02

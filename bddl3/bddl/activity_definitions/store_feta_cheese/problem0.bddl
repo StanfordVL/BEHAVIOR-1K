@@ -1,5 +1,5 @@
 (define (problem store_feta_cheese-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         feta.n.01_1 - feta.n.01

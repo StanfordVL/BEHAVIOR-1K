@@ -8,7 +8,7 @@ from PIL import Image
 from omnigibson import object_states
 from omnigibson.object_states.factory import get_state_name
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
-from omnigibson.robots import BaseRobot
+from omnigibson.robots import Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils import transform_utils as T
 from omnigibson.utils.numpy_utils import pil_to_tensor
@@ -182,8 +182,8 @@ class SceneGraphBuilder(object):
                 objs_in_fov = robot.states[object_states.ObjectsInFOVOfRobot].get_value()
                 objs_to_add &= objs_in_fov
 
-        # Remove all BaseRobot objects from the set of objects to add.
-        base_robots = [obj for obj in objs_to_add if isinstance(obj, BaseRobot)]
+        # Remove all Robot objects from the set of objects to add.
+        base_robots = [obj for obj in objs_to_add if isinstance(obj, Robot)]
         objs_to_add -= set(base_robots)
 
         for obj in objs_to_add:
@@ -240,7 +240,7 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     """
 
     nodes = list(G.nodes)
-    all_robots = [robot for robot in nodes if isinstance(robot, BaseRobot)]
+    all_robots = [robot for robot in nodes if isinstance(robot, Robot)]
 
     def _draw_graph():
         node_labels = {obj: obj.category for obj in nodes}

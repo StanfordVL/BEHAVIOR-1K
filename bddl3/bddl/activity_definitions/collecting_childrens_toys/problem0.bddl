@@ -1,5 +1,5 @@
 (define (problem collecting_childrens_toys-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         die.n.01_1 die.n.01_2 - die.n.01
@@ -45,6 +45,10 @@
                     (forall
                         (?board_game.n.01 - board_game.n.01)
                         (inside ?board_game.n.01 ?bookcase.n.01)
+                    )
+                    (forall
+                        (?train_set.n.01 - train_set.n.01)
+                        (inside ?train_set.n.01 ?bookcase.n.01)
                     )
                 )
             )

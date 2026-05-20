@@ -1,5 +1,5 @@
 (define (problem ice_cookies-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sugar_cookie.n.01_1 sugar_cookie.n.01_2 sugar_cookie.n.01_3 - sugar_cookie.n.01

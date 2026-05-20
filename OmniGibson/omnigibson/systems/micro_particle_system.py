@@ -6,7 +6,7 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.material_prim import OmniPBRMaterialPrim, OmniSurfaceMaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
@@ -16,8 +16,10 @@ from omnigibson.utils.python_utils import assert_valid_key, torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
+    create_primitive_mesh,
     scene_relative_prim_path_to_absolute,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -35,38 +37,6 @@ m.CLOTH_DRAG = 0.001
 m.CLOTH_LIFT = 0.003
 m.MIN_PARTICLE_CONTACT_OFFSET = 0.005  # Minimum particle contact offset for physical micro particles
 m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = None  # If set, the maximum particle velocity for micro particle systems
-
-
-def set_carb_settings_for_fluid_isosurface():
-    """
-    Sets relevant rendering settings in the carb settings in order to use isosurface effectively
-    """
-    min_frame_rate = 60
-    # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
-    assert (
-        (1 / og.sim.get_rendering_dt()) >= min_frame_rate
-    ), f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing rendering_frequency of env_config to {min_frame_rate}."
-
-    # Settings for Isosurface
-    isregistry = lazy.carb.settings.acquire_settings_interface()
-    # disable grid and lights
-    dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
-    dOptions &= ~(1 << 6 | 1 << 8)
-    isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
-    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)
-    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, min_frame_rate)
-    isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
-    isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
-    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
-    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse", 50000)
-    isregistry.set_float("rtx-defaults/pathtracing/optixDenoiser/blendFactor", 0.09)
-    isregistry.set_int("rtx-defaults/pathtracing/aa/op", 2)
-    isregistry.set_int("rtx-defaults/pathtracing/maxBounces", 32)
-    isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
-    isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
-    isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
 
 
 class PhysxParticleInstancer(BasePrim):
@@ -487,9 +457,10 @@ class MicroParticleSystem(BaseSystem):
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         self._material.bind(self.system_prim_path)
         # Also apply physics to this material
-        lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
-            og.sim.stage, self.mat_path, **self._pbd_material_kwargs
-        )
+        with og.sim.editing_usd():
+            lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
+                og.sim.stage, self.mat_path, **self._pbd_material_kwargs
+            )
         # Potentially modify the material
         self._customize_particle_material() if self._customize_particle_material is not None else None
 
@@ -841,7 +812,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Creates any relevant particle prototypes to be used by this particle system.
 
         Returns:
-            list of VisualGeomPrim: Visual mesh prim(s) to use as this system's particle prototype(s)
+            list of GeomPrim: Visual mesh prim(s) to use as this system's particle prototype(s)
         """
         raise NotImplementedError()
 
@@ -946,11 +917,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             )
 
         # Update semantics
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path),
-            semantic_label=self.name,
-            type_label="class",
-        )
+        prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+        add_semantic_label(prim=prim, label=self.name)
 
         return inst
 
@@ -1109,7 +1077,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Generates @n_particles new particle objects and samples their locations on the top surface of object @obj
 
         Args:
-            obj (BaseObject): Object on which to generate a particle instancer with sampled particles on the object's
+            obj (USDObject): Object on which to generate a particle instancer with sampled particles on the object's
                 top surface
             instancer_idn (None or int): Unique identification number of the particle instancer to assign the generated
                 particles to. This is used to deterministically reproduce individual particle instancer states
@@ -1412,16 +1380,17 @@ class FluidSystem(MicroPhysicalParticleSystem):
             if self.is_viscous
             else lazy.omni.physx.scripts.particleUtils.AddPBDMaterialWater
         )
-        apply_mat_physics(p=self._material.prim)
+        with og.sim.editing_usd():
+            apply_mat_physics(p=self._material.prim)
 
         # Compute the overall color of the fluid system
         self._color = self._material.average_diffuse_color
 
-        # Set custom isosurface rendering settings if we are using high-quality rendering
+        # Isosurface carb/RTX settings are applied once in Simulator._set_renderer_settings when HQ rendering is on.
         if gm.ENABLE_HQ_RENDERING:
-            set_carb_settings_for_fluid_isosurface()
-            # We also modify the grid smoothing radius to avoid "blobby" appearances
-            self.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
+            with og.sim.editing_usd():
+                # Modify the grid smoothing radius to avoid "blobby" appearances
+                self.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
     @property
     def is_fluid(self):
@@ -1438,19 +1407,17 @@ class FluidSystem(MicroPhysicalParticleSystem):
         return 0.99 * 0.6 * self._particle_contact_offset
 
     def _create_particle_prototypes(self):
-        # Simulate particles with simple spheres
         prototype_prim_path = f"{scene_relative_prim_path_to_absolute(self._scene, self.relative_prim_path)}/prototype0"
-        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
-        prototype.CreateRadiusAttr().Set(self.particle_radius)
+        # Use UsdGeom.Mesh instead of UsdGeom.Sphere so that Hydra's PointInstancer
+        # rendering resolves the prototype to a real USD prim path. UsdGeom.Sphere causes
+        # Hydra to create a virtual "instancer/proto0" path that the replicator's semantic
+        # annotator cannot read labels from (it only reads from UsdGeom.Mesh prims).
+        create_primitive_mesh(prototype_prim_path, primitive_type="Sphere", extents=2.0 * self.particle_radius)
         relative_prototype_prim_path = absolute_prim_path_to_scene_relative(self._scene, prototype_prim_path)
-        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
+        prototype = GeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
         prototype.visible = False
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=prototype.prim,
-            semantic_label=self.name,
-            type_label="class",
-        )
+        add_semantic_label(prim=prototype.prim, label=self.name)
         return [prototype]
 
     def _get_particle_material_template(self):
@@ -1547,19 +1514,16 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Copy it to the standardized prim path
         prototype_path = f"{self.prim_path}/prototype0"
-        lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
+        with og.sim.editing_usd():
+            lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
-        # Wrap it with VisualGeomPrim with the correct scale
+        # Wrap it with GeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
-        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
+        prototype = GeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
         prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=prototype.prim,
-            semantic_label=self.name,
-            type_label="class",
-        )
+        add_semantic_label(prim=prototype.prim, label=self.name)
 
         # Store the contact offset based on a minimum sphere
         # Threshold the lower-bound to avoid super small particles
@@ -1618,23 +1582,24 @@ class Cloth(MicroParticleSystem):
         Args:
             mesh_prim (Usd.Prim): Mesh prim to clothify
         """
-        # Convert into particle cloth
-        lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
-            stage=og.sim.stage,
-            path=mesh_prim.GetPath(),
-            dynamic_mesh_path=None,
-            particle_system_path=self.system_prim_path,
-            spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
-            spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
-            spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
-            spring_damping=m.CLOTH_DAMPING,
-            self_collision=True,
-            self_collision_filter=True,
-        )
+        with og.sim.editing_usd():
+            # Convert into particle cloth
+            lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
+                stage=og.sim.stage,
+                path=mesh_prim.GetPath(),
+                dynamic_mesh_path=None,
+                particle_system_path=self.system_prim_path,
+                spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
+                spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
+                spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
+                spring_damping=m.CLOTH_DAMPING,
+                self_collision=True,
+                self_collision_filter=True,
+            )
 
-        # Disable welding because it can potentially make thin objects non-manifold
-        auto_particle_cloth_api = lazy.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
-        auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
+            # Disable welding because it can potentially make thin objects non-manifold
+            auto_particle_cloth_api = lazy.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
+            auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
 
     @property
     def _pbd_material_kwargs(self):

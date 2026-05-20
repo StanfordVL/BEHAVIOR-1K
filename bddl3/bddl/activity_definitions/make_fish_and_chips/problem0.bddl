@@ -1,5 +1,5 @@
 (define (problem make_fish_and_chips-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         trout.n.01_1 - trout.n.01

@@ -1,5 +1,5 @@
 (define (problem toast_sunflower_seeds-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sunflower_seed__bag.n.01_1 - sunflower_seed__bag.n.01

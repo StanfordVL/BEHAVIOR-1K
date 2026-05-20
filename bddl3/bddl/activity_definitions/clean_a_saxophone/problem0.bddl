@@ -1,5 +1,5 @@
 (define (problem clean_a_saxophone-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         sax.n.02_1 - sax.n.02

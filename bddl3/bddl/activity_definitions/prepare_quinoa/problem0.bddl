@@ -1,5 +1,5 @@
 (define (problem prepare_quinoa-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         quinoa.n.01_1 - quinoa.n.01

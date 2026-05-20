@@ -1,5 +1,5 @@
 (define (problem spray_stucco-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         stucco.n.01_1 - stucco.n.01

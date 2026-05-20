@@ -1,5 +1,5 @@
 (define (problem polish_copper-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         polish.n.03_1 - polish.n.03

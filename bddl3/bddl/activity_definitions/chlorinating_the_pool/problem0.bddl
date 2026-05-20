@@ -1,5 +1,5 @@
 (define (problem chlorinating_the_pool-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         chlorine.n.01_1 - chlorine.n.01

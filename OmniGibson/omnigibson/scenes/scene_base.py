@@ -7,15 +7,17 @@ from abc import ABC
 from pathlib import Path
 
 import torch as th
+from packaging.version import InvalidVersion, Version
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.sensors.vision_sensor import VisionSensor
 import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots.robot_base import REGISTERED_ROBOTS, m as robot_macros
+from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -29,7 +31,7 @@ from omnigibson.systems.system_base import (
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
+from omnigibson.utils.constants import ROBOT_CATEGORY, STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -41,7 +43,7 @@ from omnigibson.utils.python_utils import (
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import CollisionAPI, add_asset_to_stage
+from omnigibson.utils.usd_utils import CollisionAPI, add_asset_to_stage, create_usd_stage
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -116,6 +118,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     scene_info = json.load(f)
             else:
                 scene_info = self.scene_file
+
+            # Verify the saved component versions are compatible with the currently-installed versions.
+            # We require each saved version to be <= the currently-installed version.
+            self._check_versions_compatible(scene_info.get("versions", {}))
+
             init_info = scene_info["objects_info"]["init_info"]
             # TODO: Remove this backwards-compatibility once newer RC is released
             self._init_state = (
@@ -175,7 +182,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the objects in the scene.
 
         Returns:
-            list of BaseObject: Standalone object(s) that are currently in this scene
+            list of USDObject: Standalone object(s) that are currently in this scene
         """
         return self.object_registry.objects
 
@@ -196,7 +203,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             list of BaseRobot: Robot(s) that are currently in this scene
         """
-        return list(sorted(self.object_registry("category", robot_macros.ROBOT_CATEGORY, []), key=lambda x: x.name))
+        return list(sorted(self.object_registry("category", ROBOT_CATEGORY, []), key=lambda x: x.name))
 
     @property
     def systems(self):
@@ -287,7 +294,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Create a new stage inside the tempdir, named after this scene's file.
             decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(scene_file_path) + ".usd", dir=og.tempdir)
             os.close(decrypted_fd)
-            stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+            stage = create_usd_stage(usd_path)
 
             # Create the world prim and make it the default
             world_prim = stage.DefinePrim("/World", "Xform")
@@ -390,15 +397,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             left_edge_to_center = -aabb_min[0]
-            self._scene_prim.set_position_orientation(
-                position=[last_scene_edge + scene_margin + left_edge_to_center, 0, 0]
-            )
+            scene_position = th.tensor([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
+            identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+            self._scene_prim.set_position_orientation(position=scene_position, orientation=identity_quat)
             new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
+            scene_position = th.zeros(3)
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             new_scene_edge = aabb_max[0]
 
-        return new_scene_edge
+        return new_scene_edge, scene_position
 
     def _load_metadata_from_scene_file(self):
         """
@@ -466,16 +474,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
         # and metadata
-        new_scene_edge = self._load_scene_prim_with_objects(**kwargs)
+        new_scene_edge, scene_position = self._load_scene_prim_with_objects(**kwargs)
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
 
-        # Cache this scene's pose
-        pos_ori = self._scene_prim.get_position_orientation()
+        # Cache this scene's pose using the position we just set, rather than reading
+        # it back from the prim, since the physics engine may not have processed the
+        # update yet (sim is stopped during load).
+        identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+        pos_ori = (scene_position, identity_quat)
         pose = T.pose2mat(pos_ori)
         self._pose_info = {
             "pos_ori": pos_ori,
-            "pose": T.pose2mat(pos_ori),
+            "pose": pose,
             "pose_inv": th.linalg.inv_ex(pose).inverse,
         }
 
@@ -496,6 +507,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Clears systems so they can be re-initialized.
         for system in self.active_systems.values():
             self.clear_system(system_name=system.name)
+
+        # Remove any vision sensors attached to this scene
+        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+        # which will cause segfault during og.clear()
+        scene_prim_path = self.prim_path
+        scene_prim_prefix = f"{scene_prim_path}/"
+        for sensor in tuple(VisionSensor.SENSORS.values()):
+            if sensor.prim_path == scene_prim_path or sensor.prim_path.startswith(scene_prim_prefix):
+                sensor.remove()
 
         # Remove all of the scene's objects.
         og.sim.batch_remove_objects(list(self.objects))
@@ -580,7 +600,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         registry.add(
             obj=SerializableRegistry(
                 name="object_registry",
-                class_types=BaseObject,
+                class_types=USDObject,
                 default_key="name",
                 hash_key="uuid",
                 unique_keys=self.object_registry_unique_keys,
@@ -637,7 +657,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         scene.load() is called. The object should also be accessible through scene.objects.
 
         Args:
-            obj (BaseObject): the object to load into the simulator
+            obj (USDObject): the object to load into the simulator
         """
         pass
 
@@ -646,7 +666,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Add an object to the scene. The scene should already be loaded.
 
         Args:
-            obj (BaseObject): the object to load
+            obj (USDObject): the object to load
             register (bool): Whether to register @obj internally in the scene object registry or not, as well as run
                 additional scene-specific logic in addition to the obj being loaded
             _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
@@ -666,7 +686,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
                 # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
                 # We do this by adding the object to our tracked collision groups
-                if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
+                if obj.fixed_base and obj.category != ROBOT_CATEGORY and not obj.visual_only:
                     obj_fixed_links = obj.get_fixed_link_names_in_subtree()
                     for link_name, link in obj.links.items():
                         if link_name in obj_fixed_links:
@@ -691,7 +711,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Method to remove an object from the simulator
 
         Args:
-            obj (BaseObject): Object to remove
+            obj (USDObject): Object to remove
             _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
                 a context externally. In general, this should NOT be explicitly set by the user
         """
@@ -756,25 +776,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Dump saved current state and also scene init info
         scene_info = {
-            # TODO: Use these to verify compatibility at load time.
-            "versions": {
-                "omnigibson": {
-                    "version": omnigibson.utils.asset_utils.get_omnigibson_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_git_hash(),
-                },
-                "bddl": {
-                    "version": omnigibson.utils.asset_utils.get_bddl_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_bddl_git_hash(),
-                },
-                "behavior-1k-assets": {
-                    "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
-                },
-                "omnigibson-robot-assets": {
-                    "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_git_hash(),
-                },
-            },
-            "metadata": self._task_metadata,
+            "versions": self._get_current_versions(),
+            "metadata": {"task": self._task_metadata},
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),
             "objects_info": self.get_objects_info(),
@@ -790,6 +793,71 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 json.dump(scene_info, f, cls=TorchEncoder, indent=4)
 
             log.info(f"Scene {self.idx} saved to {json_path}.")
+
+    @staticmethod
+    def _get_current_versions():
+        """
+        Returns:
+            dict: Dictionary of currently-installed component versions, in the same shape that is stored
+                under the "versions" key of a saved scene file.
+        """
+        return {
+            "omnigibson": {
+                "version": omnigibson.utils.asset_utils.get_omnigibson_version(),
+                "git_hash": omnigibson.utils.asset_utils.get_omnigibson_git_hash(),
+            },
+            "bddl": {
+                "version": omnigibson.utils.asset_utils.get_bddl_version(),
+            },
+            "behavior-1k-assets": {
+                "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
+            },
+            "omnigibson-robot-assets": {
+                "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
+            },
+        }
+
+    @staticmethod
+    def _check_versions_compatible(saved_versions):
+        """
+        Validates that each component version saved in @saved_versions is less than or equal to the
+        currently-installed version. This prevents loading a scene that was saved against newer
+        components than what is currently available.
+
+        Args:
+            saved_versions (dict): The "versions" sub-dictionary from a saved scene file.
+
+        Raises:
+            ValueError: If any saved version is strictly newer than the currently-installed version.
+        """
+        if not saved_versions:
+            log.warning("Scene file does not contain version information; skipping version compatibility check.")
+            return
+
+        current_versions = Scene._get_current_versions()
+        for component, current_info in current_versions.items():
+            saved_info = saved_versions.get(component)
+            if not saved_info:
+                continue
+            saved_version_str = saved_info.get("version")
+            current_version_str = current_info.get("version")
+            if saved_version_str is None or current_version_str is None:
+                continue
+            try:
+                saved_version = Version(saved_version_str)
+                current_version = Version(current_version_str)
+            except InvalidVersion:
+                log.warning(
+                    f"Could not parse version for {component} (saved={saved_version_str}, "
+                    f"current={current_version_str}); skipping comparison for this component."
+                )
+                continue
+            if saved_version > current_version:
+                raise ValueError(
+                    f"Scene file was saved with {component} version {saved_version_str}, which is newer than "
+                    f"the currently-installed version {current_version_str}. Please update {component} before "
+                    f"loading this scene."
+                )
 
     def restore(self, scene_file, update_initial_file=False):
         """
@@ -813,13 +881,21 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 scene_info = json.load(f)
         else:
             scene_info = scene_file
+
+        # Verify the saved component versions are compatible with the currently-installed versions.
+        # We require each saved version to be <= the currently-installed version.
+        self._check_versions_compatible(scene_info.get("versions", {}))
+
         init_info = scene_info["init_info"]
         # The saved state are lists, convert them to torch tensors
         state = recursively_convert_to_torch(scene_info["state"])
 
         # Recover metadata
-        for key, data in scene_info.get("metadata", dict()).items():
-            self.write_task_metadata(key=key, data=data)
+        if "metadata" in scene_info:
+            metadata = scene_info["metadata"]
+            task_metadata = metadata["task"] if "task" in metadata else metadata
+            for key, data in task_metadata.items():
+                self.write_task_metadata(key=key, data=data)
 
         # Make sure the class type is the same
         if self.__class__.__name__ != init_info["class_name"]:
@@ -887,9 +963,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             orientation (th.Tensor): (4,) orientation of the scene
         """
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
-        # Need to update sim here -- this is because downstream setters called immediately may not be respected,
-        # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+
         # Update the cached pose and inverse pose
         pos_ori = self._scene_prim.get_position_orientation()
         pose = T.pose2mat(pos_ori)
@@ -935,7 +1009,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return {
             obj.name: obj
             for obj in self.object_registry("fixed_base", True, default_val=[])
-            if obj.category != robot_macros.ROBOT_CATEGORY
+            if obj.category != ROBOT_CATEGORY
         }
 
     @property
@@ -1158,6 +1232,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
+            # Now update the rest of the state as normal
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
             self._registry.load_state(state=state, serialized=False)

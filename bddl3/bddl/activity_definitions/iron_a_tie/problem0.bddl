@@ -1,5 +1,5 @@
 (define (problem iron_a_tie-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         ironing_board.n.01_1 - ironing_board.n.01

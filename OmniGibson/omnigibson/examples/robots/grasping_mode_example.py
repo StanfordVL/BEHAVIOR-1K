@@ -15,9 +15,8 @@ GRASPING_MODES = dict(
     physical="Physical Grasping - No additional grasping assistance applied",
 )
 
-# Don't use GPU dynamics and Use flatcache for performance boost
+# Don't use GPU dynamics for performance boost
 gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -33,7 +32,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create environment configuration to use
     scene_cfg = dict(type="Scene")
     robot0_cfg = dict(
-        type="Fetch",
+        model="fetch",
         obs_modalities=["rgb"],  # we're just doing a grasping demo so we don't need all observation modalities
         action_type="continuous",
         action_normalize=True,

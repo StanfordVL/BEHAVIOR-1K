@@ -1,5 +1,5 @@
 (define (problem cooking_lunch-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         bread_slice.n.01_1 bread_slice.n.01_2 - bread_slice.n.01

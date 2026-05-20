@@ -1,5 +1,5 @@
 (define (problem make_cream_soda-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         soda_water.n.03_1 - soda_water.n.03

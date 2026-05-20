@@ -1,5 +1,5 @@
 (define (problem make_gift_bags_for_baby_showers-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         floor.n.01_1 - floor.n.01

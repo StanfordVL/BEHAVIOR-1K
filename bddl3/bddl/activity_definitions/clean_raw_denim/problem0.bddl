@@ -1,5 +1,5 @@
 (define (problem clean_raw_denim-0)
-    (:domain omnigibson)
+    (:domain behavior-1k)
 
     (:objects
         detergent__bottle.n.01_1 - detergent__bottle.n.01
