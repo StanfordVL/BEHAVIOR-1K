@@ -32278,6 +32278,7 @@
         "nonSubstance": {},
         "rigidBody": {},
         "rustable": {},
+        "sceneObject": {},
         "scratchable": {},
         "stainable": {},
         "stickyable": {},
@@ -79491,14 +79492,17 @@
     "toaster.n.02": {
         "disinfectable": {},
         "dustyable": {},
+        "fillable": {},
+        "freezable": {},
         "grassyable": {},
         "heatSource": {
             "requires_toggled_on": 1.0,
             "requires_closed": 0.0,
             "requires_inside": 1.0,
-            "temperature": 148.889,
+            "temperature": 150.0,
             "heating_rate": 0.1
         },
+        "heatable": {},
         "moldyable": {},
         "nonSubstance": {},
         "rigidBody": {},
