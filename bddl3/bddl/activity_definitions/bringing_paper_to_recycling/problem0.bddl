@@ -2,7 +2,6 @@
     (:domain behavior-1k)
 
     (:objects
-        dixie_cup.n.01_1 - dixie_cup.n.01
         sack.n.01_1 - sack.n.01
         newspaper.n.03_1 - newspaper.n.03
         recycling_bin.n.01_1 - recycling_bin.n.01
@@ -12,7 +11,6 @@
     )
 
     (:init
-        (ontop dixie_cup.n.01_1 countertop.n.01_1)
         (ontop sack.n.01_1 floor.n.01_1)
         (ontop newspaper.n.03_1 countertop.n.01_1)
         (ontop recycling_bin.n.01_1 floor.n.01_2)
@@ -24,7 +22,6 @@
 
     (:goal
         (and
-       	    (inside dixie_cup.n.01_1 ?recycling_bin.n.01_1)
        	    (inside sack.n.01_1 ?recycling_bin.n.01_1)
        	    (inside newspaper.n.03_1 ?recycling_bin.n.01_1)
             (not

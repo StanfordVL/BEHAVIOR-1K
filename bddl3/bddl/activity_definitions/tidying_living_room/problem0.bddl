@@ -5,9 +5,10 @@
         pot_plant.n.01_1 - pot_plant.n.01
         floor.n.01_1 - floor.n.01
         newspaper.n.03_1 - newspaper.n.03
-        letter.n.01_1 - letter.n.01
-        book.n.02_1 - book.n.02
+        hardback.n.01_1 - hardback.n.01
+        notebook.n.01_1 - notebook.n.01
         coffee_table.n.01_1 - coffee_table.n.01
+        desk.n.01_1 - desk.n.01
         bookcase.n.01_* - bookcase.n.01
         agent.n.01_1 - agent.n.01
     )
@@ -15,10 +16,11 @@
     (:init
         (ontop pot_plant.n.01_1 floor.n.01_1)
         (ontop newspaper.n.03_1 floor.n.01_1)
-        (ontop letter.n.01_1 floor.n.01_1)
-        (ontop book.n.02_1 floor.n.01_1)
+        (ontop hardback.n.01_1 coffee_table.n.01_1)
+        (ontop notebook.n.01_1 coffee_table.n.01_1)
         (inroom floor.n.01_1 living_room)
         (inroom coffee_table.n.01_1 living_room)
+        (inroom desk.n.01_1 living_room)
         (inroom bookcase.n.01_* living_room)
         (ontop agent.n.01_1 floor.n.01_1)
     )
@@ -28,12 +30,10 @@
             (ontop ?pot_plant.n.01_1 ?coffee_table.n.01_1)
             (exists
                 (?bookcase.n.01 - bookcase.n.01)
-                (and
-                    (inside ?newspaper.n.03_1 ?bookcase.n.01)
-                    (inside ?letter.n.01_1 ?bookcase.n.01)
-                    (inside ?book.n.02_1 ?bookcase.n.01)
-                )
+                (inside ?hardback.n.01_1 ?bookcase.n.01)
             )
+            (ontop ?newspaper.n.03_1 ?coffee_table.n.01_1)
+            (ontop ?notebook.n.01_1 ?desk.n.01_1)
         )
     )
 )
