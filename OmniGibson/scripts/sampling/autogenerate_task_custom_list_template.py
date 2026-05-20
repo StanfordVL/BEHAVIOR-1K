@@ -13,7 +13,7 @@ from floor_plan_visualization import get_floor_plan_data
 
 
 SYNSET_BASE_URL = "https://behavior.stanford.edu/knowledgebase/synsets"
-TASK_MISC_HEADER = ["Task ID", "Task", "Rooms to inlcude"]
+TASK_MISC_HEADER = ["Task ID", "Task", "Rooms to include"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-t", "--activity", type=str, required=True)
