@@ -2,34 +2,43 @@
     (:domain behavior-1k)
 
     (:objects
-        stain.n.01_1 - stain.n.01
+        dust.n.01_1 - dust.n.01
     	shoe.n.01_1 shoe.n.01_2 - shoe.n.01
-    	rag.n.01_1 - rag.n.01
+    	scrub_brush.n.01_1 - scrub_brush.n.01
+    	stand.n.04_1 - stand.n.04
+    	footstool.n.01_1 footstool.n.01_2 - footstool.n.01
     	floor.n.01_1 - floor.n.01
-    	sink.n.01_1 - sink.n.01
     	agent.n.01_1 - agent.n.01
     )
-    
-    (:init 
-        (covered shoe.n.01_1 stain.n.01_1) 
-        (covered shoe.n.01_2 stain.n.01_1) 
-        (ontop rag.n.01_1 floor.n.01_1) 
-        (ontop shoe.n.01_1 floor.n.01_1) 
-        (ontop shoe.n.01_2 floor.n.01_1) 
-        (inroom sink.n.01_1 bathroom) 
-        (inroom floor.n.01_1 bathroom) 
+
+    (:init
+        (covered shoe.n.01_1 dust.n.01_1)
+        (covered shoe.n.01_2 dust.n.01_1)
+        (ontop scrub_brush.n.01_1 stand.n.04_1)
+        (ontop shoe.n.01_1 floor.n.01_1)
+        (ontop shoe.n.01_2 floor.n.01_1)
+        (inroom floor.n.01_1 bedroom)
+        (inroom stand.n.04_1 bedroom)
+        (inroom footstool.n.01_1 bedroom)
+        (inroom footstool.n.01_2 bedroom)
         (ontop agent.n.01_1 floor.n.01_1)
     )
-    
-    (:goal 
-        (and 
-            (nextto ?rag.n.01_1 ?sink.n.01_1) 
-            (and 
-                (not 
-                    (covered ?shoe.n.01_1 ?stain.n.01_1)
-                ) 
-                (not 
-                    (covered ?shoe.n.01_2 ?stain.n.01_1)
+
+    (:goal
+        (and
+            (ontop scrub_brush.n.01_1 stand.n.04_1)
+            (not
+                (covered ?shoe.n.01_1 ?dust.n.01_1)
+            )
+            (not
+                (covered ?shoe.n.01_2 ?dust.n.01_1)
+            )
+            (nextto ?shoe.n.01_1 ?shoe.n.01_2)
+            (exists
+                (?footstool.n.01 - footstool.n.01)
+                (and
+                    (nextto ?shoe.n.01_1 ?footstool.n.01)
+                    (nextto ?shoe.n.01_2 ?footstool.n.01)
                 )
             )
         )
