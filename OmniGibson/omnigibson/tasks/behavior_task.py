@@ -372,10 +372,12 @@ class BehaviorTask(BaseTask):
         Args:
             env_idx (int): Index of the env whose scope should be rebuilt.
         """
-        existing = dict(self.object_scope[env_idx])
-        self.object_scope[env_idx] = {"agent.n.01_1": existing.get("agent.n.01_1")}
+        scope = self.object_scope[env_idx]
+        existing = dict(scope)
+        scope.clear()
+        scope["agent.n.01_1"] = existing.get("agent.n.01_1")
         for name in self.compiled_task.object_scope:
-            self.object_scope[env_idx][name] = existing.get(name)
+            scope[name] = existing.get(name)
 
     def _determine_room_instances(self, env, env_idx):
         """Determine which specific room instances to use based on assigned objects in @env_idx's scene.
