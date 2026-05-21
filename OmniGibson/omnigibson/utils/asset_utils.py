@@ -456,20 +456,20 @@ def download_omnigibson_robot_assets(upgrade: bool = False):
     Download OmniGibson robot assets
 
     Args:
-        upgrade (bool): If True, remove existing installation and redownload if no version or older version
+        upgrade (bool): If True, redownload when installed version is older than OMNIGIBSON_ROBOT_ASSETS_VERSION
     """
     dataset_path = get_dataset_path("omnigibson-robot-assets")
     current_version = get_omnigibson_robot_asset_version()
-    needs_upgrade = current_version is None or Version(current_version) < Version(MINIMUM_ROBOT_ASSETS_VERSION)
+    needs_upgrade = current_version is None or Version(current_version) < Version(OMNIGIBSON_ROBOT_ASSETS_VERSION)
     upgraded = False
     if os.path.exists(dataset_path):
         if upgrade and needs_upgrade:
-            print(f"Removing existing omnigibson-robot-assets (version: {current_version}) to upgrade...")
+            print(f"Upgrading omnigibson-robot-assets from {current_version} to {OMNIGIBSON_ROBOT_ASSETS_VERSION}...")
             shutil.rmtree(dataset_path)
             download_and_unpack_zipped_dataset("omnigibson-robot-assets")
             upgraded = True
         else:
-            print(f"OmniGibson robot assets already downloaded (version: {current_version}).")
+            print(f"OmniGibson robot assets already up to date (version: {current_version}).")
     else:
         download_and_unpack_zipped_dataset("omnigibson-robot-assets")
         upgraded = True
@@ -565,9 +565,13 @@ def download_key():
         assert urlretrieve(path, get_key_path()), "Key download failed."
 
 
-def download_behavior_1k_assets(accept_license=False):
+def download_behavior_1k_assets(accept_license=False, upgrade=False):
     """
     Download BEHAVIOR-1K dataset
+
+    Args:
+        accept_license (bool): If True, skip the interactive license prompt
+        upgrade (bool): If True, redownload when installed version is older than BEHAVIOR_1K_ASSET_VERSION
     """
     # Print user agreement
     if os.path.exists(get_key_path()):
@@ -581,16 +585,37 @@ def download_behavior_1k_assets(accept_license=False):
 
         download_key()
 
-    if os.path.exists(get_dataset_path("behavior-1k-assets")):
-        print("BEHAVIOR-1K dataset already installed.")
+    dataset_path = get_dataset_path("behavior-1k-assets")
+    if os.path.exists(dataset_path):
+        current_version = get_behavior_1k_assets_version()
+        needs_upgrade = current_version is None or Version(current_version) < Version(BEHAVIOR_1K_ASSET_VERSION)
+        if upgrade and needs_upgrade:
+            print(f"Upgrading behavior-1k-assets from {current_version} to {BEHAVIOR_1K_ASSET_VERSION}...")
+            shutil.rmtree(dataset_path)
+            download_and_unpack_zipped_dataset("behavior-1k-assets")
+            print(f"Successfully downloaded BEHAVIOR-1K assets version {get_behavior_1k_assets_version()}.")
+        else:
+            print(f"BEHAVIOR-1K dataset already up to date (version: {current_version}).")
     else:
         download_and_unpack_zipped_dataset("behavior-1k-assets")
 
 
-def download_2025_challenge_task_instances():
-    if not os.path.exists(get_dataset_path("2025-challenge-task-instances")):
+def download_2025_challenge_task_instances(upgrade=False):
+    """
+    Args:
+        upgrade (bool): If True, redownload even when the dataset is already present
+    """
+    dataset_path = get_dataset_path("2025-challenge-task-instances")
+    if os.path.exists(dataset_path):
+        if upgrade:
+            print("Redownloading 2025-challenge-task-instances...")
+            shutil.rmtree(dataset_path)
+            download_and_unpack_zipped_dataset("2025-challenge-task-instances")
+        else:
+            print("2025 BEHAVIOR Challenge Task Instances already downloaded.")
+    else:
         download_and_unpack_zipped_dataset("2025-challenge-task-instances")
-    print("2025 BEHAVIOR Challenge Tasks Instances updated.")
+    print("2025 BEHAVIOR Challenge Tasks Instances up to date.")
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):
