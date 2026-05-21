@@ -105,7 +105,6 @@ class TaskReport:
 # Loading helpers
 
 
-
 def yes_no(value):
     return "Yes" if value else "No"
 
@@ -228,7 +227,6 @@ def parse_instance_id(path, prefix):
 
 
 # Pose helpers
-
 
 
 def instance_state_path(paths, instance_id):
@@ -475,7 +473,6 @@ def load_room_categories():
 # Floor plan helpers
 
 
-
 @dataclass
 class FloorPlan:
     image_uri: str
@@ -625,7 +622,6 @@ def make_floor_plan(scene, chosen_rooms, floor=0, target_size=1200, crop_margin_
 
 
 # Report checks
-
 
 
 def validate_templates(paths):
