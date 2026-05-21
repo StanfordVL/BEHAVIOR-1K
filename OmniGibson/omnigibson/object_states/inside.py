@@ -4,6 +4,7 @@ import torch as th
 import warp as wp
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import macros, create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contains import m as contains_m
@@ -207,72 +208,47 @@ def _inside_finalize_kernel(
 class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     # Used by _inside_aabb_prefilter_kernel and the halfspace_test/mesh_reduce kernels to read
     # inner AABB centers and container AABBs from AABB.VALUES_WP.
-    _aabb_idx = None  # (N,) int32 torch  — keep-alive owner of the GPU storage
-    _aabb_idx_wp = None  # (N,) int32 wp.array view — kernel input
+    _aabb_idx = None  # wp.array (N,) int32 — Inside-N → AABB-N
 
     # All container-meta-link visual meshes across every scene are flattened into
     # one global table of length M. M = total number of containers scross scenes
 
     # Which *container* object that owns this mesh, or -1 if
     # the parent object isn't Inside-tracked.
-    # halfspace_test/mesh_reduce kernels use this to pick the column
-    # (s, _, container_j) into which mesh_reduce atomically writes.
-    _mesh_container_idx = None  # (M,) int32 torch
-    _mesh_container_idx_wp = None
+    _mesh_container_idx = None  # wp.array (M,) int32
 
     # Scene index of the container that owns this mesh.
-    # halfspace_test/mesh_reduce kernels skip meshes in other scenes.
-    _mesh_scene_idx = None  # (M,) int32 torch
-    _mesh_scene_idx_wp = None
+    _mesh_scene_idx = None  # wp.array (M,) int32
 
-    # RigidBodyViewAPI flat index of the parent link. inv_world_kernel indexes POSE_MATRICES
-    # with this to fetch the current world pose for inv-world composition.
-    _mesh_parent_link = None  # (M,) int32 torch
-    _mesh_parent_link_wp = None
+    # RigidBodyViewAPI flat index of the parent link.
+    _mesh_parent_link = None  # wp.array (M,) int32
 
-    # Static matrix that can transform a point in parent-link-frame into mesh-local-unscaled frame
-    # inv_world_kernel then multiply it with rigid_inverse_mat44(parent_link_world) each step to get
-    # the full world to mesh-local inverse.
-    _mesh_inv_local_w_scale = None  # (M, 4, 4) float32 torch
-    _mesh_inv_local_w_scale_wp = None
+    # Static matrix transforming a point in parent-link-frame into mesh-local-unscaled frame.
+    # inv_world_kernel composes this with rigid_inverse_mat44(parent_link_world) each step.
+    _mesh_inv_local_w_scale = None  # wp.array (M,) mat44
 
-    # Reverse lookup: which mesh does each face belong to. halfspace_test_kernel uses this to
-    # resolve face f → mesh m → all per-mesh state (inv_world, container, scene).
-    _face_to_mesh = None  # (F_total,) int32 torch
-    _face_to_mesh_wp = None
+    # Reverse lookup: which mesh does each face belong to.
+    _face_to_mesh = None  # wp.array (F_total,) int32
 
-    # Flat per-face data for all container meshes, concatenated end-to-end. Both are in
-    # mesh-local-unscaled frame (the frame halfspace_test_kernel transforms its query point
-    # into via inv_world[m]). The halfspace test is (p_local - centroid) · normal < 0.
-    _face_centroid = None  # (F_total, 3) float32 torch (wrapped as wp.vec3)
-    _face_centroid_wp = None
-    _face_normal = None  # (F_total, 3) float32 torch (wrapped as wp.vec3)
-    _face_normal_wp = None
+    # Flat per-face data for all container meshes, concatenated end-to-end.
+    _face_centroid = None  # wp.array (F_total,) vec3
+    _face_normal = None  # wp.array (F_total,) vec3
 
-    # Below are scratches used by kernels
+    # Scratches used by kernels.
 
-    # Scratch used by inv_world_kernel
     # Per-mesh inverse "world → mesh-local-unscaled" transform.
     # Written by inv_world_kernel each step; consumed by halfspace_test_kernel.
-    _inv_world = None  # (M, 4, 4) float32 torch (wrapped as wp.mat44)
-    _inv_world_wp = None
+    _inv_world = None  # wp.array (M,) mat44
 
     # Scratch written by aabb_prefilter_kernel (1 if inner_i's AABB center
-    # lies inside container_j's AABB, else 0). Consumed by halfspace_test/mesh_reduce kernels
-    # as an early-exit gate. Meshes whose container failed the AABB check are skipped entirely.
-    _prefilter = None  # (S, N, N) int32 torch
-    _prefilter_wp = None
+    # lies inside container_j's AABB, else 0).
+    _prefilter = None  # wp.array3d (S, N, N) int32
 
-    # Per-mesh "saw at least one failing halfspace" flag, atomic_max target for halfspace_test_kernel.
-    # Zeroed each step; mesh_reduce_kernel reads `outside_flag == 0` as "inner_i is inside mesh m".
-    _outside_flag = None  # (S, N, M) int32 torch
-    _outside_flag_wp = None
+    # Per-mesh "saw at least one failing halfspace" flag, atomic_max target.
+    _outside_flag = None  # wp.array3d (S, N, M) int32
 
     # atomic_max target for "any mesh of container_j contains inner_i's center".
-    # Zeroed at the top of _update_values, written by mesh_reduce_kernel, read by finalize_kernel
-    # which converts it (int32 → uint8) into VALUES.
-    _pair_scratch = None  # (S, N, N) int32 torch
-    _pair_scratch_wp = None
+    _pair_scratch = None  # wp.array3d (S, N, N) int32
 
     @classproperty
     def value_shape(cls):
@@ -296,29 +272,17 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     def global_initialize(cls):
         super().global_initialize()
         cls._aabb_idx = None
-        cls._aabb_idx_wp = None
         cls._mesh_container_idx = None
-        cls._mesh_container_idx_wp = None
         cls._mesh_scene_idx = None
-        cls._mesh_scene_idx_wp = None
         cls._mesh_parent_link = None
-        cls._mesh_parent_link_wp = None
         cls._mesh_inv_local_w_scale = None
-        cls._mesh_inv_local_w_scale_wp = None
         cls._face_to_mesh = None
-        cls._face_to_mesh_wp = None
         cls._face_centroid = None
-        cls._face_centroid_wp = None
         cls._face_normal = None
-        cls._face_normal_wp = None
         cls._inv_world = None
-        cls._inv_world_wp = None
         cls._prefilter = None
-        cls._prefilter_wp = None
         cls._outside_flag = None
-        cls._outside_flag_wp = None
         cls._pair_scratch = None
-        cls._pair_scratch_wp = None
 
     @classmethod
     def initialize_view(cls):
@@ -327,19 +291,20 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         N = len(cls.OBJ_IDXS)
 
         if S == 0 or N == 0:
-            cls._aabb_idx_wp = None
-            cls._inv_world_wp = None
-            cls._prefilter_wp = None
-            cls._pair_scratch_wp = None
+            cls._aabb_idx = None
+            cls._inv_world = None
+            cls._prefilter = None
+            cls._pair_scratch = None
             return
 
         # Build Inside-N → AABB-N
-        aabb_idx = th.full((N,), -1, dtype=th.int32)
+        aabb_idx_cpu = th.full((N,), -1, dtype=th.int32)
         aabb_map = AABB.OBJ_IDXS or {}
         for rel_path, idx in cls.OBJ_IDXS.items():
-            aabb_idx[idx] = aabb_map.get(rel_path, -1)
-        cls._aabb_idx = aabb_idx.cuda()
-        cls._aabb_idx_wp = wp.from_torch(cls._aabb_idx)
+            aabb_idx_cpu[idx] = aabb_map.get(rel_path, -1)
+        cls._aabb_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            aabb_idx_cpu, "int32", device="cuda"
+        )
 
         # Walk every Inside-tracked object's container meta-links and collect each visual mesh.
         # Only USD Mesh-typed visual meshes are supported; primitive types are skipped.
@@ -397,58 +362,55 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
 
         M = len(mesh_records)
         if M == 0:
-            cls._mesh_container_idx_wp = None
-            cls._mesh_scene_idx_wp = None
-            cls._mesh_parent_link_wp = None
-            cls._mesh_inv_local_w_scale_wp = None
-            cls._face_to_mesh_wp = None
-            cls._face_centroid_wp = None
-            cls._face_normal_wp = None
-            cls._inv_world_wp = None
-            cls._outside_flag_wp = None
+            cls._mesh_container_idx = None
+            cls._mesh_scene_idx = None
+            cls._mesh_parent_link = None
+            cls._mesh_inv_local_w_scale = None
+            cls._face_to_mesh = None
+            cls._face_centroid = None
+            cls._face_normal = None
+            cls._inv_world = None
+            cls._outside_flag = None
         else:
-            cls._mesh_container_idx = th.tensor([r["container"] for r in mesh_records], dtype=th.int32, device="cuda")
-            cls._mesh_scene_idx = th.tensor([r["scene"] for r in mesh_records], dtype=th.int32, device="cuda")
-            cls._mesh_parent_link = th.tensor([r["parent_link"] for r in mesh_records], dtype=th.int32, device="cuda")
-            inv_local_stack = th.stack([r["inv_local_w_scale"] for r in mesh_records]).cuda()
-            cls._mesh_inv_local_w_scale = inv_local_stack
-
-            cls._mesh_container_idx_wp = wp.from_torch(cls._mesh_container_idx)
-            cls._mesh_scene_idx_wp = wp.from_torch(cls._mesh_scene_idx)
-            cls._mesh_parent_link_wp = wp.from_torch(cls._mesh_parent_link)
-            cls._mesh_inv_local_w_scale_wp = wp.from_torch(cls._mesh_inv_local_w_scale, dtype=wp.mat44)
+            cls._mesh_container_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                [r["container"] for r in mesh_records], "int32", device="cuda"
+            )
+            cls._mesh_scene_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                [r["scene"] for r in mesh_records], "int32", device="cuda"
+            )
+            cls._mesh_parent_link = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                [r["parent_link"] for r in mesh_records], "int32", device="cuda"
+            )
+            # mat44 / vec3 have no scalar-only helper — wp.array on a numpy buffer reinterprets
+            # (M, 4, 4) float32 as (M,) mat44 and (F, 3) float32 as (F,) vec3.
+            inv_local_stack_cpu = th.stack([r["inv_local_w_scale"] for r in mesh_records])  # (M, 4, 4) CPU
+            cls._mesh_inv_local_w_scale = wp.array(inv_local_stack_cpu, dtype=wp.mat44, device="cuda")
 
             # Flat face arrays. M > 0 here and every retained mesh contributed at least one
             # face (zero-face meshes are filtered above), so F_total > 0.
-            face_centroids_flat = th.cat(face_centroids_list, dim=0).cuda().contiguous()
-            face_normals_flat = th.cat(face_normals_list, dim=0).cuda().contiguous()
-            cls._face_centroid = face_centroids_flat
-            cls._face_normal = face_normals_flat
-            cls._face_centroid_wp = wp.from_torch(face_centroids_flat, dtype=wp.vec3)
-            cls._face_normal_wp = wp.from_torch(face_normals_flat, dtype=wp.vec3)
+            face_centroids_flat_cpu = th.cat(face_centroids_list, dim=0).contiguous()  # (F, 3) CPU
+            face_normals_flat_cpu = th.cat(face_normals_list, dim=0).contiguous()  # (F, 3) CPU
+            cls._face_centroid = wp.array(face_centroids_flat_cpu, dtype=wp.vec3, device="cuda")
+            cls._face_normal = wp.array(face_normals_flat_cpu, dtype=wp.vec3, device="cuda")
 
-            cls._face_to_mesh = th.tensor(face_to_mesh_list, dtype=th.int32, device="cuda")
-            cls._face_to_mesh_wp = wp.from_torch(cls._face_to_mesh)
+            cls._face_to_mesh = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                face_to_mesh_list, "int32", device="cuda"
+            )
 
-            # Per-step scratch
-            cls._inv_world = th.zeros((M, 4, 4), dtype=th.float32, device="cuda")
-            cls._inv_world_wp = wp.from_torch(cls._inv_world, dtype=wp.mat44)
+            # Per-step scratch — allocate directly as wp.array.
+            cls._inv_world = wp.zeros(M, dtype=wp.mat44, device="cuda")
+            cls._outside_flag = wp.zeros((S, N, M), dtype=wp.int32, device="cuda")
 
-            cls._outside_flag = th.zeros((S, N, M), dtype=th.int32, device="cuda")
-            cls._outside_flag_wp = wp.from_torch(cls._outside_flag)
-
-        cls._prefilter = th.zeros((S, N, N), dtype=th.int32, device="cuda")
-        cls._prefilter_wp = wp.from_torch(cls._prefilter)
-        cls._pair_scratch = th.zeros((S, N, N), dtype=th.int32, device="cuda")
-        cls._pair_scratch_wp = wp.from_torch(cls._pair_scratch)
+        cls._prefilter = wp.zeros((S, N, N), dtype=wp.int32, device="cuda")
+        cls._pair_scratch = wp.zeros((S, N, N), dtype=wp.int32, device="cuda")
 
     @classmethod
     def _update_values(cls, values):
         if (
             cls.VALUES_WP is None
-            or cls._aabb_idx_wp is None
-            or cls._prefilter_wp is None
-            or cls._pair_scratch_wp is None
+            or cls._aabb_idx is None
+            or cls._prefilter is None
+            or cls._pair_scratch is None
             or AABB.VALUES_WP is None
             or RigidBodyViewAPI.POSE_MATRICES is None
         ):
@@ -457,16 +419,16 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         if S == 0 or N == 0:
             return
 
-        cls._pair_scratch_wp.zero_()
+        cls._pair_scratch.zero_()
 
         wp.launch(
             kernel=_inside_aabb_prefilter_kernel,
             dim=(S, N, N),
-            inputs=[AABB.VALUES_WP, cls._aabb_idx_wp, cls._prefilter_wp],
+            inputs=[AABB.VALUES_WP, cls._aabb_idx, cls._prefilter],
             device="cuda",
         )
 
-        if cls._mesh_container_idx_wp is not None:
+        if cls._mesh_container_idx is not None:
             M = cls._mesh_parent_link.shape[0]
             F_total = cls._face_centroid.shape[0]
 
@@ -476,30 +438,30 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                 dim=M,
                 inputs=[
                     RigidBodyViewAPI.POSE_MATRICES,
-                    cls._mesh_parent_link_wp,
-                    cls._mesh_inv_local_w_scale_wp,
-                    cls._inv_world_wp,
+                    cls._mesh_parent_link,
+                    cls._mesh_inv_local_w_scale,
+                    cls._inv_world,
                 ],
                 device="cuda",
             )
 
             # Each face independently votes "outside" via atomic_max into outside_flag.
             # Mesh "contains" iff no face voted outside → reduce kernel writes pair_scratch.
-            cls._outside_flag_wp.zero_()
+            cls._outside_flag.zero_()
             wp.launch(
                 kernel=_inside_halfspace_test_kernel,
                 dim=(S, N, F_total),
                 inputs=[
                     AABB.VALUES_WP,
-                    cls._aabb_idx_wp,
-                    cls._prefilter_wp,
-                    cls._inv_world_wp,
-                    cls._face_to_mesh_wp,
-                    cls._mesh_container_idx_wp,
-                    cls._mesh_scene_idx_wp,
-                    cls._face_centroid_wp,
-                    cls._face_normal_wp,
-                    cls._outside_flag_wp,
+                    cls._aabb_idx,
+                    cls._prefilter,
+                    cls._inv_world,
+                    cls._face_to_mesh,
+                    cls._mesh_container_idx,
+                    cls._mesh_scene_idx,
+                    cls._face_centroid,
+                    cls._face_normal,
+                    cls._outside_flag,
                 ],
                 device="cuda",
             )
@@ -507,12 +469,12 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                 kernel=_inside_mesh_reduce_kernel,
                 dim=(S, N, M),
                 inputs=[
-                    cls._aabb_idx_wp,
-                    cls._prefilter_wp,
-                    cls._mesh_container_idx_wp,
-                    cls._mesh_scene_idx_wp,
-                    cls._outside_flag_wp,
-                    cls._pair_scratch_wp,
+                    cls._aabb_idx,
+                    cls._prefilter,
+                    cls._mesh_container_idx,
+                    cls._mesh_scene_idx,
+                    cls._outside_flag,
+                    cls._pair_scratch,
                 ],
                 device="cuda",
             )
@@ -521,7 +483,7 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         wp.launch(
             kernel=_inside_finalize_kernel,
             dim=(S, N, N),
-            inputs=[cls._pair_scratch_wp, cls.VALUES_WP],
+            inputs=[cls._pair_scratch, cls.VALUES_WP],
             device="cuda",
         )
 

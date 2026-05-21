@@ -144,16 +144,12 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
     # S = number of scenes
     # O = number of toggleable objects
 
-    # th.Tensor (S, O) int
+    # wp.array2d (S, O) float32 — robot finger-in-marker step counter
     _robots_can_toggle_steps = None
-    _robots_can_toggle_steps_wp = None
 
-    # (O_requires_closed,) int64
-    # These are indices into flattened views of Open.VALUES and ToggledOn.VALUES.
+    # (O_requires_closed,) int32 — flat-index lookups into Open.VALUES and ToggledOn.VALUES.
     _requires_closed_obj_idxes_in_open_values = None
     _requires_closed_obj_idxes_in_this_values = None
-    _requires_closed_obj_idxes_in_open_values_wp = None
-    _requires_closed_obj_idxes_in_this_values_wp = None
 
     # list[list[GeomPrim]]: visual toggle-button markers, one per tracked object. Shape (S, O).
     # Used in _check_overlap and color updates.
@@ -162,39 +158,30 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
     # Contact masks
     # R_s = number of contact-matrix rows (links on the "who is touching" side) for scene s
     # C_s = number of contact-matrix columns (links on the "what are they touching" side) for scene s
-    _finger_query_mask = None  # list[Tensor(1, R_s) | None] — finger row mask per scene
-    _finger_query_mask_wp = None
-    _toggable_objs_with_mask = None  #  list[Tensor(O, C_s) | None] — toggle-object col masks per scene
-    _toggable_objs_with_mask_wp = None
+    _finger_query_mask = None  # list[wp.array(1, R_s) uint8 | None] — finger row mask per scene
+    _toggable_objs_with_mask = None  # list[wp.array(O, C_s) uint8 | None] — toggle-object col masks per scene
 
     # list[list of links of manipulation robots in scene s], len = S
     _finger_links = []
 
-    # Scratch masks, helper for calculate update, (S, O) int32 storage; only the flat 1D
-    # wp.array view is exposed (single source of truth — refreshed in initialize_view alongside
-    # the underlying tensor, plus a cached per-scene row view for is_in_contact_batch_warp).
-    _mask_can_toggle = None
-    _mask_can_toggle_flat_wp = None
+    # Scratch mask buffer. _mask_can_toggle is wp.array2d (S, O) int32; _mask_can_toggle_flat and
+    # _mask_can_toggle_per_scene[s] are wp views that share storage (reshape + row slice).
+    _mask_can_toggle = None  # wp.array2d (S, O) int32
+    _mask_can_toggle_flat = None  # wp.array (S*O,) view of _mask_can_toggle
+    _mask_can_toggle_per_scene = None  # list[wp.array(O,) | None] — row slice of _mask_can_toggle
 
-    # Per-scene out-row of _mask_can_toggle (uint8) for is_in_contact_batch_warp.
-    _mask_can_toggle_per_scene_wp = None  # list[wp.array | None] — (O,) per scene
-
-    # === Marker info — filled in initialize_view from USD reads. ===
+    # Marker info — filled in initialize_view from USD reads.
     # Marker is a static visual child of the togglebutton meta link, so its local offset and
     # radius never change. Per-step world center is derived inside the overlap kernel from the
     # parent link's current pose matrix in RigidBodyViewAPI.POSE_MATRICES.
-    _marker_parent_link_idx_gpu = None  # (n_markers,) int32 — flat link idx in RigidBodyViewAPI
-    _marker_parent_link_idx_wp = None
-    _marker_local_offset_gpu = None  # (n_markers, 3) float32 — marker center in parent link's local frame
-    _marker_local_offset_wp = None
-    _marker_radii_gpu = None  # (n_markers,) float32 — sphere radius
-    _marker_radii_wp = None
+    _marker_parent_link_idx = None  # wp.array (n_markers,) int32 — flat link idx in RigidBodyViewAPI
+    _marker_local_offset = None  # wp.array (n_markers,) vec3 — marker center in parent link's local frame
+    _marker_radii = None  # wp.array (n_markers,) float32 — sphere radius
 
     # === Pair index buffers built once in initialize_view (covers all (marker, finger_link) pairs across scenes). ===
     # (P,) wp.vec2i — each row is (marker_idx, finger_link_flat_idx) for one (marker, finger) pair.
     _marker_finger_pair = None
-    _marker_to_obj_idx_flat_gpu = None  # (n_markers,) int32 — flat (s*O + obj_idx) per marker (storage anchor)
-    _marker_to_obj_idx_flat_wp = None  # wp.array view
+    _marker_to_obj_idx_flat = None  # wp.array (n_markers,) int32 — flat (s*O + obj_idx) per marker
 
     COLOR_ON = th.tensor([0, 1.0, 0])  # green  — toggle is on
     COLOR_OFF = th.tensor([1.0, 0, 0])  # red    — toggle is off
@@ -221,37 +208,45 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         cls._toggable_objs_with_mask = None
 
         cls._mask_can_toggle = None
+        cls._mask_can_toggle_flat = None
+        cls._mask_can_toggle_per_scene = None
 
     @classmethod
     def initialize_view(cls):
         """
         Rebuild all class-level tensors after scene changes.
         """
-        # Snapshot existing states
+        # Snapshot existing states. wp.to_torch shares storage with the wp array;
+        # .cpu() forces a single GPU→CPU copy so the per-element carry-over reads stay on CPU.
         prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
-        prev_steps = cls._robots_can_toggle_steps.clone() if cls._robots_can_toggle_steps is not None else None
+        prev_steps_cpu = (
+            wp.to_torch(cls._robots_can_toggle_steps).cpu() if cls._robots_can_toggle_steps is not None else None
+        )
 
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for toggle bool)
         super().initialize_view()
 
         S, O = len(cls.IDX_OBJS), len(cls.OBJ_IDXS)
 
-        # Carry over _can_toggle_steps for surviving objects
-        cls._robots_can_toggle_steps = th.zeros((S, O), dtype=th.float32, device="cuda")
-        if prev_steps is not None:
-            for relative_prim_path, obj_idx_old in prev_obj_idxs.items():
-                if relative_prim_path not in cls.OBJ_IDXS:
-                    continue
-                obj_idx = cls.OBJ_IDXS[relative_prim_path]
-                for scene_idx in range(min(prev_steps.shape[0], S)):
-                    cls._robots_can_toggle_steps[scene_idx, obj_idx] = prev_steps[scene_idx, obj_idx_old]
-        cls._robots_can_toggle_steps_wp = wp.from_torch(cls._robots_can_toggle_steps)
-
         cls._init_requires_closed_logic(O)
 
         if S == 0 or O == 0:
             cls._init_empty_states()
             return
+
+        # Carry over _can_toggle_steps for surviving objects via a CPU scratch tensor,
+        # then ship to a fresh GPU wp.array.
+        new_steps_cpu = th.zeros((S, O), dtype=th.float32)
+        if prev_steps_cpu is not None:
+            for relative_prim_path, obj_idx_old in prev_obj_idxs.items():
+                if relative_prim_path not in cls.OBJ_IDXS:
+                    continue
+                obj_idx = cls.OBJ_IDXS[relative_prim_path]
+                for scene_idx in range(min(prev_steps_cpu.shape[0], S)):
+                    new_steps_cpu[scene_idx, obj_idx] = prev_steps_cpu[scene_idx, obj_idx_old]
+        cls._robots_can_toggle_steps = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            new_steps_cpu, "float32", device="cuda"
+        )
 
         marker_finger_pairs = cls._init_finger(S, O)
         cls._init_marker(S, O, marker_finger_pairs)
@@ -279,22 +274,20 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                     scene_idx * open_values_object_dim_size + idx_in_open_object_dim
                 )
         # int32 so the kernel can index with wp.int32.
-        cls._requires_closed_obj_idxes_in_open_values = th.tensor(
-            requires_closed_obj_idxes_in_open_values, dtype=th.int32, device="cuda"
-        )
-        cls._requires_closed_obj_idxes_in_this_values = th.tensor(
-            requires_closed_obj_idxes_in_this_values, dtype=th.int32, device="cuda"
-        )
-        if cls._requires_closed_obj_idxes_in_open_values.numel() > 0:
-            cls._requires_closed_obj_idxes_in_open_values_wp = wp.from_torch(
-                cls._requires_closed_obj_idxes_in_open_values
+        if requires_closed_obj_idxes_in_open_values:
+            cls._requires_closed_obj_idxes_in_open_values = (
+                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                    requires_closed_obj_idxes_in_open_values, "int32", device="cuda"
+                )
             )
-            cls._requires_closed_obj_idxes_in_this_values_wp = wp.from_torch(
-                cls._requires_closed_obj_idxes_in_this_values
+            cls._requires_closed_obj_idxes_in_this_values = (
+                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                    requires_closed_obj_idxes_in_this_values, "int32", device="cuda"
+                )
             )
         else:
-            cls._requires_closed_obj_idxes_in_open_values_wp = None
-            cls._requires_closed_obj_idxes_in_this_values_wp = None
+            cls._requires_closed_obj_idxes_in_open_values = None
+            cls._requires_closed_obj_idxes_in_this_values = None
 
     @classmethod
     def _init_empty_states(cls):
@@ -302,25 +295,17 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         Empty-scene (S == 0 or O == 0) early-init: clear every per-scene/per-marker buffer
         to a safe default (None or empty list) so `_update_values` short-circuits cleanly.
         """
+        cls._robots_can_toggle_steps = None
         cls._finger_query_mask = []
         cls._toggable_objs_with_mask = []
-        cls._mask_can_toggle = th.zeros((0, 0), dtype=th.int32, device="cuda")
-        cls._mask_can_toggle_flat_wp = None
-        cls._robots_can_toggle_steps_wp = None
-        cls._requires_closed_obj_idxes_in_open_values_wp = None
-        cls._requires_closed_obj_idxes_in_this_values_wp = None
-        cls._finger_query_mask_wp = []
-        cls._toggable_objs_with_mask_wp = []
-        cls._mask_can_toggle_per_scene_wp = []
-        cls._marker_parent_link_idx_gpu = None
-        cls._marker_parent_link_idx_wp = None
-        cls._marker_local_offset_gpu = None
-        cls._marker_local_offset_wp = None
-        cls._marker_radii_gpu = None
-        cls._marker_radii_wp = None
+        cls._mask_can_toggle = None
+        cls._mask_can_toggle_flat = None
+        cls._mask_can_toggle_per_scene = []
+        cls._marker_parent_link_idx = None
+        cls._marker_local_offset = None
+        cls._marker_radii = None
         cls._marker_finger_pair = None
-        cls._marker_to_obj_idx_flat_gpu = None
-        cls._marker_to_obj_idx_flat_wp = None
+        cls._marker_to_obj_idx_flat = None
 
     @classmethod
     def _init_finger(cls, S, O):
@@ -338,12 +323,12 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         marker_finger_pairs = []  # list[(marker_idx, finger_link_flat_idx)]
         cls._finger_query_mask = []
         cls._toggable_objs_with_mask = []
-        cls._finger_query_mask_wp = []
-        cls._toggable_objs_with_mask_wp = []
-        cls._mask_can_toggle_per_scene_wp = []
+        cls._mask_can_toggle_per_scene = []
 
-        cls._mask_can_toggle = th.zeros((S, O), dtype=th.int32, device="cuda")
-        cls._mask_can_toggle_flat_wp = wp.from_torch(cls._mask_can_toggle.view(-1))
+        # _mask_can_toggle_flat and _mask_can_toggle_per_scene[s]
+        # are wp views that share storage with this allocation (reshape + row slice).
+        cls._mask_can_toggle = wp.zeros((S, O), dtype=wp.int32, device="cuda")
+        cls._mask_can_toggle_flat = cls._mask_can_toggle.reshape((S * O,))
 
         for scene_idx, scene in enumerate(og.sim.scenes):
             # Get all finger links and their idx in RigidBodyViewAPI in this scene
@@ -358,13 +343,11 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
             cls._finger_links.append(finger_links)
             if not finger_links:
-                # Keep all 5 per-scene lists in lockstep so the per-step loop can
+                # Keep all 3 per-scene lists in lockstep so the per-step loop can
                 # index any of them by scene_idx without an IndexError.
                 cls._finger_query_mask.append(None)
                 cls._toggable_objs_with_mask.append(None)
-                cls._finger_query_mask_wp.append(None)
-                cls._toggable_objs_with_mask_wp.append(None)
-                cls._mask_can_toggle_per_scene_wp.append(None)
+                cls._mask_can_toggle_per_scene.append(None)
                 continue
 
             for obj_idx in range(O):
@@ -379,37 +362,39 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 for link_flat in finger_link_flat_idxs:
                     marker_finger_pairs.append((marker_idx_flat, link_flat))
 
-            # Build finger query mask
-            row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,) CPU
-            cls._finger_query_mask.append(row_mask.unsqueeze(0).cuda())  # (1, R_s) GPU
-
             # Build toggle-able object with mask — shape (O, C_s)
-            toggleable_obj_with_mask = []
+            toggleable_obj_with_mask_rows = []
             any_uninitialized = False
             for obj_idx in range(O):
                 if cls.IDX_OBJS[scene_idx][obj_idx] is None:
                     any_uninitialized = True
                     break
-                toggleable_obj_with_mask.append(
+                toggleable_obj_with_mask_rows.append(
                     RigidContactAPI.get_contact_col_mask(
                         scene_idx, list(cls.IDX_OBJS[scene_idx][obj_idx].links.values())
                     )
                 )
             if any_uninitialized:
+                cls._finger_query_mask.append(None)
                 cls._toggable_objs_with_mask.append(None)
-            else:
-                cls._toggable_objs_with_mask.append(th.stack(toggleable_obj_with_mask).cuda())
-
-            qmask = cls._finger_query_mask[scene_idx]
-            wmask = cls._toggable_objs_with_mask[scene_idx]
-            if qmask is None or wmask is None:
-                cls._finger_query_mask_wp.append(None)
-                cls._toggable_objs_with_mask_wp.append(None)
-                cls._mask_can_toggle_per_scene_wp.append(None)
+                cls._mask_can_toggle_per_scene.append(None)
                 continue
-            cls._finger_query_mask_wp.append(wp.from_torch(qmask.contiguous().view(th.uint8), dtype=wp.uint8))
-            cls._toggable_objs_with_mask_wp.append(wp.from_torch(wmask.contiguous().view(th.uint8), dtype=wp.uint8))
-            cls._mask_can_toggle_per_scene_wp.append(wp.from_torch(cls._mask_can_toggle[scene_idx]))
+
+            # Build CPU scratch then ship to wp on GPU. get_contact_row/col_mask return bool;
+            # cast to uint8 before tolist() so wp interprets bytes unambiguously.
+            row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,) bool CPU
+            finger_query_mask_data = row_mask.unsqueeze(0).to(th.uint8)  # (1, R_s) CPU uint8 tensor
+            with_mask_data = th.stack(toggleable_obj_with_mask_rows).to(th.uint8)  # (O, C_s) CPU uint8 tensor
+
+            cls._finger_query_mask.append(
+                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                    finger_query_mask_data, "uint8", device="cuda"
+                )
+            )
+            cls._toggable_objs_with_mask.append(
+                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(with_mask_data, "uint8", device="cuda")
+            )
+            cls._mask_can_toggle_per_scene.append(cls._mask_can_toggle[scene_idx])
 
         return marker_finger_pairs
 
@@ -418,11 +403,11 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         """
         Init marker info for check_overlap_kernel
           - cls.visual_markers[s][o]: GeomPrim handle (for color updates in post_update).
-          - marker_to_obj_idx_flat: m → flat (s*O + o) for the atomic_max target.
-          - marker_parent_link_idx: m → flat link idx in RigidBodyViewAPI.POSE_MATRICES.
-          - marker_local_offset: m → marker center expressed in parent link's local frame.
-          - marker_radii: m → BVH query radius (scale * min mesh extent).
-          - cls._marker_finger_pair: (P,) wp.vec2i wrapping the (marker, finger) pair list
+          - _marker_to_obj_idx_flat: m → flat (s*O + o) for the atomic_max target.
+          - _marker_parent_link_idx: m → flat link idx in RigidBodyViewAPI.POSE_MATRICES.
+          - _marker_local_offset: m → marker center expressed in parent link's local frame.
+          - _marker_radii: m → BVH query radius (scale * min mesh extent).
+          - _marker_finger_pair: (P,) wp.vec2i wrapping the (marker, finger) pair list
             collected by _init_finger.
 
         Marker world center is derived inside the kernel each step from the parent link's
@@ -430,10 +415,11 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         """
         n_markers = S * O
         cls.visual_markers = [[None] * O for _ in range(S)]
-        marker_to_obj_idx_flat = th.zeros((n_markers,), dtype=th.int32)
-        marker_parent_link_idx = th.zeros((n_markers,), dtype=th.int32)
-        marker_local_offset = th.zeros((n_markers, 3), dtype=th.float32)
-        marker_radii = th.zeros((n_markers,), dtype=th.float32)
+        # CPU scratch tensors — convenient for the Python fill loop; dropped after wp conversion.
+        marker_to_obj_idx_flat_cpu = th.zeros((n_markers,), dtype=th.int32)
+        marker_parent_link_idx_cpu = th.zeros((n_markers,), dtype=th.int32)
+        marker_local_offset_cpu = th.zeros((n_markers, 3), dtype=th.float32)
+        marker_radii_cpu = th.zeros((n_markers,), dtype=th.float32)
 
         for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
             for obj_idx, toggle_obj in enumerate(scene_row):
@@ -443,7 +429,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 cls.visual_markers[scene_idx][obj_idx] = state.marker
 
                 marker_idx_flat = scene_idx * O + obj_idx
-                marker_to_obj_idx_flat[marker_idx_flat] = marker_idx_flat
+                marker_to_obj_idx_flat_cpu[marker_idx_flat] = marker_idx_flat
                 # Skip if marker isn't initialized yet — state.link would assert and there's
                 # nothing meaningful to bake. _init_finger also skips pair generation for these
                 # markers, so the kernel never reads parent_link_idx / local_offset / radii here.
@@ -453,26 +439,26 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 # Compute marker center in link's local frame from current world poses:
                 marker_pos, _ = state.marker.get_position_orientation()
                 link_pos, link_ori = link.get_position_orientation()
-                marker_parent_link_idx[marker_idx_flat] = RigidBodyViewAPI.get_flat_idx(link.prim_path)
-                marker_local_offset[marker_idx_flat] = T.quat2mat(link_ori).T @ (marker_pos - link_pos)
-                marker_radii[marker_idx_flat] = th.min(state.marker.extent * state.marker.scale).item()
+                marker_parent_link_idx_cpu[marker_idx_flat] = RigidBodyViewAPI.get_flat_idx(link.prim_path)
+                marker_local_offset_cpu[marker_idx_flat] = T.quat2mat(link_ori).T @ (marker_pos - link_pos)
+                marker_radii_cpu[marker_idx_flat] = th.min(state.marker.extent * state.marker.scale).item()
 
-        # Move marker data to GPU and wrap as wp.arrays.
-        cls._marker_to_obj_idx_flat_gpu = marker_to_obj_idx_flat.cuda()
-        cls._marker_parent_link_idx_gpu = marker_parent_link_idx.cuda()
-        cls._marker_local_offset_gpu = marker_local_offset.cuda()
-        cls._marker_radii_gpu = marker_radii.cuda()
-        cls._marker_to_obj_idx_flat_wp = wp.from_torch(cls._marker_to_obj_idx_flat_gpu)
-        cls._marker_parent_link_idx_wp = wp.from_torch(cls._marker_parent_link_idx_gpu)
-        cls._marker_local_offset_wp = wp.from_torch(cls._marker_local_offset_gpu, dtype=wp.vec3)
-        cls._marker_radii_wp = wp.from_torch(cls._marker_radii_gpu)
+        # Scalar-typed → create_tensor_from_list; vec3 has no helper, use wp.array on a numpy
+        # (N, 3) buffer which it reinterprets as (N,) vec3.
+        cls._marker_to_obj_idx_flat = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            marker_to_obj_idx_flat_cpu, "int32", device="cuda"
+        )
+        cls._marker_parent_link_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            marker_parent_link_idx_cpu, "int32", device="cuda"
+        )
+        cls._marker_radii = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            marker_radii_cpu, "float32", device="cuda"
+        )
+        cls._marker_local_offset = wp.array(marker_local_offset_cpu, dtype=wp.vec3, device="cuda")
 
         # Wrap (marker, finger) pair list as wp.array of vec2i (each row a 2-element int32 vec).
         if marker_finger_pairs:
-            cls._marker_finger_pair = wp.from_torch(
-                th.tensor(marker_finger_pairs, dtype=th.int32, device="cuda"),
-                dtype=wp.vec2i,
-            )
+            cls._marker_finger_pair = wp.array(marker_finger_pairs, dtype=wp.vec2i, device="cuda")
         else:
             cls._marker_finger_pair = None
 
@@ -582,46 +568,46 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         5. Finalize: if mask == 2, increment step counter, XOR-flip values
            when counter hits the threshold, then normalize mask back to {0, 1}.
         """
-        if cls._mask_can_toggle_flat_wp is None:
+        if cls._mask_can_toggle_flat is None:
             return
         S, O = values.shape[:2]
 
-        mask_flat_wp = cls._mask_can_toggle_flat_wp
+        mask_flat = cls._mask_can_toggle_flat
         values_flat_wp = wp.from_torch(values.view(-1).view(th.uint8), dtype=wp.uint8)
-        steps_flat_wp = wp.from_torch(cls._robots_can_toggle_steps.view(-1))
+        steps_flat = cls._robots_can_toggle_steps.reshape((S * O,))
 
-        mask_flat_wp.zero_()
+        mask_flat.zero_()
 
         # check whether finger & marker touching
         for scene_idx in range(S):
-            query_mask_wp = cls._finger_query_mask_wp[scene_idx]
-            with_mask_wp = cls._toggable_objs_with_mask_wp[scene_idx]
-            out_wp = cls._mask_can_toggle_per_scene_wp[scene_idx]
-            if query_mask_wp is None or with_mask_wp is None or out_wp is None:
+            query_mask = cls._finger_query_mask[scene_idx]
+            with_mask = cls._toggable_objs_with_mask[scene_idx]
+            out = cls._mask_can_toggle_per_scene[scene_idx]
+            if query_mask is None or with_mask is None or out is None:
                 continue
             RigidContactAPI.is_in_contact_batch_warp(
                 scene_idx=scene_idx,
-                query_masks_wp=query_mask_wp,  # (1, R_s)
-                with_masks_wp=with_mask_wp,  # (O, C_s)
+                query_masks_wp=query_mask,  # (1, R_s)
+                with_masks_wp=with_mask,  # (O, C_s)
                 ignore_masks_wp=None,
                 current_only=False,
-                out_wp=out_wp,
+                out_wp=out,
             )
 
         # check requires_closed
-        if cls._requires_closed_obj_idxes_in_open_values_wp is not None and Open.VALUES_WP is not None:
+        if cls._requires_closed_obj_idxes_in_open_values is not None and Open.VALUES_WP is not None:
             R = cls._requires_closed_obj_idxes_in_open_values.shape[0]
             open_flat_wp = wp.from_torch(Open.VALUES.view(-1).view(th.uint8), dtype=wp.uint8)
             wp.launch(
                 kernel=_check_requires_closed_kernel,
                 dim=R,
                 inputs=[
-                    cls._requires_closed_obj_idxes_in_this_values_wp,
-                    cls._requires_closed_obj_idxes_in_open_values_wp,
+                    cls._requires_closed_obj_idxes_in_this_values,
+                    cls._requires_closed_obj_idxes_in_open_values,
                     open_flat_wp,
                     values_flat_wp,
-                    steps_flat_wp,
-                    mask_flat_wp,
+                    steps_flat,
+                    mask_flat,
                 ],
                 device="cuda",
             )
@@ -634,12 +620,12 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 inputs=[
                     RigidBodyViewAPI.POSE_MATRICES,
                     RigidBodyViewAPI.LINK_MESH_IDS,
-                    cls._marker_parent_link_idx_wp,
-                    cls._marker_local_offset_wp,
-                    cls._marker_radii_wp,
+                    cls._marker_parent_link_idx,
+                    cls._marker_local_offset,
+                    cls._marker_radii,
                     cls._marker_finger_pair,
-                    cls._marker_to_obj_idx_flat_wp,
-                    mask_flat_wp,
+                    cls._marker_to_obj_idx_flat,
+                    mask_flat,
                 ],
                 device="cuda",
             )
@@ -650,8 +636,8 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
             dim=(S, O),
             inputs=[
                 cls.VALUES_WP,
-                cls._mask_can_toggle_flat_wp,
-                cls._robots_can_toggle_steps_wp,
+                cls._mask_can_toggle_flat,
+                cls._robots_can_toggle_steps,
                 wp.int32(O),
                 wp.float32(m.CAN_TOGGLE_STEPS),
             ],
@@ -753,18 +739,20 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
             return dict(value=False, hand_in_marker_steps=0)
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
+        # wp.to_torch is a zero-copy view of the wp.array storage.
+        steps_view = wp.to_torch(type(self)._robots_can_toggle_steps)
         return dict(
             value=bool(self.VALUES[s, obj_idx].item()),
-            hand_in_marker_steps=int(self._robots_can_toggle_steps[s, obj_idx].item()),
+            hand_in_marker_steps=int(steps_view[s, obj_idx].item()),
         )
 
     def _load_state(self, state):
         # Restore toggle via _set_value so the visual marker color is also updated.
         self._set_value(state["value"])
-        # Restore step counter directly into the tensor.
+        # Restore step counter directly into the wp.array via a zero-copy torch view.
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        type(self)._robots_can_toggle_steps[s, obj_idx] = float(state["hand_in_marker_steps"])
+        wp.to_torch(type(self)._robots_can_toggle_steps)[s, obj_idx] = float(state["hand_in_marker_steps"])
 
     def serialize(self, state):
         # [toggle_state, can_toggle_steps] as float32
