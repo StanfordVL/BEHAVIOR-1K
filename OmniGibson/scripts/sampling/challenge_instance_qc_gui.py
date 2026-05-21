@@ -150,6 +150,13 @@ def load_or_report(load_fn, path, default, errors):
         return default
 
 
+def require_mapping(value, label, errors):
+    if isinstance(value, dict):
+        return value
+    errors.append(f"{label}: root should be an object")
+    return {}
+
+
 def find_top_level_yaml_duplicates(path):
     keys = []
     pattern = re.compile(r"^([A-Za-z0-9_][^:#]*):\s*$")
@@ -687,7 +694,7 @@ def analyze_task(paths, task_id, rooms, args):
 
     robot_positions = []
     object_positions = defaultdict(list)
-    robot_pose_ok = True
+    invalid_robot_pose_ids = []
     valid_json_count = 0
     try:
         template_data = (
@@ -699,18 +706,23 @@ def analyze_task(paths, task_id, rooms, args):
     for instance_id in range(1, args.expected_instances + 1):
         path = instance_state_path(paths, instance_id)
         if not path.exists():
+            invalid_robot_pose_ids.append(instance_id)
             continue
         try:
             data = read_json(path)
             valid_json_count += 1
         except Exception as exc:
-            robot_pose_ok = False
+            invalid_robot_pose_ids.append(instance_id)
             report.invalid_json_files.append(f"{path.relative_to(args.dataset_dir)}: {exc}")
             continue
 
-        robot_poses = data.get("robot_poses") if isinstance(data, dict) else None
+        if not isinstance(data, dict):
+            invalid_robot_pose_ids.append(instance_id)
+            continue
+
+        robot_poses = data.get("robot_poses")
         if not check_robot_pose_dict(robot_poses):
-            robot_pose_ok = False
+            invalid_robot_pose_ids.append(instance_id)
         else:
             position = first_robot_position(data)
             if position is not None:
@@ -723,7 +735,13 @@ def analyze_task(paths, task_id, rooms, args):
     report.checks.append(
         CheckLine("JSONs open cleanly", not report.invalid_json_files, format_list(report.invalid_json_files))
     )
-    report.checks.append(CheckLine("Every instance has a robot pose", robot_pose_ok))
+    report.checks.append(
+        CheckLine(
+            "Every instance has a robot pose",
+            not invalid_robot_pose_ids,
+            format_robot_pose_detail(report.missing_instance_ids, invalid_robot_pose_ids),
+        )
+    )
     report.robot_stats = compute_pose_stats(robot_positions)
     report.object_stats = {name: compute_pose_stats(points) for name, points in sorted(object_positions.items())}
     robot_std_ok = report.robot_stats.std_xy >= args.min_xy_std
@@ -755,6 +773,16 @@ def format_instance_detail(missing_ids, extra_files):
         parts.append("missing " + summarize_ints(missing_ids))
     if extra_files:
         parts.append("extra " + format_list(extra_files, max_items=5))
+    return "; ".join(parts)
+
+
+def format_robot_pose_detail(missing_ids, invalid_pose_ids):
+    parts = []
+    if missing_ids:
+        parts.append("missing instance files " + summarize_ints(missing_ids))
+    invalid_ids = sorted(set(invalid_pose_ids) - set(missing_ids))
+    if invalid_ids:
+        parts.append("invalid robot pose " + summarize_ints(invalid_ids))
     return "; ".join(parts)
 
 
@@ -881,6 +909,7 @@ def build_reports(args):
 
     metadata_load_errors = []
     available_tasks = load_or_report(load_yaml, available_path, {}, metadata_load_errors)
+    available_tasks = require_mapping(available_tasks, "available_tasks.yaml", metadata_load_errors)
     available_duplicates = find_top_level_yaml_duplicates(available_path) if available_path.exists() else []
     custom_duplicate_keys = []
     custom_lists = load_or_report(
@@ -889,6 +918,7 @@ def build_reports(args):
         {},
         metadata_load_errors,
     )
+    custom_lists = require_mapping(custom_lists, "task_custom_lists.json", metadata_load_errors)
     b100_rows, b100_duplicates = load_or_report(load_b100_rows, b100_path, ([], []), metadata_load_errors)
     discovered_paths, extra_instance_dirs = discover_task_paths(dataset_dir)
     selected_tasks = choose_tasks(available_tasks, b100_rows)

@@ -179,7 +179,7 @@ or robot poses change.
 After the task design is finalized, create a separate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
 
     - two seed instance json files: `0_0_template.json`, `0_0_template-partial_rooms.json`
-    - 300 task intance files under 
+    - 300 task instance files under `scenes/SCENE_NAME/json/SCENE_NAME_task_TASK_NAME_instances/`
     - updated `task_custom_list.json` and `available_tasks.yaml`
 
 Watch out for merge conflicts from main, which will most likely happen on `task_custom_list.json` and `available_tasks.yaml`. 
