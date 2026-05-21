@@ -212,9 +212,10 @@ def import_bad_model_originals(model_id):
     )
     assert success, f"Failed to import {model_id}."
     imported_objs_by_name = {obj.name: obj for obj in imported_meshes}
-    assert set(objects_to_import) == set(imported_objs_by_name.keys()), (
-        "Not all objects were imported. Missing: "
-        + str(set(objects_to_import) - set(imported_objs_by_name.keys()))
+    assert set(objects_to_import) == set(
+        imported_objs_by_name.keys()
+    ), "Not all objects were imported. Missing: " + str(
+        set(objects_to_import) - set(imported_objs_by_name.keys())
     )
 
     zero_layer = rt.LayerManager.getLayer(0)
@@ -265,14 +266,15 @@ def replace_object_instances(obj, respect_aspect_ratio=False):
         same_model_id_parsed_names
     ), "All same model ID objects should have a parsed name"
 
-    # Check that once grouped by instance ID, they all have the same set of links
     links_by_instance_id = defaultdict(dict)
     for inst, inst_parsed_name in zip(all_same_model_id, same_model_id_parsed_names):
         link_name = inst_parsed_name.group("link_name")
         if not link_name:
             link_name = "base_link"
         links_by_instance_id[inst_parsed_name.group("instance_id")][link_name] = inst
-    all_links = set(frozenset(x.keys()) for x in links_by_instance_id.values())
+
+    # # Check that once grouped by instance ID, they all have the same set of links
+    # all_links = set(frozenset(x.keys()) for x in links_by_instance_id.values())
     # assert (
     #     len(all_links) == 1
     # ), f"All instances of {obj.name} do not share the same set of links: {links_by_instance_id}"
@@ -297,17 +299,29 @@ def replace_object_instances(obj, respect_aspect_ratio=False):
     assert all_parented == set(all_base_links), "Not all instances were parented."
 
     # Record the transforms of all of the instances as well as their local and world BBs
-    instance_layers = [x.layer for x in all_base_links]
-    instance_parents = [inst.parent for inst in all_base_links]
-    instance_transforms = [inst.transform for inst in all_base_links]
-    instance_rotations = [inst.rotation for inst in all_base_links]
-    instance_lowbbs = [
-        node_bounding_box_incl_children(inst, rotation_only_transform(inst.transform))
-        for inst in all_base_links
-    ]
-    instance_world_bbs = [
-        node_bounding_box_incl_children(inst) for inst in all_base_links
-    ]
+    dimensionless_map = {rt.Editable_Poly: False, rt.Point: True}
+    instance_infos = []
+    for inst in all_base_links:
+        dimensionless = dimensionless_map[rt.classOf(inst)]
+        localbb = (
+            node_bounding_box_incl_children(
+                inst, rotation_only_transform(inst.transform)
+            )
+            if not dimensionless
+            else None
+        )
+        worldbb = node_bounding_box_incl_children(inst) if not dimensionless else None
+        instance_infos.append(
+            {
+                "parent": inst.parent,
+                "transform": inst.transform,
+                "rotation": inst.rotation,
+                "layer": inst.layer,
+                "dimensionless": dimensionless,
+                "localbb": localbb,
+                "worldbb": worldbb,
+            }
+        )
 
     # Delete all the objects
     for same_model_id in all_same_model_id:
@@ -336,23 +350,7 @@ def replace_object_instances(obj, respect_aspect_ratio=False):
     comparison_data = {}
 
     # Now for each of the original bozos make a copy of the whole thing, scale it up, rotate it, and shift it into place
-    for instance_id, (
-        instance_parent,
-        instance_transform,
-        instance_rotation,
-        instance_lowbb,
-        instance_world_bb,
-        instance_layer,
-    ) in enumerate(
-        zip(
-            instance_parents,
-            instance_transforms,
-            instance_rotations,
-            instance_lowbbs,
-            instance_world_bbs,
-            instance_layers,
-        )
-    ):
+    for instance_id, instance_info in enumerate(instance_infos):
         # First copy the object.
         success, child_copy = rt.maxOps.cloneNodes(
             copyable_meshes,
@@ -364,7 +362,7 @@ def replace_object_instances(obj, respect_aspect_ratio=False):
 
         # Move everything to the correct layer
         for mesh in child_copy:
-            instance_layer.addNode(mesh)
+            instance_info["layer"].addNode(mesh)
 
         # Find the base link in the child copies. It's the one whose parent is not one of the child copies
         (base_copy,) = [x for x in child_copy if x.parent not in child_copy]
@@ -372,179 +370,190 @@ def replace_object_instances(obj, respect_aspect_ratio=False):
             base_copy == child_copy[0]
         ), "The base link should be the first element in the list of child"
 
-        # Get the points
-        base_copy_points = np.concatenate(
-            get_vert_sets_including_children(base_copy), axis=0
-        )
+        if instance_info["dimensionless"]:
+            # Set the object transform here, no scaling.
+            base_copy.transform = instance_info["transform"]
 
-        # Scale the imported mesh to match the instance
-        # The target bounding box is the instance's local bounding box
-        instance_lowbb_size = instance_lowbb[1] - instance_lowbb[0]
-
-        # The current world bounding box is equal to the local bounding box, since we start
-        # with an identity transform (e.g. the points are the same in world
-        # and local frame)
-        base_copy_lowbb = bounding_box_from_verts(base_copy_points)
-        base_copy_lowbb_size = base_copy_lowbb[1] - base_copy_lowbb[0]
-
-        # The target scale is the ratio of the two sizes
-        if respect_aspect_ratio:
-            relative_scale_from_now = np.min(
-                instance_lowbb_size / base_copy_lowbb_size
-            ) * np.ones(3)
         else:
-            relative_scale_from_now = instance_lowbb_size / base_copy_lowbb_size
+            # Get the points
+            base_copy_points = np.concatenate(
+                get_vert_sets_including_children(base_copy), axis=0
+            )
 
-        # This scale needs to be applied BEFORE the rotation since it's in local frame
-        scale_transform = np.diag(relative_scale_from_now.tolist() + [1])
+            # Scale the imported mesh to match the instance
+            # The target bounding box is the instance's local bounding box
+            instance_localbb_size = (
+                instance_info["localbb"][1] - instance_info["localbb"][0]
+            )
 
-        # Combine the scale with the rotation
-        rotation_transform = rotation_only_transform(instance_transform)
-        combined_transform = rotation_transform @ scale_transform
+            # The current world bounding box is equal to the local bounding box, since we start
+            # with an identity transform (e.g. the points are the same in world
+            # and local frame)
+            base_copy_localbb = bounding_box_from_verts(base_copy_points)
+            base_copy_localbb_size = base_copy_localbb[1] - base_copy_localbb[0]
 
-        # Assert the validity of the rotation and scale
-        print("Rotation transform", rotation_transform)
-        print("Scale transform", scale_transform)
-        print(
-            "Combined transform components",
-            get_rotation_from_transform(combined_transform),
-        )
-        target_orn = R.from_quat(quat2arr(instance_transform.rotation))
-        current_orn = R.from_matrix(get_rotation_from_transform(combined_transform)[0])
-        delta_orn = target_orn * current_orn
-        delta_mag = delta_orn.magnitude()
-        print("Delta orientation", delta_orn.as_rotvec(), "magnitude", delta_mag)
+            # The target scale is the ratio of the two sizes
+            if respect_aspect_ratio:
+                relative_scale_from_now = np.min(
+                    instance_localbb_size / base_copy_localbb_size
+                ) * np.ones(3)
+            else:
+                relative_scale_from_now = instance_localbb_size / base_copy_localbb_size
 
-        # Position it to match bottom face center (this allows for the object to not be floating
-        # if respect_aspect_ratio is True)
-        base_copy_world_bb = bounding_box_from_verts(
-            apply_transform(base_copy_points, combined_transform)
-        )
-        base_copy_world_bb_bottom_center = (
-            base_copy_world_bb[0] + base_copy_world_bb[1]
-        ) / 2
-        base_copy_world_bb_bottom_center[2] = base_copy_world_bb[0][2]
-        instance_world_bb_bottom_center = (
-            instance_world_bb[0] + instance_world_bb[1]
-        ) / 2
-        instance_world_bb_bottom_center[2] = instance_world_bb[0][2]
-        move_center_by = (
-            instance_world_bb_bottom_center - base_copy_world_bb_bottom_center
-        )
-        combined_transform[:3, 3] = move_center_by
+            # This scale needs to be applied BEFORE the rotation since it's in local frame
+            scale_transform = np.diag(relative_scale_from_now.tolist() + [1])
 
-        # Convert and apply the transform to the 3ds Max object
-        if SET_VIA_TRANSFORM:
-            base_copy.transform = transform2mat(combined_transform)
-        else:
-            quat = R.from_matrix(rotation_transform[:3, :3]).as_quat()
-            base_copy.scale = rt.Point3(*relative_scale_from_now.tolist())
-            base_copy.rotation = rt.Quat(*quat.tolist())
-            base_copy.position = rt.Point3(*move_center_by.tolist())
+            # Combine the scale with the rotation
+            rotation_transform = rotation_only_transform(instance_info["transform"])
+            combined_transform = rotation_transform @ scale_transform
 
-        max_orn = R.from_quat(quat2arr(base_copy.rotation))
-        numpy_rot, numpy_scale = get_rotation_from_transform(combined_transform)
-        numpy_orn = R.from_matrix(numpy_rot)
-        delta_orn = max_orn.inv() * numpy_orn
-        delta_mag = delta_orn.magnitude()
-        print("Max orientation differs from local orientation by", delta_mag)
-        print(
-            "Max scale",
-            base_copy.transform.scale,
-            "vs Numpy scale",
-            numpy_scale,
-            "vs Relative scale",
-            relative_scale_from_now,
-        )
+            # Assert the validity of the rotation and scale
+            print("Rotation transform", rotation_transform)
+            print("Scale transform", scale_transform)
+            print(
+                "Combined transform components",
+                get_rotation_from_transform(combined_transform),
+            )
+            target_orn = R.from_quat(quat2arr(instance_info["transform"].rotation))
+            current_orn = R.from_matrix(
+                get_rotation_from_transform(combined_transform)[0]
+            )
+            delta_orn = target_orn * current_orn
+            delta_mag = delta_orn.magnitude()
+            print("Delta orientation", delta_orn.as_rotvec(), "magnitude", delta_mag)
 
-        # Assert the new world bb is the same as the original world bb and the numpy bb
-        # Compute the transformed bb via numpy
-        computed_world_bb = bounding_box_from_verts(
-            apply_transform(base_copy_points, combined_transform)
-        )
-        computed_size = computed_world_bb[1] - computed_world_bb[0]
-        computed_center = (computed_world_bb[0] + computed_world_bb[1]) / 2
-        computed_min, computed_max = computed_world_bb
+            # Position it to match bottom face center (this allows for the object to not be floating
+            # if respect_aspect_ratio is True)
+            base_copy_world_bb = bounding_box_from_verts(
+                apply_transform(base_copy_points, combined_transform)
+            )
+            base_copy_world_bb_bottom_center = (
+                base_copy_world_bb[0] + base_copy_world_bb[1]
+            ) / 2
+            base_copy_world_bb_bottom_center[2] = base_copy_world_bb[0][2]
+            instance_world_bb_bottom_center = (
+                instance_info["worldbb"][0] + instance_info["worldbb"][1]
+            ) / 2
+            instance_world_bb_bottom_center[2] = instance_info["worldbb"][0][2]
+            move_center_by = (
+                instance_world_bb_bottom_center - base_copy_world_bb_bottom_center
+            )
+            combined_transform[:3, 3] = move_center_by
 
-        # Decompose the original bb
-        orig_min, orig_max = instance_world_bb
-        orig_center = (orig_min + orig_max) / 2
-        orig_size = orig_max - orig_min
+            # Convert and apply the transform to the 3ds Max object
+            if SET_VIA_TRANSFORM:
+                base_copy.transform = transform2mat(combined_transform)
+            else:
+                quat = R.from_matrix(rotation_transform[:3, :3]).as_quat()
+                base_copy.scale = rt.Point3(*relative_scale_from_now.tolist())
+                base_copy.rotation = rt.Quat(*quat.tolist())
+                base_copy.position = rt.Point3(*move_center_by.tolist())
 
-        # Decompose the new 3ds Max bb
-        base_copy_world_bb = node_bounding_box_incl_children(base_copy)
-        new_min, new_max = base_copy_world_bb
-        new_center = (new_min + new_max) / 2
-        new_size = new_max - new_min
+            max_orn = R.from_quat(quat2arr(base_copy.rotation))
+            numpy_rot, numpy_scale = get_rotation_from_transform(combined_transform)
+            numpy_orn = R.from_matrix(numpy_rot)
+            delta_orn = max_orn.inv() * numpy_orn
+            delta_mag = delta_orn.magnitude()
+            print("Max orientation differs from local orientation by", delta_mag)
+            print(
+                "Max scale",
+                base_copy.transform.scale,
+                "vs Numpy scale",
+                numpy_scale,
+                "vs Relative scale",
+                relative_scale_from_now,
+            )
 
-        print("Bounding box info")
-        print(
-            "  Original min",
-            orig_min,
-            "vs New min",
-            new_min,
-            "vs Computed min",
-            computed_world_bb[0],
-        )
-        print(
-            "  Original max",
-            orig_max,
-            "vs New max",
-            new_max,
-            "vs Computed max",
-            computed_world_bb[1],
-        )
-        print(
-            "  Original size",
-            orig_size,
-            "vs New size",
-            new_size,
-            "vs Computed size",
-            computed_size,
-        )
-        print(
-            "  Original center",
-            orig_center,
-            "vs New center",
-            new_center,
-            "vs Computed center",
-            computed_center,
-        )
+            # Assert the new world bb is the same as the original world bb and the numpy bb
+            # Compute the transformed bb via numpy
+            computed_world_bb = bounding_box_from_verts(
+                apply_transform(base_copy_points, combined_transform)
+            )
+            computed_size = computed_world_bb[1] - computed_world_bb[0]
+            computed_center = (computed_world_bb[0] + computed_world_bb[1]) / 2
+            computed_min, computed_max = computed_world_bb
 
-        # Note the much higher tolerance due to rotation errors :(
-        if not respect_aspect_ratio:
-            assert np.allclose(
-                orig_center, computed_center, atol=100
-            ), "Computed center is not the same as the original center"
-            assert np.allclose(
-                orig_size, computed_size, atol=100
-            ), "Computed size is not the same as the original size"
+            # Decompose the original bb
+            orig_min, orig_max = instance_info["worldbb"]
+            orig_center = (orig_min + orig_max) / 2
+            orig_size = orig_max - orig_min
 
-            assert np.allclose(
-                orig_center, new_center, atol=100
-            ), "New center is not the same as the original center"
-            assert np.allclose(
+            # Decompose the new 3ds Max bb
+            base_copy_world_bb = node_bounding_box_incl_children(base_copy)
+            new_min, new_max = base_copy_world_bb
+            new_center = (new_min + new_max) / 2
+            new_size = new_max - new_min
+
+            print("Bounding box info")
+            print(
+                "  Original min",
+                orig_min,
+                "vs New min",
+                new_min,
+                "vs Computed min",
+                computed_world_bb[0],
+            )
+            print(
+                "  Original max",
+                orig_max,
+                "vs New max",
+                new_max,
+                "vs Computed max",
+                computed_world_bb[1],
+            )
+            print(
+                "  Original size",
                 orig_size,
+                "vs New size",
                 new_size,
-                atol=100,
-            ), "New size is not the same as the original size"
+                "vs Computed size",
+                computed_size,
+            )
+            print(
+                "  Original center",
+                orig_center,
+                "vs New center",
+                new_center,
+                "vs Computed center",
+                computed_center,
+            )
 
-        # Record the comparison data
-        comparison_data[instance_id] = {
-            "original_transform": mat2transform(instance_transform).tolist(),
-            "calculated_transform": combined_transform.tolist(),
-            "current_transform": mat2transform(base_copy.transform).tolist(),
-            "original_world_bb": [x.tolist() for x in instance_world_bb],
-            "computed_world_bb": [x.tolist() for x in computed_world_bb],
-            "current_world_bb": [x.tolist() for x in base_copy_world_bb],
-            "original_lowbb": [x.tolist() for x in instance_lowbb],
-            "current_lowbb": [x.tolist() for x in base_copy_lowbb],
-            "respect_aspect_ratio": respect_aspect_ratio,
-        }
+            # Note the much higher tolerance due to rotation errors :(
+            if not respect_aspect_ratio:
+                assert np.allclose(
+                    orig_center, computed_center, atol=100
+                ), "Computed center is not the same as the original center"
+                assert np.allclose(
+                    orig_size, computed_size, atol=100
+                ), "Computed size is not the same as the original size"
+
+                assert np.allclose(
+                    orig_center, new_center, atol=100
+                ), "New center is not the same as the original center"
+                assert np.allclose(
+                    orig_size,
+                    new_size,
+                    atol=100,
+                ), "New size is not the same as the original size"
+
+            # Record the comparison data
+            comparison_data[instance_id] = {
+                "original_transform": mat2transform(
+                    instance_info["transform"]
+                ).tolist(),
+                "calculated_transform": combined_transform.tolist(),
+                "current_transform": mat2transform(base_copy.transform).tolist(),
+                "original_world_bb": [x.tolist() for x in instance_info["worldbb"]],
+                "computed_world_bb": [x.tolist() for x in computed_world_bb],
+                "current_world_bb": [x.tolist() for x in base_copy_world_bb],
+                "original_localbb": [x.tolist() for x in instance_info["localbb"]],
+                "current_localbb": [x.tolist() for x in base_copy_localbb],
+                "respect_aspect_ratio": respect_aspect_ratio,
+            }
 
         # Name each of the children correctly, and parent them to the original owner's parents
         for (link_name, parent_link, joint_type, _), link in zip(copyables, child_copy):
-            link.parent = instance_parent
+            link.parent = instance_info["parent"]
             if link_name == "base_link":
                 link.name = (
                     f"B-{loose}{category}-{model_id}-{instance_id}-{link_name}{tags}"

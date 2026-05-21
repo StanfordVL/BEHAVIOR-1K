@@ -1003,6 +1003,19 @@ def _launch_simulator(*args, **kwargs):
                         obj.name in obj_registry
                     ):  # a particle system template object might not exist in the registry when it's empty
                         obj_registry.pop(obj.name)
+                    # Remove stale articulated-grasp constraints for any robot arm targeting this object.
+                    for robot in obj.scene.robots:
+                        robot_state = obj_registry.get(robot.name)
+                        ag_params = None if robot_state is None else robot_state.get("ag_obj_constraint_params")
+                        if ag_params is None:
+                            continue
+                        for arm, arm_params in ag_params.items():
+                            if not arm_params:
+                                continue
+                            target_obj = arm_params.get("target_obj")
+                            target_obj_name = target_obj.name if hasattr(target_obj, "name") else target_obj
+                            if target_obj_name == obj.name or arm_params.get("ag_obj_prim_path") == obj.prim_path:
+                                ag_params[arm] = None
 
             # Run the main method
             try:

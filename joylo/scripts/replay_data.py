@@ -117,6 +117,10 @@ def select_episode_id(episode_lengths, default_episode_id, prompt_user=False):
     """
     Selects which episode to replay, optionally prompting the user.
     """
+    if len(episode_lengths) == 1:
+        print(f"Only one episode found, auto-selecting episode {default_episode_id}.")
+        return default_episode_id
+
     if not prompt_user:
         return default_episode_id
 

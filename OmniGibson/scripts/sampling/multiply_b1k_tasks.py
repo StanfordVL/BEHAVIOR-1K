@@ -5,7 +5,7 @@ from omnigibson.macros import gm, macros
 import json
 from omnigibson.objects import DatasetObject
 import numpy as np
-from utils import validate_task, get_scene_model
+from utils import validate_task, get_scene_model, resolve_scene_model
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 
 parser = argparse.ArgumentParser()
@@ -68,6 +68,7 @@ def main():
     args = parser.parse_args()
 
     scene_model = get_scene_model(TASK_CUSTOM_LISTS[args.activity])
+    scene_model = resolve_scene_model(scene_model, os.path.join(DATASET_2026_PATH, "scenes"))
 
     if args.output_dir is None:
         args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
