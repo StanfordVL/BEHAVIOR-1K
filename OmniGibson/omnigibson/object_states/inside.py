@@ -381,8 +381,8 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             cls._mesh_parent_link = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
                 [r["parent_link"] for r in mesh_records], "int32", device="cuda"
             )
-            # mat44 / vec3 have no scalar-only helper — wp.array on a numpy buffer reinterprets
-            # (M, 4, 4) float32 as (M,) mat44 and (F, 3) float32 as (F,) vec3.
+            # mat44 / vec3 have no scalar-only helper — wp.array reinterprets the CPU torch
+            # buffer's (M, 4, 4) float32 as (M,) mat44 and (F, 3) float32 as (F,) vec3.
             inv_local_stack_cpu = th.stack([r["inv_local_w_scale"] for r in mesh_records])  # (M, 4, 4) CPU
             cls._mesh_inv_local_w_scale = wp.array(inv_local_stack_cpu, dtype=wp.mat44, device="cuda")
 

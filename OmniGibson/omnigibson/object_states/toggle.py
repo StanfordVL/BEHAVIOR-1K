@@ -381,7 +381,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 continue
 
             # Build CPU scratch then ship to wp on GPU. get_contact_row/col_mask return bool;
-            # cast to uint8 before tolist() so wp interprets bytes unambiguously.
+            # cast to uint8 first so wp reads the buffer as uint8 unambiguously.
             row_mask = RigidContactAPI.get_contact_row_mask(scene_idx, finger_links)  # (R_s,) bool CPU
             finger_query_mask_data = row_mask.unsqueeze(0).to(th.uint8)  # (1, R_s) CPU uint8 tensor
             with_mask_data = th.stack(toggleable_obj_with_mask_rows).to(th.uint8)  # (O, C_s) CPU uint8 tensor
@@ -443,8 +443,8 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 marker_local_offset_cpu[marker_idx_flat] = T.quat2mat(link_ori).T @ (marker_pos - link_pos)
                 marker_radii_cpu[marker_idx_flat] = th.min(state.marker.extent * state.marker.scale).item()
 
-        # Scalar-typed → create_tensor_from_list; vec3 has no helper, use wp.array on a numpy
-        # (N, 3) buffer which it reinterprets as (N,) vec3.
+        # Scalar-typed → create_tensor_from_list; vec3 has no helper, so use wp.array directly
+        # — it reinterprets the CPU torch (N, 3) float32 buffer as (N,) vec3.
         cls._marker_to_obj_idx_flat = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
             marker_to_obj_idx_flat_cpu, "int32", device="cuda"
         )
