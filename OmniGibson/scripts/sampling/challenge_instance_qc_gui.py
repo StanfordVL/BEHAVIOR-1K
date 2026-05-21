@@ -15,16 +15,22 @@ import cv2
 import numpy as np
 import yaml
 
+from constants import DATASET_2026_PATH
+from omnigibson.utils import transform_utils_np as T
+
 
 SCRIPT_DESCRIPTION = "Validate 2026 challenge task instances and show sampled poses on floor plans."
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_DATASET_DIR = REPO_ROOT / "datasets" / "2026-challenge-task-instances"
+DEFAULT_DATASET_DIR = Path(DATASET_2026_PATH)
 DEFAULT_ASSET_SCENES_DIR = REPO_ROOT / "datasets" / "behavior-1k-assets" / "scenes"
 ROOM_CATEGORIES_PATH = REPO_ROOT / "datasets" / "behavior-1k-assets" / "metadata" / "room_categories.txt"
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 METADATA_FILENAMES = {"B100_task_misc.csv", "available_tasks.yaml", "task_custom_lists.json"}
 INSTANCE_SUFFIX = "_template-tro_state.json"
 MAP_RESOLUTION = 0.01
+UNKNOWN_TASK_ID_SORT_KEY = 10_000
+QUATERNION_NORM_TOLERANCE = 1e-3
 POSE_KEYS_TO_SKIP = {"robot_poses"}
 STATIC_OBJECT_PREFIXES = ("floor.", "wall.", "ceiling.")
 DEFAULT_PALETTE = [
@@ -46,9 +52,7 @@ DEFAULT_PALETTE = [
     "#b45309",
 ]
 
-
-# -----------------------------------------------------------------------------
-# Small data carriers
+# Data models
 
 
 @dataclass
@@ -98,7 +102,8 @@ class TaskReport:
         return all(check.ok for check in self.checks)
 
 
-# File and metadata loading
+# Loading helpers
+
 
 
 def yes_no(value):
@@ -168,7 +173,7 @@ def load_b100_rows(path):
             if task_name in seen:
                 duplicate_tasks.append(task_name)
             seen.add(task_name)
-            raw_rooms = row.get("Rooms to inlcude") or row.get("Rooms to include") or ""
+            raw_rooms = row.get("Rooms to include") or row.get("Rooms to inlcude") or ""
             rooms = [room.strip() for room in raw_rooms.splitlines() if room.strip()]
             try:
                 task_id = int(row.get("Task ID", ""))
@@ -203,7 +208,14 @@ def discover_task_paths(dataset_dir):
 
 def task_order_from_b100(task_names, b100_rows):
     id_by_task = {row["task_name"]: row["task_id"] for row in b100_rows}
-    return sorted(task_names, key=lambda name: (id_by_task.get(name) is None, id_by_task.get(name, 10_000), name))
+    return sorted(
+        task_names,
+        key=lambda name: (
+            id_by_task.get(name) is None,
+            id_by_task.get(name, UNKNOWN_TASK_ID_SORT_KEY),
+            name,
+        ),
+    )
 
 
 def choose_tasks(available_tasks, b100_rows):
@@ -215,7 +227,8 @@ def parse_instance_id(path, prefix):
     return int(match.group(1)) if match else None
 
 
-# Pose extraction
+# Pose helpers
+
 
 
 def instance_state_path(paths, instance_id):
@@ -224,9 +237,50 @@ def instance_state_path(paths, instance_id):
 
 def template_task_metadata(data):
     if not isinstance(data, dict):
-        return None
+        raise ValueError("template JSON root should be an object")
     metadata = data.get("metadata")
-    return metadata.get("task") if isinstance(metadata, dict) else None
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata should be an object")
+    task_metadata = metadata.get("task")
+    if not isinstance(task_metadata, dict):
+        raise ValueError("metadata.task should be an object")
+    return task_metadata
+
+
+def safe_template_task_metadata(data):
+    try:
+        return template_task_metadata(data)
+    except ValueError:
+        return {}
+
+
+def is_number_sequence(value, min_length):
+    return (
+        isinstance(value, list)
+        and len(value) >= min_length
+        and all(
+            isinstance(component, (int, float)) and not isinstance(component, bool) and math.isfinite(component)
+            for component in value[:min_length]
+        )
+    )
+
+
+def is_valid_position(value, min_length=2):
+    return is_number_sequence(value, min_length)
+
+
+def is_valid_unit_quaternion(value):
+    if not is_number_sequence(value, 4):
+        return False
+    norm = math.sqrt(sum(component * component for component in value[:4]))
+    return abs(norm - 1.0) <= QUATERNION_NORM_TOLERANCE
+
+
+def require_dict_field(data, key, context):
+    value = data.get(key) if isinstance(data, dict) else None
+    if not isinstance(value, dict):
+        raise ValueError(f"{context}.{key} should be an object")
+    return value
 
 
 def check_robot_pose_dict(value):
@@ -240,16 +294,15 @@ def check_robot_pose_dict(value):
                 return False
             position = pose.get("position")
             orientation = pose.get("orientation")
-            if not (isinstance(position, list) and len(position) >= 2):
+            if not is_valid_position(position):
                 return False
-            if not (isinstance(orientation, list) and len(orientation) >= 4):
+            if not is_valid_unit_quaternion(orientation):
                 return False
     return True
 
 
 def nested_template_robot_poses(data):
-    task_metadata = template_task_metadata(data)
-    return task_metadata.get("robot_poses") if isinstance(task_metadata, dict) else None
+    return safe_template_task_metadata(data).get("robot_poses")
 
 
 def first_position_from_robot_poses(robot_poses):
@@ -259,7 +312,7 @@ def first_position_from_robot_poses(robot_poses):
         if not isinstance(poses, list) or not poses:
             continue
         position = poses[0].get("position") if isinstance(poses[0], dict) else None
-        if isinstance(position, list) and len(position) >= 2:
+        if is_valid_position(position):
             return position
     return None
 
@@ -280,7 +333,7 @@ def object_root_position(value):
     if not isinstance(root_link, dict):
         return None
     position = root_link.get("pos")
-    return position if isinstance(position, list) and len(position) >= 2 else None
+    return position if is_valid_position(position) else None
 
 
 def object_root_pose(value):
@@ -291,41 +344,29 @@ def object_root_pose(value):
         return None
     position = root_link.get("pos")
     orientation = root_link.get("ori")
-    if not (isinstance(position, list) and len(position) >= 3):
+    if not is_valid_position(position, min_length=3):
         return None
-    if not (isinstance(orientation, list) and len(orientation) >= 4):
+    if not is_valid_unit_quaternion(orientation):
         return None
     return position, orientation
 
 
-def quat_to_matrix(quat):
-    x, y, z, w = quat[:4]
-    norm = math.sqrt(x * x + y * y + z * z + w * w)
-    if norm == 0:
-        return np.eye(3)
-    x, y, z, w = x / norm, y / norm, z / norm, w / norm
-    return np.array(
-        [
-            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
-        ],
-        dtype=np.float64,
-    )
-
-
 def transform_local_position(position, parent_state):
     pose = object_root_pose(parent_state)
-    if pose is None:
+    if pose is None or not is_valid_position(position, min_length=3):
         return position
     parent_position, parent_orientation = pose
-    local = np.asarray(position[:3], dtype=np.float64)
-    world = np.asarray(parent_position[:3], dtype=np.float64) + quat_to_matrix(parent_orientation) @ local
+    world, _ = T.pose_transform(
+        np.asarray(parent_position[:3], dtype=np.float32),
+        np.asarray(parent_orientation[:4], dtype=np.float32),
+        np.asarray(position[:3], dtype=np.float32),
+        np.asarray([0, 0, 0, 1], dtype=np.float32),
+    )
     return world.tolist()
 
 
 def template_scene_to_bddl_names(data):
-    task_metadata = template_task_metadata(data)
+    task_metadata = safe_template_task_metadata(data)
     inst_to_name = task_metadata.get("inst_to_name") if isinstance(task_metadata, dict) else None
     if not isinstance(inst_to_name, dict):
         return {}
@@ -344,7 +385,7 @@ def particle_positions(value):
     positions = value.get("positions")
     if not isinstance(positions, list):
         return []
-    return [position for position in positions if isinstance(position, list) and len(position) >= 2]
+    return [position for position in positions if is_valid_position(position)]
 
 
 def particle_world_positions(value, object_states, scene_to_bddl_name=None):
@@ -388,14 +429,14 @@ def object_world_positions(object_name, object_data, state_data, scene_to_bddl_n
 
 
 def template_object_positions(data):
-    task_metadata = template_task_metadata(data)
+    task_metadata = safe_template_task_metadata(data)
     inst_to_name = task_metadata.get("inst_to_name") if isinstance(task_metadata, dict) else None
-    state = data.get("state") if isinstance(data, dict) else None
-    registry = state.get("registry") if isinstance(state, dict) else None
-    object_registry = registry.get("object_registry") if isinstance(registry, dict) else {}
-    system_registry = registry.get("system_registry") if isinstance(registry, dict) else {}
     if not isinstance(inst_to_name, dict):
         return {}
+    state = require_dict_field(data, "state", "template")
+    registry = require_dict_field(state, "registry", "template.state")
+    object_registry = require_dict_field(registry, "object_registry", "template.state.registry")
+    system_registry = require_dict_field(registry, "system_registry", "template.state.registry")
 
     positions_by_name = defaultdict(list)
     for bddl_name, scene_name in inst_to_name.items():
@@ -431,7 +472,8 @@ def load_room_categories():
     return [line.strip() for line in ROOM_CATEGORIES_PATH.read_text().splitlines() if line.strip()]
 
 
-# Floor-plan rendering
+# Floor plan helpers
+
 
 
 @dataclass
@@ -582,7 +624,8 @@ def make_floor_plan(scene, chosen_rooms, floor=0, target_size=1200, crop_margin_
     )
 
 
-# QC checks
+# Report checks
+
 
 
 def validate_templates(paths):
@@ -596,7 +639,12 @@ def validate_templates(paths):
         except Exception as exc:
             issues.append(f"{label} JSON does not open: {exc}")
             continue
-        if not check_robot_pose_dict(nested_template_robot_poses(data)):
+        try:
+            task_metadata = template_task_metadata(data)
+        except ValueError as exc:
+            issues.append(f"{label} metadata is invalid: {exc}")
+            continue
+        if not check_robot_pose_dict(task_metadata.get("robot_poses")):
             issues.append(f"{label} robot pose is missing")
     return issues
 
@@ -887,7 +935,11 @@ def build_reports(args):
             metadata_sets_match,
             metadata_set_diff_detail(available_set, custom_set),
         ),
-        CheckLine("No duplicate", duplicate_ok),
+        CheckLine(
+            "No duplicates",
+            duplicate_ok,
+            "" if duplicate_ok else duplicate_detail(available_duplicates, custom_duplicate_keys, b100_duplicates),
+        ),
         CheckLine("README mentions every selected task", not readme_missing, format_list(readme_missing)),
         CheckLine(
             "Selected tasks have folders",
@@ -995,14 +1047,19 @@ def attach_gui_payloads(reports, args):
                 template_robot_position = first_template_robot_position(template_data)
                 if template_robot_position is not None:
                     append_visible_point(report.robot_points, template_robot_position, transform, instance_id=0)
-                for object_name, positions in template_object_positions(template_data).items():
-                    for object_position in positions:
-                        append_visible_point(
-                            report.object_points.setdefault(object_name, []),
-                            object_position,
-                            transform,
-                            instance_id=0,
-                        )
+                try:
+                    template_positions = template_object_positions(template_data)
+                except ValueError as exc:
+                    report.checks.append(CheckLine("Template object registry is valid", False, str(exc)))
+                else:
+                    for object_name, positions in template_positions.items():
+                        for object_position in positions:
+                            append_visible_point(
+                                report.object_points.setdefault(object_name, []),
+                                object_position,
+                                transform,
+                                instance_id=0,
+                            )
         for instance_id in range(1, args.expected_instances + 1):
             path = instance_state_path(paths, instance_id)
             if not path.exists():
@@ -1037,8 +1094,10 @@ def print_report(result, min_xy_std, expected_instances, max_details):
     task_all_checks = [
         (
             "Every task has the required files",
-            lambda report: check_by_text(report, "Template and partial rooms are there")
-            and check_by_text(report, "Scene stable file is there"),
+            lambda report: (
+                check_by_text(report, "Template and partial rooms are there")
+                and check_by_text(report, "Scene stable file is there")
+            ),
         ),
         (
             f"Every task has {expected_instances} instances",
@@ -1048,8 +1107,10 @@ def print_report(result, min_xy_std, expected_instances, max_details):
         (f"Robot pose std is over {min_xy_std:g} m", lambda report: report.robot_stats.std_xy >= min_xy_std),
         (
             f"Object pose std is over {min_xy_std:g} m",
-            lambda report: bool(report.object_stats)
-            and max((stats.std_xy for stats in report.object_stats.values()), default=0.0) >= min_xy_std,
+            lambda report: (
+                bool(report.object_stats)
+                and max((stats.std_xy for stats in report.object_stats.values()), default=0.0) >= min_xy_std
+            ),
         ),
     ]
     for label, predicate in task_all_checks:
@@ -1130,798 +1191,9 @@ def image_data_uri(path, mime_type="image/png"):
     return f"data:{mime_type};base64,{encoded}"
 
 
-def render_gui_html(gui_data):
-    payload = json.dumps(gui_data)
-    logo_uri = image_data_uri(REPO_ROOT / "docs" / "assets" / "behavior_logo3.png")
-    logo_markup = (
-        f'<img class="brand-logo" src="{logo_uri}" alt="">'
-        if logo_uri
-        else '<span class="brand-logo brand-logo-fallback"></span>'
-    )
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Challenge Instance QC</title>
-  <style>
-    :root {{
-      --bg: #f6f8fb;
-      --panel: #ffffff;
-      --panel-soft: #f8fafc;
-      --ink: #2c3e50;
-      --muted: #5a6c7d;
-      --line: #d9e2ec;
-      --accent: #1577d8;
-      --accent-strong: #0f6fd8;
-      --accent-soft: rgba(21, 119, 216, 0.1);
-      --warn: #b42318;
-      --ok: #1f7a4d;
-      --shadow: 0 8px 24px rgba(44, 62, 80, 0.1);
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: var(--ink);
-      background: var(--bg);
-    }}
-    .app {{
-      display: grid;
-      grid-template-columns: minmax(240px, 312px) 1fr;
-      min-height: 100vh;
-    }}
-    aside {{
-      border-right: 1px solid var(--line);
-      background: var(--panel);
-      padding: 16px 14px;
-      overflow: auto;
-    }}
-    .brand {{
-      display: grid;
-      grid-template-columns: 44px 1fr;
-      align-items: center;
-      gap: 10px;
-      margin: 0 0 16px;
-      padding: 2px 2px 16px;
-      border-bottom: 1px solid var(--line);
-    }}
-    .brand-logo {{
-      width: 42px;
-      height: 32px;
-      object-fit: contain;
-    }}
-    .brand-logo-fallback {{
-      border-radius: 6px;
-      background: linear-gradient(65deg, #0f6fd8 0, #2793ea 100%);
-    }}
-    .brand-name {{
-      color: var(--accent);
-      font-size: 13px;
-      font-weight: 800;
-      line-height: 1;
-      text-transform: uppercase;
-    }}
-    h1 {{
-      color: var(--ink);
-      font-size: 16px;
-      font-weight: 700;
-      line-height: 1.15;
-      margin: 2px 0 0;
-      letter-spacing: 0;
-    }}
-    .task-list {{
-      display: grid;
-      gap: 8px;
-    }}
-    .task-button {{
-      width: 100%;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      border-radius: 8px;
-      padding: 10px 10px;
-      display: grid;
-      grid-template-columns: 10px 1fr;
-      gap: 9px;
-      align-items: center;
-      color: var(--ink);
-      text-align: left;
-      cursor: pointer;
-      font-size: 13px;
-      transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
-    }}
-    .task-button:hover {{
-      background: var(--panel-soft);
-      border-color: rgba(21, 119, 216, 0.35);
-    }}
-    .task-button.active {{
-      border-color: var(--accent);
-      background: #eef7ff;
-      box-shadow: 0 0 0 2px rgba(21, 119, 216, 0.12);
-    }}
-    .dot {{
-      width: 9px;
-      height: 9px;
-      border-radius: 99px;
-      background: var(--ok);
-    }}
-    .dot.bad {{ background: var(--warn); }}
-    main {{
-      min-width: 0;
-      display: grid;
-      grid-template-rows: auto 1fr;
-    }}
-    header {{
-      border-bottom: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.96);
-      padding: 14px 20px;
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-    }}
-    .title {{
-      display: grid;
-      gap: 2px;
-    }}
-    .title strong {{ color: var(--ink); font-size: 18px; font-weight: 700; }}
-    .title span {{ color: var(--muted); font-size: 13px; }}
-    .mode {{
-      display: inline-grid;
-      grid-template-columns: 1fr 1fr;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--panel);
-    }}
-    .mode button {{
-      border: 0;
-      padding: 9px 14px;
-      background: transparent;
-      cursor: pointer;
-      font-weight: 600;
-      color: var(--muted);
-    }}
-    .mode button.active {{
-      background: linear-gradient(65deg, var(--accent-strong) 0, #2793ea 100%);
-      color: white;
-    }}
-    .content {{
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
-      min-height: 0;
-    }}
-    .map-shell {{
-      position: relative;
-      padding: 18px 18px 78px;
-      min-width: 0;
-      overflow: auto;
-      background: var(--bg);
-    }}
-    .map-frame {{
-      position: relative;
-      margin: 0 auto;
-      width: min(100%, 1200px);
-      border: 1px solid var(--line);
-      background: white;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: var(--shadow);
-    }}
-    .map-frame img, .map-frame svg {{
-      display: block;
-      width: 100%;
-      height: auto;
-    }}
-    .map-frame svg {{
-      position: absolute;
-      inset: 0;
-    }}
-    .room-label {{
-      font-size: 11px;
-      font-weight: 700;
-      fill: var(--ink);
-      paint-order: stroke;
-      stroke: rgba(255, 255, 255, 0.9);
-      stroke-width: 4px;
-      stroke-linejoin: round;
-    }}
-    .legend {{
-      position: absolute;
-      right: 32px;
-      bottom: 112px;
-      max-width: 240px;
-      max-height: 38%;
-      overflow: auto;
-      background: rgba(255, 255, 255, 0.94);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      box-shadow: var(--shadow);
-      font-size: 12px;
-      z-index: 3;
-    }}
-    .legend-row {{
-      display: grid;
-      grid-template-columns: 11px 1fr;
-      align-items: center;
-      gap: 7px;
-      width: 100%;
-      margin: 2px 0;
-      padding: 4px;
-      border: 0;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--ink);
-      cursor: pointer;
-      font: inherit;
-      text-align: left;
-    }}
-    .legend-row:hover {{
-      background: var(--accent-soft);
-    }}
-    .legend-row.off {{
-      opacity: 0.38;
-    }}
-    .swatch {{
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-    }}
-    .instance-control {{
-      display: grid;
-      justify-items: center;
-      gap: 8px;
-      margin: 10px auto 0;
-      width: min(100%, 1200px);
-    }}
-    .instance-toggle {{
-      width: 34px;
-      height: 28px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      color: var(--accent);
-      cursor: pointer;
-      font-weight: 800;
-    }}
-    .instance-panel {{
-      display: grid;
-      grid-template-columns: auto minmax(180px, 520px) 42px;
-      align-items: center;
-      gap: 10px;
-      width: min(100%, 620px);
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.96);
-      box-shadow: var(--shadow);
-      color: var(--muted);
-      font-size: 13px;
-    }}
-    .instance-panel.hidden {{
-      display: none;
-    }}
-    .instance-panel input {{
-      width: 100%;
-      accent-color: var(--accent);
-    }}
-    .side-panel {{
-      border-left: 1px solid var(--line);
-      background: var(--panel-soft);
-      padding: 16px;
-      overflow: auto;
-    }}
-    .sheet-card {{
-      display: grid;
-      gap: 10px;
-      margin-bottom: 12px;
-      padding: 12px;
-      border: 1px solid rgba(21, 119, 216, 0.28);
-      border-radius: 8px;
-      background: white;
-      box-shadow: 0 8px 20px rgba(44, 62, 80, 0.07);
-    }}
-    .sheet-question {{
-      color: var(--ink);
-      font-size: 13px;
-      font-weight: 700;
-    }}
-    .sheet-actions {{
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }}
-    .sheet-button {{
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel-soft);
-      color: var(--muted);
-      cursor: pointer;
-      font: inherit;
-      font-size: 12px;
-      font-weight: 700;
-      padding: 8px 10px;
-    }}
-    .sheet-button.active {{
-      border-color: var(--accent);
-      background: linear-gradient(65deg, var(--accent-strong) 0, #2793ea 100%);
-      color: white;
-    }}
-    .checks {{
-      display: grid;
-      gap: 8px;
-    }}
-    .check-section {{
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: white;
-      box-shadow: 0 8px 20px rgba(44, 62, 80, 0.07);
-      overflow: hidden;
-    }}
-    .check-section.ok {{
-      border-color: rgba(31, 122, 77, 0.44);
-    }}
-    .check-section.bad {{
-      border-color: rgba(180, 35, 24, 0.48);
-      box-shadow: 0 10px 26px rgba(180, 35, 24, 0.12);
-    }}
-    .check-section-header {{
-      width: 100%;
-      border: 0;
-      border-left: 5px solid var(--ok);
-      background: #eef8f2;
-      color: var(--ink);
-      cursor: pointer;
-      display: grid;
-      grid-template-columns: 20px 1fr auto;
-      align-items: center;
-      gap: 8px;
-      padding: 11px 10px;
-      text-align: left;
-      font: inherit;
-    }}
-    .check-section.bad .check-section-header {{
-      border-left-color: var(--warn);
-      background: #fff1ee;
-    }}
-    .section-arrow {{
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 900;
-      text-align: center;
-    }}
-    .section-name {{
-      font-size: 12px;
-      font-weight: 850;
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }}
-    .section-status {{
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--ok);
-      font-size: 12px;
-      font-weight: 800;
-      white-space: nowrap;
-    }}
-    .check-section.bad .section-status {{
-      color: var(--warn);
-    }}
-    .status-dot {{
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      background: var(--ok);
-      box-shadow: 0 0 0 3px rgba(31, 122, 77, 0.12);
-    }}
-    .check-section.bad .status-dot {{
-      background: var(--warn);
-      box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.12);
-    }}
-    .check-list {{
-      padding: 10px;
-    }}
-    .check-list.hidden {{
-      display: none;
-    }}
-    .check {{
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 9px;
-      background: white;
-      display: grid;
-      gap: 4px;
-    }}
-    .check-top {{
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      font-size: 13px;
-      font-weight: 600;
-    }}
-    .answer.ok {{ color: var(--ok); }}
-    .answer.bad {{ color: var(--warn); }}
-    .detail {{
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.35;
-    }}
-    @media (max-width: 920px) {{
-      .app {{ grid-template-columns: 1fr; }}
-      aside {{ border-right: 0; border-bottom: 1px solid var(--line); max-height: 220px; }}
-      .content {{ grid-template-columns: 1fr; }}
-      .side-panel {{ border-left: 0; border-top: 1px solid var(--line); }}
-      .legend {{ right: 24px; bottom: 112px; }}
-    }}
-  </style>
-</head>
-<body>
-  <div class="app">
-    <aside>
-      <div class="brand">
-        {logo_markup}
-        <div>
-          <div class="brand-name">BEHAVIOR</div>
-          <h1>Challenge Instance QC</h1>
-        </div>
-      </div>
-      <div class="task-list" id="taskList"></div>
-    </aside>
-    <main>
-      <header>
-        <div class="title">
-          <strong id="taskTitle"></strong>
-          <span id="taskSubtitle"></span>
-        </div>
-        <div class="mode">
-          <button id="robotMode" class="active" type="button">Robot poses</button>
-          <button id="objectMode" type="button">Object poses</button>
-        </div>
-      </header>
-      <div class="content">
-        <section class="map-shell">
-          <div class="map-frame" id="mapFrame">
-            <img id="mapImage" alt="">
-            <svg id="overlay"></svg>
-          </div>
-          <div class="instance-control">
-            <button class="instance-toggle" id="instanceToggle" type="button" aria-expanded="false">v</button>
-            <div class="instance-panel hidden" id="instancePanel">
-              <label for="instanceSlider">Instance</label>
-              <input id="instanceSlider" type="range" min="0" max="300" value="0">
-              <strong id="instanceValue">0</strong>
-            </div>
-          </div>
-          <div class="legend" id="legend"></div>
-        </section>
-        <section class="side-panel">
-          <div class="sheet-card">
-            <div class="sheet-question">Did you update the sheet?</div>
-            <div class="sheet-actions">
-              <button class="sheet-button" id="sheetYes" type="button">Yes</button>
-              <button class="sheet-button active" id="sheetNo" type="button">No</button>
-            </div>
-          </div>
-          <div class="checks">
-            <section class="check-section" id="datasetSection">
-              <button
-                class="check-section-header"
-                id="datasetHeader"
-                type="button"
-                aria-expanded="true"
-                aria-controls="globalChecks"
-              >
-                <span class="section-arrow" id="datasetArrow">v</span>
-                <span class="section-name">Dataset checks</span>
-                <span class="section-status" id="datasetStatus"></span>
-              </button>
-              <div class="checks check-list" id="globalChecks"></div>
-            </section>
-            <section class="check-section" id="taskSection">
-              <button
-                class="check-section-header"
-                id="taskHeader"
-                type="button"
-                aria-expanded="true"
-                aria-controls="checks"
-              >
-                <span class="section-arrow" id="taskArrow">v</span>
-                <span class="section-name">Task checks</span>
-                <span class="section-status" id="taskStatus"></span>
-              </button>
-              <div class="checks check-list" id="checks"></div>
-            </section>
-          </div>
-        </section>
-      </div>
-    </main>
-  </div>
-  <script>
-    const DATA = {payload};
-    let currentTask = DATA.tasks[0]?.task;
-    let mode = "robot";
-    let instanceFilterOpen = false;
-    let selectedInstance = 0;
-    let sheetUpdated = false;
-    const checkSectionsOpen = {{
-      dataset: true,
-      task: true,
-    }};
-    const visibleObjectsByTask = {{}};
-    const taskList = document.getElementById("taskList");
-    const taskTitle = document.getElementById("taskTitle");
-    const taskSubtitle = document.getElementById("taskSubtitle");
-    const mapImage = document.getElementById("mapImage");
-    const overlay = document.getElementById("overlay");
-    const legend = document.getElementById("legend");
-    const instanceToggle = document.getElementById("instanceToggle");
-    const instancePanel = document.getElementById("instancePanel");
-    const instanceSlider = document.getElementById("instanceSlider");
-    const instanceValue = document.getElementById("instanceValue");
-    const globalChecks = document.getElementById("globalChecks");
-    const checks = document.getElementById("checks");
-    const datasetSection = document.getElementById("datasetSection");
-    const taskSection = document.getElementById("taskSection");
-    const datasetHeader = document.getElementById("datasetHeader");
-    const taskHeader = document.getElementById("taskHeader");
-    const datasetArrow = document.getElementById("datasetArrow");
-    const taskArrow = document.getElementById("taskArrow");
-    const datasetStatus = document.getElementById("datasetStatus");
-    const taskStatus = document.getElementById("taskStatus");
-    const sheetYes = document.getElementById("sheetYes");
-    const sheetNo = document.getElementById("sheetNo");
-    const robotMode = document.getElementById("robotMode");
-    const objectMode = document.getElementById("objectMode");
-
-    function taskByName(name) {{
-      return DATA.tasks.find(task => task.task === name);
-    }}
-
-    function setMode(nextMode) {{
-      mode = nextMode;
-      robotMode.classList.toggle("active", mode === "robot");
-      objectMode.classList.toggle("active", mode === "object");
-      render();
-    }}
-
-    function getVisibleObjects(task) {{
-      if (!visibleObjectsByTask[task.task]) {{
-        visibleObjectsByTask[task.task] = new Set(Object.keys(task.objectPoints));
-      }}
-      return visibleObjectsByTask[task.task];
-    }}
-
-    function pointPassesInstance(point) {{
-      return !instanceFilterOpen || Number(point.instance) === selectedInstance;
-    }}
-
-    function renderTaskList() {{
-      taskList.innerHTML = "";
-      DATA.tasks.forEach(task => {{
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "task-button" + (task.task === currentTask ? " active" : "");
-        button.innerHTML = `<span class="dot ${{task.ok ? "" : "bad"}}"></span><span>${{task.task}}</span>`;
-        button.addEventListener("click", () => {{
-          currentTask = task.task;
-          render();
-        }});
-        taskList.appendChild(button);
-      }});
-    }}
-
-    function circle(x, y, r, color, opacity, extra = "") {{
-      return [
-        `<circle cx="${{x.toFixed(2)}}" cy="${{y.toFixed(2)}}" r="${{r}}"`,
-        `fill="${{color}}" fill-opacity="${{opacity}}"`,
-        `stroke="white" stroke-width="0.55" ${{extra}} />`,
-      ].join(" ");
-    }}
-
-    function renderOverlay(task) {{
-      const map = task.map;
-      if (!map) {{
-        overlay.innerHTML = "";
-        return;
-      }}
-      overlay.setAttribute("viewBox", `0 0 ${{map.width}} ${{map.height}}`);
-      let html = "";
-      map.rooms.forEach(room => {{
-        if (room.chosen) {{
-          html += [
-            `<text class="room-label"`,
-            `x="${{room.x.toFixed(1)}}"`,
-            `y="${{room.y.toFixed(1)}}"`,
-            `text-anchor="middle">${{room.name}}</text>`,
-          ].join(" ");
-        }}
-      }});
-
-      if (mode === "robot") {{
-        task.robotPoints.forEach(point => {{
-          if (!pointPassesInstance(point)) return;
-          html += circle(point.x, point.y, 4.2, "#111111", 0.58);
-        }});
-      }} else {{
-        const visibleObjects = getVisibleObjects(task);
-        Object.keys(task.objectPoints).forEach(name => {{
-          if (!visibleObjects.has(name)) return;
-          const color = task.objectColors[name] || "#666666";
-          task.objectPoints[name].forEach(point => {{
-            if (!pointPassesInstance(point)) return;
-            const radius = name.includes("dust.") || name.includes("sand.") ? 2.2 : 3.4;
-            const opacity = name.includes("dust.") || name.includes("sand.") ? 0.62 : 0.48;
-            html += circle(point.x, point.y, radius, color, opacity);
-          }});
-        }});
-      }}
-      overlay.innerHTML = html;
-    }}
-
-    function renderLegend(task) {{
-      if (mode === "robot") {{
-        legend.innerHTML = [
-          `<button class="legend-row" type="button">`,
-          `<span class="swatch" style="background:#111111"></span>`,
-          `<span>robot</span>`,
-          `</button>`,
-        ].join("");
-        return;
-      }}
-      const names = Object.keys(task.objectPoints);
-      const visibleObjects = getVisibleObjects(task);
-      legend.innerHTML = names.map(name => {{
-        const color = task.objectColors[name] || "#666666";
-        const label = task.objectLabels[name] || name;
-        const offClass = visibleObjects.has(name) ? "" : " off";
-        return [
-          `<button class="legend-row${{offClass}}" type="button" data-object-name="${{name}}">`,
-          `<span class="swatch" style="background:${{color}}"></span>`,
-          `<span>${{label}}</span>`,
-          `</button>`,
-        ].join("");
-      }}).join("");
-      legend.querySelectorAll("[data-object-name]").forEach(row => {{
-        row.addEventListener("click", () => {{
-          const name = row.getAttribute("data-object-name");
-          if (visibleObjects.has(name)) {{
-            visibleObjects.delete(name);
-          }} else {{
-            visibleObjects.add(name);
-          }}
-          render();
-        }});
-      }});
-    }}
-
-    function renderInstanceControl() {{
-      instancePanel.classList.toggle("hidden", !instanceFilterOpen);
-      instanceToggle.textContent = instanceFilterOpen ? "^" : "v";
-      instanceToggle.setAttribute("aria-expanded", instanceFilterOpen ? "true" : "false");
-      instanceSlider.max = DATA.expectedInstances || 300;
-      instanceSlider.value = selectedInstance;
-      instanceValue.textContent = instanceFilterOpen ? selectedInstance.toString() : "all";
-    }}
-
-    function renderCheckList(target, checkList) {{
-      target.innerHTML = checkList.map(check => {{
-        const statusClass = check.ok ? "ok" : "bad";
-        const answer = check.ok ? "Yes" : "No";
-        const detail = check.detail ? `<div class="detail">${{check.detail}}</div>` : "";
-        return [
-          `<div class="check">`,
-          `<div class="check-top">`,
-          `<span>${{check.text}}</span>`,
-          `<span class="answer ${{statusClass}}">${{answer}}</span>`,
-          `</div>`,
-          detail,
-          `</div>`,
-        ].join("");
-      }}).join("");
-    }}
-
-    function renderCheckSection(section, header, arrow, status, list, checkList, isOpen) {{
-      const ok = checkList.every(check => check.ok);
-      section.classList.toggle("ok", ok);
-      section.classList.toggle("bad", !ok);
-      arrow.textContent = isOpen ? "v" : ">";
-      header.setAttribute("aria-expanded", isOpen ? "true" : "false");
-      status.innerHTML = ok
-        ? `<span class="status-dot"></span>`
-        : `<span class="status-dot"></span><span>Needs check</span>`;
-      list.classList.toggle("hidden", !isOpen);
-    }}
-
-    function renderSheetQuestion() {{
-      sheetYes.classList.toggle("active", sheetUpdated);
-      sheetNo.classList.toggle("active", !sheetUpdated);
-    }}
-
-    function renderChecks(task) {{
-      renderCheckList(globalChecks, DATA.globalChecks);
-      renderCheckList(checks, task.checks);
-      renderCheckSection(
-        datasetSection,
-        datasetHeader,
-        datasetArrow,
-        datasetStatus,
-        globalChecks,
-        DATA.globalChecks,
-        checkSectionsOpen.dataset
-      );
-      renderCheckSection(
-        taskSection,
-        taskHeader,
-        taskArrow,
-        taskStatus,
-        checks,
-        task.checks,
-        checkSectionsOpen.task
-      );
-    }}
-
-    function render() {{
-      const task = taskByName(currentTask);
-      if (!task) return;
-      renderTaskList();
-      taskTitle.textContent = task.task;
-      const prefix = task.task_id === null || task.task_id === undefined ? "" : `${{task.task_id}} · `;
-      taskSubtitle.textContent = `${{prefix}}${{task.scene || "missing scene"}}`;
-      if (task.map) {{
-        mapImage.src = task.map.image;
-        mapImage.style.aspectRatio = `${{task.map.width}} / ${{task.map.height}}`;
-      }} else {{
-        mapImage.removeAttribute("src");
-      }}
-      renderOverlay(task);
-      renderLegend(task);
-      renderChecks(task);
-      renderInstanceControl();
-      renderSheetQuestion();
-    }}
-
-    robotMode.addEventListener("click", () => setMode("robot"));
-    objectMode.addEventListener("click", () => setMode("object"));
-    datasetHeader.addEventListener("click", () => {{
-      checkSectionsOpen.dataset = !checkSectionsOpen.dataset;
-      render();
-    }});
-    taskHeader.addEventListener("click", () => {{
-      checkSectionsOpen.task = !checkSectionsOpen.task;
-      render();
-    }});
-    sheetYes.addEventListener("click", () => {{
-      sheetUpdated = true;
-      renderSheetQuestion();
-    }});
-    sheetNo.addEventListener("click", () => {{
-      sheetUpdated = false;
-      renderSheetQuestion();
-    }});
-    instanceToggle.addEventListener("click", () => {{
-      instanceFilterOpen = !instanceFilterOpen;
-      if (!instanceFilterOpen) {{
-        selectedInstance = 0;
-      }}
-      render();
-    }});
-    instanceSlider.addEventListener("input", () => {{
-      selectedInstance = Number(instanceSlider.value);
-      render();
-    }});
-    render();
-  </script>
-</body>
-</html>"""
-
-
 def run_gui(result, args):
     try:
-        from flask import Flask
+        from flask import Flask, render_template
     except ImportError as exc:
         raise RuntimeError("Flask is needed to show the QC GUI.") from exc
 
@@ -1933,12 +1205,12 @@ def run_gui(result, args):
         ],
         "tasks": [task_to_gui(report, index) for index, report in enumerate(result["reports"])],
     }
-    html = render_gui_html(gui_data)
-    app = Flask(__name__)
+    logo_uri = image_data_uri(REPO_ROOT / "docs" / "assets" / "behavior_logo3.png")
+    app = Flask(__name__, template_folder=str(TEMPLATE_DIR))
 
     @app.route("/")
     def index():
-        return html
+        return render_template("challenge_instance_qc_gui.html", gui_data=gui_data, logo_uri=logo_uri)
 
     url = f"http://{args.host}:{args.port}"
     print(f"\nGUI: {url}", flush=True)

@@ -158,7 +158,20 @@ python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME
 python OmniGibson/scripts/sampling/extract_task_information.py
 ```
 
-### Step 9: Prepare all files and submit PR
+### Step 9: Run Challenge Instance QC
+
+Before creating a PR to `2026-challenge-task-instances`, run the QC tool after the metadata and all 300
+instances have been generated:
+
+```bash
+python OmniGibson/scripts/sampling/challenge_instance_qc_gui.py --open-browser
+```
+
+The tool prints dataset-wide and per-task checks in the terminal, then serves a local GUI for reviewing robot and
+object sample distributions on the floor plan. Use it whenever task metadata, selected rooms, generated instances,
+or robot poses change.
+
+### Step 10: Prepare all files and submit PR
 
 After the task design is finalized, create a seperate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
 
