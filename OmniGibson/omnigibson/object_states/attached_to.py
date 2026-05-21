@@ -82,6 +82,9 @@ class AttachedTo(
     JointBreakSubscribedStateMixin,
     LinkBasedStateMixin,
 ):
+    # Pending (self, other) pairs queued during _load_state and flushed by flush_pending_reattach()
+    # after all objects' kinematic states have been restored, so that _attach() sees correct positions.
+    _pending_reattach: list = []
     """
     Handles attachment between two rigid objects, by creating a fixed/spherical joint between self.obj (child) and
     other (parent). At any given moment, an object can only be attached to at most one other object, i.e.
@@ -390,7 +393,7 @@ class AttachedTo(
             f"{self.parent_link.prim_path}/{self.obj.name}_attachment_joint" if self.parent_link is not None else None
         )
 
-    def _attach(self, other, child_link, parent_link, joint_type=None, can_joint_break=True):
+    def _attach(self, other, child_link, parent_link, joint_type=None, can_joint_break=True, skip_stabilization=False):
         """
         Creates a fixed or spherical joint between a male meta link of self.obj (@child_link) and a female meta link of
          @other (@parent_link) with a given @joint_type, @break_force and @break_torque
@@ -401,6 +404,8 @@ class AttachedTo(
             parent_link (RigidDynamicPrim): female meta link of @other.
             joint_type (JointType): joint type of the attachment, {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}
             can_joint_break (bool): whether the joint can break or not.
+            skip_stabilization (bool): if True, skip moving self.obj and zeroing velocities. Use this when both
+                objects are already at their correct positions (e.g. when restoring from saved state).
         """
         if joint_type is None:
             joint_type = m.DEFAULT_JOINT_TYPE
@@ -413,25 +418,26 @@ class AttachedTo(
         parent_pos, parent_quat = parent_link.get_position_orientation()
         child_pos, child_quat = child_link.get_position_orientation()
 
-        child_root_pos, child_root_quat = self.obj.get_position_orientation()
+        if not skip_stabilization:
+            child_root_pos, child_root_quat = self.obj.get_position_orientation()
 
-        if joint_type == JointType.JOINT_FIXED:
-            # For FixedJoint: find the relation transformation of the two frames and apply it to self.obj.
-            rel_pos, rel_quat = T.mat2pose(
-                T.pose2mat((parent_pos, parent_quat)) @ T.pose_inv(T.pose2mat((child_pos, child_quat)))
-            )
-            new_child_root_pos, new_child_root_quat = T.pose_transform(
-                rel_pos, rel_quat, child_root_pos, child_root_quat
-            )
-        else:
-            # For SphericalJoint: move the position of self.obj to align the two frames and keep the rotation unchanged.
-            new_child_root_pos = child_root_pos + (parent_pos - child_pos)
-            new_child_root_quat = child_root_quat
+            if joint_type == JointType.JOINT_FIXED:
+                # For FixedJoint: find the relation transformation of the two frames and apply it to self.obj.
+                rel_pos, rel_quat = T.mat2pose(
+                    T.pose2mat((parent_pos, parent_quat)) @ T.pose_inv(T.pose2mat((child_pos, child_quat)))
+                )
+                new_child_root_pos, new_child_root_quat = T.pose_transform(
+                    rel_pos, rel_quat, child_root_pos, child_root_quat
+                )
+            else:
+                # For SphericalJoint: move the position of self.obj to align the two frames and keep the rotation unchanged.
+                new_child_root_pos = child_root_pos + (parent_pos - child_pos)
+                new_child_root_quat = child_root_quat
 
-        # Actually move the object and also keep it still for stability purposes.
-        self.obj.set_position_orientation(position=new_child_root_pos, orientation=new_child_root_quat)
-        self.obj.keep_still()
-        other.keep_still()
+            # Actually move the object and also keep it still for stability purposes.
+            self.obj.set_position_orientation(position=new_child_root_pos, orientation=new_child_root_quat)
+            self.obj.keep_still()
+            other.keep_still()
 
         if joint_type == JointType.JOINT_FIXED:
             # FixedJoint: the parent link, the child link and the joint frame all align.
@@ -545,25 +551,49 @@ class AttachedTo(
             assert attached_obj is not None, "attached_obj_uuid does not match any object in the scene."
 
         if self.parent != attached_obj:
-            # If it's currently attached to something else, detach.
+            # If it's currently attached to something else, detach immediately.
             if self.parent is not None:
                 self.set_value(self.parent, False)
-                # assert self.parent is None, "parent reference is not cleared after detachment"
                 if self.parent is not None:
                     log.warning("parent reference is not cleared after detachment")
 
-            # If the loaded state requires attachment, attach.
+            # Defer joint creation: all objects' kinematic states must be fully loaded before _attach
+            # can find the correct link (by proximity) and create the joint without any position
+            # adjustment.  flush_pending_reattach() is called by og.sim.load_state() after the
+            # registry iteration is complete.
             if attached_obj is not None:
-                self.set_value(
-                    attached_obj,
-                    True,
-                    bypass_alignment_checking=True,
-                    check_physics_stability=False,
-                    can_joint_break=True,
+                AttachedTo._pending_reattach.append((self, attached_obj))
+
+    @classmethod
+    def flush_pending_reattach(cls):
+        """
+        Process all deferred attachment requests queued during load_state.
+
+        Must be called after all objects' kinematic states have been restored so that
+        _find_attachment_links() can locate the correct link by proximity and _attach()
+        can create the joint without moving either object.
+        """
+        pending = list(cls._pending_reattach)
+        cls._pending_reattach.clear()
+        for state_instance, attached_obj in pending:
+            # Skip if already attached (e.g. another pending entry already handled it)
+            if state_instance.parent == attached_obj:
+                continue
+            # Use position-based matching now that both objects are at their correct positions.
+            child_link, parent_link = state_instance._find_attachment_links(
+                attached_obj, bypass_alignment_checking=False
+            )
+            if child_link is not None:
+                state_instance._attach(
+                    attached_obj, child_link, parent_link, can_joint_break=True, skip_stabilization=True
                 )
-                # assert self.parent == attached_obj, "parent reference is not updated after attachment"
-                if self.parent != attached_obj:
-                    log.warning("parent reference is not updated after attachment")
+                if state_instance.parent != attached_obj:
+                    log.warning(f"parent reference not updated after deferred attachment for {state_instance.obj.name}")
+            else:
+                log.warning(
+                    f"Could not find attachment links for {state_instance.obj.name} -> {attached_obj.name} "
+                    f"during flush_pending_reattach; the joint will be missing until the next load_state."
+                )
 
     def serialize(self, state):
         return th.tensor([state["attached_obj_uuid"]], dtype=th.float32)
