@@ -11510,6 +11510,7 @@
     "food_processor.n.01": {
         "fillable": {},
         "toggleable": {},
+        "sceneObject": {},
         "rigidBody": {},
         "nonSubstance": {},
         "heatable": {},
@@ -24609,10 +24610,13 @@
         "disinfectable": {}
     },
     "toaster.n.02": {
+        "fillable": {},
         "toggleable": {},
         "heatSource": {},
         "rigidBody": {},
         "nonSubstance": {},
+        "heatable": {},
+        "freezable": {},
         "wetable": {},
         "stickyable": {},
         "dustyable": {},

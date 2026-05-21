@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from functools import cached_property, cache
 import itertools
 import json
 import networkx as nx
@@ -7,6 +6,16 @@ from typing import Dict, Optional, Set, List, Tuple
 import uuid
 from bddl.knowledge_base.utils import SynsetState
 from collections import defaultdict
+
+try:
+    from functools import cached_property
+except ImportError:
+    try:
+        from cached_property import cached_property
+    except ImportError:
+        raise ImportError(
+            "cached_property is not available in this Python version. Please install the cached_property package or upgrade to Python 3.8+."
+        )
 
 
 def UUIDField(**kwargs):
@@ -229,7 +238,6 @@ class ParticleSystem:
         pk = "name"
         ordering = ["name"]
 
-    @cache
     def matching_synset(self, synset) -> bool:
         return synset.name in self.matching_synsets
 
@@ -296,7 +304,6 @@ class Category:
         pk = "name"
         ordering = ["name"]
 
-    @cache
     def matching_synset(self, synset) -> bool:
         return synset.name in self.matching_synsets
 
@@ -364,7 +371,6 @@ class Object:
         pk = "name"
         ordering = ["name"]
 
-    @cache
     def matching_synset(self, synset) -> bool:
         return self.owner.matching_synset(synset)
 

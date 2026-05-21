@@ -889,6 +889,7 @@ stages:
     - artifacts/parallels/objects_usd.zip
     - artifacts/pipeline/usdify_objects.success
     - metadata/substance_hyperparams.csv
+    - b1k_pipeline/generate_systems.py
     outs:
     - artifacts/parallels/systems.zip
     - artifacts/pipeline/generate_systems.json
@@ -1283,8 +1284,10 @@ stages:
     - artifacts/parallels/objects_usd.zip
     - artifacts/parallels/scenes.zip
     - artifacts/parallels/metadata.zip
+    - artifacts/parallels/systems.zip
     - artifacts/pipeline/export_objs.success
     - artifacts/pipeline/export_scenes.success
+    - artifacts/pipeline/generate_systems.success
     - artifacts/pipeline/aggregate_metadata.success
     - b1k_pipeline/usd_conversion/usdify_scenes.py
     - b1k_pipeline/usd_conversion/usdify_scenes_process.py

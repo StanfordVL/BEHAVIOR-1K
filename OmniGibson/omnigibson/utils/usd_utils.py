@@ -2665,6 +2665,28 @@ def count_joints(prim):
     return n_joints, n_fixed_joints, has_attachment
 
 
+def find_joint_prims(root_prim):
+    """
+    Recursively search under @root_prim and yield every physics joint prim found.
+
+    Recent Isaac Sim USD exports place joints in a flat scope rather than nested under their body0
+    link prim, so any code that needs to enumerate an object's joints must traverse the whole subtree
+    rather than just the children of each link.
+
+    Args:
+        root_prim (Usd.Prim): Root prim to search under.
+
+    Yields:
+        Usd.Prim: Each physics joint prim found anywhere under @root_prim.
+    """
+    children = list(root_prim.GetChildren())
+    while children:
+        child = children.pop()
+        children.extend(child.GetChildren())
+        if "joint" in child.GetPrimTypeInfo().GetTypeName().lower():
+            yield child
+
+
 def compute_kinematic_only(fixed_base, scale, n_joints, n_fixed_joints, kinematic_only_config, has_attachment):
     """
     Determine whether an object should be kinematic-only based on its properties.

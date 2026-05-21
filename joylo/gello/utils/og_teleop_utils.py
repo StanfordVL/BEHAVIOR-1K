@@ -1025,12 +1025,6 @@ def optimize_sim_settings(vr_mode=False):
         # Additional RTX settings
         settings.set_bool("/rtx-transient/dlssg/enabled", True)
 
-        # Disable fractional cutout opacity for speed
-        # Alternatively, turn this on so that we can use semi-translucent visualizers
-        lazy.carb.settings.get_settings().set_bool(
-            "/rtx/raytracing/fractionalCutoutOpacity", False
-        )
-
     # Does this improve things?
     # See https://docs.omniverse.nvidia.com/kit/docs/omni.timeline/latest/TIME_STEPPING.html#synchronizing-wall-clock-time-and-simulation-time
     # Obtain the main timeline object
