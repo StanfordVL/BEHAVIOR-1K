@@ -1234,7 +1234,7 @@ def run_gui(result, args):
     try:
         from flask import Flask, render_template
     except ImportError as exc:
-        raise RuntimeError("Flask is needed to show the QC GUI.") from exc
+        raise RuntimeError("Flask is needed to show the QC GUI. Install it with `pip install flask`.") from exc
 
     gui_data = {
         "datasetDir": str(result["dataset_dir"]),
