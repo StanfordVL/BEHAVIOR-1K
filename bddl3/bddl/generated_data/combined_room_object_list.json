@@ -3572,7 +3572,6 @@
                 "stand-dbskvf": 1,
                 "wall_mounted_tv-uvlqsl": 1,
                 "shelf-nbmidu": 1,
-                "stand-maeowc": 3,
                 "desk-ohjotf": 1,
                 "armchair-ybcnmu": 1,
                 "armchair-hfydou": 1,
@@ -5039,7 +5038,6 @@
                 "downlight-hpkvem": 22,
                 "square_light-odlphz": 4,
                 "door-ggcyib": 7,
-                "door-gfrgkk": 1,
                 "door-xqxiyb": 1,
                 "door-pwoerr": 10,
                 "floors-ojzcvk": 1,
@@ -5248,24 +5246,16 @@
         },
         "office_cubicles_right": {
             "corridor_0": {
-                "ceilings-lezgrj": 1,
-                "floors-naavhr": 1,
                 "elevator_door-yazaic": 6,
                 "downlight-hpkvem": 23,
                 "square_light-odlphz": 4,
                 "door-ggcyib": 11,
-                "door-gfrgkk": 2,
-                "door-booxjn": 2,
-                "door-bkdxqa": 3,
                 "door-xqxiyb": 1,
                 "door-pwoerr": 7
             },
             "lobby_0": {
                 "wall_mounted_tv-rifpjo": 1,
-                "downlight-hpkvem": 3,
-                "floors-zfaowb": 1,
-                "ceilings-stmwcr": 1,
-                "ceilings-xvlngn": 1
+                "downlight-hpkvem": 3
             },
             "private_office_1": {
                 "projection_screen-zsquya": 2,
@@ -5277,9 +5267,7 @@
                 "door-ggcyib": 1,
                 "swivel_chair-gfixyb": 2,
                 "monitor-kmltvq": 1,
-                "downlight-hpkvem": 1,
-                "floors-schwxn": 1,
-                "ceilings-vhsxcg": 1
+                "downlight-hpkvem": 1
             },
             "private_office_2": {
                 "projection_screen-zsquya": 2,
@@ -5291,12 +5279,9 @@
                 "swivel_chair-gfixyb": 2,
                 "monitor-kmltvq": 1,
                 "door-pwoerr": 1,
-                "downlight-hpkvem": 1,
-                "floors-furgou": 1,
-                "ceilings-bkqhio": 1
+                "downlight-hpkvem": 1
             },
             "private_office_3": {
-                "projection_screen-ubdmvn": 1,
                 "statue-cxsvwj": 1,
                 "mouse-pljjtu": 1,
                 "keyboard-jtdyix": 1,
@@ -5305,17 +5290,13 @@
                 "door-ggcyib": 1,
                 "swivel_chair-gfixyb": 2,
                 "monitor-kmltvq": 1,
-                "downlight-hpkvem": 1,
-                "floors-curkiw": 1,
-                "ceilings-vsoozg": 1
+                "downlight-hpkvem": 1
             },
             "conference_hall_0": {
                 "projection_screen-zsquya": 4,
                 "wall_mounted_tv-aoqsbu": 1,
                 "door-ggcyib": 1,
-                "downlight-hpkvem": 6,
-                "floors-vxanqe": 1,
-                "ceilings-unwrsb": 1
+                "downlight-hpkvem": 6
             },
             "meeting_room_0": {
                 "projection_screen-zsquya": 2,
@@ -5325,9 +5306,7 @@
                 "swivel_chair-ucawqa": 10,
                 "pen-hiyeki": 10,
                 "gooseneck_microphone-uusnbr": 10,
-                "downlight-hpkvem": 2,
-                "floors-lmgvcb": 1,
-                "ceilings-vonsdl": 1
+                "downlight-hpkvem": 2
             },
             "shared_office_0": {
                 "square_light-odlphz": 12,
@@ -5342,8 +5321,6 @@
                 "monitor-kmltvq": 10,
                 "notepad-oaikde": 20,
                 "desk_phone-kpxrpb": 10,
-                "floors-vrggjj": 1,
-                "ceilings-pqcxos": 1,
                 "bottom_cabinet-immwzb": 10,
                 "bottom_cabinet-rvunhj": 6
             },
@@ -5357,16 +5334,11 @@
                 "door-ggcyib": 1,
                 "swivel_chair-gfixyb": 2,
                 "monitor-kmltvq": 1,
-                "downlight-hpkvem": 1,
-                "floors-pchrtt": 1,
-                "ceilings-igbhdx": 1
+                "downlight-hpkvem": 1
             },
             "copy_room_0": {
-                "countertop-epaijd": 1,
                 "printer-kqzshp": 1,
                 "square_light-odlphz": 2,
-                "floors-qrrbfo": 1,
-                "ceilings-wlglon": 1,
                 "bottom_cabinet-jhymlr": 1
             },
             "bathroom_0": {
