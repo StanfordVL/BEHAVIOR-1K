@@ -176,7 +176,7 @@ or robot poses change.
 
 ### Step 10: Prepare all files and submit PR
 
-After the task design is finalized, create a seperate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
+After the task design is finalized, create a separate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
 
     - two seed instance json files: `0_0_template.json`, `0_0_template-partial_rooms.json`
     - 300 task intance files under 

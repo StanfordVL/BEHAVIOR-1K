@@ -499,6 +499,8 @@ def parse_room_maps(scene, floor=0):
         raise FileNotFoundError("Missing floor map files: " + ", ".join(missing))
     if ins.shape != sem.shape or ins.shape != trav.shape:
         raise ValueError(f"Floor map shapes do not match for {scene}")
+    if ins.shape[0] != ins.shape[1]:
+        raise ValueError(f"Floor maps must be square for {scene}, got shape {ins.shape} for floor {floor}")
 
     room_cats = load_room_categories()
     sem_id_to_ins_ids = defaultdict(list)
@@ -534,7 +536,7 @@ def world_to_display_point(position, transform):
     raw_row = position[1] / MAP_RESOLUTION + raw_size / 2.0
     raw_col = position[0] / MAP_RESOLUTION + raw_size / 2.0
     x, y = transform_map_point(raw_row, raw_col, transform)
-    visible = 0 <= x <= transform["display_w"] and 0 <= y <= transform["display_h"]
+    visible = 0 <= x < transform["display_w"] and 0 <= y < transform["display_h"]
     return {"x": x, "y": y, "visible": visible}
 
 
@@ -644,7 +646,7 @@ def validate_templates(paths):
             issues.append(f"{label} metadata is invalid: {exc}")
             continue
         if not check_robot_pose_dict(task_metadata.get("robot_poses")):
-            issues.append(f"{label} robot pose is missing")
+            issues.append(f"{label} robot pose is missing or invalid")
     return issues
 
 

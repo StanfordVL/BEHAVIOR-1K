@@ -449,11 +449,17 @@
       <div class="content">
         <section class="map-shell">
           <div class="map-frame" id="mapFrame">
-            <img id="mapImage" alt="">
+            <img id="mapImage" alt="Task floor map">
             <svg id="overlay"></svg>
           </div>
           <div class="instance-control">
-            <button class="instance-toggle" id="instanceToggle" type="button" aria-expanded="false">v</button>
+            <button
+              class="instance-toggle"
+              id="instanceToggle"
+              type="button"
+              aria-expanded="false"
+              aria-label="Toggle instance filter"
+            >v</button>
             <div class="instance-panel hidden" id="instancePanel">
               <label for="instanceSlider">Instance</label>
               <input id="instanceSlider" type="range" min="0" max="300" value="0">
@@ -510,6 +516,7 @@
     let mode = "robot";
     let instanceFilterOpen = false;
     let selectedInstance = 0;
+    let instanceRenderFrame = null;
     let sheetUpdated = false;
     const checkSectionsOpen = {
       dataset: true,
@@ -561,6 +568,29 @@
 
     function pointPassesInstance(point) {
       return !instanceFilterOpen || Number(point.instance) === selectedInstance;
+    }
+
+    function clampSelectedInstance() {
+      const maxInstance = Math.max(0, Number(DATA.expectedInstances) || 300);
+      selectedInstance = Math.min(Math.max(Number(selectedInstance) || 0, 0), maxInstance);
+      return maxInstance;
+    }
+
+    function renderInstanceFilteredOverlay() {
+      if (instanceRenderFrame !== null) {
+        return;
+      }
+      instanceRenderFrame = requestAnimationFrame(() => {
+        instanceRenderFrame = null;
+        clampSelectedInstance();
+        const task = taskByName(currentTask);
+        if (!task) {
+          renderEmptyTaskState();
+          return;
+        }
+        renderOverlay(task);
+        renderInstanceControl();
+      });
     }
 
     function escapeHtml(value) {
@@ -685,7 +715,8 @@
       instancePanel.classList.toggle("hidden", !instanceFilterOpen);
       instanceToggle.textContent = instanceFilterOpen ? "^" : "v";
       instanceToggle.setAttribute("aria-expanded", instanceFilterOpen ? "true" : "false");
-      instanceSlider.max = DATA.expectedInstances || 300;
+      const maxInstance = clampSelectedInstance();
+      instanceSlider.max = maxInstance;
       instanceSlider.value = selectedInstance;
       instanceValue.textContent = instanceFilterOpen ? selectedInstance.toString() : "all";
     }
@@ -786,6 +817,7 @@
         renderEmptyTaskState();
         return;
       }
+      clampSelectedInstance();
       renderTaskList();
       taskTitle.textContent = task.task;
       const prefix = task.task_id === null || task.task_id === undefined ? "" : `${task.task_id} · `;
@@ -830,7 +862,7 @@
     });
     instanceSlider.addEventListener("input", () => {
       selectedInstance = Number(instanceSlider.value);
-      render();
+      renderInstanceFilteredOverlay();
     });
     render();
   </script>
