@@ -16,14 +16,16 @@ import numpy as np
 import yaml
 
 from constants import DATASET_2026_PATH
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils import transform_utils_np as T
 
 
 SCRIPT_DESCRIPTION = "Validate 2026 challenge task instances and show sampled poses on floor plans."
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATASET_DIR = Path(DATASET_2026_PATH)
-DEFAULT_ASSET_SCENES_DIR = REPO_ROOT / "datasets" / "behavior-1k-assets" / "scenes"
-ROOM_CATEGORIES_PATH = REPO_ROOT / "datasets" / "behavior-1k-assets" / "metadata" / "room_categories.txt"
+DEFAULT_ASSET_DATASET_DIR = Path(get_dataset_path("behavior-1k-assets"))
+DEFAULT_ASSET_SCENES_DIR = DEFAULT_ASSET_DATASET_DIR / "scenes"
+ROOM_CATEGORIES_PATH = DEFAULT_ASSET_DATASET_DIR / "metadata" / "room_categories.txt"
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 METADATA_FILENAMES = {"B100_task_misc.csv", "available_tasks.yaml", "task_custom_lists.json"}
@@ -139,6 +141,7 @@ def load_yaml(path):
 
 def load_or_report(load_fn, path, default, errors):
     if not path.exists():
+        errors.append(f"{path.parent.name}/{path.name}: missing")
         return default
     try:
         return load_fn(path)
@@ -1002,7 +1005,7 @@ def attach_gui_payloads(reports, args):
     for report in reports:
         if report.scene is None:
             continue
-        cache_key = (report.scene, tuple(report.rooms))
+        cache_key = (report.scene, tuple(sorted(set(report.rooms))))
         if cache_key not in cache:
             try:
                 cache[cache_key] = make_floor_plan(

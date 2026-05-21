@@ -167,6 +167,9 @@ instances have been generated:
 python OmniGibson/scripts/sampling/challenge_instance_qc_gui.py --open-browser
 ```
 
+The GUI uses Flask. If your environment does not already have it, install it in the `behavior` environment with
+`pip install flask`.
+
 The tool prints dataset-wide and per-task checks in the terminal, then serves a local GUI for reviewing robot and
 object sample distributions on the floor plan. Use it whenever task metadata, selected rooms, generated instances,
 or robot poses change.

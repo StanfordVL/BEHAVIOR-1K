@@ -563,13 +563,26 @@
       return !instanceFilterOpen || Number(point.instance) === selectedInstance;
     }
 
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function renderTaskList() {
-      taskList.innerHTML = "";
+      taskList.replaceChildren();
       DATA.tasks.forEach(task => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "task-button" + (task.task === currentTask ? " active" : "");
-        button.innerHTML = `<span class="dot ${task.ok ? "" : "bad"}"></span><span>${task.task}</span>`;
+        const dot = document.createElement("span");
+        dot.className = "dot" + (task.ok ? "" : " bad");
+        const label = document.createElement("span");
+        label.textContent = task.task;
+        button.append(dot, label);
         button.addEventListener("click", () => {
           currentTask = task.task;
           render();
@@ -600,7 +613,7 @@
             `<text class="room-label"`,
             `x="${room.x.toFixed(1)}"`,
             `y="${room.y.toFixed(1)}"`,
-            `text-anchor="middle">${room.name}</text>`,
+            `text-anchor="middle">${escapeHtml(room.name)}</text>`,
           ].join(" ");
         }
       });
@@ -627,31 +640,36 @@
     }
 
     function renderLegend(task) {
+      legend.replaceChildren();
       if (mode === "robot") {
-        legend.innerHTML = [
-          `<button class="legend-row" type="button">`,
-          `<span class="swatch" style="background:#111111"></span>`,
-          `<span>robot</span>`,
-          `</button>`,
-        ].join("");
+        const row = document.createElement("button");
+        row.className = "legend-row";
+        row.type = "button";
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = "#111111";
+        const label = document.createElement("span");
+        label.textContent = "robot";
+        row.append(swatch, label);
+        legend.appendChild(row);
         return;
       }
       const names = Object.keys(task.objectPoints);
       const visibleObjects = getVisibleObjects(task);
-      legend.innerHTML = names.map(name => {
+      names.forEach(name => {
         const color = task.objectColors[name] || "#666666";
         const label = task.objectLabels[name] || name;
         const offClass = visibleObjects.has(name) ? "" : " off";
-        return [
-          `<button class="legend-row${offClass}" type="button" data-object-name="${name}">`,
-          `<span class="swatch" style="background:${color}"></span>`,
-          `<span>${label}</span>`,
-          `</button>`,
-        ].join("");
-      }).join("");
-      legend.querySelectorAll("[data-object-name]").forEach(row => {
+        const row = document.createElement("button");
+        row.className = `legend-row${offClass}`;
+        row.type = "button";
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = color;
+        const labelNode = document.createElement("span");
+        labelNode.textContent = label;
+        row.append(swatch, labelNode);
         row.addEventListener("click", () => {
-          const name = row.getAttribute("data-object-name");
           if (visibleObjects.has(name)) {
             visibleObjects.delete(name);
           } else {
@@ -659,6 +677,7 @@
           }
           render();
         });
+        legend.appendChild(row);
       });
     }
 
@@ -672,20 +691,29 @@
     }
 
     function renderCheckList(target, checkList) {
-      target.innerHTML = checkList.map(check => {
+      target.replaceChildren();
+      checkList.forEach(check => {
         const statusClass = check.ok ? "ok" : "bad";
         const answer = check.ok ? "Yes" : "No";
-        const detail = check.detail ? `<div class="detail">${check.detail}</div>` : "";
-        return [
-          `<div class="check">`,
-          `<div class="check-top">`,
-          `<span>${check.text}</span>`,
-          `<span class="answer ${statusClass}">${answer}</span>`,
-          `</div>`,
-          detail,
-          `</div>`,
-        ].join("");
-      }).join("");
+        const row = document.createElement("div");
+        row.className = "check";
+        const top = document.createElement("div");
+        top.className = "check-top";
+        const text = document.createElement("span");
+        text.textContent = check.text;
+        const status = document.createElement("span");
+        status.className = `answer ${statusClass}`;
+        status.textContent = answer;
+        top.append(text, status);
+        row.appendChild(top);
+        if (check.detail) {
+          const detail = document.createElement("div");
+          detail.className = "detail";
+          detail.textContent = check.detail;
+          row.appendChild(detail);
+        }
+        target.appendChild(row);
+      });
     }
 
     function renderCheckSection(section, header, arrow, status, list, checkList, isOpen) {
