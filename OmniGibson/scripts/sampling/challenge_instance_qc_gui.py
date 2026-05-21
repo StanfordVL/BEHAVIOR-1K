@@ -1222,6 +1222,11 @@ def image_data_uri(path, mime_type="image/png"):
     return f"data:{mime_type};base64,{encoded}"
 
 
+def browser_url(host, port):
+    browser_host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+    return f"http://{browser_host}:{port}"
+
+
 def run_gui(result, args):
     try:
         from flask import Flask, render_template
@@ -1243,7 +1248,7 @@ def run_gui(result, args):
     def index():
         return render_template("challenge_instance_qc_gui.html", gui_data=gui_data, logo_uri=logo_uri)
 
-    url = f"http://{args.host}:{args.port}"
+    url = browser_url(args.host, args.port)
     print(f"\nGUI: {url}", flush=True)
     if args.open_browser:
         webbrowser.open(url)
