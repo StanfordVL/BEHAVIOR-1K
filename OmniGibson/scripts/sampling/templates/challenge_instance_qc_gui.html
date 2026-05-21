@@ -736,13 +736,17 @@
     function renderChecks(task) {
       renderCheckList(globalChecks, DATA.globalChecks);
       renderCheckList(checks, task.checks);
+      renderCheckSections(DATA.globalChecks, task.checks);
+    }
+
+    function renderCheckSections(globalCheckList, taskCheckList) {
       renderCheckSection(
         datasetSection,
         datasetHeader,
         datasetArrow,
         datasetStatus,
         globalChecks,
-        DATA.globalChecks,
+        globalCheckList,
         checkSectionsOpen.dataset
       );
       renderCheckSection(
@@ -751,14 +755,37 @@
         taskArrow,
         taskStatus,
         checks,
-        task.checks,
+        taskCheckList,
         checkSectionsOpen.task
       );
     }
 
+    function renderEmptyTaskState() {
+      renderTaskList();
+      taskTitle.textContent = "No tasks found";
+      taskSubtitle.textContent = "Check dataset metadata and selected task folders";
+      mapImage.removeAttribute("src");
+      mapImage.style.aspectRatio = "";
+      overlay.replaceChildren();
+      legend.replaceChildren();
+      const taskChecks = [{
+        text: "Selected tasks are available",
+        ok: false,
+        detail: "No selected tasks were loaded. Check metadata/available_tasks.yaml, metadata/task_custom_lists.json, and metadata/B100_task_misc.csv.",
+      }];
+      renderCheckList(globalChecks, DATA.globalChecks);
+      renderCheckList(checks, taskChecks);
+      renderCheckSections(DATA.globalChecks, taskChecks);
+      renderInstanceControl();
+      renderSheetQuestion();
+    }
+
     function render() {
       const task = taskByName(currentTask);
-      if (!task) return;
+      if (!task) {
+        renderEmptyTaskState();
+        return;
+      }
       renderTaskList();
       taskTitle.textContent = task.task;
       const prefix = task.task_id === null || task.task_id === undefined ? "" : `${task.task_id} · `;

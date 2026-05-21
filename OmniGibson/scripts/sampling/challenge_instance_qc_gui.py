@@ -923,7 +923,7 @@ def build_reports(args):
     duplicate_ok = not (available_duplicates or custom_duplicate_keys or b100_duplicates)
 
     global_checks = [
-        CheckLine("JSON files open cleanly", not readable_errors, format_list(readable_errors)),
+        CheckLine("Metadata and JSON files open cleanly", not readable_errors, format_list(readable_errors)),
         CheckLine(
             "Selected tasks are in every metadata file",
             metadata_selected_ok,
@@ -1113,7 +1113,7 @@ def print_report(result, min_xy_std, expected_instances, max_details):
         ),
     ]
     for label, predicate in task_all_checks:
-        print(f"{label}: {yes_no(all(predicate(report) for report in reports))}")
+        print(f"{label}: {yes_no(bool(reports) and all(predicate(report) for report in reports))}")
 
     print("\nStd by task:")
     for report in reports:
