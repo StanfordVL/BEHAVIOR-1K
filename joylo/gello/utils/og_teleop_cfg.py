@@ -27,6 +27,7 @@ ROOM_DEPENDENCIES = {
         "dining_room": ["bar", "corridor"],
         "bar": ["dining_room", "corridor", "kitchen"]
     },
+    "Rs_int": {},
     "hotel_suite_large": {},
     "office_right_cubicles": {},
 }
