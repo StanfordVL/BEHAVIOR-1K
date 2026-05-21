@@ -186,7 +186,7 @@ def load_b100_rows(path):
             rooms = [room.strip() for room in raw_rooms.splitlines() if room.strip()]
             try:
                 task_id = int(row.get("Task ID", ""))
-            except ValueError:
+            except (TypeError, ValueError):
                 task_id = None
             rows.append({"task_id": task_id, "task_name": task_name, "rooms": rooms})
     return rows, sorted(duplicate_tasks)
@@ -718,6 +718,9 @@ def analyze_task(paths, task_id, rooms, args):
 
         if not isinstance(data, dict):
             invalid_robot_pose_ids.append(instance_id)
+            report.invalid_json_files.append(
+                f"{path.relative_to(args.dataset_dir)}: root should be an object, got {type(data).__name__}"
+            )
             continue
 
         robot_poses = data.get("robot_poses")

@@ -180,7 +180,8 @@ After the task design is finalized, create a separate branch in [2026-challenge-
 
     - two seed instance json files: `SCENE_NAME_task_TASK_NAME_0_0_template.json`, `SCENE_NAME_task_TASK_NAME_0_0_template-partial_rooms.json`
     - 300 task instance files under `scenes/SCENE_NAME/json/SCENE_NAME_task_TASK_NAME_instances/`
-    - updated `task_custom_lists.json` and `available_tasks.yaml`
+    - updated `metadata/task_custom_lists.json`, `metadata/available_tasks.yaml`, and `metadata/B100_task_misc.csv`
+    - updated `README.md` task coverage entry, if the selected task list changed
 
 Watch out for merge conflicts from main, which will most likely happen on `task_custom_lists.json` and `available_tasks.yaml`.
 

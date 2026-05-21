@@ -827,6 +827,7 @@
         mapImage.style.aspectRatio = `${task.map.width} / ${task.map.height}`;
       } else {
         mapImage.removeAttribute("src");
+        mapImage.style.aspectRatio = "";
       }
       renderOverlay(task);
       renderLegend(task);
