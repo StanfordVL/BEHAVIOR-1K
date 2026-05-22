@@ -1240,7 +1240,7 @@ def _launch_simulator(*args, **kwargs):
 
             RigidBodyViewAPI.read_from_physx()
             ArticulatedObjectViewAPI.read_from_physx()
-            wp.synchronize()
+            wp.synchronize_stream(wp.get_stream())
 
             self._capture_warp_graph()
 
@@ -1276,7 +1276,7 @@ def _launch_simulator(*args, **kwargs):
                 # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
                 RigidBodyViewAPI.update()
                 RigidContactAPI.update()
-                wp.synchronize()
+                wp.synchronize_stream(wp.get_stream())
                 TensorizedState.caches_dirty = False
                 return
 
@@ -1309,7 +1309,7 @@ def _launch_simulator(*args, **kwargs):
                 if self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
 
-                wp.synchronize()
+                wp.synchronize_stream(wp.get_stream())
 
                 for state_type in tensorized_states:
                     state_type.post_update()
