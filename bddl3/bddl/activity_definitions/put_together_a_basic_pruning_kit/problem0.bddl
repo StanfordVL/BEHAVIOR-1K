@@ -1,4 +1,4 @@
-(define (problem put_togethera_basic_pruning_kit-0)
+(define (problem put_together_a_basic_pruning_kit-0)
     (:domain behavior-1k)
 
     (:objects
@@ -22,6 +22,9 @@
             (ontop ?toolbox.n.01_1 ?floor.n.01_1) 
             (inside ?pruner.n.02_1 ?toolbox.n.01_1) 
             (inside ?shears.n.01_1 ?toolbox.n.01_1)
+            (not
+                (open ?toolbox.n.01_1)
+            )
         )
     )
 )
