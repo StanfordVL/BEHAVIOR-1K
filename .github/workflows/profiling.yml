@@ -77,6 +77,14 @@ jobs:
         if: matrix.deep_profile
         run: pip install snakeviz
 
+      - name: Cache warp kernel artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/warp
+          key: warp-cache-${{ runner.os }}-${{ hashFiles('OmniGibson/omnigibson/**/*.py', 'OmniGibson/setup.py', 'OmniGibson/pyproject.toml') }}
+          restore-keys: |
+            warp-cache-${{ runner.os }}-
+
       - name: Run profiling
         run: |
           rm -f output.json
