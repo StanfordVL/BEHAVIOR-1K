@@ -1305,6 +1305,7 @@ def _launch_simulator(*args, **kwargs):
                             for state_type in tensorized_states:
                                 state_type.global_update()
                         self._state_graph = capture.graph
+                    TensorizedState.graph_dirty = False
                 if self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
 
