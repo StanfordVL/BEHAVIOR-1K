@@ -212,16 +212,27 @@ def create_stable_scene_json(scene_model):
     og.clear()
 
 
-def validate_task(task, task_scene_dict, default_scene_dict):
+def validate_task(task, task_scene_dict, default_scene_dict, active_room_instances=None):
     assert og.sim.is_playing()
 
-    conditions = task._base_conditions
-    relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
+    if active_room_instances is None:
+        conditions = task._base_conditions
+        relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
+        relevant_room_instances = None
+    else:
+        relevant_rooms = None
+        relevant_room_instances = set(active_room_instances)
     active_obj_names = set()
     for obj in og.sim.scenes[0].objects:
         if isinstance(obj, DatasetObject):
-            obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
-            active = len(relevant_rooms.intersection(obj_rooms)) > 0 or obj.category in {"floors", "walls"}
+            if relevant_room_instances is None:
+                obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
+                active = len(relevant_rooms.intersection(obj_rooms)) > 0 or obj.category in {"floors", "walls"}
+            else:
+                active = len(relevant_room_instances.intersection(obj.in_rooms)) > 0 or obj.category in {
+                    "floors",
+                    "walls",
+                }
             if active:
                 active_obj_names.add(obj.name)
 
