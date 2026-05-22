@@ -1464,17 +1464,13 @@ class RigidContactAPIImpl:
         assert self._PENDING_STEPS < og.sim.n_physics_timesteps_per_render, "Pending steps buffer is full"
 
         scene_idx_list = list(self._CONTACT_VIEW.keys())
+        dt = og.sim.get_physics_dt()
         for scene_idx in scene_idx_list:
             try:
-                # Get the contact impulse and net force matrices for this scene
-                self._PENDING_IMPULSES[scene_idx][self._PENDING_STEPS].copy_(
-                    self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=og.sim.get_physics_dt()),
-                    non_blocking=True,
-                )
-                self._PENDING_NET_FORCES[scene_idx][self._PENDING_STEPS].copy_(
-                    self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=og.sim.get_physics_dt()),
-                    non_blocking=True,
-                )
+                # Fetch source tensors from PhysX views.
+                src_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=dt)
+                src_net_forces = self._CONTACT_VIEW[scene_idx].get_net_contact_forces(dt=dt)
+                src_transforms = self._RIGID_BODY_VIEW[scene_idx].get_transforms()
             except Exception:
                 log.warning(
                     "RigidContactAPI cannot compute contacts because the physics sim view is invalid. "
@@ -1483,10 +1479,20 @@ class RigidContactAPIImpl:
                 )
                 continue
 
-            # Get the body transforms for this scene
-            # TODO(vector): Replace this with a wp.copy.
-            self._PENDING_TRANSFORMS[scene_idx][self._PENDING_STEPS].copy_(
-                self._RIGID_BODY_VIEW[scene_idx].get_transforms(), non_blocking=True
+            # Copy via wp.copy so the writes land on warp's default stream — the same
+            # stream the captured graph consumes them from — so every sync point on this
+            # path can stay stream-scoped instead of device-wide.
+            wp.copy(
+                self._PENDING_IMPULSES_WP[scene_idx][self._PENDING_STEPS],
+                wp.from_torch(src_impulses, dtype=wp.float32),
+            )
+            wp.copy(
+                self._PENDING_NET_FORCES_WP[scene_idx][self._PENDING_STEPS],
+                wp.from_torch(src_net_forces, dtype=wp.float32),
+            )
+            wp.copy(
+                self._PENDING_TRANSFORMS_WP[scene_idx][self._PENDING_STEPS],
+                wp.from_torch(src_transforms, dtype=wp.float32),
             )
 
         # Increment once per physics step and push the new count to GPU so the captured

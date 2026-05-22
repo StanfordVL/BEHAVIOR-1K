@@ -1562,7 +1562,7 @@ def _launch_simulator(*args, **kwargs):
                 # Pull the contact sensor data — must run while currently_stepping is True,
                 # since RigidContactAPI.read_from_physx asserts on it.
                 RigidContactAPI.read_from_physx()
-                wp.synchronize()
+                wp.synchronize_stream(wp.get_stream())
 
                 # Record that we are done with the step context. Joint-break callbacks below
                 # are post-step user code: they may call update_handles() / read Fabric, which
