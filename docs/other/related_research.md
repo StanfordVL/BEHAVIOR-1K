@@ -18,6 +18,14 @@ BEHAVIOR Robot Suite (BRS) provides the robot embodiment needed for complex hous
         frameborder="0" allowfullscreen>
 </iframe>
 
+### :material-chart-timeline-variant: [RLinf](https://github.com/RLinf/RLinf)
+
+RLinf is an open-source reinforcement learning infrastructure for embodied and agentic AI. It provides built-in support for **BEHAVIOR-1K** and scalable **RL post-training** pipelines for various embodied policies like OpenPi pi05 and OpenVLA-OFT, making it useful for plug-and-play BEHAVIOR research. See the [RLinf BEHAVIOR example](https://rlinf.readthedocs.io/en/latest/rst_source/examples/embodied/behavior.html) for setup and training details.
+
+<div style="margin: 1rem 0;">
+        <img src="https://github.com/RLinf/misc/raw/main/pic/logo_white.svg" alt="RLinf logo" style="max-width: 500px; width: 100%; border-radius: 8px;" />
+</div>
+
 ### :fontawesome-solid-couch: [Automated Creation of Digital Cousins for Robust Policy Learning](https://digital-cousins.github.io/)
 
 ACDC (Automatic Creation of Digital Cousins) is a method that addresses the limitations of real-world robot training and sim-to-real transfer by introducing "digital cousins" - virtual environments that capture similar geometric and semantic affordances to real scenes without explicitly modeling them.
