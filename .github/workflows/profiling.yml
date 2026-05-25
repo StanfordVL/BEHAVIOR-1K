@@ -77,6 +77,21 @@ jobs:
         if: matrix.deep_profile
         run: pip install snakeviz
 
+      - name: Probe warp cache state (debug — remove before merge)
+        run: |
+          echo "--- runner: $(hostname) ---"
+          echo "OMNIGIBSON_APPDATA_PATH=$OMNIGIBSON_APPDATA_PATH"
+          DIR="${OMNIGIBSON_APPDATA_PATH:-$GITHUB_WORKSPACE/OmniGibson/appdata}/global/warp_cache"
+          echo "warp cache dir: $DIR"
+          if [ -d "$DIR" ]; then
+            echo "size:"; du -sh "$DIR"
+            echo "entry count: $(ls "$DIR" | wc -l)"
+            echo "newest 5 entries:"; ls -lt "$DIR" | head -6
+          else
+            echo "(does not exist)"
+          fi
+        continue-on-error: true
+
       - name: Run profiling
         run: |
           rm -f output.json
