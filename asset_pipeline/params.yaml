@@ -1,3 +1,22 @@
+challenge_scenes:
+- scenes/Rs_int
+- scenes/hotel_suite_large
+- scenes/house_double_floor_lower
+- scenes/house_double_floor_upper
+- scenes/house_single_floor
+- scenes/office_cubicles_right
+- scenes/restaurant_diner
+challenge_scenes_and_deps:
+- scenes/Rs_int
+- scenes/commercial_kitchen_pans
+- scenes/hotel_suite_large
+- scenes/house_double_floor_lower
+- scenes/house_double_floor_upper
+- scenes/house_single_floor
+- scenes/office_cubicles_right
+- scenes/public_restroom_brown
+- scenes/public_restroom_marble
+- scenes/restaurant_diner
 combined:
 - objects/batch-00
 - objects/batch-01
