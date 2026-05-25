@@ -279,6 +279,13 @@ def _launch_app():
         global_data_dir.mkdir(parents=True, exist_ok=True)
         sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
 
+        # Persist warp's JIT-compiled kernel cache under gm.APPDATA_PATH so it survives
+        # across runs (warp's default ~/.cache/warp is per-user/ephemeral on some
+        # self-hosted CI runners, which means every run pays the full NVRTC JIT cost).
+        global_warp_cache_dir = Path(gm.APPDATA_PATH) / "global" / "warp_cache"
+        global_warp_cache_dir.mkdir(parents=True, exist_ok=True)
+        wp.config.kernel_cache_dir = str(global_warp_cache_dir)
+
         with launch_context(None):
             app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
     finally:
