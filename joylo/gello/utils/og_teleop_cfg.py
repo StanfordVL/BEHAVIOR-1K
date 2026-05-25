@@ -23,6 +23,13 @@ ROOM_DEPENDENCIES = {
         "garage": ["corridor"],
     },
     "house_double_floor_upper": {},
+    "restaurant_diner": {
+        "dining_room": ["bar", "corridor"],
+        "bar": ["dining_room", "corridor", "kitchen"]
+    },
+    "Rs_int": {},
+    "hotel_suite_large": {},
+    "office_right_cubicles": {},
 }
 
 TASK_SPECIFIC_EXTRA_ROOMS = {

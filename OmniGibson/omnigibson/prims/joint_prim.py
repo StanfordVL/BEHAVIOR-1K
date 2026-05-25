@@ -112,13 +112,6 @@ class JointPrim(BasePrim):
 
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
-        if self.is_single_dof:
-            # We MUST already have the joint state API defined beforehand in the USD
-            # This is because physx complains if we try to add physx APIs AFTER a simulation step occurs, which
-            # happens because joint prims are usually created externally during an EntityPrim's initialization phase
-            assert self._prim.HasAPI(
-                lazy.pxr.PhysxSchema.JointStateAPI
-            ), "Revolute or Prismatic joints must already have JointStateAPI added!"
 
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:
@@ -555,7 +548,10 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        return self.get_attribute("physics:axis")
+        axis = self.get_attribute("physics:axis")
+        if axis == "":
+            return "X"
+        return axis
 
     @axis.setter
     def axis(self, axis):

@@ -633,13 +633,14 @@ class DataPlaybackWrapper(DataWrapper):
         self.scene.restore(self.scene_file, update_initial_file=True)
 
         # Reset object attributes from the stored metadata
-        with og.sim.stopped():
+        og.sim.stop()
+        for attr, vals in init_metadata.items():
+            assert len(vals) == self.scene.n_objects
+        for i, obj in enumerate(self.scene.objects):
             for attr, vals in init_metadata.items():
-                assert len(vals) == self.scene.n_objects
-            for i, obj in enumerate(self.scene.objects):
-                for attr, vals in init_metadata.items():
-                    val = vals[i]
-                    setattr(obj, attr, val.item() if val.ndim == 0 else val)
+                val = vals[i]
+                setattr(obj, attr, val.item() if val.ndim == 0 else val)
+        og.sim.play()
         self.reset()
 
         # If not controlling robots, disable for all robots

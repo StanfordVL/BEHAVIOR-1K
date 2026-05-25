@@ -243,7 +243,9 @@ class ObjectExporter:
                         "ig_pipeline", "BEHAVIOR-1K/asset_pipeline"
                     )
                 map_path = pathlib.Path(map_path_str)
-                assert map_path.exists(), f"Object {obj.name} baked material map {sub_texmap_slot_name} does not exist at {map_path}"
+                assert (
+                    map_path.exists()
+                ), f"Object {obj.name} baked material map {sub_texmap_slot_name} does not exist at {map_path}"
                 bakery_path = pathlib.Path(
                     os.path.abspath(os.path.join(rt.maxFilePath, "bakery"))
                 )
@@ -349,9 +351,7 @@ class ObjectExporter:
 
             if rt.classOf(child) == rt.Sphere:
                 size = np.array([child.radius, child.radius, child.radius]) * scale
-                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = (
-                    "sphere"
-                )
+                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = "sphere"
                 metadata["meta_links"][meta_type][meta_id][meta_subid]["size"] = list(
                     size
                 )
@@ -363,9 +363,7 @@ class ObjectExporter:
                 )
             elif rt.classOf(child) == rt.Cylinder:
                 size = np.array([child.radius, child.radius, child.height]) * scale
-                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = (
-                    "cylinder"
-                )
+                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = "cylinder"
                 metadata["meta_links"][meta_type][meta_id][meta_subid]["size"] = list(
                     size
                 )
@@ -424,12 +422,9 @@ def main():
     success = True
     error_msg = ""
     try:
-        with (
-            TempFS(temp_dir=r"D:\tmp") as obj_out_fs,
-            ZipFS(
-                os.path.join(out_dir, "meshes.zip"), write=True, temp_fs=obj_out_fs
-            ) as zip_fs,
-        ):
+        with TempFS(temp_dir=r"D:\tmp") as obj_out_fs, ZipFS(
+            os.path.join(out_dir, "meshes.zip"), write=True, temp_fs=obj_out_fs
+        ) as zip_fs:
             exp = ObjectExporter(obj_out_fs.getsyspath("/"))
             exp.run()
 

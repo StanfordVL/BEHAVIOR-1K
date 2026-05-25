@@ -584,9 +584,12 @@ class FailedGraspMetric(MetricBase):
     """Metric for detecting failed grasp attempts.
 
     Tracks when fingers close completely without successful object grasping.
-    A failed grasp is identified when gripper transitions from open to closed
-    state without acquiring an object.
+    A failed grasp is a fingers-closed window that never overlaps with the
+    robot's grasping state before the gripper opens again.
     """
+
+    FINGERS_CLOSED_ATOL = 1e-2
+    FINGERS_OPEN_ATOL = 1e-2
 
     def _compute_step_metrics(
         self, env, action, obs, reward, terminated, truncated, info
@@ -594,12 +597,50 @@ class FailedGraspMetric(MetricBase):
         step_metrics = dict()
         for i, robot in enumerate(env.robots):
             for arm in robot.arm_names:
-                step_metrics[f"robot{i}::arm_{arm}::fingers_closed"] = th.allclose(
-                    robot.get_joint_positions()[robot.gripper_control_idx[arm]],
-                    th.zeros(2),
-                    atol=1e-2,
+                gripper_control_idx = robot.gripper_control_idx[arm]
+                gripper_joint_positions = robot.get_joint_positions()[gripper_control_idx]
+                gripper_closed_positions = (
+                    robot.joint_lower_limits[gripper_control_idx]
+                    if robot._grasping_direction == "lower"
+                    else robot.joint_upper_limits[gripper_control_idx]
                 )
+                gripper_open_positions = (
+                    robot.joint_upper_limits[gripper_control_idx]
+                    if robot._grasping_direction == "lower"
+                    else robot.joint_lower_limits[gripper_control_idx]
+                )
+                step_metrics[f"robot{i}::arm_{arm}::fingers_closed"] = th.allclose(
+                    gripper_joint_positions,
+                    gripper_closed_positions,
+                    atol=self.FINGERS_CLOSED_ATOL,
+                )
+                step_metrics[f"robot{i}::arm_{arm}::fingers_open"] = th.allclose(
+                    gripper_joint_positions,
+                    gripper_open_positions,
+                    atol=self.FINGERS_OPEN_ATOL,
+                )
+                step_metrics[f"robot{i}::arm_{arm}::is_grasping"] = robot.is_grasping(arm) > 0
         return step_metrics
+
+    @staticmethod
+    def _count_failed_grasps(
+        fingers_closed,
+        fingers_open,
+        is_grasping,
+    ):
+        failed_grasp_count = 0
+        was_closed = th.cat([th.tensor([False]), fingers_closed[:-1]])
+        close_steps = th.nonzero(fingers_closed & ~was_closed).flatten()
+        for close_step in close_steps.tolist():
+            reopened_steps = th.nonzero(fingers_open[close_step:]).flatten()
+            reopen_step = (
+                len(fingers_closed)
+                if len(reopened_steps) == 0
+                else close_step + reopened_steps[0].item()
+            )
+            if not th.any(is_grasping[close_step:reopen_step]).item():
+                failed_grasp_count += 1
+        return failed_grasp_count
 
     def _compute_episode_metrics(self, env, episode_info):
         episode_metrics = dict()
@@ -607,9 +648,12 @@ class FailedGraspMetric(MetricBase):
             for arm in robot.arm_names:
                 pf = f"robot{i}::arm_{arm}"
                 fingers_closed = th.tensor(episode_info[f"{pf}::fingers_closed"])
-                fingers_closed_transition = fingers_closed[1:] & ~fingers_closed[:-1]
-                episode_metrics[f"{pf}::failed_grasp_count"] = (
-                    fingers_closed_transition.sum().item()
+                fingers_open = th.tensor(episode_info[f"{pf}::fingers_open"])
+                is_grasping = th.tensor(episode_info[f"{pf}::is_grasping"])
+                episode_metrics[f"{pf}::failed_grasp_count"] = self._count_failed_grasps(
+                    fingers_closed=fingers_closed,
+                    fingers_open=fingers_open,
+                    is_grasping=is_grasping,
                 )
 
         return episode_metrics
@@ -1025,7 +1069,7 @@ def check_robot_nonarm_nonground_collision(env):
             env.scene.idx,
             non_arm_links,
             with_set=None,
-            ignore_set=ground_objects + [robot],
+            ignore_set=[obj for obj in ground_objects if obj.visual_only == False] + [robot],
             current_only=False,
         ):
             return True

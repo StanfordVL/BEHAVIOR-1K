@@ -90,19 +90,6 @@ VERIFIED_SCENES = {
 
 
 def main():
-    if len(sys.argv) > 1:
-        # Work-division system for multiple clients
-        salt, your_id, total_ids = sys.argv[1:]
-        your_id = int(your_id)
-        total_ids = int(total_ids)
-    else:
-        salt = ""
-        your_id = 0
-        total_ids = 1
-    assert 0 <= your_id < total_ids, f"Invalid ID {your_id}"
-
-    root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ROOT_PATH))
-
     objects_path = os.path.join(os.path.dirname(__file__), OBJS_DIR)
     all_object_list = [
         x
@@ -116,14 +103,8 @@ def main():
         and not any(re.fullmatch(exp, x) for exp in REJECTED_OBJS)
     )
     objects = sorted(
-        [
-            "objects/" + x
-            for x in approved_objects
-            if int(hashlib.md5((x + salt).encode()).hexdigest(), 16) % total_ids
-            == your_id
-        ]
+        ["objects/" + x for x in approved_objects]
     )
-    objects_unfiltered = sorted(["objects/" + x for x in all_object_list])
 
     scenes_path = os.path.join(os.path.dirname(__file__), SCENES_DIR)
     all_scenes_list = [
@@ -138,10 +119,8 @@ def main():
         and not any(re.fullmatch(exp, x) for exp in REJECTED_SCENES)
     )
     scenes = sorted(["scenes/" + x for x in approved_scenes])  #
-    scenes_unfiltered = sorted(["scenes/" + x for x in all_scenes_list])  #
 
     combined = objects + scenes
-    combined_unfiltered = objects_unfiltered + scenes_unfiltered
 
     found_final_scenes = set(FINAL_SCENES) & set(approved_scenes)
     missing_final_scene_paths = set(FINAL_SCENES) - found_final_scenes
@@ -159,13 +138,10 @@ def main():
     out_path = os.path.join(os.path.dirname(__file__), OUT_PATH)
     params = {
         "objects": objects,
-        # "objects_unfiltered": objects_unfiltered,
         "scenes": scenes,
-        # "scenes_unfiltered": scenes_unfiltered,
         "final_scenes": final_scenes,
         "verified_scenes": verified_scenes,
         "combined": combined,
-        # "combined_unfiltered": combined_unfiltered,
     }
     with open(out_path, "w") as f:
         yaml.dump(params, f)

@@ -379,12 +379,12 @@ def main():
     import sys, pathlib
 
     dataset_root = str(pathlib.Path(sys.argv[1]))
-    gm.DATASET_PATH = str(dataset_root)
+    gm.DATA_PATH = str(dataset_root)
 
     batch = sys.argv[2:]
     for path in batch:
         obj_category, obj_model = pathlib.Path(path).parts[-2:]
-        obj_dir = pathlib.Path(dataset_root) / "objects" / obj_category / obj_model
+        obj_dir = pathlib.Path(dataset_root) / "behavior-1k-assets" / "objects" / obj_category / obj_model
         assert obj_dir.exists()
         print(f"Processing {path}")
         out_path = obj_dir / "fillable_ray.obj"

@@ -12,7 +12,10 @@ from b1k_pipeline.utils import parse_name
 
 def get_verts_for_obj(obj):
     return np.array(
-        [rt.polyop.getVert(obj, i + 1) for i in range(rt.polyop.GetNumVerts(obj))]
+        [
+            rt.polyop.getVert(obj.baseObject, i + 1)
+            for i in range(rt.polyop.GetNumVerts(obj))
+        ]
     )
 
 
@@ -51,8 +54,8 @@ def validate_collision_mesh(obj, max_elements=40, max_vertices_per_element=60):
     assert obj.parent, f"{obj.name} has no parent."
     parent_parsed_name = parse_name(obj.parent.name)
     assert parent_parsed_name, f"{obj.parent.name} has an invalid name."
-    assert (
-        parsed_name.group("mesh_basename") == parent_parsed_name.group("mesh_basename")
+    assert parsed_name.group("mesh_basename") == parent_parsed_name.group(
+        "mesh_basename"
     ), f"{obj.name} and {obj.parent.name} have different mesh basenames ({parsed_name.group('mesh_basename')} vs {parent_parsed_name.group('mesh_basename')})."
 
     # Check that the parent is not bad and is not an upper side
@@ -120,13 +123,33 @@ def validate_collision_mesh(obj, max_elements=40, max_vertices_per_element=60):
                 f"{obj.name} element {i} is not a volume. It's now selected for your viewing."
             )
         elems_by_volume.append((elem, m.volume))
-        if not m.is_convex:
+
+        try:
+            try:
+                hull = m.convex_hull
+            except:
+                raise ValueError(
+                    f"{obj.name} element {i} convex hull could not be computed, which likely indicates a problem with the mesh."
+                )
+
+            assert (
+                hull.volume > 0
+            ), f"{obj.name} element {i} has non-positive volume convex hull, which likely indicates a problem with the mesh."
+            volume_ratio = m.volume / hull.volume
+            assert (
+                volume_ratio > 0.99
+            ), f"{obj.name} element {i} has volume {m.volume} that is very different from the volume of its convex hull {hull.volume} (ratio {volume_ratio}), which indicates that the mesh is not close to convex."
+
+            assert (
+                len(m.split()) == 1
+            ), f"{obj.name} element {i} has elements trimesh still finds splittable e.g. are not watertight / connected"
+        except Exception as e:
             print(
-                f"WARNING: {obj.name} element {i} may be non-convex. The checker says so, but it's not 100% accurate, so please verify that all elements are indeed convex."
+                f"Error validating {obj.name} element {i}: {str(e)}. Selecting the element for your viewing, and stopping."
             )
-        assert (
-            len(m.split()) == 1
-        ), f"{obj.name} element {i} has elements trimesh still finds splittable e.g. are not watertight / connected"
+            element_faces = (np.where(elem)[0] + 1).tolist()
+            rt.polyop.setFaceSelection(obj, element_faces)
+            raise
 
     if max_elements is not None:
         if len(elems) > max_elements:
