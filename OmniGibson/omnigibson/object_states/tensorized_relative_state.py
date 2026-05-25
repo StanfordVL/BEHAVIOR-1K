@@ -57,6 +57,12 @@ class TensorizedRelativeState(TensorizedState, RelativeObjectState):
         Rebuild all class-level tensors by scanning current objects across all scenes.
         Called from ``simulator.py`` after scene changes.
 
+        Two-pass to avoid the O(N^3) grow-by-cat pattern the naive implementation has:
+        pass 1 only touches Python dicts/lists to settle OBJ_IDXS / IDX_OBJS at their
+        final size; pass 2 allocates VALUES once at (S, N, N, *value_shape) and fills
+        carry-over values directly. For a scene with N objects across S scenes this is
+        O(S*N^2) instead of O(N^3).
+
         Carry-over: for each (a, b) pair where both relative_prim_paths still exist, the
         previous VALUES[s, a, b] is preserved. New rows/columns are zero-initialized.
         """
@@ -67,7 +73,7 @@ class TensorizedRelativeState(TensorizedState, RelativeObjectState):
         # Reset
         cls.global_initialize()
 
-        # Scan all scenes and register objects that have this state
+        # Pass 1: scan all scenes, settle OBJ_IDXS / IDX_OBJS at final shape (Python only).
         for scene_idx, scene in enumerate(og.sim.scenes):
             for obj in scene.objects:
                 if cls not in obj.states:
@@ -76,55 +82,37 @@ class TensorizedRelativeState(TensorizedState, RelativeObjectState):
 
                 # Extend scene dimension if this is a new scene index
                 while len(cls.IDX_OBJS) <= scene_idx:
-                    N = len(cls.OBJ_IDXS)
-                    cls.IDX_OBJS.append([None] * N)
-                    cls.VALUES = th.cat(
-                        [
-                            cls.VALUES,
-                            th.zeros((1, N, N, *cls.value_shape), dtype=cls.value_type, device="cuda"),
-                        ],
-                        dim=0,
-                    )
+                    cls.IDX_OBJS.append([None] * len(cls.OBJ_IDXS))
 
-                # Register new relative path if first seen across all scenes — extend BOTH N dims
+                # Register new relative path if first seen across all scenes
                 if rel_path not in cls.OBJ_IDXS:
-                    obj_idx = len(cls.OBJ_IDXS)
-                    cls.OBJ_IDXS[rel_path] = obj_idx
+                    cls.OBJ_IDXS[rel_path] = len(cls.OBJ_IDXS)
                     for s_row in cls.IDX_OBJS:
                         s_row.append(None)
-                    S = len(cls.IDX_OBJS)
-                    # Grow row dim (N → N+1) — append (S, 1, N, *vs) along dim=1
-                    cls.VALUES = th.cat(
-                        [
-                            cls.VALUES,
-                            th.zeros((S, 1, obj_idx, *cls.value_shape), dtype=cls.value_type, device="cuda"),
-                        ],
-                        dim=1,
-                    )
-                    # Grow col dim (N → N+1) — append (S, N+1, 1, *vs) along dim=2
-                    cls.VALUES = th.cat(
-                        [
-                            cls.VALUES,
-                            th.zeros((S, obj_idx + 1, 1, *cls.value_shape), dtype=cls.value_type, device="cuda"),
-                        ],
-                        dim=2,
-                    )
 
                 cls.IDX_OBJS[scene_idx][cls.OBJ_IDXS[rel_path]] = obj
 
-        # Carry over values for surviving pairs (both rel_paths present before and after).
-        if prev_values is not None and cls.VALUES.numel() > 0:
-            for rel_path_a, idx_old_a in prev_obj_idxs.items():
-                if rel_path_a not in cls.OBJ_IDXS:
-                    continue
-                idx_new_a = cls.OBJ_IDXS[rel_path_a]
-                for rel_path_b, idx_old_b in prev_obj_idxs.items():
-                    if rel_path_b not in cls.OBJ_IDXS:
+        # Pass 2: allocate VALUES once at the final shape, then fill carry-over values.
+        S = len(cls.IDX_OBJS)
+        N = len(cls.OBJ_IDXS)
+        if S > 0 and N > 0:
+            cls.VALUES = th.zeros((S, N, N, *cls.value_shape), dtype=cls.value_type, device="cuda")
+
+            if prev_values is not None and prev_values.numel() > 0:
+                for rel_path_a, idx_old_a in prev_obj_idxs.items():
+                    if rel_path_a not in cls.OBJ_IDXS:
                         continue
-                    idx_new_b = cls.OBJ_IDXS[rel_path_b]
-                    for s_idx in range(min(prev_values.shape[0], len(cls.IDX_OBJS))):
-                        if cls.IDX_OBJS[s_idx][idx_new_a] is not None and cls.IDX_OBJS[s_idx][idx_new_b] is not None:
-                            cls.VALUES[s_idx, idx_new_a, idx_new_b] = prev_values[s_idx, idx_old_a, idx_old_b]
+                    idx_new_a = cls.OBJ_IDXS[rel_path_a]
+                    for rel_path_b, idx_old_b in prev_obj_idxs.items():
+                        if rel_path_b not in cls.OBJ_IDXS:
+                            continue
+                        idx_new_b = cls.OBJ_IDXS[rel_path_b]
+                        for s_idx in range(min(prev_values.shape[0], S)):
+                            if (
+                                cls.IDX_OBJS[s_idx][idx_new_a] is not None
+                                and cls.IDX_OBJS[s_idx][idx_new_b] is not None
+                            ):
+                                cls.VALUES[s_idx, idx_new_a, idx_new_b] = prev_values[s_idx, idx_old_a, idx_old_b]
 
         # Rebuild pinned CPU mirror — synchronous copy so _get_value() is valid before first async copy
         cls.VALUES_CPU = th.zeros(cls.VALUES.shape, dtype=cls.value_type).pin_memory()
