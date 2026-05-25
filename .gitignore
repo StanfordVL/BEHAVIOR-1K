@@ -1,4 +1,5 @@
 gha-creds-*.json
+*.pem
 /site
 .vscode
 .DS_Store
