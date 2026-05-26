@@ -160,7 +160,12 @@ def main():
             task_final_state = env.scene.dump_state()
             task_scene_dict = {"state": task_final_state}
             try:
-                validate_task(env.task, task_scene_dict, default_scene_dict)
+                validate_task(
+                    env.task,
+                    task_scene_dict,
+                    default_scene_dict,
+                    active_room_instances=env.scene.load_room_instances,
+                )
             except ValueError as e:
                 print(f"instance {activity_instance_id} trial {i} validation failed: {e}")
                 continue
