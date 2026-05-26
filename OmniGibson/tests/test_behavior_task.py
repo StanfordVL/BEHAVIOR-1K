@@ -28,8 +28,8 @@ def test_behavior_task():
     try:
         env = og.Environment(configs=config)
         print(
-            "BehaviorTask instantiated successfully! Ground goal state options (env 0):",
-            len(env.task.ground_goal_state_options[0]),
+            "BehaviorTask instantiated successfully! Ground goal state options:",
+            len(env.task.ground_goal_state_options),
         )
     except Exception:
         import traceback

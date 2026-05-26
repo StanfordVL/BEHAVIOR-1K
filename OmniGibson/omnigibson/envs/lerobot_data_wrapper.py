@@ -51,6 +51,12 @@ class LeRobotDataWrapper(DataWrapper):
             task_name (None or str): If specified, task that will be recorded in LeRobot dataset. If not specified,
                 will try to automatically infer if the wrapped environment is a BehaviorTask
         """
+        # LeRobot dataset assumes a single scene with a single robot for deterministic obs mapping.
+        # Fail fast before any env.scene / env.scene.robots[0] reads (e.g., _init_lerobot_kwargs below).
+        assert env.num_envs == 1, f"LeRobotDataWrapper is single-env only; got num_envs={env.num_envs}."
+        assert (
+            len(env.scene.robots) == 1
+        ), f"LeRobotDataWrapper requires exactly one robot per scene; got {len(env.scene.robots)}."
         self._init_lerobot_kwargs(
             repo_id=output_path,
             root_dir=root_dir,

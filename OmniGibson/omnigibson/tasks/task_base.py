@@ -139,7 +139,8 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         for scene in env.scenes:
             scene.reset(hard=False)
 
-        # Compute the low dimensional observation dimension (use env_idx=0 as representative)
+        # Compute the low dimensional observation dimension. Obs keys and shape are task-defined
+        # and identical across envs, so env 0 is canonical.
         obs = self.get_obs(env=env, env_idx=0, flatten_low_dim=False)
         if "low_dim" in obs:
             self._low_dim_obs_keys = list(obs["low_dim"].keys())

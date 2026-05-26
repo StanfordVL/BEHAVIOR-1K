@@ -147,6 +147,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             "It currently only works with Tiago and R1 with their HolonomicBaseJointController/JointControllers set to absolute position mode."
         )
         super().__init__(env, robot)
+        # Resolve which env this primitive controller is bound to, based on the robot's scene.
+        # Used by get_action_space() to pick the right per-env BehaviorTask object_scope.
+        self._env_idx = next(i for i, s in enumerate(env.scenes) if s is robot.scene)
         self.controller_functions = {
             StarterSemanticActionPrimitiveSet.GRASP: self._grasp,
             StarterSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,
@@ -221,7 +224,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             assert isinstance(
                 self.env.task, BehaviorTask
             ), "Activity relevant objects can only be used for BEHAVIOR tasks"
-            self.addressable_objects = sorted(set(self.env.task.object_scope[0].values()), key=lambda obj: obj.name)
+            self.addressable_objects = sorted(
+                set(self.env.task.object_scope[self._env_idx].values()), key=lambda obj: obj.name
+            )
         else:
             self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
 

@@ -82,6 +82,7 @@ class Evaluator:
         self.robot_action = dict()
 
         self.env = self.load_env(env_wrapper=self.cfg.env_wrapper)
+        assert self.env.num_envs == 1, f"Evaluator is single-env only; got num_envs={self.env.num_envs}."
         self.policy = self.load_policy()
         self.robot = self.load_robot()
         self.metrics = self.load_metrics()
