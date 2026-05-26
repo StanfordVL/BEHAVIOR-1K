@@ -132,6 +132,8 @@ class TensorizedRelativeState(TensorizedState, RelativeObjectState):
         # Mark the captured wp.graph as stale — the simulator will re-capture before the next step.
         TensorizedState.graph_dirty = True
 
+        super().initialize_view()
+
     def _get_value(self, other):
         # Read from the pinned CPU mirror — no GPU stall for Python callers.
         s = self.obj.scene.idx

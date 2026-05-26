@@ -121,6 +121,8 @@ class TensorizedAbsoluteState(TensorizedState, AbsoluteObjectState):
         # are already covered by the time this fires.
         TensorizedState.graph_dirty = True
 
+        super().initialize_view()
+
     def _get_value(self):
         # Read from the pinned CPU mirror — no GPU stall for Python callers
         s = self.obj.scene.idx
