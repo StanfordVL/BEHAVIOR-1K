@@ -16,12 +16,15 @@ class TaskMetric(MetricBase):
             }
 
     def reset(self, env):
-        # Single-env metric (used by eval.py / eval_with_jobqueue.py): scene index 0
+        # Single-env metric (used by eval.py / eval_with_jobqueue.py): scene index 0.
+        # _compute_step_metrics' scalar reward/terminated/truncated params and the
+        # env.task.success[0] read assume one env.
+        assert env.num_envs == 1, f"TaskMetric is single-env only; got num_envs={env.num_envs}."
         self.state[env.scene] = dict()
         self.timesteps = 0
         self.render_timestep = og.sim.get_rendering_dt()
         self.initial_predicate_states = [
-            [pred.evaluate() for pred in option] for option in env.task.ground_goal_state_options[0]
+            [pred.evaluate() for pred in option] for option in env.task.ground_goal_state_options
         ]
 
     def _compute_step_metrics(self, env, action, obs, reward, terminated, truncated, info):
@@ -43,7 +46,7 @@ class TaskMetric(MetricBase):
                 )
                 / len(option)
                 for option, option_previous_state in zip(
-                    env.task.ground_goal_state_options[0], self.initial_predicate_states
+                    env.task.ground_goal_state_options, self.initial_predicate_states
                 )
             )
 

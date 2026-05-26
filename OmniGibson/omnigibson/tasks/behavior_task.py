@@ -174,10 +174,11 @@ class BehaviorTask(BaseTask):
         terminations = dict()
 
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
-        # PredicateGoal calls check_goal_fn(env_idx); thread env_idx through to the predicate evaluator.
+        # PredicateGoal calls check_goal_fn(env_idx); thread env_idx through to the predicate evaluator
+        # so the (singular) compiled task evaluates against the right env's object_scope binding.
         # TODO(vector): This needs to be extensively tested.
         terminations["predicate"] = PredicateGoal(
-            check_goal_fn=lambda env_idx: self.compiled_task[env_idx].check_goal(
+            check_goal_fn=lambda env_idx: self.compiled_task.check_goal(
                 lambda predicate_name, *entities: self._evaluate_predicate(env_idx, predicate_name, *entities)
             ),
         )
@@ -210,7 +211,8 @@ class BehaviorTask(BaseTask):
         success, self.feedback = self.initialize_activity(env=env)
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
-        # Store the scene name
+        # Store the scene name. All envs are clones of the same scene model
+        # (same invariant as _compiled_rooms), so reading from scenes[0] is canonical.
         self.scene_name = env.scenes[0].scene_model if isinstance(env.scenes[0], TraversableScene) else None
 
         # Highlight any task relevant objects if requested
@@ -310,11 +312,17 @@ class BehaviorTask(BaseTask):
 
         # Parse base scope (strips wildcards if any, giving us the non-wildcard instances)
         self._base_conditions, base_scope, self._base_inroom_assignments = self._task_def.parse_base_scope()
-        # compiled_task and downstream conditions are populated per-env in initialize_activity
-        self.compiled_task = [None] * env.num_envs
-        self.activity_initial_conditions = [None] * env.num_envs
-        self.activity_goal_conditions = [None] * env.num_envs
-        self.ground_goal_state_options = [None] * env.num_envs
+        # compiled_task and downstream conditions describe symbolic task content shared across
+        # all envs (every env is a clone of the same scene with identical room layout), so they
+        # are populated as a single instance during initialize_activity().
+        self.compiled_task = None
+        self.activity_initial_conditions = None
+        self.activity_goal_conditions = None
+        self.ground_goal_state_options = None
+        # Remembers which room dict was used to compile self.compiled_task — checked against
+        # every env's room layout in _compile_with_rooms() to detect any drift from the
+        # "all envs use the same rooms" assumption.
+        self._compiled_rooms = None
 
         # Set up base object scope per-env (agent first, then base instances)
         self.object_scope = [None] * env.num_envs
@@ -329,41 +337,47 @@ class BehaviorTask(BaseTask):
             for obj_inst in self._base_conditions.parsed_objects[obj_cat]
         }
 
-    def _finalize_compiled_task(self, env_idx):
-        """Populate derived attributes from the compiled task for a specific env.
+    def _finalize_compiled_task(self):
+        """Populate symbolic attributes from self.compiled_task.
 
-        Called after self.compiled_task[env_idx] is set (either immediately for
-        non-wildcard tasks, or after deferred compilation for wildcard tasks).
-
-        Args:
-            env_idx (int): Index of the env whose compiled task should be finalized.
+        Runs exactly once after the (singular) compiled task is built. All fields set
+        here are symbolic / scene-independent and shared across envs.
         """
-        compiled = self.compiled_task[env_idx]
+        compiled = self.compiled_task
 
-        # Rebuild this env's scope, preserving any already-assigned objects from the base scope
-        existing = dict(self.object_scope[env_idx])
-        self.object_scope[env_idx] = {"agent.n.01_1": existing.get("agent.n.01_1")}
-        for name in compiled.object_scope:
-            self.object_scope[env_idx][name] = existing.get(name)
-
-        # Object info — categories don't depend on env layout, but scope-expanded instances might
+        # Object info — derived from the compiled (wildcard-expanded) task definition
         self.object_instance_to_category = {
             obj_inst: obj_cat for obj_cat in compiled.parsed_objects for obj_inst in compiled.parsed_objects[obj_cat]
         }
 
-        # Per-env conditions
-        self.activity_initial_conditions[env_idx] = compiled.initial_conditions
-        self.activity_goal_conditions[env_idx] = compiled.goal_conditions
-        self.ground_goal_state_options[env_idx] = compiled.ground_goal_state_options
+        # Conditions
+        self.activity_initial_conditions = compiled.initial_conditions
+        self.activity_goal_conditions = compiled.goal_conditions
+        self.ground_goal_state_options = compiled.ground_goal_state_options
 
-        # Demo attributes (shared across envs — derived from the task definition, not the layout)
-        if env_idx == 0:
-            self.instruction_order = th.arange(len(compiled.conditions.parsed_goal_conditions))
-            self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
-            self.currently_viewed_index = 0
-            self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
-            self.activity_natural_language_initial_conditions = compiled.natural_language_initial_conditions
-            self.activity_natural_language_goal_conditions = compiled.natural_language_goal_conditions
+        # Demo attributes
+        self.instruction_order = th.arange(len(compiled.conditions.parsed_goal_conditions))
+        self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
+        self.currently_viewed_index = 0
+        self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
+        self.activity_natural_language_initial_conditions = compiled.natural_language_initial_conditions
+        self.activity_natural_language_goal_conditions = compiled.natural_language_goal_conditions
+
+    def _finalize_object_scope(self, env_idx):
+        """Rebuild self.object_scope[env_idx] from self.compiled_task.object_scope.
+
+        Called per env after compile. Preserves any objects already bound to base-scope
+        instances so we don't lose assignments made before wildcard expansion.
+
+        Args:
+            env_idx (int): Index of the env whose scope should be rebuilt.
+        """
+        scope = self.object_scope[env_idx]
+        existing = dict(scope)
+        scope.clear()
+        scope["agent.n.01_1"] = existing.get("agent.n.01_1")
+        for name in self.compiled_task.object_scope:
+            scope[name] = existing.get(name)
 
     def _determine_room_instances(self, env, env_idx):
         """Determine which specific room instances to use based on assigned objects in @env_idx's scene.
@@ -401,7 +415,7 @@ class BehaviorTask(BaseTask):
         return room_instances
 
     def _compile_with_rooms(self, env, env_idx):
-        """Compile the wildcard task for a single env using the specific room instances from its assigned objects.
+        """Compile the wildcard task for using the specific room instances from its assigned objects.
 
         After object scope has been assigned (via cache or sampling), this
         determines which room instances are being used, counts objects in those
@@ -409,29 +423,31 @@ class BehaviorTask(BaseTask):
 
         Args:
             env: The environment with the active scene.
-            env_idx (int): Index of the env / scene to compile for.
+            env_idx (int): Index of the env / scene to align scope for.
         """
-        # Determine which room instances the assigned objects are in
         room_instances = self._determine_room_instances(env, env_idx)
 
-        # Build scene layout from those specific rooms
-        scene_layout = self._build_scene_layout_from_rooms(env.scenes[env_idx], room_instances)
+        if self.compiled_task is None:
+            scene_layout = self._build_scene_layout_from_rooms(env.scenes[env_idx], room_instances)
+            self.compiled_task = self._task_def.compile(scene_layout=scene_layout)
+            self._compiled_rooms = room_instances
+            self._finalize_compiled_task()
+        else:
+            assert room_instances == self._compiled_rooms, (
+                f"Room layout mismatch between envs: compiled with {self._compiled_rooms} "
+                f"but env {env_idx} reports {room_instances}. Single-compile assumes uniform room layout."
+            )
 
-        # Compile with the correct scene layout for this env
-        self.compiled_task[env_idx] = self._task_def.compile(scene_layout=scene_layout)
-
-        # Preserve existing object assignments in the new scope
+        # Per-env scope: rebuild against the compiled task's scope, preserving prior assignments
         old_scope = dict(self.object_scope[env_idx])
-        self._finalize_compiled_task(env_idx)
-
-        # Re-apply previously assigned objects
+        self._finalize_object_scope(env_idx)
         for inst, entity in old_scope.items():
             if inst in self.object_scope[env_idx]:
                 self.object_scope[env_idx][inst] = entity
 
     def get_potential(self, env, env_idx):
         # Bind env_idx into the predicate evaluator so check_goal sees an arity-2 callback
-        _, satisfied_predicates = self.compiled_task[env_idx].check_goal(
+        _, satisfied_predicates = self.compiled_task.check_goal(
             lambda predicate_name, *entities: self._evaluate_predicate(env_idx, predicate_name, *entities)
         )
         success_score = len(satisfied_predicates["satisfied"]) / (
@@ -441,13 +457,14 @@ class BehaviorTask(BaseTask):
 
     def initialize_activity(self, env):
         """
-        Initializes the desired activity in the current environment @env
+        Initializes the desired activity in the current environment @env.
 
-        The flow is (per env):
-        1. Select objects for the base (non-wildcard) scope via sampling or cache.
-        2. Determine which room instances those objects are in.
-        3. Compile the task with the correct scene layout (expanding any wildcards).
-        4. Assign any wildcard-expanded instances.
+        The flow is:
+        1. Select objects for each env's base (non-wildcard) scope via sampling or cache.
+        2. Determine which room instances those objects are in (the first env's choice is
+           canonical; other envs are asserted to match).
+        3. Compile the task once with the correct scene layout (expanding any wildcards).
+        4. Assign any wildcard-expanded instances per env.
 
         Args:
             env (Environment): Current active environment instance
@@ -457,72 +474,78 @@ class BehaviorTask(BaseTask):
                 - bool: Whether the generated scene activity should be accepted or not
                 - list[dict]: Per-env feedback from the sampling / initialization process
         """
+
+        # self.sampler is a single instance bound to env 0:
+        # - Online mode: actively used (num_envs guaranteed to be 1 by the assert below).
+        # - Cache mode: created so downstream tooling (scripts/sampling/multiply_b1k_tasks.py)
+        #   can poke its internals to re-sample. Not exercised during init.
+        self.sampler = BDDLSampler(
+            env=env,
+            env_idx=0,
+            activity_conditions=self._base_conditions,
+            object_scope=self.object_scope[0],
+        )
+
+        if self.online_object_sampling:
+            assert env.num_envs == 1, "Online sampling mode only works with num_envs==1"
+            env_idx = 0
+
+            # Phase 1: assign objects using only parsed conditions (no compilation needed)
+            accept, fb = self.sampler.assign_objects(
+                sampling_whitelist=self.sampling_whitelist,
+                sampling_blacklist=self.sampling_blacklist,
+            )
+            if not accept:
+                return accept, [fb]
+
+            # Compile with the correct rooms now that objects are assigned
+            self._compile_with_rooms(env, env_idx)
+
+            # Phase 2: sample states using compiled conditions
+            accept, fb = self.sampler.sample_states(self.compiled_task)
+            if not accept:
+                return accept, [fb]
+
+            # Assign any wildcard-expanded instances to remaining scene objects
+            self._assign_wildcard_instances(env, env_idx)
+
+            return True, [fb]
+
+        # Cache mode — num_envs can be >= 1
         feedback = [None] * env.num_envs
 
-        # Per-env samplers
-        self.sampler = [None] * env.num_envs
+        # Derive future instances from parsed conditions for cache assignment
+        self.future_obj_instances = {
+            cond[1] for cond in self._base_conditions.parsed_initial_conditions if cond[0] == "future"
+        }
 
+        # Assign base scope objects from cache (non-strict: skip instances
+        # not in cache, e.g. wildcard instances that don't exist yet)
         for env_idx in range(env.num_envs):
-            # Create sampler for this env's scene/scope.
-            self.sampler[env_idx] = BDDLSampler(
-                env=env,
-                env_idx=env_idx,
-                activity_conditions=self._base_conditions,
-                object_scope=self.object_scope[env_idx],
-            )
+            self.assign_object_scope_with_cache(env, env_idx)
+            self._compile_with_rooms(env, env_idx)
 
-            if self.online_object_sampling:
-                # Phase 1: assign objects using only parsed conditions (no compilation needed)
-                accept, fb = self.sampler[env_idx].assign_objects(
-                    sampling_whitelist=self.sampling_whitelist,
-                    sampling_blacklist=self.sampling_blacklist,
-                )
-                feedback[env_idx] = fb
-                if not accept:
-                    return accept, feedback
+        # Refine future instances using the now-compiled task's (singular) initial conditions
+        self.future_obj_instances = {
+            init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
+        }
 
-                # Compile with the correct rooms now that objects are assigned
-                self._compile_with_rooms(env, env_idx)
-
-                # Phase 2: sample states using compiled conditions
-                accept, fb = self.sampler[env_idx].sample_states(self.compiled_task[env_idx])
-                feedback[env_idx] = fb
-                if not accept:
-                    return accept, feedback
-
-                # Assign any wildcard-expanded instances to remaining scene objects
-                self._assign_wildcard_instances(env, env_idx)
-            else:
-                # Derive future instances from parsed conditions for cache assignment
-                self.future_obj_instances = {
-                    cond[1] for cond in self._base_conditions.parsed_initial_conditions if cond[0] == "future"
-                }
-
-                # Assign base scope objects from cache (non-strict: skip instances
-                # not in cache, e.g. wildcard instances that don't exist yet)
-                self.assign_object_scope_with_cache(env, env_idx)
-
-                # Compile with correct rooms now that we know where objects are
-                self._compile_with_rooms(env, env_idx)
-
-                # Re-assign all objects from cache (scope now includes wildcard instances)
-                self.future_obj_instances = {
-                    init_cond.body[1]
-                    for init_cond in self.activity_initial_conditions[env_idx]
-                    if init_cond.body[0] == "future"
-                }
-                # Use non-strict so that wildcard-expanded instances absent from cache are handled by
-                # _assign_wildcard_instances below rather than raising an assertion error.
-                # TODO @wensi-ai: Check object scope again to see if any wildcard objects are recorded. 2026+ tasks do this, 2025 ones don't.
-                self.assign_object_scope_with_cache(env, env_idx)
-                # TODO @wensi-ai: Assign objects to remaining wildcard objects. This is a no-op for 2026+ tasks.
-                self._assign_wildcard_instances(env, env_idx)
-                # assert that everything in the object scope that's not a future object is not None
-                for inst, entity in self.object_scope[env_idx].items():
-                    if inst not in self.future_obj_instances and entity is None:
-                        raise ValueError(
-                            f"Object instance '{inst}' (env_idx={env_idx}) was not assigned an entity during cache assignment!"
-                        )
+        # Second pass per env: re-assign from cache (scope now includes wildcard instances)
+        # and fill in any remaining wildcard slots from scene objects.
+        # TODO @wensi-ai: Check object scope again to see if any wildcard objects are recorded.
+        # 2026+ tasks do this, 2025 ones don't.
+        for env_idx in range(env.num_envs):
+            # Use non-strict so that wildcard-expanded instances absent from cache are handled by
+            # _assign_wildcard_instances below rather than raising an assertion error.
+            self.assign_object_scope_with_cache(env, env_idx)
+            # TODO @wensi-ai: Assign objects to remaining wildcard objects. This is a no-op for 2026+ tasks.
+            self._assign_wildcard_instances(env, env_idx)
+            # assert that everything in the object scope that's not a future object is not None
+            for inst, entity in self.object_scope[env_idx].items():
+                if inst not in self.future_obj_instances and entity is None:
+                    raise ValueError(
+                        f"Object instance '{inst}' (env_idx={env_idx}) was not assigned an entity during cache assignment!"
+                    )
 
         return True, feedback
 
@@ -770,7 +793,7 @@ class BehaviorTask(BaseTask):
             in self._termination_conditions["predicate"].goal_status[env_idx]["satisfied"]
         )
         natural_language_condition = self.activity_natural_language_goal_conditions[self.currently_viewed_instruction]
-        objects = self.activity_goal_conditions[env_idx][self.currently_viewed_instruction].get_relevant_objects()
+        objects = self.activity_goal_conditions[self.currently_viewed_instruction].get_relevant_objects()
         text_color = (
             [83.0 / 255.0, 176.0 / 255.0, 72.0 / 255.0] if satisfied else [255.0 / 255.0, 51.0 / 255.0, 51.0 / 255.0]
         )
@@ -781,9 +804,8 @@ class BehaviorTask(BaseTask):
         """
         Increment the instruction
         """
-        # All envs share the same task definition / instruction list; index 0 is canonical.
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(
-            self.compiled_task[0].conditions.parsed_goal_conditions
+            self.compiled_task.conditions.parsed_goal_conditions
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 

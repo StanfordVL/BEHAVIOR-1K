@@ -85,7 +85,7 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
     """
     # Find the reference object from initial conditions (single-env script: scene 0)
     reference_object_name = None
-    for cond in env.task.activity_initial_conditions[0]:
+    for cond in env.task.activity_initial_conditions:
         object_list = []
         for bddl_name in cond.get_relevant_objects():
             obj = env.task.object_scope[0].get(bddl_name, None)

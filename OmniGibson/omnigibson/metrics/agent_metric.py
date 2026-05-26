@@ -19,6 +19,8 @@ class AgentMetric(MetricBase):
             }
 
     def reset(self, env):
+        # Single-env metric: env.scene and env.scene.robots[0] reads below assume one env / one robot.
+        assert env.num_envs == 1, f"AgentMetric is single-env only; got num_envs={env.num_envs}."
         self.state[env.scene] = dict()
         self.initialized = False
 
