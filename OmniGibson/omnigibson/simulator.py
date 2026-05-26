@@ -455,11 +455,6 @@ def _launch_simulator(*args, **kwargs):
             self.pre_step_exception = None
             self.post_step_exception = None
 
-            # Monotonically advances exactly once per og.sim.step() call.
-            # Time-dependent tensorized states gate on this so their
-            # _update_values doesn't tick during step_physics(). Reset to 0 in stop().
-            self._step_call_index = 0
-
             self._step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
             self._pre_physics_step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
             self._post_physics_step_profiler = Profiler(deep=gm.ENABLE_DEEP_PROFILING)
@@ -1443,23 +1438,9 @@ def _launch_simulator(*args, **kwargs):
                 finally:
                     self._in_sim_lifecycle -= 1
 
-            self._step_call_index = 0
-
             # Run all callbacks
             for callback in self._callbacks_on_stop.values():
                 callback()
-
-        @property
-        def step_call_index(self):
-            """
-            Monotonically increasing counter of og.sim.step() calls since the last stop().
-
-            Distinct from current_time_step_index: that one advances on every physics callback
-            (including step_physics()), while this only advances on logical step() invocations.
-            Time-dependent tensorized states (Temperature, ToggledOn, SlicerActive) gate on this
-            so their _update_values doesn't tick during step_physics() / sample_kinematics().
-            """
-            return self._step_call_index
 
         @property
         def n_physics_timesteps_per_render(self):
@@ -1506,10 +1487,6 @@ def _launch_simulator(*args, **kwargs):
                             self._report_step_exceptions()
             finally:
                 self._in_sim_lifecycle -= 1
-
-            # Bump the logical step counter after a successful physics step but before non-physics updates,
-            # so time-dependent states observe the new index during _non_physics_step().
-            self._step_call_index += 1
 
             # Additionally run non physics things
             self._non_physics_step()

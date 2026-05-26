@@ -13,14 +13,14 @@ def _temperature_decay_kernel(
     values: wp.array2d(dtype=wp.float32),
     default_temp: wp.float32,
     decay_rate: wp.float32,
-    dt: wp.float32,
+    dt: wp.array(dtype=wp.float32),
 ):
     """
     In-place exponential decay toward `default_temp`. One thread per (scene, obj).
-    Equivalent to: values += (default_temp - values) * decay_rate * dt
+    Equivalent to: values += (default_temp - values) * decay_rate * dt[0]
     """
     s, o = wp.tid()
-    values[s, o] = values[s, o] + (default_temp - values[s, o]) * decay_rate * dt
+    values[s, o] = values[s, o] + (default_temp - values[s, o]) * decay_rate * dt[0]
 
 
 # Create settings for this module
@@ -35,11 +35,6 @@ m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps
 
 
 class Temperature(TensorizedAbsoluteState):
-    # Index of the last og.sim.step() call during which _update_values ran. The gate in
-    # _update_values uses this to skip ticking during lazy refreshes triggered between
-    # real sim steps (e.g. by sample_kinematics).
-    _LAST_UPDATE_STEP_INDEX = -1
-
     @classmethod
     def initialize_view(cls):
         # Snapshot which relative paths existed before the rebuild
@@ -47,8 +42,6 @@ class Temperature(TensorizedAbsoluteState):
 
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
         super().initialize_view()
-
-        cls._LAST_UPDATE_STEP_INDEX = og.sim.step_call_index
 
         # Initialize new VALUE slots (not carried over) to DEFAULT_TEMPERATURE
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
@@ -90,14 +83,11 @@ class Temperature(TensorizedAbsoluteState):
 
     @classmethod
     def _update_values(cls, values):
-        # Apply temperature decay via Warp kernel
+        # Apply temperature decay via Warp kernel. dt is read from cls._dt at kernel-launch
+        # time inside the captured graph, so the per-frame value written in pre_update is
+        # visible without re-capturing the graph.
         if cls.VALUES_WP is None:
             return
-        # Out-of-step update
-        step = og.sim.step_call_index
-        if step == cls._LAST_UPDATE_STEP_INDEX:
-            return
-        cls._LAST_UPDATE_STEP_INDEX = step
         S, O = cls.VALUES.shape[:2]
         wp.launch(
             kernel=_temperature_decay_kernel,
@@ -106,7 +96,7 @@ class Temperature(TensorizedAbsoluteState):
                 cls.VALUES_WP,
                 wp.float32(m.DEFAULT_TEMPERATURE),
                 wp.float32(m.TEMPERATURE_DECAY_SPEED),
-                wp.float32(og.sim.get_sim_step_dt()),
+                cls._dt,
             ],
             device="cuda",
         )

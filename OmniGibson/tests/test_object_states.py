@@ -822,20 +822,20 @@ def test_toggled_on_requires_closed(env, microwave):
     assert not microwave.states[ToggledOn].set_value(True)
     assert not microwave.states[ToggledOn].get_value()
 
-    # (b) Kernel knockdown: bypass set_value, force VALUES and steps directly, then step
-    # the sim once. The requires_closed kernel should zero both because Open is True.
+    # (b) Kernel knockdown: bypass set_value, force VALUES and the seconds counter directly,
+    # then step the sim once. The requires_closed kernel should zero both because Open is True.
     s = microwave.scene.idx
     obj_idx = ToggledOn.OBJ_IDXS[microwave.relative_prim_path]
     ToggledOn.VALUES[s, obj_idx] = 1
-    # _robots_can_toggle_steps is a wp.array — wp.to_torch gives a zero-copy view we can poke.
-    wp.to_torch(ToggledOn._robots_can_toggle_steps)[s, obj_idx] = 100.0
+    # _robots_can_toggle_time is a wp.array — wp.to_torch gives a zero-copy view we can poke.
+    wp.to_torch(ToggledOn._robots_can_toggle_time)[s, obj_idx] = 100.0
     og.sim.step()
     assert not microwave.states[
         ToggledOn
     ].get_value(), "requires_closed kernel should knock VALUES back to 0 while Open is True"
     assert (
-        wp.to_torch(ToggledOn._robots_can_toggle_steps)[s, obj_idx].item() == 0.0
-    ), "requires_closed kernel should reset step counter to 0"
+        wp.to_torch(ToggledOn._robots_can_toggle_time)[s, obj_idx].item() == 0.0
+    ), "requires_closed kernel should reset the seconds counter to 0"
 
     # Close the door — set_value should now succeed.
     microwave.states[Open].set_value(False)
@@ -846,12 +846,20 @@ def test_toggled_on_requires_closed(env, microwave):
     assert microwave.states[ToggledOn].get_value()
 
 
-def test_out_of_step_refresh_freezes_time_dependent_states(env, microwave, table_knife):
+def test_zero_dt_refresh_does_not_advance_time_dependent_states(env, microwave, table_knife):
     """
-    Time-dependent tensorized states
-    (Temperature, ToggledOn._robots_can_toggle_steps, SlicerActive.DELAY_COUNTER) must
-    not advance during lazy cache refreshes or step_physics() calls between real sim
-    steps — those events represent sampling / settling, not elapsed task time.
+    Time-dependent tensorized states are driven by Δt computed from og.sim.current_time. When
+    _refresh_state_caches() is called without any physics elapsing between the previous
+    update and this one, Δt is 0 and any pure-dt accumulation is a no-op.
+
+    Load-bearing case: lazy reads triggered between real sim steps (e.g. get_value() called
+    during sample_kinematics() / settling) must not artificially tick task-relevant timers.
+
+    We assert this only for Temperature and for the slicer in its default active state —
+    those are the cases where the kernel's behavior reduces to "multiply by Δt". The toggle
+    kernel (and the slicer's cooldown branch) also resets the counter unconditionally when
+    eligibility/contact breaks; that reset path is correct and runs regardless of Δt, so it
+    isn't meaningful to assert "counter frozen" without engineering real contact.
     """
     microwave = env.scene.object_registry("name", "microwave")
     table_knife = env.scene.object_registry("name", "table_knife")
@@ -861,47 +869,32 @@ def test_out_of_step_refresh_freezes_time_dependent_states(env, microwave, table
 
     s_mw = microwave.scene.idx
     temp_idx = Temperature.OBJ_IDXS[microwave.relative_prim_path]
-    toggle_idx = ToggledOn.OBJ_IDXS[microwave.relative_prim_path]
     s_knife = table_knife.scene.idx
     slicer_idx = SlicerActive.OBJ_IDXS[table_knife.relative_prim_path]
 
     # Seed non-default values so any spurious tick would be visible.
     Temperature.VALUES[s_mw, temp_idx] = 100.0
-    ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx] = 3.0
-    SlicerActive.DELAY_COUNTER[s_knife, slicer_idx] = 7.0
+    # Slicer starts active by default; in the active branch the kernel leaves DELAY_COUNTER alone,
+    # so seeding it lets us verify the kernel truly takes the no-op path under Δt=0.
+    wp.to_torch(SlicerActive.DELAY_COUNTER)[s_knife, slicer_idx] = 7.0
 
     snap_temp = Temperature.VALUES[s_mw, temp_idx].clone()
-    snap_toggle = ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx].clone()
-    snap_slicer = SlicerActive.DELAY_COUNTER[s_knife, slicer_idx].clone()
+    snap_slicer = wp.to_torch(SlicerActive.DELAY_COUNTER)[s_knife, slicer_idx].clone()
 
-    step_idx_before = og.sim.step_call_index
-
-    # Five lazy refreshes followed by five step_physics() calls — neither path runs
-    # og.sim.step(), so step_call_index must be unchanged and all counters frozen.
+    # Five back-to-back refreshes with no physics in between — Δt = 0 each time.
     for _ in range(5):
         og.sim._refresh_state_caches()
-    for _ in range(5):
-        og.sim.step_physics()
 
-    assert (
-        og.sim.step_call_index == step_idx_before
-    ), f"step_call_index advanced unexpectedly: {step_idx_before} -> {og.sim.step_call_index}"
     assert th.equal(Temperature.VALUES[s_mw, temp_idx], snap_temp), (
-        f"Temperature drifted on out-of-step refresh: "
-        f"{snap_temp.item()} -> {Temperature.VALUES[s_mw, temp_idx].item()}"
+        f"Temperature drifted on Δt=0 refresh: " f"{snap_temp.item()} -> {Temperature.VALUES[s_mw, temp_idx].item()}"
     )
-    assert th.equal(ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx], snap_toggle), (
-        f"ToggledOn counter drifted on out-of-step refresh: "
-        f"{snap_toggle.item()} -> {ToggledOn._robots_can_toggle_steps[s_mw, toggle_idx].item()}"
-    )
-    assert th.equal(SlicerActive.DELAY_COUNTER[s_knife, slicer_idx], snap_slicer), (
-        f"SlicerActive counter drifted on out-of-step refresh: "
-        f"{snap_slicer.item()} -> {SlicerActive.DELAY_COUNTER[s_knife, slicer_idx].item()}"
-    )
+    slicer_after = wp.to_torch(SlicerActive.DELAY_COUNTER)[s_knife, slicer_idx]
+    assert th.equal(
+        slicer_after, snap_slicer
+    ), f"SlicerActive counter drifted on Δt=0 refresh: {snap_slicer.item()} -> {slicer_after.item()}"
 
-    # One real step must advance the gate counter and unfreeze the kernels.
+    # A real og.sim.step() advances time by sim_step_dt — Temperature should decay.
     og.sim.step()
-    assert og.sim.step_call_index == step_idx_before + 1
     assert (
         Temperature.VALUES[s_mw, temp_idx].item() < 100.0
     ), "Temperature should decay toward DEFAULT_TEMPERATURE after a real step"

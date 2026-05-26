@@ -1,5 +1,3 @@
-import math
-
 import torch as th
 import warp as wp
 
@@ -52,18 +50,19 @@ def _slicer_pre_clear_kernel(
 @wp.kernel
 def _slicer_post_update_kernel(
     values: wp.array2d(dtype=wp.uint8),  # (S, O) — public state, stays uint8
-    delay_counter: wp.array2d(dtype=wp.float32),  # (S, O)
+    delay_counter: wp.array2d(dtype=wp.float32),  # (S, O) — seconds elapsed since last touch
     currently_touching: wp.array2d(dtype=wp.int32),  # (S, O) — int32, written by atomic in is_in_contact_batch_warp
     prev_touching: wp.array2d(dtype=wp.int32),  # (S, O) — int32 to mirror currently_touching
-    steps_to_wait: wp.float32,
+    seconds_to_wait: wp.float32,
+    dt: wp.array(dtype=wp.float32),
 ):
     """
     Per (scene, obj) thread. Per thread does:
       - If the slicer is currently active: leave delay_counter alone (it's not in cooldown).
-      - If the slicer is inactive AND not touching anything: advance delay_counter by 1.
+      - If the slicer is inactive AND not touching anything: advance delay_counter by dt[0] seconds.
       - If the slicer is inactive AND still touching something: reset delay_counter to 0
         (touching restarts the wait — the slicer doesn't reactivate while in contact).
-      - If delay_counter has hit `steps_to_wait`, reactivate the slicer.
+      - If delay_counter has hit `seconds_to_wait`, reactivate the slicer.
       - Finally, mirror currently_touching into prev_touching for the next step's pre-clear pass.
     """
     s, o = wp.tid()
@@ -71,10 +70,10 @@ def _slicer_post_update_kernel(
     is_touching = currently_touching[s, o] != wp.int32(0)
     if not is_active:
         if not is_touching:
-            delay_counter[s, o] = delay_counter[s, o] + 1.0
+            delay_counter[s, o] = delay_counter[s, o] + dt[0]
         else:
             delay_counter[s, o] = 0.0
-    if delay_counter[s, o] >= steps_to_wait:
+    if delay_counter[s, o] >= seconds_to_wait:
         values[s, o] = wp.uint8(1)
     prev_touching[s, o] = currently_touching[s, o]
 
@@ -87,10 +86,7 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
     they depend on`RigidContactAPI.is_in_contact_batch_warp` whose output is int32.
     """
 
-    # int: Keep track of how many steps each object is waiting for
-    STEPS_TO_WAIT = None
-
-    # wp.array2d (S, O) float32 — current delay counter per slicer.
+    # wp.array2d (S, O) float32 — seconds elapsed since the last touch, per slicer.
     DELAY_COUNTER = None
 
     # wp.array2d (S, O) int32 — whether each slicer touched a sliceable in the previous step.
@@ -113,11 +109,6 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
     # Per-scene wp row slice views of _currently_touching, used as is_in_contact_batch_warp out=.
     _currently_touching_per_scene = None  # list[wp.array | None]
 
-    # Index of the last og.sim.step() call during which _update_values ran. The gate in
-    # _update_values uses this to skip ticking during lazy refreshes triggered between
-    # real sim steps (e.g. by sample_kinematics).
-    _LAST_UPDATE_STEP_INDEX = -1
-
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
@@ -128,8 +119,6 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         # Call super first
         super().global_initialize()
 
-        # Compute step-based reactivation threshold (constant for the lifetime of the simulator)
-        cls.STEPS_TO_WAIT = max(1, int(math.ceil(m.REACTIVATION_DELAY / og.sim.get_sim_step_dt())))
         cls._slicer_contact_query_masks = None
         cls._sliceable_contact_col_mask = None
         cls._currently_touching = None
@@ -149,8 +138,6 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
 
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for survivors)
         super().initialize_view()
-
-        cls._LAST_UPDATE_STEP_INDEX = og.sim.step_call_index
 
         S = len(cls.IDX_OBJS)
         O = len(cls.OBJ_IDXS)
@@ -246,11 +233,6 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
     def _update_values(cls, values):
         if cls.PREVIOUSLY_TOUCHING is None:
             return
-        # Out-of-step update
-        step = og.sim.step_call_index
-        if step == cls._LAST_UPDATE_STEP_INDEX:
-            return
-        cls._LAST_UPDATE_STEP_INDEX = step
         S, O = values.shape[:2]
 
         wp.launch(
@@ -280,7 +262,8 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
                 cls.DELAY_COUNTER,
                 cls._currently_touching,
                 cls.PREVIOUSLY_TOUCHING,
-                wp.float32(cls.STEPS_TO_WAIT),
+                wp.float32(m.REACTIVATION_DELAY),
+                cls._dt,
             ],
             device="cuda",
         )
@@ -325,7 +308,7 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
 
     def _dump_state(self):
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
-            return dict(value=True, previously_touching=False, delay_counter=0)
+            return dict(value=True, previously_touching=False, delay_counter_seconds=0.0)
         state = super()._dump_state()
         scene_idx = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
@@ -333,7 +316,7 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         prev_view = wp.to_torch(type(self).PREVIOUSLY_TOUCHING)
         delay_view = wp.to_torch(type(self).DELAY_COUNTER)
         state["previously_touching"] = bool(prev_view[scene_idx, obj_idx])
-        state["delay_counter"] = int(delay_view[scene_idx, obj_idx])
+        state["delay_counter_seconds"] = float(delay_view[scene_idx, obj_idx])
         return state
 
     def _load_state(self, state):
@@ -341,14 +324,14 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         wp.to_torch(type(self).PREVIOUSLY_TOUCHING)[s, obj_idx] = int(state["previously_touching"])
-        wp.to_torch(type(self).DELAY_COUNTER)[s, obj_idx] = float(state["delay_counter"])
+        wp.to_torch(type(self).DELAY_COUNTER)[s, obj_idx] = float(state["delay_counter_seconds"])
 
     def serialize(self, state):
         state_flat = super().serialize(state=state)
         return th.cat(
             [
                 state_flat,
-                th.tensor([state["previously_touching"], state["delay_counter"]]),
+                th.tensor([state["previously_touching"], state["delay_counter_seconds"]]),
             ]
         )
 
@@ -356,5 +339,5 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         state_dict, idx = super().deserialize(state=state)
         state_dict[f"{self.value_name}"] = bool(state_dict[f"{self.value_name}"])
         state_dict["previously_touching"] = bool(state[idx])
-        state_dict["delay_counter"] = int(state[idx + 1])
+        state_dict["delay_counter_seconds"] = float(state[idx + 1])
         return state_dict, idx + 2
