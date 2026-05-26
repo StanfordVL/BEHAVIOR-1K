@@ -2,6 +2,7 @@ import math
 
 import pytest
 import torch as th
+import warp as wp
 from utils import SYSTEM_EXAMPLES, get_random_pose, place_obj_on_floor_plane, place_objA_on_objB_bbox
 
 import omnigibson as og
@@ -825,13 +826,14 @@ def test_toggled_on_requires_closed(env, microwave):
     s = microwave.scene.idx
     obj_idx = ToggledOn.OBJ_IDXS[microwave.relative_prim_path]
     ToggledOn.VALUES[s, obj_idx] = 1
-    ToggledOn._robots_can_toggle_steps[s, obj_idx] = 100.0
+    # _robots_can_toggle_steps is a wp.array — wp.to_torch gives a zero-copy view we can poke.
+    wp.to_torch(ToggledOn._robots_can_toggle_steps)[s, obj_idx] = 100.0
     og.sim.step()
     assert not microwave.states[
         ToggledOn
     ].get_value(), "requires_closed kernel should knock VALUES back to 0 while Open is True"
     assert (
-        ToggledOn._robots_can_toggle_steps[s, obj_idx].item() == 0.0
+        wp.to_torch(ToggledOn._robots_can_toggle_steps)[s, obj_idx].item() == 0.0
     ), "requires_closed kernel should reset step counter to 0"
 
     # Close the door — set_value should now succeed.

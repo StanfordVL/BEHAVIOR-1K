@@ -1,6 +1,7 @@
 import torch as th
 import warp as wp
 
+import omnigibson.lazy as lazy
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
@@ -87,19 +88,15 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
 
     # Per-scene contact mask tables (rebuilt in initialize_view, sized to that scene's R_s / C_s).
     # Each entry covers N rows where N = len(OBJ_IDXS); rows for cloth / absent-in-scene objects are zero.
-    _obj_row_mask = None  # list[Tensor(N, R_s) bool | None]
-    _obj_row_mask_wp = None  # list[wp.array2d(uint8) | None]
-    _obj_col_mask = None  # list[Tensor(N, C_s) bool | None]
-    _obj_col_mask_wp = None  # list[wp.array2d(uint8) | None]
+    _obj_row_mask = None  # list[wp.array2d(N, R_s) uint8 | None]
+    _obj_col_mask = None  # list[wp.array2d(N, C_s) uint8 | None]
 
     # Stage 1 scratch: per-scene (N, C_s) int32 atomic_max target.
-    _obj_to_col = None  # list[Tensor(N, C_s) int32 | None]
-    _obj_to_col_wp = None  # list[wp.array2d(int32) | None]
+    _obj_to_col = None  # list[wp.array2d(N, C_s) int32 | None]
 
-    # Stage 2 scratch: single (S, N, N) int32 atomic_max target + per-scene 2D slice wrappers.
-    _pair_scratch = None  # Tensor(S, N, N) int32
-    _pair_scratch_wp = None  # wp.array3d(int32)
-    _pair_scratch_per_scene_wp = None  # list[wp.array2d(int32)]
+    # Stage 2 scratch: single (S, N, N) int32 atomic_max target + per-scene 2D slice views.
+    _pair_scratch = None  # wp.array3d (S, N, N) int32
+    _pair_scratch_per_scene = None  # list[wp.array2d(int32)] — row slices of _pair_scratch
 
     @classproperty
     def value_shape(cls):
@@ -122,14 +119,10 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     def global_initialize(cls):
         super().global_initialize()
         cls._obj_row_mask = None
-        cls._obj_row_mask_wp = None
         cls._obj_col_mask = None
-        cls._obj_col_mask_wp = None
         cls._obj_to_col = None
-        cls._obj_to_col_wp = None
         cls._pair_scratch = None
-        cls._pair_scratch_wp = None
-        cls._pair_scratch_per_scene_wp = None
+        cls._pair_scratch_per_scene = None
 
     @classmethod
     def initialize_view(cls):
@@ -140,39 +133,31 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         N = len(cls.OBJ_IDXS)
 
         cls._obj_row_mask = []
-        cls._obj_row_mask_wp = []
         cls._obj_col_mask = []
-        cls._obj_col_mask_wp = []
         cls._obj_to_col = []
-        cls._obj_to_col_wp = []
-        cls._pair_scratch_per_scene_wp = []
+        cls._pair_scratch_per_scene = []
 
         if S == 0 or N == 0:
             cls._pair_scratch = None
-            cls._pair_scratch_wp = None
             return
 
-        # Allocate single (S, N, N) int32 scratch for stage 2 output; per-scene 2D views feed stage 2 kernel.
-        cls._pair_scratch = th.zeros((S, N, N), dtype=th.int32, device="cuda")
-        cls._pair_scratch_wp = wp.from_torch(cls._pair_scratch)
+        # Allocate single (S, N, N) int32 scratch for stage 2 output; per-scene 2D row slices share storage.
+        cls._pair_scratch = wp.zeros((S, N, N), dtype=wp.int32, device="cuda")
 
         for scene_idx, scene_row in enumerate(cls.IDX_OBJS):
-            cls._pair_scratch_per_scene_wp.append(wp.from_torch(cls._pair_scratch[scene_idx]))
+            cls._pair_scratch_per_scene.append(cls._pair_scratch[scene_idx])
 
             shape = RigidContactAPI.get_contact_matrix_shape(scene_idx)
             if shape is None:
                 cls._obj_row_mask.append(None)
-                cls._obj_row_mask_wp.append(None)
                 cls._obj_col_mask.append(None)
-                cls._obj_col_mask_wp.append(None)
                 cls._obj_to_col.append(None)
-                cls._obj_to_col_wp.append(None)
                 continue
 
             R_s, C_s = shape
 
-            row_mask = th.zeros((N, R_s), dtype=th.bool)
-            col_mask = th.zeros((N, C_s), dtype=th.bool)
+            row_mask_cpu = th.zeros((N, R_s), dtype=th.uint8)
+            col_mask_cpu = th.zeros((N, C_s), dtype=th.uint8)
 
             for obj_idx, obj in enumerate(scene_row):
                 if obj is None:
@@ -181,23 +166,20 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                     # Cloth gets handled by the _get_value fallback; rigid kernel sees zero masks.
                     continue
                 link_paths = [link.prim_path for link in obj.links.values()]
-                row_mask[obj_idx] = RigidContactAPI.get_contact_row_mask(scene_idx, link_paths)
-                col_mask[obj_idx] = RigidContactAPI.get_contact_col_mask(scene_idx, link_paths)
+                row_mask_cpu[obj_idx] = RigidContactAPI.get_contact_row_mask(scene_idx, link_paths).to(th.uint8)
+                col_mask_cpu[obj_idx] = RigidContactAPI.get_contact_col_mask(scene_idx, link_paths).to(th.uint8)
 
-            row_mask_gpu = row_mask.cuda()
-            col_mask_gpu = col_mask.cuda()
-            cls._obj_row_mask.append(row_mask_gpu)
-            cls._obj_col_mask.append(col_mask_gpu)
-            cls._obj_row_mask_wp.append(wp.from_torch(row_mask_gpu.view(th.uint8), dtype=wp.uint8))
-            cls._obj_col_mask_wp.append(wp.from_torch(col_mask_gpu.view(th.uint8), dtype=wp.uint8))
-
-            obj_to_col = th.zeros((N, C_s), dtype=th.int32, device="cuda")
-            cls._obj_to_col.append(obj_to_col)
-            cls._obj_to_col_wp.append(wp.from_torch(obj_to_col))
+            cls._obj_row_mask.append(
+                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(row_mask_cpu, "uint8", device="cuda")
+            )
+            cls._obj_col_mask.append(
+                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(col_mask_cpu, "uint8", device="cuda")
+            )
+            cls._obj_to_col.append(wp.zeros((N, C_s), dtype=wp.int32, device="cuda"))
 
     @classmethod
     def _update_values(cls, values):
-        if cls._pair_scratch_wp is None or cls.VALUES_WP is None:
+        if cls._pair_scratch is None or cls.VALUES_WP is None:
             return
 
         S, N, _ = values.shape
@@ -205,15 +187,15 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             return
 
         # Zero the (S, N, N) pair scratch in one shot.
-        cls._pair_scratch_wp.zero_()
+        cls._pair_scratch.zero_()
 
         # Per-scene Stage 1 + Stage 2 launches.
         for scene_idx in range(S):
-            obj_to_col_wp = cls._obj_to_col_wp[scene_idx]
-            if obj_to_col_wp is None:
+            obj_to_col = cls._obj_to_col[scene_idx]
+            if obj_to_col is None:
                 continue
-            row_mask_wp = cls._obj_row_mask_wp[scene_idx]
-            col_mask_wp = cls._obj_col_mask_wp[scene_idx]
+            row_mask = cls._obj_row_mask[scene_idx]
+            col_mask = cls._obj_col_mask[scene_idx]
             contact_matrix_wp = RigidContactAPI.get_contact_matrix_wp(scene_idx, current_only=True)
             if contact_matrix_wp is None:
                 continue
@@ -221,13 +203,13 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             C_s = contact_matrix_wp.shape[1]
 
             # Zero stage-1 scratch.
-            obj_to_col_wp.zero_()
+            obj_to_col.zero_()
 
             # Stage 1: (N, R_s, C_s) — obj_to_col[i, c] |= row_mask[i, r] & contact[r, c]
             wp.launch(
                 kernel=_touching_obj_to_col_kernel,
                 dim=(N, R_s, C_s),
-                inputs=[row_mask_wp, contact_matrix_wp, obj_to_col_wp],
+                inputs=[row_mask, contact_matrix_wp, obj_to_col],
                 device="cuda",
             )
 
@@ -235,7 +217,7 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             wp.launch(
                 kernel=_touching_pair_kernel,
                 dim=(N, N, C_s),
-                inputs=[obj_to_col_wp, col_mask_wp, cls._pair_scratch_per_scene_wp[scene_idx]],
+                inputs=[obj_to_col, col_mask, cls._pair_scratch_per_scene[scene_idx]],
                 device="cuda",
             )
 
@@ -243,7 +225,7 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         wp.launch(
             kernel=_touching_finalize_kernel,
             dim=(S, N, N),
-            inputs=[cls._pair_scratch_wp, cls.VALUES_WP],
+            inputs=[cls._pair_scratch, cls.VALUES_WP],
             device="cuda",
         )
 

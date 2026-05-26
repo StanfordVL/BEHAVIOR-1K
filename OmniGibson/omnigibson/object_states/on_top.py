@@ -2,6 +2,7 @@ import torch as th
 import warp as wp
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
@@ -54,10 +55,8 @@ def _on_top_kernel(
 
 class OnTop(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
     # (N,) int32 mappings from OnTop's N-index to the corresponding state's N-index.
-    _touch_idx = None  # torch
-    _touch_idx_wp = None  # wp.array(int32)
-    _adj_idx = None
-    _adj_idx_wp = None
+    _touch_idx = None  # wp.array(N,) int32 — OnTop idx → Touching idx, -1 if missing
+    _adj_idx = None  # wp.array(N,) int32 — OnTop idx → Adjacency idx, -1 if missing
 
     @classproperty
     def value_shape(cls):
@@ -83,27 +82,25 @@ class OnTop(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         N = len(cls.OBJ_IDXS)
         if N == 0:
             cls._touch_idx = None
-            cls._touch_idx_wp = None
             cls._adj_idx = None
-            cls._adj_idx_wp = None
             return
 
-        touch_idx = th.full((N,), -1, dtype=th.int32)
-        adj_idx = th.full((N,), -1, dtype=th.int32)
+        touch_idx_cpu = th.full((N,), -1, dtype=th.int32)
+        adj_idx_cpu = th.full((N,), -1, dtype=th.int32)
         touch_map = Touching.OBJ_IDXS or {}
         adj_map = Adjacency.OBJ_IDXS or {}
         for rel_path, idx in cls.OBJ_IDXS.items():
-            touch_idx[idx] = touch_map.get(rel_path, -1)
-            adj_idx[idx] = adj_map.get(rel_path, -1)
+            touch_idx_cpu[idx] = touch_map.get(rel_path, -1)
+            adj_idx_cpu[idx] = adj_map.get(rel_path, -1)
 
-        cls._touch_idx = touch_idx.cuda()
-        cls._adj_idx = adj_idx.cuda()
-        cls._touch_idx_wp = wp.from_torch(cls._touch_idx)
-        cls._adj_idx_wp = wp.from_torch(cls._adj_idx)
+        cls._touch_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            touch_idx_cpu, "int32", device="cuda"
+        )
+        cls._adj_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(adj_idx_cpu, "int32", device="cuda")
 
     @classmethod
     def _update_values(cls, values):
-        if cls.VALUES_WP is None or cls._touch_idx_wp is None or cls._adj_idx_wp is None:
+        if cls.VALUES_WP is None or cls._touch_idx is None or cls._adj_idx is None:
             return
         if Touching.VALUES_WP is None or Adjacency.VALUES_WP is None:
             # Upstream not ready — leave VALUES as-is (will be zeros from initial alloc).
@@ -119,8 +116,8 @@ class OnTop(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             inputs=[
                 Touching.VALUES_WP,
                 Adjacency.VALUES_WP,
-                cls._touch_idx_wp,
-                cls._adj_idx_wp,
+                cls._touch_idx,
+                cls._adj_idx,
                 cls.VALUES_WP,
             ],
             device="cuda",

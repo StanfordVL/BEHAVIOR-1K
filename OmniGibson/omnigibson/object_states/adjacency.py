@@ -3,6 +3,7 @@ import math
 import torch as th
 import warp as wp
 
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
@@ -149,21 +150,13 @@ class Adjacency(TensorizedRelativeState):
     Cloth is excluded via is_compatible (no collision mesh to ray-cast against).
     """
 
-    # wp kernel input
-    AABB_OBJ_IDXS_WP = None  # (N_adj,) int32
-    LINK_TO_OBJ_IDX_WP = None  # (L_total,) int32
-    LINK_TO_SCENE_IDX_WP = None  # (L_total,) int32
-    DIRECTIONS_WP = None  # (22, 3) float32
-    MAX_DISTANCES_WP = None  # (22,) float32
-    OUTPUT_WP = None  # (S, N_adj, N_adj, 22) int32 — atomic_max target
-
-    # Underlying torch tensors
-    _aabb_obj_idxs = None
-    _link_to_obj_idx = None
-    _link_to_scene_idx = None
-    _directions = None
-    _max_distances = None
-    _output = None
+    # Wp kernel inputs (single source of truth).
+    _aabb_obj_idxs = None  # wp.array (N_adj,) int32
+    _link_to_obj_idx = None  # wp.array (L_total,) int32
+    _link_to_scene_idx = None  # wp.array (L_total,) int32
+    _directions = None  # wp.array2d (12, 3) float32
+    _max_distances = None  # wp.array (12,) float32
+    _output = None  # wp.array4d (S, N_adj, N_adj, 12) int32 — atomic_max target
 
     @classproperty
     def value_shape(cls):
@@ -199,10 +192,12 @@ class Adjacency(TensorizedRelativeState):
         super().global_initialize()
         # Build the constant axis tables (directions + per-axis max distance).
         directions_cpu, max_distances_cpu = _build_adjacency_axis_tables()
-        cls._directions = directions_cpu.cuda()
-        cls._max_distances = max_distances_cpu.cuda()
-        cls.DIRECTIONS_WP = wp.from_torch(cls._directions)
-        cls.MAX_DISTANCES_WP = wp.from_torch(cls._max_distances)
+        cls._directions = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            directions_cpu, "float32", device="cuda"
+        )
+        cls._max_distances = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            max_distances_cpu, "float32", device="cuda"
+        )
 
     @classmethod
     def initialize_view(cls):
@@ -213,21 +208,22 @@ class Adjacency(TensorizedRelativeState):
 
         # Build aabb_obj_idxs: maps Adjacency-N → AABB-N (or -1 if unknown to AABB).
         if N > 0 and AABB.OBJ_IDXS is not None:
-            aabb_obj_idxs = th.full((N,), -1, dtype=th.int32)
+            aabb_obj_idxs_cpu = th.full((N,), -1, dtype=th.int32)
             for rel_path, adj_idx in cls.OBJ_IDXS.items():
-                aabb_obj_idxs[adj_idx] = AABB.OBJ_IDXS.get(rel_path, -1)
+                aabb_obj_idxs_cpu[adj_idx] = AABB.OBJ_IDXS.get(rel_path, -1)
+            cls._aabb_obj_idxs = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                aabb_obj_idxs_cpu, "int32", device="cuda"
+            )
         else:
-            aabb_obj_idxs = th.empty(0, dtype=th.int32)
-        cls._aabb_obj_idxs = aabb_obj_idxs.cuda()
-        cls.AABB_OBJ_IDXS_WP = wp.from_torch(cls._aabb_obj_idxs) if N > 0 else None
+            cls._aabb_obj_idxs = None
 
         # Build link_to_obj_idx / link_to_scene_idx tables, length = N_links_total in
         # RigidBodyViewAPI (whether or not those links belong to Adjacency-tracked objects).
         # Untracked link slots stay at -1; the kernel skips them.
         if RigidBodyViewAPI._PATH_TO_IDX:
             L_total = len(RigidBodyViewAPI._PATH_TO_IDX)
-            link_to_obj = th.full((L_total,), -1, dtype=th.int32)
-            link_to_scene = th.full((L_total,), -1, dtype=th.int32)
+            link_to_obj_cpu = th.full((L_total,), -1, dtype=th.int32)
+            link_to_scene_cpu = th.full((L_total,), -1, dtype=th.int32)
             for s_idx, scene_row in enumerate(cls.IDX_OBJS):
                 for adj_idx, obj in enumerate(scene_row):
                     if obj is None:
@@ -236,38 +232,36 @@ class Adjacency(TensorizedRelativeState):
                         flat_idx = RigidBodyViewAPI.get_flat_idx(link.prim_path)
                         if flat_idx is None:
                             continue
-                        link_to_obj[flat_idx] = adj_idx
-                        link_to_scene[flat_idx] = s_idx
-            cls._link_to_obj_idx = link_to_obj.cuda()
-            cls._link_to_scene_idx = link_to_scene.cuda()
-            cls.LINK_TO_OBJ_IDX_WP = wp.from_torch(cls._link_to_obj_idx)
-            cls.LINK_TO_SCENE_IDX_WP = wp.from_torch(cls._link_to_scene_idx)
+                        link_to_obj_cpu[flat_idx] = adj_idx
+                        link_to_scene_cpu[flat_idx] = s_idx
+            cls._link_to_obj_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                link_to_obj_cpu, "int32", device="cuda"
+            )
+            cls._link_to_scene_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+                link_to_scene_cpu, "int32", device="cuda"
+            )
         else:
             cls._link_to_obj_idx = None
             cls._link_to_scene_idx = None
-            cls.LINK_TO_OBJ_IDX_WP = None
-            cls.LINK_TO_SCENE_IDX_WP = None
 
         # Allocate the int32 scratch (S, N, N, 22) used as the atomic_max target.
         if S > 0 and N > 0:
-            cls._output = th.zeros((S, N, N, _ADJ_AXIS_COUNT), dtype=th.int32, device="cuda")
-            cls.OUTPUT_WP = wp.from_torch(cls._output)
+            cls._output = wp.zeros((S, N, N, _ADJ_AXIS_COUNT), dtype=wp.int32, device="cuda")
         else:
             cls._output = None
-            cls.OUTPUT_WP = None
 
     @classmethod
     def _update_values(cls, values):
         # All required handles must be live; otherwise nothing to do this step.
         if (
-            cls.OUTPUT_WP is None
+            cls._output is None
             or cls.VALUES_WP is None
             or AABB.VALUES_WP is None
-            or cls.AABB_OBJ_IDXS_WP is None
+            or cls._aabb_obj_idxs is None
             or RigidBodyViewAPI.LINK_MESH_IDS is None
             or RigidBodyViewAPI.POSE_MATRICES is None
-            or cls.LINK_TO_OBJ_IDX_WP is None
-            or cls.LINK_TO_SCENE_IDX_WP is None
+            or cls._link_to_obj_idx is None
+            or cls._link_to_scene_idx is None
         ):
             return
 
@@ -279,7 +273,7 @@ class Adjacency(TensorizedRelativeState):
             return
 
         # 1. Zero the int32 scratch via CUDA memset (graph-capturable for contiguous wp.array).
-        cls.OUTPUT_WP.zero_()
+        cls._output.zero_()
 
         # 2. Ray-cast against each link's mesh; atomic_max into scratch on hit.
         wp.launch(
@@ -287,14 +281,14 @@ class Adjacency(TensorizedRelativeState):
             dim=(S, N, L, K),
             inputs=[
                 AABB.VALUES_WP,
-                cls.AABB_OBJ_IDXS_WP,
-                cls.DIRECTIONS_WP,
-                cls.MAX_DISTANCES_WP,
+                cls._aabb_obj_idxs,
+                cls._directions,
+                cls._max_distances,
                 RigidBodyViewAPI.LINK_MESH_IDS,
                 RigidBodyViewAPI.POSE_MATRICES,
-                cls.LINK_TO_OBJ_IDX_WP,
-                cls.LINK_TO_SCENE_IDX_WP,
-                cls.OUTPUT_WP,
+                cls._link_to_obj_idx,
+                cls._link_to_scene_idx,
+                cls._output,
             ],
             device="cuda",
         )
@@ -303,6 +297,6 @@ class Adjacency(TensorizedRelativeState):
         wp.launch(
             kernel=_adjacency_finalize_kernel,
             dim=(S, N, N, K),
-            inputs=[cls.OUTPUT_WP, cls.VALUES_WP],
+            inputs=[cls._output, cls.VALUES_WP],
             device="cuda",
         )
