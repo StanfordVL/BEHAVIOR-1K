@@ -89,10 +89,11 @@ jobs:
       working-directory: bddl3
       run: python -m bddl.data_generation.generate_datafiles
 
-    # We want to check if the knowledgebase imports correctly, and if not, we want to NOT do the pull
-    # because it will result in a permamently broken knowledgebase that blocks sampling and website.
-    - name: Test if knowledgebase loads OK
-      run: python -c "from bddl.knowledge_base import *"
+    # Validate that the generated knowledgebase still builds before auto-committing these refreshed files.
+    # If this step fails, the workflow stops and does not auto-commit/push a broken knowledgebase that
+    # would block sampling and the website. load_wordnet=True enables deeper WordNet-based synset validation.
+    - name: Test if knowledgebase builds OK
+      run: python -c "from bddl.knowledge_base import KnowledgeBase; KnowledgeBase(verbose=False, load_wordnet=True)"
 
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:

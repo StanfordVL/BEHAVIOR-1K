@@ -158,14 +158,31 @@ python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME
 python OmniGibson/scripts/sampling/extract_task_information.py
 ```
 
-### Step 9: Prepare all files and submit PR
+### Step 9: Run Challenge Instance QC
 
-After the task design is finalized, create a seperate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
+Before creating a PR to `2026-challenge-task-instances`, run the QC tool after the metadata and all 300
+instances have been generated:
 
-    - two seed instance json files: `0_0_template.json`, `0_0_template-partial_rooms.json`
-    - 300 task intance files under 
-    - updated `task_custom_list.json` and `available_tasks.yaml`
+```bash
+python OmniGibson/scripts/sampling/challenge_instance_qc_gui.py --open-browser
+```
 
-Watch out for merge conflicts from main, which will most likely happen on `task_custom_list.json` and `available_tasks.yaml`. 
+The GUI uses Flask. If your environment does not already have it, install it in the `behavior` environment with
+`pip install flask`.
+
+The tool prints dataset-wide and per-task checks in the terminal, then serves a local GUI for reviewing robot and
+object sample distributions on the floor plan. Use it whenever task metadata, selected rooms, generated instances,
+or robot poses change.
+
+### Step 10: Prepare all files and submit PR
+
+After the task design is finalized, create a separate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
+
+- two seed instance json files: `SCENE_NAME_task_TASK_NAME_0_0_template.json`, `SCENE_NAME_task_TASK_NAME_0_0_template-partial_rooms.json`
+- 300 task instance files under `scenes/SCENE_NAME/json/SCENE_NAME_task_TASK_NAME_instances/`
+- updated `metadata/task_custom_lists.json`, `metadata/available_tasks.yaml`, and `metadata/B100_task_misc.csv`
+- updated `README.md` task coverage entry, if the selected task list changed
+
+Watch out for merge conflicts from main, which will most likely happen on `task_custom_lists.json` and `available_tasks.yaml`.
 
 Submit a PR and tag the team for review.

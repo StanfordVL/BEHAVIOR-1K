@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 import pathlib
+import re
 import sys
 import traceback
 
@@ -19,6 +20,7 @@ import trimesh
 
 MINIMUM_COLLISION_DEPTH_METERS = 0.01  # 1cm of collision
 MINIMUM_COLLISION_DEPTH_METERS_SENSITIVE = 0  # any collision
+DEBUG_COLLISION_ROOT = PIPELINE_ROOT / "tmp" / "debug_collision"
 
 inventory_path = PIPELINE_ROOT / "artifacts" / "pipeline" / "object_inventory.json"
 with open(inventory_path, "r") as f:
@@ -289,7 +291,44 @@ def prepare_scene(use_clutter=False):
     return scene
 
 
-def check_collisions(scene):
+def _safe_filename_part(value):
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", value)[:120]
+
+
+def prepare_debug_collision_dir():
+    debug_collision_dir = DEBUG_COLLISION_ROOT / pathlib.Path(rt.maxFilePath).name
+    debug_collision_dir.mkdir(parents=True, exist_ok=True)
+    for debug_file in debug_collision_dir.glob("*.ply"):
+        debug_file.unlink()
+    return debug_collision_dir
+
+
+def export_debug_collision_pair(
+    scene, left_info, right_info, depth, debug_collision_dir, collision_idx
+):
+    meshes = []
+    for info, color in (
+        (left_info, [255, 64, 64, 255]),
+        (right_info, [64, 128, 255, 255]),
+    ):
+        transform, geometry_name = scene.graph.get(info["node"])
+        mesh = scene.geometry[geometry_name].copy()
+        mesh.apply_transform(transform)
+        mesh.visual.vertex_colors = np.tile(color, (len(mesh.vertices), 1))
+        meshes.append(mesh)
+
+    filename = (
+        f"{collision_idx:04d}_"
+        f"{depth:.3f}mm_"
+        f"{_safe_filename_part(left_info['node'])}__"
+        f"{_safe_filename_part(right_info['node'])}.ply"
+    )
+    output_path = debug_collision_dir / filename
+    trimesh.util.concatenate(meshes).export(output_path)
+    return str(output_path.relative_to(PIPELINE_ROOT))
+
+
+def check_collisions(scene, debug_collision_dir):
     cm, _ = trimesh.collision.scene_to_collision(scene)
     _, collision_data = cm.in_collision_internal(return_data=True)
 
@@ -322,24 +361,35 @@ def check_collisions(scene):
         for model_id, graph in graphs_by_model.items()
     }
 
+    def parse_collision_node(node_name):
+        category, model, instance, link, body, loose = node_name.split("-")
+        return {
+            "category": category,
+            "model": model,
+            "instance": instance,
+            "link": link,
+            "body": body,
+            "loose": loose == "true",
+            "node": node_name,
+        }
+
     pairs_collision = {}
     for collision in tqdm.tqdm(collision_data, desc="Filtering collisions"):
         left, right = sorted(
             tuple(collision.names)
         )  # Sorting here gives deterministic category ordering
-        left_category, left_model, left_instance, left_link, left_body, left_loose = (
-            left.split("-")
-        )
-        left_loose = left_loose == "true"
-        (
-            right_category,
-            right_model,
-            right_instance,
-            right_link,
-            right_body,
-            right_loose,
-        ) = right.split("-")
-        right_loose = right_loose == "true"
+        left_info = parse_collision_node(left)
+        right_info = parse_collision_node(right)
+        left_category = left_info["category"]
+        left_model = left_info["model"]
+        left_instance = left_info["instance"]
+        left_link = left_info["link"]
+        left_loose = left_info["loose"]
+        right_category = right_info["category"]
+        right_model = right_info["model"]
+        right_instance = right_info["instance"]
+        right_link = right_info["link"]
+        right_loose = right_info["loose"]
 
         # Exclude self-collisions
         if left_model == right_model and left_instance == right_instance:
@@ -378,11 +428,32 @@ def check_collisions(scene):
             )
         )
         if pair not in pairs_collision:
-            pairs_collision[pair] = depth
-        else:
-            pairs_collision[pair] = float(np.maximum(pairs_collision[pair], depth))
+            pairs_collision[pair] = {
+                "left": left_info,
+                "right": right_info,
+                "objects": pair,
+                "depth": depth,
+            }
+        elif depth > pairs_collision[pair]["depth"]:
+            pairs_collision[pair] = {
+                "left": left_info,
+                "right": right_info,
+                "objects": pair,
+                "depth": depth,
+            }
 
-    return [(left, right, depth) for (left, right), depth in pairs_collision.items()]
+    collisions = [pairs_collision[pair] for pair in sorted(pairs_collision)]
+    for collision_idx, collision in enumerate(collisions):
+        collision["debug_ply"] = export_debug_collision_pair(
+            scene,
+            collision["left"],
+            collision["right"],
+            collision["depth"],
+            debug_collision_dir,
+            collision_idx,
+        )
+
+    return collisions
 
 
 def main():
@@ -395,9 +466,15 @@ def main():
     try:
         scene = prepare_scene(use_clutter=use_clutter)
         scene.export(r"D:\physics.ply")
-        collisions = check_collisions(scene)
-        for left, right, depth in collisions:
-            print(f"Collision between {left} and {right}: {depth} mm")
+        debug_collision_dir = prepare_debug_collision_dir()
+        collisions = check_collisions(scene, debug_collision_dir)
+        for collision in collisions:
+            left = collision["left"]
+            right = collision["right"]
+            depth = collision["depth"]
+            print(
+                f"Collision between {left['node']} and {right['node']}: {depth} mm"
+            )
     except Exception:
         raise
     #     error = traceback.format_exc()
