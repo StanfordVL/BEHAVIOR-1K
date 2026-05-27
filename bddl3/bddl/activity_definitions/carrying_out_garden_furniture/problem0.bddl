@@ -18,13 +18,19 @@
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
-    (:goal 
-        (and 
-            (forall 
+    (:goal
+        (and
+            (forall
                 (?lawn_chair.n.01 - lawn_chair.n.01)
-                (ontop ?lawn_chair.n.01 ?lawn.n.01_1)
-            ) 
-            (ontop ?barrow.n.03_1 ?lawn.n.01_1)
+                (exists
+                    (?lawn.n.01 - lawn.n.01)
+                    (ontop ?lawn_chair.n.01 ?lawn.n.01)
+                )
+            )
+            (exists
+                (?lawn.n.01 - lawn.n.01)
+                (ontop ?barrow.n.03_1 ?lawn.n.01)
+            )
         )
     )
 )
