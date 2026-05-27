@@ -911,28 +911,49 @@ def _launch_simulator(*args, **kwargs):
             ), "import_scene can only be called with Scene instances"
             assert len(scenes) > 0, "import_scene requires at least one scene"
 
+            import time as _bench_time
+
+            _t_imp_start = _bench_time.perf_counter()
+
             # Check that the scene is not already imported
             for scene in scenes:
                 if scene.loaded:
                     raise ValueError("Scene is already loaded!")
+                _t = _bench_time.perf_counter()
                 self._last_scene_edge = scene.load(
                     idx=len(self.scenes),
                     last_scene_edge=self._last_scene_edge,
                     initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
                     scene_margin=m.SCENE_MARGIN,
                 )
+                print(f"[LOAD-BENCH] scene.load: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
                 # Load the scene.
                 self._scenes.append(scene)
 
+            _t = _bench_time.perf_counter()
             self.play()
+            print(
+                f"[LOAD-BENCH] import_scene -> play (incl. update_handles): {_bench_time.perf_counter()-_t:.2f}s",
+                flush=True,
+            )
+
+            _t = _bench_time.perf_counter()
             for scene in scenes:
                 scene.initialize()
+            print(f"[LOAD-BENCH] scene.initialize: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
+
             # One step is needed for particle systems to work.
+            _t = _bench_time.perf_counter()
             self.step()
+            print(f"[LOAD-BENCH] import_scene -> step: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
+
+            _t = _bench_time.perf_counter()
             self.stop()
+            print(f"[LOAD-BENCH] import_scene -> stop: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             for scene in scenes:
                 log.info(f"Imported scene {scene.idx}.")
+            print(f"[LOAD-BENCH] import_scene TOTAL: {_bench_time.perf_counter()-_t_imp_start:.2f}s", flush=True)
 
         # TODO: Remove this context manager and call _post_import_object directly since the objects
         # are already known when this is called.
@@ -1195,18 +1216,26 @@ def _launch_simulator(*args, **kwargs):
             self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
         def update_handles(self):
+            import time as _bench_time
+
+            _t_uh_start = _bench_time.perf_counter()
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
 
             # Flush any USD changes to PhysX
+            _t = _bench_time.perf_counter()
             with self.editing_usd():
                 self.psi.flush_changes()
+            print(f"[LOAD-BENCH]   update_handles.flush_changes: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
 
             # Refresh the sim view
+            _t = _bench_time.perf_counter()
             self._refresh_physics_sim_view()
+            print(f"[LOAD-BENCH]   update_handles.refresh_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
 
             # Then update the handles for all objects
+            _t = _bench_time.perf_counter()
             for scene in self.scenes:
                 if scene is not None:
                     for obj in scene.objects:
@@ -1216,29 +1245,53 @@ def _launch_simulator(*args, **kwargs):
                     for system in scene.active_systems.values():
                         if isinstance(system, MacroPhysicalParticleSystem):
                             system.update_handles()
+            print(f"[LOAD-BENCH]   update_handles.obj_loop: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
 
             # Finally update any unified views
+            _t = _bench_time.perf_counter()
             RigidContactAPI.initialize_view()
+            print(f"[LOAD-BENCH]     RigidContactAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
+            _t = _bench_time.perf_counter()
             RigidBodyViewAPI.initialize_view()
+            print(f"[LOAD-BENCH]     RigidBodyViewAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
+            _t = _bench_time.perf_counter()
             ArticulatedObjectViewAPI.initialize_view()
+            print(
+                f"[LOAD-BENCH]     ArticulatedObjectViewAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True
+            )
+            _t = _bench_time.perf_counter()
             ControllableObjectViewAPI.initialize_view()
+            print(
+                f"[LOAD-BENCH]     ControllableObjectViewAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s",
+                flush=True,
+            )
 
             # Per-tensorized-state init_view is expensive (full O(N) rebuild) and gets called
             # multiple times during scene load. Gate on a dirty flag that is set by
             # adding_objects / removing_objects so we only rebuild when the scene's object
             # set actually changes.
             if gm.ENABLE_OBJECT_STATES:
+                _t = _bench_time.perf_counter()
                 if TensorizedState.init_dirty:
                     for state_type in og.sim.object_state_types_requiring_update:
                         if issubclass(state_type, TensorizedState):
                             state_type.initialize_view()
                     TensorizedState.init_dirty = False
+                    print(
+                        f"[LOAD-BENCH]     TensorizedState.init_view (RAN): {_bench_time.perf_counter()-_t:.3f}s",
+                        flush=True,
+                    )
                 else:
                     # Loop skipped — but the view APIs above reallocate their GPU buffers
                     # (POSES_GPU, POSE_MATRICES, LINK_MESH_IDS, etc.) every call, so any
                     # captured warp graph that referenced those pointers is now stale.
                     # Initialize_view normally sets graph_dirty; force it here for the skip path.
                     TensorizedState.graph_dirty = True
+                    print(
+                        f"[LOAD-BENCH]     TensorizedState.init_view (SKIP): {_bench_time.perf_counter()-_t:.3f}s",
+                        flush=True,
+                    )
+            print(f"[LOAD-BENCH]   update_handles TOTAL: {_bench_time.perf_counter()-_t_uh_start:.3f}s", flush=True)
 
         # TODO(vector) Calling this actually makes most time-sensitive states
         # (temperature, toggle, sliceractive...) think a new step has happened.
@@ -1414,6 +1467,9 @@ def _launch_simulator(*args, **kwargs):
                         scene.transition_rule_api.step()
 
         def play(self):
+            import time as _bench_time
+
+            _t_play_start = _bench_time.perf_counter()
             if not self.is_playing():
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
                 was_stopped = self.is_stopped()
@@ -1432,17 +1488,33 @@ def _launch_simulator(*args, **kwargs):
                 with suppress_omni_log(channels=channels):
                     self._in_sim_lifecycle += 1
                     try:
+                        _t = _bench_time.perf_counter()
                         self._sim_context.play()
+                        print(
+                            f"[LOAD-BENCH] sim_context.play (warm_start tick): "
+                            f"{_bench_time.perf_counter()-_t:.2f}s",
+                            flush=True,
+                        )
                     finally:
                         self._in_sim_lifecycle -= 1
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
+                _t = _bench_time.perf_counter()
                 self.render()
+                print(
+                    f"[LOAD-BENCH] post-play render: {_bench_time.perf_counter()-_t:.2f}s",
+                    flush=True,
+                )
 
                 # Update all object handles, unless this is a play during initialization
                 if og.sim is not None:
+                    _t = _bench_time.perf_counter()
                     self.update_handles()
+                    print(
+                        f"[LOAD-BENCH] post-play update_handles: " f"{_bench_time.perf_counter()-_t:.2f}s",
+                        flush=True,
+                    )
 
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
@@ -1462,6 +1534,8 @@ def _launch_simulator(*args, **kwargs):
             # Run all callbacks
             for callback in self._callbacks_on_play.values():
                 callback()
+
+            print(f"[LOAD-BENCH] play TOTAL: {_bench_time.perf_counter()-_t_play_start:.2f}s", flush=True)
 
         def pause(self):
             if not self.is_paused():
