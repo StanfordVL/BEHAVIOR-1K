@@ -40,6 +40,38 @@ stages:
       outs:
       - cad/${item}/artifacts/check_collisions.json
     foreach: ${scenes}
+  check_collisions_challenge:
+    cmd: python -m b1k_pipeline.check_collisions_challenge
+    deps:
+    - cad/scenes/Rs_int/artifacts/check_collisions.json
+    - cad/scenes/commercial_kitchen_pans/artifacts/check_collisions.json
+    - cad/scenes/hotel_suite_large/artifacts/check_collisions.json
+    - cad/scenes/house_double_floor_lower/artifacts/check_collisions.json
+    - cad/scenes/house_double_floor_upper/artifacts/check_collisions.json
+    - cad/scenes/house_single_floor/artifacts/check_collisions.json
+    - cad/scenes/office_cubicles_right/artifacts/check_collisions.json
+    - cad/scenes/public_restroom_brown/artifacts/check_collisions.json
+    - cad/scenes/public_restroom_marble/artifacts/check_collisions.json
+    - cad/scenes/restaurant_diner/artifacts/check_collisions.json
+    - cad/scenes/Rs_int/artifacts/object_list.json
+    - cad/scenes/hotel_suite_large/artifacts/object_list.json
+    - cad/scenes/house_double_floor_lower/artifacts/object_list.json
+    - cad/scenes/house_double_floor_upper/artifacts/object_list.json
+    - cad/scenes/house_single_floor/artifacts/object_list.json
+    - cad/scenes/office_cubicles_right/artifacts/object_list.json
+    - cad/scenes/restaurant_diner/artifacts/object_list.json
+    - b1k_pipeline/check_collisions_challenge.py
+    - params.yaml
+    outs:
+    - artifacts/pipeline/check_collisions_challenge.json
+  check_collisions_challenge_success:
+    cmd: python -m b1k_pipeline.check_success artifacts/pipeline/check_collisions_challenge.json
+      artifacts/pipeline/check_collisions_challenge.success
+    deps:
+    - artifacts/pipeline/check_collisions_challenge.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/check_collisions_challenge.success
   check_collisions_with_clutter:
     do:
       cmd: python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/check_collisions.py
@@ -1156,7 +1188,6 @@ stages:
       - cad/${item}/processed.max
       - b1k_pipeline/max/new_sanity_check.py
       - artifacts/pipeline/object_list.success
-      - artifacts/pipeline/object_inventory.json
       outs:
       - cad/${item}/artifacts/sanitycheck.json
     foreach: ${combined}

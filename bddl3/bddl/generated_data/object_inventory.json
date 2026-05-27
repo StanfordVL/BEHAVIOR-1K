@@ -6595,7 +6595,6 @@
         "ceilings-bvwmqs": "scenes/hotel_suite_large",
         "ceilings-hnnzid": "scenes/hotel_suite_large",
         "desk-ohjotf": "scenes/hotel_suite_large",
-        "door-gjtspo": "scenes/hotel_suite_large",
         "door-uptpdr": "scenes/hotel_suite_large",
         "door-ydokma": "scenes/hotel_suite_large",
         "downlight-miioxs": "scenes/hotel_suite_large",
@@ -6720,6 +6719,7 @@
         "walls-bqgzsg": "scenes/hotel_suite_large",
         "walls-dpttpq": "scenes/hotel_suite_large",
         "walls-eideiv": "scenes/hotel_suite_large",
+        "walls-gjtspo": "scenes/hotel_suite_large",
         "walls-hssezu": "scenes/hotel_suite_large",
         "walls-irxipd": "scenes/hotel_suite_large",
         "walls-jvlvng": "scenes/hotel_suite_large",
@@ -15698,7 +15698,6 @@
             "scenes/Ihlen_1_int",
             "scenes/Merom_1_int",
             "scenes/Rs_garden",
-            "scenes/Rs_int",
             "scenes/Wainscott_0_garden",
             "scenes/Wainscott_0_int",
             "scenes/Wainscott_1_int"
@@ -30660,9 +30659,6 @@
         "desk-ohjotf": [
             "scenes/hotel_suite_large"
         ],
-        "door-gjtspo": [
-            "scenes/hotel_suite_large"
-        ],
         "door-uptpdr": [
             "scenes/hotel_suite_large"
         ],
@@ -31033,6 +31029,9 @@
             "scenes/hotel_suite_large"
         ],
         "walls-eideiv": [
+            "scenes/hotel_suite_large"
+        ],
+        "walls-gjtspo": [
             "scenes/hotel_suite_large"
         ],
         "walls-hssezu": [
@@ -61847,10 +61846,6 @@
         "desk-ohjotf": [
             "collision"
         ],
-        "door-gjtspo": [
-            "collision",
-            "joint"
-        ],
         "door-uptpdr": [
             "collision",
             "joint"
@@ -62259,6 +62254,9 @@
             "collision"
         ],
         "walls-eideiv": [
+            "collision"
+        ],
+        "walls-gjtspo": [
             "collision"
         ],
         "walls-hssezu": [
@@ -101531,9 +101529,9 @@
             1.0549644165039063
         ],
         "mkcndz": [
-            0.24003468322753907,
-            1.0000764770507813,
-            2.060035888671875
+            0.24015428161621094,
+            0.9371492309570313,
+            2.00222021484375
         ],
         "jyifxp": [
             0.16579126739501954,
@@ -106140,20 +106138,15 @@
             1.6382208251953125,
             0.6683472900390625
         ],
-        "gjtspo": [
-            0.026418617248535156,
-            1.6542633056640625,
-            2.0796634521484374
-        ],
         "uptpdr": [
             0.21452392578125,
             0.9085150756835938,
             2.073620361328125
         ],
         "ydokma": [
-            0.06815977478027344,
+            0.06669196319580079,
             1.6110118408203125,
-            2.080343994140625
+            2.080192138671875
         ],
         "miioxs": [
             0.10362739562988281,
@@ -106711,9 +106704,9 @@
             0.018959049224853516
         ],
         "ibrplo": [
-            0.04203652000427246,
-            0.49488565063476564,
-            0.0130726318359375
+            0.04203648567199707,
+            0.39875672912597654,
+            0.01307269287109375
         ],
         "huwhjg": [
             0.6850019226074219,
@@ -106764,6 +106757,11 @@
             0.1200001220703125,
             1.06633349609375,
             2.082013427734375
+        ],
+        "gjtspo": [
+            0.022680293083190917,
+            0.836981201171875,
+            2.0158416748046877
         ],
         "hssezu": [
             6.00254931640625,
@@ -115936,7 +115934,7 @@
             0.09545310974121093
         ],
         "lztyfn": [
-            0.12930270385742187,
+            0.1480439453125,
             0.9854842529296876,
             2.0670628662109376
         ],

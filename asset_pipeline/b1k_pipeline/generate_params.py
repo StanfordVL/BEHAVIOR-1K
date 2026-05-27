@@ -5,6 +5,7 @@ import re
 import sys
 import yaml
 import hashlib
+import json
 
 OBJS_DIR = "../cad/objects"
 SCENES_DIR = "../cad/scenes"
@@ -70,6 +71,16 @@ FINAL_SCENES = [
     "gates_bedroom",
 ]
 
+CHALLENGE_SCENES = [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "house_double_floor_upper",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right",
+    "Rs_int",
+]
+
 APPROVED_OBJS = {
     ".*",
 }
@@ -87,6 +98,32 @@ REJECTED_SCENES = set()
 VERIFIED_SCENES = {
     ".*",
 }
+
+
+def get_challenge_scene_deps(challenge_scenes, approved_scenes):
+    challenge_scenes_and_deps = set(challenge_scenes)
+    for scene_name in sorted(challenge_scenes):
+        object_list_path = os.path.join(
+            os.path.dirname(__file__),
+            SCENES_DIR,
+            scene_name,
+            "artifacts",
+            "object_list.json",
+        )
+        if not os.path.exists(object_list_path):
+            print(f"Missing object list for challenge scene: {scene_name}")
+            continue
+
+        with open(object_list_path, "r") as f:
+            room_object_list = json.load(f)
+
+        challenge_scenes_and_deps.update(room_object_list.get("outgoing_portals", {}).keys())
+
+    missing_challenge_deps = challenge_scenes_and_deps - set(approved_scenes)
+    if missing_challenge_deps:
+        print(f"Missing challenge scene dependencies: {missing_challenge_deps}")
+
+    return sorted(challenge_scenes_and_deps & set(approved_scenes))
 
 
 def main():
@@ -128,6 +165,16 @@ def main():
         print(f"Missing scenes: {missing_final_scene_paths}")
     final_scenes = sorted(["scenes/" + x for x in found_final_scenes])
 
+    found_challenge_scenes = set(CHALLENGE_SCENES) & set(approved_scenes)
+    missing_challenge_scene_paths = set(CHALLENGE_SCENES) - found_challenge_scenes
+    if missing_challenge_scene_paths:
+        print(f"Missing challenge scenes: {missing_challenge_scene_paths}")
+    challenge_scenes = sorted(["scenes/" + x for x in found_challenge_scenes])
+    challenge_scenes_and_deps = sorted(
+        "scenes/" + x
+        for x in get_challenge_scene_deps(found_challenge_scenes, approved_scenes)
+    )
+
     found_verified_scenes = set(
         x
         for x in all_scenes_list
@@ -140,6 +187,8 @@ def main():
         "objects": objects,
         "scenes": scenes,
         "final_scenes": final_scenes,
+        "challenge_scenes": challenge_scenes,
+        "challenge_scenes_and_deps": challenge_scenes_and_deps,
         "verified_scenes": verified_scenes,
         "combined": combined,
     }
