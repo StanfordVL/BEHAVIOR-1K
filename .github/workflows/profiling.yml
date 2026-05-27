@@ -126,6 +126,45 @@ jobs:
           OMNI_CACHE="$APPDATA/global/cache"
           echo "omni global cache size: $(du -sh "$OMNI_CACHE" 2>/dev/null | cut -f1)"
 
+      - name: Find where warp actually caches
+        if: matrix.deep_profile
+        run: |
+          set +e
+          echo "::group::All warp-related cubin/ptx files anywhere on disk (top 30)"
+          find / \( -name "*.cubin" -o -name "*.ptx" \) 2>/dev/null \
+            | grep -i -E "warp|omni" | head -30
+          echo "::endgroup::"
+          echo ""
+          echo "::group::All directories that look like warp caches"
+          find / -type d \( -name "warp" -o -name "warp_cache" -o -name "kernel_cache" \) 2>/dev/null \
+            | grep -v "proc\|sys" | head -30
+          echo "::endgroup::"
+          echo ""
+          echo "::group::~/.cache/warp"
+          du -sh /root/.cache/warp 2>/dev/null && find /root/.cache/warp -name "*.cubin" 2>/dev/null | wc -l
+          du -sh $HOME/.cache/warp 2>/dev/null && find $HOME/.cache/warp -name "*.cubin" 2>/dev/null | wc -l
+          echo "(end ~/.cache/warp)"
+          echo "::endgroup::"
+          echo ""
+          echo "::group::/tmp/warp"
+          du -sh /tmp/warp 2>/dev/null && find /tmp/warp -name "*.cubin" 2>/dev/null | wc -l
+          echo "(end /tmp/warp)"
+          echo "::endgroup::"
+          echo ""
+          echo "::group::What wp.config.kernel_cache_dir actually was during this run"
+          python -c "
+          import os
+          os.environ.setdefault('OMNIGIBSON_HEADLESS', '1')
+          import warp as wp
+          # Don't init yet; just see what defaults are
+          print(f'warp version: {wp.__version__ if hasattr(wp,\"__version__\") else \"?\"}')
+          print(f'wp.config.kernel_cache_dir (default): {wp.config.kernel_cache_dir}')
+          # Look at env vars warp might honor
+          for var in ['WARP_KERNEL_CACHE_DIR', 'WARP_CACHE_DIR', 'WARP_HOME']:
+              print(f'env {var}={os.environ.get(var, \"<unset>\")}')
+          " 2>&1 | head -20
+          echo "::endgroup::"
+
       - name: Convert deep profile to HTML
         if: matrix.deep_profile
         run: |
