@@ -388,4 +388,8 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
         # We exhausted our attempts and could not find a working sample.
         return False
 
-    # We don't need to load / save anything since the joints are saved elsewhere
+    # We don't need to load / save anything since the joints are saved elsewhere.
+    # Overriding the inherited TensorizedAbsoluteState._load_state which would
+    # call self._set_value(stored_value)
+    def _load_state(self, state):
+        return

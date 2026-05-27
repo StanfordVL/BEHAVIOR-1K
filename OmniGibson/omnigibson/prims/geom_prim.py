@@ -140,13 +140,19 @@ class GeomPrim(XFormPrim):
             face_vertex_counts = vtarray_to_torch(mesh.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
             face_indices = vtarray_to_torch(mesh.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
 
-            faces = []
-            i = 0
-            for count in face_vertex_counts:
-                for j in range(count - 2):
-                    faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
-                i += count
-            faces = th.tensor(faces, dtype=th.int)
+            # Fast path: when every polygon is already a triangle (the common case for
+            # Isaac Sim collision meshes), skip the fan-triangulation Python loop and
+            # just reshape the flat index buffer. Falls back to the loop for n-gons.
+            if face_vertex_counts.numel() > 0 and bool((face_vertex_counts == 3).all()):
+                faces = face_indices.reshape(-1, 3).to(th.int)
+            else:
+                faces = []
+                i = 0
+                for count in face_vertex_counts:
+                    for j in range(count - 2):
+                        faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
+                    i += count
+                faces = th.tensor(faces, dtype=th.int)
         else:
             tm = mesh_prim_shape_to_trimesh_mesh(mesh)
             points = th.tensor(tm.vertices, dtype=th.float32)

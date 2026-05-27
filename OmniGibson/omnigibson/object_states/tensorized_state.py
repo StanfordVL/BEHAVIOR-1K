@@ -83,6 +83,14 @@ class TensorizedState:
     # re-triggering a refresh. Set/cleared inside the simulator helper.
     _refresh_in_progress = False
 
+    # Set to True whenever the scene's object set / state-type set changes (object added or
+    # removed, state types registered/cleared). Checked in simulator.update_handles to gate
+    # the per-tensorized-state initialize_view loop, which is otherwise an expensive O(N) per
+    # state-type rebuild that gets called multiple times during scene load even when no
+    # structural change happened. Set in simulator.adding_objects / removing_objects; cleared
+    # by simulator.update_handles after running the loop.
+    init_dirty = True
+
     @classmethod
     def maybe_refresh_caches(cls):
         """Helper for `get_value`: if caches are dirty (and we're not already

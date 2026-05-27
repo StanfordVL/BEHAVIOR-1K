@@ -954,6 +954,10 @@ def _launch_simulator(*args, **kwargs):
                 SimulationManager._physics_sim_view.invalidate()
                 SimulationManager._physics_sim_view = None
 
+            # Objects are being added → tensorized-state buffers will need a rebuild on the
+            # next update_handles() call.
+            TensorizedState.init_dirty = True
+
             try:
                 yield
             finally:
@@ -1031,6 +1035,10 @@ def _launch_simulator(*args, **kwargs):
                         obj.name in obj_registry
                     ):  # a particle system template object might not exist in the registry when it's empty
                         obj_registry.pop(obj.name)
+
+            # Objects are being removed → tensorized-state buffers need a rebuild on the next
+            # update_handles() call (their OBJ_IDXS / IDX_OBJS now point at vanished objects).
+            TensorizedState.init_dirty = True
 
             # Run the main method
             try:
@@ -1215,10 +1223,15 @@ def _launch_simulator(*args, **kwargs):
             ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
 
-            if gm.ENABLE_OBJECT_STATES:
+            # Per-tensorized-state init_view is expensive (full O(N) rebuild) and gets called
+            # multiple times during scene load. Gate on a dirty flag that is set by
+            # adding_objects / removing_objects so we only rebuild when the scene's object
+            # set actually changes.
+            if gm.ENABLE_OBJECT_STATES and TensorizedState.init_dirty:
                 for state_type in og.sim.object_state_types_requiring_update:
                     if issubclass(state_type, TensorizedState):
                         state_type.initialize_view()
+                TensorizedState.init_dirty = False
 
         # TODO(vector) Calling this actually makes most time-sensitive states
         # (temperature, toggle, sliceractive...) think a new step has happened.
