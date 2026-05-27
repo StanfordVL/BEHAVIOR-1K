@@ -69,7 +69,7 @@ class TensorizedRelativeState(TensorizedState, RelativeObjectState):
         If the (scene, rel_path) set is
         unchanged, skip carry-over loop.
         """
-        # Cheap structural-equality check (only meaningful after first non-empty init).
+        # Fast path: see TensorizedAbsoluteState.initialize_view for rationale.
         if cls.OBJ_IDXS is not None and len(cls.OBJ_IDXS) > 0:
             scene_count = len(og.sim.scenes)
             current_rel_paths = set()
@@ -78,7 +78,6 @@ class TensorizedRelativeState(TensorizedState, RelativeObjectState):
                     if cls in obj.states:
                         current_rel_paths.add(obj.relative_prim_path)
             if len(cls.IDX_OBJS) == scene_count and set(cls.OBJ_IDXS.keys()) == current_rel_paths:
-                TensorizedState.graph_dirty = True
                 return
 
         # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)

@@ -53,6 +53,10 @@ class TensorizedAbsoluteState(TensorizedState, AbsoluteObjectState):
         is identical to the last init, skip the work and only flip graph_dirty so the simulator re-captures.
         """
         # Cheap structural-equality check (only meaningful after first non-empty init).
+        # If the (scene, rel_path) set is unchanged, the rebuild below would be a no-op
+        # under the carry-over logic — skip it. Caller (simulator.update_handles) sets
+        # TensorizedState.graph_dirty after this loop regardless, so graph re-capture
+        # still happens.
         if cls.OBJ_IDXS is not None and len(cls.OBJ_IDXS) > 0:
             scene_count = len(og.sim.scenes)
             current_rel_paths = set()
@@ -61,10 +65,6 @@ class TensorizedAbsoluteState(TensorizedState, AbsoluteObjectState):
                     if cls in obj.states:
                         current_rel_paths.add(obj.relative_prim_path)
             if len(cls.IDX_OBJS) == scene_count and set(cls.OBJ_IDXS.keys()) == current_rel_paths:
-                # All scenes/objects unchanged → existing OBJ_IDXS / IDX_OBJS / VALUES are
-                # still correct. Subclasses don't need their per-link buffers rebuilt either
-                # (no new links to track). Just signal a graph re-capture and return.
-                TensorizedState.graph_dirty = True
                 return
 
         # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)
