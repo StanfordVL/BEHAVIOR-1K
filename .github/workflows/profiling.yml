@@ -77,10 +77,54 @@ jobs:
         if: matrix.deep_profile
         run: pip install snakeviz
 
+      - name: Cache stats (before profiling)
+        if: matrix.deep_profile
+        run: |
+          set +e
+          APPDATA=${OMNIGIBSON_APPDATA_PATH:-$GITHUB_WORKSPACE/OmniGibson/appdata}
+          echo "host=$(hostname)"
+          echo "OMNIGIBSON_APPDATA_PATH=${OMNIGIBSON_APPDATA_PATH:-<unset>}"
+          echo "Effective APPDATA=$APPDATA"
+          if [ -d "$APPDATA" ]; then
+            echo "Total size: $(du -sh "$APPDATA" 2>/dev/null | cut -f1)"
+          else
+            echo "APPDATA directory missing"
+          fi
+          WARP_CACHE="$APPDATA/global/warp_cache"
+          if [ -d "$WARP_CACHE" ]; then
+            echo "warp_cache size: $(du -sh "$WARP_CACHE" 2>/dev/null | cut -f1)"
+            echo "warp_cache .cubin file count: $(find "$WARP_CACHE" -name '*.cubin' 2>/dev/null | wc -l)"
+            echo "warp_cache .ptx file count:   $(find "$WARP_CACHE" -name '*.ptx' 2>/dev/null | wc -l)"
+            echo "warp_cache recent (<10min):   $(find "$WARP_CACHE" -name '*.cubin' -mmin -10 2>/dev/null | wc -l)"
+            echo "warp_cache old (>1d):         $(find "$WARP_CACHE" -name '*.cubin' -mmin +1440 2>/dev/null | wc -l)"
+          else
+            echo "warp_cache missing"
+          fi
+          OMNI_CACHE="$APPDATA/global/cache"
+          if [ -d "$OMNI_CACHE" ]; then
+            echo "omni global cache size: $(du -sh "$OMNI_CACHE" 2>/dev/null | cut -f1)"
+          else
+            echo "omni global cache missing"
+          fi
+
       - name: Run profiling
         run: |
           rm -f output.json
           python tests/benchmark/profiling.py ${{ matrix.args }}
+
+      - name: Cache stats (after profiling)
+        if: matrix.deep_profile
+        run: |
+          set +e
+          APPDATA=${OMNIGIBSON_APPDATA_PATH:-$GITHUB_WORKSPACE/OmniGibson/appdata}
+          echo "host=$(hostname)"
+          echo "Total size: $(du -sh "$APPDATA" 2>/dev/null | cut -f1)"
+          WARP_CACHE="$APPDATA/global/warp_cache"
+          echo "warp_cache size: $(du -sh "$WARP_CACHE" 2>/dev/null | cut -f1)"
+          echo "warp_cache .cubin count: $(find "$WARP_CACHE" -name '*.cubin' 2>/dev/null | wc -l)"
+          echo "warp_cache .cubin written this run (<10min): $(find "$WARP_CACHE" -name '*.cubin' -mmin -10 2>/dev/null | wc -l)"
+          OMNI_CACHE="$APPDATA/global/cache"
+          echo "omni global cache size: $(du -sh "$OMNI_CACHE" 2>/dev/null | cut -f1)"
 
       - name: Convert deep profile to HTML
         if: matrix.deep_profile
