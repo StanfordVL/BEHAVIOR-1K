@@ -308,7 +308,7 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
 
     def _dump_state(self):
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
-            return dict(value=True, previously_touching=False, delay_counter_seconds=0.0)
+            return dict(value=True, previously_touching=False, delay_counter=0.0)
         state = super()._dump_state()
         scene_idx = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
@@ -316,7 +316,7 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         prev_view = wp.to_torch(type(self).PREVIOUSLY_TOUCHING)
         delay_view = wp.to_torch(type(self).DELAY_COUNTER)
         state["previously_touching"] = bool(prev_view[scene_idx, obj_idx])
-        state["delay_counter_seconds"] = float(delay_view[scene_idx, obj_idx])
+        state["delay_counter"] = float(delay_view[scene_idx, obj_idx])
         return state
 
     def _load_state(self, state):
@@ -324,14 +324,14 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         wp.to_torch(type(self).PREVIOUSLY_TOUCHING)[s, obj_idx] = int(state["previously_touching"])
-        wp.to_torch(type(self).DELAY_COUNTER)[s, obj_idx] = float(state["delay_counter_seconds"])
+        wp.to_torch(type(self).DELAY_COUNTER)[s, obj_idx] = float(state["delay_counter"])
 
     def serialize(self, state):
         state_flat = super().serialize(state=state)
         return th.cat(
             [
                 state_flat,
-                th.tensor([state["previously_touching"], state["delay_counter_seconds"]]),
+                th.tensor([state["previously_touching"], state["delay_counter"]]),
             ]
         )
 
@@ -339,5 +339,5 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
         state_dict, idx = super().deserialize(state=state)
         state_dict[f"{self.value_name}"] = bool(state_dict[f"{self.value_name}"])
         state_dict["previously_touching"] = bool(state[idx])
-        state_dict["delay_counter_seconds"] = float(state[idx + 1])
+        state_dict["delay_counter"] = float(state[idx + 1])
         return state_dict, idx + 2
