@@ -743,27 +743,29 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
     def _dump_state(self):
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
-            return dict(value=False, hand_in_marker_time=0.0)
+            return dict(value=False, hand_in_marker_steps=0.0)
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         # wp.to_torch is a zero-copy view of the wp.array storage.
         time_view = wp.to_torch(type(self)._robots_can_toggle_time)
         return dict(
             value=bool(self.VALUES[s, obj_idx].item()),
-            hand_in_marker_time=float(time_view[s, obj_idx].item()),
+            hand_in_marker_steps=float(time_view[s, obj_idx].item()),
         )
 
     def _load_state(self, state):
         # Restore toggle via _set_value so the visual marker color is also updated.
         self._set_value(state["value"])
-        # Restore the seconds counter directly into the wp.array via a zero-copy torch view.
+        if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
+            return
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        wp.to_torch(type(self)._robots_can_toggle_time)[s, obj_idx] = float(state["hand_in_marker_time"])
+        # Restore the seconds counter directly into the wp.array via a zero-copy torch view.
+        wp.to_torch(type(self)._robots_can_toggle_time)[s, obj_idx] = float(state["hand_in_marker_steps"])
 
     def serialize(self, state):
         # [toggle_state, can_toggle_time (seconds)] as float32
-        return th.tensor([state["value"], state["hand_in_marker_time"]], dtype=th.float32)
+        return th.tensor([state["value"], state["hand_in_marker_steps"]], dtype=th.float32)
 
     def deserialize(self, state):
-        return dict(value=bool(state[0].item()), hand_in_marker_time=float(state[1].item())), 2
+        return dict(value=bool(state[0].item()), hand_in_marker_steps=float(state[1].item())), 2
