@@ -207,7 +207,9 @@ def _launch_app():
     # Otherwise it will inherit the arguments of the entrypoint script.
     _saved_argv = sys.argv[:]
     try:
-        sys.argv = []
+        sys.argv = [
+            _saved_argv[0]
+        ]  # The script filename needs to be included - otherwise the first arg will get skipped.
 
         # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
         if not gm.DEBUG:
