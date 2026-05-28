@@ -54,8 +54,9 @@ class DataWrapper(EnvironmentWrapper):
             env, (Environment, EnvironmentWrapper)
         ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class or EnvironmentWrapper!"
 
-        # Only one scene is supported for now
-        assert len(og.sim.scenes) == 1, "Only one scene is currently supported for DataWrapper env!"
+        # DataWrapper is single-env only: create_dataset, step, and trajectory-processing
+        # all assume one env's worth of state/obs/rewards at a time.
+        assert env.num_envs == 1, f"DataWrapper is single-env only; got num_envs={env.num_envs}."
 
         self.traj_count = 0
         self.step_count = 0
@@ -484,6 +485,10 @@ class DataPlaybackWrapper(DataWrapper):
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
             kwargs (dict): Arguments to pass to super class
         """
+        # Playback is single-env only: env.scene reads and indexing on obs_list[0] / infos[0]
+        # later assume one env. Fail fast before env.scene.save() (below) runs in multi-env.
+        assert env.num_envs == 1, f"DataPlaybackWrapper is single-env only; got num_envs={env.num_envs}."
+
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
 

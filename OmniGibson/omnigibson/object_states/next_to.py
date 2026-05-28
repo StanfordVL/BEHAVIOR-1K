@@ -1,6 +1,7 @@
 import torch as th
 import warp as wp
 
+import omnigibson.lazy as lazy
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import Adjacency, _HORIZONTAL_K_END, _HORIZONTAL_K_START
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
@@ -86,10 +87,8 @@ def _next_to_kernel(
 
 
 class NextTo(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
-    _aabb_idx = None
-    _aabb_idx_wp = None
-    _adj_idx = None
-    _adj_idx_wp = None
+    _aabb_idx = None  # wp.array (N,) int32 — NextTo idx → AABB idx, -1 if missing
+    _adj_idx = None  # wp.array (N,) int32 — NextTo idx → Adjacency idx, -1 if missing
 
     @classproperty
     def value_shape(cls):
@@ -115,30 +114,28 @@ class NextTo(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         N = len(cls.OBJ_IDXS)
         if N == 0:
             cls._aabb_idx = None
-            cls._aabb_idx_wp = None
             cls._adj_idx = None
-            cls._adj_idx_wp = None
             return
 
-        aabb_idx = th.full((N,), -1, dtype=th.int32)
-        adj_idx = th.full((N,), -1, dtype=th.int32)
+        aabb_idx_cpu = th.full((N,), -1, dtype=th.int32)
+        adj_idx_cpu = th.full((N,), -1, dtype=th.int32)
         aabb_map = AABB.OBJ_IDXS or {}
         adj_map = Adjacency.OBJ_IDXS or {}
         for rel_path, idx in cls.OBJ_IDXS.items():
-            aabb_idx[idx] = aabb_map.get(rel_path, -1)
-            adj_idx[idx] = adj_map.get(rel_path, -1)
+            aabb_idx_cpu[idx] = aabb_map.get(rel_path, -1)
+            adj_idx_cpu[idx] = adj_map.get(rel_path, -1)
 
-        cls._aabb_idx = aabb_idx.cuda()
-        cls._adj_idx = adj_idx.cuda()
-        cls._aabb_idx_wp = wp.from_torch(cls._aabb_idx)
-        cls._adj_idx_wp = wp.from_torch(cls._adj_idx)
+        cls._aabb_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            aabb_idx_cpu, "int32", device="cuda"
+        )
+        cls._adj_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(adj_idx_cpu, "int32", device="cuda")
 
     @classmethod
     def _update_values(cls, values):
         if (
             cls.VALUES_WP is None
-            or cls._aabb_idx_wp is None
-            or cls._adj_idx_wp is None
+            or cls._aabb_idx is None
+            or cls._adj_idx is None
             or AABB.VALUES_WP is None
             or Adjacency.VALUES_WP is None
         ):
@@ -152,8 +149,8 @@ class NextTo(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             inputs=[
                 AABB.VALUES_WP,
                 Adjacency.VALUES_WP,
-                cls._aabb_idx_wp,
-                cls._adj_idx_wp,
+                cls._aabb_idx,
+                cls._adj_idx,
                 cls.VALUES_WP,
             ],
             device="cuda",

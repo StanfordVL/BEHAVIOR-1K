@@ -147,22 +147,20 @@ class TestBehaviorTaskLogic:
         _passed("TestBehaviorTaskLogic::test_object_scope_per_env")
 
     def test_goal_conditions_per_env(self, behavior_env):
-        """Each env has its own goal conditions and ground goal state options."""
+        """Goal conditions / ground goal state options are shared (singular) across envs."""
         _progress("TestBehaviorTaskLogic::test_goal_conditions_per_env")
         env = behavior_env
 
-        for env_idx in range(NUM_ENVS):
-            goals = env.task.activity_goal_conditions[env_idx]
-            assert goals is not None, f"activity_goal_conditions[{env_idx}] is None"
-            assert isinstance(goals, list)
-            assert len(goals) > 0, f"activity_goal_conditions[{env_idx}] is empty"
+        goals = env.task.activity_goal_conditions
+        assert goals is not None, "activity_goal_conditions is None"
+        assert len(goals) > 0, "activity_goal_conditions is empty"
 
-            ggo = env.task.ground_goal_state_options[env_idx]
-            assert ggo is not None, f"ground_goal_state_options[{env_idx}] is None"
-            assert isinstance(ggo, list)
-            assert len(ggo) > 0, f"ground_goal_state_options[{env_idx}] is empty"
+        ggo = env.task.ground_goal_state_options
+        assert ggo is not None, "ground_goal_state_options is None"
+        assert isinstance(ggo, list)
+        assert len(ggo) > 0, "ground_goal_state_options is empty"
 
-            print(f"  env {env_idx}: {len(goals)} goal conditions, {len(ggo)} ground goal state options")
+        print(f"  shared: {len(goals)} goal conditions, {len(ggo)} ground goal state options")
 
         _passed("TestBehaviorTaskLogic::test_goal_conditions_per_env")
 
@@ -275,11 +273,13 @@ class TestBehaviorTaskLogic:
         _progress("TestBehaviorTaskLogic::test_activity_attributes")
         env = behavior_env
 
+        from omnigibson.utils.bddl_utils import BDDLSampler
+
         assert env.task.activity_name == ACTIVITY_NAME
         assert env.task.activity_definition_id == 0
         assert env.task.activity_instance_id == 0
-        assert env.task.compiled_task[0] is not None
-        assert env.task.compiled_task[0].conditions is not None
+        assert env.task.compiled_task is not None
+        assert env.task.compiled_task.conditions is not None
         assert env.task.activity_initial_conditions is not None
         assert "BehaviorTask" in env.task.name
         assert ACTIVITY_NAME in env.task.name
@@ -288,9 +288,16 @@ class TestBehaviorTaskLogic:
         assert env.task.activity_natural_language_initial_conditions is not None
         assert env.task.activity_natural_language_goal_conditions is not None
 
-        # Sampler should be initialized per env
-        assert isinstance(env.task.sampler, list)
-        assert len(env.task.sampler) == NUM_ENVS
+        # Symbolic compiled task is now singular (shared across envs), not a list of NUM_ENVS
+        assert not isinstance(env.task.compiled_task, list)
+        # object_scope stays per-env
+        assert isinstance(env.task.object_scope, list)
+        assert len(env.task.object_scope) == NUM_ENVS
+        # Sampler is a single BDDLSampler bound to env 0
+        assert isinstance(env.task.sampler, BDDLSampler)
+
+        # Multi-env fixture must be in cache mode; online+multi-env is forbidden by _load's assert
+        assert env.task.online_object_sampling is False
 
         print(f"  task name: {env.task.name}")
         print(f"  NL goal conditions: {env.task.activity_natural_language_goal_conditions}")
@@ -320,7 +327,7 @@ class TestBehaviorTaskLogic:
         initial_idx = env.task.currently_viewed_index
         env.task.iterate_instruction()
         new_idx = env.task.currently_viewed_index
-        total_conditions = len(env.task.compiled_task[0].conditions.parsed_goal_conditions)
+        total_conditions = len(env.task.compiled_task.conditions.parsed_goal_conditions)
         expected_idx = (initial_idx + 1) % total_conditions
         assert new_idx == expected_idx, f"iterate_instruction: expected idx {expected_idx}, got {new_idx}"
         print(f"  iterate_instruction: {initial_idx} -> {new_idx} (total={total_conditions})")

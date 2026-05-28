@@ -3,6 +3,7 @@ import random
 import torch as th
 import warp as wp
 
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
@@ -144,32 +145,23 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
     VALUES shape: (S, O) — bool True = open, False = closed.
     """
 
-    # (S, O, max_dof) bool — True for DOF columns that correspond to openable joints
+    # wp.array3d (S, O, max_dof) uint8 — 1 for DOF columns corresponding to openable joints.
     OPENABLE_MASK = None
 
-    # (S, O, max_dof) float — threshold and direction per DOF for side=+1
+    # wp.array3d (S, O, max_dof) float32 — per-DOF threshold/direction for side=+1.
     THRESHOLDS_S1 = None
     DIRECTIONS_S1 = None
 
-    # (S, O, max_dof) float — threshold and direction per DOF for side=-1 (0 for non-both_sides)
+    # wp.array3d (S, O, max_dof) float32 — per-DOF threshold/direction for side=-1 (0 for non-both_sides).
     THRESHOLDS_S2 = None
     DIRECTIONS_S2 = None
 
-    # (S, O) bool — whether each object uses both-sides open logic
+    # wp.array2d (S, O) uint8 — whether each object uses both-sides open logic.
     BOTH_SIDES = None
 
-    # (S, O) int32 — row indices into ArticulatedObjectViewAPI._JOINT_POSITIONS for each (scene, obj).
-    # int32 (not long) so the Warp kernel can index with wp.int32.
+    # wp.array2d (S, O) int32 — row indices into ArticulatedObjectViewAPI._JOINT_POSITIONS.
     OBJ_IDXES_IN_ARTICULATION_VIEW = None
 
-    # wp.array views, wrapped once per initialize_view, used by the Warp kernel.
-    OPENABLE_MASK_WP = None
-    THRESHOLDS_S1_WP = None
-    DIRECTIONS_S1_WP = None
-    THRESHOLDS_S2_WP = None
-    DIRECTIONS_S2_WP = None
-    BOTH_SIDES_WP = None
-    OBJ_IDXES_IN_ARTICULATION_VIEW_WP = None
     # Cached max_dof int (kernel input). Updated in initialize_view.
     _MAX_DOF = 0
 
@@ -228,77 +220,81 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
         O = len(cls.OBJ_IDXS)
 
         if O == 0:
-            cls.OPENABLE_MASK = th.zeros((S, 0, 0), dtype=th.bool, device="cuda")
-            cls.THRESHOLDS_S1 = th.zeros((S, 0, 0), device="cuda")
-            cls.DIRECTIONS_S1 = th.zeros((S, 0, 0), device="cuda")
-            cls.THRESHOLDS_S2 = th.zeros((S, 0, 0), device="cuda")
-            cls.DIRECTIONS_S2 = th.zeros((S, 0, 0), device="cuda")
-            cls.BOTH_SIDES = th.zeros((S, 0), dtype=th.bool, device="cuda")
-            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros((0, 0), dtype=th.int32, device="cuda")
             cls._MAX_DOF = 0
-            cls.OPENABLE_MASK_WP = None
-            cls.THRESHOLDS_S1_WP = None
-            cls.DIRECTIONS_S1_WP = None
-            cls.THRESHOLDS_S2_WP = None
-            cls.DIRECTIONS_S2_WP = None
-            cls.BOTH_SIDES_WP = None
-            cls.OBJ_IDXES_IN_ARTICULATION_VIEW_WP = None
+            cls.OPENABLE_MASK = None
+            cls.THRESHOLDS_S1 = None
+            cls.DIRECTIONS_S1 = None
+            cls.THRESHOLDS_S2 = None
+            cls.DIRECTIONS_S2 = None
+            cls.BOTH_SIDES = None
+            cls.OBJ_IDXES_IN_ARTICULATION_VIEW = None
             return
 
         max_dof = ArticulatedObjectViewAPI.get_max_dof()
         cls._MAX_DOF = int(max_dof)
 
-        cls.OPENABLE_MASK = th.zeros((S, O, max_dof), dtype=th.bool, device="cuda")
-        cls.THRESHOLDS_S1 = th.zeros((S, O, max_dof), device="cuda")
-        cls.DIRECTIONS_S1 = th.zeros((S, O, max_dof), device="cuda")
-        cls.THRESHOLDS_S2 = th.zeros((S, O, max_dof), device="cuda")
-        cls.DIRECTIONS_S2 = th.zeros((S, O, max_dof), device="cuda")
-        cls.BOTH_SIDES = th.zeros((S, O), dtype=th.bool, device="cuda")
+        # Build per-DOF tables on CPU first, then upload once. Per-cell GPU writes via torch
+        # indexing would round-trip through CUDA per cell — CPU scratch + one bulk upload is faster.
+        openable_mask_cpu = th.zeros((S, O, max_dof), dtype=th.uint8)
+        thresholds_s1_cpu = th.zeros((S, O, max_dof), dtype=th.float32)
+        directions_s1_cpu = th.zeros((S, O, max_dof), dtype=th.float32)
+        thresholds_s2_cpu = th.zeros((S, O, max_dof), dtype=th.float32)
+        directions_s2_cpu = th.zeros((S, O, max_dof), dtype=th.float32)
+        both_sides_cpu = th.zeros((S, O), dtype=th.uint8)
 
-        # Fill per (scene_idx, obj_idx) so objects with different models in different scenes
-        # can have different joint counts and thresholds.
         for scene_idx, scene in enumerate(cls.IDX_OBJS):
             for obj_idx in range(O):
                 obj = scene[obj_idx]
                 if obj is None or obj.joints is None:
                     continue  # obj not initialized yet
                 both_sides, relevant_joints, joint_directions = _get_relevant_joints(obj)
-                cls.BOTH_SIDES[scene_idx, obj_idx] = both_sides
+                both_sides_cpu[scene_idx, obj_idx] = 1 if both_sides else 0
                 for joint, direction in zip(relevant_joints, joint_directions):
                     for dof_col in joint.dof_indices:
-                        cls.OPENABLE_MASK[scene_idx, obj_idx, dof_col] = True
+                        openable_mask_cpu[scene_idx, obj_idx, dof_col] = 1
                         for side, threshold_attr, direction_attr in [
-                            (1, cls.THRESHOLDS_S1, cls.DIRECTIONS_S1),
-                            (-1, cls.THRESHOLDS_S2, cls.DIRECTIONS_S2),
+                            (1, thresholds_s1_cpu, directions_s1_cpu),
+                            (-1, thresholds_s2_cpu, directions_s2_cpu),
                         ]:
                             threshold, open_end, _ = _compute_joint_threshold(joint, direction * side)
                             threshold_attr[scene_idx, obj_idx, dof_col] = threshold
                             direction_attr[scene_idx, obj_idx, dof_col] = 1.0 if open_end > threshold else -1.0
 
-        # Pre-build (S, O) row index into ArticulatedObjectViewAPI._JOINT_POSITIONS — built once, reused every step.
-        # int32 (not long) so the Warp kernel can index with wp.int32.
-        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = th.zeros(S, O, dtype=th.int32, device="cuda")
+        # (S, O) row index into ArticulatedObjectViewAPI._JOINT_POSITIONS.
+        obj_view_rows_cpu = th.zeros((S, O), dtype=th.int32)
         for _, obj_idx in cls.OBJ_IDXS.items():
             for scene_idx, scene in enumerate(cls.IDX_OBJS):
                 obj = scene[obj_idx]
                 if obj is None:
                     continue
                 row = ArticulatedObjectViewAPI.get_view_row(obj.articulation_root_path)
-                cls.OBJ_IDXES_IN_ARTICULATION_VIEW[scene_idx, obj_idx] = row
+                obj_view_rows_cpu[scene_idx, obj_idx] = row
 
-        # Wrap GPU tensors as wp.array handles for use in _update_values' Warp kernel.
-        # Bool tensors → wp.uint8 (byte-per-bool storage in torch).
-        cls.OPENABLE_MASK_WP = wp.from_torch(cls.OPENABLE_MASK.view(th.uint8), dtype=wp.uint8)
-        cls.THRESHOLDS_S1_WP = wp.from_torch(cls.THRESHOLDS_S1)
-        cls.DIRECTIONS_S1_WP = wp.from_torch(cls.DIRECTIONS_S1)
-        cls.THRESHOLDS_S2_WP = wp.from_torch(cls.THRESHOLDS_S2)
-        cls.DIRECTIONS_S2_WP = wp.from_torch(cls.DIRECTIONS_S2)
-        cls.BOTH_SIDES_WP = wp.from_torch(cls.BOTH_SIDES.view(th.uint8), dtype=wp.uint8)
-        cls.OBJ_IDXES_IN_ARTICULATION_VIEW_WP = wp.from_torch(cls.OBJ_IDXES_IN_ARTICULATION_VIEW)
+        cls.OPENABLE_MASK = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            openable_mask_cpu, "uint8", device="cuda"
+        )
+        cls.THRESHOLDS_S1 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            thresholds_s1_cpu, "float32", device="cuda"
+        )
+        cls.DIRECTIONS_S1 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            directions_s1_cpu, "float32", device="cuda"
+        )
+        cls.THRESHOLDS_S2 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            thresholds_s2_cpu, "float32", device="cuda"
+        )
+        cls.DIRECTIONS_S2 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            directions_s2_cpu, "float32", device="cuda"
+        )
+        cls.BOTH_SIDES = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            both_sides_cpu, "uint8", device="cuda"
+        )
+        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            obj_view_rows_cpu, "int32", device="cuda"
+        )
 
     @classmethod
     def _update_values(cls, values):
-        if cls.OPENABLE_MASK_WP is None or cls._MAX_DOF == 0:
+        if cls.OPENABLE_MASK is None or cls._MAX_DOF == 0:
             return
         if ArticulatedObjectViewAPI._JOINT_POSITIONS is None:
             return
@@ -308,13 +304,13 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
             dim=(S, O),
             inputs=[
                 ArticulatedObjectViewAPI._JOINT_POSITIONS,
-                cls.OBJ_IDXES_IN_ARTICULATION_VIEW_WP,
-                cls.OPENABLE_MASK_WP,
-                cls.THRESHOLDS_S1_WP,
-                cls.DIRECTIONS_S1_WP,
-                cls.THRESHOLDS_S2_WP,
-                cls.DIRECTIONS_S2_WP,
-                cls.BOTH_SIDES_WP,
+                cls.OBJ_IDXES_IN_ARTICULATION_VIEW,
+                cls.OPENABLE_MASK,
+                cls.THRESHOLDS_S1,
+                cls.DIRECTIONS_S1,
+                cls.THRESHOLDS_S2,
+                cls.DIRECTIONS_S2,
+                cls.BOTH_SIDES,
                 wp.int32(cls._MAX_DOF),
                 cls.VALUES_WP,
             ],

@@ -2,6 +2,7 @@ import torch as th
 import warp as wp
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
@@ -48,8 +49,7 @@ def _under_kernel(
 
 
 class Under(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
-    _adj_idx = None
-    _adj_idx_wp = None
+    _adj_idx = None  # wp.array (N,) int32 — Under idx → Adjacency idx, -1 if missing
 
     @classproperty
     def value_shape(cls):
@@ -75,20 +75,18 @@ class Under(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         N = len(cls.OBJ_IDXS)
         if N == 0:
             cls._adj_idx = None
-            cls._adj_idx_wp = None
             return
 
-        adj_idx = th.full((N,), -1, dtype=th.int32)
+        adj_idx_cpu = th.full((N,), -1, dtype=th.int32)
         adj_map = Adjacency.OBJ_IDXS or {}
         for rel_path, idx in cls.OBJ_IDXS.items():
-            adj_idx[idx] = adj_map.get(rel_path, -1)
+            adj_idx_cpu[idx] = adj_map.get(rel_path, -1)
 
-        cls._adj_idx = adj_idx.cuda()
-        cls._adj_idx_wp = wp.from_torch(cls._adj_idx)
+        cls._adj_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(adj_idx_cpu, "int32", device="cuda")
 
     @classmethod
     def _update_values(cls, values):
-        if cls.VALUES_WP is None or cls._adj_idx_wp is None or Adjacency.VALUES_WP is None:
+        if cls.VALUES_WP is None or cls._adj_idx is None or Adjacency.VALUES_WP is None:
             return
         S, N, _ = values.shape
         if S == 0 or N == 0:
@@ -96,7 +94,7 @@ class Under(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         wp.launch(
             kernel=_under_kernel,
             dim=(S, N, N),
-            inputs=[Adjacency.VALUES_WP, cls._adj_idx_wp, cls.VALUES_WP],
+            inputs=[Adjacency.VALUES_WP, cls._adj_idx, cls.VALUES_WP],
             device="cuda",
         )
 
