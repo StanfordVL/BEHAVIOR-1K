@@ -160,10 +160,15 @@ class SuppressLogsUntilError:
 
 
 def _launch_app():
+    import time as _bench_time
+
+    _t_la_start = _bench_time.perf_counter()
     log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 
     # ensure that the omnigibson robot assets are up to date
+    _t = _bench_time.perf_counter()
     ensure_omnigibson_robot_assets_version()
+    print(f"[LOAD-BENCH-LA] ensure_robot_assets: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
@@ -258,14 +263,18 @@ def _launch_app():
         global_data_dir.mkdir(parents=True, exist_ok=True)
         sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
 
+        _t = _bench_time.perf_counter()
         with launch_context(None):
             app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        print(f"[LOAD-BENCH-LA] SimulationApp(...): {_bench_time.perf_counter()-_t:.2f}s", flush=True)
     finally:
         # Always restore the caller's argv, even if Isaac Sim startup raises.
         sys.argv = _saved_argv
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
+    _t = _bench_time.perf_counter()
     assert lazy.isaacsim.core.utils.stage.close_stage()
+    print(f"[LOAD-BENCH-LA] close_stage: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
@@ -364,6 +373,7 @@ def _launch_app():
         _backend_utils._ComputeNumpyBackend if gm.USE_NUMPY_CONTROLLER_BACKEND else _backend_utils._ComputeTorchBackend
     )
 
+    print(f"[LOAD-BENCH-LA] _launch_app TOTAL: {_bench_time.perf_counter()-_t_la_start:.2f}s", flush=True)
     return app
 
 
@@ -404,6 +414,9 @@ def _launch_simulator(*args, **kwargs):
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
         ):
+            import time as _bench_time
+
+            _t_si_start = _bench_time.perf_counter()
             assert (
                 lazy.isaacsim.core.utils.stage.get_current_stage() is None
             ), "Stage should not exist when creating a new Simulator instance"
@@ -453,16 +466,19 @@ def _launch_simulator(*args, **kwargs):
             self._usd_guard_listener = None
 
             # Create the SimulationContext instance (composition instead of inheritance)
+            _t = _bench_time.perf_counter()
             self._sim_context = lazy.isaacsim.core.api.SimulationContext(
                 physics_dt=physics_dt,
                 rendering_dt=rendering_dt,
                 backend="torch",
                 device=device,
             )
+            print(f"[LOAD-BENCH-SI] SimulationContext(...): {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Store other references to variables that will be initialized later
             self._scenes = []
             # The callback will be called right *before* the physics step
+            _t = _bench_time.perf_counter()
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
                 pre_step=True,
@@ -479,6 +495,7 @@ def _launch_simulator(*args, **kwargs):
                     self._on_simulation_event
                 )
             )
+            print(f"[LOAD-BENCH-SI] subscribe_callbacks: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
@@ -494,13 +511,20 @@ def _launch_simulator(*args, **kwargs):
             self._callbacks_on_system_clear = dict()
 
             # Update internal settings
+            _t = _bench_time.perf_counter()
             self._set_physics_engine_settings()
+            print(f"[LOAD-BENCH-SI] _set_physics_engine_settings: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
+            _t = _bench_time.perf_counter()
             self._set_renderer_settings()
+            print(f"[LOAD-BENCH-SI] _set_renderer_settings: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Set the lighting mode to be stage by default
+            _t = _bench_time.perf_counter()
             self.set_lighting_mode(mode=LightingMode.STAGE)
+            print(f"[LOAD-BENCH-SI] set_lighting_mode: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Set of categories that can be grasped by assisted grasping
+            _t = _bench_time.perf_counter()
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = [
                 state
@@ -510,37 +534,53 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
+            print(f"[LOAD-BENCH-SI] get_states_by_dep: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Create the Fabric Hierarchy
+            _t = _bench_time.perf_counter()
             self.usdrt_stage = lazy.isaacsim.core.utils.stage.get_current_stage(fabric=True)
             self.fabric_hierarchy = lazy.usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(
                 self.usdrt_stage.GetFabricId(), self.usdrt_stage.GetStageIdAsStageId()
             )
+            print(f"[LOAD-BENCH-SI] fabric_hierarchy: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Create world prim and set up initial USD state
+            _t = _bench_time.perf_counter()
             with self.editing_usd():
                 self.stage.DefinePrim("/World", "Xform")
+            print(f"[LOAD-BENCH-SI] define_world_prim: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Cycle play / stop to validate sim.psi object to avoid getPhysXSceneStatistics errors
+            _t = _bench_time.perf_counter()
             self.play()
+            print(
+                f"[LOAD-BENCH-SI] init play() (wraps PhysX warm-up): {_bench_time.perf_counter()-_t:.2f}s", flush=True
+            )
+            _t = _bench_time.perf_counter()
             self.stop()
+            print(f"[LOAD-BENCH-SI] init stop(): {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
+            _t = _bench_time.perf_counter()
             for state in self.object_state_types_requiring_update:
                 if issubclass(state, GlobalUpdateStateMixin):
                     state.global_initialize()
+            print(f"[LOAD-BENCH-SI] state.global_initialize loop: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Now start rebuilding everything
             # Disable collision between root links of fixed base objects
+            _t = _bench_time.perf_counter()
             CollisionAPI.create_collision_group(col_group="fixed_base_fixed_links", filter_self_collisions=True)
             # Create collision group for sliding/pocket_doors to allow them to slide into walls
             CollisionAPI.create_collision_group(col_group="structural_doors", filter_self_collisions=True)
             CollisionAPI.add_group_filter(col_group="structural_doors", filter_group="fixed_base_fixed_links")
+            print(f"[LOAD-BENCH-SI] collision_groups: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Store stage ID
             self._stage_id = lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
+                _t = _bench_time.perf_counter()
                 self._set_viewer_camera(
                     viewer_width=viewer_width,
                     viewer_height=viewer_height,
@@ -549,9 +589,14 @@ def _launch_simulator(*args, **kwargs):
                     position=th.tensor(m.DEFAULT_VIEWER_CAMERA_POS),
                     orientation=th.tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
+                print(f"[LOAD-BENCH-SI] _set_viewer_camera: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Enable the USD edit guard - from now on, any USD edits outside editing_usd() will crash
             self._enable_usd_guard()
+
+            print(
+                f"[LOAD-BENCH-SI] Simulator.__init__ TOTAL: {_bench_time.perf_counter()-_t_si_start:.2f}s", flush=True
+            )
 
         def _set_viewer_camera(
             self,
