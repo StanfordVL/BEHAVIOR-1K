@@ -1626,6 +1626,13 @@ def _launch_simulator(*args, **kwargs):
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
+            import time as _bench_time
+
+            _pre_call_idx = getattr(self.__class__, "_load_bench_pre_count", 0)
+            self.__class__._load_bench_pre_count = _pre_call_idx + 1
+            _bench_verbose = _pre_call_idx < 3
+            _t_pre_start = _bench_time.perf_counter()
+
             try:
                 # Make it possible to identify that we are currently within a step
                 self.currently_stepping = True
@@ -1644,6 +1651,13 @@ def _launch_simulator(*args, **kwargs):
                     ControllableObjectViewAPI.flush_control()
 
                 self.currently_in_isaac_step = True
+
+                _dt_pre = _bench_time.perf_counter() - _t_pre_start
+                if _bench_verbose or _dt_pre > 0.5:
+                    print(
+                        f"[LOAD-BENCH-CB] pre#{_pre_call_idx} TOTAL={_dt_pre:.3f}s",
+                        flush=True,
+                    )
             except Exception as e:
                 self.currently_stepping = False
                 self.currently_in_isaac_step = False
@@ -1652,18 +1666,40 @@ def _launch_simulator(*args, **kwargs):
 
         @with_profiler(name="_post_physics_step_profiler")
         def _on_post_physics_step(self):
+            import time as _bench_time
+
+            _cb_call_idx = getattr(self.__class__, "_load_bench_cb_count", 0)
+            self.__class__._load_bench_cb_count = _cb_call_idx + 1
+            _bench_verbose = _cb_call_idx < 3
+            _t_cb_start = _bench_time.perf_counter()
+
             try:
                 self.currently_in_isaac_step = False
 
                 # Only do this if we're not in the warmup phase
+                _t = _bench_time.perf_counter()
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
+                _dt_ctrl = _bench_time.perf_counter() - _t
 
                 # Pull the contact sensor data — must run while currently_stepping is True,
                 # since RigidContactAPI.read_from_physx asserts on it.
+                _t = _bench_time.perf_counter()
                 RigidContactAPI.read_from_physx()
+                _dt_read = _bench_time.perf_counter() - _t
+
+                _t = _bench_time.perf_counter()
                 wp.synchronize_stream(wp.get_stream())
+                _dt_sync = _bench_time.perf_counter() - _t
+
+                if _bench_verbose or _dt_read > 0.5 or _dt_sync > 0.5 or _dt_ctrl > 0.5:
+                    print(
+                        f"[LOAD-BENCH-CB] post#{_cb_call_idx} "
+                        f"ctrl={_dt_ctrl:.3f}s read_from_physx={_dt_read:.3f}s "
+                        f"wp.sync_stream={_dt_sync:.3f}s",
+                        flush=True,
+                    )
 
                 # Record that we are done with the step context. Joint-break callbacks below
                 # are post-step user code: they may call update_handles() / read Fabric, which
@@ -1678,6 +1714,13 @@ def _launch_simulator(*args, **kwargs):
                     self._deferred_joint_breaks.clear()
                     for obj, state_type, joint_path in deferred_breaks:
                         obj.states[state_type].on_joint_break(joint_path)
+
+                _dt_cb_total = _bench_time.perf_counter() - _t_cb_start
+                if _bench_verbose or _dt_cb_total > 0.5:
+                    print(
+                        f"[LOAD-BENCH-CB] post#{_cb_call_idx} TOTAL={_dt_cb_total:.3f}s",
+                        flush=True,
+                    )
             except Exception as e:
                 self.currently_in_isaac_step = False
                 self.currently_stepping = False
