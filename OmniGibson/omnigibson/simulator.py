@@ -291,10 +291,43 @@ def _launch_app():
         global_warp_cache_dir.mkdir(parents=True, exist_ok=True)
         wp.config.kernel_cache_dir = str(global_warp_cache_dir)
 
+        # [SMOKE] Tracy auto-capture via env vars
+        _carb_tracy_path = os.environ.get("CARB_TRACY_OUTPUT", "")
+        if _carb_tracy_path:
+            _carb_tracy_duration = os.environ.get("CARB_TRACY_DURATION_SEC", "600")
+            os.makedirs(os.path.dirname(_carb_tracy_path) or ".", exist_ok=True)
+            sys.argv.append("--enable")
+            sys.argv.append("omni.kit.profiler.tracy")
+            sys.argv.append("--/app/profilerBackend=tracy")
+            sys.argv.append("--/exts/omni.kit.profiler.tracy/enableAutoCapture=true")
+            sys.argv.append(f"--/exts/omni.kit.profiler.tracy/autoCaptureFile={_carb_tracy_path}")
+            sys.argv.append(f"--/exts/omni.kit.profiler.tracy/autoCaptureDurationInSec={_carb_tracy_duration}")
+            print(
+                f"[CARB-TRACY] auto-capture armed: file={_carb_tracy_path} duration={_carb_tracy_duration}s",
+                flush=True,
+            )
+
         _t = _bench_time.perf_counter()
         with launch_context(None):
             app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
         print(f"[LOAD-BENCH-LA] SimulationApp(...): {_bench_time.perf_counter()-_t:.2f}s", flush=True)
+
+        # [SMOKE] Once carb is up, crank capture mask wide so we record every channel.
+        if _carb_tracy_path:
+            try:
+                import carb.profiler as _carb_profiler
+
+                _prof = _carb_profiler.acquire_profiler_interface(plugin_name="carb.profiler-tracy.plugin")
+                if _prof is not None:
+                    _prof.set_capture_mask(0xFFFFFFFFFFFFFFFF)
+                    print(
+                        f"[CARB-TRACY] set_capture_mask(0xFFFFFFFFFFFFFFFF); current={_prof.get_capture_mask():#x}",
+                        flush=True,
+                    )
+                else:
+                    print("[CARB-TRACY] WARNING: tracy plugin not acquired; mask not changed", flush=True)
+            except Exception as _e:
+                print(f"[CARB-TRACY] WARNING: set_capture_mask failed: {_e}", flush=True)
     finally:
         # Always restore the caller's argv, even if Isaac Sim startup raises.
         sys.argv = _saved_argv

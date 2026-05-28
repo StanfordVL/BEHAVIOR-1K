@@ -108,6 +108,9 @@ jobs:
           fi
 
       - name: Run profiling
+        env:
+          CARB_TRACY_OUTPUT: ${{ github.workspace }}/OmniGibson/og_${{ matrix.name }}.tracy
+          CARB_TRACY_DURATION_SEC: "900"
         run: |
           rm -f output.json
           python tests/benchmark/profiling.py ${{ matrix.args }}
@@ -181,6 +184,15 @@ jobs:
           name: profiling-${{ matrix.name }}
           path: OmniGibson/output.json
           if-no-files-found: warn
+
+      - name: Upload Tracy trace
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tracy-${{ matrix.name }}
+          path: OmniGibson/og_${{ matrix.name }}.tracy
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload deep profile outputs
         uses: actions/upload-artifact@v4
