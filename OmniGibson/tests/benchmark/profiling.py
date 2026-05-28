@@ -137,16 +137,12 @@ def main():
 
     # Launch OG before setting up the profiler. If we don't do this then the carb profiler
     # overtakes the profiler and we don't get any useful data.
-    _t_bench = time.perf_counter()
     og.launch()
-    print(f"[LOAD-BENCH] og.launch: {time.perf_counter()-_t_bench:.2f}s", flush=True)
 
     if args.deep_profiling:
         load_profiler = cProfile.Profile()
         load_profiler.enable()
-    _t_bench = time.perf_counter()
     env = og.Environment(configs=cfg)
-    print(f"[LOAD-BENCH] og.Environment: {time.perf_counter()-_t_bench:.2f}s", flush=True)
     table = env.scene.object_registry("name", "table")
     apples = [env.scene.object_registry("name", f"apple_{n}") for n in range(NUM_SLICE_OBJECT)]
     knifes = [env.scene.object_registry("name", f"knife_{n}") for n in range(NUM_SLICE_OBJECT)]
@@ -154,9 +150,7 @@ def main():
         clothes = [env.scene.object_registry("name", f"cloth_{n}") for n in range(NUM_CLOTH)]
         for cloth in clothes:
             cloth.root_link.mass = 1.0
-    _t_bench = time.perf_counter()
     env.reset()
-    print(f"[LOAD-BENCH] env.reset: {time.perf_counter()-_t_bench:.2f}s", flush=True)
 
     for n, knife in enumerate(knifes):
         knife.set_position_orientation(

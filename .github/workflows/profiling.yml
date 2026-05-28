@@ -77,95 +77,10 @@ jobs:
         if: matrix.deep_profile
         run: pip install snakeviz
 
-      - name: Cache stats (before profiling)
-        if: matrix.deep_profile
-        run: |
-          set +e
-          APPDATA=${OMNIGIBSON_APPDATA_PATH:-$GITHUB_WORKSPACE/OmniGibson/appdata}
-          echo "host=$(hostname)"
-          echo "OMNIGIBSON_APPDATA_PATH=${OMNIGIBSON_APPDATA_PATH:-<unset>}"
-          echo "Effective APPDATA=$APPDATA"
-          if [ -d "$APPDATA" ]; then
-            echo "Total size: $(du -sh "$APPDATA" 2>/dev/null | cut -f1)"
-          else
-            echo "APPDATA directory missing"
-          fi
-          WARP_CACHE="$APPDATA/global/warp_cache"
-          if [ -d "$WARP_CACHE" ]; then
-            echo "warp_cache size: $(du -sh "$WARP_CACHE" 2>/dev/null | cut -f1)"
-            echo "warp_cache .cubin file count: $(find "$WARP_CACHE" -name '*.cubin' 2>/dev/null | wc -l)"
-            echo "warp_cache .ptx file count:   $(find "$WARP_CACHE" -name '*.ptx' 2>/dev/null | wc -l)"
-            echo "warp_cache recent (<10min):   $(find "$WARP_CACHE" -name '*.cubin' -mmin -10 2>/dev/null | wc -l)"
-            echo "warp_cache old (>1d):         $(find "$WARP_CACHE" -name '*.cubin' -mmin +1440 2>/dev/null | wc -l)"
-          else
-            echo "warp_cache missing"
-          fi
-          OMNI_CACHE="$APPDATA/global/cache"
-          if [ -d "$OMNI_CACHE" ]; then
-            echo "omni global cache size: $(du -sh "$OMNI_CACHE" 2>/dev/null | cut -f1)"
-          else
-            echo "omni global cache missing"
-          fi
-
       - name: Run profiling
-        # Tracy capture disabled (CARB_TRACY_OUTPUT unset) so this run measures
-        # the raw og.launch time after the RTX-settings fix in simulator.py.
         run: |
           rm -f output.json
           python tests/benchmark/profiling.py ${{ matrix.args }}
-
-      - name: Cache stats (after profiling)
-        if: matrix.deep_profile
-        run: |
-          set +e
-          APPDATA=${OMNIGIBSON_APPDATA_PATH:-$GITHUB_WORKSPACE/OmniGibson/appdata}
-          echo "host=$(hostname)"
-          echo "Total size: $(du -sh "$APPDATA" 2>/dev/null | cut -f1)"
-          WARP_CACHE="$APPDATA/global/warp_cache"
-          echo "warp_cache size: $(du -sh "$WARP_CACHE" 2>/dev/null | cut -f1)"
-          echo "warp_cache .cubin count: $(find "$WARP_CACHE" -name '*.cubin' 2>/dev/null | wc -l)"
-          echo "warp_cache .cubin written this run (<10min): $(find "$WARP_CACHE" -name '*.cubin' -mmin -10 2>/dev/null | wc -l)"
-          OMNI_CACHE="$APPDATA/global/cache"
-          echo "omni global cache size: $(du -sh "$OMNI_CACHE" 2>/dev/null | cut -f1)"
-
-      - name: Find where warp actually caches
-        if: matrix.deep_profile
-        run: |
-          set +e
-          echo "::group::All warp-related cubin/ptx files anywhere on disk (top 30)"
-          find / \( -name "*.cubin" -o -name "*.ptx" \) 2>/dev/null \
-            | grep -i -E "warp|omni" | head -30
-          echo "::endgroup::"
-          echo ""
-          echo "::group::All directories that look like warp caches"
-          find / -type d \( -name "warp" -o -name "warp_cache" -o -name "kernel_cache" \) 2>/dev/null \
-            | grep -v "proc\|sys" | head -30
-          echo "::endgroup::"
-          echo ""
-          echo "::group::~/.cache/warp"
-          du -sh /root/.cache/warp 2>/dev/null && find /root/.cache/warp -name "*.cubin" 2>/dev/null | wc -l
-          du -sh $HOME/.cache/warp 2>/dev/null && find $HOME/.cache/warp -name "*.cubin" 2>/dev/null | wc -l
-          echo "(end ~/.cache/warp)"
-          echo "::endgroup::"
-          echo ""
-          echo "::group::/tmp/warp"
-          du -sh /tmp/warp 2>/dev/null && find /tmp/warp -name "*.cubin" 2>/dev/null | wc -l
-          echo "(end /tmp/warp)"
-          echo "::endgroup::"
-          echo ""
-          echo "::group::What wp.config.kernel_cache_dir actually was during this run"
-          python -c "
-          import os
-          os.environ.setdefault('OMNIGIBSON_HEADLESS', '1')
-          import warp as wp
-          # Don't init yet; just see what defaults are
-          print(f'warp version: {wp.__version__ if hasattr(wp,\"__version__\") else \"?\"}')
-          print(f'wp.config.kernel_cache_dir (default): {wp.config.kernel_cache_dir}')
-          # Look at env vars warp might honor
-          for var in ['WARP_KERNEL_CACHE_DIR', 'WARP_CACHE_DIR', 'WARP_HOME']:
-              print(f'env {var}={os.environ.get(var, \"<unset>\")}')
-          " 2>&1 | head -20
-          echo "::endgroup::"
 
       - name: Convert deep profile to HTML
         if: matrix.deep_profile
@@ -183,15 +98,6 @@ jobs:
           name: profiling-${{ matrix.name }}
           path: OmniGibson/output.json
           if-no-files-found: warn
-
-      - name: Upload Tracy trace
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: tracy-${{ matrix.name }}
-          path: OmniGibson/og_${{ matrix.name }}.tracy
-          if-no-files-found: warn
-          retention-days: 7
 
       - name: Upload deep profile outputs
         uses: actions/upload-artifact@v4

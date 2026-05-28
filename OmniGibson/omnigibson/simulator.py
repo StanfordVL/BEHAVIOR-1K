@@ -183,15 +183,10 @@ class SuppressLogsUntilError:
 
 
 def _launch_app():
-    import time as _bench_time
-
-    _t_la_start = _bench_time.perf_counter()
     log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 
     # ensure that the omnigibson robot assets are up to date
-    _t = _bench_time.perf_counter()
     ensure_omnigibson_robot_assets_version()
-    print(f"[LOAD-BENCH-LA] ensure_robot_assets: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
@@ -207,6 +202,8 @@ def _launch_app():
     # Otherwise it will inherit the arguments of the entrypoint script.
     _saved_argv = sys.argv[:]
     try:
+        # TODO Missed merge from main (PR #2178 / 00c69a807, 2026-05-07). Delete after merging with main
+        # without this we will recompile 216 Vulkan pipelines on every launch andmakeload time very long
         sys.argv = [
             _saved_argv[0]
         ]  # The script filename needs to be included - otherwise the first arg will get skipped.
@@ -293,51 +290,14 @@ def _launch_app():
         global_warp_cache_dir.mkdir(parents=True, exist_ok=True)
         wp.config.kernel_cache_dir = str(global_warp_cache_dir)
 
-        # [SMOKE] Tracy auto-capture via env vars
-        _carb_tracy_path = os.environ.get("CARB_TRACY_OUTPUT", "")
-        if _carb_tracy_path:
-            _carb_tracy_duration = os.environ.get("CARB_TRACY_DURATION_SEC", "600")
-            os.makedirs(os.path.dirname(_carb_tracy_path) or ".", exist_ok=True)
-            sys.argv.append("--enable")
-            sys.argv.append("omni.kit.profiler.tracy")
-            sys.argv.append("--/app/profilerBackend=tracy")
-            sys.argv.append("--/exts/omni.kit.profiler.tracy/enableAutoCapture=true")
-            sys.argv.append(f"--/exts/omni.kit.profiler.tracy/autoCaptureFile={_carb_tracy_path}")
-            sys.argv.append(f"--/exts/omni.kit.profiler.tracy/autoCaptureDurationInSec={_carb_tracy_duration}")
-            print(
-                f"[CARB-TRACY] auto-capture armed: file={_carb_tracy_path} duration={_carb_tracy_duration}s",
-                flush=True,
-            )
-
-        _t = _bench_time.perf_counter()
         with launch_context(None):
             app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
-        print(f"[LOAD-BENCH-LA] SimulationApp(...): {_bench_time.perf_counter()-_t:.2f}s", flush=True)
-
-        # [SMOKE] Once carb is up, crank capture mask wide so we record every channel.
-        if _carb_tracy_path:
-            try:
-                import carb.profiler as _carb_profiler
-
-                _prof = _carb_profiler.acquire_profiler_interface(plugin_name="carb.profiler-tracy.plugin")
-                if _prof is not None:
-                    _prof.set_capture_mask(0xFFFFFFFFFFFFFFFF)
-                    print(
-                        f"[CARB-TRACY] set_capture_mask(0xFFFFFFFFFFFFFFFF); current={_prof.get_capture_mask():#x}",
-                        flush=True,
-                    )
-                else:
-                    print("[CARB-TRACY] WARNING: tracy plugin not acquired; mask not changed", flush=True)
-            except Exception as _e:
-                print(f"[CARB-TRACY] WARNING: set_capture_mask failed: {_e}", flush=True)
     finally:
         # Always restore the caller's argv, even if Isaac Sim startup raises.
         sys.argv = _saved_argv
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
-    _t = _bench_time.perf_counter()
     assert lazy.isaacsim.core.utils.stage.close_stage()
-    print(f"[LOAD-BENCH-LA] close_stage: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
@@ -436,7 +396,6 @@ def _launch_app():
         _backend_utils._ComputeNumpyBackend if gm.USE_NUMPY_CONTROLLER_BACKEND else _backend_utils._ComputeTorchBackend
     )
 
-    print(f"[LOAD-BENCH-LA] _launch_app TOTAL: {_bench_time.perf_counter()-_t_la_start:.2f}s", flush=True)
     return app
 
 
@@ -477,9 +436,6 @@ def _launch_simulator(*args, **kwargs):
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
         ):
-            import time as _bench_time
-
-            _t_si_start = _bench_time.perf_counter()
             assert (
                 lazy.isaacsim.core.utils.stage.get_current_stage() is None
             ), "Stage should not exist when creating a new Simulator instance"
@@ -529,19 +485,16 @@ def _launch_simulator(*args, **kwargs):
             self._usd_guard_listener = None
 
             # Create the SimulationContext instance (composition instead of inheritance)
-            _t = _bench_time.perf_counter()
             self._sim_context = lazy.isaacsim.core.api.SimulationContext(
                 physics_dt=physics_dt,
                 rendering_dt=rendering_dt,
                 backend="torch",
                 device=device,
             )
-            print(f"[LOAD-BENCH-SI] SimulationContext(...): {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Store other references to variables that will be initialized later
             self._scenes = []
             # The callback will be called right *before* the physics step
-            _t = _bench_time.perf_counter()
             self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
                 pre_step=True,
@@ -558,7 +511,6 @@ def _launch_simulator(*args, **kwargs):
                     self._on_simulation_event
                 )
             )
-            print(f"[LOAD-BENCH-SI] subscribe_callbacks: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
@@ -574,20 +526,13 @@ def _launch_simulator(*args, **kwargs):
             self._callbacks_on_system_clear = dict()
 
             # Update internal settings
-            _t = _bench_time.perf_counter()
             self._set_physics_engine_settings()
-            print(f"[LOAD-BENCH-SI] _set_physics_engine_settings: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
-            _t = _bench_time.perf_counter()
             self._set_renderer_settings()
-            print(f"[LOAD-BENCH-SI] _set_renderer_settings: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Set the lighting mode to be stage by default
-            _t = _bench_time.perf_counter()
             self.set_lighting_mode(mode=LightingMode.STAGE)
-            print(f"[LOAD-BENCH-SI] set_lighting_mode: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Set of categories that can be grasped by assisted grasping
-            _t = _bench_time.perf_counter()
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = [
                 state
@@ -597,56 +542,40 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
-            print(f"[LOAD-BENCH-SI] get_states_by_dep: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Create the Fabric Hierarchy
-            _t = _bench_time.perf_counter()
             self.usdrt_stage = lazy.isaacsim.core.utils.stage.get_current_stage(fabric=True)
             self.fabric_hierarchy = lazy.usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(
                 self.usdrt_stage.GetFabricId(), self.usdrt_stage.GetStageIdAsStageId()
             )
-            print(f"[LOAD-BENCH-SI] fabric_hierarchy: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Create world prim and set up initial USD state
-            _t = _bench_time.perf_counter()
             with self.editing_usd():
                 self.stage.DefinePrim("/World", "Xform")
-            print(f"[LOAD-BENCH-SI] define_world_prim: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Cycle play / stop to validate sim.psi object to avoid getPhysXSceneStatistics errors
-            _t = _bench_time.perf_counter()
             self.play()
-            print(
-                f"[LOAD-BENCH-SI] init play() (wraps PhysX warm-up): {_bench_time.perf_counter()-_t:.2f}s", flush=True
-            )
-            _t = _bench_time.perf_counter()
             self.stop()
-            print(f"[LOAD-BENCH-SI] init stop(): {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
-            _t = _bench_time.perf_counter()
             for state in self.object_state_types_requiring_update:
                 if issubclass(state, TensorizedState):
                     state.global_initialize()
-            print(f"[LOAD-BENCH-SI] state.global_initialize loop: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Captured wp.Graph wrapping every TensorizedState's global_update().
             self._state_graph = None
 
             # Now start rebuilding everything
             # Disable collision between root links of fixed base objects
-            _t = _bench_time.perf_counter()
             CollisionAPI.create_collision_group(col_group="fixed_base_fixed_links", filter_self_collisions=True)
             # Create collision group for sliding/pocket_doors to allow them to slide into walls
             CollisionAPI.create_collision_group(col_group="structural_doors", filter_self_collisions=True)
             CollisionAPI.add_group_filter(col_group="structural_doors", filter_group="fixed_base_fixed_links")
-            print(f"[LOAD-BENCH-SI] collision_groups: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Store stage ID
             self._stage_id = lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
-                _t = _bench_time.perf_counter()
                 self._set_viewer_camera(
                     viewer_width=viewer_width,
                     viewer_height=viewer_height,
@@ -655,14 +584,9 @@ def _launch_simulator(*args, **kwargs):
                     position=th.tensor(m.DEFAULT_VIEWER_CAMERA_POS),
                     orientation=th.tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
-                print(f"[LOAD-BENCH-SI] _set_viewer_camera: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             # Enable the USD edit guard - from now on, any USD edits outside editing_usd() will crash
             self._enable_usd_guard()
-
-            print(
-                f"[LOAD-BENCH-SI] Simulator.__init__ TOTAL: {_bench_time.perf_counter()-_t_si_start:.2f}s", flush=True
-            )
 
         def _set_viewer_camera(
             self,
@@ -732,14 +656,15 @@ def _launch_simulator(*args, **kwargs):
 
         def _set_renderer_settings(self):
             settings = lazy.carb.settings.get_settings()
-            # Restored from main: explicitly select RealTimePathTracing rendermode so RTX
-            # initializes the pipeline variant whose Slang shaders are already in the
-            # shipped cache. Without these, defaults trigger ~15 Slang compiles and
-            # 216 Vulkan pipeline builds (~187s).
-            settings.set_bool("/rtx/rtx/modes/rt/enabled", True)
+            # Missed merge from main (PR #2183 / c83f35e12 "Enable RT2 and fractional opacity",
+            # 2026-05-07). Without them, RTX defaults to a different rendermode that
+            # invalidates the shipped Slang/Vulkan shader cache.
+            # TODO Delete after merging with main
+            settings.set_bool("/rtx/rtx/modes/rt/enabled", True)  # real-time 2.0 requires rt to be enabled as well
             settings.set_bool("/rtx/rtx/modes/rt2/enabled", True)
             settings.set("/rtx/rendermode", "RealTimePathTracing")
             settings.set_bool("/rtx/raytracing/fractionalCutoutOpacity", True)
+
             settings.set_bool("/rtx/reflections/enabled", True)
             settings.set_bool("/rtx/indirectDiffuse/enabled", True)
             settings.set_int(
@@ -999,49 +924,28 @@ def _launch_simulator(*args, **kwargs):
             ), "import_scene can only be called with Scene instances"
             assert len(scenes) > 0, "import_scene requires at least one scene"
 
-            import time as _bench_time
-
-            _t_imp_start = _bench_time.perf_counter()
-
             # Check that the scene is not already imported
             for scene in scenes:
                 if scene.loaded:
                     raise ValueError("Scene is already loaded!")
-                _t = _bench_time.perf_counter()
                 self._last_scene_edge = scene.load(
                     idx=len(self.scenes),
                     last_scene_edge=self._last_scene_edge,
                     initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
                     scene_margin=m.SCENE_MARGIN,
                 )
-                print(f"[LOAD-BENCH] scene.load: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
                 # Load the scene.
                 self._scenes.append(scene)
 
-            _t = _bench_time.perf_counter()
             self.play()
-            print(
-                f"[LOAD-BENCH] import_scene -> play (incl. update_handles): {_bench_time.perf_counter()-_t:.2f}s",
-                flush=True,
-            )
-
-            _t = _bench_time.perf_counter()
             for scene in scenes:
                 scene.initialize()
-            print(f"[LOAD-BENCH] scene.initialize: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
-
             # One step is needed for particle systems to work.
-            _t = _bench_time.perf_counter()
             self.step()
-            print(f"[LOAD-BENCH] import_scene -> step: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
-
-            _t = _bench_time.perf_counter()
             self.stop()
-            print(f"[LOAD-BENCH] import_scene -> stop: {_bench_time.perf_counter()-_t:.2f}s", flush=True)
 
             for scene in scenes:
                 log.info(f"Imported scene {scene.idx}.")
-            print(f"[LOAD-BENCH] import_scene TOTAL: {_bench_time.perf_counter()-_t_imp_start:.2f}s", flush=True)
 
         # TODO: Remove this context manager and call _post_import_object directly since the objects
         # are already known when this is called.
@@ -1062,10 +966,6 @@ def _launch_simulator(*args, **kwargs):
                 # and de-initialize it to avoid conflicts.
                 SimulationManager._physics_sim_view.invalidate()
                 SimulationManager._physics_sim_view = None
-
-            # Objects are being added → tensorized-state buffers will need a rebuild on the
-            # next update_handles() call.
-            TensorizedState.init_dirty = True
 
             try:
                 yield
@@ -1144,10 +1044,6 @@ def _launch_simulator(*args, **kwargs):
                         obj.name in obj_registry
                     ):  # a particle system template object might not exist in the registry when it's empty
                         obj_registry.pop(obj.name)
-
-            # Objects are being removed → tensorized-state buffers need a rebuild on the next
-            # update_handles() call (their OBJ_IDXS / IDX_OBJS now point at vanished objects).
-            TensorizedState.init_dirty = True
 
             # Run the main method
             try:
@@ -1304,26 +1200,18 @@ def _launch_simulator(*args, **kwargs):
             self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
         def update_handles(self):
-            import time as _bench_time
-
-            _t_uh_start = _bench_time.perf_counter()
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
 
             # Flush any USD changes to PhysX
-            _t = _bench_time.perf_counter()
             with self.editing_usd():
                 self.psi.flush_changes()
-            print(f"[LOAD-BENCH]   update_handles.flush_changes: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
 
             # Refresh the sim view
-            _t = _bench_time.perf_counter()
             self._refresh_physics_sim_view()
-            print(f"[LOAD-BENCH]   update_handles.refresh_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
 
             # Then update the handles for all objects
-            _t = _bench_time.perf_counter()
             for scene in self.scenes:
                 if scene is not None:
                     for obj in scene.objects:
@@ -1333,53 +1221,17 @@ def _launch_simulator(*args, **kwargs):
                     for system in scene.active_systems.values():
                         if isinstance(system, MacroPhysicalParticleSystem):
                             system.update_handles()
-            print(f"[LOAD-BENCH]   update_handles.obj_loop: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
 
             # Finally update any unified views
-            _t = _bench_time.perf_counter()
             RigidContactAPI.initialize_view()
-            print(f"[LOAD-BENCH]     RigidContactAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
-            _t = _bench_time.perf_counter()
             RigidBodyViewAPI.initialize_view()
-            print(f"[LOAD-BENCH]     RigidBodyViewAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True)
-            _t = _bench_time.perf_counter()
             ArticulatedObjectViewAPI.initialize_view()
-            print(
-                f"[LOAD-BENCH]     ArticulatedObjectViewAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s", flush=True
-            )
-            _t = _bench_time.perf_counter()
             ControllableObjectViewAPI.initialize_view()
-            print(
-                f"[LOAD-BENCH]     ControllableObjectViewAPI.init_view: {_bench_time.perf_counter()-_t:.3f}s",
-                flush=True,
-            )
 
-            # Per-tensorized-state init_view is expensive (full O(N) rebuild) and gets called
-            # multiple times during scene load. Gate on a dirty flag that is set by
-            # adding_objects / removing_objects so we only rebuild when the scene's object
-            # set actually changes.
             if gm.ENABLE_OBJECT_STATES:
-                _t = _bench_time.perf_counter()
-                if TensorizedState.init_dirty:
-                    for state_type in og.sim.object_state_types_requiring_update:
-                        if issubclass(state_type, TensorizedState):
-                            state_type.initialize_view()
-                    TensorizedState.init_dirty = False
-                    print(
-                        f"[LOAD-BENCH]     TensorizedState.init_view (RAN): {_bench_time.perf_counter()-_t:.3f}s",
-                        flush=True,
-                    )
-                else:
-                    # Loop skipped — but the view APIs above reallocate their GPU buffers
-                    # (POSES_GPU, POSE_MATRICES, LINK_MESH_IDS, etc.) every call, so any
-                    # captured warp graph that referenced those pointers is now stale.
-                    # Initialize_view normally sets graph_dirty; force it here for the skip path.
-                    TensorizedState.graph_dirty = True
-                    print(
-                        f"[LOAD-BENCH]     TensorizedState.init_view (SKIP): {_bench_time.perf_counter()-_t:.3f}s",
-                        flush=True,
-                    )
-            print(f"[LOAD-BENCH]   update_handles TOTAL: {_bench_time.perf_counter()-_t_uh_start:.3f}s", flush=True)
+                for state_type in og.sim.object_state_types_requiring_update:
+                    if issubclass(state_type, TensorizedState):
+                        state_type.initialize_view()
 
         # TODO(vector) Calling this actually makes most time-sensitive states
         # (temperature, toggle, sliceractive...) think a new step has happened.
@@ -1555,9 +1407,6 @@ def _launch_simulator(*args, **kwargs):
                         scene.transition_rule_api.step()
 
         def play(self):
-            import time as _bench_time
-
-            _t_play_start = _bench_time.perf_counter()
             if not self.is_playing():
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
                 was_stopped = self.is_stopped()
@@ -1576,33 +1425,17 @@ def _launch_simulator(*args, **kwargs):
                 with suppress_omni_log(channels=channels):
                     self._in_sim_lifecycle += 1
                     try:
-                        _t = _bench_time.perf_counter()
                         self._sim_context.play()
-                        print(
-                            f"[LOAD-BENCH] sim_context.play (warm_start tick): "
-                            f"{_bench_time.perf_counter()-_t:.2f}s",
-                            flush=True,
-                        )
                     finally:
                         self._in_sim_lifecycle -= 1
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
-                _t = _bench_time.perf_counter()
                 self.render()
-                print(
-                    f"[LOAD-BENCH] post-play render: {_bench_time.perf_counter()-_t:.2f}s",
-                    flush=True,
-                )
 
                 # Update all object handles, unless this is a play during initialization
                 if og.sim is not None:
-                    _t = _bench_time.perf_counter()
                     self.update_handles()
-                    print(
-                        f"[LOAD-BENCH] post-play update_handles: " f"{_bench_time.perf_counter()-_t:.2f}s",
-                        flush=True,
-                    )
 
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
@@ -1622,8 +1455,6 @@ def _launch_simulator(*args, **kwargs):
             # Run all callbacks
             for callback in self._callbacks_on_play.values():
                 callback()
-
-            print(f"[LOAD-BENCH] play TOTAL: {_bench_time.perf_counter()-_t_play_start:.2f}s", flush=True)
 
         def pause(self):
             if not self.is_paused():
@@ -1714,13 +1545,6 @@ def _launch_simulator(*args, **kwargs):
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
-            import time as _bench_time
-
-            _pre_call_idx = getattr(self.__class__, "_load_bench_pre_count", 0)
-            self.__class__._load_bench_pre_count = _pre_call_idx + 1
-            _bench_verbose = _pre_call_idx < 3
-            _t_pre_start = _bench_time.perf_counter()
-
             try:
                 # Make it possible to identify that we are currently within a step
                 self.currently_stepping = True
@@ -1739,13 +1563,6 @@ def _launch_simulator(*args, **kwargs):
                     ControllableObjectViewAPI.flush_control()
 
                 self.currently_in_isaac_step = True
-
-                _dt_pre = _bench_time.perf_counter() - _t_pre_start
-                if _bench_verbose or _dt_pre > 0.5:
-                    print(
-                        f"[LOAD-BENCH-CB] pre#{_pre_call_idx} TOTAL={_dt_pre:.3f}s",
-                        flush=True,
-                    )
             except Exception as e:
                 self.currently_stepping = False
                 self.currently_in_isaac_step = False
@@ -1754,40 +1571,18 @@ def _launch_simulator(*args, **kwargs):
 
         @with_profiler(name="_post_physics_step_profiler")
         def _on_post_physics_step(self):
-            import time as _bench_time
-
-            _cb_call_idx = getattr(self.__class__, "_load_bench_cb_count", 0)
-            self.__class__._load_bench_cb_count = _cb_call_idx + 1
-            _bench_verbose = _cb_call_idx < 3
-            _t_cb_start = _bench_time.perf_counter()
-
             try:
                 self.currently_in_isaac_step = False
 
                 # Only do this if we're not in the warmup phase
-                _t = _bench_time.perf_counter()
                 if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
-                _dt_ctrl = _bench_time.perf_counter() - _t
 
                 # Pull the contact sensor data — must run while currently_stepping is True,
                 # since RigidContactAPI.read_from_physx asserts on it.
-                _t = _bench_time.perf_counter()
                 RigidContactAPI.read_from_physx()
-                _dt_read = _bench_time.perf_counter() - _t
-
-                _t = _bench_time.perf_counter()
                 wp.synchronize_stream(wp.get_stream())
-                _dt_sync = _bench_time.perf_counter() - _t
-
-                if _bench_verbose or _dt_read > 0.5 or _dt_sync > 0.5 or _dt_ctrl > 0.5:
-                    print(
-                        f"[LOAD-BENCH-CB] post#{_cb_call_idx} "
-                        f"ctrl={_dt_ctrl:.3f}s read_from_physx={_dt_read:.3f}s "
-                        f"wp.sync_stream={_dt_sync:.3f}s",
-                        flush=True,
-                    )
 
                 # Record that we are done with the step context. Joint-break callbacks below
                 # are post-step user code: they may call update_handles() / read Fabric, which
@@ -1802,13 +1597,6 @@ def _launch_simulator(*args, **kwargs):
                     self._deferred_joint_breaks.clear()
                     for obj, state_type, joint_path in deferred_breaks:
                         obj.states[state_type].on_joint_break(joint_path)
-
-                _dt_cb_total = _bench_time.perf_counter() - _t_cb_start
-                if _bench_verbose or _dt_cb_total > 0.5:
-                    print(
-                        f"[LOAD-BENCH-CB] post#{_cb_call_idx} TOTAL={_dt_cb_total:.3f}s",
-                        flush=True,
-                    )
             except Exception as e:
                 self.currently_in_isaac_step = False
                 self.currently_stepping = False

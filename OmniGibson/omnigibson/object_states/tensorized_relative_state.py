@@ -65,21 +65,7 @@ class TensorizedRelativeState(TensorizedState, RelativeObjectState):
 
         Carry-over: for each (a, b) pair where both relative_prim_paths still exist, the
         previous VALUES[s, a, b] is preserved. New rows/columns are zero-initialized.
-
-        If the (scene, rel_path) set is
-        unchanged, skip carry-over loop.
         """
-        # Fast path: see TensorizedAbsoluteState.initialize_view for rationale.
-        if cls.OBJ_IDXS is not None and len(cls.OBJ_IDXS) > 0:
-            scene_count = len(og.sim.scenes)
-            current_rel_paths = set()
-            for scene in og.sim.scenes:
-                for obj in scene.objects:
-                    if cls in obj.states:
-                        current_rel_paths.add(obj.relative_prim_path)
-            if len(cls.IDX_OBJS) == scene_count and set(cls.OBJ_IDXS.keys()) == current_rel_paths:
-                return
-
         # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)
         prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
         prev_values = cls.VALUES.clone() if cls.VALUES is not None and cls.VALUES.numel() > 0 else None
