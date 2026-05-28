@@ -110,7 +110,10 @@ jobs:
       - name: Run profiling
         env:
           CARB_TRACY_OUTPUT: ${{ github.workspace }}/OmniGibson/og_${{ matrix.name }}.tracy
-          CARB_TRACY_DURATION_SEC: "900"
+          # Keep capture window shorter than total benchmark runtime so the capture
+          # binary expires + writes the .tracy file BEFORE og.shutdown's segfault.
+          # og.launch alone is ~455s on PR; 500s covers it plus a margin.
+          CARB_TRACY_DURATION_SEC: "500"
         run: |
           rm -f output.json
           python tests/benchmark/profiling.py ${{ matrix.args }}
