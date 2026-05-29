@@ -1,5 +1,6 @@
 import math
 
+
 import torch as th
 import warp as wp
 
@@ -526,6 +527,7 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             new_value: True to set Inside state (only True is supported).
             reset_before_sampling: If True, reset this object before sampling.
             use_trav_map: Whether to use traversability-based reachability checks.
+            use_trav_map: Whether to use traversability-based reachability checks.
         Returns:
             True if successfully placed inside, False otherwise.
         """
@@ -651,6 +653,8 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                 og.sim.step_physics()
                 settle_step_idx += 1
 
+            # Rejection sampling #4: Reject if the container's root pose drifted past the
+            # position/orientation thresholds (i.e. the placed object pushed the container).
             # Rejection sampling #4: Reject if the container's root pose drifted past the
             # position/orientation thresholds (i.e. the placed object pushed the container).
             container_pos, container_orn = other.get_position_orientation()

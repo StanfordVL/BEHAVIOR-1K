@@ -648,13 +648,14 @@ class DataPlaybackWrapper(DataWrapper):
         self.scene.restore(self.scene_file, update_initial_file=True)
 
         # Reset object attributes from the stored metadata
-        with og.sim.stopped():
+        og.sim.stop()
+        for attr, vals in init_metadata.items():
+            assert len(vals) == self.scene.n_objects
+        for i, obj in enumerate(self.scene.objects):
             for attr, vals in init_metadata.items():
-                assert len(vals) == self.scene.n_objects
-            for i, obj in enumerate(self.scene.objects):
-                for attr, vals in init_metadata.items():
-                    val = vals[i]
-                    setattr(obj, attr, val.item() if val.ndim == 0 else val)
+                val = vals[i]
+                setattr(obj, attr, val.item() if val.ndim == 0 else val)
+        og.sim.play()
         self.reset()
 
         # If not controlling robots, disable for all robots
@@ -673,9 +674,11 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Restore to initial state
         og.sim.load_state(state[0, : int(state_size[0])], serialized=True)
+        # take one sim step to propagate
+        og.sim.step()
 
         # If record, record initial observations
-        if record_data:
+        if record_data or self.video_writers:
             # Grab initial observations directly from restored state[0], before any action is applied.
             first_time_load_n_iteration = 10
             for _ in range(first_time_load_n_iteration):
@@ -687,10 +690,30 @@ class DataPlaybackWrapper(DataWrapper):
                 "obs"
             }, "Expected reset() to have inserted an initial obs-only entry into the trajectory history!"
             self.current_traj_history[-1]["obs"] = self._process_obs(self.current_obs, init_info)
-
+            # Write the initial frame if video_writers are configured
+            if self.video_writers:
+                self._write_video_frames()
         for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
+            # Here, state i is the state before taking action i, and reward, terminated, truncated are the results of taking action i
             if i % 1000 == 0:
                 log.info(f"Playing back episode {episode_id}, step {i}/{len(action)}")
+            # Restore the sim state, and take a very small step with the action to make sure physics are
+            # properly propagated after the sim state update
+            og.sim.load_state(s[: int(ss)], serialized=True)
+            if not self.include_contacts:
+                # When all objects/systems are visual-only, keep them still on every step
+                for obj in self.scene.objects:
+                    obj.keep_still()
+                for system in self.scene.systems:
+                    # TODO: Implement keep_still for other systems
+                    if isinstance(system, MacroPhysicalParticleSystem):
+                        system.set_particles_velocities(
+                            lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
+                        )
+
+            # Take a small step with the action to propagate physics after loading the state
+            self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
@@ -709,22 +732,6 @@ class DataPlaybackWrapper(DataWrapper):
                 # Step physics to initialize any new objects
                 og.sim.step()
 
-            # Restore the sim state, and take a very small step with the action to make sure physics are
-            # properly propagated after the sim state update
-            og.sim.load_state(s[: int(ss)], serialized=True)
-            if not self.include_contacts:
-                # When all objects/systems are visual-only, keep them still on every step
-                for obj in self.scene.objects:
-                    obj.keep_still()
-                for system in self.scene.systems:
-                    # TODO: Implement keep_still for other systems
-                    if isinstance(system, MacroPhysicalParticleSystem):
-                        system.set_particles_velocities(
-                            lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
-                        )
-            obs_list, _, _, _, infos = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
-            self.current_obs = obs_list[0]
-            info = infos[0]
             # Write videos if video_writers are configured
             if self.video_writers:
                 self._write_video_frames()

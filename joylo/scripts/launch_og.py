@@ -14,10 +14,10 @@ class Args:
     partial_load: Optional[bool] = True
     instance_id: Optional[int] = None
     ghosting: Optional[bool] = True
+    attachment_joint_visuals: Optional[bool] = None
 
 
 def launch_robot_server(args: Args):
-
     server = OGRobotServer(
         robot=args.robot,
         port=args.robot_port,
@@ -26,7 +26,8 @@ def launch_robot_server(args: Args):
         task_name=args.task_name,
         partial_load=args.partial_load,
         instance_id=args.instance_id,
-        ghosting=args.ghosting
+        ghosting=args.ghosting,
+        attachment_joint_visuals=args.attachment_joint_visuals,
     )
     server.serve()
 

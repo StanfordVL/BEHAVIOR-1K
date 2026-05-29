@@ -2,28 +2,24 @@
     (:domain behavior-1k)
 
     (:objects
-        wall_nail.n.01_1 wall_nail.n.01_2 - wall_nail.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
         floor.n.01_1 - floor.n.01
-        fire_alarm.n.02_1 fire_alarm.n.02_2 - fire_alarm.n.02
+        table.n.02_1 - table.n.02
+        fire_alarm.n.02_1 - fire_alarm.n.02
         agent.n.01_1 - agent.n.01
     )
     
     (:init 
-        (ontop fire_alarm.n.02_1 floor.n.01_1) 
-        (ontop fire_alarm.n.02_2 floor.n.01_1)
-        (inroom wall_nail.n.01_1 kitchen)
-        (inroom wall_nail.n.01_2 garage)
-        (inroom floor.n.01_1 kitchen)
+        (ontop fire_alarm.n.02_1 table.n.02_1) 
+        (inroom wall_nail.n.01_1 living_room)
+        (inroom table.n.02_1 living_room)
+        (inroom floor.n.01_1 living_room)
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
     (:goal 
         (and 
-            (forpairs 
-                (?fire_alarm.n.02 - fire_alarm.n.02)
-                (?wall_nail.n.01 - wall_nail.n.01)
-                (attached ?fire_alarm.n.02 ?wall_nail.n.01)
-            )
+            (attached fire_alarm.n.02_1 wall_nail.n.01_1)
         )
     )
 )

@@ -224,7 +224,7 @@ def _object_is_in_hand(robot, obj, grasping_mode):
         raise ValueError(f"Unknown grasping mode: {grasping_mode}")
 
 
-@pytest.mark.parametrize("grasping_mode", ["sticky", "assisted"])
+@pytest.mark.parametrize("grasping_mode", ["sticky", "assisted", "physical"])
 def test_grasping_mode(grasping_mode):
     try:
         if og.sim is not None:

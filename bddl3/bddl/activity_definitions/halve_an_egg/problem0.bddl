@@ -3,7 +3,11 @@
 
     (:objects
         carving_knife.n.01_1 - carving_knife.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
         countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        sink.n.01_1 - sink.n.01
+        plate.n.04_1 - plate.n.04
         hard-boiled_egg.n.01_1 - hard-boiled_egg.n.01
         half__hard-boiled_egg.n.01_1 half__hard-boiled_egg.n.01_2 - half__hard-boiled_egg.n.01
         floor.n.01_1 - floor.n.01
@@ -11,10 +15,14 @@
     )
     
     (:init 
-        (ontop carving_knife.n.01_1 countertop.n.01_1) 
-        (ontop hard-boiled_egg.n.01_1 countertop.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop plate.n.04_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1) 
+        (inside hard-boiled_egg.n.01_1 electric_refrigerator.n.01_1) 
         (cooked hard-boiled_egg.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
         (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
         (inroom floor.n.01_1 kitchen) 
         (future half__hard-boiled_egg.n.01_1)
         (future half__hard-boiled_egg.n.01_2)
@@ -25,6 +33,9 @@
         (and 
             (real ?half__hard-boiled_egg.n.01_1)
             (real ?half__hard-boiled_egg.n.01_2)
+            (ontop ?half__hard-boiled_egg.n.01_1 ?plate.n.04_1)
+            (ontop ?half__hard-boiled_egg.n.01_2 ?plate.n.04_1)
+            (inside ?carving_knife.n.01_1 ?sink.n.01_1)
         )
     )
 )
