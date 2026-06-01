@@ -14,7 +14,7 @@
     {
       "id": "picking_up_trash",
       "name": "Picking Up Trash",
-      "instruction": "Put the three can of soda from the living room inside the trash can in the kitchen.",
+      "instruction": "Put the three cans of soda from the living room inside the trash can in the kitchen.",
       "rooms": [
         "kitchen",
         "living_room"
