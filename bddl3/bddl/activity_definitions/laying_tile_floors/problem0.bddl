@@ -23,6 +23,15 @@
                 (?tile.n.01 - tile.n.01) 
                 (ontop ?tile.n.01 ?floor.n.01_2)
             )
+            (forall
+                (?tile.n.01 - tile.n.01)
+                (or
+                    (nextto ?tile.n.01 tile.n.01_1)
+                    (nextto ?tile.n.01 tile.n.01_2)
+                    (nextto ?tile.n.01 tile.n.01_3)
+                    (nextto ?tile.n.01 tile.n.01_4)
+                )
+            )
         )
     )
 )
