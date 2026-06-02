@@ -10,8 +10,6 @@ from omnigibson.learning.utils.eval_utils import (
     PROPRIOCEPTION_INDICES,
     TASK_NAMES_TO_INDICES,
     TASK_INDICES_TO_NAMES,
-    HEAD_RESOLUTION,
-    WRIST_RESOLUTION,
 )
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -31,6 +29,9 @@ def replay_hdf5_file(
     demo_id: int,
     output_format: str,
     flush_every_n_steps: int,
+    lerobot_repo_id: str | None = None,
+    lerobot_root_dir: str | None = None,
+    overwrite_lerobot: bool = True,
 ) -> int:
     """
     Replays a single HDF5 file and saves data to the specified format.
@@ -54,15 +55,15 @@ def replay_hdf5_file(
     robot_sensor_config = {
         "VisionSensor": {
             "sensor_kwargs": {
-                "image_height": WRIST_RESOLUTION[0],
-                "image_width": WRIST_RESOLUTION[1],
+                "image_height": 480,
+                "image_width": 480,
             },
         },
         "zed_link:Camera:0": {
             "sensor_kwargs": {
                 "horizontal_aperture": 40.0,
-                "image_height": HEAD_RESOLUTION[0],
-                "image_width": HEAD_RESOLUTION[1],
+                "image_height": 720,
+                "image_width": 720,
             },
         },
     }
@@ -119,12 +120,15 @@ def replay_hdf5_file(
         env = HDF5PlaybackWrapper.create_from_hdf5(**kwargs)
     else:
         output_path = f"b1k/{task_name}"
-        root_dir = os.path.join(data_folder, "lerobot")
+        if lerobot_repo_id is not None:
+            output_path = lerobot_repo_id
+        root_dir = lerobot_root_dir or os.path.join(data_folder, "lerobot")
         makedirs_with_mode(root_dir)
         kwargs = dict(
             **common_kwargs,
             output_path=output_path,
             root_dir=root_dir,
+            overwrite=overwrite_lerobot,
             robot_type="R1Pro",
             task_name=task_name,
         )
@@ -159,6 +163,23 @@ def main():
         help="Output format: hdf5, lerobot",
     )
     parser.add_argument("--flush_every_n_steps", type=int, default=1000, help="Flush data every N steps")
+    parser.add_argument(
+        "--lerobot_repo_id",
+        type=str,
+        default=None,
+        help="LeRobot repo id / relative output path. Defaults to b1k/<task_name>.",
+    )
+    parser.add_argument(
+        "--lerobot_root_dir",
+        type=str,
+        default=None,
+        help="Root directory for LeRobot output. Defaults to <data_folder>/lerobot.",
+    )
+    parser.add_argument(
+        "--resume_lerobot",
+        action="store_true",
+        help="Append to an existing LeRobot dataset instead of overwriting it.",
+    )
     parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
     parser.add_argument("--row", type=int, required=False, help="Row number to update")
 
@@ -185,6 +206,9 @@ def main():
         demo_id=args.demo_id,
         output_format=args.output_format,
         flush_every_n_steps=args.flush_every_n_steps,
+        lerobot_repo_id=args.lerobot_repo_id,
+        lerobot_root_dir=args.lerobot_root_dir,
+        overwrite_lerobot=not args.resume_lerobot,
     )
 
     if args.update_sheet:
