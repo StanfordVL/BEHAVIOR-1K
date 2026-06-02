@@ -2,17 +2,15 @@ import logging
 import os
 import shutil
 import torch as th
+from lerobot.configs import DepthEncoderConfig, VideoEncoderConfig
 from lerobot.datasets import LeRobotDataset
-from lerobot.datasets.io_utils import write_info
 from lerobot.utils.constants import HF_LEROBOT_HOME
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.data_wrapper import DataWrapper, DataPlaybackWrapper
-from omnigibson.learning.utils.obs_utils import encode_depth_frame, decode_depth_frame
-from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.learning.utils.obs_utils import DEPTH_SHIFT, MAX_DEPTH, MIN_DEPTH
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.asset_utils import get_omnigibson_git_hash
 from omnigibson.tasks.behavior_task import BehaviorTask
 
 
@@ -82,8 +80,25 @@ class LeRobotDataWrapper(DataWrapper):
             "robot_type": env.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
             "use_videos": True,
             "streaming_encoding": True,
-            "depth_map_encoding_fn": encode_depth_frame,
-            "depth_map_decoding_fn": decode_depth_frame,
+            "camera_encoder": VideoEncoderConfig(
+                vcodec="hevc",
+                pix_fmt="yuv420p",
+                g=8,
+                crf=30,
+                extra_options={"x265-params": "log-level=0:bframes=0"},
+            ),
+            "depth_encoder": DepthEncoderConfig(
+                vcodec="hevc",
+                pix_fmt="gray12le",
+                g=8,
+                crf=0,
+                depth_min=MIN_DEPTH,
+                depth_max=MAX_DEPTH,
+                shift=DEPTH_SHIFT,
+                use_log=True,
+                output_unit="m",
+                extra_options={"x265-params": "log-level=0:bframes=0"},
+            ),
         }
         self.dataset = None
         self.obs_mapping = None
@@ -132,40 +147,12 @@ class LeRobotDataWrapper(DataWrapper):
                 info["dtype"] = "video"
                 info["shape"] = gym_shape.shape[:-1] + (3,)
                 info["names"] = ["height", "width", "channel"]
-                info["info"] = {
-                    "video.fps": fps,
-                    "video.height": gym_shape.shape[0],
-                    "video.width": gym_shape.shape[1],
-                    "video.channels": 3,
-                    "video.codec": "hevc",
-                    "video.pix_fmt": "yuv420p",
-                    "video.g": 8,
-                    "video.crf": 30,
-                    "video.options": {
-                        "x265-params": "log-level=0:bframes=0",
-                    },
-                    "video.is_depth_map": False,
-                    "has_audio": False,
-                }
+                info["info"] = {"is_depth_map": False}
             elif "depth" in modality:
                 info["dtype"] = "video"
                 info["shape"] = gym_shape.shape + (1,)
                 info["names"] = ["height", "width", "channel"]
-                info["info"] = {
-                    "video.fps": fps,
-                    "video.height": gym_shape.shape[0],
-                    "video.width": gym_shape.shape[1],
-                    "video.channels": 1,
-                    "video.codec": "hevc",
-                    "video.pix_fmt": "yuv420p12le",
-                    "video.g": 8,
-                    "video.crf": 0,
-                    "video.options": {
-                        "x265-params": "log-level=0:bframes=0",
-                    },
-                    "video.is_depth_map": True,
-                    "has_audio": False,
-                }
+                info["info"] = {"is_depth_map": True}
 
                 # We also add relative camera transforms (wrt robot egocentric frame) in case we
                 # want to convert depth to point clouds
@@ -292,28 +279,14 @@ class LeRobotDataWrapper(DataWrapper):
                 **self.lerobot_dataset_kwargs,
             )
         else:
+            resume_kwargs = {
+                key: value
+                for key, value in self.lerobot_dataset_kwargs.items()
+                if key not in {"robot_type", "use_videos"}
+            }
             self.dataset = LeRobotDataset.resume(
-                fps=self.fps,
-                features=features,
-                **self.lerobot_dataset_kwargs,
+                **resume_kwargs,
             )
-
-        # Add in camera K matrices
-        cam_intrinsics = dict()
-
-        for sensor_name, sensor in env.external_sensors.items():
-            if isinstance(sensor, VisionSensor):
-                K = sensor.intrinsic_matrix.cpu()
-                cam_intrinsics[sensor_name] = K.numpy().tolist()
-        for sensor_name, sensor in env.robots[0].sensors.items():
-            if isinstance(sensor, VisionSensor):
-                # Remove robot naming prefix
-                sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
-                K = sensor.intrinsic_matrix.cpu()
-                cam_intrinsics[sensor_name] = K.numpy().tolist()
-        self.dataset.meta.info["cam_intrinsics"] = cam_intrinsics
-        self.dataset.meta.info["omnigibson_git_hash"] = get_omnigibson_git_hash()
-        write_info(self.dataset.meta.info, self.dataset.meta.root)
 
     def process_traj_to_dataset(self, traj_data: list[dict]) -> None:
         # Write to LeRobot dataset
