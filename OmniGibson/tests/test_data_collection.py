@@ -8,6 +8,7 @@ import os
 
 import omnigibson as og
 from omnigibson.envs import HDF5CollectionWrapper, HDF5PlaybackWrapper, LeRobotPlaybackWrapper, LeRobotDataWrapper
+from omnigibson.envs.data_wrapper import _is_system_particle_template_info, _is_system_particle_template_name
 from omnigibson.envs.hdf5_data_wrapper import HDF5DataWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
@@ -40,6 +41,34 @@ class _MinimalHDF5Wrapper(HDF5DataWrapper):
         self.max_state_size = 0
         self.current_transitions = dict()
         self.checkpoint_rollback_trajs = None
+
+
+def test_system_particle_template_transition_helpers():
+    system_names = {"diced__head_cabbage"}
+    template_info = {
+        "class_module": "omnigibson.objects.usd_object",
+        "class_name": "USDObject",
+        "args": {
+            "name": "diced__head_cabbage_template",
+            "category": "diced__head_cabbage",
+            "relative_prim_path": "/diced__head_cabbage/template",
+            "usd_path": "/workspace/OmniGibson/omnigibson/data/og_dataset/systems/diced__head_cabbage/rflakn/usd/rflakn.usd",
+        },
+    }
+    normal_object_info = {
+        "class_module": "omnigibson.objects.dataset_object",
+        "class_name": "DatasetObject",
+        "args": {
+            "name": "diced__head_cabbage_1",
+            "category": "diced__head_cabbage",
+            "relative_prim_path": "/diced__head_cabbage_1",
+        },
+    }
+
+    assert _is_system_particle_template_info(template_info, system_names)
+    assert not _is_system_particle_template_info(normal_object_info, system_names)
+    assert _is_system_particle_template_name("diced__head_cabbage_template", system_names)
+    assert not _is_system_particle_template_name("diced__head_cabbage_1", system_names)
 
 
 # ---------------------------------------------------------------------------
