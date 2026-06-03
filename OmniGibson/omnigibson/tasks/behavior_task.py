@@ -258,7 +258,8 @@ class BehaviorTask(BaseTask):
                 else:
                     robot_pose = available_poses[0]  # Use first presampled pose
 
-                robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"])
+                # Presampled poses are stored in scene-relative coordinates.
+                robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"], frame="scene")
 
         # Force wake objects
         for env_idx in env_indices:
