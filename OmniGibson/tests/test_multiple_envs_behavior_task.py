@@ -111,13 +111,16 @@ def _zero_actions(env):
     already placed, so a step purely re-evaluates the goal/reward.
     """
     return th.stack(
-        [th.zeros_like(th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float()) for i in range(NUM_ENVS)]
+        [
+            th.zeros_like(th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float())
+            for i in range(env.num_envs)
+        ]
     )
 
 
 def _random_actions(env):
     """Build a (num_envs, action_dim) random action sampled per robot."""
-    return th.stack([th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(NUM_ENVS)])
+    return th.stack([th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(env.num_envs)])
 
 
 # ---------------------------------------------------------------------------
@@ -397,17 +400,30 @@ class TestBehaviorTaskGoalCompletion:
         cans, ashcan = _goal_objects(env, 0)
         for i, can in enumerate(cans):
             assert _place_inside(can, ashcan), f"failed to place can {i} inside ashcan"
-        _, _, terminateds, _, _ = env.step(_zero_actions(env))
+        _, _, terminateds, _, infos = env.step(_zero_actions(env))
         assert terminateds[0], "env 0 should be complete before reset"
+        # env 1 was never touched: capture its (incomplete) state to confirm the reset leaves it alone
+        assert not terminateds[1], "env 1 unexpectedly complete before reset"
+        env1_potential_before = env.task.get_potential(env, 1)
+        env1_unsatisfied_before = len(infos[1]["done"]["goal_status"]["unsatisfied"])
 
         # Reset only env 0; step once so kinematic caches refresh against the restored poses
         env.reset(env_indices=th.tensor([0]))
-        _, _, terminateds2, _, _ = env.step(_zero_actions(env))
+        _, _, terminateds2, _, infos2 = env.step(_zero_actions(env))
 
         assert not terminateds2[0], "env 0 still terminating after reset"
         assert abs(env.task.get_potential(env, 0)) < 1e-6, "potential not restored to baseline after reset"
         cans0, ashcan0 = _goal_objects(env, 0)
         assert not any(can.states[Inside].get_value(ashcan0) for can in cans0), "cans still inside ashcan after reset"
+
+        # env 1 must be untouched by the selective reset: still incomplete, same potential and goal status
+        assert not terminateds2[1], "selective reset of env 0 disturbed env 1's termination state"
+        assert (
+            abs(env.task.get_potential(env, 1) - env1_potential_before) < 1e-6
+        ), "selective reset of env 0 changed env 1's potential"
+        assert (
+            len(infos2[1]["done"]["goal_status"]["unsatisfied"]) == env1_unsatisfied_before
+        ), "selective reset of env 0 changed env 1's goal status"
 
 
 # ===================================================================
