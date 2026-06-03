@@ -27,24 +27,6 @@ SCENE_MODEL = "house_double_floor_lower"
 # Reward weight used in the task config; the completing env.step should earn ~R_POTENTIAL.
 R_POTENTIAL = 1.0
 
-# Test counter for progress tracking
-_test_counter = {"current": 0, "total": 12}
-
-
-def _progress(test_name):
-    """Print progress for the current test."""
-    _test_counter["current"] += 1
-    n = _test_counter["current"]
-    total = _test_counter["total"]
-    print(f"\n{'='*60}")
-    print(f"[{n}/{total}] RUNNING: {test_name}")
-    print(f"{'='*60}")
-
-
-def _passed(test_name):
-    """Print pass confirmation."""
-    print(f"[PASSED] {test_name}")
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -175,7 +157,6 @@ class TestBehaviorTaskLogic:
 
     def test_object_scope_per_env(self, behavior_env):
         """Each env has its own independent object scope bound to its own scene's robot."""
-        _progress("TestBehaviorTaskLogic::test_object_scope_per_env")
         env = behavior_env
 
         for env_idx in range(NUM_ENVS):
@@ -195,11 +176,8 @@ class TestBehaviorTaskLogic:
         # Scopes are independent dict objects
         assert env.task.object_scope[0] is not env.task.object_scope[1]
 
-        _passed("TestBehaviorTaskLogic::test_object_scope_per_env")
-
     def test_potential_reward_computation(self, behavior_env):
         """get_potential returns a finite float for each env."""
-        _progress("TestBehaviorTaskLogic::test_potential_reward_computation")
         env = behavior_env
 
         for env_idx in range(NUM_ENVS):
@@ -211,8 +189,6 @@ class TestBehaviorTaskLogic:
             assert potential <= 0.0, f"get_potential({env_idx}) = {potential}, expected <= 0"
             print(f"  env {env_idx}: potential={potential:.4f}")
 
-        _passed("TestBehaviorTaskLogic::test_potential_reward_computation")
-
     def test_task_obs_per_env(self, behavior_env):
         """task.get_obs produces a per-env low-dim observation vector.
 
@@ -220,7 +196,6 @@ class TestBehaviorTaskLogic:
         test_step_return_shapes in test_multiple_envs_behavior_infra_api.py; here
         we exercise the BehaviorTask-specific get_obs content directly.)
         """
-        _progress("TestBehaviorTaskLogic::test_task_obs_per_env")
         env = behavior_env
 
         for env_idx in range(NUM_ENVS):
@@ -234,11 +209,8 @@ class TestBehaviorTaskLogic:
                 assert low_dim.shape[0] > 0
                 print(f"  env {env_idx}: low_dim obs dim={low_dim.shape[0]}")
 
-        _passed("TestBehaviorTaskLogic::test_task_obs_per_env")
-
     def test_presampled_robot_pose(self, behavior_env):
         """Robot is positioned at a presampled pose after reset (verifies case-insensitive lookup)."""
-        _progress("TestBehaviorTaskLogic::test_presampled_robot_pose")
         env = behavior_env
 
         for env_idx in range(NUM_ENVS):
@@ -257,11 +229,8 @@ class TestBehaviorTaskLogic:
                 ori_norm, th.tensor(1.0), atol=1e-2
             ), f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
 
-        _passed("TestBehaviorTaskLogic::test_presampled_robot_pose")
-
     def test_activity_attributes(self, behavior_env):
         """BehaviorTask has correct activity attributes after construction."""
-        _progress("TestBehaviorTaskLogic::test_activity_attributes")
         env = behavior_env
 
         from omnigibson.utils.bddl_utils import BDDLSampler
@@ -293,11 +262,8 @@ class TestBehaviorTaskLogic:
         print(f"  task name: {env.task.name}")
         print(f"  NL goal conditions: {env.task.activity_natural_language_goal_conditions}")
 
-        _passed("TestBehaviorTaskLogic::test_activity_attributes")
-
     def test_show_instruction(self, behavior_env):
         """show_instruction returns valid instruction data per env."""
-        _progress("TestBehaviorTaskLogic::test_show_instruction")
         env = behavior_env
 
         # Need a step for goal evaluation to populate goal_status
@@ -323,8 +289,6 @@ class TestBehaviorTaskLogic:
         assert new_idx == expected_idx, f"iterate_instruction: expected idx {expected_idx}, got {new_idx}"
         print(f"  iterate_instruction: {initial_idx} -> {new_idx} (total={total_conditions})")
 
-        _passed("TestBehaviorTaskLogic::test_show_instruction")
-
 
 # ===================================================================
 #  End-to-end goal completion (move objects to goal state, verify success)
@@ -345,7 +309,6 @@ class TestBehaviorTaskGoalCompletion:
 
     def test_no_completion_under_random_actions(self, behavior_env):
         """With nothing moved to the goal, no env ever reports success (none combination)."""
-        _progress("TestBehaviorTaskGoalCompletion::test_no_completion_under_random_actions")
         env = behavior_env
 
         for _ in range(10):
@@ -355,11 +318,8 @@ class TestBehaviorTaskGoalCompletion:
                 gs = infos[env_idx]["done"]["goal_status"]
                 assert len(gs["unsatisfied"]) > 0, f"env {env_idx} goal satisfied without placing cans"
 
-        _passed("TestBehaviorTaskGoalCompletion::test_no_completion_under_random_actions")
-
     def test_single_env_completion_and_reward(self, behavior_env):
         """Completing only env 0 makes env 0 (and only env 0) succeed, with correct reward."""
-        _progress("TestBehaviorTaskGoalCompletion::test_single_env_completion_and_reward")
         env = behavior_env
 
         cans, ashcan = _goal_objects(env, 0)
@@ -389,11 +349,8 @@ class TestBehaviorTaskGoalCompletion:
         assert abs(env.task.get_potential(env, 0) - (-1.0)) < 1e-6, "env 0 potential not -1.0 at success"
         assert env.task.get_potential(env, 1) > -1.0, "env 1 potential indicates success without placement"
 
-        _passed("TestBehaviorTaskGoalCompletion::test_single_env_completion_and_reward")
-
     def test_all_envs_completion(self, behavior_env):
         """Completing every env makes every env succeed (all combination)."""
-        _progress("TestBehaviorTaskGoalCompletion::test_all_envs_completion")
         env = behavior_env
 
         for env_idx in range(NUM_ENVS):
@@ -408,11 +365,8 @@ class TestBehaviorTaskGoalCompletion:
             assert infos[env_idx]["done"]["termination_conditions"]["predicate"]["done"]
             assert len(infos[env_idx]["done"]["goal_status"]["unsatisfied"]) == 0, f"env {env_idx} goal unsatisfied"
 
-        _passed("TestBehaviorTaskGoalCompletion::test_all_envs_completion")
-
     def test_partial_progress_does_not_complete(self, behavior_env):
         """Placing all-but-one can leaves the goal unsatisfied (some combination)."""
-        _progress("TestBehaviorTaskGoalCompletion::test_partial_progress_does_not_complete")
         env = behavior_env
 
         cans, ashcan = _goal_objects(env, 0)
@@ -435,11 +389,8 @@ class TestBehaviorTaskGoalCompletion:
         assert abs(env.task.get_potential(env, 0)) < 1e-6, "potential nonzero before full completion"
         assert abs(rewards[0].item()) < 1e-3, f"env 0 earned reward {rewards[0].item()} on partial progress"
 
-        _passed("TestBehaviorTaskGoalCompletion::test_partial_progress_does_not_complete")
-
     def test_selective_reset_clears_completion(self, behavior_env):
         """Resetting env 0 only clears its goal completion, leaving env 1 untouched."""
-        _progress("TestBehaviorTaskGoalCompletion::test_selective_reset_clears_completion")
         env = behavior_env
 
         # Complete env 0
@@ -457,8 +408,6 @@ class TestBehaviorTaskGoalCompletion:
         assert abs(env.task.get_potential(env, 0)) < 1e-6, "potential not restored to baseline after reset"
         cans0, ashcan0 = _goal_objects(env, 0)
         assert not any(can.states[Inside].get_value(ashcan0) for can in cans0), "cans still inside ashcan after reset"
-
-        _passed("TestBehaviorTaskGoalCompletion::test_selective_reset_clears_completion")
 
 
 # ===================================================================
@@ -481,7 +430,6 @@ class TestBehaviorTaskNoPresample:
         TestBehaviorTaskLogic::test_presampled_robot_pose; this variant only needs
         to prove the use_presampled_robot_pose=False path doesn't crash.)
         """
-        _progress("TestBehaviorTaskNoPresample::test_no_presampled_robot_pose")
         # Tear down the module-scope `behavior_env` (built with use_presampled_robot_pose=True)
         # before constructing the variant. _init_macros only stops the sim; without an explicit
         # clear, the new env's object-state machinery references prims from the previous scenes
@@ -498,4 +446,3 @@ class TestBehaviorTaskNoPresample:
             print(f"  env {env_idx}: robot pos={pos}, ori={ori}")
 
         og.clear()
-        _passed("TestBehaviorTaskNoPresample::test_no_presampled_robot_pose")

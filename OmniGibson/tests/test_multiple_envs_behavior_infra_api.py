@@ -22,24 +22,6 @@ NUM_ENVS = 2
 ACTIVITY_NAME = "picking_up_trash"
 SCENE_MODEL = "house_double_floor_lower"
 
-# Test counter for progress tracking
-_test_counter = {"current": 0, "total": 6}
-
-
-def _progress(test_name):
-    """Print progress for the current test."""
-    _test_counter["current"] += 1
-    n = _test_counter["current"]
-    total = _test_counter["total"]
-    print(f"\n{'='*60}")
-    print(f"[{n}/{total}] RUNNING: {test_name}")
-    print(f"{'='*60}")
-
-
-def _passed(test_name):
-    """Print pass confirmation."""
-    print(f"[PASSED] {test_name}")
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -123,7 +105,6 @@ class TestBehaviorEnvConstruction:
 
     def test_behavior_env_construction(self, behavior_env):
         """BehaviorTask env with num_envs=2 creates correct structure."""
-        _progress("TestBehaviorEnvConstruction::test_behavior_env_construction")
         env = behavior_env
 
         assert len(env.scenes) == NUM_ENVS
@@ -133,11 +114,8 @@ class TestBehaviorEnvConstruction:
         assert isinstance(env.task, BehaviorTask)
         assert env.task.activity_name == ACTIVITY_NAME
 
-        _passed("TestBehaviorEnvConstruction::test_behavior_env_construction")
-
     def test_scenes_spatially_separated(self, behavior_env):
         """BehaviorTask scenes occupy different spatial regions."""
-        _progress("TestBehaviorEnvConstruction::test_scenes_spatially_separated")
         env = behavior_env
 
         scene_positions = [s.get_position_orientation()[0] for s in env.scenes]
@@ -146,8 +124,6 @@ class TestBehaviorEnvConstruction:
                 dist = th.norm(scene_positions[i] - scene_positions[j])
                 print(f"  Scene {i} <-> Scene {j} distance: {dist:.2f}")
                 assert dist > 1.0, f"Scenes {i} and {j} are too close: {dist:.2f}"
-
-        _passed("TestBehaviorEnvConstruction::test_scenes_spatially_separated")
 
 
 # ===================================================================
@@ -160,7 +136,6 @@ class TestBehaviorStepAndReset:
 
     def test_step_return_shapes(self, behavior_env):
         """step() returns tensors of shape (num_envs,) for rewards/terminateds/truncateds."""
-        _progress("TestBehaviorStepAndReset::test_step_return_shapes")
         env = behavior_env
 
         actions = th.stack(
@@ -175,11 +150,8 @@ class TestBehaviorStepAndReset:
         assert truncateds.shape == (NUM_ENVS,) and truncateds.dtype == th.bool
         assert isinstance(infos, list) and len(infos) == NUM_ENVS
 
-        _passed("TestBehaviorStepAndReset::test_step_return_shapes")
-
     def test_selective_reset(self, behavior_env):
         """Resetting env_indices=[1] only resets scene 1, leaving scene 0 unchanged."""
-        _progress("TestBehaviorStepAndReset::test_selective_reset")
         env = behavior_env
 
         known_pos = th.tensor([1.0, 1.0, 0.5])
@@ -197,11 +169,8 @@ class TestBehaviorStepAndReset:
             pos_before, pos_after, atol=0.15
         ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
 
-        _passed("TestBehaviorStepAndReset::test_selective_reset")
-
     def test_per_env_step_counters(self, behavior_env):
         """episode_steps is a (num_envs,) tensor that tracks steps independently."""
-        _progress("TestBehaviorStepAndReset::test_per_env_step_counters")
         env = behavior_env
 
         assert env.episode_steps.shape == (NUM_ENVS,)
@@ -220,8 +189,6 @@ class TestBehaviorStepAndReset:
         assert env.episode_steps[0] == 0
         assert env.episode_steps[1] == 1
 
-        _passed("TestBehaviorStepAndReset::test_per_env_step_counters")
-
 
 # ===================================================================
 #  Section 1b – Single-env construction (kept separate; needs num_envs=1)
@@ -233,14 +200,11 @@ class TestBehaviorStepAndReset:
 # what guarantees the correct ordering.
 
 
-# TODO(vector): Clean up all of these multiple envs tests to not use the weird progress/passed/etc. helpers.
-# Also read through everything to make sure they're not doing anything weird.
 class TestBehaviorSingleEnv:
     """BehaviorTask with num_envs=1. Cannot share the module-scope 2-env fixture."""
 
     def test_single_env_behavior(self):
         """BehaviorTask with num_envs=1 works; scene property returns first scene."""
-        _progress("TestBehaviorEnvConstruction::test_single_env_behavior")
         # Tear down the module-scope `behavior_env` (built with num_envs=2) before constructing
         # the num_envs=1 variant. _init_macros only stops the sim; without an explicit clear,
         # the new env's object-state machinery references prims from the previous scenes and
@@ -260,4 +224,3 @@ class TestBehaviorSingleEnv:
         assert len(obs_list) == 1
 
         og.clear()
-        _passed("TestBehaviorEnvConstruction::test_single_env_behavior")
