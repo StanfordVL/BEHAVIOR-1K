@@ -2,10 +2,9 @@ import argparse
 import csv
 import omnigibson as og
 import os
-import time
 import yaml
 from omnigibson.envs import HDF5PlaybackWrapper, LeRobotPlaybackWrapper
-from omnigibson.learning.utils.dataset_utils import update_google_sheet, makedirs_with_mode
+from omnigibson.learning.utils.dataset_utils import makedirs_with_mode
 from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -42,6 +41,17 @@ def _load_challenge_task_ids() -> dict[str, int]:
             for row in csv.DictReader(f):
                 task_ids[row["Task"]] = int(row["Task ID"])
     return task_ids
+
+
+def _infer_task_id_from_demo_id(demo_id: int) -> int:
+    return demo_id // 10000
+
+
+def _get_task_name_from_task_id(task_id: int) -> str:
+    task_names_by_id = {task_id: task_name for task_name, task_id in _load_challenge_task_ids().items()}
+    if task_id not in task_names_by_id:
+        raise KeyError(f"Task ID {task_id} inferred from demo_id was not found in challenge task metadata")
+    return task_names_by_id[task_id]
 
 
 def _find_full_scene_file(task_name: str, scene_model: str) -> str:
@@ -93,9 +103,7 @@ def replay_hdf5_file(
     Returns:
         episode_id: ID of the episode
     """
-    task_ids = _load_challenge_task_ids()
-    task_names_by_id = {task_id: task_name for task_name, task_id in task_ids.items()}
-    task_name = task_names_by_id[task_id]
+    task_name = _get_task_name_from_task_id(task_id)
     replay_dir = os.path.join(data_folder, "replayed")
     makedirs_with_mode(replay_dir)
 
@@ -182,7 +190,6 @@ def main():
     parser = argparse.ArgumentParser(description="Replay HDF5 files and save data")
     parser.add_argument("--data_folder", type=str, required=True, help="Path to the data folder")
     parser.add_argument("--data_url", type=str, default="", required=False, help="URL to raw data")
-    parser.add_argument("--task_name", type=str, required=True, help="Task name to process")
     parser.add_argument("--demo_id", type=int, required=True, help="Demo ID to process")
     parser.add_argument(
         "--output_format",
@@ -209,11 +216,10 @@ def main():
         action="store_true",
         help="Append to an existing LeRobot dataset instead of overwriting it.",
     )
-    parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
-    parser.add_argument("--row", type=int, required=False, help="Row number to update")
 
     args = parser.parse_args()
-    task_id = _load_challenge_task_ids()[args.task_name]
+    task_id = _infer_task_id_from_demo_id(args.demo_id)
+    task_name = _get_task_name_from_task_id(task_id)
 
     if not os.path.exists(
         f"{args.data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
@@ -223,7 +229,7 @@ def main():
 
             instance_id = int((args.demo_id % 1e4) // 10)
             traj_id = int(args.demo_id % 10)
-            download_and_extract_data(args.data_url, args.data_folder, args.task_name, instance_id, traj_id)
+            download_and_extract_data(args.data_url, args.data_folder, task_name, instance_id, traj_id)
         else:
             raise FileNotFoundError(
                 f"Error: File episode_{args.demo_id:08d}.hdf5 does not exists under {args.data_folder}"
@@ -239,25 +245,6 @@ def main():
         lerobot_root_dir=args.lerobot_root_dir,
         overwrite_lerobot=not args.resume_lerobot,
     )
-
-    if args.update_sheet:
-        try:
-            import gspread
-        except ImportError:
-            log.warning("gspread not installed, skipping Google Sheet update")
-        else:
-            credentials_path = f"{os.environ.get('HOME')}/Documents/credentials"
-            sheet_update_success = False
-            for _ in range(5):
-                try:
-                    update_google_sheet(credentials_path, args.task_name, args.row)
-                    sheet_update_success = True
-                    break
-                except gspread.exceptions.APIError as e:
-                    log.error(f"Failed to update Google Sheet: {e}")
-                    time.sleep(60)
-            if not sheet_update_success:
-                update_google_sheet(credentials_path, args.task_name, args.row)
 
     log.info("All done!")
     og.shutdown()
