@@ -22,6 +22,20 @@ log = create_module_logger(module_name=__name__)
 log.setLevel(logging.INFO)
 
 
+def _is_system_particle_template_info(obj_info: dict, system_names: set[str]) -> bool:
+    args = obj_info.get("args", {})
+    category = args.get("category")
+    return (
+        category in system_names
+        and args.get("name") == f"{category}_template"
+        and args.get("relative_prim_path") == f"/{category}/template"
+    )
+
+
+def _is_system_particle_template_name(obj_name: str, system_names: set[str]) -> bool:
+    return any(obj_name == f"{system_name}_template" for system_name in system_names)
+
+
 class DataWrapper(EnvironmentWrapper):
     """
     An OmniGibson environment wrapper for writing data to a dataset file.
@@ -701,14 +715,20 @@ class DataPlaybackWrapper(DataWrapper):
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
                 scene = og.sim.scenes[0]
+                added_systems = set(cur_transitions["systems"]["add"])
+                removed_systems = set(cur_transitions["systems"]["remove"])
                 for add_sys_name in cur_transitions["systems"]["add"]:
                     scene.get_system(add_sys_name, force_init=True)
                 for remove_sys_name in cur_transitions["systems"]["remove"]:
                     scene.clear_system(remove_sys_name)
                 for remove_obj_name in cur_transitions["objects"]["remove"]:
+                    if _is_system_particle_template_name(remove_obj_name, removed_systems):
+                        continue
                     obj = scene.object_registry("name", remove_obj_name)
                     scene.remove_object(obj)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
+                    if _is_system_particle_template_info(add_obj_info, added_systems):
+                        continue
                     obj = create_object_from_init_info(add_obj_info)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)

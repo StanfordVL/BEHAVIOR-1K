@@ -6,11 +6,7 @@ import time
 import yaml
 from omnigibson.envs import HDF5PlaybackWrapper, LeRobotPlaybackWrapper
 from omnigibson.learning.utils.dataset_utils import update_google_sheet, makedirs_with_mode
-from omnigibson.learning.utils.eval_utils import (
-    PROPRIOCEPTION_INDICES,
-    TASK_NAMES_TO_INDICES,
-    TASK_INDICES_TO_NAMES,
-)
+from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -21,6 +17,57 @@ log.setLevel(20)
 gm.RENDER_VIEWER_CAMERA = False
 gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
+
+
+def _load_challenge_available_tasks() -> dict:
+    available_tasks = {}
+    for year in ("2025", "2026"):
+        task_cfg_path = os.path.join(
+            gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", "available_tasks.yaml"
+        )
+        if not os.path.exists(task_cfg_path):
+            continue
+        with open(task_cfg_path, "r") as f:
+            available_tasks.update(yaml.safe_load(f))
+    return available_tasks
+
+
+def _load_challenge_task_ids() -> dict[str, int]:
+    task_ids = {}
+    for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
+        task_misc_path = os.path.join(gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", filename)
+        if not os.path.exists(task_misc_path):
+            continue
+        with open(task_misc_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                task_ids[row["Task"]] = int(row["Task ID"])
+    return task_ids
+
+
+def _find_full_scene_file(task_name: str, scene_model: str) -> str:
+    for year in ("2026", "2025"):
+        task_scene_file_folder = os.path.join(
+            gm.DATA_PATH, f"{year}-challenge-task-instances", "scenes", scene_model, "json"
+        )
+        if not os.path.isdir(task_scene_file_folder):
+            continue
+        for file in os.listdir(task_scene_file_folder):
+            if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
+                return os.path.join(task_scene_file_folder, file)
+    raise FileNotFoundError(f"No full scene file found for task '{task_name}' and scene '{scene_model}'")
+
+
+def _load_room_instances(task_name: str) -> list[str]:
+    for year, filename in (("2026", "B100_task_misc.csv"), ("2025", "B50_task_misc.csv")):
+        task_misc_path = os.path.join(gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", filename)
+        if not os.path.exists(task_misc_path):
+            continue
+        with open(task_misc_path, newline="", encoding="utf-8") as f:
+            task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
+            for row in task_misc_csv:
+                if task_name in row[1]:
+                    return row[2].strip().split("\n")
+    raise FileNotFoundError(f"No task misc room instances found for task '{task_name}'")
 
 
 def replay_hdf5_file(
@@ -46,7 +93,9 @@ def replay_hdf5_file(
     Returns:
         episode_id: ID of the episode
     """
-    task_name = TASK_INDICES_TO_NAMES[task_id]
+    task_ids = _load_challenge_task_ids()
+    task_names_by_id = {task_id: task_name for task_name, task_id in task_ids.items()}
+    task_name = task_names_by_id[task_id]
     replay_dir = os.path.join(data_folder, "replayed")
     makedirs_with_mode(replay_dir)
 
@@ -67,32 +116,12 @@ def replay_hdf5_file(
             },
         },
     }
-    with open(f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/available_tasks.yaml", "r") as f:
-        available_tasks = yaml.safe_load(f)
+    available_tasks = _load_challenge_available_tasks()
+    if task_name not in available_tasks:
+        raise KeyError(f"Task '{task_name}' not found in available challenge task metadata")
     scene_model = available_tasks[task_name][0]["scene_model"]
-    task_scene_file_folder = os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_model, "json")
-    full_scene_file = None
-    for file in os.listdir(task_scene_file_folder):
-        if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
-            full_scene_file = os.path.join(task_scene_file_folder, file)
-    assert full_scene_file is not None, f"No full scene file found in {task_scene_file_folder}"
-
-    load_room_instances = None
-    try:
-        with open(
-            f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv", newline="", encoding="utf-8"
-        ) as f:
-            task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
-            for row in task_misc_csv:
-                if task_name in row[1]:
-                    load_room_instances = row[2].strip().split("\n")
-                    break
-    except FileNotFoundError as e:
-        log.error(
-            "No B50_task_misc.csv file found in 2025-challenge-task-instances/metadata folder. Please ensure the dataset is up to date."
-        )
-        raise e
-    assert load_room_instances is not None, "load room instance not found!"
+    full_scene_file = _find_full_scene_file(task_name=task_name, scene_model=scene_model)
+    load_room_instances = _load_room_instances(task_name=task_name)
 
     input_path = f"{data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5"
 
@@ -184,7 +213,7 @@ def main():
     parser.add_argument("--row", type=int, required=False, help="Row number to update")
 
     args = parser.parse_args()
-    task_id = TASK_NAMES_TO_INDICES[args.task_name]
+    task_id = _load_challenge_task_ids()[args.task_name]
 
     if not os.path.exists(
         f"{args.data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
