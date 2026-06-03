@@ -12,6 +12,7 @@ from omnigibson.envs.data_wrapper import _is_system_particle_template_info, _is_
 from omnigibson.envs.hdf5_data_wrapper import HDF5DataWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
@@ -69,6 +70,29 @@ def test_system_particle_template_transition_helpers():
     assert not _is_system_particle_template_info(normal_object_info, system_names)
     assert _is_system_particle_template_name("diced__head_cabbage_template", system_names)
     assert not _is_system_particle_template_name("diced__head_cabbage_1", system_names)
+
+
+def test_macro_physical_particle_system_update_handles_waits_for_physics_view(monkeypatch):
+    system = MacroPhysicalParticleSystem.__new__(MacroPhysicalParticleSystem)
+    system.particles_view = "stale_view"
+
+    mock_sim = MagicMock()
+    mock_sim.is_playing.return_value = False
+    mock_sim.physics_sim_view = MagicMock()
+    monkeypatch.setattr(og, "sim", mock_sim)
+
+    system.update_handles()
+
+    assert system.particles_view is None
+    mock_sim.physics_sim_view.create_rigid_body_view.assert_not_called()
+
+    system.particles_view = "stale_view"
+    mock_sim.is_playing.return_value = True
+    mock_sim.physics_sim_view = None
+
+    system.update_handles()
+
+    assert system.particles_view is None
 
 
 # ---------------------------------------------------------------------------
