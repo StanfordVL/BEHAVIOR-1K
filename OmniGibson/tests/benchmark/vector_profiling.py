@@ -42,11 +42,20 @@ def make_config(args):
         },
     }
 
-    cfg["scene"] = {
-        "type": "InteractiveTraversableScene",
-        "scene_model": "Rs_int",
-        "load_object_categories": ["floors", "breakfast_table"],
-    }
+    if args.task_type == "behavior":
+        # Cached BehaviorTask requires (scene, activity) pair with pre-sampled template JSON.
+        # house_single_floor + bringing_water is one such pair; loading the full scene (no
+        # load_object_categories filter) because the cached template includes task objects.
+        cfg["scene"] = {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "house_single_floor",
+        }
+    else:
+        cfg["scene"] = {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["floors", "breakfast_table"],
+        }
     cfg["robots"] = [
         {
             "model": "r1pro",
@@ -58,10 +67,9 @@ def make_config(args):
     if args.task_type == "behavior":
         cfg["task"] = {
             "type": "BehaviorTask",
-            "activity_name": "laying_wood_floors",
+            "activity_name": "bringing_water",
             "activity_definition_id": 0,
-            "online_object_sampling": True,
-            "use_presampled_robot_pose": False,
+            "online_object_sampling": False,
         }
     elif args.task_type == "navigation":
         cfg["task"] = {
