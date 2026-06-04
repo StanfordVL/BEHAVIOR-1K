@@ -36,6 +36,22 @@ def _is_system_particle_template_name(obj_name: str, system_names: set[str]) -> 
     return any(obj_name == f"{system_name}_template" for system_name in system_names)
 
 
+def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: dict) -> None:
+    state = recorded_scene_file.get("state", {})
+    object_registry_state = (
+        state.get("registry", {}).get("object_registry", {})
+        if "registry" in state
+        else state.get("object_registry", {})
+    )
+
+    for obj_name, recorded_obj_state in object_registry_state.items():
+        obj = scene.object_registry("name", obj_name, None)
+        if obj is None or obj.states is None:
+            continue
+
+        obj._recorded_non_kin_state_names = set(recorded_obj_state.get("non_kin", {}))
+
+
 class DataWrapper(EnvironmentWrapper):
     """
     An OmniGibson environment wrapper for writing data to a dataset file.
@@ -503,7 +519,8 @@ class DataPlaybackWrapper(DataWrapper):
         self._fps = int(
             input_config.get("env", dict()).get("rendering_frequency", env.env_config["rendering_frequency"])
         )
-        self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        self.recorded_scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        self.scene_file = self.recorded_scene_file
         assert not (
             load_room_instances and not full_scene_file
         ), "Full scene file must be specified in order to load room instances"
@@ -515,6 +532,7 @@ class DataPlaybackWrapper(DataWrapper):
                 # we loaded more room than the stored scene file, but still not the full scene
                 # we need to save the current scene file here to avoid errors
                 self.scene_file = env.scene.save(as_dict=True)
+        _align_scene_object_states_with_recorded_schema(scene=env.scene, recorded_scene_file=self.recorded_scene_file)
 
         # check flush parameters
         if flush_every_n_steps > 0:
@@ -656,6 +674,10 @@ class DataPlaybackWrapper(DataWrapper):
                 setattr(obj, attr, val.item() if val.ndim == 0 else val)
         og.sim.play()
         self.reset()
+        _align_scene_object_states_with_recorded_schema(
+            scene=self.scene,
+            recorded_scene_file=self.recorded_scene_file,
+        )
 
         # If not controlling robots, disable for all robots
         if not self.include_robot_control:
