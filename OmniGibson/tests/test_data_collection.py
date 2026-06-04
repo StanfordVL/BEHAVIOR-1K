@@ -8,7 +8,11 @@ import os
 
 import omnigibson as og
 from omnigibson.envs import HDF5CollectionWrapper, HDF5PlaybackWrapper, LeRobotPlaybackWrapper, LeRobotDataWrapper
-from omnigibson.envs.data_wrapper import _is_system_particle_template_info, _is_system_particle_template_name
+from omnigibson.envs.data_wrapper import (
+    _align_scene_object_states_with_recorded_schema,
+    _is_system_particle_template_info,
+    _is_system_particle_template_name,
+)
 from omnigibson.envs.hdf5_data_wrapper import HDF5DataWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
@@ -93,6 +97,40 @@ def test_macro_physical_particle_system_update_handles_waits_for_physics_view(mo
     system.update_handles()
 
     assert system.particles_view is None
+
+
+def test_align_scene_object_states_with_recorded_schema_marks_serialized_states():
+    class RecordedState:
+        pass
+
+    class ExtraState:
+        pass
+
+    obj = MagicMock()
+    obj.states = {
+        RecordedState: MagicMock(stateful=True),
+        ExtraState: MagicMock(stateful=True),
+    }
+    scene = MagicMock()
+    scene.object_registry.return_value = obj
+    recorded_scene_file = {
+        "state": {
+            "registry": {
+                "object_registry": {
+                    "toaster_91": {
+                        "non_kin": {
+                            "RecordedState": {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    _align_scene_object_states_with_recorded_schema(scene=scene, recorded_scene_file=recorded_scene_file)
+
+    assert set(obj.states) == {RecordedState, ExtraState}
+    assert obj._recorded_non_kin_state_names == {"RecordedState"}
 
 
 # ---------------------------------------------------------------------------
