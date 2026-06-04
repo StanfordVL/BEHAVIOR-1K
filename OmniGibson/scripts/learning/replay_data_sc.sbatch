@@ -16,13 +16,13 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  sbatch replay_data_sc.sbatch --data_folder PATH --task_name TASK --shard_id ID --demo_ids 0,1,2
+  sbatch replay_data_sc.sbatch --data_folder PATH --task_name TASK --shard_id ID --demo_ids 00000000,00000010,00000020
 
 Required:
   --data_folder        Root containing 2026-challenge-rawdata/
-  --task_name          BEHAVIOR task name
+  --task_name          BEHAVIOR task name (used for shard output paths / markers)
   --shard_id           Stable shard id, e.g. 0007
-  --demo_ids           Comma-separated demo ids to replay serially in this shard
+  --demo_ids           Comma-separated *episode demo ids* (8-digit: task_id + instance_id + traj_id) to replay serially in this shard
 
 Optional:
   --lerobot_root_dir   LeRobot shard root. Defaults to <data_folder>/lerobot_shards
@@ -203,7 +203,6 @@ for DEMO_ID in "${DEMO_ID_ARRAY[@]}"; do
   echo "Replaying task=${TASK_NAME} demo_id=${DEMO_ID} shard=${SHARD_ID} resume=${RESUME_ARGS[*]:-false}"
   OMNIGIBSON_HEADLESS=1 python OmniGibson/scripts/learning/replay_obs.py \
     --data_folder "$DATA_FOLDER" \
-    --task_name "$TASK_NAME" \
     --demo_id "$DEMO_ID" \
     --output_format lerobot \
     --flush_every_n_steps "$FLUSH_EVERY_N_STEPS" \
