@@ -7,7 +7,7 @@
         bed.n.01_1 bed.n.01_2 - bed.n.01
         armchair.n.01_1 - armchair.n.01
         tissue_dispenser.n.01_1 - tissue_dispenser.n.01
-        stand.n.04_1 - stand.n.04
+        stand.n.04_* - stand.n.04
         agent.n.01_1 - agent.n.01
     )
     
@@ -18,7 +18,7 @@
         (inroom floor.n.01_2 bathroom)
         (inroom bed.n.01_1 bedroom)
         (inroom bed.n.01_2 bedroom)
-        (inroom stand.n.04_1 bedroom)
+        (inroom stand.n.04_* bedroom)
         (inroom armchair.n.01_1 bedroom)
         (ontop tissue_dispenser.n.01_1 armchair.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
@@ -26,7 +26,10 @@
     
     (:goal 
         (and 
-            (ontop tissue_dispenser.n.01_1 stand.n.04_1)
+            (exists
+                (?stand.n.04 - stand.n.04)
+                (ontop tissue_dispenser.n.01_1 ?stand.n.04)
+            )
             (forpairs
                 (?pillow.n.01 - pillow.n.01)
                 (?bed.n.01 - bed.n.01)
