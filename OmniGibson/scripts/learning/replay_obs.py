@@ -219,21 +219,11 @@ def main():
 
     args = parser.parse_args()
     task_id = _infer_task_id_from_demo_id(args.demo_id)
-    task_name = _get_task_name_from_task_id(task_id)
 
     if not os.path.exists(
         f"{args.data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
     ):
-        if args.data_url:
-            from omnigibson.learning.utils.dataset_utils import download_and_extract_data
-
-            instance_id = int((args.demo_id % 1e4) // 10)
-            traj_id = int(args.demo_id % 10)
-            download_and_extract_data(args.data_url, args.data_folder, task_name, instance_id, traj_id)
-        else:
-            raise FileNotFoundError(
-                f"Error: File episode_{args.demo_id:08d}.hdf5 does not exists under {args.data_folder}"
-            )
+        raise FileNotFoundError(f"Error: File episode_{args.demo_id:08d}.hdf5 does not exists under {args.data_folder}")
 
     _ = replay_hdf5_file(
         data_folder=args.data_folder,

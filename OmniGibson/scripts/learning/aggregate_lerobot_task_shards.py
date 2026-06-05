@@ -4,22 +4,27 @@
 from __future__ import annotations
 
 import argparse
-import ast
+import csv
+import os
 import shutil
 from pathlib import Path
 
 from lerobot.datasets.aggregate import aggregate_datasets
 
 
-def load_task_mapping(repo_root: Path) -> dict[str, int]:
-    eval_utils = repo_root / "OmniGibson" / "omnigibson" / "learning" / "utils" / "eval_utils.py"
-    tree = ast.parse(eval_utils.read_text())
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "TASK_NAMES_TO_INDICES":
-                    return ast.literal_eval(node.value)
-    raise RuntimeError(f"TASK_NAMES_TO_INDICES not found in {eval_utils}")
+def load_task_mapping(data_root: Path) -> dict[str, int]:
+    task_mapping = {}
+    for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
+        task_misc_path = data_root / f"{year}-challenge-task-instances" / "metadata" / filename
+        if not task_misc_path.exists():
+            continue
+        with task_misc_path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                task_mapping[row["Task"]] = int(row["Task ID"])
+
+    if not task_mapping:
+        raise RuntimeError(f"No challenge task metadata found under {data_root}")
+    return task_mapping
 
 
 def parse_task_names(args: argparse.Namespace, task_mapping: dict[str, int]) -> list[str]:
@@ -87,6 +92,7 @@ def main() -> None:
     default_repo_root = Path(__file__).resolve().parents[3]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo_root", default=str(default_repo_root))
+    parser.add_argument("--data_root", default=os.environ.get("OMNIGIBSON_DATA_PATH", "/vision/group/behavior"))
     parser.add_argument("--lerobot_shards_root", required=True)
     parser.add_argument("--output_root", required=True)
     parser.add_argument("--tasks", default="", help="Comma-separated task names. Defaults to all tasks.")
@@ -100,7 +106,7 @@ def main() -> None:
     parser.add_argument("--run", action="store_true", help="Actually aggregate. Default is dry-run.")
     args = parser.parse_args()
 
-    task_mapping = load_task_mapping(Path(args.repo_root).resolve())
+    task_mapping = load_task_mapping(Path(args.data_root).resolve())
     for task_name in parse_task_names(args, task_mapping):
         aggregate_task(args, task_name)
 
