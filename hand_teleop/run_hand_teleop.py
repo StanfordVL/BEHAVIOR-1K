@@ -199,21 +199,27 @@ def _build_safety_cfg(yaml_cfg: dict) -> SafetyConfig:
 
 def _build_bridge_cfg(yaml_cfg: dict, side: str) -> BridgeConfig:
     b = (yaml_cfg.get("bridge") or {})
-    ws = (b.get("workspace_box") or {})
+    sph = (b.get("workspace_sphere") or {})
     return BridgeConfig(
         side=side,
-        workspace_min=tuple(ws.get("min", (-0.6, -0.3, 0.05))),
-        workspace_max=tuple(ws.get("max", (0.6, 0.9, 1.20))),
         position_sensitivity=float(b.get("position_sensitivity", 1.0)),
         vr_to_world_quat_xyzw=tuple(
             float(x) for x in (b.get("vr_to_world_quat_xyzw")
-                              or (0.7071067811865476, 0.0, 0.0, 0.7071067811865476))
+                              or (0.5, -0.5, -0.5, 0.5))
         ),
-        orientation_mode=str(b.get("orientation_mode", "absolute")),
+        desired_start_quat_xyzw=tuple(
+            float(x) for x in (b.get("desired_start_quat_xyzw")
+                              or (0.5, 0.5, 0.5, 0.5))
+        ),
         orn_align_quat_xyzw=tuple(
             float(x) for x in (b.get("orn_align_quat_xyzw")
-                              or (1.0, 0.0, 0.0, 0.0))
+                              or (0.0, 0.0, 0.0, 1.0))
         ),
+        shoulder_pos=tuple(sph.get("shoulder_pos", (0.0, 0.0, 1.194))),
+        shoulder_reach=float(sph.get("reach", 0.80)),
+        z_min=float(sph.get("z_min", 0.82)),
+        z_max=float(sph.get("z_max", 1.75)),
+        max_pos_step=float(sph.get("max_pos_step", 0.02)),
         skip_pinky=bool(b.get("skip_pinky", True)),
         close_target_clamp=float(b.get("close_target_clamp", 0.85)),
     )
@@ -269,6 +275,15 @@ def main():
         og.sim.enable_viewer_camera_teleoperation()
     except Exception:
         pass
+
+    # Disable OmniGibson's USD-edit guard for the teleop session. The guard
+    # crashes on ANY USD edit outside og.sim.editing_usd(); the VisionSensor
+    # viewports below make legitimate render-layer edits (viewport `.visible`
+    # toggles, replicator SDGPipeline writes) it can't see as intentional. Same
+    # fix as vr_sharpa_teleop.py.
+    if hasattr(og.sim, "_disable_usd_guard"):
+        og.sim._disable_usd_guard()
+        print("[USD] Edit guard disabled for hand_teleop (render-layer edits are expected).")
 
     # Multi-view setup. `ego` is the recommended default — adds a single
     # over-the-shoulder VisionSensor (1 extra render product, ~25% extra
@@ -351,7 +366,7 @@ def main():
     log(f"joint_limits={joint_limits}")
 
     print(f"\n{'='*60}")
-    print(f"  hand_teleop running. Quest browser: http://<host>:{args.ws_port}")
+    print(f"  hand_teleop running. Quest browser: {scheme}://<host-ip>:{args.ws_port}")
     print(f"  Press SPACE in viewer to set anchor (or pass --auto-anchor)")
     print(f"  Ctrl+C to exit.")
     print(f"{'='*60}\n")

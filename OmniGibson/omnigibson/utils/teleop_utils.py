@@ -218,9 +218,22 @@ class OVXRSystem(TeleopSystem):
         if eef_tracking_mode == "hand":
             self.raw_data["hand_data"] = {}
             self.teleop_action.hand_data = {}
-            self._hand_tracking_subscription = self.xr_core.get_message_bus().create_subscription_to_pop_by_type(
-                lazy.omni.kit.xr.core.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
-            )
+            # Isaac Sim 5.1 removed XRCoreEventType.hand_joints (event-based hand
+            # tracking was replaced by polling). Guard so init doesn't crash;
+            # hand-joint data is unavailable on 5.1 via this endpoint (use the
+            # WebXR path in hand_teleop/ for dexterous fingers instead).
+            self._hand_tracking_subscription = None
+            _hand_event = getattr(lazy.omni.kit.xr.core.XRCoreEventType, "hand_joints", None)
+            if _hand_event is not None:
+                self._hand_tracking_subscription = self.xr_core.get_message_bus().create_subscription_to_pop_by_type(
+                    _hand_event, self._update_hand_tracking_data, name="hand tracking"
+                )
+            else:
+                log.warning(
+                    "[OVXRSystem] eef_tracking_mode='hand' but Isaac Sim 5.1 has no "
+                    "XRCoreEventType.hand_joints — hand tracking DISABLED. Use --mode "
+                    "controller, or the WebXR hand_teleop pipeline for fingers."
+                )
         self.robot_cameras = (
             [s for s in self.robot.sensors.values() if isinstance(s, VisionSensor)] if self.robot else []
         )
@@ -266,46 +279,55 @@ class OVXRSystem(TeleopSystem):
             self._view_blackout_prim.visible = False
 
     def _update_camera_pose(self, e) -> None:
-        if self.align_anchor_to == "touchpad":
-            # we use x, y from right controller for 2d movement and y from left controller for z movement
-            self._move_anchor(
-                pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
-            )
-        else:
-            if self.anchor_prim is not None:
-                reference_frame = self.anchor_prim
-            elif self.align_anchor_to == "camera":
-                reference_frame = self.robot_cameras[self.active_camera_id]
-            elif self.align_anchor_to == "base":
-                reference_frame = self.robot
-            else:
-                raise ValueError(f"Invalid anchor: {self.align_anchor_to}")
-
-            anchor_pos, anchor_orn = reference_frame.get_position_orientation()
-
-            if self.head_canonical_transformation is not None:
-                current_head_physical_world_pose = self.xr2og(self.hmd.get_pose())
-                # Find the orientation change from canonical to current physical orientation
-                _, relative_orientation = T.relative_pose_transform(
-                    *current_head_physical_world_pose, *self.head_canonical_transformation
+        # Re-entry guard: get_position_orientation() -> PoseAPI._refresh() ->
+        # og.sim.render() can fire another pre_sync_update on Isaac Sim 5.1,
+        # which would recurse back into this callback (RecursionError).
+        if getattr(self, "_in_update_camera_pose", False):
+            return
+        self._in_update_camera_pose = True
+        try:
+            if self.align_anchor_to == "touchpad":
+                # we use x, y from right controller for 2d movement and y from left controller for z movement
+                self._move_anchor(
+                    pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
                 )
-                anchor_orn = T.quat_multiply(anchor_orn, relative_orientation)
+            else:
+                if self.anchor_prim is not None:
+                    reference_frame = self.anchor_prim
+                elif self.align_anchor_to == "camera":
+                    reference_frame = self.robot_cameras[self.active_camera_id]
+                elif self.align_anchor_to == "base":
+                    reference_frame = self.robot
+                else:
+                    raise ValueError(f"Invalid anchor: {self.align_anchor_to}")
 
-                if self._view_blackout_prim is not None:
-                    relative_ori_in_euler = T.quat2euler(relative_orientation)
-                    roll_limit, pitch_limit, yaw_limit = self._view_angle_limits
-                    # OVXR has a different coordinate system than OmniGibson
-                    if (
-                        abs(relative_ori_in_euler[0]) > pitch_limit
-                        or abs(relative_ori_in_euler[1]) > yaw_limit
-                        or abs(relative_ori_in_euler[2]) > roll_limit
-                    ):
-                        self._view_blackout_prim.set_position_orientation(anchor_pos, anchor_orn)
-                        self._view_blackout_prim.visible = True
-                    else:
-                        self._view_blackout_prim.visible = False
-            anchor_pose = self.og2xr(anchor_pos, anchor_orn)
-            self.xr_core.schedule_set_camera(anchor_pose.numpy())
+                anchor_pos, anchor_orn = reference_frame.get_position_orientation()
+
+                if self.head_canonical_transformation is not None:
+                    current_head_physical_world_pose = self.xr2og(self.hmd.get_pose())
+                    # Find the orientation change from canonical to current physical orientation
+                    _, relative_orientation = T.relative_pose_transform(
+                        *current_head_physical_world_pose, *self.head_canonical_transformation
+                    )
+                    anchor_orn = T.quat_multiply(anchor_orn, relative_orientation)
+
+                    if self._view_blackout_prim is not None:
+                        relative_ori_in_euler = T.quat2euler(relative_orientation)
+                        roll_limit, pitch_limit, yaw_limit = self._view_angle_limits
+                        # OVXR has a different coordinate system than OmniGibson
+                        if (
+                            abs(relative_ori_in_euler[0]) > pitch_limit
+                            or abs(relative_ori_in_euler[1]) > yaw_limit
+                            or abs(relative_ori_in_euler[2]) > roll_limit
+                        ):
+                            self._view_blackout_prim.set_position_orientation(anchor_pos, anchor_orn)
+                            self._view_blackout_prim.visible = True
+                        else:
+                            self._view_blackout_prim.visible = False
+                anchor_pose = self.og2xr(anchor_pos, anchor_orn)
+                self.xr_core.schedule_set_camera(anchor_pose.numpy())
+        finally:
+            self._in_update_camera_pose = False
 
     def register_head_canonical_transformation(self):
         """
@@ -376,14 +398,23 @@ class OVXRSystem(TeleopSystem):
         Enabling the VR profile
         """
         self.vr_profile.request_enable_profile()
-        og.sim.app.update()
-        assert self.vr_profile.is_enabled(), "[VRSys] VR profile not enabled!"
+        # Isaac Sim 5.1: Simulator has no `.app`; pump the kit app directly.
+        # Profile enable is async, so retry a few frames before asserting.
+        for _ in range(180):
+            lazy.omni.kit.app.get_app().update()
+            if self.vr_profile.is_enabled():
+                break
+        assert self.vr_profile.is_enabled(), (
+            "[VRSys] VR profile not enabled after ~3s — is the headset on, tracked, "
+            "and SteamVR/OpenXR running?"
+        )
         # We want to make sure the hmd is tracking so that the whole system is ready to go
+        required_arms = self.robot_arms if self.robot_arms else ["left", "right"]
         while True:
             print("[VRSys] Waiting for VR headset and controllers to become active...")
-            og.sim.app.update()
+            lazy.omni.kit.app.get_app().update()
             self._update_devices()
-            if self.hmd is not None and "left" in self.controllers and "right" in self.controllers:
+            if self.hmd is not None and all(a in self.controllers for a in required_arms):
                 print("[VRSys] VR headset connected, put on the headset to start")
                 # When taking the first step, xr internally calls clear_controller_model(hand) which removes a prim from stage
                 # note that this does not invalidate the physics sim view but instead removes the physics view from articulation views
@@ -425,53 +456,85 @@ class OVXRSystem(TeleopSystem):
             self._update_device_transforms()
         self._update_button_data()
 
-        # Fire the button callbacks
+        # Fire the button callbacks (rising-edge detection)
+        old_bd = self.old_raw_data.get("button_data", {})
         for controller_name, controller_button_datas in self.raw_data["button_data"].items():
             for button_name, button_data in controller_button_datas.items():
-                print(button_data)
                 button_pressed = button_data["click"]
-                if button_pressed and not self.old_raw_data["button_data"][controller_name][button_name]["click"]:
+                old_click = old_bd.get(controller_name, {}).get(button_name, {}).get("click", 0)
+                if button_pressed and not old_click:
                     print(f"Button {button_name} pressed on controller {controller_name}")
                     KeyboardEventHandler.xr_callback(controller_name, button_name)
 
         # Update teleop data based on controller input
         if self.eef_tracking_mode == "controller":
-            # update eef related info
-            for arm_name, arm in zip(["left", "right"], self.robot_arms):
-                if arm in self.controllers:
-                    controller_pose_in_robot_frame = self._pose_in_robot_frame(
-                        self.raw_data["transforms"]["controllers"][arm][0],
-                        self.raw_data["transforms"]["controllers"][arm][1],
-                    )
+            # --- Restored working controller mapping (lost in the Isaac 5.1 stock
+            # reset; recovered from the pre-5.1 working version) -------------------
+            # Head-rotation compensation: the controller's offset FROM the headset
+            # in PHYSICAL space is invariant to head rotation. We map that offset
+            # into the robot frame with a fixed XR->world rotation captured once at
+            # startup, so turning your head doesn't drag the arm. The -90deg yaw
+            # (_YAW_FIX) maps your physical "forward" onto the robot's +X
+            # (arm-forward); WITHOUT it, left/right and forward/back are swapped and
+            # the wrist comes out rotated sideways. The orientation is emitted as
+            # AXIS-ANGLE — the script's calibrated action builder consumes axis-angle.
+            hmd_phys_pos, hmd_phys_orn = self.xr2og(self.hmd.get_pose())
+            _, hmd_virt_orn = self.raw_data["transforms"]["head"]
+
+            if not hasattr(self, "_xr_to_world_rot"):
+                # Fixed rotation from XR tracking space to OG world, computed once.
+                self._xr_to_world_rot = T.quat_multiply(hmd_virt_orn, T.quat_inverse(hmd_phys_orn))
+
+            _, robot_base_orn = self.robot.get_position_orientation()
+            xr_to_robot_rot = T.quat_multiply(T.quat_inverse(robot_base_orn), self._xr_to_world_rot)
+            _YAW_FIX = th.tensor([0.0, 0.0, -0.7071067811865476, 0.7071067811865476])
+            xr_to_robot_rot = T.quat_multiply(_YAW_FIX, xr_to_robot_rot)
+
+            for vr_hand, robot_arm in zip(self.robot_arms, self.robot.arm_names):
+                if vr_hand in self.controllers:
+                    try:
+                        ctrl_phys_pos, ctrl_phys_orn = self.xr2og(self.controllers[vr_hand].get_pose())
+                        phys_offset = ctrl_phys_pos - hmd_phys_pos
+                        corrected_pos = T.quat_apply(xr_to_robot_rot, phys_offset)
+                        corrected_orn = T.quat_multiply(xr_to_robot_rot, ctrl_phys_orn)
+                    except Exception:
+                        # Fallback if controller.get_pose() is unavailable.
+                        corrected_pos, corrected_orn = self._pose_in_robot_frame(
+                            self.raw_data["transforms"]["controllers"][vr_hand][0],
+                            self.raw_data["transforms"]["controllers"][vr_hand][1],
+                        )
                     # When trigger is pressed, this value would be 1.0, otherwise 0.0
                     # Our multi-finger gripper controller closes the gripper when the value is -1.0 and opens when > 0.0
                     # So we need to negate the value here
                     trigger_press = (
-                        -self.raw_data["button_data"][arm]["trigger"]["value"]
+                        -self.raw_data["button_data"][vr_hand]["trigger"]["value"]
                         if (
                             "button_data" in self.raw_data
-                            and arm in self.raw_data["button_data"]
-                            and "trigger" in self.raw_data["button_data"][arm]
+                            and vr_hand in self.raw_data["button_data"]
+                            and "trigger" in self.raw_data["button_data"][vr_hand]
                         )
                         else 0.0
                     )
-                    self.teleop_action[arm_name] = th.cat(
+                    if not hasattr(self, "_corrected_orn"):
+                        self._corrected_orn = {}
+                    self._corrected_orn[vr_hand] = corrected_orn.clone()
+                    self.teleop_action[vr_hand] = th.cat(
                         (
-                            controller_pose_in_robot_frame[0],
+                            corrected_pos,
                             T.quat2axisangle(
                                 T.quat_multiply(
-                                    controller_pose_in_robot_frame[1],
-                                    self.robot.teleop_rotation_offset[arm_name],
+                                    corrected_orn,
+                                    self.robot.teleop_rotation_offset[robot_arm],
                                 )
                             ),
                             th.tensor([trigger_press], dtype=th.float32),
                         )
                     )
-                    self.teleop_action.is_valid[arm_name] = self._is_valid_transform(
-                        self.raw_data["transforms"]["controllers"][arm]
+                    self.teleop_action.is_valid[vr_hand] = self._is_valid_transform(
+                        self.raw_data["transforms"]["controllers"][vr_hand]
                     )
                 else:
-                    self.teleop_action.is_valid[arm_name] = False
+                    self.teleop_action.is_valid[vr_hand] = False
 
         # update base, torso, and reset info
         self.teleop_action.base = th.zeros(3)

@@ -15,3 +15,8 @@ SharpaWave_URDF/
 
 __pycache__/
 .codex
+
+# teleop debug logs (untracked runtime artifacts)
+vr_teleop_debug.log
+hand_teleop_debug.log
+vr_teleop_run_*.log

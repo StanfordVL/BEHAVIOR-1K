@@ -563,6 +563,15 @@ def main():
     wrist_track = None
     all_trackers = None
 
+    # Disable OmniGibson's USD-edit guard for the rest of this teleop session.
+    # The guard crashes on ANY USD edit outside og.sim.editing_usd(); VR teleop
+    # legitimately makes many render-layer edits (viewport creation, `.visible`
+    # toggles, replicator SDGPipeline writes during raw app.update()), several
+    # inside Omniverse code we can't wrap. Disable rather than wrap per-site.
+    if hasattr(og.sim, "_disable_usd_guard"):
+        og.sim._disable_usd_guard()
+        print("[USD] Edit guard disabled for VR teleop (render-layer edits are expected).")
+
     arm_name = robot.arm_names[0]
     orig_rot_offset = robot.teleop_rotation_offset[arm_name].tolist()
     log(f"teleop_rotation_offset={orig_rot_offset}")
@@ -905,6 +914,13 @@ def main():
     print(f"[VR] Anchor set to viewer_camera (pos={[round(x,2) for x in cam_pos.tolist()]})")
 
     vrsys.start()
+
+    # During VR startup, XR internally calls clear_controller_model(), which
+    # removes the physics view from the robot's articulation views. After that,
+    # robot.get_joint_positions() returns None. Rebuild the physics handles
+    # before the teleop loop reads joint state.
+    og.sim.update_handles()
+    log("[VR] Rebuilt physics handles after vrsys.start() (XR invalidated articulation view)")
 
     log(f"\n=== VR STARTED ===")
     log(f"robot_arms={vrsys.robot_arms}")

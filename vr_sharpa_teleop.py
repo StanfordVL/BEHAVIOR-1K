@@ -337,12 +337,13 @@ def setup_all_views(robot, hand_side, use_main_viewport=False, headless=False):
     # stacked at (0,0), which looks like "tiled views aren't appearing".
     if not headless:
         try:
-            vp_win = lazy.omni.kit.viewport.utility.create_viewport_window(
-                "Ego View",
-                width=_VP_EGO_W, height=_VP_EGO_H,
-                position_x=_VP_LAYOUT_X, position_y=_VP_LAYOUT_Y,
-                camera_path=ego_sensor.prim_path,
-            )
+            with og.sim.editing_usd():
+                vp_win = lazy.omni.kit.viewport.utility.create_viewport_window(
+                    "Ego View",
+                    width=_VP_EGO_W, height=_VP_EGO_H,
+                    position_x=_VP_LAYOUT_X, position_y=_VP_LAYOUT_Y,
+                    camera_path=ego_sensor.prim_path,
+                )
             print(f"[Multi-view] Viewport 'Ego View' → {ego_sensor.prim_path}  "
                   f"@ ({_VP_LAYOUT_X},{_VP_LAYOUT_Y}) {_VP_EGO_W}x{_VP_EGO_H}")
         except Exception as e:
@@ -368,12 +369,13 @@ def setup_all_views(robot, hand_side, use_main_viewport=False, headless=False):
             try:
                 label = view_name.replace("_", " ").title()
                 _wy = _VP_LAYOUT_Y + wi * (_VP_WRIST_H + 10)
-                vp_win = lazy.omni.kit.viewport.utility.create_viewport_window(
-                    label,
-                    width=_VP_WRIST_W, height=_VP_WRIST_H,
-                    position_x=_wrist_x, position_y=_wy,
-                    camera_path=sensor.prim_path,
-                )
+                with og.sim.editing_usd():
+                    vp_win = lazy.omni.kit.viewport.utility.create_viewport_window(
+                        label,
+                        width=_VP_WRIST_W, height=_VP_WRIST_H,
+                        position_x=_wrist_x, position_y=_wy,
+                        camera_path=sensor.prim_path,
+                    )
                 print(f"[Multi-view] Viewport '{label}' → {sensor.prim_path}  "
                       f"@ ({_wrist_x},{_wy}) {_VP_WRIST_W}x{_VP_WRIST_H}  (tracking {link_name})")
             except Exception as e:
@@ -458,10 +460,14 @@ def setup_third_person_viewport(robot, view="front", use_main_viewport=False):
     else:
         try:
             # See note in setup_all_views: 5.1 needs camera_path as a kwarg, not attr.
-            vp_window = lazy.omni.kit.viewport.utility.create_viewport_window(
-                "Third Person", width=800, height=600,
-                camera_path="/World/viewer_camera",
-            )
+            # Wrap in editing_usd(): creating the viewport allocates a render
+            # texture (a USD edit) that the OmniGibson USD-Fabric guard would
+            # otherwise flag on the next og.sim.step() (crashes vrsys.start()).
+            with og.sim.editing_usd():
+                vp_window = lazy.omni.kit.viewport.utility.create_viewport_window(
+                    "Third Person", width=800, height=600,
+                    camera_path="/World/viewer_camera",
+                )
             print(f"[Camera] Second viewport 'Third Person' → /World/viewer_camera")
             print(f"[Camera] Main viewport stays on xrCamera for VR.")
         except Exception as e:
@@ -477,6 +483,107 @@ def setup_third_person_viewport(robot, view="front", use_main_viewport=False):
         print("[Camera] WASD+mouse enabled for viewer_camera adjustment")
     except Exception:
         pass
+
+
+# ===========================================================================
+# Calibrated arm-action builder (restored working teleop mapping).
+#
+# The stock OmniGibson robot.teleop_data_to_action() (used via
+# vrsys.get_robot_teleop_action()) has NO first-frame calibration and misreads
+# the orientation, so the EEF jumps and the wrist comes out wrong. The
+# pre-Isaac-5.1 working setup did calibration in a custom robot class that the
+# YAML refactor removed. We restore that logic here, in the script, so it's
+# independent of the (resettable) OmniGibson submodule.
+#
+# OVXRSystem (controller mode) now emits, in teleop_action[hand]:
+#   [corrected_pos(3), axis-angle of corrected_orn*rotation_offset (3), trigger]
+# This builder consumes that axis-angle, anchors the EEF to its rest pose on the
+# first valid frame (no jump), and maps controller deltas 1:1.
+# ===========================================================================
+# Franka+SharpaWave reachable workspace (base frame; shoulder at Z=1.194m).
+_WS_SHOULDER_POS = th.tensor([0.0, 0.0, 1.194])
+_WS_SHOULDER_REACH = 0.80
+_WS_Z_MIN = 0.82
+_WS_Z_MAX = 1.75
+_WS_MAX_POS_STEP = 0.02
+
+
+def _clamp_to_workspace(pos, prev_pos=None):
+    """Clamp a base-frame target to the Franka's reach: floor/ceiling, a
+    shoulder-centered reach sphere, and a per-step rate limit (keeps IK stable)."""
+    clamped = pos.clone()
+    clamped[2] = th.clamp(clamped[2], min=_WS_Z_MIN, max=_WS_Z_MAX)
+    to_shoulder = clamped - _WS_SHOULDER_POS
+    dist = th.norm(to_shoulder)
+    if dist > _WS_SHOULDER_REACH:
+        clamped = _WS_SHOULDER_POS + to_shoulder * (_WS_SHOULDER_REACH / dist)
+    if prev_pos is not None:
+        delta = clamped - prev_pos
+        dn = th.norm(delta)
+        if dn > _WS_MAX_POS_STEP:
+            clamped = prev_pos + delta * (_WS_MAX_POS_STEP / dn)
+    return clamped
+
+
+def compute_calibrated_arm_action(robot, teleop_action, hand, arm_name):
+    """Return the calibrated arm command [target_pos(3), target_orn_axisangle(3)].
+
+    On the first VALID frame, records the offset between the robot's current EEF
+    rest pose and the VR pose, so the arm starts where it is (no jump) and then
+    tracks your controller's deltas 1:1. Orientation is anchored to
+    robot._teleop_desired_start_quat if set (the desired startup wrist pose),
+    else to the EEF's actual rest orientation. Returns None until calibrated.
+    """
+    arm_action = teleop_action[hand].clone().detach().float()
+    vr_pos = arm_action[:3]
+    vr_orn_aa = arm_action[3:6]
+
+    if not getattr(robot, "_teleop_calibrated", False):
+        is_valid = getattr(teleop_action, "is_valid", {})
+        if not is_valid.get(hand, False):
+            return None
+        eef_pos, eef_quat = robot.eef_links[arm_name].get_position_orientation()
+        base_pos, base_quat = robot.get_position_orientation()
+        eef_rel_pos, eef_rel_quat = T.relative_pose_transform(eef_pos, eef_quat, base_pos, base_quat)
+        robot._teleop_pos_offset = eef_rel_pos - vr_pos
+        vr_quat = T.axisangle2quat(vr_orn_aa)
+        desired = getattr(robot, "_teleop_desired_start_quat", None)
+        start_quat = desired if desired is not None else eef_rel_quat
+        robot._teleop_orn_offset_quat = T.quat_multiply(start_quat, T.quat_inverse(vr_quat))
+        robot._teleop_prev_target = eef_rel_pos.clone()
+        robot._teleop_calibrated = True
+        print(f"[Calibration] pos_offset={[round(x, 3) for x in robot._teleop_pos_offset.tolist()]}  "
+              f"used_desired_start={desired is not None}")
+
+    raw_pos = vr_pos + robot._teleop_pos_offset
+    vr_quat = T.axisangle2quat(vr_orn_aa)
+    target_orn = T.quat2axisangle(T.quat_multiply(robot._teleop_orn_offset_quat, vr_quat))
+    prev = getattr(robot, "_teleop_prev_target", None)
+    target_pos = _clamp_to_workspace(raw_pos, prev)
+    robot._teleop_prev_target = target_pos.clone()
+    return th.cat((target_pos, target_orn))
+
+
+def _safe_get_joint_positions(robot):
+    """robot.get_joint_positions(), resilient to XR clearing the physics view.
+
+    XR's clear_controller_model() can drop the physics view from the robot's
+    articulation view mid-run, making get_joint_positions() return None
+    ('NoneType' has no attribute 'view'). Rebuild the handles and retry; return
+    None if still unavailable so diagnostic callers can skip a frame instead of
+    crashing the whole teleop session.
+    """
+    try:
+        jp = robot.get_joint_positions()
+        if jp is not None:
+            return jp
+    except AttributeError:
+        pass
+    try:
+        og.sim.update_handles()
+        return robot.get_joint_positions()
+    except Exception:
+        return None
 
 
 def main():
@@ -549,6 +656,18 @@ def main():
     wrist_track = None
     all_trackers = None
 
+    # Disable OmniGibson's USD-edit guard for the rest of this teleop session.
+    # The guard is a dev aid that crashes on ANY USD edit outside og.sim.editing_usd().
+    # VR teleop legitimately makes many render-layer edits the guard can't see as
+    # intentional: viewport-window creation, viewport `.visible` toggles (hidden
+    # hydra-texture writes), and the replicator synthetic-data pipeline writing
+    # SDGPipeline attrs (e.g. simTimesToWrite) during raw app.update() inside
+    # vrsys.start(). Several of those happen inside Omniverse code we can't wrap,
+    # so wrapping per-site is impossible — disable the guard instead.
+    if hasattr(og.sim, "_disable_usd_guard"):
+        og.sim._disable_usd_guard()
+        print("[USD] Edit guard disabled for VR teleop (render-layer edits are expected).")
+
     arm_name = robot.arm_names[0]
     orig_rot_offset = robot.teleop_rotation_offset[arm_name].tolist()
     log(f"teleop_rotation_offset={orig_rot_offset}")
@@ -575,10 +694,11 @@ def main():
         else:
             try:
                 # See note in setup_all_views: 5.1 needs camera_path as a kwarg.
-                vp_window = lazy.omni.kit.viewport.utility.create_viewport_window(
-                    "Wrist Camera", width=800, height=600,
-                    camera_path="/World/viewer_camera",
-                )
+                with og.sim.editing_usd():
+                    vp_window = lazy.omni.kit.viewport.utility.create_viewport_window(
+                        "Wrist Camera", width=800, height=600,
+                        camera_path="/World/viewer_camera",
+                    )
             except Exception:
                 try:
                     viewport = lazy.omni.kit.viewport.utility.get_active_viewport()
@@ -771,6 +891,14 @@ def main():
 
     vrsys.start()
 
+    # During VR startup, XR internally calls clear_controller_model(), which
+    # removes the physics view from the robot's articulation views. After that,
+    # robot.get_joint_positions() returns None ('NoneType' has no attribute
+    # 'view'). Rebuild the physics handles before the teleop loop reads joint
+    # state. See OVXRSystem.start() notes on the invalidated views.
+    og.sim.update_handles()
+    log("[VR] Rebuilt physics handles after vrsys.start() (XR invalidated articulation view)")
+
     log(f"\n=== VR STARTED ===")
     log(f"robot_arms={vrsys.robot_arms}")
     log(f"align_anchor_to={vrsys.align_anchor_to}")
@@ -916,6 +1044,16 @@ def main():
         vrsys.update()
         action = vrsys.get_robot_teleop_action()
 
+        # Overwrite the arm portion with our calibrated mapping. The stock
+        # robot.teleop_data_to_action() (called inside get_robot_teleop_action)
+        # has no calibration and misreads the orientation; compute_calibrated_arm_action
+        # anchors to the EEF rest pose + desired_start_quat and consumes the
+        # axis-angle OVXRSystem now emits. Until the first valid frame calibrates,
+        # it returns None and we hold the stock action.
+        _arm_cmd = compute_calibrated_arm_action(robot, vrsys.teleop_action, args.hand, _arm_name)
+        if _arm_cmd is not None:
+            action[robot.arm_action_idx[_arm_name]] = _arm_cmd
+
         if not button_names_logged and "button_data" in vrsys.raw_data:
             bd = vrsys.raw_data["button_data"]
             log(f"\n=== BUTTON DATA DUMP (step {step}) ===")
@@ -943,7 +1081,7 @@ def main():
             eef_p, _ = robot.eef_links[robot.arm_names[0]].get_position_orientation()
             bp, _ = robot.get_position_orientation()
             eef_r = eef_p - bp
-            jpos = robot.get_joint_positions()
+            jpos = _safe_get_joint_positions(robot)
 
             vr_raw = ta[args.hand][:6] if hasattr(ta, args.hand) else th.zeros(6)
 
@@ -983,7 +1121,8 @@ def main():
             if clamped is not None:
                 log(f"  clamped   ={[round(x,3) for x in clamped.tolist()]}")
             log(f"  eef_base  ={[round(x,3) for x in eef_r.tolist()]}")
-            log(f"  arm_j     ={[round(x,3) for x in jpos[:7].tolist()]}")
+            if jpos is not None:
+                log(f"  arm_j     ={[round(x,3) for x in jpos[:7].tolist()]}")
             log(hmd_info)
             if btn_info:
                 log(btn_info)
@@ -1010,26 +1149,27 @@ def main():
             log(f"[Grasp ramp] t={grasp_state['t']:.2f} s={s:.2f} tgt[:5]={[round(x,3) for x in tgt[:5].tolist()]}")
 
         if step % 120 == 0:
-            jpos = robot.get_joint_positions()
-            finger_pos = jpos[7:29]
-            fp = [round(x, 3) for x in finger_pos.tolist()]
-            tgt = action[_gripper_idx]
-            ft = [round(x, 3) for x in tgt.tolist()]
-            state_str = "CLOSED" if grasp_state["closed"] else "OPEN"
-            log(f"[Finger pos] state={state_str} t={grasp_state['t']:.2f}")
-            log(f"  actual={fp}")
-            log(f"  target={ft}")
-            labels = [
-                "th_CMC_FE","th_CMC_AA","th_MCP_FE","th_MCP_AA","th_IP",
-                "ix_MCP_FE","ix_MCP_AA","ix_PIP","ix_DIP",
-                "md_MCP_FE","md_MCP_AA","md_PIP","md_DIP",
-                "rg_MCP_FE","rg_MCP_AA","rg_PIP","rg_DIP",
-                "pk_CMC","pk_MCP_FE","pk_MCP_AA","pk_PIP","pk_DIP",
-            ]
-            for i, lbl in enumerate(labels):
-                err = abs(fp[i] - ft[i])
-                if err > 0.1:
-                    log(f"  ** {lbl}: actual={fp[i]:.3f} target={ft[i]:.3f} err={err:.3f}")
+            jpos = _safe_get_joint_positions(robot)
+            if jpos is not None:
+                finger_pos = jpos[7:29]
+                fp = [round(x, 3) for x in finger_pos.tolist()]
+                tgt = action[_gripper_idx]
+                ft = [round(x, 3) for x in tgt.tolist()]
+                state_str = "CLOSED" if grasp_state["closed"] else "OPEN"
+                log(f"[Finger pos] state={state_str} t={grasp_state['t']:.2f}")
+                log(f"  actual={fp}")
+                log(f"  target={ft}")
+                labels = [
+                    "th_CMC_FE","th_CMC_AA","th_MCP_FE","th_MCP_AA","th_IP",
+                    "ix_MCP_FE","ix_MCP_AA","ix_PIP","ix_DIP",
+                    "md_MCP_FE","md_MCP_AA","md_PIP","md_DIP",
+                    "rg_MCP_FE","rg_MCP_AA","rg_PIP","rg_DIP",
+                    "pk_CMC","pk_MCP_FE","pk_MCP_AA","pk_PIP","pk_DIP",
+                ]
+                for i, lbl in enumerate(labels):
+                    err = abs(fp[i] - ft[i])
+                    if err > 0.1:
+                        log(f"  ** {lbl}: actual={fp[i]:.3f} target={ft[i]:.3f} err={err:.3f}")
 
         env.step(action)
 

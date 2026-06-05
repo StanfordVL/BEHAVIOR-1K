@@ -77,41 +77,44 @@ class BridgeConfig:
     side: str = "right"                  # "left" | "right"
 
     # Arm IK target shaping.
-    workspace_min: tuple[float, float, float] = (-0.6, -0.3, 0.05)
-    workspace_max: tuple[float, float, float] = (0.6, 0.9, 1.20)
     position_sensitivity: float = 1.0
-    # WebXR is Y-up, -Z forward; rotate into OmniGibson world (Z-up). Default
-    # quat (xyzw) below maps user facing -Y of robot (the convention used by
-    # the original teleop). Re-tune if left/right or fwd/back feels swapped.
+    # --- Frame mapping (mirrors vr_sharpa_teleop's _YAW_FIX) ----------------
+    # WebXR local-floor is Y-up, -Z forward (the direction you faced entering
+    # VR), +X right. We rotate that into OmniGibson world (Z-up, +X arm-forward,
+    # +Y left) so your physical motion maps the same way as the controller path:
+    #   WebXR forward (-Z) -> robot +X (forward),  WebXR up (+Y) -> +Z (up),
+    #   WebXR right (+X)   -> robot -Y (right).
+    # This (0.5,-0.5,-0.5,0.5) = Rz(-90deg) o Rx(90deg); the old (0.7071,0,0,0.7071)
+    # had no yaw fix, which is why forward/back and left/right felt swapped.
     vr_to_world_quat_xyzw: tuple[float, float, float, float] = (
-        0.7071067811865476, 0.0, 0.0, 0.7071067811865476,
+        0.5, -0.5, -0.5, 0.5,
     )
 
-    # Orientation tracking mode:
-    #   "absolute": target_orn = orn_align × wrist_q_robot. EEF jumps to
-    #               match wrist orientation at t=0 and tracks 1:1 thereafter.
-    #               Use this when you want palm-down hand → palm-down robot.
-    #   "delta":    EEF stays at its current orientation at t=0; only wrist
-    #               deltas move it. Use when you want the EEF "anchored".
-    orientation_mode: str = "absolute"
-
-    # Constant alignment from the (vr_to_world-mapped) wrist orientation to
-    # the SharpaWave palm orientation. Applied as `orn_align × wrist_q`.
-    # The default is the YAML's teleop_rotation_offset (180° around X) which
-    # works for the OVXR controller convention, but the WebXR wrist axes
-    # may need a different value. Try presets in this order if palm-down on
-    # your hand doesn't produce palm-down on the robot:
-    #
-    #   identity:    (0.0,  0.0, 0.0, 1.0)
-    #   180° X:      (1.0,  0.0, 0.0, 0.0)   ← matches YAML teleop_rotation_offset
-    #   180° Y:      (0.0,  1.0, 0.0, 0.0)
-    #   180° Z:      (0.0,  0.0, 1.0, 0.0)
-    #   90° X:       (0.7071, 0.0, 0.0, 0.7071)
-    #   -90° X:      (-0.7071, 0.0, 0.0, 0.7071)
-    #   90° Z:       (0.0, 0.0, 0.7071, 0.7071)
+    # --- Orientation: first-frame calibration (mirrors vr_sharpa) -----------
+    # At the first valid frame we anchor the EEF orientation to
+    # `desired_start_quat_xyzw` (the SharpaWave "handshake" rest pose, same value
+    # as vr_sharpa_teleop's _DESIRED_START_QUAT), then track the wrist's deltas
+    # 1:1. No jump at t=0; "hand rotates left -> robot rotates left".
+    desired_start_quat_xyzw: tuple[float, float, float, float] = (
+        0.5, 0.5, 0.5, 0.5,
+    )
+    # Body-frame tweak applied to the mapped wrist before calibration (the
+    # analog of the YAML teleop_rotation_offset / vr_sharpa rotation presets).
+    # Identity by default — the calibration handles the rest-pose alignment, so
+    # this only nudges the tracking frame. Try 90/180deg presets if a hand
+    # rotation drives the wrist the wrong way.
     orn_align_quat_xyzw: tuple[float, float, float, float] = (
-        1.0, 0.0, 0.0, 0.0,   # default: 180° around X (matches YAML)
+        0.0, 0.0, 0.0, 1.0,   # identity
     )
+
+    # --- Reachable workspace (shoulder-sphere; mirrors vr_sharpa) -----------
+    # Base frame, shoulder at Z=1.194m. Clamp targets to a reach sphere + floor/
+    # ceiling + per-step rate limit so IK never chases unreachable poses.
+    shoulder_pos: tuple[float, float, float] = (0.0, 0.0, 1.194)
+    shoulder_reach: float = 0.80
+    z_min: float = 0.82
+    z_max: float = 1.75
+    max_pos_step: float = 0.02
 
     # Pinky skip — same as vr_sharpa_teleop: the chain runaway in PhysX
     # makes pinky unstable, so leave it at zero regardless of retargeter
@@ -156,6 +159,30 @@ def _xyzw_to_wxyz(q):
     return np.array([q[3], q[0], q[1], q[2]])
 
 
+def _quat_inv_wxyz(q):
+    """Inverse (conjugate, assuming unit) of a wxyz quaternion."""
+    return np.array([q[0], -q[1], -q[2], -q[3]])
+
+
+def _clamp_to_workspace_sphere(pos, cfg, prev_pos=None):
+    """Clamp a base-frame target to the Franka reach (mirrors vr_sharpa's
+    _clamp_to_workspace): floor/ceiling, a shoulder-centered reach sphere, and a
+    per-step rate limit so the Jacobian IK stays stable. numpy in/out."""
+    shoulder = np.asarray(cfg.shoulder_pos, dtype=float)
+    clamped = np.asarray(pos, dtype=float).copy()
+    clamped[2] = float(np.clip(clamped[2], cfg.z_min, cfg.z_max))
+    to_shoulder = clamped - shoulder
+    dist = float(np.linalg.norm(to_shoulder))
+    if dist > cfg.shoulder_reach:
+        clamped = shoulder + to_shoulder * (cfg.shoulder_reach / dist)
+    if prev_pos is not None:
+        delta = clamped - prev_pos
+        dn = float(np.linalg.norm(delta))
+        if dn > cfg.max_pos_step:
+            clamped = prev_pos + delta * (cfg.max_pos_step / dn)
+    return clamped
+
+
 class OGBridge:
     """Owns the per-tick WebXR-to-OmniGibson translation."""
 
@@ -193,22 +220,12 @@ class OGBridge:
         self._anchor_armed = True   # set by run loop on space-press / startup
         self._calibrated = False
         self._teleop_pos_offset: Optional[np.ndarray] = None  # eef base-frame ref - first vr_pos
-        # Orientation calibration uses *world-space delta of the YAML-aligned
-        # wrist*. At first valid frame:
-        #     mapped_wrist_first = wrist_q_robot × q_yaml_offset
-        #     _eef_q_at_anchor   = eef_rel_quat               (snapshot)
-        #     _mapped_wrist_first_inv = inv(mapped_wrist_first)
-        # Per frame:
-        #     mapped_wrist_now = wrist_q_robot × q_yaml_offset
-        #     delta_world      = mapped_wrist_now × _mapped_wrist_first_inv
-        #     target_orn       = delta_world × _eef_q_at_anchor
-        # → at t=0 target_orn == eef_rel_quat (no jump); at t>0 the EEF
-        #   rotates with the same world-space delta as the user's hand,
-        #   with the YAML's `teleop_rotation_offset` baked in to handle
-        #   the wrist-vs-palm convention difference (avoids the 180° flip).
-        self._eef_q_at_anchor_wxyz: Optional[np.ndarray] = None
-        self._mapped_wrist_first_inv_wxyz: Optional[np.ndarray] = None
-        self._first_vr_pos_robot: Optional[np.ndarray] = None
+        # Orientation calibration (mirrors vr_sharpa compute_calibrated_arm_action):
+        # at the first valid frame, _teleop_orn_offset = desired_start ⊗ inv(mapped_wrist),
+        # then target_orn = _teleop_orn_offset ⊗ mapped_wrist. → at t=0 the EEF is at
+        # desired_start_quat (handshake); afterward it tracks the wrist's delta.
+        self._teleop_orn_offset_wxyz: Optional[np.ndarray] = None
+        self._prev_target_pos: Optional[np.ndarray] = None   # for the rate limiter
         self._home_eef_pose_robot: Optional[tuple[np.ndarray, np.ndarray]] = None
 
         # Arm name and gripper action index.
@@ -223,9 +240,8 @@ class OGBridge:
         self._anchor_armed = True
         self._calibrated = False
         self._teleop_pos_offset = None
-        self._eef_q_at_anchor_wxyz = None
-        self._mapped_wrist_first_inv_wxyz = None
-        self._first_vr_pos_robot = None
+        self._teleop_orn_offset_wxyz = None
+        self._prev_target_pos = None
 
     # ------------------------------------------------------------------
     def step(self, vr_payload: dict, fallback_close: float = 0.0) -> th.Tensor:
@@ -287,51 +303,25 @@ class OGBridge:
                 )
 
             target_pos = wrist_xyz_robot + self._teleop_pos_offset
-            # Workspace clamp in robot base frame — identical idea to
-            # arm_ik.py's `workspace_box`, prevents IK from chasing
-            # unreachable targets when the user moves out of range.
-            lo = np.asarray(self.cfg.workspace_min, dtype=float)
-            hi = np.asarray(self.cfg.workspace_max, dtype=float)
-            target_pos = np.clip(target_pos, lo, hi)
+            # Workspace clamp: shoulder-reach sphere + floor/ceiling + per-step
+            # rate limit, identical to vr_sharpa_teleop's _clamp_to_workspace.
+            target_pos = _clamp_to_workspace_sphere(
+                target_pos, self.cfg, prev_pos=self._prev_target_pos
+            )
+            self._prev_target_pos = target_pos.copy()
 
-            # Orientation: absolute or delta tracking, controlled by config.
-            #
-            #   absolute (default): target_orn = orn_align × wrist_q_robot
-            #     - EEF jumps at t=0 to align with the user's wrist
-            #     - 1:1 tracking after that
-            #     - "palm-down user → palm-down robot" if orn_align is right
-            #
-            #   delta: target_orn = (mapped_now × inv(mapped_first)) × eef_q_anchor
-            #     - EEF stays at its home pose at t=0 (no jump)
-            #     - World-space delta of wrist applied to home
-            #
-            # `orn_align_quat_xyzw` from config replaces the YAML's
-            # `teleop_rotation_offset` (which was tuned for the OpenXR
-            # controller convention, not WebXR wrist). Try the presets in the
-            # config docstring if palm-down doesn't produce palm-down.
-            orn_align_xyzw = np.asarray(self.cfg.orn_align_quat_xyzw, dtype=float)
-            orn_align_wxyz = _xyzw_to_wxyz(orn_align_xyzw)
-
-            if self.cfg.orientation_mode == "absolute":
-                # target_orn = orn_align × wrist_q_robot   (left-multiply: outer rotation in world)
-                final_q_wxyz = _quat_mul_wxyz(orn_align_wxyz, wrist_q_robot_wxyz)
-            else:
-                # delta mode (with orn_align baked into the mapped wrist)
-                mapped_wrist_q_wxyz = _quat_mul_wxyz(orn_align_wxyz, wrist_q_robot_wxyz)
-                eef_rel_quat_wxyz = _xyzw_to_wxyz(eef_rel_quat.numpy())
-                if self._eef_q_at_anchor_wxyz is None:
-                    self._eef_q_at_anchor_wxyz = eef_rel_quat_wxyz.copy()
-                    self._mapped_wrist_first_inv_wxyz = np.array([
-                        mapped_wrist_q_wxyz[0],
-                        -mapped_wrist_q_wxyz[1],
-                        -mapped_wrist_q_wxyz[2],
-                        -mapped_wrist_q_wxyz[3],
-                    ])
-                delta_world_wxyz = _quat_mul_wxyz(
-                    mapped_wrist_q_wxyz, self._mapped_wrist_first_inv_wxyz,
+            # Orientation: first-frame calibration anchored to desired_start_quat,
+            # then track the wrist's delta — same algorithm as vr_sharpa's
+            # compute_calibrated_arm_action. orn_align is a body-frame tweak
+            # baked into the mapped wrist (the teleop_rotation_offset analog).
+            orn_align_wxyz = _xyzw_to_wxyz(np.asarray(self.cfg.orn_align_quat_xyzw, dtype=float))
+            mapped_wrist_wxyz = _quat_mul_wxyz(wrist_q_robot_wxyz, orn_align_wxyz)
+            if self._teleop_orn_offset_wxyz is None:
+                desired_wxyz = _xyzw_to_wxyz(np.asarray(self.cfg.desired_start_quat_xyzw, dtype=float))
+                self._teleop_orn_offset_wxyz = _quat_mul_wxyz(
+                    desired_wxyz, _quat_inv_wxyz(mapped_wrist_wxyz)
                 )
-                final_q_wxyz = _quat_mul_wxyz(delta_world_wxyz, self._eef_q_at_anchor_wxyz)
-
+            final_q_wxyz = _quat_mul_wxyz(self._teleop_orn_offset_wxyz, mapped_wrist_wxyz)
             final_q_xyzw = _wxyz_to_xyzw(final_q_wxyz)
 
             action[:3] = th.tensor(target_pos, dtype=th.float32)
