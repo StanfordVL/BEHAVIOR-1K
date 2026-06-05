@@ -1,17 +1,34 @@
 #!/bin/bash
 #SBATCH --job-name=replay_data_sc
-#SBATCH --account=sc-loprio
-#SBATCH --partition=sc-loprio
+#SBATCH --account=svl
+#SBATCH --partition=svl,sc-loprio
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:titanrtx:1
 #SBATCH --mem=80G
 #SBATCH --cpus-per-task=12
 #SBATCH --time=1-00:00:00
 #SBATCH --requeue
-#SBATCH --output=/vision/u/wsai/BEHAVIOR-1K/outputs/sc/replay_data/%x-%j.out
-#SBATCH --error=/vision/u/wsai/BEHAVIOR-1K/outputs/sc/replay_data/%x-%j.err
+#SBATCH --output=/vision/u/%u/BEHAVIOR-1K/outputs/sc/replay_data/%x-%j.out
+#SBATCH --error=/vision/u/%u/BEHAVIOR-1K/outputs/sc/replay_data/%x-%j.err
 
 set -euo pipefail
+umask 0002
+
+ensure_shared_permissions() {
+  local path
+  local resolved
+  for path in "$@"; do
+    [[ -e "$path" ]] || continue
+    resolved="$(realpath -m "$path")"
+    case "$resolved" in
+      /vision/group/behavior|/vision/group/behavior/*)
+        chgrp -R behavior "$resolved" || true
+        chmod -R g+rwX "$resolved" || true
+        find "$resolved" -type d -exec chmod g+s {} + || true
+        ;;
+    esac
+  done
+}
 
 usage() {
   cat <<'EOF'
@@ -109,9 +126,11 @@ MARKER_DIR="${LEROBOT_ROOT_DIR}/.replay_status/${TASK_NAME}/shard-${SHARD_ID}"
 RUNNING_MARKER="${MARKER_DIR}/running"
 COMPLETE_MARKER="${MARKER_DIR}/complete"
 FAILED_MARKER="${MARKER_DIR}/failed"
+LEROBOT_OUTPUT_DIR="${LEROBOT_ROOT_DIR}/${LEROBOT_REPO_ID}"
 
-mkdir -p "/vision/u/wsai/BEHAVIOR-1K/outputs/sc/replay_data"
+mkdir -p "/vision/u/${USER}/BEHAVIOR-1K/outputs/sc/replay_data"
 mkdir -p "$MARKER_DIR"
+ensure_shared_permissions "$MARKER_DIR"
 
 echo "SLURM_JOBID=${SLURM_JOB_ID:-}"
 echo "SLURM_JOB_NAME=${SLURM_JOB_NAME:-}"
@@ -142,6 +161,7 @@ mark_failed() {
     echo "time=$(date --iso-8601=seconds)"
   } > "$FAILED_MARKER"
   rm -f "$RUNNING_MARKER"
+  ensure_shared_permissions "$MARKER_DIR" "$LEROBOT_OUTPUT_DIR"
   exit "$exit_code"
 }
 trap mark_failed ERR TERM INT
@@ -186,6 +206,7 @@ cd "$REPO_ROOT"
   echo "demo_ids=${DEMO_IDS}"
 } > "$RUNNING_MARKER"
 rm -f "$FAILED_MARKER"
+ensure_shared_permissions "$MARKER_DIR"
 
 IFS=',' read -r -a DEMO_ID_ARRAY <<< "$DEMO_IDS"
 FIRST_DEMO=1
@@ -220,5 +241,6 @@ done
   echo "demo_ids=${DEMO_IDS}"
 } > "$COMPLETE_MARKER"
 rm -f "$RUNNING_MARKER" "$FAILED_MARKER"
+ensure_shared_permissions "$MARKER_DIR" "$LEROBOT_OUTPUT_DIR"
 
 echo "Shard finished successfully."

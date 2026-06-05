@@ -12,6 +12,24 @@ from pathlib import Path
 from lerobot.datasets.aggregate import aggregate_datasets
 
 
+def ensure_shared_permissions(path: Path) -> None:
+    resolved = path.resolve()
+    try:
+        resolved.relative_to("/vision/group/behavior")
+    except ValueError:
+        return
+
+    shutil.chown(resolved, group="behavior")
+    for child in resolved.rglob("*"):
+        shutil.chown(child, group="behavior")
+        mode = child.stat().st_mode
+        if child.is_dir():
+            child.chmod(mode | 0o2770)
+        else:
+            child.chmod(mode | 0o660)
+    resolved.chmod(resolved.stat().st_mode | 0o2770)
+
+
 def load_task_mapping(data_root: Path) -> dict[str, int]:
     task_mapping = {}
     for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
@@ -86,9 +104,11 @@ def aggregate_task(args: argparse.Namespace, task_name: str) -> None:
         data_files_size_in_mb=args.data_files_size_in_mb,
         video_files_size_in_mb=args.video_files_size_in_mb,
     )
+    ensure_shared_permissions(output_root)
 
 
 def main() -> None:
+    os.umask(0o002)
     default_repo_root = Path(__file__).resolve().parents[3]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo_root", default=str(default_repo_root))
