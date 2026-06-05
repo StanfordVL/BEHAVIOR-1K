@@ -190,7 +190,6 @@ def replay_hdf5_file(
 def main():
     parser = argparse.ArgumentParser(description="Replay HDF5 files and save data")
     parser.add_argument("--data_folder", type=str, required=True, help="Path to the data folder")
-    parser.add_argument("--data_url", type=str, default="", required=False, help="URL to raw data")
     parser.add_argument("--demo_id", type=int, required=True, help="Demo ID to process")
     parser.add_argument(
         "--output_format",
