@@ -176,7 +176,6 @@ class BehaviorTask(BaseTask):
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
         # PredicateGoal calls check_goal_fn(env_idx); thread env_idx through to the predicate evaluator
         # so the (singular) compiled task evaluates against the right env's object_scope binding.
-        # TODO(vector): This needs to be extensively tested.
         terminations["predicate"] = PredicateGoal(
             check_goal_fn=lambda env_idx: self.compiled_task.check_goal(
                 lambda predicate_name, *entities: self._evaluate_predicate(env_idx, predicate_name, *entities)

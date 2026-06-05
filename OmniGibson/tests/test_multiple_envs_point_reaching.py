@@ -5,23 +5,10 @@ import omnigibson as og
 
 from utils import (
     MULTI_ENV_ROBOTS,
-    multi_env_progress,
-    multi_env_passed,
     setup_multi_environment,
 )
 
 TASK_TYPE = "PointReachingTask"
-
-# Test counter for progress tracking
-_test_counter = {"current": 0, "total": 16}
-
-
-def _progress(test_name):
-    multi_env_progress(test_name, _test_counter)
-
-
-def _passed(test_name):
-    multi_env_passed(test_name)
 
 
 # ===================================================================
@@ -35,8 +22,6 @@ class TestTaskTensors:
 
     def test_task_step_tensors(self, robot):
         """Task reward / done / success are (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_task_step_tensors[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
 
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
@@ -52,12 +37,9 @@ class TestTaskTensors:
         assert env.task.done.shape == (num_envs,)
         assert env.task.success.shape == (num_envs,)
         og.clear()
-        _passed(test_id)
 
     def test_reward_tensor_returns(self, robot):
         """Reward functions return (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_reward_tensor_returns[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
@@ -73,12 +55,9 @@ class TestTaskTensors:
                 num_envs,
             ), f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
         og.clear()
-        _passed(test_id)
 
     def test_termination_tensor_returns(self, robot):
         """Termination conditions return (num_envs,) bool tensors."""
-        test_id = f"TestTaskTensors::test_termination_tensor_returns[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
@@ -95,7 +74,6 @@ class TestTaskTensors:
             ), f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
             assert tc._done.dtype == th.bool
         og.clear()
-        _passed(test_id)
 
 
 # ===================================================================
@@ -109,8 +87,6 @@ class TestNavigationTasks:
 
     def test_multi_step_and_goal_shape(self, robot):
         """Run a few steps and verify goal positions exist per env."""
-        test_id = f"TestNavigationTasks::test_multi_step_and_goal_shape[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
@@ -130,4 +106,3 @@ class TestNavigationTasks:
             print(f"  env {env_idx} goal_pos={goal}")
             assert goal.shape == (3,)
         og.clear()
-        _passed(test_id)

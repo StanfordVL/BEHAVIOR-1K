@@ -7,23 +7,10 @@ from utils import (
     MULTI_ENV_ROBOTS,
     _init_multi_env_macros,
     multi_env_task_cfg,
-    multi_env_progress,
-    multi_env_passed,
     setup_multi_environment,
 )
 
 TASK_TYPE = "GraspTask"
-
-# Test counter for progress tracking
-_test_counter = {"current": 0, "total": 16}
-
-
-def _progress(test_name):
-    multi_env_progress(test_name, _test_counter)
-
-
-def _passed(test_name):
-    multi_env_passed(test_name)
 
 
 # ===================================================================
@@ -37,8 +24,6 @@ class TestTaskTensors:
 
     def test_task_step_tensors(self, robot):
         """Task reward / done / success are (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_task_step_tensors[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
 
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
@@ -54,12 +39,9 @@ class TestTaskTensors:
         assert env.task.done.shape == (num_envs,)
         assert env.task.success.shape == (num_envs,)
         og.clear()
-        _passed(test_id)
 
     def test_reward_tensor_returns(self, robot):
         """Reward functions return (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_reward_tensor_returns[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
@@ -75,12 +57,9 @@ class TestTaskTensors:
                 num_envs,
             ), f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
         og.clear()
-        _passed(test_id)
 
     def test_termination_tensor_returns(self, robot):
         """Termination conditions return (num_envs,) bool tensors."""
-        test_id = f"TestTaskTensors::test_termination_tensor_returns[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
@@ -97,7 +76,6 @@ class TestTaskTensors:
             ), f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
             assert tc._done.dtype == th.bool
         og.clear()
-        _passed(test_id)
 
 
 # ===================================================================
@@ -111,8 +89,6 @@ class TestGraspTask:
 
     def test_grasp_task_precached_reset(self, robot):
         """GraspTask resets correctly using precached_reset_pose_path."""
-        test_id = f"TestGraspTask::test_grasp_task_precached_reset[{robot}]"
-        _progress(test_id)
         num_envs = 2
 
         _init_multi_env_macros()
@@ -140,4 +116,3 @@ class TestGraspTask:
         # Reset again to verify repeated resets work
         env.reset()
         og.clear()
-        _passed(test_id)

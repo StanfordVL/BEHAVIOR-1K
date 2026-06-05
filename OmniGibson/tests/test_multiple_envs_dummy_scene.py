@@ -9,21 +9,8 @@ from omnigibson.utils.transform_utils import quat_multiply
 
 from utils import (
     MULTI_ENV_ROBOTS,
-    multi_env_progress,
-    multi_env_passed,
     setup_multi_environment,
 )
-
-# Test counter for progress tracking
-_test_counter = {"current": 0, "total": 18}
-
-
-def _progress(test_name):
-    multi_env_progress(test_name, _test_counter)
-
-
-def _passed(test_name):
-    multi_env_passed(test_name)
 
 
 # ===================================================================
@@ -35,7 +22,6 @@ class TestSceneCoordinates:
     """Multi-scene position/orientation and state dump/load tests."""
 
     def test_multi_scene_dump_load_states(self):
-        _progress("TestSceneCoordinates::test_multi_scene_dump_load_states")
         env = setup_multi_environment(3)
         robot_0 = env.scenes[0].robots[0]
         robot_1 = env.scenes[1].robots[0]
@@ -101,10 +87,8 @@ class TestSceneCoordinates:
         assert th.allclose(initial_robot_pos_scene_2[1], post_robot_pos_scene_2[1], atol=1e-3)
 
         og.clear()
-        _passed("TestSceneCoordinates::test_multi_scene_dump_load_states")
 
     def test_multi_scene_get_local_position(self):
-        _progress("TestSceneCoordinates::test_multi_scene_get_local_position")
         env = setup_multi_environment(3)
 
         robot_1_pos_local = env.scenes[1].robots[0].get_position_orientation(frame="scene")[0]
@@ -115,10 +99,8 @@ class TestSceneCoordinates:
         print(f"  local={robot_1_pos_local}, global={robot_1_pos_global}, scene_origin={pos_scene}")
         assert th.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
         og.clear()
-        _passed("TestSceneCoordinates::test_multi_scene_get_local_position")
 
     def test_multi_scene_set_local_position(self):
-        _progress("TestSceneCoordinates::test_multi_scene_set_local_position")
         env = setup_multi_environment(3)
 
         robot = env.scenes[1].robots[0]
@@ -149,10 +131,8 @@ class TestSceneCoordinates:
         ), f"Global position change {global_pos_change} does not match expected change {expected_change}"
 
         og.clear()
-        _passed("TestSceneCoordinates::test_multi_scene_set_local_position")
 
     def test_multi_scene_scene_prim(self):
-        _progress("TestSceneCoordinates::test_multi_scene_scene_prim")
         env = setup_multi_environment(1)
         original_robot_pos = env.scenes[0].robots[0].get_position_orientation()[0]
         scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
@@ -166,10 +146,8 @@ class TestSceneCoordinates:
         assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-2)
 
         og.clear()
-        _passed("TestSceneCoordinates::test_multi_scene_scene_prim")
 
     def test_multi_scene_position_orientation_relative_to_scene(self):
-        _progress("TestSceneCoordinates::test_multi_scene_position_orientation_relative_to_scene")
         env = setup_multi_environment(3)
 
         robot = env.scenes[1].robots[0]
@@ -202,7 +180,6 @@ class TestSceneCoordinates:
         ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
 
         og.clear()
-        _passed("TestSceneCoordinates::test_multi_scene_position_orientation_relative_to_scene")
 
 
 # ===================================================================
@@ -215,8 +192,6 @@ class TestRobotGetterSetter:
     """Position/orientation getter and setter correctness across robots."""
 
     def test_getter(self, robot):
-        test_id = f"TestRobotGetterSetter::test_getter[{robot}]"
-        _progress(test_id)
         env = setup_multi_environment(2, robot=robot)
         robot1 = env.scenes[0].robots[0]
 
@@ -243,11 +218,8 @@ class TestRobotGetterSetter:
         assert th.allclose(robot2_world_orientation, combined_orientation, atol=1e-3)
 
         og.clear()
-        _passed(test_id)
 
     def test_setter(self, robot):
-        test_id = f"TestRobotGetterSetter::test_setter[{robot}]"
-        _progress(test_id)
         env = setup_multi_environment(2, robot=robot)
 
         robot_obj = env.scenes[1].robots[0]
@@ -282,12 +254,9 @@ class TestRobotGetterSetter:
         assert not th.allclose(got_world_ori2, new_world_ori, atol=1e-3)
 
         og.clear()
-        _passed(test_id)
 
     def test_setter_sim_stopped(self, robot):
         """Getter/setter should work even when the simulator is stopped."""
-        test_id = f"TestRobotGetterSetter::test_setter_sim_stopped[{robot}]"
-        _progress(test_id)
         env = setup_multi_environment(2, robot=robot)
         og.sim.stop()
         print("  Sim stopped")
@@ -325,7 +294,6 @@ class TestRobotGetterSetter:
         assert not th.allclose(got_world_ori2, new_world_ori, atol=1e-3)
 
         og.clear()
-        _passed(test_id)
 
 
 # ===================================================================
@@ -335,7 +303,6 @@ class TestRobotGetterSetter:
 
 class TestParticles:
     def test_multi_scene_particle_source(self):
-        _progress("TestParticles::test_multi_scene_particle_source")
         sink_cfg = dict(
             type="DatasetObject",
             name="sink",
@@ -370,4 +337,3 @@ class TestParticles:
             og.sim.step()
 
         og.clear()
-        _passed("TestParticles::test_multi_scene_particle_source")
