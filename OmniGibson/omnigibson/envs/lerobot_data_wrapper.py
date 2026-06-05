@@ -372,6 +372,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
         load_room_instances: list[str] | None = None,
         include_robot_control: bool = True,
         include_contacts: bool = True,
+        batch_state_load: bool = False,
         root_dir: str = HF_LEROBOT_HOME,
         robot_type: str | None = None,
         task_name: str | None = None,
@@ -397,6 +398,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
             load_room_instances (None or str): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
+            batch_state_load (bool): Whether to batch nested USD edits during replay state loads so Fabric is synced
+                once per restored frame instead of once per prim setter.
             root_dir (str): Root directory to store output dataset files
             robot_type (None or str): Name of the robot within this dataset. If not specified, will be inferred
                 from environment
@@ -417,6 +420,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
+            batch_state_load=batch_state_load,
             root_dir=root_dir,
             robot_type=robot_type,
             task_name=task_name,

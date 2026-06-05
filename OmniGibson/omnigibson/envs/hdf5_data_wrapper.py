@@ -623,6 +623,7 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
         load_room_instances: list[str] | None = None,
         include_robot_control: bool = True,
         include_contacts: bool = True,
+        batch_state_load: bool = False,
         compression: dict | None = None,
     ):
         """
@@ -645,6 +646,8 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
             load_room_instances (None or str): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
+            batch_state_load (bool): Whether to batch nested USD edits during replay state loads so Fabric is synced
+                once per restored frame instead of once per prim setter.
             compression (None or dict): If specified, the compression arguments to use for the hdf5 file.
         """
         if flush_every_n_steps > 0:
@@ -665,6 +668,7 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
+            batch_state_load=batch_state_load,
             compression=compression,
         )
 

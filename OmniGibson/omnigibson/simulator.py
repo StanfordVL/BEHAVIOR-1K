@@ -446,6 +446,7 @@ def _launch_simulator(*args, **kwargs):
 
             # USD edit guard: detects edits outside editing_usd() context
             self._editing_usd = False
+            self._allow_nested_usd_edits = False
             self._editing_usd_caller = None
             self._in_sim_lifecycle = 0
             self._deferred_usd_guard_error = None
@@ -1560,9 +1561,9 @@ def _launch_simulator(*args, **kwargs):
             to Fabric (via SynchronizeToFabric) when the block exits, so that code immediately
             after the block can rely on Fabric being up to date.
 
-            This context MUST NOT be nested — opening an editing_usd() context while another is
-            already open will raise an error. All USD edits within a single logical operation
-            should be in one context.
+            This context MUST NOT be nested directly — opening an editing_usd() context while another is
+            already open will raise an error. All USD edits within a single logical operation should be in one context.
+            Use batched_usd_edits() for the rare case where nested lower-level setters need to share one outer sync.
 
             A guard (enabled after simulator init) detects any USD edits that occur outside this
             context and raises a RuntimeError with a full backtrace.
@@ -1579,6 +1580,9 @@ def _launch_simulator(*args, **kwargs):
                 yield
                 return
 
+            if self._editing_usd and self._allow_nested_usd_edits:
+                yield
+                return
             caller = traceback.extract_stack(limit=3)[0]
             assert not self._editing_usd, (
                 f"Cannot nest editing_usd() contexts. All USD edits for a logical operation "
@@ -1595,6 +1599,23 @@ def _launch_simulator(*args, **kwargs):
                 self._editing_usd = False
                 self._editing_usd_caller = None
                 self.usdrt_stage.SynchronizeToFabric()
+
+        @contextlib.contextmanager
+        def batched_usd_edits(self):
+            """
+            Batch nested USD edits into a single Fabric synchronization.
+
+            This is useful for state replay, where many low-level setters each wrap their USD writes in editing_usd().
+            The outer context keeps the USD edit guard active while deferring Fabric sync until all nested edits finish.
+            """
+            assert not self._editing_usd, "Cannot start batched_usd_edits() while another editing_usd() context is open"
+            old_allow_nested_usd_edits = self._allow_nested_usd_edits
+            self._allow_nested_usd_edits = True
+            try:
+                with self.editing_usd():
+                    yield
+            finally:
+                self._allow_nested_usd_edits = old_allow_nested_usd_edits
 
         def _enable_usd_guard(self):
             """Enable the guard that detects USD edits outside editing_usd() context."""

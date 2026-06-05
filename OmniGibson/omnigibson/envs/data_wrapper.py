@@ -277,6 +277,7 @@ class DataPlaybackWrapper(DataWrapper):
         include_task_obs: bool = True,
         include_robot_control: bool = True,
         include_contacts: bool = True,
+        batch_state_load: bool = False,
         load_room_instances: list[str] | None = None,
         **kwargs,
     ) -> "DataPlaybackWrapper":
@@ -331,6 +332,8 @@ class DataPlaybackWrapper(DataWrapper):
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all
                 objects to be visual_only
+            batch_state_load (bool): Whether to batch nested USD edits during replay state loads so Fabric is synced
+                once per restored frame instead of once per prim setter.
             load_room_instances (None or list of str): If specified, list of room instance names to load during
                 playback
             kwargs (dict): Any remaining keyword arguments to pass into class constructor
@@ -433,6 +436,7 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
+            batch_state_load=batch_state_load,
             **kwargs,
         )
 
@@ -450,6 +454,7 @@ class DataPlaybackWrapper(DataWrapper):
         load_room_instances: list[str] | None = None,
         include_robot_control: bool = True,
         include_contacts: bool = True,
+        batch_state_load: bool = False,
         **kwargs,
     ):
         """
@@ -472,6 +477,8 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances (None or list[str]): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
+            batch_state_load (bool): Whether to batch nested USD edits during replay state loads so Fabric is synced
+                once per restored frame instead of once per prim setter.
             kwargs (dict): Arguments to pass to super class
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
@@ -515,6 +522,7 @@ class DataPlaybackWrapper(DataWrapper):
         self.current_episode_id = None
         self.include_robot_control = include_robot_control
         self.include_contacts = include_contacts
+        self.batch_state_load = batch_state_load
 
         self.video_writers = []
         self.video_output_dir = os.path.dirname(output_path)
@@ -583,6 +591,13 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["terminated"] = terminated
         step_data["truncated"] = truncated
         return step_data
+
+    def _load_replay_state(self, state: th.Tensor) -> None:
+        if self.batch_state_load:
+            with og.sim.batched_usd_edits():
+                og.sim.load_state(state, serialized=True)
+        else:
+            og.sim.load_state(state, serialized=True)
 
     def playback_episode(
         self,
@@ -658,7 +673,7 @@ class DataPlaybackWrapper(DataWrapper):
                         )
 
         # Restore to initial state
-        og.sim.load_state(state[0, : int(state_size[0])], serialized=True)
+        self._load_replay_state(state[0, : int(state_size[0])])
         # take one sim step to propagate
         og.sim.step()
 
@@ -682,7 +697,7 @@ class DataPlaybackWrapper(DataWrapper):
                 log.info(f"Playing back episode {episode_id}, step {i}/{len(action)}")
             # Restore the sim state, and take a very small step with the action to make sure physics are
             # properly propagated after the sim state update
-            og.sim.load_state(s[: int(ss)], serialized=True)
+            self._load_replay_state(s[: int(ss)])
             if not self.include_contacts:
                 # When all objects/systems are visual-only, keep them still on every step
                 for obj in self.scene.objects:

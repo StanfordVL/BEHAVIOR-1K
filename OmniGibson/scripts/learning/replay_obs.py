@@ -107,6 +107,7 @@ def replay_hdf5_file(
         robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
         robot_obs_modalities=["proprio", "rgb", "depth_linear"],
         include_contacts=False,
+        batch_state_load=True,
     )
 
     if output_format == "hdf5":
