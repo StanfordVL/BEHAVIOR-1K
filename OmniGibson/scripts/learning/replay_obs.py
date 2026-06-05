@@ -4,8 +4,8 @@ import omnigibson as og
 import os
 import yaml
 from omnigibson.envs import HDF5PlaybackWrapper, LeRobotPlaybackWrapper
-from omnigibson.learning.utils.dataset_utils import makedirs_with_mode
-from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES
+from omnigibson.eval.utils.dataset_utils import makedirs_with_mode
+from omnigibson.eval.utils.eval_utils import PROPRIOCEPTION_INDICES
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -168,6 +168,7 @@ def replay_hdf5_file(
             overwrite=overwrite_lerobot,
             robot_type="R1Pro",
             task_name=task_name,
+            include_task_obs=False,
         )
         env = LeRobotPlaybackWrapper.create_from_hdf5(**kwargs)
 
