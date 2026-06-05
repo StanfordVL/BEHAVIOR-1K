@@ -1,6 +1,6 @@
 from omnigibson.envs import EnvironmentWrapper, Environment
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.learning.utils.eval_utils import ROBOT_CAMERA_NAMES
+from omnigibson.eval.utils.eval_utils import ROBOT_CAMERA_NAMES
 
 
 # Create module logger
@@ -20,10 +20,12 @@ class RGBLowResWrapper(EnvironmentWrapper):
         robot = env.robots[0]
         for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
             sensor_name = camera_name.split("::")[1]
+            sensor = robot.sensors[sensor_name]
             if camera_id == "head":
-                robot.sensors[sensor_name].horizontal_aperture = 40.0  # this is what we used in data collection
-            robot.sensors[sensor_name].image_height = 224
-            robot.sensors[sensor_name].image_width = 224
-        # reload observation space
-        env.load_observation_space()
-        logger.info("Reloaded observation space!")
+                sensor.horizontal_aperture = 40.0  # this is what we used in data collection
+            sensor.image_height = 224
+            sensor.image_width = 224
+            sensor_space = sensor.load_observation_space()
+            if env.observation_space is not None:
+                env.observation_space.spaces[robot.name].spaces[sensor_name] = sensor_space
+        logger.info("Reloaded camera observation spaces!")

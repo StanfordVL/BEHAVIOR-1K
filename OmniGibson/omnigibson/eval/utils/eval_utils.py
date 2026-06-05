@@ -1,5 +1,8 @@
+import csv
+import os
 import numpy as np
 from collections import OrderedDict
+from omnigibson.macros import gm
 
 
 ROBOT_CAMERA_NAMES = {
@@ -9,6 +12,24 @@ ROBOT_CAMERA_NAMES = {
         "head": "robot_r1::robot_r1:zed_link:Camera:0",
     },
 }
+
+HEAD_RESOLUTION = (720, 720)
+WRIST_RESOLUTION = (480, 480)
+
+
+def _load_challenge_task_ids() -> dict[str, int]:
+    task_ids = {}
+    for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
+        task_misc_path = os.path.join(gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", filename)
+        if not os.path.exists(task_misc_path):
+            continue
+        with open(task_misc_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                task_ids[row["Task"]] = int(row["Task ID"])
+    return task_ids
+
+
+TASK_NAMES_TO_INDICES = _load_challenge_task_ids()
 
 # Camera parameteres
 CAMERA_INTRINSICS = {

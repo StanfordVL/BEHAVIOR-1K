@@ -10,7 +10,7 @@ import omnigibson as og
 from omnigibson.controllers import ControllerView, ControlType
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
-from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
+from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm, macros
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.data_utils import merge_scene_files

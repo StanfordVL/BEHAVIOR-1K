@@ -3,7 +3,7 @@ import csv
 import json
 import os
 from omnigibson.macros import gm
-from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
+from omnigibson.eval.utils.eval_utils import TASK_NAMES_TO_INDICES
 
 
 def sanity_check_filename(input_dir: str) -> None:

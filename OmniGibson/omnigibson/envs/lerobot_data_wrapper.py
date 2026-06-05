@@ -9,7 +9,7 @@ from lerobot.utils.constants import HF_LEROBOT_HOME
 import omnigibson.utils.transform_utils as T
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.data_wrapper import DataWrapper, DataPlaybackWrapper
-from omnigibson.learning.utils.obs_utils import DEPTH_SHIFT, MAX_DEPTH, MIN_DEPTH
+from omnigibson.eval.utils.obs_utils import DEPTH_SHIFT, MAX_DEPTH, MIN_DEPTH
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.tasks.behavior_task import BehaviorTask
 
