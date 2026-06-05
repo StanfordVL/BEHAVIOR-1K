@@ -5,23 +5,10 @@ import omnigibson as og
 
 from utils import (
     MULTI_ENV_ROBOTS,
-    multi_env_progress,
-    multi_env_passed,
     setup_multi_environment,
 )
 
 TASK_TYPE = "DummyTask"
-
-# Test counter for progress tracking
-_test_counter = {"current": 0, "total": 18}
-
-
-def _progress(test_name):
-    multi_env_progress(test_name, _test_counter)
-
-
-def _passed(test_name):
-    multi_env_passed(test_name)
 
 
 # ===================================================================
@@ -34,18 +21,15 @@ class TestEnvConstruction:
 
     def test_env_construction(self):
         """Environment with num_envs=3 creates 3 scenes."""
-        _progress("TestEnvConstruction::test_env_construction")
         env = setup_multi_environment(num_of_envs=3)
         assert len(env.scenes) == 3
         assert env.num_envs == 3
         for scene in env.scenes:
             assert len(scene.robots) == 1
         og.clear()
-        _passed("TestEnvConstruction::test_env_construction")
 
     def test_single_env_compat(self):
         """num_envs=1 (default) should still work; scene property returns first scene."""
-        _progress("TestEnvConstruction::test_single_env_compat")
         env = setup_multi_environment(num_of_envs=1)
         env.reset()
 
@@ -58,11 +42,9 @@ class TestEnvConstruction:
         assert rewards.shape == (1,)
         assert len(obs_list) == 1
         og.clear()
-        _passed("TestEnvConstruction::test_single_env_compat")
 
     def test_scenes_spatially_separated(self):
         """Each scene occupies a different spatial region (no overlap)."""
-        _progress("TestEnvConstruction::test_scenes_spatially_separated")
         num_envs = 3
         env = setup_multi_environment(num_of_envs=num_envs)
 
@@ -73,7 +55,6 @@ class TestEnvConstruction:
                 print(f"  Scene {i} <-> Scene {j} distance: {dist:.2f}")
                 assert dist > 1.0, f"Scenes {i} and {j} are too close: {dist:.2f}"
         og.clear()
-        _passed("TestEnvConstruction::test_scenes_spatially_separated")
 
 
 # ===================================================================
@@ -86,7 +67,6 @@ class TestStepAndReset:
 
     def test_step_return_shapes(self):
         """step() returns tensors of shape (num_envs,) for rewards/terminateds/truncateds."""
-        _progress("TestStepAndReset::test_step_return_shapes")
         num_envs = 3
         env = setup_multi_environment(num_of_envs=num_envs)
         env.reset()
@@ -104,11 +84,9 @@ class TestStepAndReset:
         assert truncateds.shape == (num_envs,) and truncateds.dtype == th.bool
         assert isinstance(infos, list) and len(infos) == num_envs
         og.clear()
-        _passed("TestStepAndReset::test_step_return_shapes")
 
     def test_selective_reset(self):
         """Resetting env_indices=[1] only resets scene 1, leaving 0 and 2 unchanged."""
-        _progress("TestStepAndReset::test_selective_reset")
         num_envs = 3
         env = setup_multi_environment(num_of_envs=num_envs)
         env.reset()
@@ -127,11 +105,9 @@ class TestStepAndReset:
             pos_before, pos_after, atol=0.05
         ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
         og.clear()
-        _passed("TestStepAndReset::test_selective_reset")
 
     def test_per_env_step_counters(self):
         """episode_steps is a (num_envs,) tensor that tracks steps independently."""
-        _progress("TestStepAndReset::test_per_env_step_counters")
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs)
         env.reset()
@@ -152,7 +128,6 @@ class TestStepAndReset:
         assert env.episode_steps[0] == 0
         assert env.episode_steps[1] == 1
         og.clear()
-        _passed("TestStepAndReset::test_per_env_step_counters")
 
 
 # ===================================================================
@@ -166,8 +141,6 @@ class TestTaskTensors:
 
     def test_task_step_tensors(self, robot):
         """Task reward / done / success are (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_task_step_tensors[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
 
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
@@ -183,12 +156,9 @@ class TestTaskTensors:
         assert env.task.done.shape == (num_envs,)
         assert env.task.success.shape == (num_envs,)
         og.clear()
-        _passed(test_id)
 
     def test_reward_tensor_returns(self, robot):
         """Reward functions return (num_envs,) tensors."""
-        test_id = f"TestTaskTensors::test_reward_tensor_returns[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
@@ -204,12 +174,9 @@ class TestTaskTensors:
                 num_envs,
             ), f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
         og.clear()
-        _passed(test_id)
 
     def test_termination_tensor_returns(self, robot):
         """Termination conditions return (num_envs,) bool tensors."""
-        test_id = f"TestTaskTensors::test_termination_tensor_returns[{TASK_TYPE}-{robot}]"
-        _progress(test_id)
         num_envs = 2
         env = setup_multi_environment(num_of_envs=num_envs, robot=robot, task_type=TASK_TYPE)
         env.reset()
@@ -226,4 +193,3 @@ class TestTaskTensors:
             ), f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
             assert tc._done.dtype == th.bool
         og.clear()
-        _passed(test_id)
