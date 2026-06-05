@@ -277,6 +277,7 @@ class DataPlaybackWrapper(DataWrapper):
         include_task_obs: bool = True,
         include_robot_control: bool = True,
         include_contacts: bool = True,
+        keep_still_on_replay: bool = True,
         load_room_instances: list[str] | None = None,
         **kwargs,
     ) -> "DataPlaybackWrapper":
@@ -331,6 +332,8 @@ class DataPlaybackWrapper(DataWrapper):
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all
                 objects to be visual_only
+            keep_still_on_replay (bool): Whether to zero object/system velocities after each replay state load when
+                contacts are disabled.
             load_room_instances (None or list of str): If specified, list of room instance names to load during
                 playback
             kwargs (dict): Any remaining keyword arguments to pass into class constructor
@@ -433,6 +436,7 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
+            keep_still_on_replay=keep_still_on_replay,
             **kwargs,
         )
 
@@ -450,6 +454,7 @@ class DataPlaybackWrapper(DataWrapper):
         load_room_instances: list[str] | None = None,
         include_robot_control: bool = True,
         include_contacts: bool = True,
+        keep_still_on_replay: bool = True,
         **kwargs,
     ):
         """
@@ -472,6 +477,8 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances (None or list[str]): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
+            keep_still_on_replay (bool): Whether to zero object/system velocities after each replay state load when
+                contacts are disabled.
             kwargs (dict): Arguments to pass to super class
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
@@ -515,6 +522,7 @@ class DataPlaybackWrapper(DataWrapper):
         self.current_episode_id = None
         self.include_robot_control = include_robot_control
         self.include_contacts = include_contacts
+        self.keep_still_on_replay = keep_still_on_replay
 
         self.video_writers = []
         self.video_output_dir = os.path.dirname(output_path)
@@ -683,7 +691,7 @@ class DataPlaybackWrapper(DataWrapper):
             # Restore the sim state, and take a very small step with the action to make sure physics are
             # properly propagated after the sim state update
             og.sim.load_state(s[: int(ss)], serialized=True)
-            if not self.include_contacts:
+            if not self.include_contacts and self.keep_still_on_replay:
                 # When all objects/systems are visual-only, keep them still on every step
                 for obj in self.scene.objects:
                     obj.keep_still()

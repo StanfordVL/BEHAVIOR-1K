@@ -31,6 +31,7 @@ def replay_hdf5_file(
     demo_id: int,
     output_format: str,
     flush_every_n_steps: int,
+    keep_still_on_replay: bool,
 ) -> int:
     """
     Replays a single HDF5 file and saves data to the specified format.
@@ -107,6 +108,7 @@ def replay_hdf5_file(
         robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
         robot_obs_modalities=["proprio", "rgb", "depth_linear"],
         include_contacts=False,
+        keep_still_on_replay=keep_still_on_replay,
     )
 
     if output_format == "hdf5":
@@ -159,6 +161,11 @@ def main():
         help="Output format: hdf5, lerobot",
     )
     parser.add_argument("--flush_every_n_steps", type=int, default=1000, help="Flush data every N steps")
+    parser.add_argument(
+        "--skip_keep_still",
+        action="store_true",
+        help="Skip per-frame keep_still() calls when replay contacts are disabled",
+    )
     parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
     parser.add_argument("--row", type=int, required=False, help="Row number to update")
 
@@ -185,6 +192,7 @@ def main():
         demo_id=args.demo_id,
         output_format=args.output_format,
         flush_every_n_steps=args.flush_every_n_steps,
+        keep_still_on_replay=not args.skip_keep_still,
     )
 
     if args.update_sheet:
