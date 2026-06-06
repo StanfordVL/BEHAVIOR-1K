@@ -75,6 +75,25 @@ class VisionSensor(BaseSensor):
         "pointcloud",
     )
 
+    RAW_SENSOR_TYPES = dict(
+        rgb="rgb",
+        depth="distance_to_camera",
+        depth_linear="distance_to_image_plane",
+        normal="normals",
+        # Semantic segmentation shows the category each pixel belongs to
+        seg_semantic="semantic_segmentation",
+        # Instance segmentation shows the name of the object each pixel belongs to
+        seg_instance="instance_segmentation",
+        # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to
+        seg_instance_id="instance_id_segmentation",
+        flow="motion_vectors",
+        bbox_2d_tight="bounding_box_2d_tight",
+        bbox_2d_loose="bounding_box_2d_loose",
+        bbox_3d="bounding_box_3d",
+        camera_params="camera_params",
+        pointcloud="pointcloud",
+    )
+
     # Documentation for the different types of segmentation for particle systems:
     # - Cloth (e.g. `dishtowel`):
     #   - semantic: all shows up under one semantic label (e.g. `"4207839377": "dishtowel"`)
@@ -141,28 +160,9 @@ class VisionSensor(BaseSensor):
         self._image_height = image_height  # used when viewport is not created
         self._image_width = image_width  # used when viewport is not created
 
-        self._RAW_SENSOR_TYPES = dict(
-            rgb="rgb",
-            depth="distance_to_camera",
-            depth_linear="distance_to_image_plane",
-            normal="normals",
-            # Semantic segmentation shows the category each pixel belongs to
-            seg_semantic="semantic_segmentation",
-            # Instance segmentation shows the name of the object each pixel belongs to
-            seg_instance="instance_segmentation",
-            # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to
-            seg_instance_id="instance_id_segmentation",
-            flow="motion_vectors",
-            bbox_2d_tight="bounding_box_2d_tight",
-            bbox_2d_loose="bounding_box_2d_loose",
-            bbox_3d="bounding_box_3d",
-            camera_params="camera_params",
-            pointcloud="pointcloud",
-        )
-
-        assert {key for key in self._RAW_SENSOR_TYPES.keys() if key != "camera_params"} == set(
+        assert {key for key in self.raw_sensor_types.keys() if key != "camera_params"} == set(
             self.all_modalities
-        ), "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
+        ), "VisionSensor.RAW_SENSOR_TYPES must have the same keys as VisionSensor.ALL_MODALITIES!"
 
         if modalities == "all":
             modalities = self.all_modalities
@@ -283,7 +283,7 @@ class VisionSensor(BaseSensor):
 
         Args:
             names (str or list of str): Name of the raw sensor(s) to initialize.
-                If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
+                If they are not part of self.raw_sensor_types' keys, we will simply pass over them
         """
         names = {names} if isinstance(names, str) else set(names)
         for name in names:
@@ -589,7 +589,7 @@ class VisionSensor(BaseSensor):
         if self._annotators.get(modality, None) is None:
             with og.sim.editing_usd():
                 self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
-                    self._RAW_SENSOR_TYPES[modality]
+                    self.raw_sensor_types[modality]
                 )
                 self._annotators[modality].attach([self._render_product])
 
@@ -604,7 +604,14 @@ class VisionSensor(BaseSensor):
             # Passing an explicit list is bugged -- see omni source code
             # So we only pass in the product directly, which gets post-processed correctly
             with og.sim.editing_usd():
-                self._annotators[modality].detach(self._render_product)
+                try:
+                    self._annotators[modality].detach(self._render_product)
+                except TypeError:
+                    # omni.syntheticdata's node deactivation walk is fragile once a tiled render product
+                    # has existed in the session: cached graph node handles become invalid and detach raises
+                    # "Invalid NodeObj object". The annotator's nodes are already gone at that point, so we
+                    # just drop our reference (teardown-only; nothing further to clean up)
+                    log.warning(f"Failed to cleanly detach annotator for modality {modality}; skipping")
             self._annotators[modality] = None
 
     def remove(self):
@@ -996,6 +1003,10 @@ class VisionSensor(BaseSensor):
     @classproperty
     def all_modalities(cls):
         return {modality for modality in cls.ALL_MODALITIES if modality != "camera_params"}
+
+    @classproperty
+    def raw_sensor_types(cls):
+        return cls.RAW_SENSOR_TYPES.copy()
 
     @classproperty
     def no_noise_modalities(cls):
