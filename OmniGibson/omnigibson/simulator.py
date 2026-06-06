@@ -1088,7 +1088,8 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[USDObject]): list of objects to remove
             """
-            if objs != []:
+            objs = list(objs)
+            if len(objs) > 0:
                 with self.removing_objects(objs=objs):
                     for obj in objs:
                         obj.scene.remove_object(obj, _batched_call=True)

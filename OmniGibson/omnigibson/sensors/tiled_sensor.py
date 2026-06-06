@@ -3,14 +3,19 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import torch as th
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.utils.ui_utils import create_module_logger
 from typing import Any, Tuple, List
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class TiledVisionSensor:
     """
     Tiled vision sensor that leverages Omniverse Replicator to render tiled images from multiple cameras
     Args:
-        envs (Iterable[og.Environment]): List of environments to create tiled sensors for.
+        envs (Iterable): Robot containers to create tiled sensors for -- any objects exposing a .robots list
+            (e.g. the per-env Scene instances of a multi-env Environment), one per environment, in env order.
         tile_all_sensors (bool): Whether to tile all cameras in the envs or only those with matching names. Defaults to False.
             NOTE: If True, all cameras must have the same modalities and resolution.
     """
@@ -74,7 +79,10 @@ class TiledVisionSensor:
             for sensor_name in self._annotators:
                 for annotator in self._annotators[sensor_name].values():
                     # Passing an explicit list is bugged -- see VisionSensor._remove_modality_from_backend
-                    annotator.detach(self._render_product_paths[sensor_name])
+                    try:
+                        annotator.detach(self._render_product_paths[sensor_name])
+                    except TypeError:
+                        log.warning(f"Failed to cleanly detach tiled annotator for {sensor_name}; skipping")
         # Render so the syntheticdata graph settles before the render product is destroyed -- destroying
         # with pending graph edits leaves invalid nodes that break subsequent annotator detach calls
         og.sim.render()

@@ -1096,7 +1096,7 @@ def reshape_tiled_image(
         batched_image[camera_id, height_id, width_id, i] = tiled_image_buffer[pixel_start + i]
 
 
-# uint32 -> int32 conversion is required for non-colored segmentation annotators
+# uint32 is used for non-colored segmentation annotators (raw IDs, no dtype conversion is performed)
 wp.overload(
     reshape_tiled_image,
     {"tiled_image_buffer": wp.array(dtype=wp.uint32), "batched_image": wp.array(dtype=wp.uint32, ndim=4)},
