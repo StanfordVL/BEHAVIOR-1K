@@ -153,7 +153,7 @@ if [[ -z "$INSTANCE_IDS_FILE" && -n "$INSTANCE_IDS_FILE_TEMPLATE" ]]; then
   INSTANCE_IDS_FILE="${INSTANCE_IDS_FILE_TEMPLATE//\{task_id\}/$TASK_ID_PADDED}"
 fi
 
-mkdir -p /vision/u/wsai/BEHAVIOR-1K/outputs/sc/download_gcs_rawdata
+mkdir -p "/vision/u/${USER}/BEHAVIOR-1K/outputs/sc/download_gcs_rawdata"
 mkdir -p "$TARGET_ROOT"
 
 echo "SLURM_JOBID=${SLURM_JOB_ID:-}"
