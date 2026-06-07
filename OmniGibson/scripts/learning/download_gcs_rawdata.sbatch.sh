@@ -6,8 +6,8 @@
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=8
 #SBATCH --time=1-00:00:00
-#SBATCH --output=/vision/u/wsai/BEHAVIOR-1K/outputs/sc/download_gcs_rawdata/%x-%A_%a.out
-#SBATCH --error=/vision/u/wsai/BEHAVIOR-1K/outputs/sc/download_gcs_rawdata/%x-%A_%a.err
+#SBATCH --output=/vision/u/%u/BEHAVIOR-1K/outputs/sc/download_gcs_rawdata/%x-%A_%a.out
+#SBATCH --error=/vision/u/%u/BEHAVIOR-1K/outputs/sc/download_gcs_rawdata/%x-%A_%a.err
 
 set -euo pipefail
 
