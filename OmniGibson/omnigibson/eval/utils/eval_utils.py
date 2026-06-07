@@ -30,6 +30,13 @@ def _load_challenge_task_ids() -> dict[str, int]:
 
 
 TASK_NAMES_TO_INDICES = _load_challenge_task_ids()
+if not TASK_NAMES_TO_INDICES:
+    raise RuntimeError(
+        "Could not load challenge task metadata. Expected one of: "
+        f"{os.path.join(gm.DATA_PATH, '2025-challenge-task-instances', 'metadata', 'B50_task_misc.csv')} or "
+        f"{os.path.join(gm.DATA_PATH, '2026-challenge-task-instances', 'metadata', 'B100_task_misc.csv')}. "
+        "Please ensure OMNIGIBSON_DATA_PATH / gm.DATA_PATH points at the BEHAVIOR data root."
+    )
 
 # Camera parameteres
 CAMERA_INTRINSICS = {
