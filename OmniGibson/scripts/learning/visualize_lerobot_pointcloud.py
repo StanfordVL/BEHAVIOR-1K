@@ -16,8 +16,8 @@ import open3d as o3d
 import torch as th
 from lerobot.datasets import LeRobotDataset
 
-from omnigibson.learning.utils.eval_utils import CAMERA_INTRINSICS
-from omnigibson.learning.utils.obs_utils import depth_to_pcd, color_pcd_vis
+from omnigibson.eval.utils.eval_utils import CAMERA_INTRINSICS
+from omnigibson.eval.utils.obs_utils import depth_to_pcd, color_pcd_vis
 
 
 CAMERA_KEY_TO_INTRINSIC_NAME = {
