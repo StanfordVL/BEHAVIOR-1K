@@ -130,7 +130,11 @@ class LeRobotDataWrapper(DataWrapper):
         return step_data
 
     @classmethod
-    def get_lerobot_obs_mapping(cls, env: Environment, fps: int) -> tuple[dict[str, str], dict[str, dict]]:
+    def get_lerobot_obs_mapping(
+        cls,
+        env: Environment,
+        depth_output_unit: str = "m",
+    ) -> tuple[dict[str, str], dict[str, dict]]:
         obs_mapping, obs_features = dict(), dict()
         for key, gym_shape in env.observation_space.items():
             modality = key.split("::")[-1]
@@ -152,7 +156,10 @@ class LeRobotDataWrapper(DataWrapper):
                 info["dtype"] = "video"
                 info["shape"] = gym_shape.shape + (1,)
                 info["names"] = ["height", "width", "channel"]
-                info["info"] = {"is_depth_map": True}
+                info["info"] = {
+                    "is_depth_map": True,
+                    "video.output_unit": depth_output_unit,
+                }
 
                 # We also add relative camera transforms (wrt robot egocentric frame) in case we
                 # want to convert depth to point clouds
@@ -178,6 +185,12 @@ class LeRobotDataWrapper(DataWrapper):
             obs_mapping[key] = lerobot_obs_name
 
         return obs_mapping, obs_features
+
+    def _validate_video_fps(self) -> None:
+        for video_key in self.dataset.meta.video_keys:
+            video_fps = (self.dataset.meta.features[video_key].get("info") or {}).get("video.fps")
+            if video_fps is not None and video_fps != self.fps:
+                raise ValueError(f"Encoded video {video_key} has fps={video_fps}, expected fps={self.fps}")
 
     def _process_obs(self, obs: dict[str, th.Tensor], info: dict) -> dict[str, th.Tensor]:
         # Add tfs to flattened obs
@@ -268,7 +281,10 @@ class LeRobotDataWrapper(DataWrapper):
             },
         }
 
-        obs_mapping, obs_features = self.get_lerobot_obs_mapping(env=env, fps=self.fps)
+        obs_mapping, obs_features = self.get_lerobot_obs_mapping(
+            env=env,
+            depth_output_unit=self.lerobot_dataset_kwargs["depth_encoder"].output_unit,
+        )
         self.obs_mapping = obs_mapping
         features.update(obs_features)
 
@@ -315,6 +331,7 @@ class LeRobotDataWrapper(DataWrapper):
             self.dataset.add_frame(frame=frame)
 
         self.dataset.save_episode()
+        self._validate_video_fps()
 
     def flush_current_file(self) -> None:
         # Does nothing currently

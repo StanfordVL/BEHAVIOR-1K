@@ -249,7 +249,7 @@ def test_lerobot_obs_mapping_proprio():
         "robot::fetch:proprio::proprio": _MockGymSpace((12,)),
     }
 
-    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
+    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env)
 
     assert "robot::fetch:proprio::proprio" in mapping
     assert mapping["robot::fetch:proprio::proprio"] == "observation.state"
@@ -264,7 +264,7 @@ def test_lerobot_obs_mapping_rgb():
         "robot::fetch:eef_link:Camera:0::rgb": _MockGymSpace((128, 128, 4)),
     }
 
-    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
+    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env)
 
     assert mapping["robot::fetch:eef_link:Camera:0::rgb"] == "observation.rgb.eef_link_camera_0"
     key = "observation.rgb.eef_link_camera_0"
@@ -279,7 +279,7 @@ def test_lerobot_obs_mapping_depth():
         "robot::fetch:eef_link:Camera:0::depth_linear": _MockGymSpace((128, 128)),
     }
 
-    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
+    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env)
 
     assert "observation.depth_linear.eef_link_camera_0" in features
     assert features["observation.depth_linear.eef_link_camera_0"]["dtype"] == "video"

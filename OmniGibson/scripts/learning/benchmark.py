@@ -63,7 +63,9 @@ def _as_numpy_frame(value) -> np.ndarray:
 
 def _depth_unit(dataset: LeRobotDataset, depth_key: str) -> str:
     feature_info = dataset.meta.features[depth_key].get("info") or {}
-    unit = feature_info.get("video.output_unit", feature_info.get("depth.unit", "mm"))
+    unit = feature_info.get("video.output_unit")
+    if unit is None:
+        raise ValueError(f"Depth feature {depth_key} is missing info['video.output_unit']")
     if unit not in {"m", "mm"}:
         raise ValueError(f"Unsupported depth unit for {depth_key}: {unit!r}")
     return unit
@@ -140,7 +142,7 @@ def _dataset_summary(dataset: LeRobotDataset) -> None:
         print(
             f"  {key}: codec={info.get('video.codec')} pix_fmt={info.get('video.pix_fmt')} "
             f"g={info.get('video.g')} crf={info.get('video.crf')} depth={info.get('is_depth_map', False)} "
-            f"output_unit={info.get('video.output_unit', info.get('depth.unit'))}"
+            f"output_unit={info.get('video.output_unit')}"
         )
 
 
