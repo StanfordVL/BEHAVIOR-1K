@@ -63,7 +63,10 @@ def _as_hw_depth(value, unit: str) -> th.Tensor:
 
 def _depth_unit(dataset: LeRobotDataset, key: str) -> str:
     info = dataset.meta.features[key].get("info") or {}
-    return info.get("video.output_unit", info.get("depth.unit", "m"))
+    unit = info.get("video.output_unit")
+    if unit is None:
+        raise ValueError(f"Depth feature {key} is missing info['video.output_unit']")
+    return unit
 
 
 def _load_intrinsics(args: argparse.Namespace, dataset: LeRobotDataset) -> dict[str, np.ndarray]:
