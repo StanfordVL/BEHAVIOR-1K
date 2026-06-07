@@ -223,7 +223,7 @@ def main():
     if not os.path.exists(
         f"{args.data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
     ):
-        raise FileNotFoundError(f"Error: File episode_{args.demo_id:08d}.hdf5 does not exists under {args.data_folder}")
+        raise FileNotFoundError(f"Error: File episode_{args.demo_id:08d}.hdf5 does not exist under {args.data_folder}")
 
     _ = replay_hdf5_file(
         data_folder=args.data_folder,
