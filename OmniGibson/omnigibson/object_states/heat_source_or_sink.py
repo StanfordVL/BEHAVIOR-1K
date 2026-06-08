@@ -1,6 +1,7 @@
 import torch as th
 import warp as wp
 
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
@@ -25,7 +26,7 @@ m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 
 
 @wp.kernel
-def _hss_gate_kernel(
+def _heatsource_is_active_kernel(
     requires_toggled_on: wp.array(dtype=wp.uint8),  # (N_hss,)
     requires_closed: wp.array(dtype=wp.uint8),  # (N_hss,)
     toggle_idx: wp.array(dtype=wp.int32),  # (N_hss,) into ToggledOn.OBJ_IDXS, -1 if missing
@@ -37,7 +38,8 @@ def _hss_gate_kernel(
     out_values: wp.array2d(dtype=wp.uint8),  # (S, N_hss) — set to 1 if gate passes
 ):
     """
-    Per (scene, hss) thread: compute the activation gate.
+    hss = heat_source_or_sink
+    Per (scene, hss) thread: compute whether this hss is active. 0 not active. 1 active.
 
     Active iff:
       - !requires_toggled_on OR ToggledOn[scene, toggle_idx[h]] is True
@@ -61,7 +63,7 @@ def _hss_gate_kernel(
 
 
 @wp.kernel
-def _hss_propagate_kernel(
+def _heatsource_can_influence_kernel(
     hss_values: wp.array2d(dtype=wp.uint8),  # (S, N_hss)
     requires_inside: wp.array(dtype=wp.uint8),  # (N_hss,)
     temperatures: wp.array(dtype=wp.float32),  # (N_hss,)
@@ -82,44 +84,52 @@ def _hss_propagate_kernel(
     incoming_heat_rate: wp.array2d(dtype=wp.float32),  # Temperature.INCOMING_HEAT_RATE (S, N_temp) — out
 ):
     """
+    hss = heat_source_or_sink
     Per (scene, hss, target) thread: if HSS h is active and target n is in range, write
-    AFFECTED_MASK[s, h, n] = 1 and atomic_add (T_h - T_n) * rate into INCOMING_HEAT_RATE[s, n].
+    affected_mask[s, h, n] = 1 and atomic_add (T_h - T_n) * rate into incoming_heat_rate[s, n].
     """
     s, h, n = wp.tid()
-    if hss_values[s, h] == wp.uint8(0):
+    if hss_values[s, h] == wp.uint8(0):  # early return if hss not active
         return
-    if self_temp_idx[h] == n:
+    if self_temp_idx[h] == n:  # do not influence self
         return
-    a_n = temp_to_aabb_idx[n]
-    if a_n < wp.int32(0):
+    target_aabb_idx = temp_to_aabb_idx[n]
+    if target_aabb_idx < wp.int32(0):
         return
 
+    # for require_inside items
     if requires_inside[h] != wp.uint8(0):
-        if has_inside == wp.int32(0):
+        if has_inside == wp.int32(0):  # check whether item is inside hss
             return
-        ihi = self_inside_idx[h]
-        ini = temp_to_inside_idx[n]
-        if ihi < wp.int32(0) or ini < wp.int32(0):
+        hss_idx_in_inside = self_inside_idx[h]
+        target_idx_in_inside = temp_to_inside_idx[n]
+        if hss_idx_in_inside < wp.int32(0) or target_idx_in_inside < wp.int32(0):
             return
-        # Inside[s, target, container]: True iff target's AABB center lies in container's volume
-        if inside_values[s, ini, ihi] == wp.uint8(0):
+        # Check if target's AABB center lies in container's volume
+        if inside_values[s, target_idx_in_inside, hss_idx_in_inside] == wp.uint8(0):
             return
+    # for other items
     else:
+        # compute hss world position
         li = link_flat_idx[h]
         if li < wp.int32(0):
             return
         link_pose = pose_matrices[li]
-        off = link_local_offset[h]
-        heat_world = wp.mul(link_pose, wp.vec4(off[0], off[1], off[2], wp.float32(1.0)))
-        cx = (aabb_values[s, a_n, 0] + aabb_values[s, a_n, 3]) * wp.float32(0.5)
-        cy = (aabb_values[s, a_n, 1] + aabb_values[s, a_n, 4]) * wp.float32(0.5)
-        cz = (aabb_values[s, a_n, 2] + aabb_values[s, a_n, 5]) * wp.float32(0.5)
-        dx = heat_world[0] - cx
-        dy = heat_world[1] - cy
-        dz = heat_world[2] - cz
+        local_offset = link_local_offset[h]
+        hss_world_position = wp.mul(
+            link_pose, wp.vec4(local_offset[0], local_offset[1], local_offset[2], wp.float32(1.0))
+        )
+        # get cx, cy, cz: center x, y, z of target's aabb bounding box
+        cx = (aabb_values[s, target_aabb_idx, 0] + aabb_values[s, target_aabb_idx, 3]) * wp.float32(0.5)
+        cy = (aabb_values[s, target_aabb_idx, 1] + aabb_values[s, target_aabb_idx, 4]) * wp.float32(0.5)
+        cz = (aabb_values[s, target_aabb_idx, 2] + aabb_values[s, target_aabb_idx, 5]) * wp.float32(0.5)
+        # get dx, dy, dz: delta of hss position and target's center on 3 directions
+        dx = hss_world_position[0] - cx
+        dy = hss_world_position[1] - cy
+        dz = hss_world_position[2] - cz
         d2 = dx * dx + dy * dy + dz * dz
-        thr = distance_thresholds[h]
-        if d2 > thr * thr:
+        threshold = distance_thresholds[h]
+        if d2 > threshold * threshold:
             return
 
     affected_mask[s, h, n] = wp.uint8(1)
@@ -131,71 +141,50 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
     """
     Boolean state representing whether a heat source / sink is currently active. Active means
     the activation gates (`requires_toggled_on`, `requires_closed`) are satisfied; spatial
-    affecting of specific objects is queried via `affects_obj(obj)` against the AFFECTED_MASK.
+    affecting of specific objects is queried via `affects_obj(obj)` against `_affected_mask`.
 
     Computation runs inside the captured Warp graph:
-      1. Per-HSS gate kernel writes VALUES based on ToggledOn / Open.
-      2. Per-(scene, hss, target) propagate kernel writes AFFECTED_MASK and atomic_adds
-         (T_h - T_n) * rate into Temperature.INCOMING_HEAT_RATE.
+      1. Per-HSS `_heatsource_is_active_kernel` writes VALUES based on ToggledOn / Open.
+      2. Per-(scene, hss, target) `_heatsource_can_influence_kernel` writes `_affected_mask`
+         and atomic_adds (T_h - T_n) * rate into Temperature.INCOMING_HEAT_RATE.
 
-    The Temperature decay kernel then consumes the accumulated rate and zeros the buffer
+    The Temperature decay kernel then consumes the accumulated rate and zeros INCOMING_HEAT_RATE
     (see temperature.py for the consume-and-zero rationale). Cloth targets are handled by a
-    CPU post-pass in `_update` because cloth is not tracked by AABB / Inside.
+    CPU post-pass in `_update` because cloth is not tracked by AABB / Inside and not supported now.
     """
 
-    # Per-HSS config (N_hss,) — uploaded once in initialize_view from each instance.
-    TEMPERATURES = None
-    TEMPERATURES_WP = None
-    HEATING_RATES = None
-    HEATING_RATES_WP = None
-    DISTANCE_THRESHOLDS = None
-    DISTANCE_THRESHOLDS_WP = None
-    REQUIRES_TOGGLED_ON = None  # uint8 (N_hss,)
-    REQUIRES_TOGGLED_ON_WP = None
-    REQUIRES_CLOSED = None
-    REQUIRES_CLOSED_WP = None
-    REQUIRES_INSIDE = None
-    REQUIRES_INSIDE_WP = None
-    LINK_FLAT_IDX = None  # int32 (N_hss,) into RigidBodyViewAPI.POSE_MATRICES — -1 if requires_inside
-    LINK_FLAT_IDX_WP = None
-    LINK_LOCAL_OFFSET = None  # float32 (N_hss, 3) — offset of heat element in link frame
-    LINK_LOCAL_OFFSET_WP = None
+    # Per-HSS config (N_hss,) — uploaded once in initialize_view as wp.arrays (single source of truth).
+    _temperatures = None  # wp.array (N_hss,) float32
+    _heating_rates = None  # wp.array (N_hss,) float32
+    _distance_thresholds = None  # wp.array (N_hss,) float32
+    _requires_toggled_on = None  # wp.array (N_hss,) uint8
+    _requires_closed = None  # wp.array (N_hss,) uint8
+    _requires_inside = None  # wp.array (N_hss,) uint8
+    _link_flat_idx = None  # wp.array (N_hss,) int32 into RigidBodyViewAPI.POSE_MATRICES — -1 if requires_inside
+    _link_local_offset = None  # wp.array (N_hss,) vec3 — offset of heat element in link frame
 
     # Cross-state index maps — rebuilt in pre_update because Temperature.initialize_view
     # runs after HSS.initialize_view (HSS is a dep of Temperature in the topo).
-    SELF_TEMP_IDX = None  # int32 (N_hss,) into Temperature.OBJ_IDXS
-    SELF_TEMP_IDX_WP = None
-    SELF_INSIDE_IDX = None  # int32 (N_hss,) into Inside.OBJ_IDXS
-    SELF_INSIDE_IDX_WP = None
-    TOGGLE_IDX = None  # int32 (N_hss,) into ToggledOn.OBJ_IDXS
-    TOGGLE_IDX_WP = None
-    OPEN_IDX = None  # int32 (N_hss,) into Open.OBJ_IDXS
-    OPEN_IDX_WP = None
-    TEMP_TO_AABB_IDX = None  # int32 (N_temp,) Temperature N → AABB N
-    TEMP_TO_AABB_IDX_WP = None
-    TEMP_TO_INSIDE_IDX = None  # int32 (N_temp,) Temperature N → Inside N
-    TEMP_TO_INSIDE_IDX_WP = None
+    _self_temp_idx = None  # wp.array (N_hss,) int32 into Temperature.OBJ_IDXS
+    _self_inside_idx = None  # wp.array (N_hss,) int32 into Inside.OBJ_IDXS
+    _self_toggle_idx = None  # wp.array (N_hss,) int32 into ToggledOn.OBJ_IDXS
+    _self_open_idx = None  # wp.array (N_hss,) int32 into Open.OBJ_IDXS
+    _temp_to_aabb_idx = None  # wp.array (N_temp,) int32 Temperature N → AABB N
+    _temp_to_inside_idx = None  # wp.array (N_temp,) int32 Temperature N → Inside N
 
-    # AFFECTED_MASK: (S, N_hss, N_temp) bool — set by the propagate kernel, consumed via
-    # affects_obj() on CPU.
-    AFFECTED_MASK = None
-    AFFECTED_MASK_WP = None
-    AFFECTED_MASK_CPU = None
-    AFFECTED_MASK_CPU_WP = None
+    # _affected_mask: (S, N_hss, N_temp) — set by the propagate kernel, consumed via affects_obj().
+    # GPU is a uint8 wp.array (single source of truth); the CPU mirror keeps a torch
+    # tensor (for .item() reads) plus a wp view (for the graph-safe wp.copy), mirroring how the
+    # base class keeps VALUES_CPU + VALUES_CPU_WP.
+    _affected_mask = None  # wp.array (S, N_hss, N_temp) uint8 — GPU
+    _affected_mask_cpu = None  # torch bool (S, N_hss, N_temp), pinned — CPU mirror for affects_obj()
+    _affected_mask_cpu_wp = None  # wp.array uint8 view of _affected_mask_cpu
 
-    # Tracks the (N_hss, N_temp) shape used to allocate AFFECTED_MASK so pre_update can
-    # detect when Temperature's count changes and resize.
-    _CACHED_N_HSS = 0
-    _CACHED_N_TEMP = 0
-
-    # Placeholder wp.arrays used as kernel arguments when an optional dependency state has
-    # zero tracked objects. The kernel branches behind `has_*` flags so it never indexes them,
-    # but Warp requires a valid wp.array of the correct dtype for the signature. Allocated
-    # once in global_initialize so the captured graph never touches torch / wp.from_torch.
-    _PLACEHOLDER_VALUES = None
-    _PLACEHOLDER_VALUES_WP = None
-    _PLACEHOLDER_INSIDE = None
-    _PLACEHOLDER_INSIDE_WP = None
+    # Placeholder wp.array to fill into kernel arguments when an optional dependent state
+    # (like toggle, inside) is empty. Warp requires a valid wp.array of the correct dtype
+    # for the signature.
+    _placeholder_values = None  # wp.array (1, 1) uint8
+    _placeholder_inside = None  # wp.array (1, 1, 1) uint8
 
     def __init__(
         self,
@@ -317,47 +306,28 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
     @classmethod
     def global_initialize(cls):
         super().global_initialize()
-        cls.TEMPERATURES = None
-        cls.TEMPERATURES_WP = None
-        cls.HEATING_RATES = None
-        cls.HEATING_RATES_WP = None
-        cls.DISTANCE_THRESHOLDS = None
-        cls.DISTANCE_THRESHOLDS_WP = None
-        cls.REQUIRES_TOGGLED_ON = None
-        cls.REQUIRES_TOGGLED_ON_WP = None
-        cls.REQUIRES_CLOSED = None
-        cls.REQUIRES_CLOSED_WP = None
-        cls.REQUIRES_INSIDE = None
-        cls.REQUIRES_INSIDE_WP = None
-        cls.LINK_FLAT_IDX = None
-        cls.LINK_FLAT_IDX_WP = None
-        cls.LINK_LOCAL_OFFSET = None
-        cls.LINK_LOCAL_OFFSET_WP = None
-        cls.SELF_TEMP_IDX = None
-        cls.SELF_TEMP_IDX_WP = None
-        cls.SELF_INSIDE_IDX = None
-        cls.SELF_INSIDE_IDX_WP = None
-        cls.TOGGLE_IDX = None
-        cls.TOGGLE_IDX_WP = None
-        cls.OPEN_IDX = None
-        cls.OPEN_IDX_WP = None
-        cls.TEMP_TO_AABB_IDX = None
-        cls.TEMP_TO_AABB_IDX_WP = None
-        cls.TEMP_TO_INSIDE_IDX = None
-        cls.TEMP_TO_INSIDE_IDX_WP = None
-        cls.AFFECTED_MASK = None
-        cls.AFFECTED_MASK_WP = None
-        cls.AFFECTED_MASK_CPU = None
-        cls.AFFECTED_MASK_CPU_WP = None
-        cls._CACHED_N_HSS = 0
-        cls._CACHED_N_TEMP = 0
+        cls._temperatures = None
+        cls._heating_rates = None
+        cls._distance_thresholds = None
+        cls._requires_toggled_on = None
+        cls._requires_closed = None
+        cls._requires_inside = None
+        cls._link_flat_idx = None
+        cls._link_local_offset = None
+        cls._self_temp_idx = None
+        cls._self_inside_idx = None
+        cls._self_toggle_idx = None
+        cls._self_open_idx = None
+        cls._temp_to_aabb_idx = None
+        cls._temp_to_inside_idx = None
+        cls._affected_mask = None
+        cls._affected_mask_cpu = None
+        cls._affected_mask_cpu_wp = None
 
-        # Single-cell placeholders for use as kernel arguments when an optional dep state
-        # is empty. The kernel never indexes them — flags gate the branches.
-        cls._PLACEHOLDER_VALUES = th.zeros((1, 1), dtype=th.uint8, device="cuda")
-        cls._PLACEHOLDER_VALUES_WP = wp.from_torch(cls._PLACEHOLDER_VALUES, dtype=wp.uint8)
-        cls._PLACEHOLDER_INSIDE = th.zeros((1, 1, 1), dtype=th.uint8, device="cuda")
-        cls._PLACEHOLDER_INSIDE_WP = wp.from_torch(cls._PLACEHOLDER_INSIDE, dtype=wp.uint8)
+        # Placeholder wp.array to fill into kernel arguments when an optional dependent state
+        # (like toggle, inside) is empty.
+        cls._placeholder_values = wp.zeros((1, 1), dtype=wp.uint8, device="cuda")
+        cls._placeholder_inside = wp.zeros((1, 1, 1), dtype=wp.uint8, device="cuda")
 
     @classmethod
     def initialize_view(cls):
@@ -366,30 +336,25 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
 
         N = len(cls.OBJ_IDXS)
         if N == 0:
-            cls.TEMPERATURES_WP = None
-            cls.HEATING_RATES_WP = None
-            cls.DISTANCE_THRESHOLDS_WP = None
-            cls.REQUIRES_TOGGLED_ON_WP = None
-            cls.REQUIRES_CLOSED_WP = None
-            cls.REQUIRES_INSIDE_WP = None
-            cls.LINK_FLAT_IDX_WP = None
-            cls.LINK_LOCAL_OFFSET_WP = None
-            cls.SELF_TEMP_IDX_WP = None
-            cls.SELF_INSIDE_IDX_WP = None
-            cls.TOGGLE_IDX_WP = None
-            cls.OPEN_IDX_WP = None
-            cls.TEMP_TO_AABB_IDX_WP = None
-            cls.TEMP_TO_INSIDE_IDX_WP = None
-            cls.AFFECTED_MASK = None
-            cls.AFFECTED_MASK_WP = None
-            cls.AFFECTED_MASK_CPU = None
-            cls.AFFECTED_MASK_CPU_WP = None
-            cls._CACHED_N_HSS = 0
-            cls._CACHED_N_TEMP = 0
+            cls._temperatures = None
+            cls._heating_rates = None
+            cls._distance_thresholds = None
+            cls._requires_toggled_on = None
+            cls._requires_closed = None
+            cls._requires_inside = None
+            cls._link_flat_idx = None
+            cls._link_local_offset = None
+            cls._self_temp_idx = None
+            cls._self_inside_idx = None
+            cls._self_toggle_idx = None
+            cls._self_open_idx = None
+            cls._temp_to_aabb_idx = None
+            cls._temp_to_inside_idx = None
+            cls._affected_mask = None
+            cls._affected_mask_cpu = None
+            cls._affected_mask_cpu_wp = None
             return
 
-        # Per-HSS config — same across all scenes (HSS instances are matched by relative_prim_path).
-        # We pick the first non-None instance for each obj_idx to read configuration from.
         temperatures = th.zeros(N, dtype=th.float32)
         heating_rates = th.zeros(N, dtype=th.float32)
         distance_thresholds = th.zeros(N, dtype=th.float32)
@@ -399,155 +364,125 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         link_flat_idx = th.full((N,), -1, dtype=th.int32)
         link_local_offset = th.zeros((N, 3), dtype=th.float32)
 
-        for rel_path, obj_idx in cls.OBJ_IDXS.items():
-            inst = None
+        for _, hss_obj_idx in cls.OBJ_IDXS.items():
+            hss_state_instance = None
             for scene_row in cls.IDX_OBJS:
-                if scene_row[obj_idx] is not None:
-                    inst = scene_row[obj_idx].states[cls]
+                if scene_row[hss_obj_idx] is not None:
+                    hss_state_instance = scene_row[hss_obj_idx].states[cls]
                     break
-            if inst is None:
+            if hss_state_instance is None:
                 continue
-            temperatures[obj_idx] = float(inst._temperature)
-            heating_rates[obj_idx] = float(inst._heating_rate)
-            distance_thresholds[obj_idx] = float(inst.distance_threshold)
-            requires_toggled_on[obj_idx] = 1 if inst.requires_toggled_on else 0
-            requires_closed[obj_idx] = 1 if inst.requires_closed else 0
-            requires_inside[obj_idx] = 1 if inst.requires_inside else 0
-            if not inst.requires_inside and inst._links:
-                # Meta link exists; use its flat idx. Heat element pos == link world pos
-                # (offset is zero since the meta link IS the heat element).
-                link = inst.link
-                flat = RigidBodyViewAPI.get_flat_idx(link.prim_path)
-                if flat is not None:
-                    link_flat_idx[obj_idx] = int(flat)
+            temperatures[hss_obj_idx] = float(hss_state_instance._temperature)
+            heating_rates[hss_obj_idx] = float(hss_state_instance._heating_rate)
+            distance_thresholds[hss_obj_idx] = float(hss_state_instance.distance_threshold)
+            requires_toggled_on[hss_obj_idx] = 1 if hss_state_instance.requires_toggled_on else 0
+            requires_closed[hss_obj_idx] = 1 if hss_state_instance.requires_closed else 0
+            requires_inside[hss_obj_idx] = 1 if hss_state_instance.requires_inside else 0
+            if not hss_state_instance.requires_inside and hss_state_instance._links:
+                # store information of this hss' link position so later we can compute distance of item with hss
+                link_flat_idx[hss_obj_idx] = RigidBodyViewAPI.get_flat_idx(hss_state_instance.link.prim_path)
 
-        cls.TEMPERATURES = temperatures.cuda()
-        cls.HEATING_RATES = heating_rates.cuda()
-        cls.DISTANCE_THRESHOLDS = distance_thresholds.cuda()
-        cls.REQUIRES_TOGGLED_ON = requires_toggled_on.cuda()
-        cls.REQUIRES_CLOSED = requires_closed.cuda()
-        cls.REQUIRES_INSIDE = requires_inside.cuda()
-        cls.LINK_FLAT_IDX = link_flat_idx.cuda()
-        cls.LINK_LOCAL_OFFSET = link_local_offset.cuda()
+        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
+        cls._temperatures = create_tensor_from_list(temperatures, "float32", device="cuda")
+        cls._heating_rates = create_tensor_from_list(heating_rates, "float32", device="cuda")
+        cls._distance_thresholds = create_tensor_from_list(distance_thresholds, "float32", device="cuda")
+        cls._requires_toggled_on = create_tensor_from_list(requires_toggled_on, "uint8", device="cuda")
+        cls._requires_closed = create_tensor_from_list(requires_closed, "uint8", device="cuda")
+        cls._requires_inside = create_tensor_from_list(requires_inside, "uint8", device="cuda")
+        cls._link_flat_idx = create_tensor_from_list(link_flat_idx, "int32", device="cuda")
+        # vec3 has no scalar-only helper — wp.array reinterprets the (N, 3) float32 CPU buffer as (N,) vec3.
+        cls._link_local_offset = wp.array(link_local_offset, dtype=wp.vec3, device="cuda")
 
-        cls.TEMPERATURES_WP = wp.from_torch(cls.TEMPERATURES)
-        cls.HEATING_RATES_WP = wp.from_torch(cls.HEATING_RATES)
-        cls.DISTANCE_THRESHOLDS_WP = wp.from_torch(cls.DISTANCE_THRESHOLDS)
-        cls.REQUIRES_TOGGLED_ON_WP = wp.from_torch(cls.REQUIRES_TOGGLED_ON, dtype=wp.uint8)
-        cls.REQUIRES_CLOSED_WP = wp.from_torch(cls.REQUIRES_CLOSED, dtype=wp.uint8)
-        cls.REQUIRES_INSIDE_WP = wp.from_torch(cls.REQUIRES_INSIDE, dtype=wp.uint8)
-        cls.LINK_FLAT_IDX_WP = wp.from_torch(cls.LINK_FLAT_IDX)
-        cls.LINK_LOCAL_OFFSET_WP = wp.from_torch(cls.LINK_LOCAL_OFFSET, dtype=wp.vec3)
-
-        # Cross-state index maps + AFFECTED_MASK are deferred to pre_update because
+        # Init of cross-state index maps + `_affected_mask` are deferred to pre_update because
         # Temperature / Inside / ToggledOn / Open initialize_views may not have been called yet
         # in the order Temperature depends on HSS.
-        cls.SELF_TEMP_IDX_WP = None
-        cls.SELF_INSIDE_IDX_WP = None
-        cls.TOGGLE_IDX_WP = None
-        cls.OPEN_IDX_WP = None
-        cls.TEMP_TO_AABB_IDX_WP = None
-        cls.TEMP_TO_INSIDE_IDX_WP = None
-        cls.AFFECTED_MASK = None
-        cls.AFFECTED_MASK_WP = None
-        cls.AFFECTED_MASK_CPU = None
-        cls.AFFECTED_MASK_CPU_WP = None
-        cls._CACHED_N_HSS = N
-        cls._CACHED_N_TEMP = 0
+        cls._self_temp_idx = None
+        cls._self_inside_idx = None
+        cls._self_toggle_idx = None
+        cls._self_open_idx = None
+        cls._temp_to_aabb_idx = None
+        cls._temp_to_inside_idx = None
+        cls._affected_mask = None
+        cls._affected_mask_cpu = None
+        cls._affected_mask_cpu_wp = None
 
     @classmethod
     def _rebuild_cross_state_maps(cls):
         """
         Build (or rebuild) the index tables that reference *other* states' OBJ_IDXS, and
-        allocate AFFECTED_MASK with the current N_temp. Called from pre_update when needed.
+        allocate `_affected_mask` with the current number of object with temperature state.
+        Called from pre_update when needed.
         """
-        # Local import to avoid circular dependency at module load time
+        # Local import to avoid circular dependency
         from omnigibson.object_states.temperature import Temperature
 
-        N = len(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else 0
-        S = len(cls.IDX_OBJS) if cls.IDX_OBJS is not None else 0
+        N_hss = len(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else 0
+        S_hss = len(cls.IDX_OBJS) if cls.IDX_OBJS is not None else 0
         N_temp = len(Temperature.OBJ_IDXS) if Temperature.OBJ_IDXS is not None else 0
 
-        if N == 0:
+        if N_hss == 0:
             return
 
-        # Per-HSS lookups into other states' N spaces
-        self_temp_idx = th.full((N,), -1, dtype=th.int32)
-        self_inside_idx = th.full((N,), -1, dtype=th.int32)
-        toggle_idx = th.full((N,), -1, dtype=th.int32)
-        open_idx = th.full((N,), -1, dtype=th.int32)
-
-        temp_map = Temperature.OBJ_IDXS or {}
-        inside_map = Inside.OBJ_IDXS or {}
-        toggle_map = ToggledOn.OBJ_IDXS or {}
-        open_map = Open.OBJ_IDXS or {}
+        # lookup table into other states
+        # hss' index in temp's obj_idx, to prevent influence self's temperature
+        self_temp_idx = th.full((N_hss,), -1, dtype=th.int32)
+        # hss' index in inside's obj_idx, to help find out whether an item is inside hss
+        self_inside_idx = th.full((N_hss,), -1, dtype=th.int32)
+        self_toggle_idx = th.full((N_hss,), -1, dtype=th.int32)
+        self_open_idx = th.full((N_hss,), -1, dtype=th.int32)
 
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
-            self_temp_idx[obj_idx] = temp_map.get(rel_path, -1)
-            self_inside_idx[obj_idx] = inside_map.get(rel_path, -1)
-            toggle_idx[obj_idx] = toggle_map.get(rel_path, -1)
-            open_idx[obj_idx] = open_map.get(rel_path, -1)
+            self_temp_idx[obj_idx] = Temperature.OBJ_IDXS.get(rel_path, -1)
+            self_inside_idx[obj_idx] = Inside.OBJ_IDXS.get(rel_path, -1)
+            self_toggle_idx[obj_idx] = ToggledOn.OBJ_IDXS.get(rel_path, -1)
+            self_open_idx[obj_idx] = Open.OBJ_IDXS.get(rel_path, -1)
 
-        cls.SELF_TEMP_IDX = self_temp_idx.cuda()
-        cls.SELF_INSIDE_IDX = self_inside_idx.cuda()
-        cls.TOGGLE_IDX = toggle_idx.cuda()
-        cls.OPEN_IDX = open_idx.cuda()
-        cls.SELF_TEMP_IDX_WP = wp.from_torch(cls.SELF_TEMP_IDX)
-        cls.SELF_INSIDE_IDX_WP = wp.from_torch(cls.SELF_INSIDE_IDX)
-        cls.TOGGLE_IDX_WP = wp.from_torch(cls.TOGGLE_IDX)
-        cls.OPEN_IDX_WP = wp.from_torch(cls.OPEN_IDX)
+        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
+        cls._self_temp_idx = create_tensor_from_list(self_temp_idx, "int32", device="cuda")
+        cls._self_inside_idx = create_tensor_from_list(self_inside_idx, "int32", device="cuda")
+        cls._self_toggle_idx = create_tensor_from_list(self_toggle_idx, "int32", device="cuda")
+        cls._self_open_idx = create_tensor_from_list(self_open_idx, "int32", device="cuda")
 
-        # Per-Temperature lookups into AABB / Inside N spaces
-        aabb_map = AABB.OBJ_IDXS or {}
+        # Build Temperature to AABB / Inside look-up table
         temp_to_aabb = th.full((N_temp,), -1, dtype=th.int32)
         temp_to_inside = th.full((N_temp,), -1, dtype=th.int32)
-        for rel_path, t_idx in temp_map.items():
-            temp_to_aabb[t_idx] = aabb_map.get(rel_path, -1)
-            temp_to_inside[t_idx] = inside_map.get(rel_path, -1)
+        for rel_path, temperature_idx in Temperature.OBJ_IDXS.items():
+            temp_to_aabb[temperature_idx] = AABB.OBJ_IDXS.get(rel_path, -1)
+            temp_to_inside[temperature_idx] = Inside.OBJ_IDXS.get(rel_path, -1)
         if N_temp > 0:
-            cls.TEMP_TO_AABB_IDX = temp_to_aabb.cuda()
-            cls.TEMP_TO_INSIDE_IDX = temp_to_inside.cuda()
-            cls.TEMP_TO_AABB_IDX_WP = wp.from_torch(cls.TEMP_TO_AABB_IDX)
-            cls.TEMP_TO_INSIDE_IDX_WP = wp.from_torch(cls.TEMP_TO_INSIDE_IDX)
+            cls._temp_to_aabb_idx = create_tensor_from_list(temp_to_aabb, "int32", device="cuda")
+            cls._temp_to_inside_idx = create_tensor_from_list(temp_to_inside, "int32", device="cuda")
         else:
-            cls.TEMP_TO_AABB_IDX_WP = None
-            cls.TEMP_TO_INSIDE_IDX_WP = None
+            cls._temp_to_aabb_idx = None
+            cls._temp_to_inside_idx = None
 
-        # (Re)allocate AFFECTED_MASK if the shape changed
-        if S > 0 and N > 0 and N_temp > 0:
-            cls.AFFECTED_MASK = th.zeros((S, N, N_temp), dtype=th.bool, device="cuda")
-            cls.AFFECTED_MASK_WP = _wp_from_torch(cls.AFFECTED_MASK)
-            cls.AFFECTED_MASK_CPU = th.zeros((S, N, N_temp), dtype=th.bool).pin_memory()
-            cls.AFFECTED_MASK_CPU_WP = _wp_from_torch(cls.AFFECTED_MASK_CPU)
+        # (Re)allocate `_affected_mask` if the shape changed
+        if S_hss > 0 and N_hss > 0 and N_temp > 0:
+            cls._affected_mask = wp.zeros((S_hss, N_hss, N_temp), dtype=wp.uint8, device="cuda")
+            cls._affected_mask_cpu = th.zeros((S_hss, N_hss, N_temp), dtype=th.bool).pin_memory()
+            cls._affected_mask_cpu_wp = _wp_from_torch(cls._affected_mask_cpu)
         else:
-            cls.AFFECTED_MASK = None
-            cls.AFFECTED_MASK_WP = None
-            cls.AFFECTED_MASK_CPU = None
-            cls.AFFECTED_MASK_CPU_WP = None
-        cls._CACHED_N_TEMP = N_temp
+            cls._affected_mask = None
+            cls._affected_mask_cpu = None
+            cls._affected_mask_cpu_wp = None
 
     @classmethod
     def pre_update(cls):
         super().pre_update()
-        # Local import to avoid circular dependency at module load time
-        from omnigibson.object_states.temperature import Temperature
-
-        N_temp_now = len(Temperature.OBJ_IDXS) if Temperature.OBJ_IDXS is not None else 0
-        # Rebuild cross-state maps when the captured graph is being rebuilt or N_temp changed.
-        # `graph_dirty=True` indicates initialize_view has run since the last refresh.
-        if TensorizedState.graph_dirty or cls._CACHED_N_TEMP != N_temp_now or cls.SELF_TEMP_IDX_WP is None:
+        # Make sure that only rebuild when graph is dirty
+        if TensorizedState.graph_dirty:
             cls._rebuild_cross_state_maps()
 
-        # Zero AFFECTED_MASK every step so the propagate kernel only OR-writes hits.
-        if cls.AFFECTED_MASK is not None:
-            cls.AFFECTED_MASK.zero_()
+        # Zero _affected_mask every step so the propagate kernel only OR-writes hits.
+        if cls._affected_mask is not None:
+            cls._affected_mask.zero_()
 
     @classmethod
     def _update_values(cls, values):
         # Local imports to keep module-load order safe
         from omnigibson.object_states.temperature import Temperature
 
-        if cls.VALUES_WP is None or cls.SELF_TEMP_IDX_WP is None:
+        if cls.VALUES_WP is None or cls._self_temp_idx is None:
             return
         S, N = cls.VALUES.shape[:2]
         if S == 0 or N == 0:
@@ -555,29 +490,29 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
 
         toggle_values_wp = ToggledOn.VALUES_WP
         open_values_wp = Open.VALUES_WP
-        # When an optional gate state has no tracked objects, swap in the cached placeholder
-        # wp.array (allocated in global_initialize) so the kernel signature is satisfied;
-        # the `has_*` flags below gate the actual reads.
+        # It's possible that an optional state has no tracked objects,
+        # in that case we swap in a cached placeholder wp.array to satisfy
+        # kernel's signature.
         if toggle_values_wp is None:
-            toggle_values_wp = cls._PLACEHOLDER_VALUES_WP
+            toggle_values_wp = cls._placeholder_values
             has_toggle = 0
         else:
             has_toggle = 1
         if open_values_wp is None:
-            open_values_wp = cls._PLACEHOLDER_VALUES_WP
+            open_values_wp = cls._placeholder_values
             has_open = 0
         else:
             has_open = 1
 
-        # 1) Gate kernel: write VALUES
+        # check whether HSS is active and update VALUES
         wp.launch(
-            kernel=_hss_gate_kernel,
+            kernel=_heatsource_is_active_kernel,
             dim=(S, N),
             inputs=[
-                cls.REQUIRES_TOGGLED_ON_WP,
-                cls.REQUIRES_CLOSED_WP,
-                cls.TOGGLE_IDX_WP,
-                cls.OPEN_IDX_WP,
+                cls._requires_toggled_on,
+                cls._requires_closed,
+                cls._self_toggle_idx,
+                cls._self_open_idx,
                 toggle_values_wp,
                 open_values_wp,
                 wp.int32(has_toggle),
@@ -587,12 +522,13 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             device="cuda",
         )
 
-        # 2) Propagate kernel: write AFFECTED_MASK + atomic_add INCOMING_HEAT_RATE
+        # check what TEMPERATURE obj will be influenced by hss
+        # write `_affected_mask` + INCOMING_HEAT_RATE
         if (
-            cls.AFFECTED_MASK_WP is None
+            cls._affected_mask is None
             or Temperature.VALUES_WP is None
             or Temperature.INCOMING_HEAT_RATE_WP is None
-            or cls.TEMP_TO_AABB_IDX_WP is None
+            or cls._temp_to_aabb_idx is None
             or AABB.VALUES_WP is None
         ):
             return
@@ -602,40 +538,40 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
 
         inside_values_wp = Inside.VALUES_WP
         if inside_values_wp is None:
-            inside_values_wp = cls._PLACEHOLDER_INSIDE_WP
+            inside_values_wp = cls._placeholder_inside
             has_inside = 0
         else:
             has_inside = 1
 
         wp.launch(
-            kernel=_hss_propagate_kernel,
+            kernel=_heatsource_can_influence_kernel,
             dim=(S, N, N_temp),
             inputs=[
                 cls.VALUES_WP,
-                cls.REQUIRES_INSIDE_WP,
-                cls.TEMPERATURES_WP,
-                cls.HEATING_RATES_WP,
-                cls.DISTANCE_THRESHOLDS_WP,
-                cls.SELF_TEMP_IDX_WP,
-                cls.SELF_INSIDE_IDX_WP,
-                cls.LINK_FLAT_IDX_WP,
-                cls.LINK_LOCAL_OFFSET_WP,
-                cls.TEMP_TO_AABB_IDX_WP,
-                cls.TEMP_TO_INSIDE_IDX_WP,
+                cls._requires_inside,
+                cls._temperatures,
+                cls._heating_rates,
+                cls._distance_thresholds,
+                cls._self_temp_idx,
+                cls._self_inside_idx,
+                cls._link_flat_idx,
+                cls._link_local_offset,
+                cls._temp_to_aabb_idx,
+                cls._temp_to_inside_idx,
                 RigidBodyViewAPI.POSE_MATRICES,
                 AABB.VALUES_WP,
                 inside_values_wp,
                 Temperature.VALUES_WP,
                 wp.int32(has_inside),
-                cls.AFFECTED_MASK_WP,
+                cls._affected_mask,
                 Temperature.INCOMING_HEAT_RATE_WP,
             ],
             device="cuda",
         )
 
-        # Mirror AFFECTED_MASK → AFFECTED_MASK_CPU for affects_obj() CPU reads.
-        if cls.AFFECTED_MASK_CPU_WP is not None:
-            wp.copy(cls.AFFECTED_MASK_CPU_WP, cls.AFFECTED_MASK_WP)
+        # Mirror `_affected_mask` → `_affected_mask_cpu` for affects_obj() CPU reads.
+        if cls._affected_mask_cpu_wp is not None:
+            wp.copy(cls._affected_mask_cpu_wp, cls._affected_mask)
 
     def _get_value(self):
         # Match base class semantics: bring caches into sync, then read CPU mirror
@@ -680,11 +616,11 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             return False
         if Temperature.OBJ_IDXS is None or obj.relative_prim_path not in Temperature.OBJ_IDXS:
             return False
-        if cls.AFFECTED_MASK_CPU is None:
+        if cls._affected_mask_cpu is None:
             return False
         h = cls.OBJ_IDXS[self.obj.relative_prim_path]
         n = Temperature.OBJ_IDXS[obj.relative_prim_path]
         s = self.obj.scene.idx
-        return bool(cls.AFFECTED_MASK_CPU[s, h, n].item())
+        return bool(cls._affected_mask_cpu[s, h, n].item())
 
     # Nothing needs to be done to save/load HeatSource
