@@ -50,9 +50,9 @@ class DataWrapper(EnvironmentWrapper):
             dataset metadata before calling ``super().__init__``.
         """
         # Make sure the wrapped environment inherits correct omnigibson format
-        assert isinstance(
-            env, (Environment, EnvironmentWrapper)
-        ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class or EnvironmentWrapper!"
+        assert isinstance(env, (Environment, EnvironmentWrapper)), (
+            "Expected wrapped @env to be a subclass of OmniGibson's Environment class or EnvironmentWrapper!"
+        )
 
         # Only one scene is supported for now
         assert len(og.sim.scenes) == 1, "Only one scene is currently supported for DataWrapper env!"
@@ -490,9 +490,9 @@ class DataPlaybackWrapper(DataWrapper):
             input_config.get("env", dict()).get("rendering_frequency", env.env_config["rendering_frequency"])
         )
         self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
-        assert not (
-            load_room_instances and not full_scene_file
-        ), "Full scene file must be specified in order to load room instances"
+        assert not (load_room_instances and not full_scene_file), (
+            "Full scene file must be specified in order to load room instances"
+        )
         if full_scene_file:
             with open(full_scene_file, "r") as json_file:
                 full_scene_json = json.load(json_file)
@@ -505,7 +505,9 @@ class DataPlaybackWrapper(DataWrapper):
         # check flush parameters
         if flush_every_n_steps > 0:
             assert flush_every_n_traj == 1, "flush_every_n_traj must be 1 if flush_every_n_steps is set"
-            assert not only_successes, "only_successes must be False if flush_every_n_steps is set, since we need to store partial trajectories regardless of success"
+            assert not only_successes, (
+                "only_successes must be False if flush_every_n_steps is set, since we need to store partial trajectories regardless of success"
+            )
         self.flush_every_n_steps = flush_every_n_steps
 
         # Store additional variables
@@ -669,9 +671,9 @@ class DataPlaybackWrapper(DataWrapper):
             for _ in range(first_time_load_n_iteration):
                 og.sim.render()
             self.current_obs, init_info = self.env.get_obs()
-            assert len(self.current_traj_history) == 1 and set(self.current_traj_history[-1].keys()) == {
-                "obs"
-            }, "Expected reset() to have inserted an initial obs-only entry into the trajectory history!"
+            assert len(self.current_traj_history) == 1 and set(self.current_traj_history[-1].keys()) == {"obs"}, (
+                "Expected reset() to have inserted an initial obs-only entry into the trajectory history!"
+            )
             self.current_traj_history[-1]["obs"] = self._process_obs(self.current_obs, init_info)
             # Write the initial frame if video_writers are configured
             if self.video_writers:

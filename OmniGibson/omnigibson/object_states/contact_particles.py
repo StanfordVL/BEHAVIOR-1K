@@ -27,9 +27,9 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
             set of int: Set of particle IDs in contact
         """
         # Make sure system is valid
-        assert self.obj.scene.is_physical_particle_system(
-            system_name=system.name
-        ), "Can only get ContactParticles for a PhysicalParticleSystem!"
+        assert self.obj.scene.is_physical_particle_system(system_name=system.name), (
+            "Can only get ContactParticles for a PhysicalParticleSystem!"
+        )
 
         # Variables to update mid-iteration
         contacts = set()

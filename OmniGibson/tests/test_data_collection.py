@@ -540,9 +540,9 @@ def test_hdf5_playback_and_dataset():
 
                         if "rgb" in obs_key:
                             expected_shape = (obs_data.shape[0], 3, img_h, img_w)
-                            assert (
-                                obs_data.shape == expected_shape
-                            ), f"Demo {demo_idx} obs {obs_key}: expected {expected_shape}, got {obs_data.shape}"
+                            assert obs_data.shape == expected_shape, (
+                                f"Demo {demo_idx} obs {obs_key}: expected {expected_shape}, got {obs_data.shape}"
+                            )
                             if (
                                 "external_sensor0" not in obs_key
                                 and "eef_link_camera_0" not in obs_key
@@ -554,9 +554,9 @@ def test_hdf5_playback_and_dataset():
                                 )
                         elif "depth_linear" in obs_key:
                             expected_shape = (obs_data.shape[0], 3, img_h, img_w)
-                            assert (
-                                obs_data.shape == expected_shape
-                            ), f"Demo {demo_idx} obs {obs_key}: expected {expected_shape}, got {obs_data.shape}"
+                            assert obs_data.shape == expected_shape, (
+                                f"Demo {demo_idx} obs {obs_key}: expected {expected_shape}, got {obs_data.shape}"
+                            )
                             if "eef_link_camera_0" not in obs_key and "eyes_camera_0" not in obs_key:
                                 assert False, (
                                     f"Demo {demo_idx} obs {obs_key} has unexpected depth_linear key (expected one of: "
@@ -666,9 +666,9 @@ def test_lerobot_playback_and_dataset():
     ):
         assert key in batch
         expected_shape = (batch_size, *shape)
-        assert (
-            batch[key].shape == expected_shape
-        ), f"Expected key [{key}] to have shape {expected_shape}, but got {batch[key].shape}"
+        assert batch[key].shape == expected_shape, (
+            f"Expected key [{key}] to have shape {expected_shape}, but got {batch[key].shape}"
+        )
 
     # Validate metadata
     assert dataset.meta.info["omnigibson_git_hash"] is not None

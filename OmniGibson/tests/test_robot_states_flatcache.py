@@ -302,27 +302,27 @@ def test_grasping_mode(grasping_mode):
         for _ in range(30):
             og.sim.step()
 
-        assert _object_is_in_hand(
-            robot, box_object, grasping_mode
-        ), f"Grasping mode {grasping_mode} failed to grasp the object"
+        assert _object_is_in_hand(robot, box_object, grasping_mode), (
+            f"Grasping mode {grasping_mode} failed to grasp the object"
+        )
 
         # Move eef
         eef_offset = th.tensor([0.0, 0.2, 0.2])
         for action in action_primitives._move_hand_direct_ik((target_eef_pos + eef_offset, target_eef_orn)):
             env.step(action)
 
-        assert _object_is_in_hand(
-            robot, box_object, grasping_mode
-        ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
+        assert _object_is_in_hand(robot, box_object, grasping_mode), (
+            f"Grasping mode {grasping_mode} failed to keep the object in hand"
+        )
 
         # Release the box
         ControllerView.update_goal(group_key, controller_idx, th.tensor([1.0]))
         for _ in range(20):
             og.sim.step()
 
-        assert not _object_is_in_hand(
-            robot, box_object, grasping_mode
-        ), f"Grasping mode {grasping_mode} failed to release the object"
+        assert not _object_is_in_hand(robot, box_object, grasping_mode), (
+            f"Grasping mode {grasping_mode} failed to release the object"
+        )
     finally:
         if og.sim is not None:
             og.clear()
@@ -407,9 +407,9 @@ def test_holonomic_robot_tuck_untuck_base_joint_invariance():
     robot.tuck()
     base_joint_pos_after_tuck = robot.get_joint_positions()[robot.base_idx]
     pos_after_tuck, ori_after_tuck = robot.get_position_orientation()
-    assert th.allclose(
-        initial_base_joint_pos, base_joint_pos_after_tuck, atol=1e-6
-    ), f"tuck() changed base joint positions! Initial: {initial_base_joint_pos}, After tuck: {base_joint_pos_after_tuck}"
+    assert th.allclose(initial_base_joint_pos, base_joint_pos_after_tuck, atol=1e-6), (
+        f"tuck() changed base joint positions! Initial: {initial_base_joint_pos}, After tuck: {base_joint_pos_after_tuck}"
+    )
     assert th.allclose(initial_pos, pos_after_tuck, atol=1e-6), "tuck() changed robot position"
     assert th.allclose(initial_ori, ori_after_tuck, atol=1e-6), "tuck() changed robot orientation"
 
@@ -417,9 +417,9 @@ def test_holonomic_robot_tuck_untuck_base_joint_invariance():
     robot.untuck()
     base_joint_pos_after_untuck = robot.get_joint_positions()[robot.base_idx]
     pos_after_untuck, ori_after_untuck = robot.get_position_orientation()
-    assert th.allclose(
-        initial_base_joint_pos, base_joint_pos_after_untuck, atol=1e-6
-    ), f"untuck() changed base joint positions! Initial: {initial_base_joint_pos}, After untuck: {base_joint_pos_after_untuck}"
+    assert th.allclose(initial_base_joint_pos, base_joint_pos_after_untuck, atol=1e-6), (
+        f"untuck() changed base joint positions! Initial: {initial_base_joint_pos}, After untuck: {base_joint_pos_after_untuck}"
+    )
     assert th.allclose(initial_pos, pos_after_untuck, atol=1e-6), "untuck() changed robot position"
     assert th.allclose(initial_ori, ori_after_untuck, atol=1e-6), "untuck() changed robot orientation"
 

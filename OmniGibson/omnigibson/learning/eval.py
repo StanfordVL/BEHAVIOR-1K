@@ -405,9 +405,9 @@ if __name__ == "__main__":
     if config.write_video:
         video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
-    assert not (
-        config.eval_on_train_instances and config.test_hidden
-    ), "Cannot eval on train instances and test hidden instances simultaneously."
+    assert not (config.eval_on_train_instances and config.test_hidden), (
+        "Cannot eval on train instances and test hidden instances simultaneously."
+    )
     if config.test_hidden:
         logger.info("You are evaluating on hidden test instances! This is for internal use only.")
     # get run instances
@@ -423,33 +423,33 @@ if __name__ == "__main__":
             if episode["episode_index"] // 1e4 == task_idx:
                 instances_to_run.append(str(int((episode["episode_index"] // 10) % 1e3)))
         if config.eval_instance_ids:
-            assert set(config.eval_instance_ids).issubset(
-                set(range(m.NUM_TRAIN_INSTANCES))
-            ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
+            assert set(config.eval_instance_ids).issubset(set(range(m.NUM_TRAIN_INSTANCES))), (
+                f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
+            )
             instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
     elif config.test_hidden:
         instances_to_run = (
             config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
         )
-        assert set(instances_to_run).issubset(
-            set(range(m.NUM_EVAL_INSTANCES))
-        ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
+        assert set(instances_to_run).issubset(set(range(m.NUM_EVAL_INSTANCES))), (
+            f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
+        )
     else:
         instances_to_run = (
             config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
         )
-        assert set(instances_to_run).issubset(
-            set(range(m.NUM_EVAL_INSTANCES))
-        ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
+        assert set(instances_to_run).issubset(set(range(m.NUM_EVAL_INSTANCES))), (
+            f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
+        )
         # load csv file
         task_instance_csv_path = os.path.join(
             gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
         )
         with open(task_instance_csv_path, "r") as f:
             lines = list(csv.reader(f))[1:]
-        assert (
-            lines[TASK_NAMES_TO_INDICES[config.task.name]][1] == config.task.name
-        ), f"Task name from config {config.task.name} does not match task name from csv {lines[TASK_NAMES_TO_INDICES[config.task.name]][1]}"
+        assert lines[TASK_NAMES_TO_INDICES[config.task.name]][1] == config.task.name, (
+            f"Task name from config {config.task.name} does not match task name from csv {lines[TASK_NAMES_TO_INDICES[config.task.name]][1]}"
+        )
         test_instances = lines[TASK_NAMES_TO_INDICES[config.task.name]][2].strip().split(",")
         instances_to_run = [int(test_instances[i]) for i in instances_to_run]
     # establish metrics
