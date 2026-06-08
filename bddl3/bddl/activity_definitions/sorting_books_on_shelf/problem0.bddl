@@ -2,10 +2,9 @@
     (:domain behavior-1k)
 
     (:objects
-        textbook.n.01_1 textbook.n.01_2 - textbook.n.01
+        hardback.n.01_1 hardback.n.01_2 - hardback.n.01
         comic_book.n.01_1 comic_book.n.01_2 comic_book.n.01_3 - comic_book.n.01
         notebook.n.01_1 notebook.n.01_2 - notebook.n.01
-        coffee_table.n.01_1 - coffee_table.n.01
         bookcase.n.01_1 - bookcase.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
@@ -16,10 +15,9 @@
         (inside comic_book.n.01_1 bookcase.n.01_1) 
         (ontop notebook.n.01_2 comic_book.n.01_1) 
         (ontop comic_book.n.01_2 notebook.n.01_1) 
-        (inside textbook.n.01_1 bookcase.n.01_1) 
+        (inside hardback.n.01_1 bookcase.n.01_1) 
         (inside comic_book.n.01_3 bookcase.n.01_1) 
-        (ontop textbook.n.01_2 comic_book.n.01_3) 
-        (inroom coffee_table.n.01_1 living_room) 
+        (ontop hardback.n.01_2 comic_book.n.01_3) 
         (inroom bookcase.n.01_1 living_room) 
         (inroom floor.n.01_1 living_room) 
         (ontop agent.n.01_1 floor.n.01_1)
@@ -52,14 +50,14 @@
                 )
             )
             (forall 
-                (?textbook.n.01 - textbook.n.01)
-                (inside ?textbook.n.01 ?bookcase.n.01_1)
+                (?hardback.n.01 - hardback.n.01)
+                (inside ?hardback.n.01 ?bookcase.n.01_1)
             )
             (exists
-                (?textbook.n.01 - textbook.n.01)
+                (?hardback.n.01 - hardback.n.01)
                 (or 
-                    (ontop ?textbook.n.01 ?textbook.n.01_1)
-                    (ontop ?textbook.n.01 ?textbook.n.01_2)
+                    (ontop ?hardback.n.01 ?hardback.n.01_1)
+                    (ontop ?hardback.n.01 ?hardback.n.01_2)
                 )
             )
         )
