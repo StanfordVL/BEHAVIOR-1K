@@ -1,6 +1,7 @@
 import torch as th
 import warp as wp
 
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -22,7 +23,7 @@ m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 
 
 @wp.kernel
-def _on_fire_gate_kernel(
+def _on_fire_is_active_kernel(
     self_temp_idx: wp.array(dtype=wp.int32),  # (N_of,)
     ignition_temperatures: wp.array(dtype=wp.float32),  # (N_of,)
     temperature_values: wp.array2d(dtype=wp.float32),  # (S, N_temp)
@@ -32,18 +33,18 @@ def _on_fire_gate_kernel(
     Per (scene, of) thread: VALUES[s, h] = Temperature[s, self_temp_idx[h]] >= ignition[h].
     """
     s, h = wp.tid()
-    ti = self_temp_idx[h]
-    if ti < wp.int32(0):
+    n_self = self_temp_idx[h]
+    if n_self < wp.int32(0):
         out_values[s, h] = wp.uint8(0)
         return
-    if temperature_values[s, ti] >= ignition_temperatures[h]:
+    if temperature_values[s, n_self] >= ignition_temperatures[h]:
         out_values[s, h] = wp.uint8(1)
     else:
         out_values[s, h] = wp.uint8(0)
 
 
 @wp.kernel
-def _on_fire_propagate_kernel(
+def _on_fire_can_influence_kernel(
     of_values: wp.array2d(dtype=wp.uint8),  # (S, N_of)
     fire_temperatures: wp.array(dtype=wp.float32),  # (N_of,)
     heating_rates: wp.array(dtype=wp.float32),  # (N_of,)
@@ -67,8 +68,8 @@ def _on_fire_propagate_kernel(
         return
     if self_temp_idx[h] == n:
         return
-    a_n = temp_to_aabb_idx[n]
-    if a_n < wp.int32(0):
+    target_aabb_idx = temp_to_aabb_idx[n]
+    if target_aabb_idx < wp.int32(0):
         return
     li = link_flat_idx[h]
     if li < wp.int32(0):
@@ -76,9 +77,9 @@ def _on_fire_propagate_kernel(
     link_pose = pose_matrices[li]
     off = link_local_offset[h]
     heat_world = wp.mul(link_pose, wp.vec4(off[0], off[1], off[2], wp.float32(1.0)))
-    cx = (aabb_values[s, a_n, 0] + aabb_values[s, a_n, 3]) * wp.float32(0.5)
-    cy = (aabb_values[s, a_n, 1] + aabb_values[s, a_n, 4]) * wp.float32(0.5)
-    cz = (aabb_values[s, a_n, 2] + aabb_values[s, a_n, 5]) * wp.float32(0.5)
+    cx = (aabb_values[s, target_aabb_idx, 0] + aabb_values[s, target_aabb_idx, 3]) * wp.float32(0.5)
+    cy = (aabb_values[s, target_aabb_idx, 1] + aabb_values[s, target_aabb_idx, 4]) * wp.float32(0.5)
+    cz = (aabb_values[s, target_aabb_idx, 2] + aabb_values[s, target_aabb_idx, 5]) * wp.float32(0.5)
     dx = heat_world[0] - cx
     dy = heat_world[1] - cy
     dz = heat_world[2] - cz
@@ -92,25 +93,22 @@ def _on_fire_propagate_kernel(
 
 @wp.kernel
 def _on_fire_clamp_kernel(
-    of_values: wp.array2d(dtype=wp.uint8),  # (S, N_of)
+    onfire_values: wp.array2d(dtype=wp.uint8),  # (S, N_of)
     self_temp_idx: wp.array(dtype=wp.int32),  # (N_of,)
     fire_temperatures: wp.array(dtype=wp.float32),  # (N_of,)
     temperature_values: wp.array2d(dtype=wp.float32),  # (S, N_temp)
 ):
     """
     For each ignited OnFire entry, set Temperature[s, n_self] = max(current, fire_temp).
-    This is the *one* legitimate cross-state Temperature write outside of Temperature:
-    OnFire owns its own temperature when ignited so that subsequent decay/heatsource
-    contributions cannot pull it back below the fire temperature.
     """
     s, h = wp.tid()
-    if of_values[s, h] == wp.uint8(0):
+    if onfire_values[s, h] == wp.uint8(0):
         return
-    ti = self_temp_idx[h]
-    if ti < wp.int32(0):
+    self_idx_in_temp = self_temp_idx[h]
+    if self_idx_in_temp < wp.int32(0):
         return
-    if fire_temperatures[h] > temperature_values[s, ti]:
-        temperature_values[s, ti] = fire_temperatures[h]
+    if fire_temperatures[h] > temperature_values[s, self_idx_in_temp]:
+        temperature_values[s, self_idx_in_temp] = fire_temperatures[h]
 
 
 class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
@@ -121,36 +119,23 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
     Its temperature is further clamped to fire_temperature each step, heating nearby objects.
 
     Implementation runs inside the captured Warp graph in this order (after Temperature):
-      1. Gate kernel: VALUES = Temperature >= ignition_temperature.
-      2. Propagate kernel: atomic_add (T_fire - T_n) * rate into Temperature.INCOMING_HEAT_RATE
-         for nearby Temperature-tracked targets (consumed NEXT step — lag-1).
-      3. Clamp kernel: write Temperature.VALUES[n_self] = fire_temperature where ignited.
-
-    After (3), Temperature.VALUES → Temperature.VALUES_CPU is re-mirrored so the clamp is
-    visible to CPU readers without one step of staleness.
+      1. set VALUES = Temperature >= ignition_temperature.
+      2. update temperature change rate: atomic_add (T_fire - T_n) * rate into Temperature.INCOMING_HEAT_RATE
+         for nearby Temperature-tracked targets (consumed NEXT step).
+      3. clamp: write Temperature.VALUES[self] = fire_temperature where ignited.
     """
 
-    # Per-OnFire config (N_of,) — uploaded once in initialize_view.
-    IGNITION_TEMPERATURES = None
-    IGNITION_TEMPERATURES_WP = None
-    FIRE_TEMPERATURES = None
-    FIRE_TEMPERATURES_WP = None
-    HEATING_RATES = None
-    HEATING_RATES_WP = None
-    DISTANCE_THRESHOLDS = None
-    DISTANCE_THRESHOLDS_WP = None
-    LINK_FLAT_IDX = None
-    LINK_FLAT_IDX_WP = None
-    LINK_LOCAL_OFFSET = None
-    LINK_LOCAL_OFFSET_WP = None
+    # Per-OnFire config (N_of,) — uploaded once in initialize_view as wp.arrays (single source of truth).
+    _ignition_temperatures = None  # wp.array (N_of,) float32
+    _fire_temperatures = None  # wp.array (N_of,) float32
+    _heating_rates = None  # wp.array (N_of,) float32
+    _distance_thresholds = None  # wp.array (N_of,) float32
+    _link_flat_idx = None  # wp.array (N_of,) int32 into RigidBodyViewAPI.POSE_MATRICES — -1 if N/A
+    _link_local_offset = None  # wp.array (N_of,) vec3 — offset of heat element in link frame
 
     # Cross-state index maps — rebuilt in pre_update (Temperature/AABB initialize after OnFire).
-    SELF_TEMP_IDX = None
-    SELF_TEMP_IDX_WP = None
-    TEMP_TO_AABB_IDX = None
-    TEMP_TO_AABB_IDX_WP = None
-
-    _CACHED_N_TEMP = 0
+    _self_temp_idx = None  # wp.array (N_of,) int32 into Temperature.OBJ_IDXS
+    _temp_to_aabb_idx = None  # wp.array (N_temp,) int32 Temperature N → AABB N
 
     def __init__(
         self,
@@ -230,23 +215,14 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
     @classmethod
     def global_initialize(cls):
         super().global_initialize()
-        cls.IGNITION_TEMPERATURES = None
-        cls.IGNITION_TEMPERATURES_WP = None
-        cls.FIRE_TEMPERATURES = None
-        cls.FIRE_TEMPERATURES_WP = None
-        cls.HEATING_RATES = None
-        cls.HEATING_RATES_WP = None
-        cls.DISTANCE_THRESHOLDS = None
-        cls.DISTANCE_THRESHOLDS_WP = None
-        cls.LINK_FLAT_IDX = None
-        cls.LINK_FLAT_IDX_WP = None
-        cls.LINK_LOCAL_OFFSET = None
-        cls.LINK_LOCAL_OFFSET_WP = None
-        cls.SELF_TEMP_IDX = None
-        cls.SELF_TEMP_IDX_WP = None
-        cls.TEMP_TO_AABB_IDX = None
-        cls.TEMP_TO_AABB_IDX_WP = None
-        cls._CACHED_N_TEMP = 0
+        cls._ignition_temperatures = None
+        cls._fire_temperatures = None
+        cls._heating_rates = None
+        cls._distance_thresholds = None
+        cls._link_flat_idx = None
+        cls._link_local_offset = None
+        cls._self_temp_idx = None
+        cls._temp_to_aabb_idx = None
 
     @classmethod
     def initialize_view(cls):
@@ -254,15 +230,14 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
 
         N = len(cls.OBJ_IDXS)
         if N == 0:
-            cls.IGNITION_TEMPERATURES_WP = None
-            cls.FIRE_TEMPERATURES_WP = None
-            cls.HEATING_RATES_WP = None
-            cls.DISTANCE_THRESHOLDS_WP = None
-            cls.LINK_FLAT_IDX_WP = None
-            cls.LINK_LOCAL_OFFSET_WP = None
-            cls.SELF_TEMP_IDX_WP = None
-            cls.TEMP_TO_AABB_IDX_WP = None
-            cls._CACHED_N_TEMP = 0
+            cls._ignition_temperatures = None
+            cls._fire_temperatures = None
+            cls._heating_rates = None
+            cls._distance_thresholds = None
+            cls._link_flat_idx = None
+            cls._link_local_offset = None
+            cls._self_temp_idx = None
+            cls._temp_to_aabb_idx = None
             return
 
         ignition_temperatures = th.zeros(N, dtype=th.float32)
@@ -272,46 +247,40 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
         link_flat_idx = th.full((N,), -1, dtype=th.int32)
         link_local_offset = th.zeros((N, 3), dtype=th.float32)
 
-        for rel_path, obj_idx in cls.OBJ_IDXS.items():
-            inst = None
+        for _, obj_idx in cls.OBJ_IDXS.items():
+            onfire_state_instance = None
             for scene_row in cls.IDX_OBJS:
                 if scene_row[obj_idx] is not None:
-                    inst = scene_row[obj_idx].states[cls]
+                    onfire_state_instance = scene_row[obj_idx].states[cls]
                     break
-            if inst is None:
+            if onfire_state_instance is None:
                 continue
-            ignition_temperatures[obj_idx] = float(inst.ignition_temperature)
-            fire_temperatures[obj_idx] = float(inst._fire_temperature)
-            heating_rates[obj_idx] = float(inst._heating_rate)
-            distance_thresholds[obj_idx] = float(inst.distance_threshold)
+            ignition_temperatures[obj_idx] = float(onfire_state_instance.ignition_temperature)
+            fire_temperatures[obj_idx] = float(onfire_state_instance._fire_temperature)
+            heating_rates[obj_idx] = float(onfire_state_instance._heating_rate)
+            distance_thresholds[obj_idx] = float(onfire_state_instance.distance_threshold)
             # OnFire always uses root_link (or meta link if present) as the heat element.
             # Offset is zero — the link's world position IS the heat-source position.
-            if inst._links:
-                link = inst.link
+            if onfire_state_instance._links:
+                link = onfire_state_instance.link
             else:
-                link = inst.obj.root_link
+                link = onfire_state_instance.obj.root_link
             flat = RigidBodyViewAPI.get_flat_idx(link.prim_path)
             if flat is not None:
                 link_flat_idx[obj_idx] = int(flat)
 
-        cls.IGNITION_TEMPERATURES = ignition_temperatures.cuda()
-        cls.FIRE_TEMPERATURES = fire_temperatures.cuda()
-        cls.HEATING_RATES = heating_rates.cuda()
-        cls.DISTANCE_THRESHOLDS = distance_thresholds.cuda()
-        cls.LINK_FLAT_IDX = link_flat_idx.cuda()
-        cls.LINK_LOCAL_OFFSET = link_local_offset.cuda()
-
-        cls.IGNITION_TEMPERATURES_WP = wp.from_torch(cls.IGNITION_TEMPERATURES)
-        cls.FIRE_TEMPERATURES_WP = wp.from_torch(cls.FIRE_TEMPERATURES)
-        cls.HEATING_RATES_WP = wp.from_torch(cls.HEATING_RATES)
-        cls.DISTANCE_THRESHOLDS_WP = wp.from_torch(cls.DISTANCE_THRESHOLDS)
-        cls.LINK_FLAT_IDX_WP = wp.from_torch(cls.LINK_FLAT_IDX)
-        cls.LINK_LOCAL_OFFSET_WP = wp.from_torch(cls.LINK_LOCAL_OFFSET, dtype=wp.vec3)
+        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
+        cls._ignition_temperatures = create_tensor_from_list(ignition_temperatures, "float32", device="cuda")
+        cls._fire_temperatures = create_tensor_from_list(fire_temperatures, "float32", device="cuda")
+        cls._heating_rates = create_tensor_from_list(heating_rates, "float32", device="cuda")
+        cls._distance_thresholds = create_tensor_from_list(distance_thresholds, "float32", device="cuda")
+        cls._link_flat_idx = create_tensor_from_list(link_flat_idx, "int32", device="cuda")
+        # vec3 has no scalar-only helper — wp.array reinterprets the (N, 3) float32 CPU buffer as (N,) vec3.
+        cls._link_local_offset = wp.array(link_local_offset, dtype=wp.vec3, device="cuda")
 
         # Cross-state maps deferred (Temperature N may not be sized yet).
-        cls.SELF_TEMP_IDX_WP = None
-        cls.TEMP_TO_AABB_IDX_WP = None
-        cls._CACHED_N_TEMP = 0
+        cls._self_temp_idx = None
+        cls._temp_to_aabb_idx = None
 
     @classmethod
     def _rebuild_cross_state_maps(cls):
@@ -323,70 +292,72 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
         temp_map = Temperature.OBJ_IDXS or {}
         aabb_map = AABB.OBJ_IDXS or {}
 
+        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
         self_temp_idx = th.full((N,), -1, dtype=th.int32)
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
             self_temp_idx[obj_idx] = temp_map.get(rel_path, -1)
-        cls.SELF_TEMP_IDX = self_temp_idx.cuda()
-        cls.SELF_TEMP_IDX_WP = wp.from_torch(cls.SELF_TEMP_IDX)
+        cls._self_temp_idx = create_tensor_from_list(self_temp_idx, "int32", device="cuda")
 
         temp_to_aabb = th.full((N_temp,), -1, dtype=th.int32)
-        for rel_path, t_idx in temp_map.items():
-            temp_to_aabb[t_idx] = aabb_map.get(rel_path, -1)
+        for rel_path, temp_idx in temp_map.items():
+            temp_to_aabb[temp_idx] = aabb_map.get(rel_path, -1)
         if N_temp > 0:
-            cls.TEMP_TO_AABB_IDX = temp_to_aabb.cuda()
-            cls.TEMP_TO_AABB_IDX_WP = wp.from_torch(cls.TEMP_TO_AABB_IDX)
+            cls._temp_to_aabb_idx = create_tensor_from_list(temp_to_aabb, "int32", device="cuda")
         else:
-            cls.TEMP_TO_AABB_IDX_WP = None
-        cls._CACHED_N_TEMP = N_temp
+            cls._temp_to_aabb_idx = None
 
     @classmethod
     def pre_update(cls):
         super().pre_update()
-        N_temp_now = len(Temperature.OBJ_IDXS) if Temperature.OBJ_IDXS is not None else 0
-        if TensorizedState.graph_dirty or cls._CACHED_N_TEMP != N_temp_now or cls.SELF_TEMP_IDX_WP is None:
+        # Rebuild cross-state maps only when the captured graph is being rebuilt. graph_dirty is
+        # the single trigger: every event that changes N_temp or invalidates the index tables goes
+        # through some state's initialize_view, which sets graph_dirty. Rebuild reallocates GPU
+        # buffers that must be baked into the freshly-captured graph, so rebuild and recapture must
+        # stay coupled — gating on anything else risks reallocating without a recapture.
+        if TensorizedState.graph_dirty:
             cls._rebuild_cross_state_maps()
 
     @classmethod
     def _update_values(cls, values):
-        if cls.VALUES_WP is None or cls.SELF_TEMP_IDX_WP is None or Temperature.VALUES_WP is None:
+        if cls.VALUES_WP is None or cls._self_temp_idx is None or Temperature.VALUES_WP is None:
             return
         S, N = cls.VALUES.shape[:2]
         if S == 0 or N == 0:
             return
 
-        # 1) Gate — VALUES[s, h] = (Temperature[s, n_self] >= ignition_temp)
+        # 1) VALUES[s, h] = (Temperature[s, n_self] >= ignition_temp)
         wp.launch(
-            kernel=_on_fire_gate_kernel,
+            kernel=_on_fire_is_active_kernel,
             dim=(S, N),
             inputs=[
-                cls.SELF_TEMP_IDX_WP,
-                cls.IGNITION_TEMPERATURES_WP,
+                cls._self_temp_idx,
+                cls._ignition_temperatures,
                 Temperature.VALUES_WP,
                 cls.VALUES_WP,
             ],
             device="cuda",
         )
 
-        # 2) Propagate — atomic_add (T_fire - T_n) * rate into INCOMING_HEAT_RATE
+        # 2) atomic_add (T_fire - T_n) * rate into INCOMING_HEAT_RATE
         if (
             Temperature.INCOMING_HEAT_RATE_WP is not None
-            and cls.TEMP_TO_AABB_IDX_WP is not None
+            and cls._temp_to_aabb_idx is not None
             and AABB.VALUES_WP is not None
         ):
             N_temp = Temperature.VALUES.shape[1]
             if N_temp > 0:
                 wp.launch(
-                    kernel=_on_fire_propagate_kernel,
+                    kernel=_on_fire_can_influence_kernel,
                     dim=(S, N, N_temp),
                     inputs=[
                         cls.VALUES_WP,
-                        cls.FIRE_TEMPERATURES_WP,
-                        cls.HEATING_RATES_WP,
-                        cls.DISTANCE_THRESHOLDS_WP,
-                        cls.SELF_TEMP_IDX_WP,
-                        cls.LINK_FLAT_IDX_WP,
-                        cls.LINK_LOCAL_OFFSET_WP,
-                        cls.TEMP_TO_AABB_IDX_WP,
+                        cls._fire_temperatures,
+                        cls._heating_rates,
+                        cls._distance_thresholds,
+                        cls._self_temp_idx,
+                        cls._link_flat_idx,
+                        cls._link_local_offset,
+                        cls._temp_to_aabb_idx,
                         RigidBodyViewAPI.POSE_MATRICES,
                         AABB.VALUES_WP,
                         Temperature.VALUES_WP,
@@ -395,20 +366,20 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
                     device="cuda",
                 )
 
-        # 3) Clamp — Temperature[s, n_self] = max(current, fire_temp) for ignited entries.
+        # 3) Temperature[s, n_self] = max(current, fire_temp) for ignited entries.
         wp.launch(
             kernel=_on_fire_clamp_kernel,
             dim=(S, N),
             inputs=[
                 cls.VALUES_WP,
-                cls.SELF_TEMP_IDX_WP,
-                cls.FIRE_TEMPERATURES_WP,
+                cls._self_temp_idx,
+                cls._fire_temperatures,
                 Temperature.VALUES_WP,
             ],
             device="cuda",
         )
 
-        # Re-mirror Temperature.VALUES → Temperature.VALUES_CPU so the clamp is visible
+        # Re-mirror Temperature.VALUES to Temperature.VALUES_CPU so the clamp is visible
         # to CPU readers this step (otherwise it lags by one step — the base global_update
         # already mirrored Temperature.VALUES_CPU before the clamp executed).
         if Temperature.VALUES_CPU_WP is not None and Temperature.VALUES_WP is not None:
