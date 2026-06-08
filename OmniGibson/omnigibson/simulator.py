@@ -29,6 +29,7 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
+from omnigibson.sensors.tiled_sensor import TiledVisionSensor
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.asset_utils import ensure_omnigibson_robot_assets_version, get_dataset_path
@@ -1087,9 +1088,11 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[USDObject]): list of objects to remove
             """
-            with self.removing_objects(objs=objs):
-                for obj in objs:
-                    obj.scene.remove_object(obj, _batched_call=True)
+            objs = list(objs)
+            if len(objs) > 0:
+                with self.removing_objects(objs=objs):
+                    for obj in objs:
+                        obj.scene.remove_object(obj, _batched_call=True)
 
         def remove_prim(self, prim):
             """
@@ -2115,6 +2118,10 @@ def _launch_simulator(*args, **kwargs):
             self._pre_physics_step_callback.unsubscribe()
             self._post_physics_step_callback.unsubscribe()
             self._simulation_event_callback.unsubscribe()
+
+            # Clear all tiled vision sensors first -- their render products reference per-scene cameras,
+            # so they must be destroyed before the scenes (and the cameras) are removed
+            TiledVisionSensor.clear()
 
             # Clear all scenes
             for scene in self.scenes:
