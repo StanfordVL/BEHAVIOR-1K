@@ -4,8 +4,16 @@ class MetricBase:
     each environment episode
     """
 
-    def __init__(self):
+    def __init__(self, env_idx=0):
+        # env_idx selects which environment (scene) this metric instance tracks. Defaults to 0 so
+        # single-env usage is unchanged; vectorized evaluation instantiates one metric per env slot.
+        self.env_idx = env_idx
         self.state = dict()
+
+    def _scene(self, env):
+        """The scene this metric tracks. Uses ``env.scenes[env_idx]`` so it works for any num_envs
+        (``env.scene`` asserts a single scene and would raise for num_envs > 1)."""
+        return env.scenes[self.env_idx]
 
     @classmethod
     def is_compatible(cls, env):
@@ -50,10 +58,11 @@ class MetricBase:
             info (dict): info, i.e. dictionary with any useful information
         """
         step_metrics = self._compute_step_metrics(env, action, obs, reward, terminated, truncated, info)
+        scene = self._scene(env)
         assert (
-            env.scene in self.state
-        ), f"Environment {env} is not being tracked, please call 'self.reset(env)' to track!"
-        state = self.state[env.scene]
+            scene in self.state
+        ), f"Environment {env} (env_idx={self.env_idx}) is not being tracked, please call 'self.reset(env)' to track!"
+        state = self.state[scene]
         for k, v in step_metrics.items():
             if k not in state:
                 state[k] = []
@@ -102,11 +111,12 @@ class MetricBase:
         Returns:
             dict: Any relevant aggregated metric information
         """
-        if env.scene in self.state:
-            if self.state[env.scene] == dict():
+        scene = self._scene(env)
+        if scene in self.state:
+            if self.state[scene] == dict():
                 return dict()
             else:
-                return self._compute_episode_metrics(env=env, episode_info=self.state[env.scene])
+                return self._compute_episode_metrics(env=env, episode_info=self.state[scene])
         else:
             print("Environment not yet tracked, skipping metric aggregation!")
             return dict()
@@ -118,4 +128,4 @@ class MetricBase:
         Args:
             env (EnvironmentWrapper): Environment being tracked
         """
-        self.state[env.scene] = dict()
+        self.state[self._scene(env)] = dict()
