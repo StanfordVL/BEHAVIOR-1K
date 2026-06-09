@@ -1,11 +1,9 @@
-import torch as th
 import warp as wp
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
-from omnigibson.object_states.tensorized_state import _wp_from_torch
 from omnigibson.utils.python_utils import classproperty
 
 
@@ -22,7 +20,7 @@ def _temperature_decay_kernel(
     incoming heat rate scratch buffer. One thread per (scene, obj).
         values += (default_temp - values) * decay_rate * dt[0] + incoming_heat_rate * dt[0]
     Then zero the consumed entry so the buffer is fresh for the next-step writers
-    (HSS at the start of the next step plus any lag-1 writes from OnFire / cloth
+    (HeatSourceOrSink at the start of the next step plus any lag-1 writes from OnFire / cloth
     post-pass that happen after this kernel).
 
     `dt` is a single-element warp array (read as `dt[0]`) rather than a scalar so the
@@ -49,9 +47,8 @@ class Temperature(TensorizedAbsoluteState):
     # (S, N) float32 — per-step rate accumulator. HeatSourceOrSink (and cloth post-pass)
     # atomic_add into this; the decay kernel consumes it and zeros it at the end of the same
     # kernel so contributions from later-running states (OnFire, cloth post-pass) accumulate
-    # for the *next* step's consumption (lag-1, matches the pre-tensorized behavior).
-    INCOMING_HEAT_RATE = None
-    INCOMING_HEAT_RATE_WP = None
+    # for the next step's consumption.
+    INCOMING_HEAT_RATE = None  # wp.array (S, N) float32 — GPU-only scratch (single source of truth)
 
     @classmethod
     def get_dependencies(cls):
@@ -62,9 +59,9 @@ class Temperature(TensorizedAbsoluteState):
     @classmethod
     def get_optional_dependencies(cls):
         deps = super().get_optional_dependencies()
-        # HSS stays *optional*: the topo sort still places it before Temperature (so the
-        # captured graph runs HSS's atomic_add into INCOMING_HEAT_RATE before this kernel
-        # reads it), but objects without HSS on them (e.g. cookable food items) are still
+        # HeatSourceOrSink stays optional, the topo sort still places it before Temperature (so the
+        # captured graph runs HeatSourceOrSink's atomic_add into INCOMING_HEAT_RATE before this kernel
+        # reads it), but objects without HeatSourceOrSink on them (e.g. cookable food items) are still
         # eligible to receive a Temperature state.
         deps.add(HeatSourceOrSink)
         return deps
@@ -88,18 +85,16 @@ class Temperature(TensorizedAbsoluteState):
         # Allocate the per-step heat-rate scratch buffer. No carry-over: a partial step from
         # the previous configuration would be applied to the wrong indices.
         if cls.VALUES.numel() > 0:
-            cls.INCOMING_HEAT_RATE = th.zeros(cls.VALUES.shape, dtype=th.float32, device="cuda")
-            cls.INCOMING_HEAT_RATE_WP = _wp_from_torch(cls.INCOMING_HEAT_RATE)
+            cls.INCOMING_HEAT_RATE = wp.zeros(tuple(cls.VALUES.shape), dtype=wp.float32, device="cuda")
         else:
             cls.INCOMING_HEAT_RATE = None
-            cls.INCOMING_HEAT_RATE_WP = None
 
     @classmethod
     def _update_values(cls, values):
         # Apply temperature decay + incoming heat rate consumption via Warp kernel. dt is read
         # from cls._dt at kernel-launch time inside the captured graph, so the per-frame value
         # written in pre_update is visible without re-capturing the graph.
-        if cls.VALUES_WP is None or cls.INCOMING_HEAT_RATE_WP is None:
+        if cls.VALUES_WP is None or cls.INCOMING_HEAT_RATE is None:
             return
         S, O = cls.VALUES.shape[:2]
         wp.launch(
@@ -107,7 +102,7 @@ class Temperature(TensorizedAbsoluteState):
             dim=(S, O),
             inputs=[
                 cls.VALUES_WP,
-                cls.INCOMING_HEAT_RATE_WP,
+                cls.INCOMING_HEAT_RATE,
                 wp.float32(m.DEFAULT_TEMPERATURE),
                 wp.float32(m.TEMPERATURE_DECAY_SPEED),
                 cls._dt,
