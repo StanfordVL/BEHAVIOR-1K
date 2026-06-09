@@ -377,9 +377,11 @@ class Evaluator:
         metrics_dir: str = None,
     ) -> dict:
         """
-        Offline driver: evaluate every instance in @instances_to_run, processing them in batches of
-        ``num_envs`` (barrier between batches; no streaming refill). Writes one result JSON per instance
-        to @metrics_dir if given. Returns {instance id -> result metrics dict}.
+        Offline driver: evaluate every instance in @instances_to_run, processing them num_envs at a
+        time. The whole group finishes before the next group loads, and an early-finishing slot waits
+        idle rather than getting a new instance -- loading an instance settles physics for ALL scenes
+        at once, so refilling one slot mid-group would disturb the slots still running. Writes one
+        result JSON per instance to @metrics_dir if given. Returns {instance id -> result metrics dict}.
         """
         task_name = self.cfg.task.name
 
