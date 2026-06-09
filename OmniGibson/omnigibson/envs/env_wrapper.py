@@ -64,14 +64,16 @@ class EnvironmentWrapper(Wrapper, Registerable):
         """
         return self.env.step(action, n_render_iterations=n_render_iterations)
 
-    def reset(self):
+    def reset(self, **kwargs):
         """
-        By default, run the normal environment reset() function
+        By default, run the normal environment reset() function. Keyword arguments (e.g. ``env_indices``
+        for vectorized per-env reset, ``seed``, ``options``) are forwarded to the wrapped environment so
+        the wrapper stays transparent to reset.
 
         Returns:
             dict: Environment observation space after reset occurs
         """
-        return self.env.reset()
+        return self.env.reset(**kwargs)
 
     def observation_spec(self):
         """
