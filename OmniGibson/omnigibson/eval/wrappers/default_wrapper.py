@@ -16,7 +16,8 @@ class DefaultWrapper(EnvironmentWrapper):
         super().__init__(env=env)
         # Note that from eval.py we only set rgb modality, here we include more (depth + seg_instance_id)
         # Here, we change the camera resolution and head camera aperture to match the one we used in data collection
-        for robot in env.robots:
+        # env.robots is list[list[Robot]] (one inner list per scene); flatten to every robot.
+        for robot in [r for scene_robots in env.robots for r in scene_robots]:
             # Update robot sensors:
             for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
                 sensor_name = camera_name.split("::")[1]
