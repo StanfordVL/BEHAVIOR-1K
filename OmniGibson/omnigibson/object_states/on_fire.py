@@ -183,8 +183,10 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        # OnFire reads Temperature.VALUES (pre-step value, before this step's decay) for the
-        # ignition gate, and writes back to Temperature via the clamp. It also needs AABB.
+        # Temperature is a dependency, so Temperature.global_update() (the decay kernel) runs
+        # before OnFire in the captured graph — OnFire's ignition gate therefore reads this
+        # step's already-decayed Temperature. OnFire then writes back to Temperature via the
+        # clamp. It also needs AABB.
         deps.update({AABB, Temperature})
         return deps
 
