@@ -1,7 +1,31 @@
 import omnigibson as og
-from omnigibson.eval.utils.vec_eval_scheduler import compute_q_score
 from omnigibson.metrics.metric_base import MetricBase
-from typing import Optional
+from typing import Optional, Sequence
+
+
+def compute_q_score(
+    success: bool,
+    now_satisfied_options: Sequence[Sequence[bool]],
+    initial_satisfied_options: Sequence[Sequence[bool]],
+) -> float:
+    """
+    Partial-success (Q-score) for one episode/env: a full success scores 1.0; otherwise the fraction
+    of goal predicates that were NOT satisfied at episode start but ARE satisfied now, maximized over
+    the alternative goal-state options. Mirrors the pre-refactor inline formula (lives here next to its
+    only caller, TaskMetric). Empty options/no options return 0.0 instead of raising.
+    """
+    if success:
+        return 1.0
+    if not now_satisfied_options:
+        return 0.0
+    option_scores = []
+    for now_opt, init_opt in zip(now_satisfied_options, initial_satisfied_options):
+        if len(now_opt) == 0:
+            option_scores.append(0.0)
+            continue
+        newly_satisfied = sum(int((not init) and now) for now, init in zip(now_opt, init_opt))
+        option_scores.append(newly_satisfied / len(now_opt))
+    return max(option_scores) if option_scores else 0.0
 
 
 class TaskMetric(MetricBase):

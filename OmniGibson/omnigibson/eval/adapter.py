@@ -6,7 +6,7 @@ import os
 import sys
 import traceback
 from signal import SIGINT, signal
-from typing import Any, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -33,7 +33,6 @@ from omnigibson.eval.utils.eval_utils import (
     generate_basic_environment_config,
 )
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
-from omnigibson.eval.utils.vec_eval_scheduler import evaluate_instances_batched
 from omnigibson.macros import create_module_macros, gm, macros
 from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
@@ -54,6 +53,57 @@ with macros.unlocked():
 
 logger = logging.getLogger("evaluator")
 logger.setLevel(logging.INFO)
+
+
+def evaluate_instances_batched(
+    instances: Sequence,
+    num_envs: int,
+    load_fn: Callable[[Dict[int, object]], None],
+    step_fn: Callable[[List[int]], "tuple[Sequence[bool], Sequence[bool]]"],
+    record_fn: Callable[..., object],
+    max_steps: Optional[int] = None,
+) -> "Dict[object, object]":
+    """
+    Drive evaluation of @instances in groups of @num_envs (see Evaluator.run for the plain-language
+    description). Pure orchestration: all sim work is delegated to the injected load_fn / step_fn /
+    record_fn, and a slot that finishes early is dropped from the active list (frozen) until the whole
+    group is done. Returns {instance id -> record_fn's return}.
+    """
+    if num_envs < 1:
+        raise ValueError(f"num_envs must be >= 1, got {num_envs}")
+
+    results: Dict[object, object] = {}
+    pending = list(instances)
+
+    while pending:
+        batch = pending[:num_envs]
+        pending = pending[num_envs:]
+
+        slot_to_instance: Dict[int, object] = {slot: inst for slot, inst in enumerate(batch)}
+        load_fn(dict(slot_to_instance))
+
+        active = {slot: True for slot in slot_to_instance}
+        step = 0
+        while any(active.values()):
+            active_slots = sorted(slot for slot, is_active in active.items() if is_active)
+            terminated, truncated = step_fn(active_slots)
+            step += 1
+
+            hit_cap = max_steps is not None and step >= max_steps
+            for slot in active_slots:
+                term = bool(terminated[slot])
+                trunc = bool(truncated[slot]) or hit_cap
+                if term or trunc:
+                    results[slot_to_instance[slot]] = record_fn(
+                        slot=slot,
+                        instance=slot_to_instance[slot],
+                        step=step,
+                        terminated=term,
+                        truncated=trunc,
+                    )
+                    active[slot] = False
+
+    return results
 
 
 class Evaluator:

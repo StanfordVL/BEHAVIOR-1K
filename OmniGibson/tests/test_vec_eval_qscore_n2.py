@@ -16,7 +16,7 @@ import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.eval.utils.vec_eval_scheduler import compute_q_score
+from omnigibson.metrics.task_metric import compute_q_score
 from omnigibson.metrics import AgentMetric, TaskMetric
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
 
