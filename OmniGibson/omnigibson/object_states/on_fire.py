@@ -340,7 +340,7 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
 
         # 2) atomic_add (T_fire - T_n) * rate into INCOMING_HEAT_RATE
         if (
-            Temperature.INCOMING_HEAT_RATE_WP is not None
+            Temperature.INCOMING_HEAT_RATE is not None
             and cls._temp_to_aabb_idx is not None
             and AABB.VALUES_WP is not None
         ):
@@ -361,7 +361,7 @@ class OnFire(TensorizedAbsoluteState, LinkBasedStateMixin):
                         RigidBodyViewAPI.POSE_MATRICES,
                         AABB.VALUES_WP,
                         Temperature.VALUES_WP,
-                        Temperature.INCOMING_HEAT_RATE_WP,
+                        Temperature.INCOMING_HEAT_RATE,
                     ],
                     device="cuda",
                 )

@@ -527,7 +527,7 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         if (
             cls._affected_mask is None
             or Temperature.VALUES_WP is None
-            or Temperature.INCOMING_HEAT_RATE_WP is None
+            or Temperature.INCOMING_HEAT_RATE is None
             or cls._temp_to_aabb_idx is None
             or AABB.VALUES_WP is None
         ):
@@ -564,7 +564,7 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
                 Temperature.VALUES_WP,
                 wp.int32(has_inside),
                 cls._affected_mask,
-                Temperature.INCOMING_HEAT_RATE_WP,
+                Temperature.INCOMING_HEAT_RATE,
             ],
             device="cuda",
         )
