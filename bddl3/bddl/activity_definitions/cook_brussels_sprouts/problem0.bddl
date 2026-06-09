@@ -2,61 +2,62 @@
     (:domain behavior-1k)
 
     (:objects
-        brussels_sprouts.n.01_1 brussels_sprouts.n.01_2 brussels_sprouts.n.01_3 brussels_sprouts.n.01_4 brussels_sprouts.n.01_5 brussels_sprouts.n.01_6 brussels_sprouts.n.01_7 brussels_sprouts.n.01_8 - brussels_sprouts.n.01
+        brussels_sprouts.n.01_1 brussels_sprouts.n.01_2 brussels_sprouts.n.01_3 brussels_sprouts.n.01_4 - brussels_sprouts.n.01
+        half__brussels_sprouts.n.01_1 half__brussels_sprouts.n.01_2 half__brussels_sprouts.n.01_3 half__brussels_sprouts.n.01_4 half__brussels_sprouts.n.01_5 half__brussels_sprouts.n.01_6 half__brussels_sprouts.n.01_7 half__brussels_sprouts.n.01_8 - half__brussels_sprouts.n.01
         tupperware.n.01_1 - tupperware.n.01
-        stockpot.n.01_1 - stockpot.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        oven.n.01_1 - oven.n.01
         electric_refrigerator.n.01_1 - electric_refrigerator.n.01
-        stove.n.01_1 - stove.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
-    
-    (:init 
-        (inside brussels_sprouts.n.01_1 tupperware.n.01_1) 
-        (inside brussels_sprouts.n.01_2 tupperware.n.01_1) 
-        (inside brussels_sprouts.n.01_3 tupperware.n.01_1) 
-        (inside brussels_sprouts.n.01_4 tupperware.n.01_1) 
-        (inside brussels_sprouts.n.01_5 tupperware.n.01_1) 
-        (inside brussels_sprouts.n.01_6 tupperware.n.01_1) 
-        (inside brussels_sprouts.n.01_7 tupperware.n.01_1) 
-        (inside brussels_sprouts.n.01_8 tupperware.n.01_1) 
+
+    (:init
+        (inside brussels_sprouts.n.01_1 tupperware.n.01_1)
+        (inside brussels_sprouts.n.01_2 tupperware.n.01_1)
+        (inside brussels_sprouts.n.01_3 tupperware.n.01_1)
+        (inside brussels_sprouts.n.01_4 tupperware.n.01_1)
         (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
-        (not 
-            (cooked brussels_sprouts.n.01_1)
-        ) 
-        (not 
-            (cooked brussels_sprouts.n.01_2)
-        ) 
-        (not 
-            (cooked brussels_sprouts.n.01_3)
-        ) 
-        (not 
-            (cooked brussels_sprouts.n.01_4)
-        ) 
-        (not 
-            (cooked brussels_sprouts.n.01_5)
-        ) 
-        (not 
-            (cooked brussels_sprouts.n.01_6)
-        ) 
-        (not 
-            (cooked brussels_sprouts.n.01_7)
-        ) 
-        (not 
-            (cooked brussels_sprouts.n.01_8)
-        ) 
-        (ontop stockpot.n.01_1 stove.n.01_1)
-        (inroom electric_refrigerator.n.01_1 kitchen) 
-        (inroom stove.n.01_1 kitchen) 
-        (inroom floor.n.01_1 kitchen) 
+        (not (cooked brussels_sprouts.n.01_1))
+        (not (cooked brussels_sprouts.n.01_2))
+        (not (cooked brussels_sprouts.n.01_3))
+        (not (cooked brussels_sprouts.n.01_4))
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1)
+        (ontop cookie_sheet.n.01_1 countertop.n.01_1)
+        (future half__brussels_sprouts.n.01_1)
+        (future half__brussels_sprouts.n.01_2)
+        (future half__brussels_sprouts.n.01_3)
+        (future half__brussels_sprouts.n.01_4)
+        (future half__brussels_sprouts.n.01_5)
+        (future half__brussels_sprouts.n.01_6)
+        (future half__brussels_sprouts.n.01_7)
+        (future half__brussels_sprouts.n.01_8)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom oven.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen)
         (ontop agent.n.01_1 floor.n.01_1)
     )
-    
-    (:goal 
-        (and 
-            (forall 
-                (?brussels_sprouts.n.01 - brussels_sprouts.n.01)
-                (cooked ?brussels_sprouts.n.01)
+
+    (:goal
+        (and
+            (forall
+                (?half__brussels_sprouts.n.01 - half__brussels_sprouts.n.01)
+                (and
+                    (real ?half__brussels_sprouts.n.01)
+                    (cooked ?half__brussels_sprouts.n.01)
+                    (inside ?half__brussels_sprouts.n.01 oven.n.01_1)
+                )
+            )
+            (not
+                (open ?electric_refrigerator.n.01_1)
+            )
+            (not
+                (open ?oven.n.01_1)
             )
         )
     )

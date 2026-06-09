@@ -11,9 +11,9 @@
     
     (:init 
         (ontop jar__of__honey.n.01_1 countertop.n.01_1) 
-        (inroom cabinet.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 entryway) 
         (inroom countertop.n.01_1 kitchen) 
-        (inroom floor.n.01_1 kitchen) 
+        (inroom floor.n.01_1 living_room) 
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
