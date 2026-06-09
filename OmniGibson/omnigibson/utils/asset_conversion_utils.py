@@ -186,7 +186,7 @@ def _get_visual_objs_from_urdf(urdf_path):
     return visual_objs
 
 
-def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path, dataset_root):
+def _force_asset_pipeline_materials(stage, obj_category, obj_model, usd_path, dataset_root):
     """
     Updates the object to use V-Ray materials rendered through the asset pipeline instead of
     its currently assigned materials.
@@ -200,7 +200,7 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
     6. Copies state-conditioned texture maps (e.g., cooked, soaked) for the object.
 
     Args:
-        obj_prim (Usd.Prim): The USD prim representing the object.
+        stage (pxr.Usd.Stage): The USD stage.
         obj_category (str): The category of the object (e.g., "ceilings", "walls").
         obj_model (str): The model name of the object.
         usd_path (str): The path to the USD file.
@@ -212,24 +212,25 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
     """
     usd_dir = os.path.dirname(usd_path)
 
-    # Remove the material prims as we will create them explictly later.
-    stage = lazy.omni.usd.get_context().get_stage()
-    for prim in obj_prim.GetChildren():
-        looks_prim = None
-        if prim.GetName() == "Looks":
-            looks_prim = prim
-        elif prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-            looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
-            looks_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            continue
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            log.debug(
-                f"Removed material prim {subprim.GetPath()}:",
-                stage.RemovePrim(subprim.GetPath()),
-            )
+    obj_prim = stage.GetDefaultPrim()
+
+    # Remove all /meshes/*/Looks hierarchies and clear MaterialBindingAPI on all meshes.
+    meshes_prim = stage.GetPrimAtPath("/meshes")
+    for mesh_group_prim in meshes_prim.GetChildren():
+        mesh_world_prim = mesh_group_prim.GetChild("World")
+        looks_prim = mesh_world_prim.GetChild("Looks")
+        if looks_prim:
+            stage.RemovePrim(looks_prim.GetPath())
+        mesh_prim = mesh_world_prim.GetChild("mesh")
+        if mesh_prim and mesh_prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
+            # Erase the binding property and the apiSchemas entry from the prim entirely.
+            # (Usd.Prim.RemoveAPI would instead author a "delete" entry in the apiSchemas list op
+            # and leave the material:binding property behind.) Clearing the metadata wholesale is
+            # safe since MaterialBindingAPI is the only schema the URDF importer applies here.
+            applied_schemas = mesh_prim.GetAppliedSchemas()
+            assert applied_schemas == ["MaterialBindingAPI"], f"Unexpected applied schemas: {applied_schemas}"
+            mesh_prim.RemoveProperty("material:binding")
+            mesh_prim.ClearMetadata("apiSchemas")
 
     # Remove the materials copied over by the URDF importer
     urdf_importer_mtl_dir = os.path.join(usd_dir, "materials")
@@ -293,7 +294,9 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
             mtl_name="OmniGibsonVRayMtl",
             mtl_created_list=mtl_created_list,
         )
-        vray_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
+        mtl_prim_path = f"{obj_prim.GetPath().pathString}/Looks/{mtl_name}"
+        lazy.omni.kit.commands.execute("MovePrim", path_from=mtl_created_list[0], path_to=mtl_prim_path)
+        vray_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_prim_path)
 
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
@@ -310,26 +313,15 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
     root_prim_path = obj_prim.GetPrimPath().pathString
     for link_name, mesh_mtl_names in link_mtl_files.items():
         for mesh_name, mtl_name in mesh_mtl_names.items():
-            if mesh_name is not None:
-                # Omni only accepts a-z, A-Z as valid start characters for prim names
-                # So we check if there is an invalid character, and modify it as we know Omni does
-                if not ord("a") <= ord(mesh_name[0]) <= ord("z") and not ord("A") <= ord(mesh_name[0]) <= ord("Z"):
-                    mesh_name = "a_" + mesh_name[1:]
-                mesh_prim_path = f"{root_prim_path}/{link_name}/visuals/{mesh_name}"
-                visual_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
-                assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
-            else:
-                visuals_scope_prim_path = f"{root_prim_path}/{link_name}/visuals"
-                visuals_scope_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(visuals_scope_prim_path)
-                assert visuals_scope_prim, f"Error: Did not find valid visuals scope prim at {visuals_scope_prim_path}!"
-                (visual_prim,) = visuals_scope_prim.GetChildren()
-                assert visual_prim, f"Error: Did not find valid visual prim at {visuals_scope_prim_path}!"
+            visuals_scope_prim_path = f"{root_prim_path}/{link_name}/visuals"
+            visuals_scope_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(visuals_scope_prim_path)
+            assert visuals_scope_prim, f"Error: Did not find valid visuals scope prim at {visuals_scope_prim_path}!"
 
             # Bind the created link material to the visual prim
             log.debug(
-                f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {visual_prim.GetPath().pathString}..."
+                f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {visuals_scope_prim.GetPath().pathString}..."
             )
-            lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(
+            lazy.pxr.UsdShade.MaterialBindingAPI(visuals_scope_prim).Bind(
                 shaders[mtl_name], lazy.pxr.UsdShade.Tokens.strongerThanDescendants
             )
 
@@ -612,13 +604,8 @@ def _process_glass_link(prim):
     # `visuals` Xform child (e.g. /{model}/{link}/visuals/<mesh_name>) — the
     # old fixed-depth walk only matched meshes sitting directly under the
     # link or under a Scope and missed those.
-    glass_prim_paths = [
-        descendant.GetPath().pathString
-        for descendant in lazy.pxr.Usd.PrimRange(prim.GetChild("visuals"))
-        if descendant.GetTypeName() == "Mesh"
-    ]
-
-    assert glass_prim_paths, f"No visual Mesh prims found under {prim.GetPath()}"
+    glass_prim_path = prim.GetChild("visuals")
+    assert glass_prim_path, f"No visual Mesh prims found under {prim.GetPath()}"
 
     stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     root_path = stage.GetDefaultPrim().GetPath().pathString
@@ -632,14 +619,13 @@ def _process_glass_link(prim):
             mtl_created_list=mtl_created,
         )
 
-    for glass_prim_path in glass_prim_paths:
-        print(f"Applying glass material {glass_mtl_prim_path} to {glass_prim_path}")
-        lazy.omni.kit.commands.execute(
-            "BindMaterialCommand",
-            prim_path=glass_prim_path,
-            material_path=glass_mtl_prim_path,
-            strength=None,
-        )
+    print(f"Applying glass material {glass_mtl_prim_path} to {glass_prim_path}")
+    lazy.omni.kit.commands.execute(
+        "BindMaterialCommand",
+        prim_path=glass_prim_path,
+        material_path=glass_mtl_prim_path,
+        strength=None,
+    )
 
 
 def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_asset_pipeline_materials=False):
@@ -772,7 +758,7 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_a
     # Add material channels
     if force_asset_pipeline_materials:
         _force_asset_pipeline_materials(
-            obj_prim=prim,
+            stage=stage,
             obj_category=obj_category,
             obj_model=obj_model,
             usd_path=str(usd_path),
@@ -981,13 +967,15 @@ def convert_urdf_to_usd(
     # Find all the relevant files. The URDF-to-USD conversion process creates a few different files:
     # - configuration/
     # - configuration/materials/: directory containing the materials used by the object.
-    # - configuration/{model}_base.usd: USD file containing the base geometry of the object.
+    # - configuration/{model}_base.usd: USD file containing the base geometry of the object, including the nice
+    #                                   instanceable references for the visual and collision meshes.
     # - configuration/{model}_physics.usd: USD file containing physx APIs for the object, layered on top of the base USD file.
-    #                                      We take this file as our root USD file since it contains everything we need.
+    #                                      We merge this layer's opinions into the base layer and remove it.
     # - configuration/{model}_sensor.usd: USD file containing sensor APIs for the object. Usually empty, so we remove.
     # - configuration/{model}_robot.usd: USD file containing some robot joint offset metadata. We don't need this, so we remove.
     # - {model}.usd: Main USD file for the object. Defines "variantSets" which allow us to select between different modes of the
-    #                object (e.g. physx vs just geometry). This is not useful for us, so we remove, and save the physics file as our root USD file.
+    #                object (e.g. physx vs just geometry). This is not useful for us, so we remove, and save the merged
+    #                base + physics layer as our root USD file.
     configuration_dir = usd_dir / "configuration"
     physics_usd_path = configuration_dir / f"{obj_model}_physics.usd"
     sensor_usd_path = configuration_dir / f"{obj_model}_sensor.usd"
@@ -1007,13 +995,35 @@ def convert_urdf_to_usd(
         for texture in current_materials.iterdir():
             texture.rename(new_materials / texture.name)
 
-    # Move the physics USD to the USD path. Move the base USD also to the root directory.
-    physics_usd_path.rename(usd_path)
-    correct_base_usd_path = usd_path.with_name(base_usd_path.name)
-    base_usd_path.rename(correct_base_usd_path)
+    # Combine the physics layer into the base layer. The physics layer sublayers the base layer and contains
+    # "over" opinions on its prims (physics APIs and attributes) plus some new prims (joints, collision
+    # references, physics scene). We intentionally do NOT flatten the composed stage here, since flattening
+    # destroys the instanceable references in the base layer. Instead, we stitch the physics layer's specs
+    # directly into the base layer. StitchLayers copies every prim spec / field from the (weaker) physics
+    # layer that does not already exist in the (stronger) base layer, properly merging list ops such as the
+    # prepended apiSchemas. Keeping the base layer as the strong layer ensures prims keep their "def"
+    # specifiers and type names instead of being downgraded to the physics layer's "over"s.
+    base_layer = lazy.pxr.Sdf.Layer.FindOrOpen(str(base_usd_path))
+    physics_layer = lazy.pxr.Sdf.Layer.FindOrOpen(str(physics_usd_path))
+    assert base_layer is not None, f"Could not open base layer at {base_usd_path}"
+    assert physics_layer is not None, f"Could not open physics layer at {physics_usd_path}"
+    lazy.pxr.UsdUtils.StitchLayers(base_layer, physics_layer)
 
-    # Now reload at the correct path.
-    base_stage = lazy.pxr.Usd.Stage.Open(str(correct_base_usd_path))
+    # The stitch also copies the physics layer's subLayers entry (which points at the base layer itself),
+    # so remove all sublayers to keep the merged layer self-contained.
+    base_layer.subLayerPaths.clear()
+
+    # Now open the merged stage for some fixes.
+    merged_stage = lazy.pxr.Usd.Stage.Open(base_layer)
+
+    # Delete any collision groups and physics scenes
+    for child_prim in list(merged_stage.Traverse()):
+        if child_prim.GetTypeName() in ("PhysicsCollisionGroup", "PhysicsScene"):
+            del (
+                merged_stage.GetRootLayer()
+                .GetPrimAtPath(child_prim.GetPath().GetParentPath())
+                .nameChildren[child_prim.GetPath().name]
+            )
 
     # Also update the asset paths
     def _update_path(asset_path):
@@ -1034,27 +1044,17 @@ def convert_urdf_to_usd(
         print("Updating", asset_path, "to", final_path)
         return final_path
 
-    lazy.pxr.UsdUtils.ModifyAssetPaths(base_stage.GetRootLayer(), _update_path)
+    lazy.pxr.UsdUtils.ModifyAssetPaths(merged_stage.GetRootLayer(), _update_path)
 
-    # Save the base stage
-    base_stage.Save()
-    del base_stage
+    # Save the merged stage and release our handles on the layers.
+    merged_stage.Save()
+    del merged_stage
+    del base_layer
+    del physics_layer
 
-    # Now open the physics stage for some fixes.
-    physics_stage = lazy.pxr.Usd.Stage.Open(str(physics_usd_path))
-
-    # Delete any collision groups and physics scenes
-    for child_prim in list(physics_stage.Traverse()):
-        if child_prim.GetTypeName() in ("PhysicsCollisionGroup", "PhysicsScene"):
-            del (
-                physics_stage.GetRootLayer()
-                .GetPrimAtPath(child_prim.GetPath().GetParentPath())
-                .nameChildren[child_prim.GetPath().name]
-            )
-
-    # Save the physics stage
-    physics_stage.Save()
-    del physics_stage
+    # Remove the physics file, and move the merged base file to the final USD path.
+    physics_usd_path.unlink()
+    base_usd_path.rename(usd_path)
 
     # Remove the old stage files.
     shutil.rmtree(configuration_dir)

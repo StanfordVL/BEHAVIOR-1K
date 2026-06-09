@@ -148,7 +148,7 @@ if __name__ == "__main__":
         print("Encrypting")
         for usd_path in glob.glob(
             os.path.join(
-                dataset_root, "objects", obj_category, obj_model, "usd", "*_base.usd"
+                dataset_root, "objects", obj_category, obj_model, "usd", "*.usd"
             )
         ):
             encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
