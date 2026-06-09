@@ -156,7 +156,11 @@ class Evaluator:
         return instantiate(env_wrapper, env=env)
 
     def load_robots(self) -> List[Robot]:
-        # env.robots is list[list[Robot]] (one inner list per scene); each scene has a single robot.
+        # env.robots is list[list[Robot]] (one inner list per scene). The eval pipeline assumes a single
+        # robot per scene (load_env configures exactly one "robot_r1"; _preprocess_obs hardcodes its
+        # name) -- assert it so a multi-robot config fails loudly instead of silently using robot 0.
+        for scene_robots in self.env.robots:
+            assert len(scene_robots) == 1, f"Eval assumes one robot per scene, got {len(scene_robots)}."
         return [scene_robots[0] for scene_robots in self.env.robots]
 
     def load_policies(self) -> List[Any]:
