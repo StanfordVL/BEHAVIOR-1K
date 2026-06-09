@@ -919,93 +919,6 @@ def _create_urdf_import_config(
     return import_config
 
 
-def _migrate_materials_to_looks(stage):
-    """
-    Migrates material prims from the /meshes hierarchy to /Looks hierarchy and updates all material bindings.
-
-    This is necessary for IsaacSim 5.1+ where materials are placed under the /meshes hierarchy,
-    which gets deleted during post-processing. By moving materials to /Looks, we preserve them
-    and follow USD best practices.
-
-    Args:
-        stage (pxr.Usd.Stage): The USD stage containing the materials to migrate
-
-    Returns:
-        dict: Mapping from old material paths to new material paths
-    """
-    # Get the meshes prim - this is where materials are currently located
-    meshes_prim = stage.GetPrimAtPath("/meshes")
-    if not meshes_prim.IsValid():
-        log.debug("No /meshes prim found, skipping material migration")
-        return {}
-
-    # Find all Material prims under /meshes
-    material_prims = []
-    for prim in lazy.pxr.Usd.PrimRange(meshes_prim):
-        if prim.GetTypeName() == "Material":
-            material_prims.append(prim)
-
-    if not material_prims:
-        log.debug("No materials found in /meshes hierarchy")
-        return {}
-
-    log.debug(f"Found {len(material_prims)} material prims to migrate")
-
-    # Get the /Looks scope
-    looks_prim = stage.GetDefaultPrim().GetChild("Looks")
-    looks_path = looks_prim.GetPath()
-
-    # Map from old paths to new paths
-    material_path_mapping = {}
-
-    # Move each material to /Looks
-    for material_prim in material_prims:
-        old_path = material_prim.GetPath()
-        material_name = material_prim.GetName()
-
-        # Create a unique name in /Looks if there's a conflict
-        new_path = looks_path.AppendChild(material_name)
-        counter = 0
-        while stage.GetPrimAtPath(new_path).IsValid():
-            new_path = looks_path.AppendChild(f"{material_name}_{counter}")
-            counter += 1
-
-        # Copy the material prim to the new location
-        success = lazy.pxr.Sdf.CopySpec(stage.GetRootLayer(), old_path, stage.GetRootLayer(), new_path)
-
-        if success:
-            material_path_mapping[str(old_path)] = str(new_path)
-            log.debug(f"Moved material from {old_path} to {new_path}")
-        else:
-            log.warning(f"Failed to copy material from {old_path} to {new_path}")
-
-    # Update all material bindings to point to new paths
-    for prim in stage.Traverse():
-        # Check if this prim has material bindings
-        if lazy.pxr.UsdShade.MaterialBindingAPI.CanApply(prim):
-            binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(prim)
-
-            # Get direct binding
-            direct_binding = binding_api.GetDirectBinding()
-            if direct_binding:
-                material_path = direct_binding.GetMaterialPath()
-                material_path_str = str(material_path)
-
-                # If this material was moved, update the binding
-                if material_path_str in material_path_mapping:
-                    new_material_path = material_path_mapping[material_path_str]
-                    new_material_prim = stage.GetPrimAtPath(new_material_path)
-
-                    if new_material_prim.IsValid():
-                        new_material = lazy.pxr.UsdShade.Material(new_material_prim)
-                        binding_api.Bind(new_material)
-                        log.debug(
-                            f"Updated material binding on {prim.GetPath()} from {material_path_str} to {new_material_path}"
-                        )
-
-    return material_path_mapping
-
-
 def convert_urdf_to_usd(
     urdf_path,
     obj_category,
@@ -1065,14 +978,26 @@ def convert_urdf_to_usd(
     # Also clear again to release the file.
     og.clear()
 
-    # Find all the relevant files
+    # Find all the relevant files. The URDF-to-USD conversion process creates a few different files:
+    # - configuration/
+    # - configuration/materials/: directory containing the materials used by the object.
+    # - configuration/{model}_base.usd: USD file containing the base geometry of the object.
+    # - configuration/{model}_physics.usd: USD file containing physx APIs for the object, layered on top of the base USD file.
+    #                                      We take this file as our root USD file since it contains everything we need.
+    # - configuration/{model}_sensor.usd: USD file containing sensor APIs for the object. Usually empty, so we remove.
+    # - configuration/{model}_robot.usd: USD file containing some robot joint offset metadata. We don't need this, so we remove.
+    # - {model}.usd: Main USD file for the object. Defines "variantSets" which allow us to select between different modes of the
+    #                object (e.g. physx vs just geometry). This is not useful for us, so we remove, and save the physics file as our root USD file.
     configuration_dir = usd_dir / "configuration"
     physics_usd_path = configuration_dir / f"{obj_model}_physics.usd"
     sensor_usd_path = configuration_dir / f"{obj_model}_sensor.usd"
+    robot_usd_path = configuration_dir / f"{obj_model}_robot.usd"
+    base_usd_path = configuration_dir / f"{obj_model}_base.usd"
 
     # Remove the mixed and sensor files
     usd_path.unlink()
     sensor_usd_path.unlink()
+    robot_usd_path.unlink()
 
     # Move the materials directory contents
     current_materials = configuration_dir / "materials" / "textures"
@@ -1082,40 +1007,13 @@ def convert_urdf_to_usd(
         for texture in current_materials.iterdir():
             texture.rename(new_materials / texture.name)
 
-    # Load the physics stage and prepare to flatten it and save it.
-    physics_stage = lazy.pxr.Usd.Stage.Open(str(physics_usd_path))
-
-    # Prior to flattening things, we want to remove all instanceable flags and refs. We do this because
-    # if you flatten with instancing the flatten function ends up duplicating the whole mesh tree.
-    # We keep track to reenable them post-flattening
-    instanceable_prims_and_refs = {}
-    for prim in physics_stage.Traverse():
-        arcs = lazy.pxr.Usd.PrimCompositionQuery.GetDirectReferences(prim).GetCompositionArcs()
-        if not arcs:
-            continue
-        assert len(arcs) == 1, f"Expected only one reference arc for {prim.GetPath()}"
-        instanceable_prims_and_refs[str(prim.GetPath())] = (
-            str(arcs[0].GetTargetPrimPath()),
-            prim.IsInstanceable(),
-        )
-    for instanceable_prim_path, _ in instanceable_prims_and_refs.items():
-        instanceable_prim = physics_stage.GetPrimAtPath(instanceable_prim_path)
-        instanceable_prim.SetInstanceable(False)
-        instanceable_prim.GetReferences().ClearReferences()
-
-    # Flatten everything and save at the target location.
-    physics_stage.Flatten()
-    physics_stage.Export(str(usd_path))
-    del physics_stage
+    # Move the physics USD to the USD path. Move the base USD also to the root directory.
+    physics_usd_path.rename(usd_path)
+    correct_base_usd_path = usd_path.with_name(base_usd_path.name)
+    base_usd_path.rename(correct_base_usd_path)
 
     # Now reload at the correct path.
-    side_stage = lazy.pxr.Usd.Stage.Open(str(usd_path))
-
-    # Return everything back to its original reference state.
-    for instanceable_prim_path, (ref, is_instanceable) in instanceable_prims_and_refs.items():
-        instanceable_prim = side_stage.GetPrimAtPath(instanceable_prim_path)
-        instanceable_prim.SetInstanceable(is_instanceable and _ALLOW_INSTANCING)
-        instanceable_prim.GetReferences().AddReference("", ref)
+    base_stage = lazy.pxr.Usd.Stage.Open(str(correct_base_usd_path))
 
     # Also update the asset paths
     def _update_path(asset_path):
@@ -1136,132 +1034,27 @@ def convert_urdf_to_usd(
         print("Updating", asset_path, "to", final_path)
         return final_path
 
-    lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
+    lazy.pxr.UsdUtils.ModifyAssetPaths(base_stage.GetRootLayer(), _update_path)
 
-    # Go through all of the prims in the visuals and colliders trees, and promote the mesh prims
-    # one level up, so instead of visuals -> linkname -> mesh we just have visuals -> linkname where
-    # the linkname prim has the mesh and xforms combined.
-    visuals_prim = side_stage.GetPrimAtPath("/visuals")
-    colliders_prim = side_stage.GetPrimAtPath("/colliders")
-    links = list(visuals_prim.GetChildren()) + list(colliders_prim.GetChildren())
-    wrappers = [wrapper for link in links for wrapper in link.GetChildren()]
+    # Save the base stage
+    base_stage.Save()
+    del base_stage
 
-    for parent_prim in wrappers:
-        parent_path = parent_prim.GetPath()
-        grandparent_path = parent_path.GetParentPath()
+    # Now open the physics stage for some fixes.
+    physics_stage = lazy.pxr.Usd.Stage.Open(str(physics_usd_path))
 
-        # Find the child prim - it's actually away at a reference. There should be exactly one.
-        references = parent_prim.GetPrimStack()[0].referenceList.prependedItems
-        assert len(references) == 1, f"{parent_path} is not a reference!"
-        referenced_wrapper_path_str = str(references[0].primPath)
-        referenced_wrapper_prim = side_stage.GetPrimAtPath(referenced_wrapper_path_str)
-        assert referenced_wrapper_prim.IsValid()
-
-        child_prim = referenced_wrapper_prim.GetChild("World").GetChild("mesh")
-        assert child_prim.IsValid()
-        child_path = child_prim.GetPath()
-
-        # Duplicate the properties on the parent prim onto the child.
-        for attr in parent_prim.GetAttributes():
-            if attr.IsAuthored():
-                # Get attribute info
-                attr_name = attr.GetName()
-                attr_type = attr.GetTypeName()
-
-                # Create or get the attribute on destination
-                dest_attr = child_prim.CreateAttribute(attr_name, attr_type)
-
-                # Copy the value
-                if attr.HasValue():
-                    dest_attr.Set(attr.Get())
-
-        # Delete the parent prim
-        del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
-
-        # Move the child prim to the parent's path.
-        assert lazy.pxr.Sdf.CopySpec(side_stage.GetRootLayer(), child_path, side_stage.GetRootLayer(), parent_path)
-
-        # Delete the child's original path
-        del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
-
-    # Migrate materials from /meshes to /Looks before deleting the meshes hierarchy
-    # This is necessary for IsaacSim 5.1+ where materials are now placed under /meshes
-    _migrate_materials_to_looks(side_stage)
-
-    # Remove the meshes hierarchy altogether
-    del side_stage.GetRootLayer().rootPrims["meshes"]
-
-    # Delete any collision groups
-    for child_prim in list(side_stage.Traverse()):
-        if child_prim.GetTypeName() == "PhysicsCollisionGroup":
+    # Delete any collision groups and physics scenes
+    for child_prim in list(physics_stage.Traverse()):
+        if child_prim.GetTypeName() in ("PhysicsCollisionGroup", "PhysicsScene"):
             del (
-                side_stage.GetRootLayer()
+                physics_stage.GetRootLayer()
                 .GetPrimAtPath(child_prim.GetPath().GetParentPath())
                 .nameChildren[child_prim.GetPath().name]
             )
 
-    # Find references to correct. The idea here is that we do not want our `visuals` or `collisions`
-    # prims to be references, because we want to be able to put properties on the meshes underneath.
-    # Instead, we'll just make the mesh prims instanceable.
-    found_reference_prims = {}
-    for possible_referrer in list(side_stage.Traverse()):
-        if not possible_referrer.IsValid():
-            continue
-        # Check if the prim has a reference on it
-        references = possible_referrer.GetPrimStack()[0].referenceList.prependedItems
-        if references:
-            assert possible_referrer.GetName() in ["visuals", "collisions"]
-            assert (
-                len(references) == 1
-            ), f"Expected exactly one reference for {possible_referrer.GetPath()}, got {len(references)}"
-            referrer_path = possible_referrer.GetPath()
-            referee_path = references[0].primPath
-            # Isaac Sim's URDF importer emits a placeholder `visuals` /
-            # `collisions` reference on every link, even stub meta-links that
-            # have no geometry — those references are dangling. Just drop the
-            # empty referrer prim so we don't choke on it below.
-            if not side_stage.GetPrimAtPath(referee_path).IsValid():
-                del (
-                    side_stage.GetRootLayer()
-                    .GetPrimAtPath(referrer_path.GetParentPath())
-                    .nameChildren[referrer_path.name]
-                )
-                continue
-            found_reference_prims[referrer_path] = referee_path
-            del side_stage.GetRootLayer().GetPrimAtPath(referrer_path.GetParentPath()).nameChildren[referrer_path.name]
-
-    # Create references for all of the individual meshes
-    for referrer_prim_path, referee_path in found_reference_prims.items():
-        referee_prim = side_stage.GetPrimAtPath(referee_path)
-
-        # Create an XFormPrim for the collisions/visuals tree
-        referrer_prim = lazy.pxr.UsdGeom.Xform.Define(side_stage, referrer_prim_path)
-
-        # For each of the mesh originals, add a reference to the collisions/visuals prim
-        for mesh_original in referee_prim.GetChildren():
-            # Get its type
-            assert mesh_original.IsValid(), f"Can't find mesh {mesh_original.GetPath()}"
-            prim_type = mesh_original.GetTypeName()
-
-            # Create the prim
-            name = mesh_original.GetName()
-            mesh_prim = side_stage.DefinePrim(referrer_prim.GetPath().AppendChild(name), prim_type)
-
-            # Add the collision APIs
-            if referrer_prim_path.name == "collisions":
-                lazy.pxr.UsdPhysics.CollisionAPI.Apply(mesh_prim)
-                mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(mesh_prim)
-                mesh_collision_api.GetApproximationAttr().Set("convexHull")
-
-            # Add the reference to the actual collisions
-            mesh_prim.GetReferences().AddReference("", mesh_original.GetPath())
-
-            # Make it instanceable
-            mesh_prim.SetInstanceable(_ALLOW_INSTANCING)
-
-    # Flatten everything and save at the target location.
-    side_stage.Save()
-    del side_stage
+    # Save the physics stage
+    physics_stage.Save()
+    del physics_stage
 
     # Remove the old stage files.
     shutil.rmtree(configuration_dir)
