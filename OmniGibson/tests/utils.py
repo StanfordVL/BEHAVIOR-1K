@@ -123,21 +123,6 @@ def multi_env_task_cfg(task_type, robot="fetch"):
     return {"type": task_type}
 
 
-def multi_env_progress(test_name, counter):
-    """Print progress for the current test."""
-    counter["current"] += 1
-    n = counter["current"]
-    total = counter["total"]
-    print(f"\n{'='*60}")
-    print(f"[{n}/{total}] RUNNING: {test_name}")
-    print(f"{'='*60}")
-
-
-def multi_env_passed(test_name):
-    """Print pass confirmation."""
-    print(f"[PASSED] {test_name}")
-
-
 def _init_multi_env_macros():
     """Set simulator macros (only once, before first Environment is created)."""
     if og.sim is None:

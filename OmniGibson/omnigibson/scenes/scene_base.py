@@ -394,17 +394,21 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 )
 
         # Position the scene prim based on the last scene's right edge
+        # NOTE: for empty scenes (no objects), the computed AABB is degenerate, so we manually use a zero extent
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
-            left_edge_to_center = -aabb_min[0]
+            left_edge_to_center = 0.0 if len(self._init_objs) == 0 else -aabb_min[0]
             scene_position = th.tensor([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
             identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
             self._scene_prim.set_position_orientation(position=scene_position, orientation=identity_quat)
-            new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
+            if len(self._init_objs) == 0:
+                new_scene_edge = last_scene_edge + scene_margin
+            else:
+                new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
             scene_position = th.zeros(3)
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
-            new_scene_edge = aabb_max[0]
+            new_scene_edge = 0.0 if len(self._init_objs) == 0 else aabb_max[0]
 
         return new_scene_edge, scene_position
 
