@@ -16,7 +16,7 @@
         (ontop can__of__soda.n.01_4 floor.n.01_1) 
         (ontop can__of__soda.n.01_5 floor.n.01_1) 
         (ontop can__of__soda.n.01_6 floor.n.01_1) 
-        (ontop bucket.n.01_1 bed.n.01_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
         (inroom bed.n.01_1 bedroom) 
         (inroom floor.n.01_1 bedroom) 
         (ontop agent.n.01_1 floor.n.01_1)
