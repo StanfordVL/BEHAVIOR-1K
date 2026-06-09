@@ -1,5 +1,5 @@
 env_wrapper: 
-  _target_: omnigibson.learning.wrappers.RGBLowResWrapper
+  _target_: omnigibson.eval.wrappers.RGBLowResWrapper
 policy_name: ???  # filled by policy
 headless: true  # whether to run in headless mode (no GUI)
 eval_on_train_instances: false  # whether to eval on training instances

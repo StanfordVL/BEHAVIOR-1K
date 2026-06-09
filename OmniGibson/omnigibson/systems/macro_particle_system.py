@@ -1263,6 +1263,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         This is called through og.sim.update_handles when the physx object count etc. changes.
         """
+        if not og.sim.is_playing() or og.sim.physics_sim_view is None:
+            self.particles_view = None
+            return
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"

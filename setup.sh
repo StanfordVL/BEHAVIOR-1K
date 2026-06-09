@@ -262,7 +262,7 @@ echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
 # Determine the CUDA version string for pip URL (e.g., cu128, cu126, etc.)
 CUDA_VER_SHORT=$(echo "$CUDA_VERSION" | sed 's/\.//g')  # e.g. convert 12.8 to 128
 
-pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
+pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 torchcodec==0.5 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
 
 echo "✓ PyTorch installation completed"
 
