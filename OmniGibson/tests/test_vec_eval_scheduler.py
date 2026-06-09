@@ -73,8 +73,8 @@ class FakeSim:
         self.truncate_instances = set(truncate_instances or ())
         self.slot_instance = {}
         self.slot_steps = {}
-        self.load_calls = []          # list of slot_to_instance dicts, in load order
-        self.active_history = []      # list of active_slots lists, one per step_fn call
+        self.load_calls = []  # list of slot_to_instance dicts, in load order
+        self.active_history = []  # list of active_slots lists, one per step_fn call
 
     def load(self, slot_to_instance):
         self.load_calls.append(dict(slot_to_instance))
@@ -162,9 +162,7 @@ def test_scheduler_max_steps_cap_truncates():
 
 def test_scheduler_truncated_flag_propagates():
     sim = FakeSim(durations={"T": 2}, truncate_instances={"T"})
-    results = evaluate_instances_batched(
-        ["T"], num_envs=1, load_fn=sim.load, step_fn=sim.step, record_fn=sim.record
-    )
+    results = evaluate_instances_batched(["T"], num_envs=1, load_fn=sim.load, step_fn=sim.step, record_fn=sim.record)
     assert results["T"]["truncated"] is True and results["T"]["terminated"] is False
 
 

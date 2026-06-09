@@ -12,7 +12,6 @@ Key assertion: perturbing env 0's objects must NOT change env 1's reported satis
 
 import copy
 
-import pytest
 import torch as th
 
 import omnigibson as og
@@ -92,9 +91,9 @@ def test_goal_option_satisfaction_is_env_aware_and_isolated():
             og.sim.step()
 
         masks1_after = task.get_goal_option_satisfaction(1)
-        assert masks1_after == masks1_before, (
-            "env 1 goal satisfaction changed after perturbing only env 0 -> scope is leaking across envs"
-        )
+        assert (
+            masks1_after == masks1_before
+        ), "env 1 goal satisfaction changed after perturbing only env 0 -> scope is leaking across envs"
 
         # --- per-env metrics compute independently and emit the score_utils schema ---
         env.reset()  # restore (we perturbed env 0 above)
