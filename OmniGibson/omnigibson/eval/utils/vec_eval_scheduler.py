@@ -9,7 +9,7 @@ the vectorized ``Evaluator`` calls:
   batches of ``num_envs``; there is a barrier between batches (a slot that finishes early *freezes*
   until the whole batch is done, then the next batch is loaded). Streaming refill is intentionally
   NOT done here -- loading a new instance mid-run requires settling physics with global steps that
-  would corrupt the other still-running envs. See ``VEC_EVAL_PLAN.md`` ("Deferred: refill").
+  would corrupt the other still-running envs.
 * :func:`compute_q_score` -- the per-episode partial-success (Q-score) math, mirroring exactly the
   formula in ``omnigibson/metrics/task_metric.py``. It is fed by env-aware predicate evaluation in
   the real harness; here it operates on plain boolean masks so it is trivially testable.

@@ -171,3 +171,42 @@ def test_scheduler_rejects_bad_num_envs():
         evaluate_instances_batched(
             [1], num_envs=0, load_fn=lambda x: None, step_fn=lambda a: ([], []), record_fn=lambda **k: None
         )
+
+
+# --------------------------------------------------------------------------------------
+# edge cases
+# --------------------------------------------------------------------------------------
+
+
+def test_scheduler_num_envs_exceeds_instances():
+    # Fewer instances than slots: a single short batch using only slot 0; extra slots stay unused.
+    sim = FakeSim(durations={10: 2})
+    results = evaluate_instances_batched([10], num_envs=3, load_fn=sim.load, step_fn=sim.step, record_fn=sim.record)
+    assert set(results.keys()) == {10}
+    assert results[10]["step"] == 2 and results[10]["slot"] == 0
+    assert sim.load_calls == [{0: 10}]  # only slot 0 loaded
+    assert sim.active_history == [[0], [0]]  # never references slots 1/2
+
+
+def test_scheduler_terminated_and_truncated_same_step():
+    # A slot may report terminated AND truncated on the same step; it must be recorded exactly once.
+    record_calls = []
+
+    def step(active_slots):
+        n = max(active_slots) + 1
+        return [True] * n, [True] * n  # both flags true for every active slot
+
+    def record(slot, instance, step, terminated, truncated):
+        record_calls.append(instance)
+        return {"terminated": terminated, "truncated": truncated}
+
+    results = evaluate_instances_batched(["X"], num_envs=1, load_fn=lambda s2i: None, step_fn=step, record_fn=record)
+    assert record_calls == ["X"]  # recorded exactly once, not twice
+    assert results["X"]["terminated"] is True and results["X"]["truncated"] is True
+
+
+def test_scheduler_empty_instances_returns_empty():
+    sim = FakeSim(durations={})
+    results = evaluate_instances_batched([], num_envs=2, load_fn=sim.load, step_fn=sim.step, record_fn=sim.record)
+    assert results == {}
+    assert sim.load_calls == []  # nothing loaded, no steps
