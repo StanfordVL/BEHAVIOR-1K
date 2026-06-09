@@ -1,11 +1,12 @@
 import omnigibson as og
+from omnigibson.eval.utils.vec_eval_scheduler import compute_q_score
 from omnigibson.metrics.metric_base import MetricBase
 from typing import Optional
 
 
 class TaskMetric(MetricBase):
-    def __init__(self, human_stats: Optional[dict] = None):
-        super().__init__()
+    def __init__(self, human_stats: Optional[dict] = None, env_idx: int = 0):
+        super().__init__(env_idx=env_idx)
         self.timesteps = 0
         self.human_stats = human_stats
         if human_stats is None:
@@ -16,17 +17,13 @@ class TaskMetric(MetricBase):
             }
 
     def reset(self, env):
-        # Single-env metric (used by eval.py / eval_with_jobqueue.py): scene index 0.
-        # _compute_step_metrics' scalar reward/terminated/truncated params and the
-        # env.task.success[0] read assume one env.
-        assert env.num_envs == 1, f"TaskMetric is single-env only; got num_envs={env.num_envs}."
-        self.state[env.scene] = dict()
+        # Tracks env.scenes[env_idx]. Partial-success (Q-score) is computed via the env-aware
+        # BehaviorTask.get_goal_option_satisfaction(env_idx) so each env reports its OWN goal state;
+        # reading ground_goal_state_options[*].evaluate() would bind the shared scope (env 0).
+        self.state[self._scene(env)] = dict()
         self.timesteps = 0
         self.render_timestep = og.sim.get_rendering_dt()
-        self.initial_predicate_states = [
-            [pred.evaluate(env.task._evaluate_predicate) for pred in option]
-            for option in env.task.ground_goal_state_options
-        ]
+        self.initial_predicate_states = env.task.get_goal_option_satisfaction(self.env_idx)
 
     def _compute_step_metrics(self, env, action, obs, reward, terminated, truncated, info):
         self.timesteps += 1
@@ -36,20 +33,13 @@ class TaskMetric(MetricBase):
         # Use the accumulated state from episode_info
         timesteps = episode_info.get("timesteps", [])[-1] if episode_info.get("timesteps") else self.timesteps
 
-        # task.success is a (num_envs,) bool tensor post-#2001; single-env eval reads scene 0
-        if bool(env.task.success[0]):
-            final_q_score = 1.0
-        else:
-            final_q_score = max(
-                sum(
-                    int(not initially_true and pred.evaluate(env.task._evaluate_predicate))
-                    for pred, initially_true in zip(option, option_previous_state)
-                )
-                / len(option)
-                for option, option_previous_state in zip(
-                    env.task.ground_goal_state_options, self.initial_predicate_states
-                )
-            )
+        # task.success is a (num_envs,) bool tensor; read THIS env's slot. Partial credit (when not a
+        # full success) counts newly-satisfied goal predicates per option, max over options.
+        final_q_score = compute_q_score(
+            success=bool(env.task.success[self.env_idx]),
+            now_satisfied_options=env.task.get_goal_option_satisfaction(self.env_idx),
+            initial_satisfied_options=self.initial_predicate_states,
+        )
 
         return {
             "q_score": {"final": final_q_score},
