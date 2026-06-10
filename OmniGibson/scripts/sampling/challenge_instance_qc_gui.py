@@ -6,6 +6,8 @@ import csv
 import json
 import math
 import re
+import threading
+import time
 import webbrowser
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -14,6 +16,14 @@ from pathlib import Path
 import cv2
 import numpy as np
 import yaml
+
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler as _WatchdogHandler
+
+    _HAS_WATCHDOG = True
+except ImportError:
+    _HAS_WATCHDOG = False
 
 from constants import DATASET_2026_PATH
 from omnigibson.utils.asset_utils import get_dataset_path
@@ -1034,85 +1044,99 @@ def append_visible_point(points, position, transform, instance_id):
         points.append(point)
 
 
+def _attach_one_report(report, args, cache, task_paths):
+    """Attach floor plan and pose data to a single report. Mutates report in place."""
+    if report.scene is None:
+        return
+    cache_key = (report.scene, tuple(sorted(set(report.rooms))))
+    if cache_key not in cache:
+        try:
+            cache[cache_key] = make_floor_plan(
+                scene=report.scene,
+                chosen_rooms=report.rooms,
+                floor=args.floor,
+                target_size=args.target_size,
+                crop_margin_px=args.crop_margin_px,
+            )
+        except Exception as exc:
+            report.checks.append(CheckLine("Floor map opens", False, str(exc)))
+            return
+    floor_plan = cache[cache_key]
+    missing_rooms = sorted(set(report.rooms) - floor_plan.existing_room_names)
+    report.checks.append(CheckLine("CSV rooms exist in the floor map", not missing_rooms, format_list(missing_rooms)))
+
+    transform = floor_plan.transform
+    report.map_payload = {
+        "image": floor_plan.image_uri,
+        "width": floor_plan.width,
+        "height": floor_plan.height,
+        "rooms": floor_plan.rooms,
+    }
+
+    paths = task_paths.get(report.task_name)
+    if paths is None or paths.instance_dir is None:
+        return
+    scene_to_bddl_name = {}
+    if paths.template_path is not None and paths.template_path.exists():
+        try:
+            template_data = read_json(paths.template_path)
+        except Exception:
+            template_data = None
+        scene_to_bddl_name = template_scene_to_bddl_names(template_data) if template_data is not None else {}
+        if template_data is not None:
+            template_robot_position = first_template_robot_position(template_data)
+            if template_robot_position is not None:
+                append_visible_point(report.robot_points, template_robot_position, transform, instance_id=0)
+            try:
+                template_positions = template_object_positions(template_data)
+            except ValueError as exc:
+                report.checks.append(CheckLine("Template object registry is valid", False, str(exc)))
+            else:
+                for object_name, positions in template_positions.items():
+                    for object_position in positions:
+                        append_visible_point(
+                            report.object_points.setdefault(object_name, []),
+                            object_position,
+                            transform,
+                            instance_id=0,
+                        )
+    for instance_id in range(1, args.expected_instances + 1):
+        path = instance_state_path(paths, instance_id)
+        if not path.exists():
+            continue
+        try:
+            data = read_json(path)
+        except Exception:
+            continue
+        robot_position = first_robot_position(data)
+        if robot_position is not None:
+            append_visible_point(report.robot_points, robot_position, transform, instance_id)
+        for object_name, object_data in data.items():
+            for object_position in object_world_positions(object_name, object_data, data, scene_to_bddl_name):
+                append_visible_point(
+                    report.object_points.setdefault(object_name, []),
+                    object_position,
+                    transform,
+                    instance_id,
+                )
+
+
 def attach_gui_payloads(reports, args):
     cache = {}
     task_paths = discover_task_paths(args.dataset_dir)[0]
     for report in reports:
-        if report.scene is None:
-            continue
-        cache_key = (report.scene, tuple(sorted(set(report.rooms))))
-        if cache_key not in cache:
-            try:
-                cache[cache_key] = make_floor_plan(
-                    scene=report.scene,
-                    chosen_rooms=report.rooms,
-                    floor=args.floor,
-                    target_size=args.target_size,
-                    crop_margin_px=args.crop_margin_px,
-                )
-            except Exception as exc:
-                report.checks.append(CheckLine("Floor map opens", False, str(exc)))
-                continue
-        floor_plan = cache[cache_key]
-        missing_rooms = sorted(set(report.rooms) - floor_plan.existing_room_names)
-        report.checks.append(
-            CheckLine("CSV rooms exist in the floor map", not missing_rooms, format_list(missing_rooms))
-        )
+        _attach_one_report(report, args, cache, task_paths)
 
-        transform = floor_plan.transform
-        report.map_payload = {
-            "image": floor_plan.image_uri,
-            "width": floor_plan.width,
-            "height": floor_plan.height,
-            "rooms": floor_plan.rooms,
-        }
 
-        paths = task_paths.get(report.task_name)
-        if paths is None or paths.instance_dir is None:
-            continue
-        scene_to_bddl_name = {}
-        if paths.template_path is not None and paths.template_path.exists():
-            try:
-                template_data = read_json(paths.template_path)
-            except Exception:
-                template_data = None
-            scene_to_bddl_name = template_scene_to_bddl_names(template_data) if template_data is not None else {}
-            if template_data is not None:
-                template_robot_position = first_template_robot_position(template_data)
-                if template_robot_position is not None:
-                    append_visible_point(report.robot_points, template_robot_position, transform, instance_id=0)
-                try:
-                    template_positions = template_object_positions(template_data)
-                except ValueError as exc:
-                    report.checks.append(CheckLine("Template object registry is valid", False, str(exc)))
-                else:
-                    for object_name, positions in template_positions.items():
-                        for object_position in positions:
-                            append_visible_point(
-                                report.object_points.setdefault(object_name, []),
-                                object_position,
-                                transform,
-                                instance_id=0,
-                            )
-        for instance_id in range(1, args.expected_instances + 1):
-            path = instance_state_path(paths, instance_id)
-            if not path.exists():
-                continue
-            try:
-                data = read_json(path)
-            except Exception:
-                continue
-            robot_position = first_robot_position(data)
-            if robot_position is not None:
-                append_visible_point(report.robot_points, robot_position, transform, instance_id)
-            for object_name, object_data in data.items():
-                for object_position in object_world_positions(object_name, object_data, data, scene_to_bddl_name):
-                    append_visible_point(
-                        report.object_points.setdefault(object_name, []),
-                        object_position,
-                        transform,
-                        instance_id,
-                    )
+def build_gui_data(result, args):
+    return {
+        "datasetDir": str(result["dataset_dir"]),
+        "expectedInstances": args.expected_instances,
+        "globalChecks": [
+            {"text": check.text, "ok": check.ok, "detail": check.detail} for check in result["global_checks"]
+        ],
+        "tasks": [task_to_gui(report, index) for index, report in enumerate(result["reports"])],
+    }
 
 
 def print_report(result, min_xy_std, expected_instances, max_details):
@@ -1230,26 +1254,254 @@ def browser_url(host, port):
     return f"http://{browser_host}:{port}"
 
 
-def run_gui(result, args):
+class WatchState:
+    def __init__(self, result, gui_data, args, floor_plan_cache):
+        self.result = result
+        self.gui_data = gui_data
+        self.args = args
+        self.floor_plan_cache = floor_plan_cache
+        self.version = 0
+        self.lock = threading.Lock()
+
+
+def classify_changed_path(rel_path):
+    """Return task name if path affects a specific task, None for global/metadata changes, False to ignore."""
+    parts = Path(rel_path).parts
+    if not parts:
+        return False
+    if parts[0] == "metadata" or rel_path == "README.md":
+        return None
+    if len(parts) >= 4 and parts[0] == "scenes" and parts[2] == "json":
+        scene = parts[1]
+        item = parts[3]
+        if item == f"{scene}_stable.json":
+            return None
+        # File inside an instances directory
+        if len(parts) >= 5:
+            dir_name = parts[3]
+            prefix = f"{scene}_task_"
+            if dir_name.startswith(prefix) and dir_name.endswith("_instances"):
+                return dir_name[len(prefix) : -len("_instances")]
+        # Template or partial-rooms file at the json level
+        m = re.match(rf"^{re.escape(scene)}_task_(.+?)_0_0_", item)
+        if m:
+            return m.group(1)
+    return False
+
+
+def rebuild_task_incremental(task_name, state):
+    """Re-analyze one task and update state in place. Returns the report list index, or -1."""
+    args = state.args
+    dataset_dir = args.dataset_dir
+    discovered_paths, _ = discover_task_paths(dataset_dir)
+    paths = discovered_paths.get(task_name, TaskPaths(task_name=task_name))
+
+    metadata_dir = dataset_dir / "metadata"
+    errs = []
+    available_tasks = require_mapping(
+        load_or_report(load_yaml, metadata_dir / "available_tasks.yaml", {}, errs),
+        "available_tasks.yaml",
+        errs,
+    )
+    custom_lists = require_mapping(
+        load_or_report(lambda p: load_json_file(p), metadata_dir / "task_custom_lists.json", {}, errs),
+        "task_custom_lists.json",
+        errs,
+    )
+    b100_rows, _ = load_or_report(load_b100_rows, metadata_dir / "B100_task_misc.csv", ([], []), errs)
+    b100_row = {row["task_name"]: row for row in b100_rows}.get(task_name, {})
+
+    report = analyze_task(
+        paths=paths,
+        task_id=b100_row.get("task_id"),
+        rooms=b100_row.get("rooms", []),
+        args=args,
+    )
+    add_metadata_scene_check(report, available_tasks, custom_lists, paths)
+
+    with state.lock:
+        _attach_one_report(report, args, state.floor_plan_cache, discovered_paths)
+        for i, existing in enumerate(state.result["reports"]):
+            if existing.task_name == task_name:
+                state.result["reports"][i] = report
+                return i
+    return -1
+
+
+def full_rebuild_state(state):
+    """Full rebuild: re-run build_reports + attach for all tasks."""
+    args = state.args
+    result = build_reports(args)
+    floor_plan_cache = {}
+    task_paths = discover_task_paths(args.dataset_dir)[0]
+    for report in result["reports"]:
+        _attach_one_report(report, args, floor_plan_cache, task_paths)
+    gui_data = build_gui_data(result, args)
+    with state.lock:
+        state.result = result
+        state.gui_data = gui_data
+        state.floor_plan_cache = floor_plan_cache
+        state.version += 1
+    print(f"[watch] Full rebuild done. Version={state.version}.", flush=True)
+
+
+def process_changes(state, changed_rel_paths):
+    """Handle detected file changes: incremental per-task or full rebuild."""
+    task_names = set()
+    needs_full = False
+    for rel in changed_rel_paths:
+        classification = classify_changed_path(rel)
+        if classification is None:
+            needs_full = True
+            break
+        elif classification is not False:
+            task_names.add(classification)
+
+    if needs_full:
+        print("[watch] Metadata/structure changed — full rebuild...", flush=True)
+        full_rebuild_state(state)
+        return
+
+    if not task_names:
+        return
+
+    print(f"[watch] Updating {len(task_names)} task(s): {', '.join(sorted(task_names))}", flush=True)
+    updated_indices = set()
+    for task_name in task_names:
+        idx = rebuild_task_incremental(task_name, state)
+        if idx >= 0:
+            updated_indices.add(idx)
+
+    with state.lock:
+        for i in updated_indices:
+            report = state.result["reports"][i]
+            state.gui_data["tasks"][i] = task_to_gui(report, i)
+        state.version += 1
+    print(f"[watch] Done. Version={state.version}.", flush=True)
+
+
+def start_watcher(state):
+    """Start a background thread that watches the dataset directory for changes."""
+    dataset_dir = state.args.dataset_dir
+    poll_interval = state.args.poll_interval
+
+    if _HAS_WATCHDOG:
+        print("[watch] Using watchdog for file monitoring.", flush=True)
+
+        class _Handler(_WatchdogHandler):
+            def __init__(self):
+                super().__init__()
+                self._lock = threading.Lock()
+                self._pending = set()
+                self._timer = None
+
+            def on_any_event(self, event):
+                if event.is_directory:
+                    return
+                path = Path(event.src_path)
+                try:
+                    rel = str(path.relative_to(dataset_dir))
+                except ValueError:
+                    return
+                with self._lock:
+                    self._pending.add(rel)
+                    if self._timer is not None:
+                        self._timer.cancel()
+                    self._timer = threading.Timer(0.8, self._fire)
+                    self._timer.daemon = True
+                    self._timer.start()
+
+            def _fire(self):
+                with self._lock:
+                    paths = set(self._pending)
+                    self._pending.clear()
+                    self._timer = None
+                process_changes(state, paths)
+
+        observer = Observer()
+        observer.schedule(_Handler(), str(dataset_dir), recursive=True)
+        observer.daemon = True
+        observer.start()
+    else:
+        print(
+            f"[watch] watchdog not installed — polling every {poll_interval}s. Install watchdog for instant updates.",
+            flush=True,
+        )
+
+        def _poll():
+            seen = {}
+            for path in dataset_dir.rglob("*"):
+                if ".git" in path.parts or path.is_dir():
+                    continue
+                try:
+                    seen[path] = path.stat().st_mtime
+                except OSError:
+                    pass
+            while True:
+                time.sleep(poll_interval)
+                current = {}
+                changed = set()
+                for path in dataset_dir.rglob("*"):
+                    if ".git" in path.parts or path.is_dir():
+                        continue
+                    try:
+                        mtime = path.stat().st_mtime
+                        current[path] = mtime
+                        if path not in seen or seen[path] != mtime:
+                            try:
+                                changed.add(str(path.relative_to(dataset_dir)))
+                            except ValueError:
+                                pass
+                    except OSError:
+                        pass
+                for path in set(seen) - set(current):
+                    try:
+                        changed.add(str(path.relative_to(dataset_dir)))
+                    except ValueError:
+                        pass
+                seen = current
+                if changed:
+                    process_changes(state, changed)
+
+        threading.Thread(target=_poll, daemon=True).start()
+
+
+def run_gui(result, args, watch_state=None):
     try:
-        from flask import Flask, render_template
+        from flask import Flask, jsonify, render_template
     except ImportError as exc:
         raise RuntimeError("Flask is needed to show the QC GUI. Install it with `pip install flask`.") from exc
 
-    gui_data = {
-        "datasetDir": str(result["dataset_dir"]),
-        "expectedInstances": args.expected_instances,
-        "globalChecks": [
-            {"text": check.text, "ok": check.ok, "detail": check.detail} for check in result["global_checks"]
-        ],
-        "tasks": [task_to_gui(report, index) for index, report in enumerate(result["reports"])],
-    }
+    if watch_state is None:
+        gui_data = build_gui_data(result, args)
+        watch_state = WatchState(result, gui_data, args, {})
+
     logo_uri = image_data_uri(REPO_ROOT / "docs" / "assets" / "behavior_logo3.png")
     app = Flask(__name__, template_folder=str(TEMPLATE_DIR))
 
     @app.route("/")
     def index():
-        return render_template("challenge_instance_qc_gui.html", gui_data=gui_data, logo_uri=logo_uri)
+        with watch_state.lock:
+            data = watch_state.gui_data
+        return render_template(
+            "challenge_instance_qc_gui.html",
+            gui_data=data,
+            logo_uri=logo_uri,
+            watch_mode=args.watch,
+        )
+
+    @app.route("/api/version")
+    def api_version():
+        with watch_state.lock:
+            return jsonify({"version": watch_state.version})
+
+    @app.route("/api/data")
+    def api_data():
+        with watch_state.lock:
+            return jsonify(watch_state.gui_data)
+
+    if args.watch:
+        start_watcher(watch_state)
 
     url = browser_url(args.host, args.port)
     print(f"\nGUI: {url}", flush=True)
@@ -1270,6 +1522,13 @@ def parse_args():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--open-browser", action="store_true")
+    parser.add_argument("--watch", action="store_true", help="Watch dataset dir for changes and auto-refresh the GUI")
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=3.0,
+        help="Polling interval in seconds when watchdog is not installed (default: 3.0)",
+    )
     return parser.parse_args()
 
 
@@ -1277,14 +1536,19 @@ def main():
     args = parse_args()
     print("Building QC report for all tasks...", flush=True)
     result = build_reports(args)
-    attach_gui_payloads(result["reports"], args)
+    floor_plan_cache = {}
+    task_paths = discover_task_paths(args.dataset_dir)[0]
+    for report in result["reports"]:
+        _attach_one_report(report, args, floor_plan_cache, task_paths)
     print_report(
         result,
         min_xy_std=args.min_xy_std,
         expected_instances=args.expected_instances,
         max_details=args.max_details,
     )
-    run_gui(result, args)
+    gui_data = build_gui_data(result, args)
+    watch_state = WatchState(result, gui_data, args, floor_plan_cache)
+    run_gui(result, args, watch_state)
 
 
 if __name__ == "__main__":

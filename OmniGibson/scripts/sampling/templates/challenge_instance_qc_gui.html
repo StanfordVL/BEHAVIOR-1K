@@ -410,6 +410,15 @@
       font-size: 12px;
       line-height: 1.35;
     }
+    .watch-status {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .watch-status.live::before {
+      content: "● ";
+      color: var(--ok);
+    }
     @media (max-width: 920px) {
       .app { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 220px; }
@@ -441,6 +450,9 @@
           <strong id="taskTitle"></strong>
           <span id="taskSubtitle"></span>
         </div>
+        {% if watch_mode %}
+        <span class="watch-status live" id="watchStatus">Watching</span>
+        {% endif %}
         <div class="mode">
           <button id="robotMode" class="active" type="button">Robot poses</button>
           <button id="objectMode" type="button">Object poses</button>
@@ -512,6 +524,7 @@
   </div>
   <script>
     const DATA = {{ gui_data | tojson }};
+    const WATCH_MODE = {{ watch_mode | tojson }};
     let currentTask = DATA.tasks[0]?.task;
     let mode = "robot";
     let instanceFilterOpen = false;
@@ -834,6 +847,43 @@
       renderChecks(task);
       renderInstanceControl();
       renderSheetQuestion();
+    }
+
+    // Live-reload polling (enabled with --watch)
+    if (WATCH_MODE) {
+      const watchStatus = document.getElementById("watchStatus");
+      let knownVersion = 0;
+
+      function updateData(newData) {
+        DATA.globalChecks = newData.globalChecks;
+        DATA.tasks = newData.tasks;
+        if (!taskByName(currentTask)) {
+          currentTask = DATA.tasks[0]?.task;
+        }
+        render();
+        if (watchStatus) {
+          const t = new Date().toLocaleTimeString();
+          watchStatus.textContent = `Updated ${t}`;
+        }
+      }
+
+      async function pollForUpdates() {
+        try {
+          const resp = await fetch("/api/version");
+          if (!resp.ok) return;
+          const { version } = await resp.json();
+          if (version !== knownVersion) {
+            knownVersion = version;
+            const dataResp = await fetch("/api/data");
+            if (!dataResp.ok) return;
+            updateData(await dataResp.json());
+          }
+        } catch (_) {
+          // ignore transient network errors
+        }
+      }
+
+      setInterval(pollForUpdates, 2000);
     }
 
     robotMode.addEventListener("click", () => setMode("robot"));
