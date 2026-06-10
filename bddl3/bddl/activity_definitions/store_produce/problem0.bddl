@@ -6,7 +6,7 @@
         pomegranate.n.02_1 pomegranate.n.02_2 - pomegranate.n.02
         wicker_basket.n.01_1 - wicker_basket.n.01
         floor.n.01_1 - floor.n.01
-        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        electric_refrigerator.n.01_1 electric_refrigerator.n.01_2 - electric_refrigerator.n.01
         agent.n.01_1 - agent.n.01
     )
     
@@ -17,19 +17,25 @@
         (inside pomegranate.n.02_2 wicker_basket.n.01_1) 
         (ontop wicker_basket.n.01_1 floor.n.01_1) 
         (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_2 kitchen) 
         (inroom floor.n.01_1 kitchen) 
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
     (:goal 
         (and 
-            (forall 
-                (?pomegranate.n.02 - pomegranate.n.02)
-                (inside ?pomegranate.n.02 ?electric_refrigerator.n.01_1) 
-            )
-            (forall 
-                (?mango.n.02 - mango.n.02)
-                (inside ?mango.n.02 ?electric_refrigerator.n.01_1) 
+            (exists
+                (?electric_refrigerator.n.01 - electric_refrigerator.n.01)
+                (and
+                    (forall 
+                        (?pomegranate.n.02 - pomegranate.n.02)
+                        (inside ?pomegranate.n.02 ?electric_refrigerator.n.01) 
+                    )
+                    (forall 
+                        (?mango.n.02 - mango.n.02)
+                        (inside ?mango.n.02 ?electric_refrigerator.n.01) 
+                    )
+                )
             )
         )
     )
