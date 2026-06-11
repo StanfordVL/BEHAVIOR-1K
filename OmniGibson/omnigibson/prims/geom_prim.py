@@ -15,7 +15,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import ensure_usd_api, mesh_prim_shape_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -45,7 +45,6 @@ class GeomPrim(XFormPrim):
         load_config=None,
     ):
         self._mesh_type = None
-        self._applied_physics_material = None
 
         # Run super method
         super().__init__(
@@ -61,24 +60,6 @@ class GeomPrim(XFormPrim):
     def _post_load(self):
         super()._post_load()
         self._mesh_type = self.prim.GetTypeName()
-
-    @property
-    def purpose(self):
-        """
-        Returns:
-            str: the purpose used for this geom, one of {"default", "render", "proxy", "guide"}
-        """
-        return self.get_attribute("purpose")
-
-    @purpose.setter
-    def purpose(self, purpose):
-        """
-        Sets the purpose of this geom
-
-        Args:
-            purpose (str): the purpose used for this geom, one of {"default", "render", "proxy", "guide"}
-        """
-        self.set_attribute("purpose", purpose)
 
     @property
     def color(self):
@@ -309,7 +290,7 @@ class GeomPrim(XFormPrim):
             weaker_than_descendants (bool, optional): True if the material shouldn't override the descendants
                                                       materials, otherwise False. Defaults to False.
         """
-        binding_api = self._binding_api
+        binding_api = ensure_usd_api(self.prim, lazy.pxr.UsdShade.MaterialBindingAPI)
         with og.sim.editing_usd():
             if weaker_than_descendants:
                 binding_api.Bind(
@@ -323,22 +304,3 @@ class GeomPrim(XFormPrim):
                     bindingStrength=lazy.pxr.UsdShade.Tokens.strongerThanDescendants,
                     materialPurpose="physics",
                 )
-        self._applied_physics_material = physics_material
-
-    def get_applied_physics_material(self):
-        """
-        Returns the current applied physics material in case it was applied using apply_physics_material or not.
-
-        Returns:
-            PhysicsMaterial: the current applied physics material.
-        """
-        if self._applied_physics_material is not None:
-            return self._applied_physics_material
-        else:
-            physics_binding = self._binding_api.GetDirectBinding(materialPurpose="physics")
-            path = physics_binding.GetMaterialPath()
-            if path == "":
-                return None
-            else:
-                self._applied_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(prim_path=path)
-                return self._applied_physics_material

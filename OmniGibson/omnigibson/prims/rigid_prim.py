@@ -190,7 +190,11 @@ class RigidPrim(XFormPrim):
                     self._mesh_collision_apis.append((prim, lazy.pxr.UsdPhysics.MeshCollisionAPI(prim)))
                 geom_prims.append((prim, is_collision))
 
-            for child in prim.GetChildren():
+            # Traverse into instance proxies so that instanceable references (e.g. links whose visuals /
+            # collisions reference prototype scopes) are followed. Instance proxy prims keep paths prefixed
+            # by the instancing prim's path, so downstream consumers see paths under this link as usual.
+            child_predicate = lazy.pxr.Usd.TraverseInstanceProxies(lazy.pxr.Usd.PrimDefaultPredicate)
+            for child in prim.GetFilteredChildren(child_predicate):
                 _find_geom_prims(child, is_collision)
 
         _find_geom_prims(self._prim)
@@ -212,8 +216,6 @@ class RigidPrim(XFormPrim):
             mesh = GeomPrim(**mesh_kwargs)
             mesh.load(self.scene)
             if is_collision:
-                # Collision meshes should not show up in rendering by default
-                mesh.purpose = "guide"
                 self._collision_meshes[mesh_name] = mesh
 
                 volume, com = get_mesh_volume_and_com(mesh.prim)
@@ -228,24 +230,22 @@ class RigidPrim(XFormPrim):
                     apply_collision_approximation(prim, lazy.pxr.UsdPhysics.MeshCollisionAPI(prim), "boundingCube")
             else:
                 self._visual_meshes[mesh_name] = mesh
-                # TODO: tmp fix for visible metalinks
-                if "meta" in mesh.name:
-                    if "togglebutton" in mesh.name:
-                        # Make sure togglebutton mesh is visible
-                        mesh.purpose = "default"
-                    elif any(
-                        metalink in mesh.name
-                        for metalink in [
-                            "particlesource",
-                            "particlesink",
-                            "fillable",
-                            "particleremover",
-                            "particleapplier",
-                            "slicer",
-                        ]
-                    ):
-                        # Make sure particlesource, particlesink and fillable meshes are not visible
-                        mesh.purpose = "guide"
+
+            # TODO: tmp fix for visible metalinks
+            if "meta" in mesh.name:
+                if any(
+                    metalink in mesh.name
+                    for metalink in [
+                        "particlesource",
+                        "particlesink",
+                        "fillable",
+                        "particleremover",
+                        "particleapplier",
+                        "slicer",
+                    ]
+                ):
+                    # Make sure particlesource, particlesink and fillable meshes are not visible
+                    self.visible = False
 
         # If we have any collision meshes, compute the center of mass from collision geometry
         if len(coms) > 0:

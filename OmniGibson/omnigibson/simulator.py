@@ -621,6 +621,7 @@ def _launch_simulator(*args, **kwargs):
 
         def _set_renderer_settings(self):
             settings = lazy.carb.settings.get_settings()
+            settings.set_bool("/crashreporter/enabled", False)
             settings.set_bool("/rtx/rtx/modes/rt/enabled", True)  # real-time 2.0 requires rt to be enabled as well
             settings.set_bool("/rtx/rtx/modes/rt2/enabled", True)
             settings.set("/rtx/rendermode", "RealTimePathTracing")

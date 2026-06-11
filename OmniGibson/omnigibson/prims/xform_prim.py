@@ -66,16 +66,15 @@ class XFormPrim(BasePrim):
         # These only need to be done if we are creating this prim from scratch AND it is not an instanceable / proxy prim.
         # Pre-created OG objects' prims always have these things set up ahead of time.
         # Note that if this is an instanceable prim, we also don't need write these properties
-        # TODO: This still breaks things downstream so we assert here to make sure we have backwards-compatibility with the expected prim types
-        assert (
-            not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy()
-        ), "Support for instanceable prims has not been implemented yet!"
-        if not self._xform_props_pre_loaded and not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy():
+        if not self._xform_props_pre_loaded:
             self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
-        self.original_scale = th.tensor(self.get_attribute("xformOp:scale"))
+        original_scale = self.get_attribute("xformOp:scale")
+        if original_scale is None:
+            original_scale = [1.0, 1.0, 1.0]
+        self.original_scale = th.tensor(original_scale, dtype=th.float32)
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -161,13 +160,18 @@ class XFormPrim(BasePrim):
 
     @property
     def _binding_api(self):
-        return ensure_usd_api(self.prim, lazy.pxr.UsdShade.MaterialBindingAPI)
+        if self.prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
+            return lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
+
+        return None
 
     def has_material(self):
         """
         Returns:
             bool: True if there is a visual material bound to this prim. False otherwise
         """
+        if self._binding_api is None:
+            return False
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
         return material_path != "" and lazy.isaacsim.core.utils.prims.is_prim_path_valid(material_path)
 
