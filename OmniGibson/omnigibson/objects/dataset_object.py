@@ -124,7 +124,7 @@ class DatasetObject(USDObject):
         load_config["dataset_name"] = dataset_name
 
         # All DatasetObjects should have xform properties pre-loaded, so we don't need to set them here.
-        load_config["skip_creating_xform_props"] = True
+        load_config["dont_add_xform_props"] = True
 
         # Infer the correct usd path to use
         if model is None:

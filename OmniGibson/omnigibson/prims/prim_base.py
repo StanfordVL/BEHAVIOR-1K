@@ -58,11 +58,11 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._prim = None
         self._n_duplicates = 0  # Simple counter for keeping track of duplicates for unique name indexing
 
-        # Check if this prim was created manually. This member will be automatically set for prims
-        # that get created during the _load phase of this class, but sometimes we create prims using
-        # alternative methods and then create this class - in that case too we need to make sure we
-        # add the right xform properties, so callers will just pass in the created manually flag.
-        self._skip_creating_xform_props = self._load_config.get("skip_creating_xform_props", False)
+        # Whether or not xform properties should be added to this prim if it's an XFormPrim. This is
+        # necessary for every xform prim, but many of them from our dataset USDs already have these properties,
+        # and readding them is very slow, so we skip it for those. This can also be used to skip adding xform
+        # properties onto prims for arbitrary other reasons (e.g. instanceable prims).
+        self._dont_add_xform_props = self._load_config.get("dont_add_xform_props", False)
         # Run super init
         super().__init__()
 

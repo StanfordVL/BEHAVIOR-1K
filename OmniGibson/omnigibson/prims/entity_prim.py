@@ -246,7 +246,7 @@ class EntityPrim(XFormPrim):
                 "kinematic_only": is_kinematic,
                 "belongs_to_articulation": self._articulation_view is not None and not is_root_link,
                 "remesh": self._load_config.get("remesh", True),
-                "skip_creating_xform_props": self._load_config.get("skip_creating_xform_props", False),
+                "dont_add_xform_props": self._load_config.get("dont_add_xform_props", False),
                 "scale": self._load_config.get("scale", None),
                 "visual_only": self._load_config.get("visual_only", False),
             }
