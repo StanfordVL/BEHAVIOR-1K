@@ -34,9 +34,9 @@
                 (?sack.n.01 - sack.n.01)
                 (inside ?wrapped_hamburger.n.01 ?sack.n.01)
             )
-	    (forall
-	        (?sack.n.01 - sack.n.01)
-		(ontop ?sack.n.01 ?storage_container.n.01_1)
+            (forall
+                (?sack.n.01 - sack.n.01)
+                (ontop ?sack.n.01 ?storage_container.n.01_1)
             )
         )
     )
