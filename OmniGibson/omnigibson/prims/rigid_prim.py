@@ -211,7 +211,7 @@ class RigidPrim(XFormPrim):
             mesh_kwargs = {
                 "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
                 "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
-                "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
+                "load_config": {"skip_creating_xform_props": self._load_config["skip_creating_xform_props"]},
             }
             mesh = GeomPrim(**mesh_kwargs)
             mesh.load(self.scene)

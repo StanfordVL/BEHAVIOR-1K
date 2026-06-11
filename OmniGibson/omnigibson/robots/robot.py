@@ -299,7 +299,7 @@ class Robot(USDObject, GymObservable):
 
         # All BaseRobots should have xform properties pre-loaded
         load_config = {} if load_config is None else load_config
-        load_config["xform_props_pre_loaded"] = True
+        load_config["skip_creating_xform_props"] = True
 
         # Store control-related inputs
         self._control_freq = control_freq
