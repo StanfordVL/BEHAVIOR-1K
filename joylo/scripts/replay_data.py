@@ -10,7 +10,7 @@ import torch as th
 import yaml
 from typing import Optional
 from omnigibson.envs import DataPlaybackWrapper
-from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
+from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm
 from omnigibson.utils.config_utils import TorchEncoder
 
