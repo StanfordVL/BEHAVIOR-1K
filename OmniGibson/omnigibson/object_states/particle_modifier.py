@@ -1121,7 +1121,9 @@ class ParticleApplier(ParticleModifier):
                 self.obj.scene, self.projection_system.GetPrimPath().pathString
             )
             self.projection_system_prim = BasePrim(
-                relative_prim_path=relative_projection_system_path, name=projection_name
+                relative_prim_path=relative_projection_system_path,
+                name=projection_name,
+                load_config={"dont_add_xform_props": True},
             )
             self.projection_system_prim.load(self.obj.scene)
 

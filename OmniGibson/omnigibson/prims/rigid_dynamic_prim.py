@@ -126,7 +126,7 @@ class RigidDynamicPrim(RigidPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
-        # If the simulation is stopped, we can just use the XFormPrim implementation directly. This is slower than
+        # If the simulation is stopped, we can just use the BasePrim implementation directly. This is slower than
         # the PhysX-based implementation, but the PhysX implementation is not available when the simulation is stopped.
         if og.sim.is_stopped():
             return super().set_position_orientation(position=position, orientation=orientation, frame=frame)

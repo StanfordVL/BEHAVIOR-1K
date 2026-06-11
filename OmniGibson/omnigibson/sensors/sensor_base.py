@@ -2,7 +2,7 @@ from abc import ABCMeta
 
 import gymnasium as gym
 
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import Registerable, assert_valid_key, classproperty
 
@@ -13,7 +13,7 @@ REGISTERED_SENSORS = dict()
 ALL_SENSOR_MODALITIES = set()
 
 
-class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
+class BaseSensor(BasePrim, GymObservable, Registerable, metaclass=ABCMeta):
     """
     Base Sensor class.
     Sensor-specific get_obs method is implemented in subclasses

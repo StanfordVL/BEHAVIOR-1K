@@ -7,7 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.usd_utils import create_usd_stage, ensure_usd_api
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
@@ -125,7 +125,7 @@ class LightObject(USDObject):
         super()._post_load()
 
         # Grab reference to light link
-        self._light_link = XFormPrim(
+        self._light_link = BasePrim(
             relative_prim_path=f"{self._relative_prim_path}/base_link/light", name=f"{self.name}:light_link"
         )
         self._light_link.load(self.scene)
@@ -160,7 +160,7 @@ class LightObject(USDObject):
     def light_link(self):
         """
         Returns:
-            XFormPrim: Link corresponding to the light prim itself
+            BasePrim: Link corresponding to the light prim itself
         """
         return self._light_link
 

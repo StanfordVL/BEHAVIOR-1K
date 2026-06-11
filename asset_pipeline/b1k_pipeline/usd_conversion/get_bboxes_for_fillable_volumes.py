@@ -9,7 +9,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson.objects import DatasetObject
 from omnigibson.macros import gm
-from omnigibson.prims import XFormPrim
+from omnigibson.prims import BasePrim
 from omnigibson.utils.ui_utils import KeyboardEventHandler
 from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 import omnigibson.utils.transform_utils as T

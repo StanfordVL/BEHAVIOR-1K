@@ -228,7 +228,7 @@ class MacroParticleSystem(BaseSystem):
                 automatically generate a new unique one
 
         Returns:
-            XFormPrim: Newly created particle instance, which is added internally as well
+            BasePrim: Newly created particle instance, which is added internally as well
         """
         # Generate the new particle
         name = self.particle_idn2name(idn=self.next_available_particle_idn if idn is None else idn)
@@ -301,7 +301,7 @@ class MacroParticleSystem(BaseSystem):
             name (str): The name to assign to this new particle at the path
 
         Returns:
-            XFormPrim: Loaded particle
+            BasePrim: Loaded particle
         """
         raise NotImplementedError()
 
@@ -693,7 +693,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 if is_cloth:
                     if obj not in link_tfs:
                         # We want World --> obj transform, NOT the World --> root_link transform, since these particles
-                        # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
+                        # do NOT exist under a link but rather the object prim itself. So we use BasePrim to directly
                         # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
                         link_tfs[obj] = obj.scaled_transform
@@ -732,7 +732,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         is_cloth = self._is_cloth_obj(obj=parent_obj)
         local_mat = self._particles_local_mat[name]
         # link_tf = (
-        #     T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
+        #     T.pose2mat(BasePrim.get_position_orientation(parent_obj, frame="parent"))
         #     if is_cloth
         #     else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
         # )
@@ -787,7 +787,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 if is_cloth:
                     if obj not in link_tfs:
                         # We want World --> obj transform, NOT the World --> root_link transform, since these particles
-                        # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
+                        # do NOT exist under a link but rather the object prim itself. So we use BasePrim to directly
                         # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
                         link_tfs[obj] = obj.scaled_transform

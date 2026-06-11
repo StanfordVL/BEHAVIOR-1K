@@ -24,7 +24,7 @@ from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBre
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.prims import XFormPrim
+from omnigibson.prims import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
@@ -792,7 +792,7 @@ def _launch_simulator(*args, **kwargs):
 
             triangularize_mesh(lazy.pxr.UsdGeom.Mesh.Define(self.stage, plane.prim.GetChildren()[0].GetPath()))
 
-            self._floor_plane = XFormPrim(
+            self._floor_plane = BasePrim(
                 relative_prim_path=ground_plane_relative_path,
                 name=plane.name,
             )

@@ -416,7 +416,7 @@ class VisualParticleSystem(BaseSystem):
     def particle_object(self):
         """
         Returns:
-            XFormPrim: Particle object to be used as a template for duplication
+            BasePrim: Particle object to be used as a template for duplication
         """
         raise NotImplementedError()
 

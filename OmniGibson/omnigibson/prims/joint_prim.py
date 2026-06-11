@@ -81,6 +81,10 @@ class JointPrim(BasePrim):
         )
         self._joint_name = None  # The name of this joint in the parent's articulation tree
 
+        # A joint is not an Xform, so we should not add xform properties to it
+        load_config = dict() if load_config is None else load_config
+        load_config["dont_add_xform_props"] = True
+
         # Run super method
         super().__init__(
             relative_prim_path=relative_prim_path,

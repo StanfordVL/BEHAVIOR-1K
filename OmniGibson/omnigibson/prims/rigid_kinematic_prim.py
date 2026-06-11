@@ -3,7 +3,7 @@ from typing import Literal
 
 import torch as th
 
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 
 from .rigid_prim import RigidPrim
 
@@ -61,7 +61,7 @@ class RigidKinematicPrim(RigidPrim):
             frame (Literal): The frame in which to set the position and orientation. Defaults to world.
                 Scene frame sets position relative to the scene.
         """
-        # Use the XFormPrim implementation directly
+        # Use the BasePrim implementation directly
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
         # Invalidate kinematic-only object pose cache when new pose is set
@@ -83,8 +83,8 @@ class RigidKinematicPrim(RigidPrim):
         """
         # If we don't have the raw (world-frame) pose, query it now
         if "world" not in self._kinematic_pose_cache:
-            # If this is the first time we're getting the pose, use XFormPrim implementation
-            position, orientation = XFormPrim.get_position_orientation(self, clone=clone)
+            # If this is the first time we're getting the pose, use BasePrim implementation
+            position, orientation = BasePrim.get_position_orientation(self, clone=clone)
 
             # Assert that the orientation is a unit quaternion
             assert math.isclose(

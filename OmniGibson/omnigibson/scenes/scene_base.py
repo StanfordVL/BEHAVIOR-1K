@@ -16,7 +16,7 @@ import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
@@ -358,7 +358,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 scene_prim_obj = add_asset_to_stage(asset_path=self.prebuild(), prim_path=scene_absolute_path)
 
         # Store world prim and load the scene into the simulator
-        self._scene_prim = XFormPrim(
+        self._scene_prim = BasePrim(
             relative_prim_path=scene_relative_path,
             name=f"scene_{self.idx}",
         )

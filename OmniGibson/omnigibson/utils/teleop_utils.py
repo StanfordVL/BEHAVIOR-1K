@@ -9,7 +9,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.controllers import ControllerView
 from omnigibson.robots.robot import Robot
 from omnigibson.sensors import VisionSensor
@@ -162,7 +162,7 @@ class OVXRSystem(TeleopSystem):
                 The "touchpad" option enables free movement of the VR view (i.e. the user), while the other two constrain the VR view to the either the robot base or camera pose.
             view_angle_limits (Iterable): the view angle limits for the VR system (roll, pitch, and yaw) in degrees, default is None.
         """
-        align_to_prim = isinstance(align_anchor_to, XFormPrim)
+        align_to_prim = isinstance(align_anchor_to, BasePrim)
         assert (
             align_anchor_to
             in [
@@ -171,7 +171,7 @@ class OVXRSystem(TeleopSystem):
                 "touchpad",
             ]
             or align_to_prim
-        ), "align_anchor_to must be one of ['camera', 'base', 'touchpad'] or a XFormPrim"
+        ), "align_anchor_to must be one of ['camera', 'base', 'touchpad'] or a BasePrim"
         self.align_anchor_to = align_anchor_to
         self.anchor_prim = None
         if align_to_prim:

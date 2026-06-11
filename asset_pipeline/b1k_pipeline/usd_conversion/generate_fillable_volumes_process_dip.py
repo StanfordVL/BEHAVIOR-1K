@@ -7,7 +7,7 @@ from scipy.sparse import csr_matrix
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims import BasePrim
 from omnigibson.utils.asset_utils import decrypted
 import omnigibson.utils.transform_utils as T
 import omnigibson.lazy as lazy
@@ -82,7 +82,7 @@ def generate_box(box_half_extent):
             # restitution=restitution,
         )
 
-        plane_as_prim = XFormPrim(
+        plane_as_prim = BasePrim(
             relative_prim_path=f"/plane_{i}",
             name=plane.name,
         )
@@ -364,7 +364,7 @@ def process_object(cat, mdl, out_path):
     # from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
     # container_prim_path = fillable.root_link.prim_path + "/container"
     # CreateMeshPrimWithDefaultXformCommand(prim_path=container_prim_path, prim_type="Mesh", trimesh_mesh=hull).do()
-    # mesh_prim = XFormPrim(name="container", prim_path=container_prim_path)
+    # mesh_prim = BasePrim(name="container", prim_path=container_prim_path)
 
 
 def main():

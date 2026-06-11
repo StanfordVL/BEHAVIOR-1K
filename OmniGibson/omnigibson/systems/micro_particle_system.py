@@ -57,8 +57,12 @@ class PhysxParticleInstancer(BasePrim):
         # Store inputs
         self._idn = idn
 
-        # Run super method directly
-        super().__init__(relative_prim_path=relative_prim_path, name=name)
+        # A particle instancer is not an Xform, so we should not add xform properties to it
+        super().__init__(
+            relative_prim_path=relative_prim_path,
+            name=name,
+            load_config={"dont_add_xform_props": True},
+        )
 
     def _load(self):
         # We raise an error, this should NOT be created from scratch
@@ -68,7 +72,11 @@ class PhysxParticleInstancer(BasePrim):
         # We need to create this parent prim to avoid calling the low level omniverse delete prim method
         parent_absolute_path = self.prim.GetParent().GetPath().pathString
         parent_relative_path = absolute_prim_path_to_scene_relative(self.scene, parent_absolute_path)
-        self._parent_prim = BasePrim(relative_prim_path=parent_relative_path, name=f"{self._name}_parent")
+        self._parent_prim = BasePrim(
+            relative_prim_path=parent_relative_path,
+            name=f"{self._name}_parent",
+            load_config={"dont_add_xform_props": True},
+        )
         self._parent_prim.load(self.scene)
         super().remove()
         self._parent_prim.remove()

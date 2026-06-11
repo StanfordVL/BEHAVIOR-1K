@@ -12,7 +12,7 @@ from omnigibson.utils.geometry_utils import (
     check_points_in_sphere,
 )
 import omnigibson.utils.transform_utils as T
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ensure_usd_api, mesh_prim_shape_to_trimesh_mesh
@@ -21,7 +21,7 @@ from omnigibson.utils.usd_utils import ensure_usd_api, mesh_prim_shape_to_trimes
 log = create_module_logger(module_name=__name__)
 
 
-class GeomPrim(XFormPrim):
+class GeomPrim(BasePrim):
     """
     Provides high level functions to deal with a geom prim and its attributes / properties.
     If there is an geom prim present at the path, it will use it. By default, a geom prim cannot be directly

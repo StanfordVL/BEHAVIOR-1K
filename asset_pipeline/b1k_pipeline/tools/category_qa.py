@@ -9,7 +9,7 @@ import sys
 import json
 import argparse
 import time
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims import BasePrim
 import trimesh
 import omnigibson as og
 from omnigibson.utils.asset_utils import (
@@ -946,7 +946,7 @@ class BatchQAViewer:
         lazy.omni.isaac.core.utils.stage.add_reference_to_stage(
             usd_path=human_usd_path, prim_path=human_prim_path, prim_type="Xform"
         )
-        human_prim = XFormPrim(name="human", relative_prim_path="/human")
+        human_prim = BasePrim(name="human", relative_prim_path="/human")
         human_prim.load(self.env.scene)
         human_prim.set_position_orientation(
             orientation=T.euler2quat(th.tensor([0, 0, th.pi / 2]))

@@ -11,7 +11,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
@@ -33,7 +33,7 @@ m.DEFAULT_REST_OFFSET = 0.0
 m.LEGACY_META_LINK_PATTERN = re.compile(r".*:(\w+)_([A-Za-z0-9]+)_(\d+)_link")
 
 
-class RigidPrim(XFormPrim):
+class RigidPrim(BasePrim):
     """
     Base class that provides common functionality for all rigid prim types.
     This serves as the parent class for RigidDynamicPrim and RigidKinematicPrim.

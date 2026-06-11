@@ -129,6 +129,10 @@ class MaterialPrim(BasePrim):
         # Users of this material: should be a set of USDObject and BaseSystem
         self._users = set()
 
+        # A material is not an Xform, so we should not add xform properties to it
+        load_config = dict() if load_config is None else load_config
+        load_config["dont_add_xform_props"] = True
+
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,

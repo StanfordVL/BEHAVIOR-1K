@@ -13,7 +13,7 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints, find_joint_prims
 
@@ -25,7 +25,7 @@ m = create_module_macros(module_path=__file__)
 m.DEFAULT_SLEEP_THRESHOLD = 0.00005
 
 
-class EntityPrim(XFormPrim):
+class EntityPrim(BasePrim):
     """
     Provides high level functions to deal with an articulation prim and its attributes/ properties. Note that this
     type of prim cannot be created from scratch, and assumes there is already a pre-existing prim tree that should
@@ -335,9 +335,9 @@ class EntityPrim(XFormPrim):
                 for link in self.links.values():
                     if joint.body0 == link.prim_path:
                         # Find the parent link frame orientation in the object frame. Note that we
-                        # are OK getting this from XFormPrim since we actually want it relative to
+                        # are OK getting this from BasePrim since we actually want it relative to
                         # the object frame, notwithstanding the physics.
-                        _, link_local_orn = XFormPrim.get_position_orientation(link, frame="parent")
+                        _, link_local_orn = BasePrim.get_position_orientation(link, frame="parent")
 
                         # Find the joint frame orientation in the parent link frame
                         joint_local_orn = th.tensor(
@@ -1014,7 +1014,7 @@ class EntityPrim(XFormPrim):
         # It does create a dual path for places where the transform might end up being set, but is a necessary evil.
         # In this case, we also want to make sure that the root link does not have a relative pose to the entity prim.
         if og.sim.is_stopped():
-            this_position, this_orientation = XFormPrim.get_position_orientation(self, frame=frame)
+            this_position, this_orientation = BasePrim.get_position_orientation(self, frame=frame)
             root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
             assert th.allclose(
                 this_position, root_link_position, atol=1e-2
@@ -1022,7 +1022,7 @@ class EntityPrim(XFormPrim):
             assert th.allclose(
                 this_orientation, root_link_orientation, atol=1e-2
             ), "Orientation mismatch between entity prim and root link"
-            XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+            BasePrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
             if self.kinematic_only:
                 for link in self._links.values():
                     if isinstance(link, RigidKinematicPrim):

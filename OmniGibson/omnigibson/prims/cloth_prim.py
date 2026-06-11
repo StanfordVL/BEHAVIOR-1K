@@ -15,7 +15,7 @@ import tempfile
 from typing import Literal
 import uuid
 
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.python_utils import multi_dim_linspace
 import torch as th
 from omnigibson.utils.ui_utils import create_module_logger
@@ -421,7 +421,7 @@ class ClothPrim(GeomPrim):
                 visible=False,
             )
 
-            plane_as_prim = XFormPrim(
+            plane_as_prim = BasePrim(
                 relative_prim_path=f"/plane_{i}",
                 name=plane.name,
             )

@@ -13,7 +13,7 @@ from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
 from omnigibson.systems.macro_particle_system import MacroVisualParticleSystem
 from omnigibson.object_states import Filled
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims import BasePrim
 from omnigibson.utils.usd_utils import RigidContactAPI, ControllableObjectViewAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControllerView
@@ -421,7 +421,7 @@ class OGRobotServer:
 
         if VIEWING_MODE == ViewingMode.VR:
             for cam_path in self.camera_paths:
-                cam_prim = XFormPrim(
+                cam_prim = BasePrim(
                     relative_prim_path=utils.absolute_prim_path_to_scene_relative(
                         self.robot.scene, cam_path
                     ),

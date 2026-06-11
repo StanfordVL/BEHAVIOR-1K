@@ -44,7 +44,7 @@ class ScanSensor(BaseSensor):
             height == width of the map
         occupancy_grid_range (float): Range of the occupancy grid, in meters
         occupancy_grid_inner_radius (float): Inner range of the occupancy grid that will assumed to be empty, in meters
-        occupancy_grid_local_link (None or XFormPrim): XForm prim that represents the "origin" of any generated
+        occupancy_grid_local_link (None or BasePrim): XForm prim that represents the "origin" of any generated
             occupancy grid, e.g.: if this scan sensor is attached to a robot, then this should possibly be the base link
             for that robot. If None is specified, then this will default to this own sensor's frame as the origin.
     """
