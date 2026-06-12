@@ -2,11 +2,11 @@
     (:domain behavior-1k)
 
     (:objects
-        wrapped_hamburger.n.01_1 wrapped_hamburger.n.01_2 wrapped_hamburger.n.01_3 wrapped_hamburger.n.01_4 - wrapped_hamburger.n.01
+        wrapped_hamburger.n.01_1 wrapped_hamburger.n.01_2 wrapped_hamburger.n.01_3 - wrapped_hamburger.n.01
         tray.n.01_1 - tray.n.01
         storage_container.n.01_1 - storage_container.n.01
         countertop.n.01_1 - countertop.n.01
-        sack.n.01_1 sack.n.01_2 sack.n.01_3 sack.n.01_4 - sack.n.01
+        sack.n.01_1 sack.n.01_2 sack.n.01_3 - sack.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
@@ -15,13 +15,11 @@
         (ontop wrapped_hamburger.n.01_1 tray.n.01_1)
         (ontop wrapped_hamburger.n.01_2 tray.n.01_1)
         (ontop wrapped_hamburger.n.01_3 tray.n.01_1)
-        (ontop wrapped_hamburger.n.01_4 tray.n.01_1)
         (ontop tray.n.01_1 countertop.n.01_1)
         (ontop storage_container.n.01_1 countertop.n.01_1)
         (ontop sack.n.01_1 countertop.n.01_1)
         (ontop sack.n.01_2 countertop.n.01_1)
         (ontop sack.n.01_3 countertop.n.01_1)
-        (ontop sack.n.01_4 countertop.n.01_1)
         (inroom floor.n.01_1 kitchen)
         (inroom countertop.n.01_1 kitchen)
         (ontop agent.n.01_1 floor.n.01_1)
