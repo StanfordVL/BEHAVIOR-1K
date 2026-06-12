@@ -13,13 +13,13 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.utils.bddl_utils import get_knowledge_base
 from omnigibson.utils.ui_utils import create_module_logger
 from utils import (
-    get_rooms,
     get_predicates,
     get_valid_tasks,
     hide_all_lights,
     UNSUPPORTED_PREDICATES,
     validate_task,
     get_scene_model,
+    resolve_scene_model,
 )
 from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 from postprocess_sampled_task import postprocess_task
@@ -81,7 +81,8 @@ logging.getLogger().setLevel(logging.INFO)
 def main(random_selection=False, headless=False, short_exec=False):
     args = parser.parse_args()
 
-    scene_model = get_scene_model(TASK_CUSTOM_LISTS[args.activity])
+    scene_model_key = get_scene_model(TASK_CUSTOM_LISTS[args.activity])
+    scene_model = resolve_scene_model(scene_model_key, os.path.join(DATASET_2026_PATH, "scenes"))
 
     if args.output_dir is None:
         args.output_dir = os.path.join(DATASET_2026_PATH, "scenes", scene_model, "json")
@@ -176,9 +177,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         reason = f"Unsupported predicate(s): {unsupported_predicates}"
 
     env.task_config["activity_name"] = activity
-    if activity in TASK_CUSTOM_LISTS and scene_model in TASK_CUSTOM_LISTS[activity]:
-        whitelist = TASK_CUSTOM_LISTS[activity][scene_model]["whitelist"]
-        blacklist = TASK_CUSTOM_LISTS[activity][scene_model]["blacklist"]
+    if activity in TASK_CUSTOM_LISTS and scene_model_key in TASK_CUSTOM_LISTS[activity]:
+        whitelist = TASK_CUSTOM_LISTS[activity][scene_model_key]["whitelist"]
+        blacklist = TASK_CUSTOM_LISTS[activity][scene_model_key]["blacklist"]
     else:
         whitelist, blacklist = None, None
     env.task_config["sampling_whitelist"] = whitelist
@@ -198,12 +199,16 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Attempt to sample
     if should_sample:
-        relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
-        log.info(f"relevant rooms: {relevant_rooms}")
+        active_room_instances = env.scene.load_room_instances
+        log.info(f"relevant room instances: {active_room_instances}")
+        relevant_room_instances = set(active_room_instances) if active_room_instances is not None else None
         for obj in env.scene.objects:
             if isinstance(obj, DatasetObject):
-                obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
-                active = len(relevant_rooms.intersection(obj_rooms)) > 0 or obj.category in {"floors", "walls"}
+                active = (
+                    relevant_room_instances is None
+                    or len(relevant_room_instances.intersection(obj.in_rooms)) > 0
+                    or obj.category in {"floors", "walls"}
+                )
                 obj.visual_only = not active
                 obj.visible = active
 
@@ -250,7 +255,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         for obj in env.task.object_scope.values():
             if isinstance(obj, DatasetObject):
                 obj.wake()
-        assert validate_task(env.task, task_scene_dict, default_scene_dict)
+        assert validate_task(
+            env.task,
+            task_scene_dict,
+            default_scene_dict,
+            active_room_instances=active_room_instances,
+        )
         # BREAKPOINT: Validation failed - inspect the task state to understand why
         # At this breakpoint, you can:
         # - Run: for _ in range(1000): og.sim.render()

@@ -251,7 +251,7 @@ class DatasetObject(USDObject):
             native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
             if native_bb_attr.IsValid():
                 native_bb = th.tensor(list(native_bb_attr.Get()))
-                bb = th.tensor(bounding_box, dtype=th.float32)
+                bb = th.as_tensor(bounding_box, dtype=th.float32)
                 scale = th.ones(3)
                 valid_idxes = native_bb > 1e-4
                 scale[valid_idxes] = bb[valid_idxes] / native_bb[valid_idxes]

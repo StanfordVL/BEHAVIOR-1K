@@ -9,6 +9,7 @@ rt = pymxs.runtime
 REMACRO = re.compile('^[0-9]+ +"[^"]*" +"([^"]*)" +"[^"]*" +"([^"]*)"', re.M)
 
 ENTRYPOINTS = {
+    "add_buttons.py": "Update the SVL script buttons in the 3ds Max menu.",
     "add_fillable_seed.py": "Add a seed for generating fillable volumes.",
     "align_pivots.py": "Find instances with unaligned pivots and align them.",
     "assign_light.py": "Assign lights to objects.",
@@ -57,6 +58,7 @@ ENTRYPOINTS = {
     "wensi_view_complaints.py": "View Wensi's TODO complaints for this file.",
     "wensi_resolve_complaints.py": "Resolve Wensi's TODO complaints for this file.",
     "require_rebake.py": "Mark the object for rebaking of its texture.",
+    "prebake_textures.py": "Prebake textures for the selected objects (or all objects that need it if nothing is selected).",
 }
 
 
@@ -109,9 +111,7 @@ def main():
 
         # Create a menu item that calls the sample macroScript
         actionItem = rt.menuMan.createActionItem(script_name, "SVL_Tools")
-        assert actionItem, (
-            "Failed to create action item " + script_human_readable_name
-        )
+        assert actionItem, "Failed to create action item " + script_human_readable_name
         # Add the item to the menu
         subMenu.addItem(actionItem, -1)
 

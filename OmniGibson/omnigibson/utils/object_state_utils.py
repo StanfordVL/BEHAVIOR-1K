@@ -123,15 +123,22 @@ def get_reachability_sampling_context(objB, predicate, use_trav_map=True, warn_o
     trav_map = objB.scene.trav_map
     trav_map_floor_map = trav_map.floor_map[0]
     arm_length_pixel = int(math.ceil(m.ARM_LENGTH_XY / trav_map.map_resolution))
-    reachability_map = th.tensor(
-        cv2.dilate(trav_map_floor_map.cpu().numpy(), np.ones((arm_length_pixel, arm_length_pixel)))
-    )
-    has_prismatic_joint = any(j.joint_type == JointType.JOINT_PRISMATIC for j in objB.joints.values())
 
-    eroded_trav_map = None
-    if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
-        robot = objB.scene.robots[0] if len(objB.scene.robots) > 0 else None
-        eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=robot)
+    robot = objB.scene.robots[0] if len(objB.scene.robots) > 0 else None
+    eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=robot)
+
+    # The eroded map pulls robot standing positions back by erosion_radius from obstacles.
+    # Dilating by arm_length alone would give net reach of (arm_length - erosion_radius) from
+    # obstacles, which is too small. Adding erosion_radius back restores the correct effective reach.
+    if robot is not None:
+        erosion_radius = th.norm(robot.reset_joint_pos_aabb_extent[:2]).item() / 2.0 + 0.2
+    else:
+        erosion_radius = trav_map.default_erosion_radius
+    erosion_radius_pixel = int(math.ceil(erosion_radius / trav_map.map_resolution))
+    reach_pixel = arm_length_pixel + erosion_radius_pixel
+
+    reachability_map = th.tensor(cv2.dilate(eroded_trav_map.cpu().numpy(), np.ones((reach_pixel, reach_pixel))))
+    has_prismatic_joint = any(j.joint_type == JointType.JOINT_PRISMATIC for j in objB.joints.values())
 
     return {
         "trav_map": trav_map,
@@ -195,6 +202,7 @@ def sample_kinematics(
     skip_falling=False,
     use_last_ditch_effort=False,
     use_trav_map=True,
+    reachability_context=None,
 ):
     """
     Samples the given @predicate kinematic state for @objA with respect to @objB
@@ -211,16 +219,19 @@ def sample_kinematics(
         use_last_ditch_effort (bool): Whether to use last-ditch effort to sample the kinematics if the first
             sampling attempt fails. This will place @objA at the center of @objB's AABB, offset in z direction such
         use_trav_map (bool): Whether to use the traversability map of the scene to check if the sampled position is traversable.
+        reachability_context (dict or None): Pre-computed context from get_reachability_sampling_context. If provided,
+            skips recomputing it (avoids repeated cv2.erode calls when sample_kinematics is called in a loop).
 
     Returns:
         bool: True if successfully sampled, else False
     """
-    reachability_context = get_reachability_sampling_context(
-        objB=objB,
-        predicate=predicate,
-        use_trav_map=use_trav_map,
-        warn_on_scene_mismatch=True,
-    )
+    if reachability_context is None:
+        reachability_context = get_reachability_sampling_context(
+            objB=objB,
+            predicate=predicate,
+            use_trav_map=use_trav_map,
+            warn_on_scene_mismatch=True,
+        )
     use_trav_map = reachability_context is not None
     if max_trials is None:
         max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS

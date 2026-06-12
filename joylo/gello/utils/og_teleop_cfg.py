@@ -23,6 +23,19 @@ ROOM_DEPENDENCIES = {
         "garage": ["corridor"],
     },
     "house_double_floor_upper": {},
+    "restaurant_diner": {
+        "dining_room": ["bar", "corridor"],
+        "bar": ["dining_room", "corridor", "kitchen"]
+    },
+    "Rs_int": {
+        "living_room": ["kitchen"],
+        "kitchen": ["living_room"],
+    },
+    "hotel_suite_large": {
+        "bedroom": ["bathroom"],
+        "bathroom": ["bedroom"]
+    },
+    "office_cubicles_right": {},
 }
 
 TASK_SPECIFIC_EXTRA_ROOMS = {
@@ -37,6 +50,9 @@ TASK_SPECIFIC_EXTRA_ROOMS = {
     },
     "chopping_wood": {
         "house_double_floor_lower": ["garage"],
+    },
+    "dispose_of_batteries": {
+        "office_cubicles_right": ["corridor"],
     },
 }
 
