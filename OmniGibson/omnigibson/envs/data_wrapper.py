@@ -720,6 +720,7 @@ class DataPlaybackWrapper(DataWrapper):
             # Write the initial frame if video_writers are configured
             if self.video_writers:
                 self._write_video_frames()
+        self._after_playback_step(0, record_data=record_data)
         for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
             # Here, state i is the state before taking action i, and reward, terminated, truncated are the results of taking action i
             if i % 1000 == 0:
@@ -790,6 +791,8 @@ class DataPlaybackWrapper(DataWrapper):
                 # append to current trajectory history
                 self.current_traj_history.append(step_data)
 
+            self._after_playback_step(i + 1, record_data=record_data)
+
             self.current_episode_step_count += 1
             self.step_count += 1
 
@@ -798,6 +801,16 @@ class DataPlaybackWrapper(DataWrapper):
 
         if self.video_writers:
             self._flush_video_writers()
+
+    def _after_playback_step(self, step_index: int, record_data: bool = True) -> None:
+        """
+        Hook called after each restored playback state has been stepped.
+
+        Args:
+            step_index (int): 0 for the restored initial state, then 1, 2, ... after each replayed action.
+            record_data (bool): Whether regular replay data recording is enabled.
+        """
+        pass
 
     def playback_dataset(self, record_data: bool = False) -> None:
         """

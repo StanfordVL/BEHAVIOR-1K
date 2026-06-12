@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import omnigibson as og
 import os
 import yaml
@@ -9,6 +10,7 @@ from omnigibson.eval.utils.eval_utils import PROPRIOCEPTION_INDICES
 from omnigibson.macros import gm
 from omnigibson.eval.utils.light_utils import LightToggleSynchronizer
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 
 log = create_module_logger(module_name="replay_obs")
@@ -19,6 +21,47 @@ gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
 LIGHT_REPLAY_TASKS = {"turning_out_all_lights_before_sleep"}
+
+
+class ContactPlaybackMixin:
+    """
+    Mixin for collecting rigid contact pairs during playback.
+    """
+
+    def _after_playback_step(self, step_index: int, record_data: bool = True) -> None:
+        if not self.include_contacts:
+            return
+        if step_index == 0:
+            self._contact_list = []
+        try:
+            query_set = set(self.env.scene.objects)
+            pairs = RigidContactAPI.get_contact_pairs(0, query_set=query_set, with_set=None, current_only=True)
+            seen = set()
+            for body0, body1 in pairs:
+                key = (body0, body1) if body0 <= body1 else (body1, body0)
+                if key in seen:
+                    continue
+                seen.add(key)
+                self._contact_list.append((step_index, key[0], key[1]))
+        except Exception as e:
+            log.warning(f"Could not get contact pairs at step {step_index}: {e}")
+
+    def write_contact_json(self, output_path: str) -> None:
+        records = [
+            {"frame": int(frame), "contact_obj1": body0, "contact_obj2": body1}
+            for frame, body0, body1 in getattr(self, "_contact_list", [])
+        ]
+        with open(output_path, "w") as f:
+            json.dump(records, f, indent=2)
+        log.info(f"Wrote {len(records)} contact pairs to {output_path}")
+
+
+class ContactHDF5PlaybackWrapper(ContactPlaybackMixin, HDF5PlaybackWrapper):
+    pass
+
+
+class ContactLeRobotPlaybackWrapper(ContactPlaybackMixin, LeRobotPlaybackWrapper):
+    pass
 
 
 def _load_challenge_available_tasks() -> dict:
@@ -93,6 +136,7 @@ def replay_hdf5_file(
     lerobot_root_dir: str | None = None,
     overwrite_lerobot: bool = True,
     use_longest_demo: bool = False,
+    save_contact_json: bool = True,
 ) -> int:
     """
     Replays a single HDF5 file and saves data to the specified format.
@@ -149,7 +193,7 @@ def replay_hdf5_file(
         include_robot_control=False,
         robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
         robot_obs_modalities=["proprio", "rgb", "depth_linear"],
-        include_contacts=False,
+        include_contacts=save_contact_json,
     )
 
     if output_format == "hdf5":
@@ -159,7 +203,7 @@ def replay_hdf5_file(
             output_path=output_path,
             compression={"compression": "lzf"},
         )
-        env = HDF5PlaybackWrapper.create_from_hdf5(**kwargs)
+        env = ContactHDF5PlaybackWrapper.create_from_hdf5(**kwargs)
     else:
         output_path = f"b1k/{task_name}"
         if lerobot_repo_id is not None:
@@ -175,7 +219,7 @@ def replay_hdf5_file(
             task_name=task_name,
             include_task_obs=False,
         )
-        env = LeRobotPlaybackWrapper.create_from_hdf5(**kwargs)
+        env = ContactLeRobotPlaybackWrapper.create_from_hdf5(**kwargs)
 
     env.load_observation_space()
 
@@ -205,6 +249,8 @@ def replay_hdf5_file(
         record_data=True,
         post_state_update_callback=post_state_update_callback,
     )
+    if save_contact_json:
+        env.write_contact_json(os.path.join(replay_dir, f"episode_{demo_id:08d}_contacts.json"))
 
     log.info("Playback complete. Saving data...")
     env.save_data()
@@ -248,6 +294,11 @@ def main():
         action="store_true",
         help="Replay the demo with the most steps instead of the last demo group.",
     )
+    parser.add_argument(
+        "--skip_contact_json",
+        action="store_true",
+        help="Skip contact sidecar JSON extraction and use visual-only replay.",
+    )
 
     args = parser.parse_args()
     task_id = _infer_task_id_from_demo_id(args.demo_id)
@@ -267,6 +318,7 @@ def main():
         lerobot_root_dir=args.lerobot_root_dir,
         overwrite_lerobot=not args.resume_lerobot,
         use_longest_demo=args.use_longest_demo,
+        save_contact_json=not args.skip_contact_json,
     )
 
     log.info("All done!")
