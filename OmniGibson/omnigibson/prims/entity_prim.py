@@ -1544,6 +1544,13 @@ class EntityPrim(XFormPrim):
         return state
 
     def _load_state(self, state):
+        recorded_sleep = state.get("is_asleep", False)
+        if recorded_sleep:
+            pos, orn = state["root_link"]["pos"], state["root_link"]["ori"]
+            cur_pos, cur_orn = self.get_position_orientation()
+            same_pos = bool(th.allclose(cur_pos, pos, rtol=0.0, atol=1e-7))
+            same_orn = bool((1.0 - th.abs(th.dot(cur_orn, orn))) < 1e-7)
+
         # Load base link state and joint states
         self.root_link._load_state(state=state["root_link"])
 
@@ -1556,9 +1563,10 @@ class EntityPrim(XFormPrim):
             self.set_joint_positions(state["joint_pos"])
             self.set_joint_velocities(state["joint_vel"])
 
-        # Make sure this object is awake if it was not asleep during setting
-        # TODO: Remove backwards compatibility once we re-sample scenes
-        self.sleep() if state.get("is_asleep", False) else self.wake()
+        if recorded_sleep and same_pos and same_orn:
+            self.sleep()
+        else:
+            self.wake()
 
     def serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and
