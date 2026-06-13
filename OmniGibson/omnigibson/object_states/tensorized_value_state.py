@@ -56,8 +56,11 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
         new_values = cls._update_values(values=cls.VALUES)
 
-        # Compare with previous values, and add any changed objects to the scene-tracked set
-        changed_idxs = th.where(th.any(new_values != cls.VALUES, dim=-1))[0]
+        # Compare with previous values, and add any changed objects to the scene-tracked set.
+        # Reshape the diff to (N, -1) so the reduction is always per-object: for scalar-valued
+        # states (value_shape == ()) VALUES is 1-D (N,), and reducing dim=-1 directly would
+        # collapse the object axis itself, flagging only IDX_OBJS[0] instead of the changed objects.
+        changed_idxs = th.where(th.any((new_values != cls.VALUES).reshape(len(cls.VALUES), -1), dim=-1))[0]
         for idx in changed_idxs:
             cls.IDX_OBJS[idx].state_updated()
 
