@@ -4,8 +4,7 @@
     (:objects
      	facsimile.n.02_1 - facsimile.n.02
     	floor.n.01_1 floor.n.01_2 - floor.n.01
-    	carrel.n.02_1 carrel.n.02_2 carrel.n.02_3 carrel.n.02_4 carrel.n.02_5
-        carrel.n.02_6 carrel.n.02_7 carrel.n.02_8 carrel.n.02_9 carrel.n.02_10 - carrel.n.02
+    	carrel.n.02_1 carrel.n.02_* - carrel.n.02
     	agent.n.01_1 - agent.n.01
     )
     
@@ -15,6 +14,8 @@
             (toggled_on facsimile.n.02_1)
         ) 
         (inroom floor.n.01_1 shared_office)
+        (inroom carrel.n.02_1 shared_office) 
+        (inroom carrel.n.02_* shared_office) 
         (inroom floor.n.01_2 corridor) 
         (ontop agent.n.01_1 floor.n.01_1)
     )
