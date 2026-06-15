@@ -25,7 +25,6 @@
     (:goal 
         (and 
             (ontop apple_pie.n.01_1 tray.n.01_1)
-            (inside apple_pie.n.01_1 oven.n.01_1)
             (cooked ?apple_pie.n.01_1)
         )
     )
