@@ -225,7 +225,7 @@ def replay_hdf5_to_video(
             task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
             for row in task_misc_csv:
                 if task_name in row[1]:
-                    load_room_instances = row[2].strip().split("\n")
+                    load_room_instances = row[2].strip().splitlines()
                     break
     except FileNotFoundError as e:
         raise e
