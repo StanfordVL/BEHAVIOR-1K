@@ -12,13 +12,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # hadolint ignore=SC2086,DL3015,DL3008,DL3013,SC2015
 RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
   && apt-get update \
-  && apt-get install -y --no-install-recommends gnupg \
-  && ( \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ${GIT_CORE_PPA_KEY} \
-      || apt-key adv --keyserver pgp.mit.edu --recv-keys ${GIT_CORE_PPA_KEY} \
-      || apt-key adv --keyserver keyserver.pgp.com --recv-keys ${GIT_CORE_PPA_KEY} \
-  ) \
-  && apt-get update \
   && apt-get install -y --no-install-recommends \
     gnupg \
     lsb-release \
@@ -53,10 +46,17 @@ RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
     gosu \
     pkg-config \
     graphviz \
+  && mkdir -p /etc/apt/keyrings \
+  && ( \
+    gpg --keyserver keyserver.ubuntu.com --recv-keys ${GIT_CORE_PPA_KEY} \
+      || gpg --keyserver pgp.mit.edu --recv-keys ${GIT_CORE_PPA_KEY} \
+      || gpg --keyserver keyserver.pgp.com --recv-keys ${GIT_CORE_PPA_KEY} \
+  ) \
+  && gpg --export ${GIT_CORE_PPA_KEY} > /etc/apt/keyrings/git-core.gpg \
   && DPKG_ARCH="$(dpkg --print-architecture)" \
   && LSB_RELEASE_CODENAME="$(lsb_release --codename | cut -f2)" \
   && sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers \
-  && echo deb http://ppa.launchpad.net/git-core/ppa/ubuntu $([[ $(grep -E '^ID=' /etc/os-release | sed 's/.*=//g') == "ubuntu" ]] && (grep VERSION_CODENAME /etc/os-release | sed 's/.*=//g') || echo bionic) main>/etc/apt/sources.list.d/git-core.list \
+  && echo "deb [signed-by=/etc/apt/keyrings/git-core.gpg] http://ppa.launchpad.net/git-core/ppa/ubuntu $([[ $(grep -E '^ID=' /etc/os-release | sed 's/.*=//g') == "ubuntu" ]] && (grep VERSION_CODENAME /etc/os-release | sed 's/.*=//g') || echo bionic) main" > /etc/apt/sources.list.d/git-core.list \
   && apt-get update \
   && ( apt-get install -y --no-install-recommends git || apt-get install -t stable -y --no-install-recommends git || apt-get install -y --no-install-recommends git=1:2.33.1-0ppa1~ubuntu18.04.1 git-man=1:2.33.1-0ppa1~ubuntu18.04.1 ) \
   && ( [[ $(apt-cache search -n liblttng-ust0 | awk '{print $1}') == "liblttng-ust0" ]] && apt-get install -y --no-install-recommends liblttng-ust0 || : ) \
@@ -64,23 +64,14 @@ RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
   && ( ( curl "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip" && unzip awscliv2.zip -d /tmp/ && /tmp/aws/install && rm awscliv2.zip) || pip3 install --no-cache-dir awscli ) \
   && ( curl -s "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${DPKG_ARCH}-v${GIT_LFS_VERSION}.tar.gz" -L -o /tmp/lfs.tar.gz && tar -xzf /tmp/lfs.tar.gz -C /tmp && /tmp/git-lfs-${GIT_LFS_VERSION}/install.sh && rm -rf /tmp/lfs.tar.gz  /tmp/git-lfs-${GIT_LFS_VERSION}) \
   && distro=$(lsb_release -is | awk '{print tolower($0)}') \
-  && VERSION_ID=$(lsb_release -r | cut -f2) \
-  && echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel-kubic-libcontainers-stable.list \
-  && curl -Ls https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_$VERSION_ID/Release.key | apt-key add - \
-  && apt-get update \
-  && apt-get install buildah podman fuse-overlayfs -y \
+  && apt-get install buildah podman skopeo fuse-overlayfs -y \
   && sed -i 's/^\[machine\]$/#\[machine\]/' /usr/share/containers/containers.conf \
-  # && sed -i 's/#mount_program/mount_program/g' /etc/containers/storage.conf \
-  && mkdir -p /etc/apt/keyrings \
   && ( curl -fsSL https://download.docker.com/linux/${distro}/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg ) \
   && version=$(lsb_release -cs | sed 's/trixie\|n\/a/bookworm/g') \
   && ( echo "deb [arch=${DPKG_ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${version} stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null ) \
   && apt-get update \
-  && apt-get install -y docker-ce docker-ce-cli docker-buildx-plugin containerd.io docker-compose-plugin --no-install-recommends --allow-unauthenticated \
-  && echo -e '#!/bin/sh\ndocker compose --compatibility "$@"' > /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose \
-  && ( [[ "${LSB_RELEASE_CODENAME}" == "focal" ]] && ( echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/ /" | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && curl -L "https://build.opensuse.org/projects/devel:kubic/public_key" | apt-key add -; echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/ /" | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && curl -L "https://build.opensuse.org/projects/devel:kubic/public_key" | apt-key add - && apt-get update) || : ) \
-  && ( [[ "${LSB_RELEASE_CODENAME}" == "focal" || "${LSB_RELEASE_CODENAME}" == "jammy" || "${LSB_RELEASE_CODENAME}" == "sid" || "${LSB_RELEASE_CODENAME}" == "bullseye" ]] && apt-get install -y --no-install-recommends podman buildah skopeo || : ) \
-  && ( [[ "${LSB_RELEASE_CODENAME}" == "jammy" ]] && echo "Ubuntu Jammy is marked as beta. Please see https://github.com/actions/virtual-environments/issues/5490" || : ) \
+  && apt-get install -y docker-ce docker-ce-cli docker-buildx-plugin containerd.io docker-compose-plugin --no-install-recommends \
+  && echo '#!/bin/sh\ndocker compose --compatibility "$@"' > /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose \
   && GH_CLI_VERSION=$(curl -sL -H "Accept: application/vnd.github+json"   https://api.github.com/repos/cli/cli/releases/latest | jq -r '.tag_name' | sed 's/^v//g') \
   && GH_CLI_DOWNLOAD_URL=$(curl -sL -H "Accept: application/vnd.github+json"   https://api.github.com/repos/cli/cli/releases/latest | jq ".assets[] | select(.name == \"gh_${GH_CLI_VERSION}_linux_${DPKG_ARCH}.deb\")" | jq -r '.browser_download_url') \
   && curl -sSLo /tmp/ghcli.deb ${GH_CLI_DOWNLOAD_URL} && apt-get -y install /tmp/ghcli.deb && rm /tmp/ghcli.deb \
@@ -93,8 +84,7 @@ RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
   && useradd -mr -d /home/runner -u 1001 -g 121 runner \
   && usermod -aG sudo runner \
   && usermod -aG docker runner \
-  && echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers \
-  && ( [[ -f /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list ]] && rm /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list || : )
+  && echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache
 RUN mkdir -p /opt/hostedtoolcache

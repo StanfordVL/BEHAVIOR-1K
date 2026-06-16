@@ -309,6 +309,20 @@ if [ "$OMNIGIBSON" = true ]; then
         EXTRAS="[${EXTRAS%,}]"
     fi
 
+    # curobo (via OmniGibson primitives extra) builds CUDA extensions during pip install.
+    # Limit parallel compilation to reduce peak RAM usage in constrained CI environments.
+    if [ "$PRIMITIVES" = true ]; then
+        : "${CUROBO_MAX_JOBS:=1}"
+        : "${CUROBO_CMAKE_PARALLEL_LEVEL:=$CUROBO_MAX_JOBS}"
+        export MAX_JOBS="$CUROBO_MAX_JOBS"
+        export CMAKE_BUILD_PARALLEL_LEVEL="$CUROBO_CMAKE_PARALLEL_LEVEL"
+        # Some build systems respect this for ninja-based builds.
+        export NINJA_NUM_JOBS="$CUROBO_MAX_JOBS"
+        # Keep build artifacts in a predictable location (also helps avoid surprises in overlayfs).
+        export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/tmp/torch_extensions}"
+        echo "Limiting curobo/PyTorch extension compile jobs: MAX_JOBS=$MAX_JOBS CMAKE_BUILD_PARALLEL_LEVEL=$CMAKE_BUILD_PARALLEL_LEVEL"
+    fi
+
     pip install -e "$WORKDIR/OmniGibson$EXTRAS" --no-build-isolation
 
     # Install pre-commit for dev setup
