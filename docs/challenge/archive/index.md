@@ -4,12 +4,6 @@ hide:
   - toc
 ---
 
-# Past Challenges
-
-An archive of previous editions of the BEHAVIOR Challenge. These pages are preserved for
-reference — including their rules, datasets, leaderboards, and demo galleries. For the current
-challenge, see the [2026 BEHAVIOR Challenge](../index.md).
-
 ## 2025 BEHAVIOR Challenge
 
 *Foundation Models Meet Embodied Agents Challenge @ NeurIPS 2025*
@@ -26,3 +20,8 @@ the BEHAVIOR-1K environment, supported by 10,000 teleoperated expert demonstrati
 - [Evaluation and Rules](2025/evaluation.md)
 - [Submission Guidelines](2025/submission.md)
 - [Demo Gallery](2025/tasks/index.md)
+
+## Workshops & Tutorials
+
+- [1st BEHAVIOR Workshop @ ICCV 2021](../../workshops/iccv21.md)
+- [1st BEHAVIOR Tutorial @ ECCV 2022](../../workshops/eccv22.md)

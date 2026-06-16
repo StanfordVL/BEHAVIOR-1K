@@ -10,7 +10,7 @@
 
     The 2026 BEHAVIOR Challenge is being prepared. Dates, prizes, sponsors, and dataset
     details below are placeholders (**TBD**) and will be finalized before launch. Looking for
-    last year's challenge? See [Past Challenges](./archive/index.md).
+    previous year's events? See [Past Events](./archive/index.md).
 
 ---
 
