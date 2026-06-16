@@ -19,6 +19,7 @@ video/duration/instruction/thumbnail yet, so the gallery shows "coming soon" pla
 until those are added (videos are Vimeo URLs added by hand to the JSON).
 """
 
+import csv
 import json
 from pathlib import Path
 
@@ -31,6 +32,8 @@ TASK_DATA_2025 = REPO_ROOT / "docs" / "challenge" / "archive" / "2025" / "task_d
 DATASET_2026 = REPO_ROOT / "datasets" / "2026-challenge-task-instances" / "metadata"
 AVAILABLE_TASKS = DATASET_2026 / "available_tasks.yaml"
 CUSTOM_LISTS = DATASET_2026 / "task_custom_lists.json"
+# Canonical B100 task ordering: column "Task ID" is a numeric index, column "Task" is the id.
+B100_TASK_LIST = DATASET_2026 / "B100_task_misc.csv"
 
 # Output
 OUT_FILE = REPO_ROOT / "docs" / "challenge" / "task_data.json"
@@ -44,13 +47,28 @@ def title_case(task_id: str) -> str:
     return task_id.replace("_", " ").title()
 
 
+def load_b100_order() -> dict:
+    """Map each task id to its index in the canonical B100 task list."""
+    order = {}
+    with open(B100_TASK_LIST, newline="") as f:
+        for row in csv.DictReader(f):
+            task_id = row["Task"].strip()
+            if task_id:
+                order[task_id] = int(row["Task ID"])
+    return order
+
+
 def main() -> None:
     # 50 carryover tasks: copy 2025 entries verbatim (full media preserved).
     carryover = json.loads(TASK_DATA_2025.read_text())["tasks"]
     carryover_ids = {t["id"] for t in carryover}
 
-    # 50 new tasks: authoritative list = keys of available_tasks.yaml.
+    # 50 new tasks: authoritative list = keys of available_tasks.yaml, ordered by their index
+    # in the canonical B100 task list. Tasks absent from B100 keep their available_tasks order
+    # and are appended after the indexed ones (stable sort + sentinel index).
+    b100_order = load_b100_order()
     new_ids = list(yaml.safe_load(AVAILABLE_TASKS.read_text()).keys())
+    new_ids.sort(key=lambda task_id: b100_order.get(task_id, len(b100_order) + 1))
     custom_lists = json.loads(CUSTOM_LISTS.read_text())
 
     new_tasks = []
