@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # Past Challenges
 
 An archive of previous editions of the BEHAVIOR Challenge. These pages are preserved for
