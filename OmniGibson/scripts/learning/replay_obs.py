@@ -89,6 +89,7 @@ def replay_hdf5_file(
     lerobot_repo_id: str | None = None,
     lerobot_root_dir: str | None = None,
     overwrite_lerobot: bool = True,
+    use_longest_demo: bool = False,
 ) -> int:
     """
     Replays a single HDF5 file and saves data to the specified format.
@@ -99,6 +100,7 @@ def replay_hdf5_file(
         demo_id: ID of the demo to replay
         output_format: Output format, "hdf5" or "lerobot"
         flush_every_n_steps: Number of steps to flush the data after
+        use_longest_demo: If True, replay the demo with the most steps instead of the last demo group
 
     Returns:
         episode_id: ID of the episode
@@ -174,9 +176,21 @@ def replay_hdf5_file(
 
     env.load_observation_space()
 
-    num_samples = [env.input_hdf5["data"][key].attrs["num_samples"] for key in env.input_hdf5["data"].keys()]
-    episode_id = num_samples.index(max(num_samples))
-    log.info(f" >>> Replaying episode {episode_id} with {num_samples[episode_id]} steps")
+    demo_ids = sorted(int(key.split("_", 1)[1]) for key in env.input_hdf5["data"].keys() if key.startswith("demo_"))
+    if not demo_ids:
+        raise ValueError(f"No demo groups found in {input_path}")
+
+    if use_longest_demo:
+        episode_id = max(
+            demo_ids,
+            key=lambda cur_episode_id: env.input_hdf5["data"][f"demo_{cur_episode_id}"].attrs["num_samples"],
+        )
+        selection_reason = "most steps"
+    else:
+        episode_id = demo_ids[-1]
+        selection_reason = "last demo"
+    num_samples = env.input_hdf5["data"][f"demo_{episode_id}"].attrs["num_samples"]
+    log.info(f" >>> Replaying episode {episode_id} ({selection_reason}) with {num_samples} steps")
 
     env.playback_episode(episode_id=episode_id, record_data=True)
 
@@ -216,6 +230,12 @@ def main():
         action="store_true",
         help="Append to an existing LeRobot dataset instead of overwriting it.",
     )
+    parser.add_argument(
+        "--use_longest_demo",
+        "--use-longest-demo",
+        action="store_true",
+        help="Replay the demo with the most steps instead of the last demo group.",
+    )
 
     args = parser.parse_args()
     task_id = _infer_task_id_from_demo_id(args.demo_id)
@@ -234,6 +254,7 @@ def main():
         lerobot_repo_id=args.lerobot_repo_id,
         lerobot_root_dir=args.lerobot_root_dir,
         overwrite_lerobot=not args.resume_lerobot,
+        use_longest_demo=args.use_longest_demo,
     )
 
     log.info("All done!")

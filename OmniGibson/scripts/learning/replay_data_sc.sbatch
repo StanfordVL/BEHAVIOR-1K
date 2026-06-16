@@ -128,6 +128,10 @@ COMPLETE_MARKER="${MARKER_DIR}/complete"
 FAILED_MARKER="${MARKER_DIR}/failed"
 LEROBOT_OUTPUT_DIR="${LEROBOT_ROOT_DIR}/${LEROBOT_REPO_ID}"
 
+cleanup_shared_permissions() {
+  ensure_shared_permissions "$MARKER_DIR" "$LEROBOT_OUTPUT_DIR"
+}
+
 mkdir -p "/vision/u/${USER}/BEHAVIOR-1K/outputs/sc/replay_data"
 mkdir -p "$MARKER_DIR"
 ensure_shared_permissions "$MARKER_DIR"
@@ -159,11 +163,12 @@ mark_failed() {
     echo "job_id=${SLURM_JOB_ID:-}"
     echo "host=$(hostname)"
     echo "time=$(date --iso-8601=seconds)"
-  } > "$FAILED_MARKER"
-  rm -f "$RUNNING_MARKER"
-  ensure_shared_permissions "$MARKER_DIR" "$LEROBOT_OUTPUT_DIR"
-  exit "$exit_code"
-}
+	  } > "$FAILED_MARKER"
+	  rm -f "$RUNNING_MARKER"
+	  cleanup_shared_permissions
+	  exit "$exit_code"
+	}
+trap cleanup_shared_permissions EXIT
 trap mark_failed ERR TERM INT
 
 GPU_INFO="$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits | head -n 1 || true)"
@@ -241,6 +246,6 @@ done
   echo "demo_ids=${DEMO_IDS}"
 } > "$COMPLETE_MARKER"
 rm -f "$RUNNING_MARKER" "$FAILED_MARKER"
-ensure_shared_permissions "$MARKER_DIR" "$LEROBOT_OUTPUT_DIR"
+cleanup_shared_permissions
 
 echo "Shard finished successfully."
