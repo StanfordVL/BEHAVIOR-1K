@@ -64,11 +64,7 @@ RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
   && ( ( curl "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip" && unzip awscliv2.zip -d /tmp/ && /tmp/aws/install && rm awscliv2.zip) || pip3 install --no-cache-dir awscli ) \
   && ( curl -s "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${DPKG_ARCH}-v${GIT_LFS_VERSION}.tar.gz" -L -o /tmp/lfs.tar.gz && tar -xzf /tmp/lfs.tar.gz -C /tmp && /tmp/git-lfs-${GIT_LFS_VERSION}/install.sh && rm -rf /tmp/lfs.tar.gz  /tmp/git-lfs-${GIT_LFS_VERSION}) \
   && distro=$(lsb_release -is | awk '{print tolower($0)}') \
-  && VERSION_ID=$(lsb_release -r | cut -f2) \
-  && echo "deb [signed-by=/etc/apt/keyrings/devel-kubic-libcontainers.gpg] http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel-kubic-libcontainers-stable.list \
-  && ( curl -Ls https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_$VERSION_ID/Release.key | gpg --dearmor -o /etc/apt/keyrings/devel-kubic-libcontainers.gpg ) \
-  && apt-get update \
-  && apt-get install buildah podman fuse-overlayfs -y \
+  && apt-get install -y --no-install-recommends buildah podman fuse-overlayfs \
   && sed -i 's/^\[machine\]$/#\[machine\]/' /usr/share/containers/containers.conf \
   # && sed -i 's/#mount_program/mount_program/g' /etc/containers/storage.conf \
   && mkdir -p /etc/apt/keyrings \
