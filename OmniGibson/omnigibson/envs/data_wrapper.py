@@ -10,7 +10,7 @@ import omnigibson as og
 from omnigibson.controllers import ControllerView, ControlType
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
-from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
+from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm, macros
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.data_utils import merge_scene_files
@@ -20,6 +20,36 @@ from omnigibson.utils.ui_utils import create_module_logger
 # Create module logger
 log = create_module_logger(module_name=__name__)
 log.setLevel(logging.INFO)
+
+
+def _is_system_particle_template_info(obj_info: dict, system_names: set[str]) -> bool:
+    args = obj_info.get("args", {})
+    category = args.get("category")
+    return (
+        category in system_names
+        and args.get("name") == f"{category}_template"
+        and args.get("relative_prim_path") == f"/{category}/template"
+    )
+
+
+def _is_system_particle_template_name(obj_name: str, system_names: set[str]) -> bool:
+    return any(obj_name == f"{system_name}_template" for system_name in system_names)
+
+
+def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: dict) -> None:
+    state = recorded_scene_file.get("state", {})
+    object_registry_state = (
+        state.get("registry", {}).get("object_registry", {})
+        if "registry" in state
+        else state.get("object_registry", {})
+    )
+
+    for obj_name, recorded_obj_state in object_registry_state.items():
+        obj = scene.object_registry("name", obj_name, None)
+        if obj is None or obj.states is None:
+            continue
+
+        obj._recorded_non_kin_state_names = set(recorded_obj_state.get("non_kin", {}))
 
 
 class DataWrapper(EnvironmentWrapper):
@@ -489,7 +519,8 @@ class DataPlaybackWrapper(DataWrapper):
         self._fps = int(
             input_config.get("env", dict()).get("rendering_frequency", env.env_config["rendering_frequency"])
         )
-        self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        self.recorded_scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        self.scene_file = self.recorded_scene_file
         assert not (
             load_room_instances and not full_scene_file
         ), "Full scene file must be specified in order to load room instances"
@@ -501,6 +532,7 @@ class DataPlaybackWrapper(DataWrapper):
                 # we loaded more room than the stored scene file, but still not the full scene
                 # we need to save the current scene file here to avoid errors
                 self.scene_file = env.scene.save(as_dict=True)
+        _align_scene_object_states_with_recorded_schema(scene=env.scene, recorded_scene_file=self.recorded_scene_file)
 
         # check flush parameters
         if flush_every_n_steps > 0:
@@ -642,6 +674,10 @@ class DataPlaybackWrapper(DataWrapper):
                 setattr(obj, attr, val.item() if val.ndim == 0 else val)
         og.sim.play()
         self.reset()
+        _align_scene_object_states_with_recorded_schema(
+            scene=self.scene,
+            recorded_scene_file=self.recorded_scene_file,
+        )
 
         # If not controlling robots, disable for all robots
         if not self.include_robot_control:
@@ -701,14 +737,20 @@ class DataPlaybackWrapper(DataWrapper):
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
                 scene = og.sim.scenes[0]
+                added_systems = set(cur_transitions["systems"]["add"])
+                removed_systems = set(cur_transitions["systems"]["remove"])
                 for add_sys_name in cur_transitions["systems"]["add"]:
                     scene.get_system(add_sys_name, force_init=True)
                 for remove_sys_name in cur_transitions["systems"]["remove"]:
                     scene.clear_system(remove_sys_name)
                 for remove_obj_name in cur_transitions["objects"]["remove"]:
+                    if _is_system_particle_template_name(remove_obj_name, removed_systems):
+                        continue
                     obj = scene.object_registry("name", remove_obj_name)
                     scene.remove_object(obj)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
+                    if _is_system_particle_template_info(add_obj_info, added_systems):
+                        continue
                     obj = create_object_from_init_info(add_obj_info)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)

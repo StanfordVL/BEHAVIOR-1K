@@ -1,6 +1,6 @@
 import logging
 import torch as th
-from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
+from omnigibson.eval.utils.network_utils import WebsocketClientPolicy
 from typing import Optional
 
 
@@ -18,6 +18,9 @@ class LocalPolicy:
 
     def __init__(self, *args, action_dim: Optional[int] = None, **kwargs) -> None:
         self.policy = None  # To be set later
+        self.action_dim = action_dim
+
+    def set_action_dim(self, action_dim: int) -> None:
         self.action_dim = action_dim
 
     def act(self, obs: dict) -> th.Tensor:
