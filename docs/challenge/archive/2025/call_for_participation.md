@@ -1,9 +1,4 @@
 
-!!! warning "🚧 Provisional — carried over from 2025"
-
-    This page reflects the 2025 challenge and will be updated for 2026. Dates, prizes, and
-    rules are subject to change.
-
 # **Announcing the 1st BEHAVIOR Challenge @ NeurIPS 2025**
 
 Robots in the BEHAVIOR simulator perform everyday activities (like cooking or cleaning) in virtual home environments. *BEHAVIOR* (Benchmark for Everyday Household Activities in Virtual, Interactive, and Realistic environments) is a large-scale embodied AI benchmark with 1,000 defined household tasks grounded in real human needs. These tasks introduce long-horizon mobile manipulation challenges in realistic settings, bridging the gap between current research and real-world, human-centric applications. Even the state-of-the-art robot learning solutions struggle with the complexity and extended duration of BEHAVIOR’s activities, which is why we are thrilled to announce the 1st BEHAVIOR Challenge at NeurIPS 2025. This competition invites the community to tackle 50 of these full-length tasks in a realistic simulator - pushing the frontiers of both high-level planning and low-level control in house-scale environments.
@@ -38,7 +33,7 @@ For the 1st challenge, we use Galaxea’s R1 Pro robot, a wheeled humanoid, as t
 
 All demonstrations were collected via **JoyLo**, our custom whole-body teleoperation interface. Using two handheld controllers (inspired by game consoles) and two toy robot arms, human operators can smoothly drive the mobile manipulator’s base, torso, and dual arms. We enforced strict quality control to ensure the data is *near-optimal and clean*. That means no failed grasps, no accidental collisions with the environment, and no jittery, unnatural motions - only smooth and purposeful manipulation behavior. Teleoperators moved at a moderate, consistent speed, providing expert examples. In short, this dataset reflects successful task executions, with minimal noise or trial-and-error, which is ideal for methods like imitation learning or offline reinforcement learning. All of our data and annotations are purchased from Simovation.
 
-*[JoyLo](../behavior_components/joylo.md)* is a low-cost teleoperation system that lets a human operator control a complex robot. Our vendor, Simovation, used JoyLo to collect over 1,200 hours of expert demonstrations for BEHAVIOR tasks. JoyLo originally demonstrated impressive results on real robots and now works in simulation too, enabling operators to command the robot’s base, torso, arms, and grippers fluidly. This interface significantly speeds up data collection and improves data quality. 
+*[JoyLo](../../../behavior_components/joylo.md)* is a low-cost teleoperation system that lets a human operator control a complex robot. Our vendor, Simovation, used JoyLo to collect over 1,200 hours of expert demonstrations for BEHAVIOR tasks. JoyLo originally demonstrated impressive results on real robots and now works in simulation too, enabling operators to command the robot’s base, torso, arms, and grippers fluidly. This interface significantly speeds up data collection and improves data quality. 
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/fFAtUzEETe4?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Data Quality Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 

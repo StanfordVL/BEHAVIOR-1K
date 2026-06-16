@@ -1,13 +1,8 @@
 # Submission
 
-!!! warning "🚧 Provisional — carried over from 2025"
+- **Submission Portal**: [Google Form](https://forms.gle/54tVqi5zs3ANGutn7)
 
-    This page reflects the 2025 challenge and will be updated for 2026. The submission portal,
-    deadlines, and rules are subject to change.
-
-- **Submission Portal**: *To be announced*
-
-- **Leaderboard**: *To be announced*
+- **Leaderboard**: [here](./leaderboard.md)
 
 
 ## **Submission details**

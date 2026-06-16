@@ -1,10 +1,5 @@
 # Evaluation and Rules
 
-!!! warning "🚧 Provisional — carried over from 2025"
-
-    This page reflects the 2025 challenge rules and will be updated for 2026. Tracks, metrics,
-    and the evaluation protocol are subject to change.
-
 ---
 
 ## Challenge Tracks

@@ -1,13 +1,5 @@
 # Dataset
 
-!!! warning "🚧 Provisional — 2026 dataset in preparation"
-
-    The 2026 challenge covers **100 tasks** (the 50 from 2025 plus 50 new ones). The dataset
-    and statistics below describe the **2025** release (50 tasks); the demonstration data and
-    task instances for the 50 new 2026 tasks are **TBD** and will be released before launch.
-    Task instances for the new tasks live in
-    [`datasets/2026-challenge-task-instances`](https://github.com/StanfordVL/BEHAVIOR-1K/tree/main/datasets/2026-challenge-task-instances).
-
 **NOTE: The [joint efforts data](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/eval_utils.py#L90) in the robot state entry of the parquet files are wrong. This is because we do not store observations during our initial data collection, and all observations are collected through a round of "data replay" in which we restore sim state every step without stepping physics, and thus the joint effort reading is wrong. Please do not use them for training. They will be removed in the next dataset release.**
 
 
@@ -50,7 +42,7 @@ The dataset includes 3 visual modalities: RGB (rgb), Depth (depth_linear), and M
             We provide [RGBVideoLoader](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/obs_utils.py#L315-L330) class for loading RGB mp4 video from demo dataset. <br><br>
         </td>
         <td>
-            <img src="../assets/challenge_2025/dataset_rgb.png" alt="rgb">
+            <img src="../../../assets/challenge_2025/dataset_rgb.png" alt="rgb">
         </td>
     </tr>
     <tr>
@@ -63,7 +55,7 @@ The dataset includes 3 visual modalities: RGB (rgb), Depth (depth_linear), and M
             We provide [DepthVideoLoader](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/obs_utils.py#L333-L351) class for loading depth mp4 video from demo dataset. <br><br>
         </td>
         <td>
-            <img src="../assets/challenge_2025/dataset_depth.png" alt="Depth Map Linear">
+            <img src="../../../assets/challenge_2025/dataset_depth.png" alt="Depth Map Linear">
         </td>
     </tr>
     <tr>
@@ -75,7 +67,7 @@ The dataset includes 3 visual modalities: RGB (rgb), Depth (depth_linear), and M
             We provide [SegVideoLoader](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/obs_utils.py#L354-L375) class for loading mesh segmentation mp4 video from demo dataset. <br><br>
         </td>
         <td>
-            <img src="../assets/challenge_2025/dataset_seg.png" alt="Instance Segmentation ID">
+            <img src="../../../assets/challenge_2025/dataset_seg.png" alt="Instance Segmentation ID">
         </td>
     </tr>
 </table>
@@ -133,8 +125,8 @@ The dataset includes 3 visual modalities: RGB (rgb), Depth (depth_linear), and M
 
 ### Overall Demo Duration
 
-![Overall Demo Duration](../assets/challenge_2025/overall_demo_duration.png)
+![Overall Demo Duration](../../../assets/challenge_2025/overall_demo_duration.png)
 
 ### Per Task Demo Duration
 
-![Per Task Demo Duration](../assets/challenge_2025/per_task_demo_duration.png)
+![Per Task Demo Duration](../../../assets/challenge_2025/per_task_demo_duration.png)
