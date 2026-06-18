@@ -450,7 +450,7 @@ if [ "$EVAL" = true ]; then
     TORCH_VERSION=$(pip show torch | grep Version | cut -d " " -f 2)
     pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
     # install av and ffmpeg
-    conda install av "numpy<2" -c conda-forge -y
+    # conda install av "numpy<2" -c conda-forge -y
 fi
 
 # Install asset pipeline
