@@ -33,7 +33,7 @@ from omnigibson.eval.utils.eval_utils import (
     flatten_obs_dict,
     generate_basic_environment_config,
 )
-from omnigibson.eval.utils.obs_utils import write_video
+from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import create_module_macros, gm, macros
 from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
@@ -73,6 +73,8 @@ class Evaluator:
 
         self.env._current_episode = 0
         self._video_writer = None
+        self._video_path = None
+        self._video_rate = 30
 
     def load_env(self, env_wrapper: DictConfig) -> EnvironmentWrapper:
         for rule in DISABLED_TRANSITION_RULES:
@@ -159,6 +161,9 @@ class Evaluator:
         self.robot_action = self.policy.forward(obs=self.obs)
         obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
         self.obs = self._preprocess_obs(obs)
+
+        if self._video_path is not None:
+            self._write_video()
 
         if terminated or truncated:
             self.n_trials += 1
@@ -265,12 +270,23 @@ class Evaluator:
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb"].numpy(),
             (448, 448),
         )
-        write_video(
-            np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0),
-            video_writer=self.video_writer,
-            batch_size=1,
-            mode="rgb",
-        )
+        frame = np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0)
+        if self._video_writer is None:
+            # Writer is created lazily so its resolution matches the composite (H, W) frame above.
+            self.video_writer = create_video_writer(
+                self._video_path, resolution=frame.shape[1:3], rate=self._video_rate
+            )
+        write_video(frame, video_writer=self.video_writer, batch_size=1, mode="rgb")
+
+    def start_recording(self, fpath: str, rate: int = 30) -> None:
+        # Finalize any in-progress recording, then arm a new one (writer is created on the first frame).
+        self.video_writer = None
+        self._video_path = fpath
+        self._video_rate = rate
+
+    def stop_recording(self) -> None:
+        self.video_writer = None
+        self._video_path = None
 
     def reset(self) -> None:
         self.obs = self._preprocess_obs(self.env.reset()[0])

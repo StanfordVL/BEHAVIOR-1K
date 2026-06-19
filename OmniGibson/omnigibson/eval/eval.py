@@ -11,7 +11,7 @@ Example:
         --task-name turning_on_radio \
         --host 127.0.0.1 --port 8000 \
         --instance-indices 0 --max-steps 500 \
-        --output-dir outputs/b1k_eval
+        --output-dir outputs/b1k_eval --write-video
 """
 
 import argparse
@@ -45,6 +45,13 @@ def parse_args() -> argparse.Namespace:
         help="Target path of the EnvironmentWrapper to apply.",
     )
     parser.add_argument("--output-dir", default="/tmp/b1k_eval", help="Where to write result JSONs.")
+    parser.add_argument(
+        "--write-video",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Save an MP4 rollout video (head + wrist cameras) per rollout under <output-dir>/videos.",
+    )
+    parser.add_argument("--video-fps", type=int, default=30, help="Frame rate for saved rollout videos.")
     parser.add_argument(
         "--headless",
         action=argparse.BooleanOptionalAction,
@@ -81,7 +88,7 @@ def main() -> None:
             "headless": args.headless,
             "partial_scene_load": True,
             "max_steps": args.max_steps,
-            "write_video": False,
+            "write_video": args.write_video,
             "test_hidden": False,
             "task": {"name": args.task_name},
             "robot": {"type": "R1Pro", "controllers": None},
@@ -90,14 +97,20 @@ def main() -> None:
 
     json_dir = os.path.join(os.path.expanduser(args.output_dir), "json")
     os.makedirs(json_dir, exist_ok=True)
+    video_dir = os.path.join(os.path.expanduser(args.output_dir), "videos")
+    if args.write_video:
+        os.makedirs(video_dir, exist_ok=True)
 
     results = []
     with Evaluator(cfg) as evaluator:
         for instance_id in instance_ids:
             for rollout_id in range(args.num_rollouts):
+                video_path = os.path.join(video_dir, f"{args.task_name}_{instance_id}_{rollout_id}.mp4")
                 try:
                     evaluator.load_task_instance(int(instance_id), test_hidden=False)
                     evaluator.reset()
+                    if args.write_video:
+                        evaluator.start_recording(video_path, rate=args.video_fps)
                     terminated = truncated = False
                     steps = 0
                     while not (terminated or truncated):
@@ -124,11 +137,15 @@ def main() -> None:
                     print(
                         f"[result] instance={instance_id} rollout={rollout_id} steps={steps} "
                         f"success={success} q_score={q_score} -> {out_path}"
+                        + (f" | video -> {video_path}" if args.write_video else "")
                     )
                     results.append(result)
                 except Exception:
                     print(f"[error] instance={instance_id} rollout={rollout_id} failed:")
                     traceback.print_exc()
+                finally:
+                    if args.write_video:
+                        evaluator.stop_recording()
 
     n = len(results)
     n_success = sum(r["success"] for r in results)
