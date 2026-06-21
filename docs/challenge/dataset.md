@@ -59,7 +59,7 @@ The dataset includes 2 visual modalities: RGB (rgb) and Depth (depth_linear):
 | Total Skills | 270,600 |
 | Unique Skills | 31 |
 | Avg. Skills per Trajectory | 27.06 |
-| Avg. Trajectory Duration | 397.04 seconds / 6.6 minutes |
+| Avg. Trajectory Duration | 351.54 seconds / 5.9 minutes |
 
 <details>
 <summary><b>Show unique skills breakdown</b></summary>
@@ -102,8 +102,8 @@ The dataset includes 2 visual modalities: RGB (rgb) and Depth (depth_linear):
 
 ### Overall Demo Duration
 
-![Overall Demo Duration](../assets/challenge_2025/overall_demo_duration.png)
+![Overall Demo Duration](../assets/challenge_2026/overall_demo_duration.png)
 
 ### Per Task Demo Duration
 
-![Per Task Demo Duration](../assets/challenge_2025/per_task_demo_duration.png)
+![Per Task Demo Duration](../assets/challenge_2026/per_task_demo_duration.png)
