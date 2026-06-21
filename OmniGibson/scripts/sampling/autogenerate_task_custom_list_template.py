@@ -8,7 +8,7 @@ from collections import defaultdict
 import numpy as np
 from omnigibson.utils.bddl_utils import get_knowledge_base, GOOD_MODELS, BAD_CLOTH_MODELS
 from omnigibson.utils.asset_utils import get_all_object_category_models, get_scene_path
-from constants import DATASET_2025_PATH, DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
+from constants import DATASET_2026_PATH, TASK_CUSTOM_LIST_PATH
 from floor_plan_visualization import get_floor_plan_data
 
 
@@ -21,9 +21,9 @@ parser.add_argument("--no-room-gui", action="store_true", help="Skip the floor-p
 parser.add_argument("--floor", type=int, default=0, help="Floor index to show in the room picker.")
 
 
-def get_2025_models_for_task(activity_name):
-    """Return {synset: {category: [model_id, ...]}} for a task found in the 2025 dataset."""
-    pattern = os.path.join(DATASET_2025_PATH, "scenes", "*", "json", f"*_task_{activity_name}_0_0_template.json")
+def get_existing_models_for_task(activity_name):
+    """Return {synset: {category: [model_id, ...]}} for a task found in the dataset."""
+    pattern = os.path.join(DATASET_2026_PATH, "scenes", "*", "json", f"*_task_{activity_name}_0_0_template.json")
     results = {}
     for template_path in glob.glob(pattern):
         try:
@@ -459,7 +459,7 @@ def autogenerate_task_custom_list(activity_name, use_room_gui=True, floor=0):
             print(f"Saved room types for compatibility: {', '.join(sorted(room_types))}")
 
     # Prompt for models per synset/category
-    models_2025 = get_2025_models_for_task(activity_name)
+    existing_models = get_existing_models_for_task(activity_name)
     whitelist = {}
     for synset in sorted(synsets):
         synset_obj = get_knowledge_base().get_synset(synset)
@@ -481,8 +481,12 @@ def autogenerate_task_custom_list(activity_name, use_room_gui=True, floor=0):
             if not available_models:
                 print(f"\n  No models found for category '{cat_name}', skipping.")
                 continue
-            used_in_2025 = sorted(models_2025.get(synset, {}).get(cat_name, []))
-            hint = f"  (used in 2025: {', '.join(used_in_2025)})" if used_in_2025 else "  (not found in 2025 dataset)"
+            used_models = sorted(existing_models.get(synset, {}).get(cat_name, []))
+            hint = (
+                f"  (used in existing templates: {', '.join(used_models)})"
+                if used_models
+                else "  (not found in existing templates)"
+            )
             models = prompt_choice(
                 f"Select model(s) for {synset} / {cat_name} ({SYNSET_BASE_URL}/{synset}.html):\n{hint}",
                 available_models,

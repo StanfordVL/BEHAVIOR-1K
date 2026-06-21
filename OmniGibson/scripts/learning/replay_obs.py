@@ -19,27 +19,17 @@ gm.DEFAULT_VIEWER_HEIGHT = 128
 
 
 def _load_challenge_available_tasks() -> dict:
-    available_tasks = {}
-    for year in ("2025", "2026"):
-        task_cfg_path = os.path.join(
-            gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", "available_tasks.yaml"
-        )
-        if not os.path.exists(task_cfg_path):
-            continue
-        with open(task_cfg_path, "r") as f:
-            available_tasks.update(yaml.safe_load(f))
-    return available_tasks
+    task_cfg_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "available_tasks.yaml")
+    with open(task_cfg_path, "r") as f:
+        return yaml.safe_load(f)
 
 
 def _load_challenge_task_ids() -> dict[str, int]:
     task_ids = {}
-    for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
-        task_misc_path = os.path.join(gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", filename)
-        if not os.path.exists(task_misc_path):
-            continue
-        with open(task_misc_path, newline="", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                task_ids[row["Task"]] = int(row["Task ID"])
+    task_misc_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "B100_task_misc.csv")
+    with open(task_misc_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            task_ids[row["Task"]] = int(row["Task ID"])
     return task_ids
 
 
@@ -55,12 +45,8 @@ def _get_task_name_from_task_id(task_id: int) -> str:
 
 
 def _find_full_scene_file(task_name: str, scene_model: str) -> str:
-    for year in ("2026", "2025"):
-        task_scene_file_folder = os.path.join(
-            gm.DATA_PATH, f"{year}-challenge-task-instances", "scenes", scene_model, "json"
-        )
-        if not os.path.isdir(task_scene_file_folder):
-            continue
+    task_scene_file_folder = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "scenes", scene_model, "json")
+    if os.path.isdir(task_scene_file_folder):
         for file in os.listdir(task_scene_file_folder):
             if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
                 return os.path.join(task_scene_file_folder, file)
@@ -68,15 +54,12 @@ def _find_full_scene_file(task_name: str, scene_model: str) -> str:
 
 
 def _load_room_instances(task_name: str) -> list[str]:
-    for year, filename in (("2026", "B100_task_misc.csv"), ("2025", "B50_task_misc.csv")):
-        task_misc_path = os.path.join(gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", filename)
-        if not os.path.exists(task_misc_path):
-            continue
-        with open(task_misc_path, newline="", encoding="utf-8") as f:
-            task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
-            for row in task_misc_csv:
-                if task_name in row[1]:
-                    return row[2].strip().split("\n")
+    task_misc_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "B100_task_misc.csv")
+    with open(task_misc_path, newline="", encoding="utf-8") as f:
+        task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
+        for row in task_misc_csv:
+            if task_name in row[1]:
+                return row[2].strip().split("\n")
     raise FileNotFoundError(f"No task misc room instances found for task '{task_name}'")
 
 

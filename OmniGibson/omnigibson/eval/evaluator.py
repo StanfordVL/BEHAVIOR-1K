@@ -8,7 +8,6 @@ import traceback
 from signal import SIGINT, signal
 from typing import Any, List, Tuple
 
-import gymnasium as gym
 import numpy as np
 import torch as th
 from av.container import Container
@@ -34,26 +33,30 @@ from omnigibson.eval.utils.eval_utils import (
     generate_basic_environment_config,
 )
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
-from omnigibson.macros import create_module_macros, gm, macros
+from omnigibson.macros import gm
 from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
 from omnigibson.utils.asset_utils import get_task_instance_path
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
+from omnigibson.utils.ui_utils import create_module_logger
 
-m = create_module_macros(module_path=__file__)
-m.NUM_EVAL_EPISODES = 1
-m.NUM_TRAIN_INSTANCES = 200
-m.NUM_EVAL_INSTANCES = 10
 
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 
-with macros.unlocked():
-    macros.robots.manipulation_robot.GRASP_WINDOW = 0.75
-
-logger = logging.getLogger("evaluator")
+logger = create_module_logger(module_name=__name__)
 logger.setLevel(logging.INFO)
+
+
+def resolve_instance_ids(task_name: str, instance_indices: list[int]) -> list[int]:
+    task_instance_csv_path = os.path.join(
+        gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "test_instances.csv"
+    )
+    with open(task_instance_csv_path, newline="", encoding="utf-8") as f:
+        row = next(row for row in csv.DictReader(f) if row["Task"] == task_name)
+    test_instances = [int(instance_id.strip()) for instance_id in row["Public Test Instance IDs"].split(",")]
+    return [int(test_instances[i]) for i in instance_indices]
 
 
 class Evaluator:
@@ -91,7 +94,7 @@ class Evaluator:
             "left_eef_displacement": [],
             "right_eef_displacement": [],
         }
-        with open(os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "episodes.jsonl"), "r") as f:
+        with open(os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "episodes.jsonl"), "r") as f:
             episodes = [json.loads(line) for line in f]
         for episode in episodes:
             if episode["episode_index"] // 1e4 == task_idx:
@@ -198,7 +201,7 @@ class Evaluator:
         if test_hidden:
             tro_file_path = os.path.join(
                 gm.DATA_PATH,
-                "2025-challenge-test-instances",
+                "2026-challenge-test-instances",
                 self.env.task.activity_name,
                 f"{tro_filename}-tro_state.json",
             )
@@ -320,158 +323,4 @@ class Evaluator:
         sys.exit(0)
 
 
-class BehaviorEvalEnv(gym.Env):
-    metadata = {"render_modes": []}
-
-    def __init__(
-        self,
-        task_name: str = "turning_on_radio",
-        instance_indices: list[int] | None = None,
-        log_path: str = "/tmp/og-envhub",
-        max_steps: int | None = 1,
-        partial_scene_load: bool = True,
-        headless: bool = True,
-        write_video: bool = False,
-    ) -> None:
-        super().__init__()
-        self.task_name = task_name
-        self.instance_ids = self._resolve_instance_ids(task_name, instance_indices or [0])
-        self._next_instance_idx = 0
-        self._loaded_instance_id = None
-        self._closed = False
-
-        gm.HEADLESS = headless
-        self.evaluator = Evaluator(
-            OmegaConf.create(
-                {
-                    "env_wrapper": {"_target_": "omnigibson.eval.wrappers.RGBLowResWrapper"},
-                    "policy_name": "local",
-                    "model": {"_target_": "omnigibson.eval.policies.LocalPolicy", "action_dim": None},
-                    "headless": headless,
-                    "eval_on_train_instances": False,
-                    "eval_instance_ids": instance_indices or [0],
-                    "write_video": write_video,
-                    "partial_scene_load": partial_scene_load,
-                    "max_steps": max_steps,
-                    "log_path": log_path,
-                    "test_hidden": False,
-                    "task": {"name": task_name},
-                    "robot": {"type": "R1Pro", "controllers": None},
-                }
-            )
-        )
-        self.action_space = self.evaluator.robot.action_space
-
-        obs, _ = self.reset(options={"instance_id": self.instance_ids[0]})
-        self.observation_space = gym.spaces.Dict({key: self._space_from_value(value) for key, value in obs.items()})
-
-    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
-        super().reset(seed=seed)
-        options = options or {}
-        instance_id = options.get("instance_id")
-        if instance_id is None:
-            instance_id = self.instance_ids[self._next_instance_idx % len(self.instance_ids)]
-            self._next_instance_idx += 1
-
-        if instance_id != self._loaded_instance_id:
-            self.evaluator.load_task_instance(int(instance_id), test_hidden=False)
-            self._loaded_instance_id = int(instance_id)
-
-        self.evaluator.reset()
-        obs = self._to_numpy(self.evaluator.obs)
-        return obs, {"task_name": self.task_name, "instance_id": int(instance_id)}
-
-    def step(self, action):
-        action = th.as_tensor(action, dtype=th.float32)
-        obs, reward, terminated, truncated, info = self.evaluator.env.step(action, n_render_iterations=1)
-        self.evaluator.obs = self.evaluator._preprocess_obs(obs)
-
-        if terminated or truncated:
-            self.evaluator.n_trials += 1
-            if info["done"]["success"]:
-                self.evaluator.n_success_trials += 1
-
-        for metric in self.evaluator.metrics:
-            metric.step(self.evaluator.env, action, obs, reward, terminated, truncated, info)
-
-        if terminated or truncated:
-            metrics = {}
-            for metric in self.evaluator.metrics:
-                metrics.update(metric.aggregate(self.evaluator.env))
-            info["metrics"] = metrics
-
-        return self._to_numpy(self.evaluator.obs), float(reward), bool(terminated), bool(truncated), info
-
-    def close(self):
-        if self._closed:
-            return
-        self._closed = True
-        self.evaluator.video_writer = None
-        self.evaluator.env.close()
-        og.shutdown()
-
-    @staticmethod
-    def _resolve_instance_ids(task_name: str, instance_indices: list[int]) -> list[int]:
-        task_instance_csv_path = os.path.join(
-            gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
-        )
-        with open(task_instance_csv_path, newline="", encoding="utf-8") as f:
-            row = next(row for row in csv.DictReader(f) if row["Task"] == task_name)
-        test_instances = [int(instance_id.strip()) for instance_id in row["Public Test Instance IDs"].split(",")]
-        return [int(test_instances[i]) for i in instance_indices]
-
-    @staticmethod
-    def _space_from_value(value):
-        value = np.asarray(value)
-        if np.issubdtype(value.dtype, np.integer):
-            if value.dtype == np.uint8:
-                return gym.spaces.Box(low=0, high=255, shape=value.shape, dtype=value.dtype)
-            dtype_info = np.iinfo(value.dtype)
-            return gym.spaces.Box(low=dtype_info.min, high=dtype_info.max, shape=value.shape, dtype=value.dtype)
-        return gym.spaces.Box(low=-np.inf, high=np.inf, shape=value.shape, dtype=np.float32)
-
-    @staticmethod
-    def _to_numpy(obs: dict[str, Any]) -> dict[str, np.ndarray]:
-        converted = {}
-        for key, value in obs.items():
-            if isinstance(value, th.Tensor):
-                value = value.detach().cpu().numpy()
-            else:
-                value = np.asarray(value)
-            if np.issubdtype(value.dtype, np.floating):
-                value = value.astype(np.float32, copy=False)
-            converted[key] = value
-        return converted
-
-
-def _get_cfg_value(cfg, name, default):
-    if cfg is None:
-        return default
-    if isinstance(cfg, dict):
-        return cfg.get(name, default)
-    return getattr(cfg, name, default)
-
-
-def make_env(n_envs: int = 1, use_async_envs: bool = False, cfg=None):
-    if n_envs != 1:
-        raise ValueError(
-            "BEHAVIOR-1K EnvHub currently supports n_envs=1 because OmniGibson uses a singleton simulator."
-        )
-    if use_async_envs:
-        raise ValueError("BEHAVIOR-1K EnvHub currently supports only synchronous execution.")
-
-    def _make_env():
-        return BehaviorEvalEnv(
-            task_name=_get_cfg_value(cfg, "task_name", "turning_on_radio"),
-            instance_indices=_get_cfg_value(cfg, "instance_indices", [0]),
-            log_path=_get_cfg_value(cfg, "log_path", "/tmp/og-envhub"),
-            max_steps=_get_cfg_value(cfg, "max_steps", 1),
-            partial_scene_load=_get_cfg_value(cfg, "partial_scene_load", True),
-            headless=_get_cfg_value(cfg, "headless", True),
-            write_video=_get_cfg_value(cfg, "write_video", False),
-        )
-
-    return {"behavior_1k": {0: gym.vector.SyncVectorEnv([_make_env])}}
-
-
-__all__ = ["BehaviorEvalEnv", "Evaluator", "make_env"]
+__all__ = ["Evaluator", "resolve_instance_ids"]

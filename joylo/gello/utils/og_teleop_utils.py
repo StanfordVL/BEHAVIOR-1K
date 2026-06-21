@@ -1330,17 +1330,12 @@ def load_available_tasks():
     Returns:
         dict: Dictionary of available tasks
     """
-    # TODO (@wensi-ai): unify the config file structure for 2025 and 2026 and simplify this loading logic before challenge announcement
     task_cfg_path_2026 = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "available_tasks.yaml")
-    task_cfg_path_2025 = os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "available_tasks.yaml")
+    available_tasks = {}
 
     try:
-        available_tasks = {}
-        # Here, tasks configurations for 2026 take precedence over 2025 if there are duplicate keys, since 2026 is the current challenge version
-        with open(task_cfg_path_2025, "r") as file:
-            available_tasks.update(yaml.safe_load(file))
         with open(task_cfg_path_2026, "r") as file:
-            available_tasks.update(yaml.safe_load(file))
+            available_tasks = yaml.safe_load(file)
     except (FileNotFoundError, yaml.YAMLError) as e:
         print(f"Error loading available tasks: {e}")
     return available_tasks

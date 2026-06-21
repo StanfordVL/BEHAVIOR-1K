@@ -11,12 +11,10 @@ This preparation step needs only be done once.
     ```bash
     python OmniGibson/omnigibson/utils/asset_utils.py --update_omnigibson_robot_assets
     ```
-- Go inside `2025-challenge-task-instances` and `git pull`
 - Clone [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances.git) into `BEHAVIOR-1K/datasets`
 
 **Outcome:** You should see the following folders under `BEHAVIOR-1K/datasets`:
 
-- `2025-challenge-task-instances`
 - `2026-challenge-task-instances`
 - `behavior-1k-assets`
 - `omnigibson-robot-assets`

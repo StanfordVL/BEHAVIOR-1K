@@ -71,9 +71,9 @@ def main() -> None:
     # Imported after macros are set; this also pulls in OmniGibson + gello.
     from omegaconf import OmegaConf
 
-    from omnigibson.eval.adapter import BehaviorEvalEnv, Evaluator
+    from omnigibson.eval.evaluator import Evaluator, resolve_instance_ids
 
-    instance_ids = BehaviorEvalEnv._resolve_instance_ids(args.task_name, args.instance_indices)
+    instance_ids = resolve_instance_ids(args.task_name, args.instance_indices)
     print(f"Resolved test instance ids for {args.task_name}: {instance_ids}")
 
     cfg = OmegaConf.create(

@@ -61,7 +61,7 @@ def compute_final_q_score(
     if testset == "public":
         # load test instance files
         task_instance_csv_path = os.path.join(
-            gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
+            gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "test_instances.csv"
         )
         with open(task_instance_csv_path, "r") as f:
             lines = list(csv.reader(f))[1:]

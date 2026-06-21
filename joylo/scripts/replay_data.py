@@ -185,12 +185,6 @@ def replay_hdf5_to_video(
         },
     }
     available_tasks = {}
-    # 2026 task instances has precedence over 2025.
-    with open(
-        f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/available_tasks.yaml",
-        "r",
-    ) as f:
-        available_tasks.update(yaml.safe_load(f))
     with open(
         f"{gm.DATA_PATH}/2026-challenge-task-instances/metadata/available_tasks.yaml",
         "r",
@@ -198,22 +192,16 @@ def replay_hdf5_to_video(
         available_tasks.update(yaml.safe_load(f))
     scene_model = available_tasks[task_name][0]["scene_model"]
     full_scene_file = None
-    for year in ("2026", "2025"):
-        task_scene_file_folder = os.path.join(
-            gm.DATA_PATH, f"{year}-challenge-task-instances", "scenes", scene_model, "json"
-        )
-        if not os.path.isdir(task_scene_file_folder):
-            continue
+    task_scene_file_folder = os.path.join(
+        gm.DATA_PATH, "2026-challenge-task-instances", "scenes", scene_model, "json"
+    )
+    if os.path.isdir(task_scene_file_folder):
         for file in os.listdir(task_scene_file_folder):
             if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
                 full_scene_file = os.path.join(task_scene_file_folder, file)
                 break
-        if full_scene_file is not None:
-            break
     if full_scene_file is None:
-        raise FileNotFoundError(
-            f"No full scene file found for task '{task_name}' in either 2026 or 2025 scene directories"
-        )
+        raise FileNotFoundError(f"No full scene file found for task '{task_name}' in 2026 scene directories")
 
     load_room_instances = None
     try:

@@ -133,20 +133,10 @@ def get_task_instance_path(scene_name, instance_name):
     Returns:
         str: file path to the scene name
     """
-    # TODO (@wensi-ai): unify the config file structure for 2025 and 2026 and simplify this loading logic before challenge announcement
-    task_instance_path = None
-    task_instances_path_2025 = os.path.join(
-        gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_name, "json", f"{instance_name}.json"
-    )
     task_instances_path_2026 = os.path.join(
         gm.DATA_PATH, "2026-challenge-task-instances", "scenes", scene_name, "json", f"{instance_name}.json"
     )
-    if os.path.exists(task_instances_path_2025):
-        task_instance_path = task_instances_path_2025
-    # 2026 instances take precedence over 2025 instances if both exist
-    if os.path.exists(task_instances_path_2026):
-        task_instance_path = task_instances_path_2026
-    return task_instance_path
+    return task_instances_path_2026 if os.path.exists(task_instances_path_2026) else None
 
 
 def get_category_path(category_name, dataset_name="behavior-1k-assets"):
