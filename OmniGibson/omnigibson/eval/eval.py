@@ -104,10 +104,16 @@ def main() -> None:
     results = []
     with Evaluator(cfg) as evaluator:
         for instance_id in instance_ids:
+            try:
+                evaluator.reset()
+                evaluator.load_task_instance(int(instance_id), test_hidden=False)
+            except Exception:
+                print(f"[error] instance={instance_id} failed to load:")
+                traceback.print_exc()
+                continue
             for rollout_id in range(args.num_rollouts):
                 video_path = os.path.join(video_dir, f"{args.task_name}_{instance_id}_{rollout_id}.mp4")
                 try:
-                    evaluator.load_task_instance(int(instance_id), test_hidden=False)
                     evaluator.reset()
                     if args.write_video:
                         evaluator.start_recording(video_path, rate=args.video_fps)

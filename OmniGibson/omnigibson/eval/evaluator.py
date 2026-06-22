@@ -74,6 +74,10 @@ class Evaluator:
         self.metrics = self.load_metrics()
         self.obs = None
 
+        # Initialize the physics views so the first reset() (which eval.py issues before the first
+        # load_task_instance) can read/restore robot joint state.
+        og.sim.update_handles()
+
         self.env._current_episode = 0
         self._video_writer = None
         self._video_path = None
@@ -230,11 +234,14 @@ class Evaluator:
             else:
                 self.env.task.object_scope[tro_key].load_state(tro_state, serialized=False)
 
+        # Keep all task-relevant entities (including the robot/agent) still while the scene settles,
+        # so the snapshotted per-instance initial state is stable. The robot must already be in a clean
+        # configuration when this is called -- eval.py resets before load_task_instance for this reason.
         og.sim.update_handles()
         for _ in range(25):
             og.sim.step_physics()
             for inst, entity in self.env.task.object_scope.items():
-                if not is_system_bddl_inst(inst) and entity is not None and not isinstance(entity, Robot):
+                if not is_system_bddl_inst(inst) and entity is not None:
                     entity.keep_still()
 
         self.env.scene.update_initial_file()
