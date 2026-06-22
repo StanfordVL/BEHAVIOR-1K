@@ -156,7 +156,7 @@ Top 3 teams from each track will be invited to present at the workshop!
 Join our community to ask questions and discuss the challenge:
 
 - **Discord**: [Join our Discord Server](https://discord.gg/bccR5vGFEx)
-- **Office Hours**: Monday and Thursday, 4:30-6pm PST via [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1)
+- **Office Hours**: Monday, 5-6pm PST via [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1)
 
 Whether you're a robotics veteran or just entering the field, we're here to support you.
 

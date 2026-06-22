@@ -35,38 +35,19 @@ Browse the full task list in the [Demo Gallery](./tasks/).
 
 ## :material-database: **Dataset & Baselines**
 
-### Teleoperated Demonstrations
+Expert teleoperated demonstrations include synchronized RGBD observations, robot proprioception, and skill/subtask annotations. The dataset for the 50 new 2026 tasks is **TBD** and will be released before launch. [Dataset details →](./dataset.md)
 
-Expert demonstrations collected via teleoperation, with:
-
-- Synchronized RGBD observations
-- Object and part-level segmentation
-- Ground-truth object states
-- Robot proprioception and actions
-- Skill and subtask annotations
-
-The dataset for the 50 new 2026 tasks is **TBD** and will be released before the challenge launch. See [Dataset details →](./dataset.md).
-
-### Baseline Methods
-
-Pre-implemented training & evaluation pipelines (carried over from 2025, updates **TBD**):
-
-- **Behavioral Cloning baselines**: ACT, Diffusion Policy, BC-RNN, WB-VIMA
-- **Pre-trained Visuo-Language Action models**: OpenVLA and π0
-
-[Baselines details →](./baselines.md)
+This year's pre-implemented training and evaluation pipelines are **π0.5** and **GR00T N1.7**. [Baselines details →](./baselines.md)
 
 ## :material-chart-box: **Evaluation & Rules**
 
 The organizers reserve the right of final interpretation of the challenge rules.
 
-### Challenge Tracks
+### Challenge Track
 
-**Standard track:** Limited to provided robot onboard observations (RGB + depth + instance segmentation + proprioception).
+This year has a single track limited to provided robot onboard observations: **RGB + depth + proprioception**.
 
-**Privileged information track:** May query simulator for any information (object poses, scene point clouds, etc.).
-
-🏆 **Prizes per track:** *To be announced*
+🏆 **Prizes:** *To be announced*. Special prizes will be awarded for outstanding open-source solutions.
 
 ### Evaluation Metrics
 

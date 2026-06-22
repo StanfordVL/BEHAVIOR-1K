@@ -210,7 +210,7 @@ The success score (**Q**) is the metric used for ranking submissions. If two sub
 
 **Challenge office hours**
 
-- Every Monday and Thursday, 4:30pm-5:30pm, PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
+- Every Monday, 5-6pm PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
 
 ## Performance Benchmarks
 
