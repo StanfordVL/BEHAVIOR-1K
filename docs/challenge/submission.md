@@ -7,7 +7,7 @@
 
 - **Submission Portal**: *To be announced*
 
-- **Leaderboard**: *To be announced*
+- **Leaderboard**: [2026 BEHAVIOR Challenge Leaderboard](https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard)
 
 
 ## **Submission details**

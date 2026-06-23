@@ -37,7 +37,7 @@ Browse the full task list in the [Demo Gallery](./tasks/).
 
 Expert teleoperated demonstrations include synchronized RGBD observations, robot proprioception, and skill/subtask annotations. The dataset for the 50 new 2026 tasks is **TBD** and will be released before launch. [Dataset details →](./dataset.md)
 
-This year's pre-implemented training and evaluation pipelines are **π0.5** and **GR00T N1.7**. [Baselines details →](./baselines.md)
+This year's starter training and evaluation pipelines are **π0.5 (pi0.5)** and **GR00T N1.7**. [Baselines details →](./baselines.md)
 
 ## :material-chart-box: **Evaluation & Rules**
 

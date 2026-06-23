@@ -80,7 +80,6 @@ plugins:
         'omnigibson/behavior_components/behavior_knowledgebase.md': 'https://behavior.stanford.edu/knowledgebase/'
         'behavior-100.md': 'behavior_100/overview.md'
         'challenge/rules.md': 'challenge/evaluation.md'
-        'challenge/leaderboard.md': 'challenge/archive/2025/index.md'
         'workshops/overview.md': 'challenge/archive/index.md'
   - mkdocstrings:
       handlers:
@@ -107,6 +106,7 @@ nav:
     - challenge/index.md
     - Call for Participation: challenge/call_for_participation.md
     - Announcements / Updates: challenge/updates.md
+    - Leaderboard: https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard
     - Dataset: challenge/dataset.md
     - Baselines: challenge/baselines.md
     - Evaluation and Rules: challenge/evaluation.md

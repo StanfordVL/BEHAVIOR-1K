@@ -55,7 +55,7 @@ There are other arguments that you can overwrite in CLI. For example, `partial_s
 
 You are welcome to use the wrappers we provided, or implement custom wrappers for your own use case. Submitted evaluation wrappers must expose only RGB, depth, and proprioception to the policy. We ask that you also include the wrapper code when submitting your result. The wrapper code will be manually inspected by our team to make sure the submission follows the challenge-track observation restrictions and has not abused the environment by any means (e.g. teleporting the robot, or changing object states directly).
 
-As a starter, we provided a codebase of common imitation learning algorithms for you to get started. Please refer to the [baselines section](./baselines.md) for more information.
+As a starting point, we provide baseline pipelines for **π0.5 (pi0.5)** and **GR00T N1.7**. Please refer to the [baselines section](./baselines.md) for details.
 
 
 ## Configure Robot Action Space

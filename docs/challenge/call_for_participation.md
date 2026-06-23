@@ -59,15 +59,11 @@ A striking aspect of BEHAVIOR is the variety of object **state transitions and l
 
 ## **Baselines and Getting Started**
 
-To lower the entry barrier and facilitate rapid progress, we provide a suite of **baseline models** and tools that participants can use out of the box. Specifically, the challenge release includes training and evaluation pipelines for a number of state-of-the-art methods:
+To lower the entry barrier and help teams make progress quickly, the 2026 challenge provides starter training and evaluation pipelines for two modern robot foundation models: **π0.5 (pi0.5)** and **GR00T N1.7**. These baselines are intended as practical starting points for working with the BEHAVIOR demonstrations, validating the evaluation setup, and building stronger challenge submissions.
 
-*Classic Behavioral Cloning baselines:* **ACT**, **Diffusion Policy**, **BC-RNN**, **WB-VIMA** - these are standard imitation learning approaches that learn from the provided demonstrations.
+Participants are encouraged to reproduce, adapt, and improve on these pipelines. The release includes the simulator setup, assets, demonstration data, and evaluation tools needed to train policies and test them in OmniGibson. The documentation walks through environment setup, dataset loading, robot observations and actions, baseline training, and submission packaging so teams can move from installation to a working evaluation run with minimal overhead.
 
-*Pre-trained Visuo-Language Action models:* **OpenVLA** and **π0**.  These models are pretrained by a large amount of demonstration data, giving an alternative to models that need to be trained from scratch.
-
-Participants are encouraged to test and build upon these baselines. All the necessary code, simulation assets, and data are available. In fact, **everything is open-source** on our website: you’ll find instructions to install the OmniGibson simulator, download the 3D scene assets and object models, and load the demonstration dataset. We also include a **starter kit** with example training scripts and evaluation routines, so you can reproduce baseline results and then go beyond them. The **documentation** covers how to set up the environment, use our APIs for robot control, and visualize the task executions - making it as easy as possible to get started with developing your solution.
-
-If you’re new to embodied AI, don’t worry: the BEHAVIOR challenge provides tutorials and a step-by-step guide (from simulator setup to submitting results). We’re excited to see what creative ideas teams will bring to tackle these tasks!
+If you’re new to embodied AI, don’t worry: the BEHAVIOR challenge provides tutorials and step-by-step guidance from simulator setup to submitting results. We’re excited to see what creative ideas teams will bring to tackle these tasks!
 
 ## **Evaluation, Timeline, and Prizes**
 
