@@ -83,38 +83,6 @@ def _load_room_instances(task_name: str) -> list[str]:
     raise FileNotFoundError(f"No task misc room instances found for task '{task_name}'")
 
 
-def _render_and_get_obs(env, light_synchronizer, n_render_iterations: int = 1):
-    light_synchronizer.sync_from_current_state()
-    for _ in range(n_render_iterations):
-        og.sim.render()
-    return env.get_obs()
-
-
-def _playback_episode_with_light_sync(env, episode_id: int, record_data: bool) -> None:
-    original_load_state = og.sim.load_state
-    original_step = env.env.step
-    light_synchronizer = LightToggleSynchronizer(env.scene)
-
-    def load_state_and_sync(*args, **kwargs):
-        result = original_load_state(*args, **kwargs)
-        light_synchronizer.sync_from_current_state()
-        return result
-
-    def step_and_sync(*args, **kwargs):
-        _, reward, terminated, truncated, info = original_step(*args, **kwargs)
-        n_render_iterations = kwargs.get("n_render_iterations", 1)
-        obs, _ = _render_and_get_obs(env, light_synchronizer, n_render_iterations=n_render_iterations)
-        return obs, reward, terminated, truncated, info
-
-    og.sim.load_state = load_state_and_sync
-    env.env.step = step_and_sync
-    try:
-        env.playback_episode(episode_id=episode_id, record_data=record_data)
-    finally:
-        env.env.step = original_step
-        og.sim.load_state = original_load_state
-
-
 def replay_hdf5_file(
     data_folder: str,
     task_id: int,
@@ -227,10 +195,16 @@ def replay_hdf5_file(
     num_samples = env.input_hdf5["data"][f"demo_{episode_id}"].attrs["num_samples"]
     log.info(f" >>> Replaying episode {episode_id} ({selection_reason}) with {num_samples} steps")
 
+    post_state_update_callback = None
     if task_name in LIGHT_REPLAY_TASKS:
-        _playback_episode_with_light_sync(env, episode_id=episode_id, record_data=True)
-    else:
-        env.playback_episode(episode_id=episode_id, record_data=True)
+        light_synchronizer = LightToggleSynchronizer(env.scene)
+        post_state_update_callback = light_synchronizer.sync_from_current_state
+
+    env.playback_episode(
+        episode_id=episode_id,
+        record_data=True,
+        post_state_update_callback=post_state_update_callback,
+    )
 
     log.info("Playback complete. Saving data...")
     env.save_data()
