@@ -15,18 +15,13 @@ For the 2026 BEHAVIOR Challenge, there is a single evaluation track:
     - RGB + depth + proprioception
     - No segmentation, object state, target object pose, full-scene point cloud, robot global pose, or other simulator-only privileged information during evaluation.
 
-You are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using it during challenge-track evaluation. BDDL task definitions can be used and are identical during evaluation. You may also collect additional data yourself (via teleoperation, RL, scripted policies, etc.). However, you may **not** collect data on evaluation instances, as these are reserved for testing the generalization capability of your submitted policy.
+You are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using it during challenge-track evaluation. BDDL task definitions can be used and are identical during evaluation. You may also collect additional data yourself via teleoperation, RL, scripted policies, or other approaches.
 
 There are no restrictions on the type of policy used. Methods such as IL, RL, or TAMP are all allowed. Additional components like SLAM or LLM-based querying are also permitted, provided the policy follows the challenge-track observation restrictions during evaluation.
 
-We will select winning teams from the challenge track, and they will be invited to present their approaches at the challenge workshop!
-
-🏆 **Prizes:** *To be announced*. Special prizes will be awarded for outstanding open-source solutions.
-
-
 ## Running Evaluations
 
-We provide a [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) as a unified entry point for running evaluation:
+We provide an [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) as a unified entry point for running evaluation:
 ```
 python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
 ```
@@ -54,9 +49,6 @@ After launching, the evaluator will try to listen to `0.0.0.0:80`. The IP and po
 There are other arguments that you can overwrite in CLI. For example, `partial_scene_load` will only load objects in the task-relevant rooms, which will help speed up loading and evaluation time. `testing_on_train_instances` will load the training instances instead of testing instances, which is helpful for debugging model overfitting. `max_steps` can be set to enable early stopping for rollouts (setting it to null will use the default timeout, which is 2 * average human task completion time within the demo dataset). See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. 
 
 You are welcome to use the wrappers we provided, or implement custom wrappers for your own use case. Submitted evaluation wrappers must expose only RGB, depth, and proprioception to the policy. We ask that you also include the wrapper code when submitting your result. The wrapper code will be manually inspected by our team to make sure the submission follows the challenge-track observation restrictions and has not abused the environment by any means (e.g. teleporting the robot, or changing object states directly).
-
-As a starting point, we provide baseline pipelines for **π0.5 (pi0.5)** and **GR00T N1.7**. Please refer to the [baselines section](./baselines.md) for details.
-
 
 ## Configure Robot Action Space
 
@@ -188,7 +180,7 @@ The success score (**Q**) is the metric used for ranking submissions. If two sub
 
 - **Training:** The training instances and human demonstrations (200 per task) are released to the public.
 
-- **Self-evaluation and report:** In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the **first 10** instances for evaluation results. Participants should report their performance on theese 10 instances and submit their scores using our Google Form located at the [submission page](./submission.md). You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance. The **remaining 10** instances are not used for evaluation and may serve as a test set before evaluating your final policy.
+- **Self-evaluation and report:** In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the **first 10** instances for evaluation results. Participants should report their performance on these 10 instances through the process described on the [submission page](./submission.md). You should evaluate your policy 1 time on each instance, using the default time-outs provided by our evaluation script. We will update the leaderboard once we sanity-check the performance. The **remaining 10** instances are not used for leaderboard reporting and may serve as a test set before evaluating your final policy.
 
 
 - **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard upon submission deadline, we will evaluate the top-5 solutions on the leaderboard using these instances.
@@ -205,11 +197,6 @@ The success score (**Q**) is the metric used for ranking submissions. If two sub
   allow="autoplay; fullscreen" 
   allowfullscreen>
 </iframe>
-
-
-**Challenge office hours**
-
-- Every Monday, 5-6pm PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
 
 ## Performance Benchmarks
 

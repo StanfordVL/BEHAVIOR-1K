@@ -111,7 +111,7 @@ nav:
     - Baselines: challenge/baselines.md
     - Evaluation and Rules: challenge/evaluation.md
     - Submission Guidelines: challenge/submission.md
-    - Demo Gallery: challenge/tasks/
+    - Demo Gallery: challenge/tasks/index.md
   - Documentation:
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md
@@ -175,6 +175,7 @@ nav:
   - <i class="fa-brands fa-discord"></i>  Support: https://discord.gg/bccR5vGFEx
 
 not_in_nav: |
+  challenge/tasks/**
   challenge/archive/2025/**
   workshops/**
 

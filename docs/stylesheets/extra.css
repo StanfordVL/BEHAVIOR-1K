@@ -27,3 +27,97 @@
 .md-tabs__item i[class*="fa-"] {
     margin-right: 8px;
 }
+
+.challenge-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0 2rem;
+}
+
+.challenge-action-card {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: 1.05rem;
+    background: var(--md-default-bg-color);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.035);
+}
+
+.challenge-action-card--deadlines {
+    border-left-color: #2f6f8f;
+}
+
+.challenge-action-card--venue {
+    border-left-color: #c26a24;
+}
+
+.challenge-action-card h2 {
+    margin: 0 0 0.75rem !important;
+    font-size: 1.15rem;
+    font-weight: 650;
+}
+
+.challenge-action-list {
+    margin: 0 0 0.9rem !important;
+    padding-left: 0 !important;
+    list-style: none !important;
+}
+
+.challenge-action-list li {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    margin: 0.3rem 0;
+}
+
+.challenge-action-list span {
+    color: var(--md-default-fg-color--light);
+    text-align: left;
+}
+
+.challenge-action-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+}
+
+.challenge-action-links a,
+.challenge-action-disabled {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 6px;
+    padding: 0.4rem 0.65rem;
+    font-weight: 600;
+}
+
+.challenge-action-links a {
+    background: var(--md-default-bg-color);
+    color: var(--md-default-fg-color) !important;
+}
+
+.challenge-action-card--deadlines .challenge-action-links a {
+    border-color: #2f6f8f;
+    color: #2f6f8f !important;
+}
+
+.challenge-action-card--venue .challenge-action-links a {
+    border-color: #c26a24;
+    color: #9a4f17 !important;
+}
+
+.challenge-action-links a:hover {
+    opacity: 0.88;
+}
+
+.challenge-action-disabled {
+    color: var(--md-default-fg-color--light);
+    background: var(--md-code-bg-color);
+}
+
+@media (max-width: 768px) {
+    .challenge-action-grid {
+        grid-template-columns: 1fr;
+    }
+}

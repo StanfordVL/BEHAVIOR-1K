@@ -1,18 +1,10 @@
-# Submission
-
-!!! warning "🚧 Provisional — carried over from 2025"
-
-    This page reflects the 2025 challenge and will be updated for 2026. The submission portal,
-    deadlines, and rules are subject to change.
+# Submission Guidelines
 
 - **Submission Portal**: *To be announced*
 
-- **Leaderboard**: [2026 BEHAVIOR Challenge Leaderboard](https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard)
-
-
 ## **Submission details**
 
-After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) (see [evaluation](./evaluation.md) for more details), there will be two output files: an json file containing the metric results, and a mp4 video recording of the rollout trajectory. Here is a sample output json file for one episode of evaluation:
+After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) (see [Evaluation and Rules](./evaluation.md) for more details), each rollout will produce two output files: a JSON file containing the metrics and an MP4 video recording of the rollout trajectory. Here is a sample output JSON file for one episode of evaluation:
 
 ```
 {
@@ -37,9 +29,9 @@ After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/
 }
 ```
 
-- Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7). No formal registration is required to participate in the challenge. We encourage you to submit intermediate results and models to be showcased on our leaderboard. The same model with different checkpoints from the same team will be considered as a single entry.
+- Submit your results and models through the submission portal once it is announced. No formal registration is required to participate in the challenge. We encourage you to submit intermediate results and models to be showcased on our [leaderboard](https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard). The same model with different checkpoints from the same team will be considered as a single entry.
 
-- **Partial submission is allowed**: Since each tasks will be evaluated on 10 instances and 1 rollout each, there should be 500 json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
+- **Partial submission is allowed**: Since each task will be evaluated on 10 instances and 1 rollout each, there should be 1,000 JSON files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks or instances. Any rollout instances not submitted will be counted as zero when calculating the final score of the submission.
 
 
 ## **Final model submission and evaluation**
@@ -68,13 +60,13 @@ There are two ways to submit your model for evaluation:
 
 **YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON FILES AND VIDEOS IN ANY WAY**. Your final submission will be a zip file containing the following:
 
-1. All the json files, one for each rollout you performed (up to 500);
-3. Wrapper code (.py) used during evaluation;
-4. Robot (R1Pro) config file (.yaml) used during evaluation; 
-5. A readme file (.md) that specifies the details to perform evaluation with your policy:
+1. All JSON files, one for each rollout you performed (up to 1,000);
+2. Wrapper code (.py) used during evaluation;
+3. Robot (R1Pro) config file (.yaml) used during evaluation;
+4. A readme file (.md) that specifies the details to perform evaluation with your policy:
     - For docker image-based submission, please include the link to your docker image, as well as the image digest hash
     - For IP address-based evaluation, please provide the corresponding IP address that you used to serve the policy.
-    - Please also include any other information you deem necessary to help us evaluation your policy
+    - Please also include any other information needed to help us evaluate your policy.
 
 
-In addition, we require you to submit a link to all the mp4 videos, one for each rollout you performed (up to 500). See our submission [Google Form](https://forms.gle/54tVqi5zs3ANGutn7) for more details. 
+In addition, we require you to submit a link to all MP4 videos, one for each rollout you performed (up to 1,000). More details will be provided when the submission portal is announced.

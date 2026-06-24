@@ -1,82 +1,59 @@
 # 🏆 **2026 BEHAVIOR Challenge**
 
-**Join us for the second year of the BEHAVIOR challenge and solve 100 full-length household tasks in the realistic BEHAVIOR-1K environment!** 🤖
+Join us for the second year of the BEHAVIOR Challenge: solve **100 full-length household tasks** in the realistic BEHAVIOR-1K environment. BEHAVIOR tests whether embodied agents can combine high-level reasoning, long-horizon navigation, and dexterous bimanual manipulation in house-scale scenes.
 
-- Event: *To be announced*
-- Time: *To be announced*
-- Location: *To be announced*
+<div class="challenge-action-grid">
+  <section class="challenge-action-card challenge-action-card--deadlines">
+    <h2>Important Dates</h2>
+    <ul class="challenge-action-list">
+      <li><strong>Challenge Launch:</strong> <span>06/30/2026</span></li>
+      <li><strong>Submission Deadline:</strong> <span>10/16/2026</span></li>
+      <li><strong>Winners Announcement:</strong> <span>11/4/2026</span></li>
+    </ul>
+    <div class="challenge-action-links">
+      <span class="challenge-action-disabled">Portal TBD</span>
+      <a href="./submission/">Submission Guidelines</a>
+    </div>
+  </section>
 
-!!! warning "🚧 Page under construction"
+  <section class="challenge-action-card challenge-action-card--venue">
+    <h2>Event Details</h2>
+    <ul class="challenge-action-list">
+      <li><strong>Event:</strong> <span>To be announced</span></li>
+      <li><strong>Time:</strong> <span>To be announced</span></li>
+      <li><strong>Location:</strong> <span>To be announced</span></li>
+    </ul>
+    <div class="challenge-action-links">
+      <a href="https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard">Leaderboard</a>
+      <a href="./evaluation/">Evaluation & Rules</a>
+    </div>
+  </section>
+</div>
 
-    The 2026 BEHAVIOR Challenge is being prepared. Dates, prizes, sponsors, and dataset
-    details below are placeholders (**TBD**) and will be finalized before launch. Looking for
-    previous year's events? See [Past Events](./archive/index.md).
+## :material-star-four-points: **What’s New in 2026**
 
----
+- **100 full-length household tasks**: the 50 tasks from the 2025 challenge plus 50 new tasks from our 1,000-activity collection
+- **7 scenes** including 4 new scenes ranging from household, office, restaurant, and hotel environments
+- **One official challenge track** using robot onboard observations: **RGB + depth + proprioception**
+- **Special prizes** for outstanding open-source solutions
 
-## 📣 **Announcements**
+Browse the full task list in the [Demo Gallery](./tasks/index.md).
 
-See the [Announcements / Updates](./updates.md) page for the latest news.
+## :material-view-dashboard: **Challenge Format**
 
----
+- **Data:** 20,000 teleoperated demonstrations with RGB, depth, proprioception, actions, and skill/subtask annotations. See [Dataset](./dataset.md).
+- **Baselines:** starter pipelines for **π0.5 (pi0.5)** and **GR00T N1.7**. See [Baselines](./baselines.md).
+- **Evaluation:** one official track using **RGB + depth + proprioception**, ranked by average task success with BDDL partial credit. See [Evaluation & Rules](./evaluation.md).
 
-## :material-graph-outline: **Overview**
+## :octicons-person-add-16: **Getting Started**
 
-**BEHAVIOR** is a robotics challenge for everyday household tasks. It's a large-scale, human-grounded benchmark that tests a robot's capability in high-level reasoning, long-range locomotion, and dexterous bimanual manipulation in house-scale scenes.
-
-This year's challenge features:
-
-- **100 full-length household tasks** from our 1,000 activity collection — the 50 tasks from the 2025 challenge **plus 50 new tasks** — covering diverse activities like rearrangement, cooking, cleaning, and installation
-- **Four new scenes** including office, restaurant, and hotel environments
-
-Browse the full task list in the [Demo Gallery](./tasks/).
-
----
-
-## :material-database: **Dataset & Baselines**
-
-Expert teleoperated demonstrations include synchronized RGBD observations, robot proprioception, and skill/subtask annotations. The dataset for the 50 new 2026 tasks is **TBD** and will be released before launch. [Dataset details →](./dataset.md)
-
-This year's starter training and evaluation pipelines are **π0.5 (pi0.5)** and **GR00T N1.7**. [Baselines details →](./baselines.md)
-
-## :material-chart-box: **Evaluation & Rules**
-
-The organizers reserve the right of final interpretation of the challenge rules.
-
-### Challenge Track
-
-This year has a single track limited to provided robot onboard observations: **RGB + depth + proprioception**.
-
-🏆 **Prizes:** *To be announced*. Special prizes will be awarded for outstanding open-source solutions.
-
-### Evaluation Metrics
-
-**Primary metric (for ranking):** Task success rate averaged across all tasks. Partial credit given as fraction of satisfied BDDL goal predicates.
-
-**Secondary metrics (efficiency):**
-
-- **Simulated time** - Total simulation steps × time per step
-- **Distance navigated** - Total base movement distance
-- **Hand displacement** - Cumulative hand movement
-
-[Evaluation details & Full challenge rules →](./evaluation.md)
-
-
-## :octicons-person-add-16: **Participating**
-
-### Resources
-
-Join our community to ask questions and discuss the challenge:
-
-- **Discord**: [Join our Discord Server](https://discord.gg/bccR5vGFEx)
+1. Join the [Discord community](https://discord.gg/bccR5vGFEx) for announcements and participant discussion.
+2. Attend office hours every Monday, 5-6pm PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
+3. Download the dataset and review the [dataset documentation](./dataset.md).
+4. Start from the [π0.5 and GR00T N1.7 baseline pipelines](./baselines.md).
+5. Run evaluation and prepare your submission using the [submission guidelines](./submission.md).
 
 Whether you're a robotics veteran or just entering the field, we're here to support you.
-
-### Important Dates
-
-- **Challenge Launch**: *To be announced*
-- **Submission Deadline**: *To be announced*
-- **Winners Announcement**: *To be announced*
 
 ## :material-book-edit: **BibTeX**
 
