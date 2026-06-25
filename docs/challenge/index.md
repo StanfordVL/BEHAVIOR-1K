@@ -2,6 +2,8 @@
 
 Join us for the second year of the BEHAVIOR Challenge: solve **100 full-length household tasks** in the realistic BEHAVIOR-1K environment. BEHAVIOR tests whether embodied agents can combine high-level reasoning, long-horizon navigation, and dexterous bimanual manipulation in house-scale scenes.
 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/iSFpinMiT0s?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Challenge Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
 <div class="challenge-action-grid">
   <section class="challenge-action-card challenge-action-card--deadlines">
     <h2>Important Dates</h2>
@@ -30,20 +32,66 @@ Join us for the second year of the BEHAVIOR Challenge: solve **100 full-length h
   </section>
 </div>
 
-## :material-star-four-points: **What’s New in 2026**
+## :material-view-dashboard: **Challenge at a Glance**
 
-- **100 full-length household tasks**: the 50 tasks from the 2025 challenge plus 50 new tasks from our 1,000-activity collection
-- **7 scenes** including 4 new scenes ranging from household, office, restaurant, and hotel environments
-- **One official challenge track** using robot onboard observations: **RGB + depth + proprioception**
-- **Special prizes** for outstanding open-source solutions
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td>Tasks</td>
+      <td>100 full-length household tasks</td>
+    </tr>
+    <tr>
+      <td>Environments</td>
+      <td>7 scenes, including 4 new scenes</td>
+    </tr>
+    <tr>
+      <td>Evaluation track</td>
+      <td>One track using RGB + depth + proprioception</td>
+    </tr>
+    <tr>
+      <td>Demonstrations</td>
+      <td>20,000 human teleoperation demos</td>
+    </tr>
+    <tr>
+      <td>Baselines</td>
+      <td>π0.5 (pi0.5) and GR00T N1.7</td>
+    </tr>
+    <tr>
+      <td>Ranking metric</td>
+      <td>Average task success score with BDDL partial credit</td>
+    </tr>
+    <tr>
+      <td>Prizes</td>
+      <td>To be announced, with special prizes for outstanding open-source solutions</td>
+    </tr>
+  </tbody>
+</table>
 
-Browse the full task list in the [Demo Gallery](./tasks/index.md).
+Detailed specifications live on the canonical challenge pages: [Dataset](./dataset.md), [Baselines](./baselines.md), [Evaluation and Rules](./evaluation.md), and [Submission Guidelines](./submission.md). Browse the full task list in the [Demo Gallery](./tasks/index.md).
 
-## :material-view-dashboard: **Challenge Format**
+## :material-database: **Demonstration Data**
 
-- **Data:** 20,000 teleoperated demonstrations with RGB, depth, proprioception, actions, and skill/subtask annotations. See [Dataset](./dataset.md).
-- **Baselines:** starter pipelines for **π0.5 (pi0.5)** and **GR00T N1.7**. See [Baselines](./baselines.md).
-- **Evaluation:** one official track using **RGB + depth + proprioception**, ranked by average task success with BDDL partial credit. See [Evaluation & Rules](./evaluation.md).
+The challenge provides large-scale human teleoperation demonstrations for learning long-horizon household behaviors. The release includes RGB and depth observations, robot proprioception and actions, and skill/subtask annotations; the full dataset format and statistics are documented on the [Dataset](./dataset.md) page.
+
+Demonstrations were collected with **JoyLo**, a whole-body teleoperation interface for controlling the robot base, torso, arms, and grippers. We thank [Simovation](https://www.linkedin.com/company/simovationinc/) for providing high-quality JoyLo teleoperation data in simulation.
+
+<div class="challenge-video-grid">
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/oVr3IYnQiys?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Annotation Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/fFAtUzEETe4?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Data Quality Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+</div>
+
+## :material-lightbulb-on-outline: **Why Participate**
+
+BEHAVIOR tasks go beyond short pick-and-place or navigation benchmarks. Agents must search across rooms, manipulate many objects, handle object state changes, and satisfy symbolic BDDL goal conditions after several minutes of autonomous execution.
+
+The 2026 challenge is intended as a shared benchmark for testing robot foundation models, imitation learning, reinforcement learning, task and motion planning, memory systems, SLAM, and LLM-assisted policies under the same realistic evaluation protocol.
+
+The tasks also exercise diverse object state changes and low-level skills, including opening, closing, pouring, wiping, spraying, attaching, toggling, cooking, and slicing.
+
+<div class="challenge-video-grid">
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/3XKhbg9_MS4?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Long-Horizon Task Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/FeD8_KgVOag?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Skills Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+</div>
 
 ## :octicons-person-add-16: **Getting Started**
 

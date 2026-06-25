@@ -104,7 +104,6 @@ nav:
   - Home: index.md
   - 🏆 2026 BEHAVIOR Challenge:
     - challenge/index.md
-    - Call for Participation: challenge/call_for_participation.md
     - Announcements / Updates: challenge/updates.md
     - Leaderboard: https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard
     - Dataset: challenge/dataset.md
