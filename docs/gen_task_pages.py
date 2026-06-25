@@ -505,6 +505,18 @@ def generate_gallery(prefix, task_data_file, blurb):
                         'width="720" height="720" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>\n'
                     )
                     fd.write("</div>\n\n")
+                elif "youtube.com" in video_url or "youtu.be" in video_url:
+                    # Minimal YouTube params: controls on; hide related/branding.
+                    fd.write('<div class="video-wrapper">\n')
+                    fd.write(
+                        f'  <iframe src="{video_url}?controls=1&modestbranding=1&rel=0&showinfo=0" '
+                    )
+                    fd.write(
+                        'width="720" height="720" frameborder="0" '
+                        'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" '
+                        "allowfullscreen></iframe>\n"
+                    )
+                    fd.write("</div>\n\n")
             else:
                 # Placeholder when video is not available.
                 fd.write('<div class="video-placeholder">\n')
