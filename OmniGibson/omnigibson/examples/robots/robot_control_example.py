@@ -128,9 +128,9 @@ def main(
     elif control_mode is None:
         control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
     else:
-        assert control_mode in CONTROL_MODES, (
-            f"Unknown control mode '{control_mode}'. Valid options are: {list(CONTROL_MODES)}"
-        )
+        assert (
+            control_mode in CONTROL_MODES
+        ), f"Unknown control mode '{control_mode}'. Valid options are: {list(CONTROL_MODES)}"
 
     # Update the control mode of the robot
     controller_config = {component: {"name": name} for component, name in controller_choices.items()}
