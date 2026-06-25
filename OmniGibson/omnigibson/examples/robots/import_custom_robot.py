@@ -395,7 +395,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
             stage=stage,
             link_prim_path=link_prim_path,
         )
-        link_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=link_prim_path)
+        link_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(link_prim_path)
 
         # Create fixed joint to connect the two together
         create_joint(
@@ -409,14 +409,22 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
         # Set child prim to the appropriate local pose -- this should be the parent local pose transformed by
         # the additional offset
-        parent_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=parent_path)
-        parent_pos, parent_quat = parent_prim_xform.get_local_pose()
-        parent_quat = parent_quat[[1, 2, 3, 0]]
-        parent_pose = T.pose2mat((th.tensor(parent_pos), th.tensor(parent_quat)))
+        parent_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(parent_path)
+        parent_pos_arr, parent_quat_arr = parent_prim_xform.get_local_poses()
+        # Convert from numpy (w,x,y,z) to torch (x,y,z,w)
+        parent_pos = th.tensor(parent_pos_arr[0])
+        parent_quat = th.tensor(parent_quat_arr[0][[1, 2, 3, 0]])
+        parent_pose = T.pose2mat((parent_pos, parent_quat))
         offset_pose = T.pose2mat((pos_offset, ori_offset))
         child_pose = parent_pose @ offset_pose
         link_pos, link_quat = T.mat2pose(child_pose)
-        link_prim_xform.set_local_pose(link_pos, link_quat[[3, 0, 1, 2]])
+        # Convert back from (x,y,z,w) to scalar-first (w,x,y,z) for Isaac Sim API
+        link_pos_np = link_pos.numpy()
+        link_quat_np = link_quat[[3, 0, 1, 2]].numpy()
+        link_prim_xform.set_local_poses(
+            link_pos_np.reshape(1, 3),
+            link_quat_np.reshape(1, 4),
+        )
 
     else:
         # Otherwise, link prim MUST exist
@@ -688,6 +696,20 @@ def find_all_meshes(root_prim):
     )
 
 
+def shift_prim_local_z(prim, z_offset):
+    translate_attr = prim.GetAttribute("xformOp:translate")
+    if translate_attr.IsValid():
+        local_pos = translate_attr.Get() or lazy.pxr.Gf.Vec3d(0.0, 0.0, 0.0)
+        translate_attr.Set(lazy.pxr.Gf.Vec3d(local_pos[0], local_pos[1], local_pos[2] - z_offset))
+    else:
+        translate_op = lazy.pxr.UsdGeom.Xformable(prim).AddXformOp(
+            lazy.pxr.UsdGeom.XformOp.TypeTranslate,
+            lazy.pxr.UsdGeom.XformOp.PrecisionDouble,
+            "",
+        )
+        translate_op.Set(lazy.pxr.Gf.Vec3d(0.0, 0.0, -z_offset))
+
+
 def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_dir, is_holonomic=False):
     """
     Creates a set of curobo configs based on @robot_prim and @curobo_cfg
@@ -845,6 +867,7 @@ def main(config):
     urdf_path, usd_path, prim = import_og_asset_from_urdf(
         category="robot",
         model=cfg.name,
+        dataset_name="custom_dataset",
         urdf_path=cfg.urdf_path,
         collision_method=cfg.collision.decompose_method,
         coacd_links=cfg.collision.coacd_links,
@@ -931,10 +954,7 @@ def main(config):
     # Grab all of the root prim's nested children and joints, and modify their offsets based on AABB z-lower bound
     root_meshes = find_all_meshes(root_prim=articulation_root_prim)
     for mesh in root_meshes:
-        translate_attr = mesh.GetAttribute("xformOp:translate")
-        local_pos = translate_attr.Get()
-        local_pos[2] -= z_offset
-        translate_attr.Set(local_pos)
+        shift_prim_local_z(prim=mesh, z_offset=z_offset)
     root_joints = find_all_joints(root_prim=articulation_root_prim, only_articulated=False)
     root_prim_path = articulation_root_prim.GetPrimPath().pathString
     for joint in root_joints:
@@ -952,10 +972,7 @@ def main(config):
     for link in all_links:
         if link == articulation_root_prim:
             continue
-        translate_attr = link.GetAttribute("xformOp:translate")
-        local_pos = translate_attr.Get()
-        local_pos[2] -= z_offset
-        translate_attr.Set(local_pos)
+        shift_prim_local_z(prim=link, z_offset=z_offset)
 
     # Add holonomic base if requested
     if cfg.base_motion.use_holonomic_joints:

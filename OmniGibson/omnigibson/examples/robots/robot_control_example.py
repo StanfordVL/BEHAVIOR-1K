@@ -60,7 +60,15 @@ def choose_controllers(robot, random_selection=False):
     return controller_choices
 
 
-def main(random_selection=False, headless=False, short_exec=False, quickstart=False):
+def main(
+    random_selection=False,
+    headless=False,
+    short_exec=False,
+    quickstart=False,
+    robot_name=None,
+    scene_model=None,
+    control_mode=None,
+):
     """
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
@@ -68,16 +76,22 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose scene to load
-    scene_model = "Rs_int"
-    if not quickstart:
+    if scene_model is None and quickstart:
+        scene_model = "Rs_int"
+    elif scene_model is None:
         scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
+    else:
+        assert scene_model in SCENES, f"Unknown scene '{scene_model}'. Valid options are: {list(SCENES)}"
 
     # Choose robot to create
-    robot_name = "fetch"
-    if not quickstart:
+    if robot_name is None and quickstart:
+        robot_name = "fetch"
+    elif robot_name is None:
         robot_name = choose_from_options(
             options=list(sorted(REGISTERED_ROBOTS)), name="robot", random_selection=random_selection
         )
+    else:
+        assert robot_name in REGISTERED_ROBOTS, f"{robot_name} is not a registered robot."
 
     scene_cfg = dict()
     if scene_model == "empty":
@@ -101,22 +115,22 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Choose robot controller to use
     robot = env.robots[0]
-    controller_choices = {
-        "base": "DifferentialDriveController",
-        "arm_0": "InverseKinematicsController",
-        "gripper_0": "MultiFingerGripperController",
-        "camera": "JointController",
-    }
-    if not quickstart:
+    if quickstart or (robot_name is not None and scene_model is not None and control_mode is not None):
+        controller_choices = {component: robot._default_controllers[component] for component in robot.controller_order}
+    else:
         controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
 
     # Choose control mode
     if random_selection:
         control_mode = "random"
     elif quickstart:
-        control_mode = "teleop"
-    else:
+        control_mode = control_mode or "teleop"
+    elif control_mode is None:
         control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
+    else:
+        assert control_mode in CONTROL_MODES, (
+            f"Unknown control mode '{control_mode}'. Valid options are: {list(CONTROL_MODES)}"
+        )
 
     # Update the control mode of the robot
     controller_config = {component: {"name": name} for component, name in controller_choices.items()}
@@ -138,6 +152,8 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Create teleop controller
     action_generator = KeyboardRobotController(robot=robot)
+    if len(action_generator.ik_arms) > 0:
+        print(f"Detected IK arms: {action_generator.ik_arms}. Use 3/4 or Z/X to switch active arm.")
 
     # Register custom binding to reset the environment
     action_generator.register_custom_keymapping(
@@ -154,12 +170,18 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     print("Running demo.")
     print("Press ESC to quit")
 
+    if not og.sim.is_playing():
+        og.sim.play()
+
     # Loop control until user quits
     max_steps = -1 if not short_exec else 100
     step = 0
 
     random_action = None
     while step != max_steps:
+        if not og.sim.is_playing():
+            og.sim.play()
+
         if control_mode == "random":
             # Sample new random action every 30 steps
             if step % 30 == 0:
@@ -185,5 +207,33 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether the example should be loaded with default settings for a quick start.",
     )
+    parser.add_argument(
+        "--robot",
+        default=None,
+        help="Robot model to load. If omitted, the example prompts for a robot unless --quickstart is used.",
+    )
+    parser.add_argument(
+        "--scene",
+        default=None,
+        choices=sorted(SCENES),
+        help="Scene to load. If omitted, the example prompts for a scene unless --quickstart is used.",
+    )
+    parser.add_argument(
+        "--control-mode",
+        default=None,
+        choices=sorted(CONTROL_MODES),
+        help="Control mode to use. If omitted, the example prompts for a mode unless --quickstart is used.",
+    )
+    parser.add_argument(
+        "--short-exec",
+        action="store_true",
+        help="Run only a short fixed-length rollout, useful for smoke testing.",
+    )
     args = parser.parse_args()
-    main(quickstart=args.quickstart)
+    main(
+        quickstart=args.quickstart,
+        short_exec=args.short_exec,
+        robot_name=args.robot,
+        scene_model=args.scene,
+        control_mode=args.control_mode,
+    )

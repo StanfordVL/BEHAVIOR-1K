@@ -1146,19 +1146,79 @@ def convert_urdf_to_usd(
     links = list(visuals_prim.GetChildren()) + list(colliders_prim.GetChildren())
     wrappers = [wrapper for link in links for wrapper in link.GetChildren()]
 
+    geom_types = {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
+
+    def _ensure_geom_xform_ops(prim):
+        if prim.GetTypeName() not in geom_types:
+            return
+
+        prop_names = prim.GetPropertyNames()
+        xformable = lazy.pxr.UsdGeom.Xformable(prim)
+
+        if "xformOp:translate" in prop_names:
+            xform_op_translate = lazy.pxr.UsdGeom.XformOp(prim.GetAttribute("xformOp:translate"))
+            if prim.GetAttribute("xformOp:translate").Get() is None:
+                xform_op_translate.Set(lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0]))
+        else:
+            xform_op_translate = xformable.AddXformOp(
+                lazy.pxr.UsdGeom.XformOp.TypeTranslate, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+            )
+            xform_op_translate.Set(lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0]))
+
+        if "xformOp:orient" in prop_names:
+            xform_op_orient = lazy.pxr.UsdGeom.XformOp(prim.GetAttribute("xformOp:orient"))
+            if prim.GetAttribute("xformOp:orient").Get() is None:
+                xform_op_orient.Set(lazy.pxr.Gf.Quatd(1.0, lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0])))
+        else:
+            xform_op_orient = xformable.AddXformOp(
+                lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+            )
+            xform_op_orient.Set(lazy.pxr.Gf.Quatd(1.0, lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0])))
+
+        if "xformOp:scale" in prop_names:
+            xform_op_scale = lazy.pxr.UsdGeom.XformOp(prim.GetAttribute("xformOp:scale"))
+            if prim.GetAttribute("xformOp:scale").Get() is None:
+                xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
+        else:
+            xform_op_scale = xformable.AddXformOp(
+                lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+            )
+            xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
+
+        xformable.SetXformOpOrder([xform_op_translate, xform_op_orient, xform_op_scale])
+
     for parent_prim in wrappers:
         parent_path = parent_prim.GetPath()
         grandparent_path = parent_path.GetParentPath()
 
-        # Find the child prim - it's actually away at a reference. There should be exactly one.
+        # Find the child prim - it is usually away at a reference. Isaac Sim 5.1
+        # may also emit direct primitive colliders here, which should be kept as-is.
         references = parent_prim.GetPrimStack()[0].referenceList.prependedItems
-        assert len(references) == 1, f"{parent_path} is not a reference!"
+        if not references:
+            for child_prim in lazy.pxr.Usd.PrimRange(parent_prim):
+                _ensure_geom_xform_ops(child_prim)
+            continue
+        assert len(references) == 1, f"Expected exactly one reference for {parent_path}, got {len(references)}"
         referenced_wrapper_path_str = str(references[0].primPath)
         referenced_wrapper_prim = side_stage.GetPrimAtPath(referenced_wrapper_path_str)
         assert referenced_wrapper_prim.IsValid()
 
-        child_prim = referenced_wrapper_prim.GetChild("World").GetChild("mesh")
-        assert child_prim.IsValid()
+        # Older importer output stores the authored geometry under World/mesh.
+        # Isaac Sim 5.1 can emit a whole /meshes/<name> prim instead, so promote
+        # that entire subtree while leaving the source around for material migration.
+        world_prim = referenced_wrapper_prim.GetChild("World")
+        if world_prim.IsValid() and world_prim.GetChild("mesh").IsValid():
+            child_prim = world_prim.GetChild("mesh")
+            delete_child_source = True
+        elif referenced_wrapper_prim.GetTypeName() in geom_types or referenced_wrapper_prim.GetChildren():
+            child_prim = referenced_wrapper_prim
+            delete_child_source = False
+        else:
+            # No mesh for this link — remove the wrapper prim and continue
+            del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
+            continue
+        for prim_to_update in lazy.pxr.Usd.PrimRange(child_prim):
+            _ensure_geom_xform_ops(prim_to_update)
         child_path = child_prim.GetPath()
 
         # Duplicate the properties on the parent prim onto the child.
@@ -1181,8 +1241,11 @@ def convert_urdf_to_usd(
         # Move the child prim to the parent's path.
         assert lazy.pxr.Sdf.CopySpec(side_stage.GetRootLayer(), child_path, side_stage.GetRootLayer(), parent_path)
 
-        # Delete the child's original path
-        del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
+        # Delete the child's original path when materials live outside it. For
+        # copied /meshes/<name> subtrees, keep the source until material bindings
+        # are migrated, then /meshes is removed wholesale below.
+        if delete_child_source:
+            del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
 
     # Migrate materials from /meshes to /Looks before deleting the meshes hierarchy
     # This is necessary for IsaacSim 5.1+ where materials are now placed under /meshes
