@@ -480,19 +480,19 @@ if [ "$DATASET" = true ]; then
     export OMNI_KIT_ACCEPT_EULA=YES
     
     echo "Downloading OmniGibson robot assets..."
-    python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()" || {
+    python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets(upgrade=True)" || {
         echo "ERROR: OmniGibson robot assets installation failed"
         exit 1
     }
 
     echo "Downloading BEHAVIOR-1K assets..."
-    python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=${DATASET_ACCEPT_FLAG})" || {
+    python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=${DATASET_ACCEPT_FLAG}, upgrade=True)" || {
         echo "ERROR: Dataset installation failed"
         exit 1
     }
 
     echo "Downloading 2025 BEHAVIOR Challenge Task Instances..."
-    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()" || {
+    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances(upgrade=True)" || {
         echo "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
         exit 1
     }
