@@ -8,6 +8,119 @@ import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.scenes import Scene
 from omnigibson.utils.geometry_utils import get_particle_positions_from_frame
+from omnigibson.utils.ui_utils import create_module_logger
+
+log = create_module_logger(module_name=__name__)
+
+
+def add_object_with_parts(scene, obj, pos=None, orn=None):
+    """
+    Add @obj to @scene, together with any connectedpart/extrapart objects defined in its metadata.
+    For connectedpart objects, sets up the attachment joint automatically after loading.
+
+    Args:
+        scene (Scene): Scene to add objects to
+        obj (DatasetObject): Main object to add
+        pos (None or 3-array): World position (x,y,z) for the main object's root link.
+            If None, leaves the object at its default spawn position.
+        orn (None or 4-array): World orientation quaternion (x,y,z,w) for the main object.
+            If None, leaves the object at its default spawn orientation.
+
+    Returns:
+        list of DatasetObject: All added objects, main object first followed by its parts.
+    """
+    from omnigibson.object_states.attached_to import AttachedTo
+    from omnigibson.objects.dataset_object import DatasetObject
+
+    scene.add_object(obj)
+    if pos is not None or orn is not None:
+        cur_pos, cur_orn = obj.get_position_orientation()
+        obj.set_position_orientation(
+            position=pos if pos is not None else cur_pos,
+            orientation=orn if orn is not None else cur_orn,
+        )
+
+    metadata = obj.metadata
+    if metadata is None or not metadata.get("object_parts"):
+        return [obj]
+
+    # object_parts is stored as a list in JSON but USD round-trips it to a dict
+    # with string-integer keys {"0": {...}, "1": {...}}. Handle both formats.
+    raw_parts = metadata["object_parts"]
+    if isinstance(raw_parts, dict):
+        try:
+            sorted_items = sorted(raw_parts.items(), key=lambda kv: int(kv[0]))
+        except (ValueError, TypeError):
+            sorted_items = sorted(raw_parts.items(), key=lambda kv: str(kv[0]))
+        parts = [v for _, v in sorted_items]
+    else:
+        parts = raw_parts
+
+    has_connectedpart = any(part.get("type") == "connectedpart" for part in parts)
+    if AttachedTo not in obj.states and has_connectedpart:
+        log.warning(
+            f"{obj.name} has connectedpart metadata but no AttachedTo state. "
+            f"Create it with abilities={{'attachable': {{}}}} for connectedpart attachment to work."
+        )
+
+    parent_pos, parent_orn = obj.get_position_orientation()
+    all_objs = [obj]
+    connectedparts = []
+
+    for i, part in enumerate(parts):
+        if part["type"] not in ("connectedpart", "extrapart"):
+            continue
+
+        part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
+        part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
+        part_bb_size = th.tensor(part["bb_size"], dtype=th.float32)
+
+        # Scale the offset to account for non-unit parent scale (same logic as SlicingRule)
+        if th.all(obj.scale == obj.scale[0]):
+            scale = obj.scale
+        else:
+            assert T.check_quat_right_angle(part_bb_orn), (
+                f"Part {part['category']}/{part['model']} of {obj.name} must have orientations that are multiples "
+                f"of 90 degrees when the parent has non-uniform scale!"
+            )
+            scale = th.abs(T.quat2mat(part_bb_orn) @ obj.scale)
+
+        # Compute global bounding box pose for this part
+        global_bb_pos = parent_pos + T.quat2mat(parent_orn) @ (part_bb_pos * scale)
+        global_bb_orn = T.quat_multiply(parent_orn, part_bb_orn)
+
+        # connectedpart objects need attachable so AttachedTo is included in their states
+        part_abilities = {"attachable": {}} if part["type"] == "connectedpart" else {}
+        part_obj = DatasetObject(
+            name=f"{obj.name}_{part['category']}_{i}",
+            category=part["category"],
+            model=part["model"],
+            bounding_box=part_bb_size * scale,
+            abilities=part_abilities,
+        )
+        scene.add_object(part_obj)
+        part_obj.set_bbox_center_position_orientation(position=global_bb_pos, orientation=global_bb_orn)
+
+        if part["type"] == "connectedpart":
+            connectedparts.append(part_obj)
+
+        all_objs.append(part_obj)
+
+    # Step the simulator to initialize all newly added objects before setting states
+    if connectedparts:
+        og.sim.step()
+        for part_obj in connectedparts:
+            if AttachedTo in part_obj.states:
+                success = part_obj.states[AttachedTo].set_value(obj, True, bypass_alignment_checking=True)
+                if not success:
+                    log.warning(
+                        f"Failed to attach connectedpart {part_obj.name} to {obj.name}. "
+                        f"Check that both objects have matching attachment meta links."
+                    )
+            else:
+                log.warning(f"connectedpart {part_obj.name} has no AttachedTo state — missing attachment meta links?")
+
+    return all_objs
 
 
 def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
