@@ -38,9 +38,12 @@ from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
 from omnigibson.utils.asset_utils import get_task_instance_path
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
+from omnigibson.eval.utils.light_utils import LightToggleSynchronizer, set_light_control_toggles
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
 
+
+LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
@@ -73,6 +76,7 @@ class Evaluator:
         self.policy = self.load_policy()
         self.metrics = self.load_metrics()
         self.obs = None
+        self.light_synchronizer = None
 
         # Initialize the physics views so the first reset() (which eval.py issues before the first
         # load_task_instance) can read/restore robot joint state.
@@ -82,6 +86,30 @@ class Evaluator:
         self._video_writer = None
         self._video_path = None
         self._video_rate = 30
+
+    @property
+    def should_sync_lights(self) -> bool:
+        return self.env.task.activity_name in LIGHT_EVAL_TASKS
+
+    def _reset_light_synchronizer(self) -> None:
+        if self.should_sync_lights:
+            self.light_synchronizer = LightToggleSynchronizer(self.env.scene)
+            self.light_synchronizer.reset_from_current_state()
+        else:
+            self.light_synchronizer = None
+
+    def _sync_lights_and_get_obs(self, obs: dict | None = None) -> dict:
+        if not self.should_sync_lights:
+            return obs
+
+        if self.light_synchronizer is None:
+            self._reset_light_synchronizer()
+        else:
+            self.light_synchronizer.sync_from_current_state()
+        for _ in range(3):
+            og.sim.render()
+        obs, _ = self.env.get_obs()
+        return obs
 
     def load_env(self, env_wrapper: DictConfig) -> EnvironmentWrapper:
         for rule in DISABLED_TRANSITION_RULES:
@@ -167,6 +195,7 @@ class Evaluator:
     def step(self) -> Tuple[bool, bool]:
         self.robot_action = self.policy.forward(obs=self.obs)
         obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
+        obs = self._sync_lights_and_get_obs(obs)
         self.obs = self._preprocess_obs(obs)
 
         if self._video_path is not None:
@@ -234,6 +263,9 @@ class Evaluator:
             else:
                 self.env.task.object_scope[tro_key].load_state(tro_state, serialized=False)
 
+        if self.should_sync_lights:
+            set_light_control_toggles(self.env.task.object_scope.values(), True)
+
         # Keep all task-relevant entities (including the robot/agent) still while the scene settles,
         # so the snapshotted per-instance initial state is stable. The robot must already be in a clean
         # configuration when this is called -- eval.py resets before load_task_instance for this reason.
@@ -246,6 +278,7 @@ class Evaluator:
 
         self.env.scene.update_initial_file()
         self.env.scene.reset()
+        self._reset_light_synchronizer()
 
     def _preprocess_obs(self, obs: dict) -> dict:
         obs = flatten_obs_dict(obs)
@@ -299,7 +332,10 @@ class Evaluator:
         self._video_path = None
 
     def reset(self) -> None:
-        self.obs = self._preprocess_obs(self.env.reset()[0])
+        obs = self.env.reset()[0]
+        self._reset_light_synchronizer()
+        obs = self._sync_lights_and_get_obs(obs)
+        self.obs = self._preprocess_obs(obs)
         for metric in self.metrics:
             metric.reset(self.env)
         self.policy.reset()

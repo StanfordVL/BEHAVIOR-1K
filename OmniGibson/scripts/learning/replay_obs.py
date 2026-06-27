@@ -7,6 +7,7 @@ from omnigibson.envs import HDF5PlaybackWrapper, LeRobotPlaybackWrapper
 from omnigibson.eval.utils.dataset_utils import makedirs_with_mode
 from omnigibson.eval.utils.eval_utils import PROPRIOCEPTION_INDICES
 from omnigibson.macros import gm
+from omnigibson.eval.utils.light_utils import LightToggleSynchronizer
 from omnigibson.utils.ui_utils import create_module_logger
 
 
@@ -16,6 +17,8 @@ log.setLevel(20)
 gm.RENDER_VIEWER_CAMERA = False
 gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
+
+LIGHT_REPLAY_TASKS = {"turning_out_all_lights_before_sleep"}
 
 
 def _load_challenge_available_tasks() -> dict:
@@ -175,7 +178,16 @@ def replay_hdf5_file(
     num_samples = env.input_hdf5["data"][f"demo_{episode_id}"].attrs["num_samples"]
     log.info(f" >>> Replaying episode {episode_id} ({selection_reason}) with {num_samples} steps")
 
-    env.playback_episode(episode_id=episode_id, record_data=True)
+    post_state_update_callback = None
+    if task_name in LIGHT_REPLAY_TASKS:
+        light_synchronizer = LightToggleSynchronizer(env.scene)
+        post_state_update_callback = light_synchronizer.sync_from_current_state
+
+    env.playback_episode(
+        episode_id=episode_id,
+        record_data=True,
+        post_state_update_callback=post_state_update_callback,
+    )
 
     log.info("Playback complete. Saving data...")
     env.save_data()
