@@ -13,7 +13,7 @@ Join us for the second year of the BEHAVIOR Challenge: solve **100 full-length h
       <li><strong>Winners Announcement:</strong> <span>11/4/2026</span></li>
     </ul>
     <div class="challenge-action-links">
-      <span class="challenge-action-disabled">Portal TBD</span>
+      <a href="https://behavior-1k-2026-challenge-leaderboard.hf.space/submit">Submission Portal</a>
       <a href="./submission/">Submission Guidelines</a>
     </div>
   </section>

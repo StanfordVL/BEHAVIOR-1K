@@ -1,7 +1,7 @@
 # Submission Guidelines
 
 <div class="challenge-portal-cta">
-  <span>Submission Portal TBD</span>
+  <a href="https://behavior-1k-2026-challenge-leaderboard.hf.space/submit">Open Submission Portal</a>
 </div>
 
 ## Submission Overview
@@ -132,4 +132,4 @@ Your final zip file should contain:
   </tbody>
 </table>
 
-In addition, submit a link to all rollout MP4 videos, one for each rollout performed, up to 1,000 videos. More details will be provided when the submission portal is announced.
+In addition, submit a link through the [submission portal](https://behavior-1k-2026-challenge-leaderboard.hf.space/submit) to all rollout MP4 videos, one for each rollout performed, up to 1,000 videos.
