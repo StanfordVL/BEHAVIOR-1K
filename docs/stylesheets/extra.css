@@ -123,6 +123,26 @@
     background: var(--md-code-bg-color);
 }
 
+.challenge-portal-cta {
+    display: flex;
+    margin: 1rem 0 1.5rem;
+}
+
+.challenge-portal-cta span,
+.challenge-portal-cta a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    border: 2px solid #2f6f8f;
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    background: rgba(47, 111, 143, 0.08);
+    color: #2f6f8f !important;
+    font-weight: 700;
+    text-decoration: none;
+}
+
 .md-typeset table.challenge-data-table {
     display: table;
     width: 100%;

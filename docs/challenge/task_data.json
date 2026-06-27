@@ -9,7 +9,8 @@
       ],
       "duration": 72,
       "thumbnail": "https://vumbnail.com/1109198872.jpg",
-      "video": "https://player.vimeo.com/video/1109198872"
+      "video": "https://player.vimeo.com/video/1109198872",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "picking_up_trash",
@@ -21,7 +22,8 @@
       ],
       "duration": 176,
       "thumbnail": "https://vumbnail.com/1109202972.jpg",
-      "video": "https://player.vimeo.com/video/1109202972"
+      "video": "https://player.vimeo.com/video/1109202972",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "putting_away_Halloween_decorations",
@@ -32,7 +34,8 @@
       ],
       "duration": 460,
       "thumbnail": "https://vumbnail.com/1114054409.jpg",
-      "video": "https://player.vimeo.com/video/1114054409"
+      "video": "https://player.vimeo.com/video/1114054409",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "cleaning_up_plates_and_food",
@@ -43,7 +46,8 @@
       ],
       "duration": 457,
       "thumbnail": "https://vumbnail.com/1114054554.jpg",
-      "video": "https://player.vimeo.com/video/1114054554"
+      "video": "https://player.vimeo.com/video/1114054554",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "can_meat",
@@ -54,7 +58,8 @@
       ],
       "duration": 395,
       "thumbnail": "https://vumbnail.com/1114054618.jpg",
-      "video": "https://player.vimeo.com/video/1114054618"
+      "video": "https://player.vimeo.com/video/1114054618",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "setting_mousetraps",
@@ -65,7 +70,8 @@
       ],
       "duration": 339,
       "thumbnail": "https://vumbnail.com/1114054686.jpg",
-      "video": "https://player.vimeo.com/video/1114054686"
+      "video": "https://player.vimeo.com/video/1114054686",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "hiding_Easter_eggs",
@@ -76,7 +82,8 @@
       ],
       "duration": 254,
       "thumbnail": "https://vumbnail.com/1114055436.jpg",
-      "video": "https://player.vimeo.com/video/1114055436"
+      "video": "https://player.vimeo.com/video/1114055436",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "picking_up_toys",
@@ -87,7 +94,8 @@
       ],
       "duration": 630,
       "thumbnail": "https://vumbnail.com/1114054920.jpg",
-      "video": "https://player.vimeo.com/video/1114054920"
+      "video": "https://player.vimeo.com/video/1114054920",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "rearranging_kitchen_furniture",
@@ -98,7 +106,8 @@
       ],
       "duration": 298,
       "thumbnail": "https://vumbnail.com/1114056046.jpg",
-      "video": "https://player.vimeo.com/video/1114056046"
+      "video": "https://player.vimeo.com/video/1114056046",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "putting_up_Christmas_decorations_inside",
@@ -110,7 +119,8 @@
       ],
       "duration": 457,
       "thumbnail": "https://vumbnail.com/1114056731.jpg",
-      "video": "https://player.vimeo.com/video/1114056731"
+      "video": "https://player.vimeo.com/video/1114056731",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "set_up_a_coffee_station_in_your_kitchen",
@@ -121,7 +131,8 @@
       ],
       "duration": 209,
       "thumbnail": "https://vumbnail.com/1114056931.jpg",
-      "video": "https://player.vimeo.com/video/1114056931"
+      "video": "https://player.vimeo.com/video/1114056931",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "putting_dishes_away_after_cleaning",
@@ -132,7 +143,8 @@
       ],
       "duration": 365,
       "thumbnail": "https://vumbnail.com/1114057082.jpg",
-      "video": "https://player.vimeo.com/video/1114057082"
+      "video": "https://player.vimeo.com/video/1114057082",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "preparing_lunch_box",
@@ -143,7 +155,8 @@
       ],
       "duration": 275,
       "thumbnail": "https://vumbnail.com/1114057330.jpg",
-      "video": "https://player.vimeo.com/video/1114057330"
+      "video": "https://player.vimeo.com/video/1114057330",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "loading_the_car",
@@ -155,7 +168,8 @@
       ],
       "duration": 641,
       "thumbnail": "https://vumbnail.com/1114057519.jpg",
-      "video": "https://player.vimeo.com/video/1114057519"
+      "video": "https://player.vimeo.com/video/1114057519",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "carrying_in_groceries",
@@ -167,7 +181,8 @@
       ],
       "duration": 476,
       "thumbnail": "https://vumbnail.com/1114057919.jpg",
-      "video": "https://player.vimeo.com/video/1114057919"
+      "video": "https://player.vimeo.com/video/1114057919",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "bringing_in_wood",
@@ -179,7 +194,8 @@
       ],
       "duration": 451,
       "thumbnail": "https://vumbnail.com/1114058068.jpg",
-      "video": "https://player.vimeo.com/video/1114058068"
+      "video": "https://player.vimeo.com/video/1114058068",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "moving_boxes_to_storage",
@@ -191,7 +207,8 @@
       ],
       "duration": 487,
       "thumbnail": "https://vumbnail.com/1114058315.jpg",
-      "video": "https://player.vimeo.com/video/1114058315"
+      "video": "https://player.vimeo.com/video/1114058315",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "bringing_water",
@@ -203,7 +220,8 @@
       ],
       "duration": 315,
       "thumbnail": "https://vumbnail.com/1114058418.jpg",
-      "video": "https://player.vimeo.com/video/1114058418"
+      "video": "https://player.vimeo.com/video/1114058418",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "tidying_bedroom",
@@ -214,7 +232,8 @@
       ],
       "duration": 368,
       "thumbnail": "https://vumbnail.com/1114058519.jpg",
-      "video": "https://player.vimeo.com/video/1114058519"
+      "video": "https://player.vimeo.com/video/1114058519",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "outfit_a_basic_toolbox",
@@ -225,7 +244,8 @@
       ],
       "duration": 355,
       "thumbnail": "https://vumbnail.com/1114058641.jpg",
-      "video": "https://player.vimeo.com/video/1114058641"
+      "video": "https://player.vimeo.com/video/1114058641",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "sorting_vegetables",
@@ -236,7 +256,8 @@
       ],
       "duration": 397,
       "thumbnail": "https://vumbnail.com/1114058741.jpg",
-      "video": "https://player.vimeo.com/video/1114058741"
+      "video": "https://player.vimeo.com/video/1114058741",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "collecting_childrens_toys",
@@ -247,7 +268,8 @@
       ],
       "duration": 640,
       "thumbnail": "https://vumbnail.com/1114058872.jpg",
-      "video": "https://player.vimeo.com/video/1114058872"
+      "video": "https://player.vimeo.com/video/1114058872",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "putting_shoes_on_rack",
@@ -258,7 +280,8 @@
       ],
       "duration": 258,
       "thumbnail": "https://vumbnail.com/1114058985.jpg",
-      "video": "https://player.vimeo.com/video/1114058985"
+      "video": "https://player.vimeo.com/video/1114058985",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "boxing_books_up_for_storage",
@@ -269,7 +292,8 @@
       ],
       "duration": 808,
       "thumbnail": "https://vumbnail.com/1114059113.jpg",
-      "video": "https://player.vimeo.com/video/1114059113"
+      "video": "https://player.vimeo.com/video/1114059113",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "storing_food",
@@ -280,7 +304,8 @@
       ],
       "duration": 662,
       "thumbnail": "https://vumbnail.com/1114059272.jpg",
-      "video": "https://player.vimeo.com/video/1114059272"
+      "video": "https://player.vimeo.com/video/1114059272",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "clearing_food_from_table_into_fridge",
@@ -291,7 +316,8 @@
       ],
       "duration": 436,
       "thumbnail": "https://vumbnail.com/1114059394.jpg",
-      "video": "https://player.vimeo.com/video/1114059394"
+      "video": "https://player.vimeo.com/video/1114059394",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "assembling_gift_baskets",
@@ -302,7 +328,8 @@
       ],
       "duration": 869,
       "thumbnail": "https://vumbnail.com/1114059476.jpg",
-      "video": "https://player.vimeo.com/video/1114059476"
+      "video": "https://player.vimeo.com/video/1114059476",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "sorting_household_items",
@@ -314,7 +341,8 @@
       ],
       "duration": 527,
       "thumbnail": "https://vumbnail.com/1114059574.jpg",
-      "video": "https://player.vimeo.com/video/1114059574"
+      "video": "https://player.vimeo.com/video/1114059574",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "getting_organized_for_work",
@@ -325,7 +353,8 @@
       ],
       "duration": 522,
       "thumbnail": "https://vumbnail.com/1114059683.jpg",
-      "video": "https://player.vimeo.com/video/1114059683"
+      "video": "https://player.vimeo.com/video/1114059683",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "clean_up_your_desk",
@@ -336,7 +365,8 @@
       ],
       "duration": 714,
       "thumbnail": "https://vumbnail.com/1114059839.jpg",
-      "video": "https://player.vimeo.com/video/1114059839"
+      "video": "https://player.vimeo.com/video/1114059839",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "setting_the_fire",
@@ -347,7 +377,8 @@
       ],
       "duration": 304,
       "thumbnail": "https://vumbnail.com/1114059945.jpg",
-      "video": "https://player.vimeo.com/video/1114059945"
+      "video": "https://player.vimeo.com/video/1114059945",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "clean_boxing_gloves",
@@ -358,7 +389,8 @@
       ],
       "duration": 275,
       "thumbnail": "https://vumbnail.com/1114060008.jpg",
-      "video": "https://player.vimeo.com/video/1114060008"
+      "video": "https://player.vimeo.com/video/1114060008",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "wash_a_baseball_cap",
@@ -369,7 +401,8 @@
       ],
       "duration": 278,
       "thumbnail": "https://vumbnail.com/1114060147.jpg",
-      "video": "https://player.vimeo.com/video/1114060147"
+      "video": "https://player.vimeo.com/video/1114060147",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "wash_dog_toys",
@@ -380,7 +413,8 @@
       ],
       "duration": 374,
       "thumbnail": "https://vumbnail.com/1114060219.jpg",
-      "video": "https://player.vimeo.com/video/1114060219"
+      "video": "https://player.vimeo.com/video/1114060219",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "hanging_pictures",
@@ -391,7 +425,8 @@
       ],
       "duration": 80,
       "thumbnail": "https://vumbnail.com/1114060330.jpg",
-      "video": "https://player.vimeo.com/video/1114060330"
+      "video": "https://player.vimeo.com/video/1114060330",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "attach_a_camera_to_a_tripod",
@@ -402,7 +437,8 @@
       ],
       "duration": 130,
       "thumbnail": "https://vumbnail.com/1114060393.jpg",
-      "video": "https://player.vimeo.com/video/1114060393"
+      "video": "https://player.vimeo.com/video/1114060393",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "clean_a_patio",
@@ -413,7 +449,8 @@
       ],
       "duration": 402,
       "thumbnail": "https://vumbnail.com/1114060492.jpg",
-      "video": "https://player.vimeo.com/video/1114060492"
+      "video": "https://player.vimeo.com/video/1114060492",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "clean_a_trumpet",
@@ -424,7 +461,8 @@
       ],
       "duration": 177,
       "thumbnail": "https://vumbnail.com/1114060606.jpg",
-      "video": "https://player.vimeo.com/video/1114060606"
+      "video": "https://player.vimeo.com/video/1114060606",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "spraying_for_bugs",
@@ -435,7 +473,8 @@
       ],
       "duration": 216,
       "thumbnail": "https://vumbnail.com/1114060681.jpg",
-      "video": "https://player.vimeo.com/video/1114060681"
+      "video": "https://player.vimeo.com/video/1114060681",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "spraying_fruit_trees",
@@ -446,7 +485,8 @@
       ],
       "duration": 278,
       "thumbnail": "https://vumbnail.com/1114060748.jpg",
-      "video": "https://player.vimeo.com/video/1114060748"
+      "video": "https://player.vimeo.com/video/1114060748",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "make_microwave_popcorn",
@@ -457,7 +497,8 @@
       ],
       "duration": 108,
       "thumbnail": "https://vumbnail.com/1114060842.jpg",
-      "video": "https://player.vimeo.com/video/1114060842"
+      "video": "https://player.vimeo.com/video/1114060842",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "cook_cabbage",
@@ -468,7 +509,8 @@
       ],
       "duration": 471,
       "thumbnail": "https://vumbnail.com/1114060935.jpg",
-      "video": "https://player.vimeo.com/video/1114060935"
+      "video": "https://player.vimeo.com/video/1114060935",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "chop_an_onion",
@@ -479,7 +521,8 @@
       ],
       "duration": 213,
       "thumbnail": "https://vumbnail.com/1114061062.jpg",
-      "video": "https://player.vimeo.com/video/1114061062"
+      "video": "https://player.vimeo.com/video/1114061062",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "slicing_vegetables",
@@ -490,7 +533,8 @@
       ],
       "duration": 495,
       "thumbnail": "https://vumbnail.com/1114061183.jpg",
-      "video": "https://player.vimeo.com/video/1114061183"
+      "video": "https://player.vimeo.com/video/1114061183",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "chopping_wood",
@@ -501,7 +545,8 @@
       ],
       "duration": 358,
       "thumbnail": "https://vumbnail.com/1114061262.jpg",
-      "video": "https://player.vimeo.com/video/1114061262"
+      "video": "https://player.vimeo.com/video/1114061262",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "cook_hot_dogs",
@@ -512,7 +557,8 @@
       ],
       "duration": 305,
       "thumbnail": "https://vumbnail.com/1114061371.jpg",
-      "video": "https://player.vimeo.com/video/1114061371"
+      "video": "https://player.vimeo.com/video/1114061371",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "cook_bacon",
@@ -523,7 +569,8 @@
       ],
       "duration": 256,
       "thumbnail": "https://vumbnail.com/1114061497.jpg",
-      "video": "https://player.vimeo.com/video/1114061497"
+      "video": "https://player.vimeo.com/video/1114061497",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "freeze_pies",
@@ -534,7 +581,8 @@
       ],
       "duration": 415,
       "thumbnail": "https://vumbnail.com/1114061625.jpg",
-      "video": "https://player.vimeo.com/video/1114061625"
+      "video": "https://player.vimeo.com/video/1114061625",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "canning_food",
@@ -545,7 +593,8 @@
       ],
       "duration": 766,
       "thumbnail": "https://vumbnail.com/1114061821.jpg",
-      "video": "https://player.vimeo.com/video/1114061821"
+      "video": "https://player.vimeo.com/video/1114061821",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "make_pizza",
@@ -556,7 +605,8 @@
       ],
       "duration": 640,
       "thumbnail": "https://vumbnail.com/1114061917.jpg",
-      "video": "https://player.vimeo.com/video/1114061917"
+      "video": "https://player.vimeo.com/video/1114061917",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "freeze_fruit",
@@ -566,7 +616,8 @@
       ],
       "duration": 339,
       "thumbnail": "https://img.youtube.com/vi/6nM9_B5OoRY/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/6nM9_B5OoRY"
+      "video": "https://www.youtube.com/embed/6nM9_B5OoRY",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "cook_a_brisket",
@@ -576,7 +627,8 @@
       ],
       "duration": 251,
       "thumbnail": "https://img.youtube.com/vi/RCSy8B0_s5Y/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/RCSy8B0_s5Y"
+      "video": "https://www.youtube.com/embed/RCSy8B0_s5Y",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "sorting_bottles_cans_and_paper",
@@ -586,7 +638,8 @@
       ],
       "duration": 312,
       "thumbnail": "https://img.youtube.com/vi/h8-XZ85UxSU/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/h8-XZ85UxSU"
+      "video": "https://www.youtube.com/embed/h8-XZ85UxSU",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "tidying_living_room",
@@ -596,7 +649,8 @@
       ],
       "duration": 316,
       "thumbnail": "https://img.youtube.com/vi/aTCNKnjR03c/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/aTCNKnjR03c"
+      "video": "https://www.youtube.com/embed/aTCNKnjR03c",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "putting_away_toys",
@@ -607,7 +661,8 @@
       ],
       "duration": 438,
       "thumbnail": "https://img.youtube.com/vi/StbSZCTn7D4/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/StbSZCTn7D4"
+      "video": "https://www.youtube.com/embed/StbSZCTn7D4",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "re_shelving_library_books",
@@ -617,7 +672,8 @@
       ],
       "duration": 281,
       "thumbnail": "https://img.youtube.com/vi/AQdhTrye7NQ/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/AQdhTrye7NQ"
+      "video": "https://www.youtube.com/embed/AQdhTrye7NQ",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "make_rose_centerpieces",
@@ -627,7 +683,8 @@
       ],
       "duration": 111,
       "thumbnail": "https://img.youtube.com/vi/Nb8kdrf7c_M/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/Nb8kdrf7c_M"
+      "video": "https://www.youtube.com/embed/Nb8kdrf7c_M",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "sweeping_garage",
@@ -637,7 +694,8 @@
       ],
       "duration": 126,
       "thumbnail": "https://img.youtube.com/vi/0bdsrbEeFEc/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/0bdsrbEeFEc"
+      "video": "https://www.youtube.com/embed/0bdsrbEeFEc",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "stacking_wood",
@@ -647,7 +705,8 @@
       ],
       "duration": 447,
       "thumbnail": "https://img.youtube.com/vi/8MDz0GuPlto/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/8MDz0GuPlto"
+      "video": "https://www.youtube.com/embed/8MDz0GuPlto",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "organizing_art_supplies",
@@ -657,7 +716,8 @@
       ],
       "duration": 228,
       "thumbnail": "https://img.youtube.com/vi/M1D9oCKBJZg/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/M1D9oCKBJZg"
+      "video": "https://www.youtube.com/embed/M1D9oCKBJZg",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "scrubbing_bathroom_floor",
@@ -667,7 +727,8 @@
       ],
       "duration": 123,
       "thumbnail": "https://img.youtube.com/vi/u9wtUgoB8o8/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/u9wtUgoB8o8"
+      "video": "https://www.youtube.com/embed/u9wtUgoB8o8",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "bringing_paper_to_recycling",
@@ -678,7 +739,8 @@
       ],
       "duration": 318,
       "thumbnail": "https://img.youtube.com/vi/5OU6Zq9bGG4/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/5OU6Zq9bGG4"
+      "video": "https://www.youtube.com/embed/5OU6Zq9bGG4",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "halve_an_egg",
@@ -688,7 +750,8 @@
       ],
       "duration": 212,
       "thumbnail": "https://img.youtube.com/vi/c1YJezdD7oM/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/c1YJezdD7oM"
+      "video": "https://www.youtube.com/embed/c1YJezdD7oM",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "installing_smoke_detectors",
@@ -700,7 +763,8 @@
       ],
       "duration": 68,
       "thumbnail": "https://img.youtube.com/vi/gRtLcTllXqQ/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/gRtLcTllXqQ"
+      "video": "https://www.youtube.com/embed/gRtLcTllXqQ",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "setting_the_table",
@@ -711,7 +775,8 @@
       ],
       "duration": 727,
       "thumbnail": "https://img.youtube.com/vi/Tkf34ap-z8U/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/Tkf34ap-z8U"
+      "video": "https://www.youtube.com/embed/Tkf34ap-z8U",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "unloading_the_car",
@@ -722,7 +787,8 @@
       ],
       "duration": 378,
       "thumbnail": "https://img.youtube.com/vi/IBV8nn39hTM/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/IBV8nn39hTM"
+      "video": "https://www.youtube.com/embed/IBV8nn39hTM",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "turning_out_all_lights_before_sleep",
@@ -739,7 +805,8 @@
       ],
       "duration": 337,
       "thumbnail": "https://img.youtube.com/vi/AN8l_cduvqU/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/AN8l_cduvqU"
+      "video": "https://www.youtube.com/embed/AN8l_cduvqU",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "boxing_food_after_dinner",
@@ -750,7 +817,8 @@
       ],
       "duration": 240,
       "thumbnail": "https://img.youtube.com/vi/OmpbFiXPwMo/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/OmpbFiXPwMo"
+      "video": "https://www.youtube.com/embed/OmpbFiXPwMo",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "cleaning_up_branches_and_twigs",
@@ -760,7 +828,8 @@
       ],
       "duration": 434,
       "thumbnail": "https://img.youtube.com/vi/iztsNYYMpv0/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/iztsNYYMpv0"
+      "video": "https://www.youtube.com/embed/iztsNYYMpv0",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "vacuuming_floors",
@@ -770,7 +839,8 @@
       ],
       "duration": 65,
       "thumbnail": "https://img.youtube.com/vi/RqYuT-aj21A/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/RqYuT-aj21A"
+      "video": "https://www.youtube.com/embed/RqYuT-aj21A",
+      "scene_model": "house_double_floor_upper"
     },
     {
       "id": "thawing_frozen_food",
@@ -780,7 +850,8 @@
       ],
       "duration": 348,
       "thumbnail": "https://img.youtube.com/vi/FF3HiYSHGdc/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/FF3HiYSHGdc"
+      "video": "https://www.youtube.com/embed/FF3HiYSHGdc",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "clean_your_rusty_garden_tools",
@@ -790,7 +861,8 @@
       ],
       "duration": 484,
       "thumbnail": "https://img.youtube.com/vi/tHiesuHDgkc/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/tHiesuHDgkc"
+      "video": "https://www.youtube.com/embed/tHiesuHDgkc",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "cook_a_frozen_pie",
@@ -800,7 +872,8 @@
       ],
       "duration": 323,
       "thumbnail": "https://img.youtube.com/vi/H4z3xTJn058/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/H4z3xTJn058"
+      "video": "https://www.youtube.com/embed/H4z3xTJn058",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "organizing_school_stuff",
@@ -810,7 +883,8 @@
       ],
       "duration": 426,
       "thumbnail": "https://img.youtube.com/vi/GO2Bw-0OY7M/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/GO2Bw-0OY7M"
+      "video": "https://www.youtube.com/embed/GO2Bw-0OY7M",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "carrying_out_garden_furniture",
@@ -825,7 +899,8 @@
       ],
       "duration": 358,
       "thumbnail": "https://img.youtube.com/vi/NCQc0IIRmos/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/NCQc0IIRmos"
+      "video": "https://www.youtube.com/embed/NCQc0IIRmos",
+      "scene_model": "house_single_floor"
     },
     {
       "id": "put_together_a_basic_pruning_kit",
@@ -835,7 +910,8 @@
       ],
       "duration": 448,
       "thumbnail": "https://img.youtube.com/vi/UmGRVx-OCac/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/UmGRVx-OCac"
+      "video": "https://www.youtube.com/embed/UmGRVx-OCac",
+      "scene_model": "house_double_floor_lower"
     },
     {
       "id": "dispose_of_glass",
@@ -846,7 +922,8 @@
       ],
       "duration": 240,
       "thumbnail": "https://img.youtube.com/vi/dzVB9aAmnNU/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/dzVB9aAmnNU"
+      "video": "https://www.youtube.com/embed/dzVB9aAmnNU",
+      "scene_model": "hotel_suite_large"
     },
     {
       "id": "installing_a_modem",
@@ -859,7 +936,8 @@
       ],
       "duration": 63,
       "thumbnail": "https://img.youtube.com/vi/zHEfUkrCWfc/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/zHEfUkrCWfc"
+      "video": "https://www.youtube.com/embed/zHEfUkrCWfc",
+      "scene_model": "Rs_int"
     },
     {
       "id": "make_cabinet_doors",
@@ -872,7 +950,8 @@
       ],
       "duration": 120,
       "thumbnail": "https://img.youtube.com/vi/rqqgwEPTLwk/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/rqqgwEPTLwk"
+      "video": "https://www.youtube.com/embed/rqqgwEPTLwk",
+      "scene_model": "Rs_int"
     },
     {
       "id": "polishing_shoes",
@@ -882,7 +961,8 @@
       ],
       "duration": 363,
       "thumbnail": "https://img.youtube.com/vi/bSCbEvVJykI/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/bSCbEvVJykI"
+      "video": "https://www.youtube.com/embed/bSCbEvVJykI",
+      "scene_model": "hotel_suite_large"
     },
     {
       "id": "clean_up_broken_glass",
@@ -893,7 +973,8 @@
       ],
       "duration": 286,
       "thumbnail": "https://img.youtube.com/vi/qXliGIYzh2w/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/qXliGIYzh2w"
+      "video": "https://www.youtube.com/embed/qXliGIYzh2w",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "packing_meal_for_delivery",
@@ -903,7 +984,8 @@
       ],
       "duration": 300,
       "thumbnail": "https://img.youtube.com/vi/DirqFshrOAA/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/DirqFshrOAA"
+      "video": "https://www.youtube.com/embed/DirqFshrOAA",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "store_batteries",
@@ -916,7 +998,8 @@
       ],
       "duration": 328,
       "thumbnail": "https://img.youtube.com/vi/jMSkFQy95FY/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/jMSkFQy95FY"
+      "video": "https://www.youtube.com/embed/jMSkFQy95FY",
+      "scene_model": "Rs_int"
     },
     {
       "id": "store_honey",
@@ -929,7 +1012,8 @@
       ],
       "duration": 193,
       "thumbnail": "https://img.youtube.com/vi/oFu38YPgVEU/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/oFu38YPgVEU"
+      "video": "https://www.youtube.com/embed/oFu38YPgVEU",
+      "scene_model": "Rs_int"
     },
     {
       "id": "tidying_bathroom",
@@ -939,7 +1023,8 @@
       ],
       "duration": 541,
       "thumbnail": "https://img.youtube.com/vi/EdKc0cKLITw/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/EdKc0cKLITw"
+      "video": "https://www.youtube.com/embed/EdKc0cKLITw",
+      "scene_model": "hotel_suite_large"
     },
     {
       "id": "putting_dirty_dishes_in_sink",
@@ -950,7 +1035,8 @@
       ],
       "duration": 337,
       "thumbnail": "https://img.youtube.com/vi/SCX0NPFlMhI/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/SCX0NPFlMhI"
+      "video": "https://www.youtube.com/embed/SCX0NPFlMhI",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "make_gift_bags_for_baby_showers",
@@ -960,7 +1046,8 @@
       ],
       "duration": 242,
       "thumbnail": "https://img.youtube.com/vi/EY42jyNoEh8/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/EY42jyNoEh8"
+      "video": "https://www.youtube.com/embed/EY42jyNoEh8",
+      "scene_model": "Rs_int"
     },
     {
       "id": "collecting_aluminum_cans",
@@ -970,7 +1057,8 @@
       ],
       "duration": 325,
       "thumbnail": "https://img.youtube.com/vi/QRgCjhEdNzA/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/QRgCjhEdNzA"
+      "video": "https://www.youtube.com/embed/QRgCjhEdNzA",
+      "scene_model": "hotel_suite_large"
     },
     {
       "id": "rearrange_your_room",
@@ -981,7 +1069,8 @@
       ],
       "duration": 515,
       "thumbnail": "https://img.youtube.com/vi/PuP9DeUF4K4/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/PuP9DeUF4K4"
+      "video": "https://www.youtube.com/embed/PuP9DeUF4K4",
+      "scene_model": "hotel_suite_large"
     },
     {
       "id": "installing_a_fax_machine",
@@ -992,7 +1081,8 @@
       ],
       "duration": 148,
       "thumbnail": "https://img.youtube.com/vi/v1CrUuIN0lY/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/v1CrUuIN0lY"
+      "video": "https://www.youtube.com/embed/v1CrUuIN0lY",
+      "scene_model": "office_cubicles_right"
     },
     {
       "id": "composting_waste",
@@ -1004,7 +1094,8 @@
       ],
       "duration": 115,
       "thumbnail": "https://img.youtube.com/vi/RR3PLEFcdYg/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/RR3PLEFcdYg"
+      "video": "https://www.youtube.com/embed/RR3PLEFcdYg",
+      "scene_model": "Rs_int"
     },
     {
       "id": "store_produce",
@@ -1014,7 +1105,8 @@
       ],
       "duration": 316,
       "thumbnail": "https://img.youtube.com/vi/jppOziwq7xI/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/jppOziwq7xI"
+      "video": "https://www.youtube.com/embed/jppOziwq7xI",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "installing_a_scanner",
@@ -1024,7 +1116,8 @@
       ],
       "duration": 122,
       "thumbnail": "https://img.youtube.com/vi/fVy3dPNOBYk/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/fVy3dPNOBYk"
+      "video": "https://www.youtube.com/embed/fVy3dPNOBYk",
+      "scene_model": "office_cubicles_right"
     },
     {
       "id": "clean_a_keyboard",
@@ -1034,7 +1127,8 @@
       ],
       "duration": 142,
       "thumbnail": "https://img.youtube.com/vi/yEV3cFqyu-4/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/yEV3cFqyu-4"
+      "video": "https://www.youtube.com/embed/yEV3cFqyu-4",
+      "scene_model": "office_cubicles_right"
     },
     {
       "id": "dispose_of_batteries",
@@ -1047,7 +1141,8 @@
       ],
       "duration": 441,
       "thumbnail": "https://img.youtube.com/vi/TmJ7dNwDyws/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/TmJ7dNwDyws"
+      "video": "https://www.youtube.com/embed/TmJ7dNwDyws",
+      "scene_model": "office_cubicles_right"
     },
     {
       "id": "cook_brussels_sprouts",
@@ -1059,7 +1154,8 @@
       ],
       "duration": 687,
       "thumbnail": "https://img.youtube.com/vi/9XPaPQmWAgI/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/9XPaPQmWAgI"
+      "video": "https://www.youtube.com/embed/9XPaPQmWAgI",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "cook_broccolini",
@@ -1069,7 +1165,8 @@
       ],
       "duration": 137,
       "thumbnail": "https://img.youtube.com/vi/NXoYiAs_KCs/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/NXoYiAs_KCs"
+      "video": "https://www.youtube.com/embed/NXoYiAs_KCs",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "setup_a_bar_for_a_cocktail_party",
@@ -1079,7 +1176,8 @@
       ],
       "duration": 350,
       "thumbnail": "https://img.youtube.com/vi/3V0ySKyGKRw/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/3V0ySKyGKRw"
+      "video": "https://www.youtube.com/embed/3V0ySKyGKRw",
+      "scene_model": "restaurant_diner"
     },
     {
       "id": "laying_tile_floors",
@@ -1090,7 +1188,8 @@
       ],
       "duration": 520,
       "thumbnail": "https://img.youtube.com/vi/a3OjMFaaSs8/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/a3OjMFaaSs8"
+      "video": "https://www.youtube.com/embed/a3OjMFaaSs8",
+      "scene_model": "office_cubicles_right"
     },
     {
       "id": "sorting_books_on_shelf",
@@ -1100,7 +1199,8 @@
       ],
       "duration": 200,
       "thumbnail": "https://img.youtube.com/vi/wXUyDWyvpRA/hqdefault.jpg",
-      "video": "https://www.youtube.com/embed/wXUyDWyvpRA"
+      "video": "https://www.youtube.com/embed/wXUyDWyvpRA",
+      "scene_model": "house_double_floor_upper"
     }
   ]
 }

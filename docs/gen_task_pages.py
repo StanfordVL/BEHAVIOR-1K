@@ -64,6 +64,13 @@ GALLERY_CONTROLS = f"""<div class="controls">
     </select>
   </div>
 
+  <div class="filter-control scene-filter-control">
+    <label for="scene-filter">Filter by scene:</label>
+    <select id="scene-filter">
+      <option value="all">All Scenes</option>
+    </select>
+  </div>
+
   <div class="sort-control">
     <label for="sort-select">Sort by:</label>
     <select id="sort-select">
@@ -77,6 +84,18 @@ GALLERY_CONTROLS = f"""<div class="controls">
 
 <div class="grid cards compact" id="task-grid">
   <div class="loading">Loading tasks...</div>
+</div>
+
+<div class="task-video-modal" id="task-video-modal" hidden>
+  <div class="task-video-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="task-video-title">
+    <button class="task-video-modal__close" id="task-video-close" type="button" aria-label="Close video">×</button>
+    <h2 id="task-video-title"></h2>
+    <p id="task-video-meta"></p>
+    <div class="task-video-modal__frame">
+      <iframe id="task-video-frame" src="" title="Task video demonstration" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+      <div class="task-video-placeholder" id="task-video-placeholder" hidden>Video demonstration coming soon</div>
+    </div>
+  </div>
 </div>
 """
 
@@ -93,25 +112,97 @@ GALLERY_SCRIPT_SUFFIX = f"""
   function initGallery() {{
     const taskGrid = document.getElementById('task-grid');
     const roomFilter = document.getElementById('room-filter');
+    const sceneFilter = document.getElementById('scene-filter');
+    const sceneFilterControl = document.querySelector('.scene-filter-control');
     const sortSelect = document.getElementById('sort-select');
+    const videoModal = document.getElementById('task-video-modal');
+    const videoClose = document.getElementById('task-video-close');
+    const videoTitle = document.getElementById('task-video-title');
+    const videoMeta = document.getElementById('task-video-meta');
+    const videoFrame = document.getElementById('task-video-frame');
+    const videoPlaceholder = document.getElementById('task-video-placeholder');
 
-    if (!taskGrid || !roomFilter || !sortSelect) {{
+    if (!taskGrid || !roomFilter || !sceneFilter || !sortSelect || !videoModal || !videoClose || !videoTitle || !videoMeta || !videoFrame || !videoPlaceholder) {{
       setTimeout(initGallery, 10);
       return;
     }}
+
+    const sceneModels = [...new Set(tasks.map(task => task.scene_model).filter(Boolean))].sort();
+    sceneModels.forEach((sceneModel) => {{
+      const option = document.createElement('option');
+      option.value = sceneModel;
+      option.textContent = sceneModel;
+      sceneFilter.appendChild(option);
+    }});
+    if (sceneModels.length === 0 && sceneFilterControl) {{
+      sceneFilterControl.hidden = true;
+    }}
+
+    function buildVideoSrc(videoUrl) {{
+      if (!videoUrl) {{
+        return '';
+      }}
+
+      const separator = videoUrl.includes('?') ? '&' : '?';
+      if (videoUrl.includes('vimeo.com')) {{
+        return `${{videoUrl}}${{separator}}controls=1&title=0&byline=0&portrait=0&dnt=1&transparent=0&sidedock=0&logo=0`;
+      }}
+      if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {{
+        return `${{videoUrl}}${{separator}}controls=1&modestbranding=1&rel=0&showinfo=0`;
+      }}
+      return videoUrl;
+    }}
+
+    function openTaskVideo(task, taskIndex, roomsDisplay, durationDisplay) {{
+      videoTitle.textContent = `Task ${{taskIndex}}: ${{task.name}}`;
+      videoMeta.textContent = [task.scene_model, roomsDisplay, durationDisplay].filter(Boolean).join(' · ');
+
+      const videoSrc = buildVideoSrc(task.video);
+      if (videoSrc) {{
+        videoFrame.src = videoSrc;
+        videoFrame.hidden = false;
+        videoPlaceholder.hidden = true;
+      }} else {{
+        videoFrame.src = '';
+        videoFrame.hidden = true;
+        videoPlaceholder.hidden = false;
+      }}
+
+      videoModal.hidden = false;
+      document.body.classList.add('task-video-modal-open');
+      videoClose.focus();
+    }}
+
+    function closeTaskVideo() {{
+      videoModal.hidden = true;
+      videoFrame.src = '';
+      document.body.classList.remove('task-video-modal-open');
+    }}
+
+    videoClose.addEventListener('click', closeTaskVideo);
+    videoModal.addEventListener('click', (event) => {{
+      if (event.target === videoModal) {{
+        closeTaskVideo();
+      }}
+    }});
+    document.addEventListener('keydown', (event) => {{
+      if (event.key === 'Escape' && !videoModal.hidden) {{
+        closeTaskVideo();
+      }}
+    }});
 
     // Render tasks
     function renderTasks(taskList) {{
       taskGrid.innerHTML = '';
 
       taskList.forEach((task) => {{
-        const card = document.createElement('a');
+        const card = document.createElement('button');
         card.className = 'task-card';
+        card.type = 'button';
         // Get original task index from the full tasks array
         const taskIndex = tasks.indexOf(task);
-        const taskIndexPadded = String(taskIndex).padStart(2, '0');
-        card.href = `./${{taskIndexPadded}}_${{task.id}}.html`;
         card.dataset.id = task.id;
+        card.dataset.scene = task.scene_model || '';
 
         const roomsDisplay = task.rooms.map(r => roomNames[r] || r).join(', ');
 
@@ -147,6 +238,10 @@ GALLERY_SCRIPT_SUFFIX = f"""
           </div>
         `;
 
+        card.addEventListener('click', () => {{
+          openTaskVideo(task, taskIndex, roomsDisplay, durationDisplay);
+        }});
+
         taskGrid.appendChild(card);
       }});
     }}
@@ -154,12 +249,13 @@ GALLERY_SCRIPT_SUFFIX = f"""
     // Filter tasks
     function filterTasks() {{
       const selectedRoom = roomFilter.value;
+      const selectedScene = sceneFilter.value;
 
-      if (selectedRoom === 'all') {{
-        currentTasks = [...tasks];
-      }} else {{
-        currentTasks = tasks.filter(task => task.rooms.includes(selectedRoom));
-      }}
+      currentTasks = tasks.filter((task) => {{
+        const matchesRoom = selectedRoom === 'all' || task.rooms.includes(selectedRoom);
+        const matchesScene = selectedScene === 'all' || task.scene_model === selectedScene;
+        return matchesRoom && matchesScene;
+      }});
 
       sortTasks();
     }}
@@ -189,6 +285,7 @@ GALLERY_SCRIPT_SUFFIX = f"""
 
     // Event listeners
     roomFilter.addEventListener('change', filterTasks);
+    sceneFilter.addEventListener('change', filterTasks);
     sortSelect.addEventListener('change', sortTasks);
 
     // Initial render
@@ -209,6 +306,7 @@ GALLERY_STYLE = """
 <style>
 .controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 2rem;
   margin: 1.5rem 0;
   align-items: center;
@@ -229,7 +327,7 @@ GALLERY_STYLE = """
   white-space: nowrap;
 }
 
-#room-filter, #sort-select {
+#room-filter, #scene-filter, #sort-select {
   padding: 0.5rem;
   border: 1px solid var(--md-default-fg-color--lightest);
   border-radius: 4px;
@@ -257,6 +355,12 @@ GALLERY_STYLE = """
   text-decoration: none;
   color: inherit;
   height: 100%;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
 .task-card:hover {
@@ -313,9 +417,10 @@ GALLERY_STYLE = """
 }
 
 .task-metadata {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 0.5rem;
   margin-top: auto;
   padding-top: 0.5rem;
   border-top: 1px solid var(--md-default-fg-color--lightest);
@@ -327,8 +432,10 @@ GALLERY_STYLE = """
 
 .task-room {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.2rem;
+  min-width: 0;
+  line-height: 1.35;
 }
 
 .task-room::before {
@@ -339,9 +446,11 @@ GALLERY_STYLE = """
 
 .task-duration {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.2rem;
   font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.35;
 }
 
 .task-duration::before {
@@ -354,6 +463,82 @@ GALLERY_STYLE = """
   text-align: center;
   padding: 2rem;
   color: var(--md-default-fg-color--light);
+}
+
+.task-video-modal[hidden] {
+  display: none;
+}
+
+.task-video-modal__frame iframe[hidden],
+.task-video-placeholder[hidden] {
+  display: none;
+}
+
+.task-video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.56);
+}
+
+.task-video-modal__dialog {
+  position: relative;
+  width: min(860px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--md-default-bg-color);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+}
+
+.task-video-modal__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 999px;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.task-video-modal__dialog h2 {
+  margin: 0 2.5rem 0.25rem 0 !important;
+  font-size: 1.2rem;
+}
+
+.task-video-modal__dialog p {
+  margin: 0 2.5rem 0.9rem 0;
+  color: var(--md-default-fg-color--light);
+}
+
+.task-video-modal__frame iframe,
+.task-video-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  background: var(--md-code-bg-color);
+}
+
+.task-video-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-default-fg-color--light);
+}
+
+body.task-video-modal-open {
+  overflow: hidden;
 }
 
 @media (max-width: 768px) {

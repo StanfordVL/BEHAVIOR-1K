@@ -14,9 +14,9 @@ Run from the repository root::
 
     python docs/gen_2026_task_data.py
 
-Re-running reproduces the committed JSON (sources permitting). New tasks have no
-video/duration/instruction/thumbnail yet, so the gallery shows "coming soon" placeholders
-until those are added (videos are Vimeo URLs added by hand to the JSON).
+Re-running reproduces the committed JSON (sources permitting). For 2026-only tasks, manually
+curated fields already present in the committed JSON (videos, durations, thumbnails, etc.) are
+preserved while source-derived room and scene metadata are refreshed.
 """
 
 import csv
@@ -58,16 +58,42 @@ def load_b100_order() -> dict:
     return order
 
 
+def load_scene_models(available_tasks: dict) -> dict:
+    """Map each task id to its configured scene model."""
+    scene_models = {}
+    for task_id, instances in available_tasks.items():
+        scenes = sorted(
+            {
+                instance.get("scene_model")
+                for instance in instances.values()
+                if isinstance(instance, dict) and instance.get("scene_model")
+            }
+        )
+        if scenes:
+            scene_models[task_id] = scenes[0]
+    return scene_models
+
+
 def main() -> None:
+    existing_by_id = {}
+    if OUT_FILE.exists():
+        existing_by_id = {task["id"]: task for task in json.loads(OUT_FILE.read_text())["tasks"]}
+
     # 50 carryover tasks: copy 2025 entries verbatim (full media preserved).
     carryover = json.loads(TASK_DATA_2025.read_text())["tasks"]
     carryover_ids = {t["id"] for t in carryover}
+    available_tasks = yaml.safe_load(AVAILABLE_TASKS.read_text())
+    scene_models = load_scene_models(available_tasks)
+    for task in carryover:
+        scene_model = scene_models.get(task["id"])
+        if scene_model:
+            task["scene_model"] = scene_model
 
     # 50 new tasks: authoritative list = keys of available_tasks.yaml, ordered by their index
     # in the canonical B100 task list. Tasks absent from B100 keep their available_tasks order
     # and are appended after the indexed ones (stable sort + sentinel index).
     b100_order = load_b100_order()
-    new_ids = list(yaml.safe_load(AVAILABLE_TASKS.read_text()).keys())
+    new_ids = list(available_tasks.keys())
     new_ids.sort(key=lambda task_id: b100_order.get(task_id, len(b100_order) + 1))
     custom_lists = json.loads(CUSTOM_LISTS.read_text())
 
@@ -77,14 +103,14 @@ def main() -> None:
             # Defensive: skip anything already covered by the 2025 carryover.
             continue
         rooms = custom_lists.get(task_id, {}).get("room_types", [])
-        new_tasks.append(
-            {
-                "id": task_id,
-                "name": title_case(task_id),
-                "rooms": rooms,
-                # No video / duration / instruction / thumbnail yet -> placeholders.
-            }
-        )
+        task = dict(existing_by_id.get(task_id, {}))
+        task["id"] = task_id
+        task.setdefault("name", title_case(task_id))
+        task["rooms"] = rooms
+        scene_model = scene_models.get(task_id)
+        if scene_model:
+            task["scene_model"] = scene_model
+        new_tasks.append(task)
 
     tasks = carryover + new_tasks
 

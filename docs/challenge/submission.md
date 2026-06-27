@@ -1,35 +1,19 @@
 # Submission Guidelines
 
-!!! info "Submission portal"
-
-    The 2026 challenge submission portal will be announced later. No formal registration is required to participate.
+<div class="challenge-portal-cta">
+  <span>Submission Portal TBD</span>
+</div>
 
 ## Submission Overview
 
-<table class="challenge-data-table">
-  <tbody>
-    <tr>
-      <td>Public leaderboard</td>
-      <td><a href="https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard">2026 BEHAVIOR Challenge Leaderboard</a></td>
-    </tr>
-    <tr>
-      <td>Full evaluation size</td>
-      <td>100 tasks x 10 instances x 1 rollout = 1,000 rollout outputs</td>
-    </tr>
-    <tr>
-      <td>Partial submission</td>
-      <td>Allowed. Missing rollout instances count as zero in the final score.</td>
-    </tr>
-    <tr>
-      <td>Multiple checkpoints</td>
-      <td>Different checkpoints from the same team and model family are considered one entry.</td>
-    </tr>
-  </tbody>
-</table>
+- **No formal registration is required** to participate in the challenge.
+- **Full evaluation size:** 100 tasks x 10 instances x 1 rollout = 1,000 rollout outputs.
+- **Partial submissions are allowed.** Missing rollout instances count as zero in the final score.
+- **Multiple checkpoints** from the same team and model family are considered one entry.
 
 ## Evaluation Outputs
 
-After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py), each rollout produces:
+After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/eval/eval.py), each rollout produces:
 
 <table class="challenge-data-table">
   <tbody>
@@ -87,10 +71,15 @@ There are two supported ways to submit your model for final evaluation.
   </section>
   <section>
     <h3>IP address-based evaluation</h3>
-    <p>Serve your policy yourself and provide an IP address that allows us to query it for evaluation.</p>
+    <p>Serve your policy yourself and provide an IP address that allows us to query it for evaluation. We only accept IP address-based submissions that expose at least 64 ports for parallel evaluation.</p>
     <p>Common serving options include TorchServe, LitServe, vLLM, NVIDIA Triton, or an equivalent model-serving stack.</p>
   </section>
 </div>
+
+
+!!! note "Submission confidentiality and open source"
+
+    Submitted solutions will remain confidential unless participants explicitly grant permission for disclosure. We strongly encourage open-source submissions, as they help advance reproducible research and accelerate progress in embodied AI.
 
 ### Docker Test Command
 
@@ -138,7 +127,7 @@ Your final zip file should contain:
     </tr>
     <tr>
       <td>README</td>
-      <td>Instructions for evaluating your policy, including Docker image details or IP address information.</td>
+      <td>Instructions for evaluating your policy, including Docker image details or IP address information. For IP address-based submissions, include at least 64 available ports.</td>
     </tr>
   </tbody>
 </table>
