@@ -9,6 +9,169 @@ These baselines are meant to help participants verify the full workflow: loading
 
 Participants are encouraged to build on these pipelines, compare against them, and open-source improvements when possible. Additional setup instructions, checkpoints, and runnable examples will be linked here as they are finalized for the 2026 release.
 
+## π0.5 (π₀.₅)
+
+This tutorial provides a minimal walkthrough for fine-tuning [π₀.₅](https://www.physicalintelligence.company/blog/pi05) on the 2026 BEHAVIOR-1K Challenge dataset and running evaluation in OmniGibson. It is adapted from the [openpi](https://github.com/Physical-Intelligence/openpi) training stack with BEHAVIOR-specific configs and scripts on the `behavior` branch of [wensi-ai/openpi](https://github.com/wensi-ai/openpi).
+
+Throughout this tutorial, replace the placeholders below with your local paths and the task you want to train or evaluate:
+
+- `$OPENPI_DIR` — path to your OpenPi checkout
+- `$PATH_TO_BEHAVIOR_1K` — path to your BEHAVIOR-1K checkout
+- `$TASK_NAME` — BDDL task name (see the [dataset page](./dataset.md) for the full task list)
+- `$DATASET_ROOT` — local path to the LeRobot dataset for that task (typically `$OPENPI_DIR/2026-challenge-demos/b1k/$TASK_NAME`)
+- `$EXP_NAME` — experiment name for a training run
+- `$PATH_TO_CKPT` — checkpoint step directory (for example, `outputs/checkpoints/pi05_b1k/$EXP_NAME/$STEP`)
+- `$LOG_PATH` — directory where the evaluator writes metrics and videos
+
+### Repo Clone
+
+```bash
+git clone https://github.com/wensi-ai/openpi.git -b behavior
+git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+```
+
+### Installation
+
+OpenPi uses [uv](https://docs.astral.sh/uv/) to manage Python dependencies. See the [uv installation instructions](https://docs.astral.sh/uv/getting-started/installation/) to set it up. Once uv is installed, run the following to set up the training environment:
+
+```bash
+cd $OPENPI_DIR
+git submodule update --init --recursive
+GIT_LFS_SKIP_SMUDGE=1 uv sync
+source .venv/bin/activate
+GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
+```
+
+Install BEHAVIOR-1K packages needed for evaluation (a separate `behavior` conda environment is recommended):
+
+```bash
+cd $PATH_TO_BEHAVIOR_1K
+pip install -e bddl3
+pip install -e OmniGibson[eval]
+```
+
+### Dataset
+
+Download the [2026-challenge-demos](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos) LeRobot dataset from HuggingFace. For a single task, you can download only the relevant folder:
+
+```bash
+huggingface-cli download behavior-1k/2026-challenge-demos \
+    --repo-type dataset \
+    --local-dir $OPENPI_DIR/2026-challenge-demos \
+    --include "b1k/$TASK_NAME/**"
+```
+
+Update `dataset_root` and `repo_id` in the `pi05_b1k` block of `src/openpi/training/config.py`, or override them from the command line when computing stats or training:
+
+```bash
+--data.repo_id=$TASK_NAME \
+--data.base_config.dataset_root=$DATASET_ROOT
+```
+
+### Finetune Pi0.5
+
+The `pi05_b1k` config fine-tunes the π₀.₅ base model (`gs://openpi-assets/checkpoints/pi05_base/params`) on the R1Pro robot with a 32-step action horizon. Robot and task definitions live in `src/openpi/configs/robots/b1k.py` and `src/openpi/configs/tasks/b1k.py`.
+
+Before training, compute normalization statistics for your dataset:
+
+```bash
+cd $OPENPI_DIR
+uv run scripts/compute_norm_stats.py pi05_b1k \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_ROOT
+```
+
+This writes `norm_stats.json` under `outputs/assets/pi05_b1k/$TASK_NAME`.
+
+Then start fine-tuning. On a single GPU:
+
+```bash
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/b1k/train_b1k.py pi05_b1k \
+    --exp_name=$EXP_NAME \
+    --overwrite \
+    --batch_size=64 \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_ROOT
+```
+
+For multi-GPU training on a single node, use the helper script:
+
+```bash
+./scripts/b1k/train_b1k.sh pi05_b1k $NUM_GPUS $CUDA_VISIBLE_DEVICES \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_ROOT
+```
+
+For SLURM clusters, use `scripts/b1k/train_b1k.sbatch.sh`. Before submitting, edit the `#SBATCH` directives at the top of the script for your account, partition, GPU type/count, memory, and time limit, and update the virtual-environment activation line to point to your OpenPi install.
+
+Submit a new training run from the OpenPi repo root (set `EXP_NAME` to a unique run name):
+
+```bash
+cd $OPENPI_DIR
+EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
+    --overwrite \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_ROOT
+```
+
+Resume an existing run:
+
+```bash
+EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_ROOT
+```
+
+The sbatch script passes any extra arguments after the config name through to `train_b1k.py`. By default it resumes from `outputs/checkpoints/pi05_b1k/$EXP_NAME/`; pass `--overwrite` to start a fresh run with a new `$EXP_NAME`. Job logs are written to the path set by `#SBATCH --output` in the script.
+
+Checkpoints are saved under `outputs/checkpoints/pi05_b1k/$EXP_NAME/`.
+
+!!! note "Hardware requirements"
+
+    Full fine-tuning requires a GPU with more than 70 GB VRAM (for example, A100 or H100). Batch size must be divisible by the number of visible GPUs. If you run out of memory, lower `--batch_size` or raise `--fsdp_devices`.
+
+### Evaluation
+
+Evaluation runs as two processes: a policy server (OpenPi) and the OmniGibson evaluator (BEHAVIOR-1K).
+
+#### 1. Deploy the fine-tuned checkpoint
+
+From the OpenPi repo:
+
+```bash
+source .venv/bin/activate
+CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.85 \
+uv run scripts/b1k/serve_b1k.py \
+    --robot b1k/R1Pro \
+    --task b1k/$TASK_NAME \
+    --repo-id $TASK_NAME \
+    policy:checkpoint \
+    --policy.config pi05_b1k \
+    --policy.dir $PATH_TO_CKPT \
+    --control_mode receding_horizon \
+    --action_horizon 16 \
+    --port 8000
+```
+
+This starts a websocket policy server on `0.0.0.0:8000`.
+
+#### 2. Run evaluation in OmniGibson
+
+In a separate terminal, activate the `behavior` conda environment and run the evaluator from the BEHAVIOR-1K repo:
+
+```bash
+conda activate behavior
+cd $PATH_TO_BEHAVIOR_1K
+OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/eval.py \
+    policy=websocket \
+    task.name=$TASK_NAME \
+    log_path=$LOG_PATH
+```
+
+If the policy server and simulator run on the same machine with multiple GPUs, pin them to different devices: use `CUDA_VISIBLE_DEVICES` for the policy server and `OMNIGIBSON_GPU_ID` for the simulator.
+
+See [Evaluation and Rules](./evaluation.md) for wrapper options, metrics, and additional command-line arguments.
+
 ## GR00T N1.7
 
 This tutorial provides a simplest version instruction to finetune GR00T N1.7 on the 2026 BEHAVIOR-1K Challenge dataset.
