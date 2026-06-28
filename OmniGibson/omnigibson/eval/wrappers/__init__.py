@@ -1,5 +1,4 @@
 from .default_wrapper import DefaultWrapper
-from .heavy_robot_wrapper import HeavyRobotWrapper
-from .rgb_low_res_wrapper import RGBLowResWrapper
+from .rgbd_full_res_wrapper import RGBDFullResWrapper
 
-__all__ = ["DefaultWrapper", "HeavyRobotWrapper", "RGBLowResWrapper"]
+__all__ = ["DefaultWrapper", "RGBDFullResWrapper"]

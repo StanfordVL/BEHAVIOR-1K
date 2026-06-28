@@ -44,6 +44,9 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 
 LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
+EVAL_BASE_LINK_MASS = 250.0
+EVAL_HEAD_HORIZONTAL_APERTURE = 40.0
+NUM_TEST_INSTANCES = 40
 
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
@@ -58,7 +61,13 @@ def resolve_instance_ids(task_name: str, instance_indices: list[int]) -> list[in
     )
     with open(task_instance_csv_path, newline="", encoding="utf-8") as f:
         row = next(row for row in csv.DictReader(f) if row["Task"] == task_name)
-    test_instances = [int(instance_id.strip()) for instance_id in row["Public Test Instance IDs"].split(",")]
+    test_instances = [int(instance_id.strip()) for instance_id in row["Test Instance IDs"].split(",")]
+    assert (
+        len(test_instances) == NUM_TEST_INSTANCES
+    ), f"Expected {NUM_TEST_INSTANCES} test instances for {task_name}, got {len(test_instances)}"
+    assert set(instance_indices).issubset(
+        set(range(NUM_TEST_INSTANCES))
+    ), f"Instance indices must be in range({NUM_TEST_INSTANCES})"
     return [int(test_instances[i]) for i in instance_indices]
 
 
@@ -73,6 +82,7 @@ class Evaluator:
 
         self.env = self.load_env(env_wrapper=self.cfg.env_wrapper)
         self.robot = self.load_robot()
+        self._apply_robot_eval_settings()
         self.policy = self.load_policy()
         self.metrics = self.load_metrics()
         self.obs = None
@@ -178,6 +188,15 @@ class Evaluator:
     def load_robot(self) -> Robot:
         return self.env.scene.object_registry("name", "robot_r1")
 
+    def _apply_robot_eval_settings(self) -> None:
+        if self.robot.model in ("r1", "r1pro"):
+            og.sim.stop()
+            self.robot.base_footprint_link.mass = EVAL_BASE_LINK_MASS
+            og.sim.play()
+
+        head_sensor_name = ROBOT_CAMERA_NAMES["R1Pro"]["head"].split("::")[1]
+        self.robot.sensors[head_sensor_name].horizontal_aperture = EVAL_HEAD_HORIZONTAL_APERTURE
+
     def load_policy(self) -> Any:
         policy = instantiate(self.cfg.model)
         if hasattr(policy, "set_action_dim"):
@@ -223,7 +242,7 @@ class Evaluator:
             container.close()
         self._video_writer = video_writer
 
-    def load_task_instance(self, instance_id: int, test_hidden: bool = False) -> None:
+    def load_task_instance(self, instance_id: int) -> None:
         scene_model = self.env.task.scene_name
         tro_filename = self.env.task.get_cached_activity_scene_filename(
             scene_model=scene_model,
@@ -231,20 +250,12 @@ class Evaluator:
             activity_definition_id=self.env.task.activity_definition_id,
             activity_instance_id=instance_id,
         )
-        if test_hidden:
-            tro_file_path = os.path.join(
-                gm.DATA_PATH,
-                "2026-challenge-test-instances",
-                self.env.task.activity_name,
-                f"{tro_filename}-tro_state.json",
+        tro_file_path = os.path.join(
+            get_task_instance_path(
+                scene_model,
+                f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
             )
-        else:
-            tro_file_path = os.path.join(
-                get_task_instance_path(
-                    scene_model,
-                    f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
-                )
-            )
+        )
 
         with open(tro_file_path, "r") as f:
             tro_state = recursively_convert_to_torch(json.load(f))

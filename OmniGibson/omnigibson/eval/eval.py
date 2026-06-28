@@ -16,8 +16,14 @@ Example:
 
 import argparse
 import json
+import logging
 import os
-import traceback
+
+from omnigibson.utils.ui_utils import create_module_logger
+
+
+logger = create_module_logger(module_name=__name__)
+logger.setLevel(logging.INFO)
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,7 +36,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
         nargs="+",
         default=[0],
-        help="Indices into the task's Public Test Instance IDs (test_instances.csv).",
+        help="Indices into the task's 40 test instance IDs. Indices 0-19 are public; 20-39 are hidden.",
     )
     parser.add_argument("--num-rollouts", type=int, default=1, help="Rollouts per instance.")
     parser.add_argument(
@@ -41,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--env-wrapper",
-        default="omnigibson.eval.wrappers.RGBLowResWrapper",
+        default="omnigibson.eval.wrappers.DefaultWrapper",
         help="Target path of the EnvironmentWrapper to apply.",
     )
     parser.add_argument("--output-dir", default="/tmp/b1k_eval", help="Where to write result JSONs.")
@@ -74,7 +80,7 @@ def main() -> None:
     from omnigibson.eval.evaluator import Evaluator, resolve_instance_ids
 
     instance_ids = resolve_instance_ids(args.task_name, args.instance_indices)
-    print(f"Resolved test instance ids for {args.task_name}: {instance_ids}")
+    logger.info(f"Resolved test instance ids for {args.task_name}: {instance_ids}")
 
     cfg = OmegaConf.create(
         {
@@ -89,7 +95,6 @@ def main() -> None:
             "partial_scene_load": True,
             "max_steps": args.max_steps,
             "write_video": args.write_video,
-            "test_hidden": False,
             "task": {"name": args.task_name},
             "robot": {"type": "R1Pro", "controllers": None},
         }
@@ -106,11 +111,10 @@ def main() -> None:
         for instance_id in instance_ids:
             try:
                 evaluator.reset()
-                evaluator.load_task_instance(int(instance_id), test_hidden=False)
+                evaluator.load_task_instance(int(instance_id))
             except Exception:
-                print(f"[error] instance={instance_id} failed to load:")
-                traceback.print_exc()
-                continue
+                logger.exception(f"Failed to load task instance {instance_id}.")
+                raise
             for rollout_id in range(args.num_rollouts):
                 video_path = os.path.join(video_dir, f"{args.task_name}_{instance_id}_{rollout_id}.mp4")
                 try:
@@ -140,15 +144,15 @@ def main() -> None:
                     with open(out_path, "w") as f:
                         json.dump(result, f, indent=2, default=float)
                     q_score = metrics.get("q_score", {}).get("final")
-                    print(
-                        f"[result] instance={instance_id} rollout={rollout_id} steps={steps} "
-                        f"success={success} q_score={q_score} -> {out_path}"
-                        + (f" | video -> {video_path}" if args.write_video else "")
+                    video_msg = f" | video -> {video_path}" if args.write_video else ""
+                    logger.info(
+                        f"Result: instance={instance_id} rollout={rollout_id} steps={steps} "
+                        f"success={success} q_score={q_score} -> {out_path}{video_msg}"
                     )
                     results.append(result)
                 except Exception:
-                    print(f"[error] instance={instance_id} rollout={rollout_id} failed:")
-                    traceback.print_exc()
+                    logger.exception(f"Instance {instance_id} rollout {rollout_id} failed.")
+                    raise
                 finally:
                     if args.write_video:
                         evaluator.stop_recording()
@@ -156,7 +160,7 @@ def main() -> None:
     n = len(results)
     n_success = sum(r["success"] for r in results)
     mean_q = (sum(r.get("q_score", {}).get("final", 0.0) for r in results) / n) if n else 0.0
-    print(f"\n=== EVAL SUMMARY: {n_success}/{n} success | mean q_score={mean_q:.3f} | task={args.task_name} ===")
+    logger.info(f"Eval summary: {n_success}/{n} success | mean q_score={mean_q:.3f} | task={args.task_name}")
 
 
 if __name__ == "__main__":
