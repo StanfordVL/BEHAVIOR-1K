@@ -491,9 +491,9 @@ if [ "$DATASET" = true ]; then
         exit 1
     }
 
-    echo "Downloading 2025 BEHAVIOR Challenge Task Instances..."
-    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()" || {
-        echo "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
+    echo "Downloading 2026 BEHAVIOR Challenge Task Instances..."
+    python -c "from omnigibson.utils.asset_utils import download_2026_challenge_task_instances; download_2026_challenge_task_instances()" || {
+        echo "ERROR: 2026 BEHAVIOR Challenge Task Instances installation failed"
         exit 1
     }
 fi
