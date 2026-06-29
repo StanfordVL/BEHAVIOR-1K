@@ -11,7 +11,13 @@ Participants are encouraged to build on these pipelines, compare against them, a
 
 ## π0.5 (π₀.₅)
 
-This tutorial provides a minimal walkthrough for fine-tuning [π₀.₅](https://www.physicalintelligence.company/blog/pi05) on the 2026 BEHAVIOR-1K Challenge dataset and running evaluation in OmniGibson. It is adapted from the [openpi](https://github.com/Physical-Intelligence/openpi) training stack with BEHAVIOR-specific configs and scripts on the `behavior` branch of [wensi-ai/openpi](https://github.com/wensi-ai/openpi).
+This tutorial provides a minimal walkthrough for fine-tuning [π₀.₅](https://www.physicalintelligence.company/blog/pi05) on the 2026 BEHAVIOR-1K Challenge dataset and running evaluation in OmniGibson. 
+
+We provide a GR00T N1.7 checkpoint for:
+
+- turning_on_radio task [here](TODO: add checkpoint link).
+
+If you would like to run eval only feel free to skip to the evaluation section.
 
 Throughout this tutorial, replace the placeholders below with your local paths and the task you want to train or evaluate:
 
@@ -126,10 +132,6 @@ The sbatch script passes any extra arguments after the config name through to `t
 
 Checkpoints are saved under `outputs/checkpoints/pi05_b1k/$EXP_NAME/`.
 
-!!! note "Hardware requirements"
-
-    Full fine-tuning requires a GPU with more than 70 GB VRAM (for example, A100 or H100). Batch size must be divisible by the number of visible GPUs. If you run out of memory, lower `--batch_size` or raise `--fsdp_devices`.
-
 ### Evaluation
 
 Evaluation runs as two processes: a policy server (OpenPi) and the OmniGibson evaluator (BEHAVIOR-1K).
@@ -167,10 +169,6 @@ OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/eval.py \
     task.name=$TASK_NAME \
     log_path=$LOG_PATH
 ```
-
-If the policy server and simulator run on the same machine with multiple GPUs, pin them to different devices: use `CUDA_VISIBLE_DEVICES` for the policy server and `OMNIGIBSON_GPU_ID` for the simulator.
-
-See [Evaluation and Rules](./evaluation.md) for wrapper options, metrics, and additional command-line arguments.
 
 ## GR00T N1.7
 
