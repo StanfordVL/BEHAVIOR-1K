@@ -2,7 +2,35 @@
 
 Join us for the second year of the BEHAVIOR Challenge: solve **100 full-length household tasks** in the realistic BEHAVIOR-1K environment. BEHAVIOR tests whether embodied agents can combine high-level reasoning, long-horizon navigation, and dexterous bimanual manipulation in house-scale scenes.
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/iSFpinMiT0s?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Challenge Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+<div class="challenge-teaser-player" data-youtube-src="https://www.youtube.com/embed/Vk6Obhe-dGE?autoplay=1&mute=1&playsinline=1&enablejsapi=1&modestbranding=1&showinfo=0&rel=0&controls=1">
+  <button class="challenge-teaser-button" type="button" aria-label="Play BEHAVIOR Challenge teaser video">
+    <img src="../assets/challenge_teaser_frame_240.png" alt="BEHAVIOR Challenge teaser">
+    <span class="challenge-teaser-play" aria-hidden="true"></span>
+  </button>
+</div>
+
+<script>
+document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
+  const button = player.querySelector(".challenge-teaser-button");
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener("click", () => {
+    const iframe = document.createElement("iframe");
+    const videoUrl = new URL(player.dataset.youtubeSrc);
+    videoUrl.searchParams.set("origin", window.location.origin);
+    videoUrl.searchParams.set("widget_referrer", window.location.href);
+    iframe.src = videoUrl.toString();
+    iframe.title = "BEHAVIOR Challenge Video";
+    iframe.setAttribute("frameborder", "0");
+    iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+    iframe.setAttribute("allowfullscreen", "");
+    iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    player.replaceChildren(iframe);
+  }, { once: true });
+});
+</script>
 
 <div class="challenge-action-grid">
   <section class="challenge-action-card challenge-action-card--deadlines">

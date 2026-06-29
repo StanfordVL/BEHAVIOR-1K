@@ -268,6 +268,72 @@
     border-radius: 8px;
 }
 
+.challenge-teaser-player {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    margin: 1rem 0 1.4rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--md-code-bg-color);
+}
+
+.challenge-teaser-player iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.challenge-teaser-button {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: #000;
+    cursor: pointer;
+}
+
+.challenge-teaser-button img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.challenge-teaser-button:hover img,
+.challenge-teaser-button:focus-visible img {
+    opacity: 0.88;
+    transform: scale(1.01);
+}
+
+.challenge-teaser-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4.25rem;
+    height: 4.25rem;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.72);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.challenge-teaser-play::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 54%;
+    width: 0;
+    height: 0;
+    border-top: 0.8rem solid transparent;
+    border-bottom: 0.8rem solid transparent;
+    border-left: 1.15rem solid #fff;
+    transform: translate(-50%, -50%);
+}
+
 .challenge-video-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
