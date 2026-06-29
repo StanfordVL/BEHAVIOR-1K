@@ -529,10 +529,10 @@ if ($Dataset) {
         exit 1
     }
 
-    Write-Host "Downloading 2025 BEHAVIOR Challenge Task Instances..."
-    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()"
+    Write-Host "Downloading 2026 BEHAVIOR Challenge Task Instances..."
+    python -c "from omnigibson.utils.asset_utils import download_2026_challenge_task_instances; download_2026_challenge_task_instances()"
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
+        Write-Host "ERROR: 2026 BEHAVIOR Challenge Task Instances installation failed"
         exit 1
     }
 }
