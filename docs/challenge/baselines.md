@@ -13,7 +13,7 @@ Participants are encouraged to build on these pipelines, compare against them, a
 
 This tutorial provides a minimal walkthrough for fine-tuning [π₀.₅](https://www.physicalintelligence.company/blog/pi05) on the 2026 BEHAVIOR-1K Challenge dataset and running evaluation in OmniGibson. 
 
-We provide a GR00T N1.7 checkpoint for:
+We provide a Pi0.5 checkpoint for:
 
 - turning_on_radio task [here](TODO: add checkpoint link).
 
