@@ -138,5 +138,10 @@ After finetuning, you can run evaluation by following the steps below:
   ```
     This opens a connection listening on 127.0.0.1:8000. Health-check it with `curl -s http://127.0.0.1:8000/healthz` (returns `OK`).
 2. Run the evaluation on BEHAVIOR:
-  Assume you have behavior env installed (check [https://github.com/StanfordVL/BEHAVIOR-1K](https://github.com/StanfordVL/BEHAVIOR-1K) for more details), run the following command within the BEHAVIOR-1K directory:
-
+  Assume you have behavior env installed (check [https://github.com/StanfordVL/BEHAVIOR-1K](https://github.com/StanfordVL/BEHAVIOR-1K) for more details), run the following command within the BEHAVIOR-1K directory: 
+  ```
+    conda activate behavior
+    python -m omnigibson.eval.eval \
+        --task-name $TASK \
+        --output-dir $LOG_PATH
+  ```
