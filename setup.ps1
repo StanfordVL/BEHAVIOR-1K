@@ -391,7 +391,7 @@ if ($extrasList.Count -gt 0) {
             "isaacsim_test-5.1.0.0", "isaacsim-5.1.0.0", "isaacsim_extscache_physics-5.1.0.0",
             "isaacsim_extscache_kit-5.1.0.0", "isaacsim_extscache_kit_sdk-5.1.0.0"
         )
-        
+                
         $tempDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
         $wheelFiles = @()
         
@@ -405,7 +405,15 @@ if ($extrasList.Count -gt 0) {
                 
                 Write-Host "Downloading $pkg..."
                 try {
+                    # Disable the progress bar - this makes things 50x faster.
+                    $ProgressPreference = 'SilentlyContinue'
+
+                    # Download.
                     Invoke-WebRequest -Uri $url -OutFile $filepath -UseBasicParsing
+
+                    # Re-enable the progress bar for the rest of your script
+                    $ProgressPreference = 'Continue'
+                    
                     $wheelFiles += $filepath
                 }
                 catch {
@@ -432,6 +440,7 @@ if ($extrasList.Count -gt 0) {
         
         # Extract ISAAC_PATH from isaacsim module
         $IsaacPath = python -c "import isaacsim, os; print(os.environ.get('ISAAC_PATH', ''))" 2>$null
+        $IsaacPath = ($IsaacPath -split "`n")[-1].Trim()
         
         if ($IsaacPath) {
             # Fix websockets conflict - remove any extscache/**/pip_prebundle/websockets

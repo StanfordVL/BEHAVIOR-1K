@@ -9,6 +9,7 @@ from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.object_state_utils import get_reachability_sampling_context
 from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.utils.python_utils import classproperty
@@ -129,7 +130,7 @@ class OnTop(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
 
         return super()._get_value(other)
 
-    def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
+    def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=True):
         if not new_value:
             raise NotImplementedError("OnTop does not support set_value(False)")
 
@@ -142,8 +143,11 @@ class OnTop(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         if reset_before_sampling:
             self.obj.reset()
 
+        reachability_context = get_reachability_sampling_context(other, "onTop", use_trav_map=use_trav_map)
         for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
-            if sample_kinematics("onTop", self.obj, other, use_trav_map=use_trav_map) and self.get_value(other):
+            if sample_kinematics(
+                "onTop", self.obj, other, use_trav_map=use_trav_map, reachability_context=reachability_context
+            ) and self.get_value(other):
                 return True
             else:
                 og.sim.load_state(state, serialized=False)

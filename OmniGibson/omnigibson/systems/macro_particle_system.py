@@ -9,6 +9,8 @@ from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import torch_delete
+from omnigibson.utils.constants import GROUND_CATEGORIES
+from omnigibson.utils.object_state_utils import get_reachability_sampling_context, is_pose_reachable_for_predicate
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
@@ -610,6 +612,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             link_prim_paths = None
             self._cloth_face_ids[group] = face_ids
         else:
+            # "carpet" is in GROUND_CATEGORIES for navigation but rugs are movable furnishings, not structural floors
+            is_ground = obj.category in GROUND_CATEGORIES and obj.category != "carpet"
+            reachability_context = get_reachability_sampling_context(obj, predicate="onTop") if is_ground else None
             # Sample locations for all particles
             results = sample_cuboid_on_object_symmetric_bimodal_distribution(
                 obj=obj,
@@ -619,7 +624,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 bimodal_stdev_fraction=self._SAMPLING_BIMODAL_STDEV_FRACTION,
                 axis_probabilities=self._SAMPLING_AXIS_PROBABILITIES,
                 undo_cuboid_bottom_padding=True,
-                verify_cuboid_empty=False,
+                verify_cuboid_empty=is_ground,
                 aabb_offset=self._SAMPLING_AABB_OFFSET,
                 max_sampling_attempts=self._SAMPLING_MAX_ATTEMPTS,
                 refuse_downwards=True,
@@ -631,6 +636,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             for result, scale in zip(results, scales):
                 position, normal, quaternion, hit_link, reasons = result
                 if position is not None:
+                    if is_ground and not is_pose_reachable_for_predicate(position, obj, "onTop", reachability_context):
+                        continue
                     positions.append(position)
                     orientations.append(quaternion)
                     particle_scales.append(scale)
@@ -943,7 +950,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # Sanity check the common groups, we will recreate any where there is a mismatch
         for name in common_groups:
             info = name_to_info_mapping[name]
-            if self.num_group_particles(group=name) != info["n_particles"]:
+            current_idns = {self.particle_name2idn(p_name) for p_name in self._group_particles[name]}
+            desired_idns = {int(idn) for idn in info["particle_idns"]}
+            if current_idns != desired_idns:
                 log.debug(f"Got mismatch in particle group {name} when syncing, deleting and recreating group now.")
                 # Add this group to both the delete and creation pile
                 groups_to_delete.append(name)
@@ -1254,6 +1263,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         This is called through og.sim.update_handles when the physx object count etc. changes.
         """
+        if not og.sim.is_playing() or og.sim.physics_sim_view is None:
+            self.particles_view = None
+            return
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"

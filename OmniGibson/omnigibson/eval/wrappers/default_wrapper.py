@@ -1,6 +1,6 @@
 from omnigibson.envs import EnvironmentWrapper, Environment
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.learning.utils.eval_utils import ROBOT_CAMERA_NAMES, HEAD_RESOLUTION, WRIST_RESOLUTION
+from omnigibson.eval.utils.eval_utils import ROBOT_CAMERA_NAMES, HEAD_RESOLUTION, WRIST_RESOLUTION
 
 # Create module logger
 logger = create_module_logger("DefaultWrapper")

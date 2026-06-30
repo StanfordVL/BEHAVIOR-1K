@@ -131,6 +131,12 @@ After teleoperation succeeds, you should see a `hdf5` file at `HDF_PATH`. Run th
 OMNIGIBSON_HEADLESS=1 python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
 ```
 
+If the HDF5 contains multiple saved demos, the replay script prints an episode-selection table with each `demo_N` episode ID and its trajectory length. The episode ID is the number in `demo_N`, so episode ID `2` replays `demo_2`. Press Enter to replay the longest trajectory, or enter an episode ID to replay a specific demo. For non-interactive runs, pass the episode explicitly:
+
+```bash
+OMNIGIBSON_HEADLESS=1 python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa --episode_id EPISODE_ID
+```
+
 Check the QA json file output. **All QA should pass unless for task-specific reasons** (e.g. one failed grasp is allowed for `turning_on_radio` because the gripper needs to close to poke the button). Also check mp4 to make sure the replay visual looks reasonable. For example, you shouldn't see a whole in the ground, which might indicates you forgot to put one room in the task misc csv. 
 
 If all outputs seems reasonable, share the generated MP4 file and QA result with the team for review.
@@ -152,14 +158,31 @@ python OmniGibson/scripts/sampling/sample_robot_pose.py -t TASK_NAME
 python OmniGibson/scripts/sampling/extract_task_information.py
 ```
 
-### Step 9: Prepare all files and submit PR
+### Step 9: Run Challenge Instance QC
 
-After the task design is finalized, create a seperate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
+Before creating a PR to `2026-challenge-task-instances`, run the QC tool after the metadata and all 300
+instances have been generated:
 
-    - two seed instance json files: `0_0_template.json`, `0_0_template-partial_rooms.json`
-    - 300 task intance files under 
-    - updated `task_custom_list.json` and `available_tasks.yaml`
+```bash
+python OmniGibson/scripts/sampling/challenge_instance_qc_gui.py --open-browser
+```
 
-Watch out for merge conflicts from main, which will most likely happen on `task_custom_list.json` and `available_tasks.yaml`. 
+The GUI uses Flask. If your environment does not already have it, install it in the `behavior` environment with
+`pip install flask`.
+
+The tool prints dataset-wide and per-task checks in the terminal, then serves a local GUI for reviewing robot and
+object sample distributions on the floor plan. Use it whenever task metadata, selected rooms, generated instances,
+or robot poses change.
+
+### Step 10: Prepare all files and submit PR
+
+After the task design is finalized, create a separate branch in [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances), commit the files created:
+
+- two seed instance json files: `SCENE_NAME_task_TASK_NAME_0_0_template.json`, `SCENE_NAME_task_TASK_NAME_0_0_template-partial_rooms.json`
+- 300 task instance files under `scenes/SCENE_NAME/json/SCENE_NAME_task_TASK_NAME_instances/`
+- updated `metadata/task_custom_lists.json`, `metadata/available_tasks.yaml`, and `metadata/B100_task_misc.csv`
+- updated `README.md` task coverage entry, if the selected task list changed
+
+Watch out for merge conflicts from main, which will most likely happen on `task_custom_lists.json` and `available_tasks.yaml`.
 
 Submit a PR and tag the team for review.

@@ -2,27 +2,28 @@
     (:domain behavior-1k)
 
     (:objects
-        switch.n.01_1 switch.n.01_2 switch.n.01_3 switch.n.01_4 switch.n.01_5 switch.n.01_6 switch.n.01_7 - switch.n.01
+        switch.n.01_1 switch.n.01_2 switch.n.01_3 - switch.n.01
     	floor.n.01_1 - floor.n.01
     	agent.n.01_1 - agent.n.01
+        table_lamp.n.01_1 table_lamp.n.01_2 - table_lamp.n.01
+        countertop.n.01_1 - countertop.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
     )
     
     (:init 
         (toggled_on switch.n.01_1)
         (toggled_on switch.n.01_2)
         (toggled_on switch.n.01_3)
-        (toggled_on switch.n.01_4)
-        (toggled_on switch.n.01_5)
-        (toggled_on switch.n.01_6)
-        (toggled_on switch.n.01_7)
+        (toggled_on table_lamp.n.01_1)
+        (toggled_on table_lamp.n.01_2)
         (inroom switch.n.01_1 kitchen)
-        (inroom switch.n.01_2 bedroom)
-        (inroom switch.n.01_3 utility_room)
-        (inroom switch.n.01_4 dining_room)
-        (inroom switch.n.01_5 childs_room)
-        (inroom switch.n.01_6 bathroom)
-        (inroom switch.n.01_7 corridor)
+        (inroom switch.n.01_2 utility_room)
+        (inroom switch.n.01_3 dining_room)
+        (inroom coffee_table.n.01_1 living_room)
+        (inroom countertop.n.01_1 utility_room)
         (inroom floor.n.01_1 corridor)
+        (ontop table_lamp.n.01_1 coffee_table.n.01_1)
+        (ontop table_lamp.n.01_2 countertop.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
@@ -32,6 +33,12 @@
                 (?switch.n.01 - switch.n.01)
                 (not 
                     (toggled_on ?switch.n.01)
+                )
+            )
+            (forall
+                (?table_lamp.n.01 - table_lamp.n.01)
+                (not
+                    (toggled_on ?table_lamp.n.01)
                 )
             )
         )

@@ -3603,11 +3603,15 @@ def activate_prim_and_children(prim_path):
     Args:
         prim_path (str): Path to the prim to activate
     """
-    current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
-    current_prim.SetActive(True)
-    # Use GetAllChildren to also find those that are inactive
-    for child in current_prim.GetAllChildren():
-        activate_prim_and_children(child.GetPath().pathString)
+
+    def _activate(path):
+        current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(path)
+        current_prim.SetActive(True)
+        for child in current_prim.GetAllChildren():
+            _activate(child.GetPath().pathString)
+
+    with og.sim.editing_usd():
+        _activate(prim_path)
 
 
 def get_sdf_value_type_name(val):
@@ -3793,6 +3797,28 @@ def count_joints(prim):
         if "attachment" in child_prim.GetName().lower():
             has_attachment = True
     return n_joints, n_fixed_joints, has_attachment
+
+
+def find_joint_prims(root_prim):
+    """
+    Recursively search under @root_prim and yield every physics joint prim found.
+
+    Recent Isaac Sim USD exports place joints in a flat scope rather than nested under their body0
+    link prim, so any code that needs to enumerate an object's joints must traverse the whole subtree
+    rather than just the children of each link.
+
+    Args:
+        root_prim (Usd.Prim): Root prim to search under.
+
+    Yields:
+        Usd.Prim: Each physics joint prim found anywhere under @root_prim.
+    """
+    children = list(root_prim.GetChildren())
+    while children:
+        child = children.pop()
+        children.extend(child.GetChildren())
+        if "joint" in child.GetPrimTypeInfo().GetTypeName().lower():
+            yield child
 
 
 def compute_kinematic_only(fixed_base, scale, n_joints, n_fixed_joints, kinematic_only_config, has_attachment):

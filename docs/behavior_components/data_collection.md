@@ -53,3 +53,9 @@ Run the following script to replay the trajectory. This will create one `video.m
 ```bash
 python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
 ```
+
+If the HDF5 contains multiple saved demos, the replay script prints an episode-selection table with each `demo_N` episode ID and its trajectory length. The episode ID is the number in `demo_N`, so episode ID `2` replays `demo_2`. Press Enter to replay the longest trajectory, or enter an episode ID to replay a specific demo. For non-interactive runs, pass the episode explicitly:
+
+```bash
+python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa --episode_id EPISODE_ID
+```

@@ -3,7 +3,7 @@
     {
       "id": "turning_on_radio",
       "name": "Turning On Radio",
-      "instruction": "Turn on the radio receiver that’s on the table in the living room.",
+      "instruction": "Turn on the radio receiver that's on the table in the living room.",
       "rooms": [
         "living_room"
       ],
@@ -14,7 +14,7 @@
     {
       "id": "picking_up_trash",
       "name": "Picking Up Trash",
-      "instruction": "Put the three can of soda from the living room inside the tash can in the kitchen.",
+      "instruction": "Put the three cans of soda from the living room inside the trash can in the kitchen.",
       "rooms": [
         "kitchen",
         "living_room"
@@ -81,7 +81,7 @@
     {
       "id": "picking_up_toys",
       "name": "Picking Up Toys",
-      "instruction": "Put all the toys in the child’s room - the three board games (two on the bed and one on the table), the two jigsaw puzzles on the table, and the tennis ball on the table - inside the toy box on the table in the child’s room.",
+      "instruction": "Put all the toys in the child's room - the three board games (two on the bed and one on the table), the two jigsaw puzzles on the table, and the tennis ball on the table - inside the toy box on the table in the child's room.",
       "rooms": [
         "childs_room"
       ],
@@ -126,7 +126,7 @@
     {
       "id": "putting_dishes_away_after_cleaning",
       "name": "Putting Dishes Away After Cleaning",
-      "instruction": "In the kitchen, gather all eight plates from the two countertops, place them all inside a single cabinet (either one), and make sure all cabinets are closed when you’re done.",
+      "instruction": "In the kitchen, gather all eight plates from the two countertops, place them all inside a single cabinet (either one), and make sure all cabinets are closed when you're done.",
       "rooms": [
         "kitchen"
       ],
@@ -137,7 +137,7 @@
     {
       "id": "preparing_lunch_box",
       "name": "Preparing Lunch Box",
-      "instruction": "Put both apple halves, the club sandwich, and the chocolate chip cookie from the chopping board on the kitchen countertop into the packing box on the countertop. Then take the bottle of tea out of the refrigerator, put it into the same box, and close the refrigerator when you’re done.",
+      "instruction": "Put both apple halves, the club sandwich, and the chocolate chip cookie from the chopping board on the kitchen countertop into the packing box on the countertop. Then take the bottle of tea out of the refrigerator, put it into the same box, and close the refrigerator when you're done.",
       "rooms": [
         "kitchen"
       ],
@@ -160,7 +160,7 @@
     {
       "id": "carrying_in_groceries",
       "name": "Carrying in Groceries",
-      "instruction": "Take the sack of groceries out of the car trunk in the garage, bring it to the kitchen, and put both the tomato and the carton of milk into the refrigerator in the kitchen. When you’re done, close the car trunk and make sure the refrigerator in the kitchen is closed.",
+      "instruction": "Take the sack of groceries out of the car trunk in the garage, bring it to the kitchen, and put both the tomato and the carton of milk into the refrigerator in the kitchen. When you're done, close the car trunk and make sure the refrigerator in the kitchen is closed.",
       "rooms": [
         "kitchen",
         "garage"
@@ -241,7 +241,7 @@
     {
       "id": "collecting_childrens_toys",
       "name": "Collecting Children's Toys",
-      "instruction": "Pick up the two dice from the bed, the two teddy bears from the floor, and the two board games (one from the desk and one from the bed), and place them all inside the same bookcase in the child’s room.",
+      "instruction": "Pick up the two dice from the bed, the two teddy bears from the floor, and the two board games (one from the desk and one from the bed), and place them all inside the same bookcase in the child's room.",
       "rooms": [
         "childs_room"
       ],
@@ -330,7 +330,7 @@
     {
       "id": "clean_up_your_desk",
       "name": "Clean Up Your Desk",
-      "instruction": "In the child’s room, clean up the desk: put both folders and both paperback books into the bookcase; put the pencil and both pens into the pencil case and leave the case on the desk; take the stapler out of the bookcase and place it on the desk; move the laptop from the bed onto the desk and close it.",
+      "instruction": "In the child's room, clean up the desk: put both folders and both paperback books into the bookcase; put the pencil and both pens into the pencil case and leave the case on the desk; take the stapler out of the bookcase and place it on the desk; move the laptop from the bed onto the desk and close it.",
       "rooms": [
         "childs_room"
       ],
@@ -418,7 +418,7 @@
     {
       "id": "clean_a_trumpet",
       "name": "Clean a Trumpet",
-      "instruction": "In the bedroom, pick up the scrub brush from the desk and scrub the cornet (trumpet) on the desk until it’s no longer covered in dust.",
+      "instruction": "In the bedroom, pick up the scrub brush from the desk and scrub the cornet (trumpet) on the desk until it's no longer covered in dust.",
       "rooms": [
         "bedroom"
       ],
@@ -517,7 +517,7 @@
     {
       "id": "cook_bacon",
       "name": "Cook Bacon",
-      "instruction": "Take the tray with six slices of bacon out of the refrigerator in the kitchen, cook all six slices in the frying pan on the stove until they’re cooked, and make sure the refrigerator is closed when you’re done.",
+      "instruction": "Take the tray with six slices of bacon out of the refrigerator in the kitchen, cook all six slices in the frying pan on the stove until they're cooked, and make sure the refrigerator is closed when you're done.",
       "rooms": [
         "kitchen"
       ],
@@ -550,7 +550,7 @@
     {
       "id": "make_pizza",
       "name": "Make Pizza",
-      "instruction": "Make a pizza on the cookie sheet in the kitchen: take the grated cheese, the four pieces of pepperoni, and the two mushrooms from their tupperware containers in the refrigerator; chop the Vidalia onion on the chopping board with the knife, and also chop the two whole mushrooms in half; top the pizza dough that’s already on the cookie sheet with the cheese, pepperoni, halved mushrooms, and chopped onion; bake it in the oven until it becomes a pizza, and leave the finished pizza on the cookie sheet.",
+      "instruction": "Make a pizza on the cookie sheet in the kitchen: take the grated cheese, the four pieces of pepperoni, and the two mushrooms from their tupperware containers in the refrigerator; chop the Vidalia onion on the chopping board with the knife, and also chop the two whole mushrooms in half; top the pizza dough that's already on the cookie sheet with the cheese, pepperoni, halved mushrooms, and chopped onion; bake it in the oven until it becomes a pizza, and leave the finished pizza on the cookie sheet.",
       "rooms": [
         "kitchen"
       ],
