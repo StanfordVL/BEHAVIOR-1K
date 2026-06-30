@@ -19,13 +19,10 @@ WRIST_RESOLUTION = (480, 480)
 
 def _load_challenge_task_ids() -> dict[str, int]:
     task_ids = {}
-    for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
-        task_misc_path = os.path.join(gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", filename)
-        if not os.path.exists(task_misc_path):
-            continue
-        with open(task_misc_path, newline="", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                task_ids[row["Task"]] = int(row["Task ID"])
+    task_misc_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "B100_task_misc.csv")
+    with open(task_misc_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            task_ids[row["Task"]] = int(row["Task ID"])
     return task_ids
 
 
@@ -33,7 +30,6 @@ TASK_NAMES_TO_INDICES = _load_challenge_task_ids()
 if not TASK_NAMES_TO_INDICES:
     raise RuntimeError(
         "Could not load challenge task metadata. Expected one of: "
-        f"{os.path.join(gm.DATA_PATH, '2025-challenge-task-instances', 'metadata', 'B50_task_misc.csv')} or "
         f"{os.path.join(gm.DATA_PATH, '2026-challenge-task-instances', 'metadata', 'B100_task_misc.csv')}. "
         "Please ensure OMNIGIBSON_DATA_PATH / gm.DATA_PATH points at the BEHAVIOR data root."
     )

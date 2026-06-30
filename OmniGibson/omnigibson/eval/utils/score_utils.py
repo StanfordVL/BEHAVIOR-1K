@@ -6,6 +6,11 @@ from omnigibson.macros import gm
 from omnigibson.eval.utils.eval_utils import TASK_NAMES_TO_INDICES
 
 
+NUM_TEST_INSTANCES = 40
+NUM_PUBLIC_TEST_INSTANCES = 20
+NUM_HIDDEN_TEST_INSTANCES = NUM_TEST_INSTANCES - NUM_PUBLIC_TEST_INSTANCES
+
+
 def sanity_check_filename(input_dir: str) -> None:
     """
     Sanity check whether the input directory name follows the expected format:
@@ -58,23 +63,28 @@ def compute_final_q_score(
     # get the root of the input dir to extract team, affiliation, date
     base_name = os.path.basename(os.path.normpath(input_dir))
     track, testset, team, affiliation, date = base_name.split(".")
-    if testset == "public":
-        # load test instance files
-        task_instance_csv_path = os.path.join(
-            gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
-        )
-        with open(task_instance_csv_path, "r") as f:
-            lines = list(csv.reader(f))[1:]
+    task_instance_csv_path = os.path.join(
+        gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "test_instances.csv"
+    )
+    with open(task_instance_csv_path, newline="", encoding="utf-8") as f:
+        rows = {row["Task"]: row for row in csv.DictReader(f)}
     # get all possible filenames:
     possible_filenames = set()
-    for task_name, task_idx in TASK_NAMES_TO_INDICES.items():
+    for task_name in TASK_NAMES_TO_INDICES:
+        test_instances = [int(x.strip()) for x in rows[task_name]["Test Instance IDs"].split(",")]
+        assert (
+            len(test_instances) == NUM_TEST_INSTANCES
+        ), f"Expected {NUM_TEST_INSTANCES} test instances for {task_name}, got {len(test_instances)}"
         test_instances = (
-            [int(x) for x in lines[task_idx][2].strip().split(",")][:10] if testset == "public" else range(10)
+            test_instances[:NUM_PUBLIC_TEST_INSTANCES]
+            if testset == "public"
+            else test_instances[NUM_PUBLIC_TEST_INSTANCES:]
         )
         for instance_id in test_instances:
             for rollout_id in range(1):  # 1 rollout per instance
                 filename = f"{task_name}_{instance_id}_{rollout_id}.json"
                 possible_filenames.add(filename)
+    n_instances_per_task = NUM_PUBLIC_TEST_INSTANCES if testset == "public" else NUM_HIDDEN_TEST_INSTANCES
     # Initialize score dictionaries
     q_score = {task_name: dict() for task_name in TASK_NAMES_TO_INDICES.keys()}
     time_score = {task_name: dict() for task_name in TASK_NAMES_TO_INDICES.keys()}
@@ -111,12 +121,12 @@ def compute_final_q_score(
         dict(),
     )
     for task_name in TASK_NAMES_TO_INDICES.keys():
-        q_score_avg[task_name] = sum(q_score[task_name].values()) / 10
-        task_sr[task_name] = sum(1 for v in q_score[task_name].values() if v == 1) / 10
-        time_score_avg[task_name] = sum(time_score[task_name].values()) / 10
-        base_distance_score_avg[task_name] = sum(base_distance_score[task_name].values()) / 10
-        left_distance_score_avg[task_name] = sum(left_distance_score[task_name].values()) / 10
-        right_distance_score_avg[task_name] = sum(right_distance_score[task_name].values()) / 10
+        q_score_avg[task_name] = sum(q_score[task_name].values()) / n_instances_per_task
+        task_sr[task_name] = sum(1 for v in q_score[task_name].values() if v == 1) / n_instances_per_task
+        time_score_avg[task_name] = sum(time_score[task_name].values()) / n_instances_per_task
+        base_distance_score_avg[task_name] = sum(base_distance_score[task_name].values()) / n_instances_per_task
+        left_distance_score_avg[task_name] = sum(left_distance_score[task_name].values()) / n_instances_per_task
+        right_distance_score_avg[task_name] = sum(right_distance_score[task_name].values()) / n_instances_per_task
 
     # Now, compute overall score across tasks
     overall_q_score = sum(q_score_avg.values()) / len(TASK_NAMES_TO_INDICES)

@@ -449,8 +449,6 @@ if [ "$EVAL" = true ]; then
     # get torch version via pip and install corresponding torch-cluster
     TORCH_VERSION=$(pip show torch | grep Version | cut -d " " -f 2)
     pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
-    # install av and ffmpeg
-    conda install av "numpy<2" -c conda-forge -y
 fi
 
 # Install asset pipeline
@@ -491,9 +489,9 @@ if [ "$DATASET" = true ]; then
         exit 1
     }
 
-    echo "Downloading 2025 BEHAVIOR Challenge Task Instances..."
-    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()" || {
-        echo "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
+    echo "Downloading 2026 BEHAVIOR Challenge Task Instances..."
+    python -c "from omnigibson.utils.asset_utils import download_2026_challenge_task_instances; download_2026_challenge_task_instances()" || {
+        echo "ERROR: 2026 BEHAVIOR Challenge Task Instances installation failed"
         exit 1
     }
 fi
