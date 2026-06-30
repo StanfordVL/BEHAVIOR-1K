@@ -22,6 +22,10 @@ vulkan = true # Explicitly enable Vulkan (on by default on Linux, off by default
 window.iconPath = "${app}/OmniGibson_logo.png"
 enableDeveloperWarnings = false    # disable developer warnings to reduce log noise
 
+[settings.crashreporter]
+enabled = false           # disable Kit crash reporter
+gatherUserStory = false
+
 [settings.app.livestream]
 proto = "ws"
 allowResize = true
