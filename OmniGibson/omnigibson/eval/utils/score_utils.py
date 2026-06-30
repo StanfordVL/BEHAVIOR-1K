@@ -2,8 +2,229 @@ import argparse
 import csv
 import json
 import os
+from collections import defaultdict
+from pathlib import Path
 from omnigibson.macros import gm
-from omnigibson.eval.utils.eval_utils import TASK_NAMES_TO_INDICES
+from omnigibson.eval.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_NAMES_TO_INDICES
+
+
+HUMAN_STATS_KEYS = (
+    "length",
+    "distance_traveled",
+    "left_eef_displacement",
+    "right_eef_displacement",
+)
+
+
+def default_task_jsonl_path() -> str:
+    return os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "task.jsonl")
+
+
+def load_human_stats(task_name: str, task_jsonl_path: str | None = None) -> dict[str, float]:
+    """
+    Load task-level human statistics for evaluator metrics.
+
+    The file is one JSON object per task and should contain:
+    task_name, task_index, length, distance_traveled, left_eef_displacement, right_eef_displacement.
+    """
+    task_jsonl_path = os.path.expanduser(task_jsonl_path or default_task_jsonl_path())
+    task_idx = TASK_NAMES_TO_INDICES[task_name]
+    with open(task_jsonl_path, "r") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            task_stats = json.loads(line)
+            if task_stats.get("task_name") == task_name or task_stats.get("task_index") == task_idx:
+                return {key: task_stats[key] for key in HUMAN_STATS_KEYS}
+
+    raise ValueError(f"Could not find human stats for task {task_name} in {task_jsonl_path}")
+
+
+def generate_task_jsonl_from_lerobot_v3(
+    data_dir: str,
+    output_path: str,
+    robot_type: str = "R1Pro",
+    num_tasks: int | None = None,
+) -> None:
+    """
+    Aggregate LeRobot v3 per-task datasets into the task-level task.jsonl format.
+
+    Supports both layouts:
+        data_dir/<task_name>/{meta,data}/...
+        data_dir/{meta,data}/... where each chunk is one task.
+    """
+    import pandas as pd
+
+    data_dir = Path(os.path.expanduser(data_dir))
+    task_names_by_idx = {task_idx: task_name for task_name, task_idx in TASK_NAMES_TO_INDICES.items()}
+    totals = {}
+    task_idx_filter = set(range(num_tasks)) if num_tasks is not None else None
+
+    if (data_dir / "meta" / "tasks.parquet").exists():
+        with open(data_dir / "meta" / "info.json", "r") as f:
+            fps = json.load(f).get("fps", 30)
+        episode_chunk_dirs = sorted((data_dir / "meta" / "episodes").glob("chunk-*"))
+        for episode_chunk_dir in episode_chunk_dirs:
+            task_idx = int(episode_chunk_dir.name.split("-")[-1])
+            if task_idx_filter is not None and task_idx not in task_idx_filter:
+                continue
+            task_totals = _compute_lerobot_v3_task_totals(
+                episode_paths=sorted(episode_chunk_dir.glob("file-*.parquet")),
+                data_paths=sorted((data_dir / "data" / f"chunk-{task_idx:03d}").glob("file-*.parquet")),
+                task_name=task_names_by_idx.get(task_idx, str(task_idx)),
+                fps=fps,
+                robot_type=robot_type,
+            )
+            if task_totals is not None:
+                totals[task_idx] = task_totals
+        _write_task_jsonl(totals=totals, task_names_by_idx=task_names_by_idx, output_path=output_path)
+        return
+
+    for task_dir in sorted(path for path in data_dir.iterdir() if path.is_dir()):
+        task_info_path = task_dir / "meta" / "tasks.parquet"
+        if not task_info_path.exists():
+            continue
+
+        task_info = pd.read_parquet(task_info_path)
+        task_idx = int(task_info["task_index"].iloc[0])
+        if task_idx_filter is not None and task_idx not in task_idx_filter:
+            continue
+        task_name = task_names_by_idx.get(task_idx, task_dir.name)
+        with open(task_dir / "meta" / "info.json", "r") as f:
+            fps = json.load(f).get("fps", 30)
+
+        task_totals = _compute_lerobot_v3_task_totals(
+            episode_paths=sorted((task_dir / "meta" / "episodes").glob("chunk-*/file-*.parquet")),
+            data_paths=sorted((task_dir / "data").glob("chunk-*/file-*.parquet")),
+            task_name=task_name,
+            fps=fps,
+            robot_type=robot_type,
+        )
+        if task_totals is not None:
+            totals[task_idx] = task_totals
+
+    _write_task_jsonl(totals=totals, task_names_by_idx=task_names_by_idx, output_path=output_path)
+
+
+def _compute_lerobot_v3_task_totals(
+    episode_paths: list[Path],
+    data_paths: list[Path],
+    task_name: str,
+    fps: int,
+    robot_type: str,
+) -> dict | None:
+    import numpy as np
+    import pandas as pd
+
+    if not episode_paths or not data_paths:
+        return None
+
+    episode_lengths = {}
+    for path in episode_paths:
+        episodes = pd.read_parquet(path, columns=["episode_index", "length"])
+        episode_lengths.update({int(row.episode_index): float(row.length) for row in episodes.itertuples(index=False)})
+
+    data_paths = sorted(data_paths)
+    state_sample = pd.read_parquet(data_paths[0], columns=["observation.state"]).iloc[0]["observation.state"]
+    base_position_idx, base_velocity_idx, eef_indices = _resolve_lerobot_state_indices(
+        robot_type=robot_type,
+        state_dim=len(state_sample),
+    )
+
+    episode_totals = defaultdict(lambda: {key: 0.0 for key in HUMAN_STATS_KEYS if key != "length"})
+    previous_state = {}
+    for path in data_paths:
+        data = pd.read_parquet(path, columns=["episode_index", "observation.state"])
+        for episode_idx, group in data.groupby("episode_index", sort=False):
+            episode_idx = int(episode_idx)
+            current_values = np.stack(group["observation.state"].to_numpy())
+            if base_position_idx is None:
+                assert base_velocity_idx is not None, "Need either robot_pos or base_qvel to compute base travel"
+                base_qvel = current_values[:, base_velocity_idx]
+                episode_totals[episode_idx]["distance_traveled"] += (
+                    np.linalg.norm(base_qvel[:, :2], axis=-1).sum() / fps
+                )
+
+            values = current_values
+            if episode_idx in previous_state:
+                values = np.concatenate([previous_state[episode_idx][None, :], values], axis=0)
+            if len(values) > 1:
+                if base_position_idx is not None:
+                    robot_positions = values[:, base_position_idx]
+                    episode_totals[episode_idx]["distance_traveled"] += np.linalg.norm(
+                        robot_positions[1:] - robot_positions[:-1], axis=-1
+                    ).sum()
+                for key, state_idx in eef_indices.items():
+                    positions = values[:, state_idx]
+                    episode_totals[episode_idx][key] += np.linalg.norm(positions[1:] - positions[:-1], axis=-1).sum()
+            previous_state[episode_idx] = values[-1]
+
+    num_episodes = len(episode_lengths)
+    if num_episodes == 0:
+        return None
+
+    return {
+        "task_name": task_name,
+        "num_episodes": num_episodes,
+        "length": sum(episode_lengths.values()),
+        "distance_traveled": sum(stats["distance_traveled"] for stats in episode_totals.values()),
+        "left_eef_displacement": sum(stats["left_eef_displacement"] for stats in episode_totals.values()),
+        "right_eef_displacement": sum(stats["right_eef_displacement"] for stats in episode_totals.values()),
+    }
+
+
+def _resolve_lerobot_state_indices(
+    robot_type: str,
+    state_dim: int,
+) -> tuple[slice | None, slice | None, dict[str, slice]]:
+    if robot_type == "R1Pro" and state_dim >= 256:
+        return (
+            slice(140, 143),
+            None,
+            {
+                "left_eef_displacement": slice(186, 189),
+                "right_eef_displacement": slice(225, 228),
+            },
+        )
+
+    proprio_indices = PROPRIOCEPTION_INDICES[robot_type]
+    base_position_idx = proprio_indices.get("robot_pos")
+    base_velocity_idx = proprio_indices.get("base_qvel")
+    if base_position_idx is None and base_velocity_idx is None:
+        raise ValueError(
+            "This LeRobot dataset does not expose robot_pos or base_qvel in observation.state, "
+            "so human base distance cannot be computed."
+        )
+
+    return (
+        base_position_idx,
+        base_velocity_idx,
+        {
+            "left_eef_displacement": proprio_indices["eef_left_pos"],
+            "right_eef_displacement": proprio_indices["eef_right_pos"],
+        },
+    )
+
+
+def _write_task_jsonl(totals: dict, task_names_by_idx: dict[int, str], output_path: str) -> None:
+    output_path = os.path.expanduser(output_path)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    with open(output_path, "w") as f:
+        for task_idx in sorted(totals):
+            num_episodes = totals[task_idx]["num_episodes"]
+            if num_episodes == 0:
+                continue
+            task_stats = {
+                "task_index": task_idx,
+                "task_name": totals[task_idx].get("task_name", task_names_by_idx.get(task_idx, str(task_idx))),
+                "num_episodes": num_episodes,
+            }
+            for key in HUMAN_STATS_KEYS:
+                task_stats[key] = round(totals[task_idx][key] / num_episodes, 4)
+            json.dump(task_stats, f)
+            f.write("\n")
 
 
 NUM_TEST_INSTANCES = 40
@@ -184,14 +405,43 @@ def compute_final_q_score(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--generate_task_jsonl",
+        action="store_true",
+        help="Generate task-level human stats JSONL instead of scoring submissions.",
+    )
+    parser.add_argument(
+        "--lerobot_data_dir",
+        type=str,
+        default=None,
+        help="LeRobot v3 directory, either one subdirectory per task or one aggregated dataset with one chunk per task.",
+    )
+    parser.add_argument(
+        "--task_jsonl",
+        type=str,
+        default=default_task_jsonl_path(),
+        help="Output path for generated task-level human stats, or evaluator input path.",
+    )
+    parser.add_argument(
+        "--robot_type",
+        type=str,
+        default="R1Pro",
+        help="Robot type used when aggregating LeRobot v3 data.",
+    )
+    parser.add_argument(
+        "--num_tasks",
+        type=int,
+        default=None,
+        help="Only generate stats for task indices 0 through num_tasks - 1.",
+    )
+    parser.add_argument(
         "--input_dir",
         "-i",
         type=str,
-        required=True,
+        default=None,
         help="Path to the directory containing evaluation result json files.",
     )
     parser.add_argument(
-        "--output_dir", "-o", type=str, required=True, help="Path to save the computed final scores json file."
+        "--output_dir", "-o", type=str, default=None, help="Path to save the computed final scores json file."
     )
     parser.add_argument(
         "--final_score_only",
@@ -201,6 +451,20 @@ if __name__ == "__main__":
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Whether to print verbose output.")
     args = parser.parse_args()
+
+    if args.generate_task_jsonl:
+        assert args.lerobot_data_dir is not None, "--lerobot_data_dir is required with --generate_task_jsonl"
+        generate_task_jsonl_from_lerobot_v3(
+            args.lerobot_data_dir,
+            args.task_jsonl,
+            robot_type=args.robot_type,
+            num_tasks=args.num_tasks,
+        )
+        print(f"Generated task-level human stats at {args.task_jsonl}")
+        raise SystemExit(0)
+
+    assert args.input_dir is not None, "--input_dir is required when scoring submissions"
+    assert args.output_dir is not None, "--output_dir is required when scoring submissions"
     assert os.path.exists(args.input_dir), f"Input path {args.input_dir} does not exist"
     os.makedirs(args.output_dir, exist_ok=True)
     # Iterate through all submission folders in the input directory

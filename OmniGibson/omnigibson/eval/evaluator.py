@@ -33,6 +33,7 @@ from omnigibson.eval.utils.eval_utils import (
     generate_basic_environment_config,
 )
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
+from omnigibson.eval.utils.score_utils import load_human_stats
 from omnigibson.macros import gm
 from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
@@ -129,21 +130,7 @@ class Evaluator:
         task_name = self.cfg.task.name
         assert task_name in available_tasks, f"Got invalid task name: {task_name}"
 
-        task_idx = TASK_NAMES_TO_INDICES[task_name]
-        self.human_stats = {
-            "length": [],
-            "distance_traveled": [],
-            "left_eef_displacement": [],
-            "right_eef_displacement": [],
-        }
-        with open(os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "episodes.jsonl"), "r") as f:
-            episodes = [json.loads(line) for line in f]
-        for episode in episodes:
-            if episode["episode_index"] // 1e4 == task_idx:
-                for key in self.human_stats:
-                    self.human_stats[key].append(episode[key])
-        for key in self.human_stats:
-            self.human_stats[key] = sum(self.human_stats[key]) / len(self.human_stats[key])
+        self.human_stats = load_human_stats(task_name)
 
         task_cfg = available_tasks[task_name][0]
         robot_type = self.cfg.robot.type
