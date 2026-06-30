@@ -395,7 +395,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
             stage=stage,
             link_prim_path=link_prim_path,
         )
-        link_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=link_prim_path)
+        link_prim_xform = lazy.isaacsim.core.prims.SingleXFormPrim(prim_path=link_prim_path)
 
         # Create fixed joint to connect the two together
         create_joint(
@@ -409,7 +409,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
         # Set child prim to the appropriate local pose -- this should be the parent local pose transformed by
         # the additional offset
-        parent_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=parent_path)
+        parent_prim_xform = lazy.isaacsim.core.prims.SingleXFormPrim(prim_path=parent_path)
         parent_pos, parent_quat = parent_prim_xform.get_local_pose()
         parent_quat = parent_quat[[1, 2, 3, 0]]
         parent_pose = T.pose2mat((th.tensor(parent_pos), th.tensor(parent_quat)))
@@ -829,6 +829,30 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
             yaml.dump({"robot_cfg": {"kinematics": arm_only_no_torso_cfg}}, f)
 
 
+def resolve_dataset_name(cfg):
+    """Output dataset for the imported robot (config ``dataset_name`` key, default ``omnigibson-robot-assets``)."""
+    name = cfg.get("dataset_name", None)
+    # addict.Dict returns an empty Dict() for a missing key, so treat any falsy value as unset.
+    return name if name else "omnigibson-robot-assets"
+
+
+def shift_prim_local_z(prim, z_offset):
+    """Subtract ``z_offset`` from a prim's local Z translation, adding the translate op if it's missing
+    or null (5.1 can emit prims without one).
+    """
+    translate_attr = prim.GetAttribute("xformOp:translate")
+    if translate_attr.IsValid():
+        local_pos = translate_attr.Get()
+        if local_pos is None:
+            local_pos = lazy.pxr.Gf.Vec3d(0.0, 0.0, 0.0)
+        translate_attr.Set(lazy.pxr.Gf.Vec3d(local_pos[0], local_pos[1], local_pos[2] - z_offset))
+    else:
+        translate_op = lazy.pxr.UsdGeom.Xformable(prim).AddXformOp(
+            lazy.pxr.UsdGeom.XformOp.TypeTranslate, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+        )
+        translate_op.Set(lazy.pxr.Gf.Vec3d(0.0, 0.0, -z_offset))
+
+
 @click.command(name="import-custom-robot", help=_DOCSTRING)
 @click.option(
     "--config",
@@ -845,6 +869,7 @@ def main(config):
     urdf_path, usd_path, prim = import_og_asset_from_urdf(
         category="robot",
         model=cfg.name,
+        dataset_name=resolve_dataset_name(cfg),
         urdf_path=cfg.urdf_path,
         collision_method=cfg.collision.decompose_method,
         coacd_links=cfg.collision.coacd_links,
@@ -931,10 +956,7 @@ def main(config):
     # Grab all of the root prim's nested children and joints, and modify their offsets based on AABB z-lower bound
     root_meshes = find_all_meshes(root_prim=articulation_root_prim)
     for mesh in root_meshes:
-        translate_attr = mesh.GetAttribute("xformOp:translate")
-        local_pos = translate_attr.Get()
-        local_pos[2] -= z_offset
-        translate_attr.Set(local_pos)
+        shift_prim_local_z(mesh, z_offset)
     root_joints = find_all_joints(root_prim=articulation_root_prim, only_articulated=False)
     root_prim_path = articulation_root_prim.GetPrimPath().pathString
     for joint in root_joints:
@@ -952,10 +974,7 @@ def main(config):
     for link in all_links:
         if link == articulation_root_prim:
             continue
-        translate_attr = link.GetAttribute("xformOp:translate")
-        local_pos = translate_attr.Get()
-        local_pos[2] -= z_offset
-        translate_attr.Set(local_pos)
+        shift_prim_local_z(link, z_offset)
 
     # Add holonomic base if requested
     if cfg.base_motion.use_holonomic_joints:

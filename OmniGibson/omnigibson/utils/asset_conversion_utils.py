@@ -1006,6 +1006,70 @@ def _migrate_materials_to_looks(stage):
     return material_path_mapping
 
 
+# Prim types that carry authored geometry in the URDF importer output.
+_GEOM_TYPES = {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
+
+
+def resolve_imported_geometry(referenced_wrapper_prim):
+    """Return the single mesh-bearing child under an importer wrapper, or None if it's ambiguous.
+
+    The wrapper's name varies by source format (World for OBJ, Scene for DAE, node_STL_BINARY_* for
+    STL), so we look up the lone Xform child and its "mesh". None means the wrapper should be pruned.
+    """
+    xform_children = [child for child in referenced_wrapper_prim.GetChildren() if child.GetTypeName() == "Xform"]
+    if len(xform_children) != 1:
+        return None
+    child_prim = xform_children[0].GetChild("mesh")
+    if child_prim is None or not child_prim.IsValid():
+        return None
+    return child_prim
+
+
+def _ensure_geom_xform_ops(prim):
+    """Add identity translate/orient/scale xformOps (in canonical order) to a geometry prim if missing.
+
+    5.1 can emit geometry prims with no transform ops, which the downstream AABB re-centering assumes
+    exist. No-op for non-geometry prims.
+    """
+    if prim.GetTypeName() not in _GEOM_TYPES:
+        return
+
+    prop_names = prim.GetPropertyNames()
+    xformable = lazy.pxr.UsdGeom.Xformable(prim)
+
+    if "xformOp:translate" in prop_names:
+        xform_op_translate = lazy.pxr.UsdGeom.XformOp(prim.GetAttribute("xformOp:translate"))
+        if prim.GetAttribute("xformOp:translate").Get() is None:
+            xform_op_translate.Set(lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0]))
+    else:
+        xform_op_translate = xformable.AddXformOp(
+            lazy.pxr.UsdGeom.XformOp.TypeTranslate, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+        )
+        xform_op_translate.Set(lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0]))
+
+    if "xformOp:orient" in prop_names:
+        xform_op_orient = lazy.pxr.UsdGeom.XformOp(prim.GetAttribute("xformOp:orient"))
+        if prim.GetAttribute("xformOp:orient").Get() is None:
+            xform_op_orient.Set(lazy.pxr.Gf.Quatd(1.0, lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0])))
+    else:
+        xform_op_orient = xformable.AddXformOp(
+            lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+        )
+        xform_op_orient.Set(lazy.pxr.Gf.Quatd(1.0, lazy.pxr.Gf.Vec3d([0.0, 0.0, 0.0])))
+
+    if "xformOp:scale" in prop_names:
+        xform_op_scale = lazy.pxr.UsdGeom.XformOp(prim.GetAttribute("xformOp:scale"))
+        if prim.GetAttribute("xformOp:scale").Get() is None:
+            xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
+    else:
+        xform_op_scale = xformable.AddXformOp(
+            lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+        )
+        xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
+
+    xformable.SetXformOpOrder([xform_op_translate, xform_op_orient, xform_op_scale])
+
+
 def convert_urdf_to_usd(
     urdf_path,
     obj_category,
@@ -1150,15 +1214,25 @@ def convert_urdf_to_usd(
         parent_path = parent_prim.GetPath()
         grandparent_path = parent_path.GetParentPath()
 
-        # Find the child prim - it's actually away at a reference. There should be exactly one.
+        # The child is usually behind one reference, but 5.1 can emit a direct primitive collider (no reference).
         references = parent_prim.GetPrimStack()[0].referenceList.prependedItems
-        assert len(references) == 1, f"{parent_path} is not a reference!"
+        if not references:
+            for prim_to_update in lazy.pxr.Usd.PrimRange(parent_prim):
+                _ensure_geom_xform_ops(prim_to_update)
+            continue
+        assert len(references) == 1, f"Expected exactly one reference for {parent_path}, got {len(references)}"
         referenced_wrapper_path_str = str(references[0].primPath)
         referenced_wrapper_prim = side_stage.GetPrimAtPath(referenced_wrapper_path_str)
         assert referenced_wrapper_prim.IsValid()
 
-        child_prim = referenced_wrapper_prim.GetChild("World").GetChild("mesh")
-        assert child_prim.IsValid()
+        # Wrapper name varies by mesh format, so resolve the geometry name-agnostically.
+        child_prim = resolve_imported_geometry(referenced_wrapper_prim)
+        if child_prim is None:
+            # No mesh child for this link; drop the wrapper.
+            del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
+            continue
+        for prim_to_update in lazy.pxr.Usd.PrimRange(child_prim):
+            _ensure_geom_xform_ops(prim_to_update)
         child_path = child_prim.GetPath()
 
         # Duplicate the properties on the parent prim onto the child.
@@ -1181,8 +1255,7 @@ def convert_urdf_to_usd(
         # Move the child prim to the parent's path.
         assert lazy.pxr.Sdf.CopySpec(side_stage.GetRootLayer(), child_path, side_stage.GetRootLayer(), parent_path)
 
-        # Delete the child's original path
-        del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
+        # Don't delete the source here -- multiple links can share one mesh. /meshes is cleared below.
 
     # Migrate materials from /meshes to /Looks before deleting the meshes hierarchy
     # This is necessary for IsaacSim 5.1+ where materials are now placed under /meshes
@@ -2075,11 +2148,23 @@ def get_collision_approximation_for_urdf(
     col_mesh_rel_folder = "meshes/collision"
     col_mesh_folder = pathlib.Path(urdf_dir) / col_mesh_rel_folder
     col_mesh_folder.mkdir(exist_ok=True, parents=True)
+    from omnigibson.utils.urdf_preprocessing import link_has_dedicated_collision
+
     for link in root.findall("link"):
         link_name = link.attrib["name"]
         old_cols = link.findall("collision")
         # Completely skip this link if this a link to explicitly skip or we have no collision tags
         if link_name in ignore_links or len(old_cols) == 0:
+            continue
+
+        # Keep an existing collision proxy instead of regenerating a hull; coacd/convex links override.
+        if (
+            link_name not in coacd_links
+            and link_name not in convex_links
+            and link_name not in visual_only_links
+            and link_has_dedicated_collision(link)
+        ):
+            print(f"Preserving provided collision for link {link_name} (dedicated collision found)...")
             continue
 
         print(f"Generating collision approximation for link {link_name}...")

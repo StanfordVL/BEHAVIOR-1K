@@ -4,7 +4,10 @@ While OmniGibson assets includes a set of commonly-used robots, users might stil
 
 ## Preparation
 
-In order to import a custom robot, You will need to first prepare your robot model file. For the next section we will assume you have the URDF file for the robots ready with all the corresponding meshes and textures. If your robot file is in another format (e.g. MCJF), please convert it to URDF format. If you already have the robot model USD file, feel free to skip the next section and move onto [Create the Robot Class](#create-the-robot-class).
+In order to import a custom robot, You will need to first prepare your robot model file. For the next section we will assume you have the URDF file for the robots ready with all the corresponding meshes and textures. If your robot file is in another format (e.g. MCJF), please convert it to URDF format. If you already have the robot model USD file, feel free to skip the next section and move onto [Author the Robot Definition](#author-the-robot-definition).
+
+!!! note "Data-driven robots (no Python subclass needed)"
+    Since the Isaac Sim 5.1 migration, a robot is defined entirely by data — an imported USD plus a single `RobotDefinition` YAML at `<gm.DATA_PATH>/<dataset>/models/<name>/<name>.yaml`, which OmniGibson auto-discovers at startup. The old "write `stretch.py` and edit `robots/__init__.py`" workflow is obsolete; see [Author the Robot Definition](#author-the-robot-definition).
 
 Below, we will walk through each step for importing a new custom robot into **OmniGibson**. We use [Hello Robotic](https://hello-robot.com/)'s [Stretch](https://hello-robot.com/stretch-3-product) robot as an example, taken directly from their [official repo](https://github.com/hello-robot/stretch_urdf).
 
@@ -15,13 +18,13 @@ There are two ways to convert our raw robot URDF into an OmniGibson-compatible U
 Our custom robot importer [`import_custom_robot.py`](https://github.com/StanfordVL/OmniGibson/tree/main/omnigibson/examples/robots/import_custom_robot.py) wraps the native URDF Importer from Isaac Sim to convert our robot URDF model into USD format. Please see the following steps for running this script:
 
 1. All that is required is a single source config yaml file that dictates how the URDF should be post-processed when being converted into a USD. You can run `import_custom_robot.py --help` to see a detailed example configuration used, which is also shown below (`r1_pro_source_config.yaml`) for your convenience.
-2. All output files are written to `<gm.DATA_PATH>/custom_dataset/objects/robot/<name>`. Please move this directory to `<gm.DATA_PATH>/omnigibson-robot-assets/objects/<name>` so it can be imported into **OmniGibson**.
+2. By default, output files are written to `<gm.DATA_PATH>/omnigibson-robot-assets/objects/robot/<name>/`. The destination dataset is configurable via the optional `dataset_name` key in the source config (default `omnigibson-robot-assets`). The imported asset is **not yet discoverable** at this location — it must be **copied** into the `models/` tree and paired with a `RobotDefinition` YAML. See [Register the Robot](#register-the-robot).
 
 Some notes about the importing script:
 
 - The importing procedure can be summarized as follows:
 
-  1. Copy the raw URDF file + any dependencies into the `gm.DATA_PATH/custom_dataset` directory
+  1. Copy the raw URDF file + any dependencies into the output dataset directory (`<gm.DATA_PATH>/<dataset>/objects/robot/<name>/`, where `<dataset>` defaults to `omnigibson-robot-assets`)
   2. Updates the URDF + meshes to ensure all scaling is positive
   3. Generates collision meshes for each robot link (as specified by the source config)
   4. Generates metadata necessary for **OmniGibson**
@@ -342,6 +345,52 @@ Some notes about the importing script:
     ```
 
 
+### Preprocessing a messy URDF
+
+Vendor URDFs (especially CAD exports) often contain artifacts that break the importer. The helper module [`omnigibson/utils/urdf_preprocessing.py`](https://github.com/StanfordVL/OmniGibson/tree/main/omnigibson/utils/urdf_preprocessing.py) operates on a parsed `xml.etree.ElementTree`, so you can clean a URDF *before* importing it. Start by **auditing**:
+
+```python
+from omnigibson.utils.urdf_preprocessing import urdf_audit
+print(urdf_audit("my_robot.urdf"))
+# -> n_links / n_joints / joint_type_counts / mimic_joints / mesh_refs / mesh_formats /
+#    package_uris / nonascii_paths / broken_relative_paths / links_without_inertial / root_link
+```
+
+Each cleaner helper mutates the tree in place and returns the number of changes it made. The one exception is `sanitize_names`, which returns its `{old: new}` rename map.
+
+| Helper | Fixes | When you need it |
+| --- | --- | --- |
+| `rewrite_mesh_paths(tree, [(old, new), ...])` | Rewrites `<mesh filename>` substrings | Converting `package://` URIs or broken relative paths (`../../`) into absolute paths |
+| `stage_meshes(tree, dest_dir)` | Copies every mesh into a clean dir under a **USD-safe basename** (space/paren -> `_`), dedupes shared sources | Mesh **filenames** contain spaces/parens — the importer names each geometry prim after the mesh basename, so a space yields an *ill-formed SdfPath* and the whole import fails. Run **after** `rewrite_mesh_paths` (needs resolvable paths) |
+| `sanitize_names(tree)` | Replaces space/paren in **link & joint names** (and all parent/child/mimic refs) | The importer silently renames such links, breaking downstream name matching. Returns the rename map so you can update your config/definition references identically |
+| `strip_mimic_joints(tree)` | Removes all `<mimic>` elements | The importer writes **no DriveAPI** on a mimic joint, leaving the mimicking finger non-drivable. Let the runtime gripper controller drive both fingers instead |
+| `override_joint_limits(tree, {joint: {attr: val}})` | Sets `<limit>` attributes | Joints shipped with all-zero `<limit effort="0" ... velocity="0"/>` (common for grippers/wheels) are non-drivable in sim |
+| `set_joint_dynamics(tree, joints, **attrs)` | Sets `<dynamics>` (e.g. `friction=0`) | Sluggish/jerky drive from CAD friction values |
+| `link_has_dedicated_collision(link_el)` | Reports whether a link already has a real collision proxy | Used internally by the importer's auto-detect (see [Collision handling](#collision-handling)) |
+
+A typical end-to-end pass (the recipe used for Gento Luna — `package://` URIs, spaces/parens in mesh and link/joint names, mimic joints, zeroed limits):
+
+```python
+import xml.etree.ElementTree as ET
+from omnigibson.utils.urdf_preprocessing import (
+    rewrite_mesh_paths, stage_meshes, strip_mimic_joints, sanitize_names,
+    override_joint_limits, urdf_audit,
+)
+
+tree = ET.parse("vendor/robot.urdf")
+rewrite_mesh_paths(tree, [("package://robot_description/", "/abs/robot_description/")])  # -> absolute
+stage_meshes(tree, "staging/meshes_clean")            # -> space-free mesh basenames
+strip_mimic_joints(tree)                              # -> drivable fingers
+renames = sanitize_names(tree)                        # -> space-free link/joint names (keep the map!)
+override_joint_limits(tree, {                         # -> repair zeroed limits
+    renames.get("left finger_joint", "left finger_joint"): {"effort": 30, "velocity": 0.1, "lower": 0, "upper": 0.05},
+})
+tree.write("staging/robot.urdf", encoding="utf-8", xml_declaration=True)
+assert urdf_audit("staging/robot.urdf")["package_uris"] == 0  # confirm it is now clean
+```
+
+Point your source config's `urdf_path` at the cleaned URDF. If `sanitize_names` renamed anything, use the **sanitized** names everywhere downstream (source config and definition YAML) — they are the values in the returned `renames` map.
+
 ### Option 2: Using IsaacSim's Native URDF-to-USD Converter
 In this section, we will be using the URDF Importer in native Isaac Sim to convert our robot URDF model into USD format. Before we get started, it is strongly recommended that you read through the official [URDF Importer Tutorial](https://docs.omniverse.nvidia.com/isaacsim/latest/features/environment_setup/ext_omni_isaac_urdf.html).
 
@@ -406,155 +455,105 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
 
 6. Finally, save your USD (as a USDA file)! Note that you need to remove the fixed link created at step 4 before saving. Please save the file to `<gm.DATA_PATH>/omnigibson-robot-assets/models/<name>/usd/<name>.usda`.
 
-## Create the Robot Class
-Now that we have the USD file for the robot, let's write our own robot class. For more information please refer to the [Robot module](../omnigibson/robots.md).
+## Register the Robot
 
-1. Create a new python file named after your robot. In our case, our file exists under `omnigibson/robots` and is named `stretch.py`.
+The import script writes the converted asset to `<gm.DATA_PATH>/<dataset>/objects/robot/<name>/`, but OmniGibson discovers robots under the **`models/`** tree. Two steps make the robot loadable:
 
-2. Determine which robot interfaces it should inherit. We currently support three modular interfaces that can be used together: [`LocomotionRobot`](../reference/robots/locomotion_robot.md) for robots whose bases can move (and a more specific [`TwoWheelRobot`](../reference/robots/two_wheel_robot.md) for locomotive robots that only have two wheels), [`ManipulationRobot`](../reference/robots/manipulation_robot.md) for robots equipped with one or more arms and grippers, and [`ActiveCameraRobot`](../reference/robots/active_camera_robot.md) for robots with a controllable head or camera mount. In our case, our robot is a mobile manipulator with a moveable camera mount, so our Python class inherits all three interfaces.
+1. **Copy** the imported asset from `objects/robot/<name>/` into `models/<name>/`. Use the bundled helper (idempotent):
 
-3. You must implement all required abstract properties defined by each respective inherited robot interface. In the most simple case, this is usually simply defining relevant metadata from the original robot source files, such as relevant joint / link names and absolute paths to the corresponding robot URDF and USD files. Please see our annotated `stretch.py` module below which serves as a good starting point that you can modify. Note that **OmniGibson** automatically looks for your robot file at `<gm.DATA_PATH>/omnigibson-robot-assets/models/<name>/usd/<name>.usda`, so if it exists elsewhere please specify the path via the `usd_path` property in the robot class.
-
-    ??? note "Optional properties"
-
-        We offer a more in-depth description of a couple of more advanced properties for ManipulationRobots below:
-
-        - `assisted_grasp_start_points`, `assisted_grasp_end_points`: you need to implement this if you want to use sticky grasp/assisted grasp on the new robot.
-
-            These points are `omnigibson.robots.manipulation_robot.GraspingPoint` that is defined by the end effector link name and the relative position of the point w.r.t. to the pose of the link. Basically when the gripper receives a close command and OmniGibson tries to perform assisted grasping, it will cast rays from every start point to every end point, and if there is one object that is hit by any rays, then we consider the object is grasped by the robot.
-
-            In practice, for parallel grippers, naturally the start and end points should be uniformally sampled on the inner surface of the two fingers. You can refer to the Fetch class for an example of this case. For more complicated end effectors like dexterous hands, it's usually best practice to have start points at palm center and lower center, and thumb tip, and end points at each every other finger tips. You can refer to the Franka class for examples of this case.
-
-            Best practise of setting these points is to load the robot into Isaac Sim, and create a small sphere under the target link of the end effector. Then drag the sphere to the desired location (which should be just right outside the mesh of the link) or by setting the position in the `Property` tab. After you get a desired relative pose to the link, write down the link name and position in the robot class.
-
-4. If your robot is a manipulation robot, you must additionally define a description .yaml file in order to use our CuRobo solver for end-effector motion planning. Our example description file is shown below for our R1 robot, which you can modify as needed. (Note that if you import your robot URDF using our import script, these files are automatically generated for you!). Place the curobo file under `<PATH_TO_OG_ASSET_DIR>/models/<YOUR_MODEL>/curobo`.
-
-5. In order for **OmniGibson** to register your new robot class internally, you must import the robot class before running the simulation. If your python module exists under `omnigibson/robots`, you can simply add an additional import line in `omnigibson/robots/__init__.py`. Otherwise, in any end use-case script, you can simply import your robot class from your python module at the top of the file.
-
-
-??? code "stretch.py"
-    ``` python linenums="1"
-    import os
-    import math
-    import torch as th
+    ```python
+    from omnigibson.utils.urdf_preprocessing import copy_robot_to_models
     from omnigibson.macros import gm
-    from omnigibson.robots.active_camera_robot import ActiveCameraRobot
-    from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-    from omnigibson.robots.two_wheel_robot import TwoWheelRobot
-
-
-    class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
-        """
-        Strech Robot from Hello Robotics
-        Reference: https://hello-robot.com/stretch-3-product
-        """
-
-        @property
-        def discrete_action_list(self):
-            raise NotImplementedError()
-
-        def _create_discrete_action_space(self):
-            raise ValueError("Stretch does not support discrete actions!")
-
-        @property
-        def _raw_controller_order(self):
-            # Ordered by general robot kinematics chain
-            return ["base", "camera", f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
-
-        @property
-        def _default_controllers(self):
-            # Always call super first
-            controllers = super()._default_controllers
-
-            # We use multi finger gripper, differential drive, and IK controllers as default
-            controllers["base"] = "DifferentialDriveController"
-            controllers["camera"] = "JointController"
-            controllers[f"arm_{self.default_arm}"] = "JointController"
-            controllers[f"gripper_{self.default_arm}"] = "MultiFingerGripperController"
-
-            return controllers
-
-        @property
-        def _default_joint_pos(self):
-            return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8])
-
-        @property
-        def wheel_radius(self):
-            return 0.050
-
-        @property
-        def wheel_axle_length(self):
-            return 0.330
-
-        @property
-        def disabled_collision_pairs(self):
-            return [
-                ["link_lift", "link_arm_l3"],
-                ["link_lift", "link_arm_l2"],
-                ["link_lift", "link_arm_l1"],
-                ["link_lift", "link_arm_l0"],
-                ["link_arm_l3", "link_arm_l1"],
-                ["link_arm_l0", "link_arm_l1"],
-                ["link_arm_l0", "link_arm_l2"],
-                ["link_arm_l0", "link_arm_l3"],
-            ]
-
-        @property
-        def base_joint_names(self):
-            return ["joint_left_wheel", "joint_right_wheel"]
-
-        @property
-        def camera_joint_names(self):
-            return ["joint_head_pan", "joint_head_tilt"]
-
-        @property
-        def arm_link_names(self):
-            return {
-                self.default_arm: [
-                    "link_lift",
-                    "link_arm_l3",
-                    "link_arm_l2",
-                    "link_arm_l1",
-                    "link_arm_l0",
-                    "link_wrist_yaw",
-                    "link_wrist_pitch",
-                    "link_wrist_roll",
-                ]
-            }
-
-        @property
-        def arm_joint_names(self):
-            return {
-                self.default_arm: [
-                    "joint_lift",
-                    "joint_arm_l3",
-                    "joint_arm_l2",
-                    "joint_arm_l1",
-                    "joint_arm_l0",
-                    "joint_wrist_yaw",
-                    "joint_wrist_pitch",
-                    "joint_wrist_roll",
-                ]
-            }
-
-        @property
-        def eef_link_names(self):
-            return {self.default_arm: "eef_link"}
-
-        @property
-        def finger_link_names(self):
-            return {
-                self.default_arm: [
-                    "link_gripper_finger_left",
-                    "link_gripper_finger_right",
-                ]
-            }
-
-        @property
-        def finger_joint_names(self):
-            return {self.default_arm: ["joint_gripper_finger_right", "joint_gripper_finger_left"]}
-
+    copy_robot_to_models("my_robot", gm.DATA_PATH)  # dataset_name defaults to "omnigibson-robot-assets"
     ```
+
+2. **Author** a `RobotDefinition` YAML (next section) and place it at `<gm.DATA_PATH>/<dataset>/models/<name>/<name>.yaml`. At startup, `REGISTERED_ROBOTS` globs `<gm.DATA_PATH>/*/models/*/*.yaml`, so a correctly-placed definition is auto-registered under its file stem — **no Python class and no `robots/__init__.py` edits required**. A single concrete `Robot` class is instantiated for *every* robot; capabilities are composed from whichever definition sub-config blocks are present (not from inheritance). You can then load the robot via `model: <name>` (lowercase) in any environment/robot config.
+
+## Author the Robot Definition
+
+A robot is described by a single `RobotDefinition` YAML (schema in [`definition_schema.py`](https://github.com/StanfordVL/OmniGibson/tree/main/omnigibson/robots/definition_schema.py)). Only `raw_controller_order` and `default_controllers` are required; each capability is opted into by adding its sub-config block. OmniGibson infers the robot's interfaces from which blocks are present — replacing the old multiple-inheritance class.
+
+| Sub-config block | Enables | Key fields |
+| --- | --- | --- |
+| `manipulation` | Arm(s) + gripper(s) | `n_arms`, `arm_names`, `arm_{link,joint}_names`, `eef_link_names`, `finger_{link,joint}_names`, `arm_workspace_range` |
+| `holonomic_base` | Holonomic (x, y, rz) base | `force_sphere_wheel_approximation` |
+| `two_wheel` | Differential-drive base | `wheel_radius`, `wheel_axle_length` |
+| `locomotion` | Base joints / floor contact | `base_joint_names`, `floor_touching_base_link_names` |
+| `articulated_trunk` | Controllable torso | `trunk_joint_names`, `trunk_link_names` |
+| `active_camera` | Controllable head/camera | `camera_joint_names` |
+| `mobile_manipulation` | Tuck/untuck arm poses | `untucked_default_joint_pos`, `tucked_default_joint_pos` |
+
+Top-level fields worth calling out:
+
+- **`default_joint_pos`** — rest pose (one value per DOF). **Required if any arm uses an `InverseKinematicsController`** (it supplies the IK null-space reset pose); a missing value crashes at load. Zeros are a valid starting point to refine later.
+- **`self_collisions`** (`true`/`false`/unset) — overrides the robot's default self-collision setting at load. Auto-generated hulls often overlap at rest, so NVIDIA's guidance is `false` (relying on planner spheres / `disabled_collision_pairs`). Leave unset to keep the default.
+- **`disabled_collision_pairs`** / **`disabled_collision_link_names`** — filter specific colliding *pairs*, or disable all collision on named links. Prefer these with `self_collisions: true` to keep self-collision on for the rest of the robot.
+- **`base_footprint_link_name`** — root link a synthesized holonomic base attaches to.
+
+Below is the in-repo R1 definition — a complete, working dual-arm holonomic-base example:
+
+??? code "r1.yaml (RobotDefinition)"
+    ``` yaml linenums="1"
+    raw_controller_order: ["base", "trunk", "arm_left", "gripper_left", "arm_right", "gripper_right"]
+    linear_velocity_gain_for_primitives: 0.3
+    angular_velocity_gain_for_primitives: 0.2
+    default_controllers:
+      base: HolonomicBaseJointController
+      trunk: JointController
+      arm_left: InverseKinematicsController
+      arm_right: InverseKinematicsController
+      gripper_left: MultiFingerGripperController
+      gripper_right: MultiFingerGripperController
+    disabled_collision_pairs:
+      - ["left_gripper_link1", "left_gripper_link2"]
+      - ["right_gripper_link1", "right_gripper_link2"]
+      - ["base_link", "wheel_link1"]
+      - ["base_link", "wheel_link2"]
+      - ["base_link", "wheel_link3"]
+      - ["torso_link2", "torso_link4"]
+    base_footprint_link_name: "base_link"
+
+    holonomic_base:
+      force_sphere_wheel_approximation: true
+
+    locomotion:
+      base_joint_names: ["base_footprint_x_joint", "base_footprint_y_joint", "base_footprint_rz_joint"]
+      floor_touching_base_link_names: ["wheel_link1", "wheel_link2", "wheel_link3"]
+
+    articulated_trunk:
+      trunk_link_names: ["torso_link1", "torso_link2", "torso_link3", "torso_link4"]
+      trunk_joint_names: ["torso_joint1", "torso_joint2", "torso_joint3", "torso_joint4"]
+
+    mobile_manipulation:
+      untucked_default_joint_pos: [5.4849e-06, -1.2843e-05, 4.7727e-03, 2.5797e-03, 1.0873e-03, -2.1720e-06, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.906, 1.906, -0.991, -0.991, 1.571, 1.571, 0.915, 0.915, -1.571, -1.571, 0.05, 0.05, 0.05, 0.05]
+      tucked_default_joint_pos: [5.4849e-06, -1.2843e-05, 4.7727e-03, 2.5797e-03, 1.0873e-03, -2.1720e-06, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.05, 0.05, 0.05, 0.05]
+
+    manipulation:
+      n_arms: 2
+      arm_names: ["left", "right"]
+      arm_link_names:
+        left: ["left_arm_link1", "left_arm_link2", "left_arm_link3", "left_arm_link4", "left_arm_link5", "left_arm_link6"]
+        right: ["right_arm_link1", "right_arm_link2", "right_arm_link3", "right_arm_link4", "right_arm_link5", "right_arm_link6"]
+      arm_joint_names:
+        left: ["left_arm_joint1", "left_arm_joint2", "left_arm_joint3", "left_arm_joint4", "left_arm_joint5", "left_arm_joint6"]
+        right: ["right_arm_joint1", "right_arm_joint2", "right_arm_joint3", "right_arm_joint4", "right_arm_joint5", "right_arm_joint6"]
+      eef_link_names:
+        left: "left_eef_link"
+        right: "right_eef_link"
+      finger_link_names:
+        left: ["left_gripper_link1", "left_gripper_link2"]
+        right: ["right_gripper_link1", "right_gripper_link2"]
+      finger_joint_names:
+        left: ["left_gripper_axis1", "left_gripper_axis2"]
+        right: ["right_gripper_axis1", "right_gripper_axis2"]
+      arm_workspace_range:
+        left: [-45, 45]
+        right: [-45, 45]
+    ```
+
+If your robot is a manipulation robot, it additionally needs a **CuRobo** description YAML (for end-effector motion planning) under `models/<name>/curobo/`. When you import with `import_custom_robot.py`, **these are generated automatically** from the `curobo` block in your source config (shown in the R1 source config above) — you do not write them by hand. The generated file looks like:
+
+
 
 ??? code "r1_description_curobo_default.yaml"
     ``` yaml linenums="1"
@@ -1198,8 +1197,34 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
     ```
 
 
+## Collision handling
+
+The importer **auto-detects** existing collision proxies (`link_has_dedicated_collision`): a link whose `<collision>` is a primitive or a mesh *different* from its visual mesh is **preserved**; a link is only regenerated when its collision is missing or identical to the visual mesh (regenerating a hull from a dense visual mesh balloons it and causes self-collision instability). The `collision.{coacd_links, convex_links, no_decompose_links, no_collision_links}` lists are **overrides** on top of this:
+
+- Ships good collision meshes -> leave the lists empty (preserved automatically).
+- Ships none -> pick `convex` (fast, one hull/link; good with `self_collisions: false`) or `coacd` (slower, multi-hull; `pip install coacd`). A single convex base hull + `use_sphere_wheels` keeps a mobile base flat.
+- Put sensor/decoration frames (cameras, IMUs, F/T sensors) in `no_collision_links`.
+
+Some additional notes:
+
+- **Spaces/parens/non-ASCII in names or mesh filenames** are the most common hard failure: the importer renames offending links/joints and names each geometry prim after the mesh basename, so a space yields an ill-formed USD path and the import fails (surfacing as a `null prim` error). Run `stage_meshes` and `sanitize_names`, then re-`urdf_audit` until `package_uris`/`broken_relative_paths`/`mimic_joints`/`nonascii_paths` are `0`.
+- **Isaac Sim 5.1 no longer merges fixed-joint links that carry mass/inertia** (4.x did). These leftover sub-parts can self-collide at rest — disable them individually via `disabled_collision_link_names`, unless the link needs collision (e.g. gripper fingertips).
+- **IK arms require `default_joint_pos`**, or load crashes.
+- **CAD exports often ship bad inertials / off-scale masses / zeroed limits** — audit and repair (`override_joint_limits`, `set_joint_dynamics`) first.
+
 ## Deploy Your Robot!
 
-You can now try testing your custom robot! Import and control the robot by launching `python omnigibson/examples/robot/robot_control_examples.py`! Try different controller options and teleop the robot with your keyboard, If you observe poor joint behavior, you can inspect and tune relevant joint parameters as needed. This test also exposes other bugs that may have occurred along the way, such as missing / bad joint limits, collisions, etc. Please refer to the Franka or Fetch robots as a baseline for a common set of joint parameters that work well. This is what our newly imported Stretch robot looks like in action:
+You can now test your custom robot by launching the control example:
+
+```bash
+python omnigibson/examples/robots/robot_control_example.py
+```
+
+Try different controller options and teleop the robot with your keyboard. If you observe poor joint behavior, inspect and tune the relevant joint parameters as needed — this also exposes bugs that may have crept in along the way (missing/bad joint limits, collisions, etc.). Please refer to the Franka or Fetch robots as a baseline for joint parameters that work well.
+
+!!! tip "Validation gates"
+    A quick programmatic check helps: load into `Rs_int`, step a few dozen frames with a **zero action** and assert the robot settles (max joint velocity -> ~0) without drifting, then nudge each controller's action slice and assert its joints respond. Note `get_joint_positions()`/`get_joint_velocities()` return **torch tensors** — `.detach().cpu().numpy()` before NumPy ops.
+
+This is what our newly imported Stretch robot looks like in action:
 
  ![Stretch Import Test](../assets/tutorials/stretch-import-test.png)
