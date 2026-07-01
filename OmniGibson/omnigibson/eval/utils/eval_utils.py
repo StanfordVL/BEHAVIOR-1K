@@ -1,31 +1,63 @@
 import csv
 import os
+import random
 import numpy as np
+import torch as th
 from collections import OrderedDict
 from omnigibson.macros import gm
 
 
-ROBOT_CAMERA_NAMES = {
-    "R1Pro": {
-        "left_wrist": "robot_r1::robot_r1:left_realsense_link:Camera:0",
-        "right_wrist": "robot_r1::robot_r1:right_realsense_link:Camera:0",
-        "head": "robot_r1::robot_r1:zed_link:Camera:0",
-    },
-}
-
 HEAD_RESOLUTION = (720, 720)
 WRIST_RESOLUTION = (480, 480)
+DEFAULT_EVAL_SEED = 0
+NUM_TEST_INSTANCES = 40
+NUM_PUBLIC_TEST_INSTANCES = 20
+NUM_HIDDEN_TEST_INSTANCES = NUM_TEST_INSTANCES - NUM_PUBLIC_TEST_INSTANCES
+TEST_INSTANCE_IDS = list(range(301, 341))
+
+
+def seed_everything(seed: int, deterministic_torch: bool = False) -> int:
+    """
+    Seed Python, NumPy, and Torch RNGs used by eval.
+
+    Setting PYTHONHASHSEED here helps child processes and documents the intended seed, but
+    hash randomization for the current Python process is fixed at interpreter startup.
+    """
+    seed = int(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    th.manual_seed(seed)
+    if th.cuda.is_available():
+        th.cuda.manual_seed(seed)
+        th.cuda.manual_seed_all(seed)
+    try:
+        import warp as wp
+
+        wp.rand_init(seed)
+    except ImportError:
+        pass
+
+    if hasattr(th.backends, "cudnn"):
+        th.backends.cudnn.benchmark = False
+        th.backends.cudnn.deterministic = True
+
+    if deterministic_torch:
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        try:
+            th.use_deterministic_algorithms(True, warn_only=True)
+        except TypeError:
+            th.use_deterministic_algorithms(True)
+
+    return seed
 
 
 def _load_challenge_task_ids() -> dict[str, int]:
     task_ids = {}
-    for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
-        task_misc_path = os.path.join(gm.DATA_PATH, f"{year}-challenge-task-instances", "metadata", filename)
-        if not os.path.exists(task_misc_path):
-            continue
-        with open(task_misc_path, newline="", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                task_ids[row["Task"]] = int(row["Task ID"])
+    task_misc_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "B100_task_misc.csv")
+    with open(task_misc_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            task_ids[row["Task"]] = int(row["Task ID"])
     return task_ids
 
 
@@ -33,7 +65,6 @@ TASK_NAMES_TO_INDICES = _load_challenge_task_ids()
 if not TASK_NAMES_TO_INDICES:
     raise RuntimeError(
         "Could not load challenge task metadata. Expected one of: "
-        f"{os.path.join(gm.DATA_PATH, '2025-challenge-task-instances', 'metadata', 'B50_task_misc.csv')} or "
         f"{os.path.join(gm.DATA_PATH, '2026-challenge-task-instances', 'metadata', 'B100_task_misc.csv')}. "
         "Please ensure OMNIGIBSON_DATA_PATH / gm.DATA_PATH points at the BEHAVIOR data root."
     )
@@ -101,6 +132,32 @@ PROPRIOCEPTION_INDICES = {
         }
     ),
 }
+
+
+def get_robot_camera_names(robot_name: str, robot_eval_config: dict | None) -> dict[str, str]:
+    """
+    Return flattened observation names for cameras configured by eval role.
+
+    Robot configs may include:
+        eval:
+          camera_sensor_names:
+            head: robot_r1:zed_link:Camera:0
+
+    Values are robot sensor names, i.e. keys in robot.sensors. The flattened
+    observation name adds the robot observation namespace.
+    """
+    robot_eval_config = robot_eval_config or {}
+    camera_sensor_names = robot_eval_config.get("camera_sensor_names", {})
+    return {camera_id: f"{robot_name}::{sensor_name}" for camera_id, sensor_name in camera_sensor_names.items()}
+
+
+def set_sensor_modalities(sensor, modalities: set[str]) -> None:
+    for modality in tuple(sensor.modalities):
+        if modality not in modalities:
+            sensor.remove_modality(modality)
+    for modality in modalities:
+        if modality not in sensor.modalities:
+            sensor.add_modality(modality)
 
 
 def generate_basic_environment_config(task_name, task_cfg):

@@ -122,31 +122,28 @@ def get_scene_path(scene_name, dataset_name="behavior-1k-assets"):
     return os.path.join(scenes_path, scene_name)
 
 
-def get_task_instance_path(scene_name, instance_name):
+def get_task_instance_path(scene_name, instance_name, mode="train"):
     """
     Get task instance path
 
     Args:
         scene_name (str): scene name, e.g., "Rs_int"
         instance_name (str): instance name, e.g., "house_double_floor_lower_task_turning_on_radio_0_0_template"
+        mode (str): Instance split to load. One of "train", "public_test", or "hidden_test".
 
     Returns:
         str: file path to the scene name
     """
-    # TODO (@wensi-ai): unify the config file structure for 2025 and 2026 and simplify this loading logic before challenge announcement
-    task_instance_path = None
-    task_instances_path_2025 = os.path.join(
-        gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_name, "json", f"{instance_name}.json"
-    )
+    mode_to_dir = {
+        "train": "scenes",
+        "public_test": os.path.join("scene_test", "public"),
+        "hidden_test": os.path.join("scene_test", "private"),
+    }
+    assert mode in mode_to_dir, f"Invalid task instance mode: {mode}"
     task_instances_path_2026 = os.path.join(
-        gm.DATA_PATH, "2026-challenge-task-instances", "scenes", scene_name, "json", f"{instance_name}.json"
+        gm.DATA_PATH, "2026-challenge-task-instances", mode_to_dir[mode], scene_name, "json", f"{instance_name}.json"
     )
-    if os.path.exists(task_instances_path_2025):
-        task_instance_path = task_instances_path_2025
-    # 2026 instances take precedence over 2025 instances if both exist
-    if os.path.exists(task_instances_path_2026):
-        task_instance_path = task_instances_path_2026
-    return task_instance_path
+    return task_instances_path_2026 if os.path.exists(task_instances_path_2026) else None
 
 
 def get_category_path(category_name, dataset_name="behavior-1k-assets"):
@@ -587,6 +584,12 @@ def download_behavior_1k_assets(accept_license=False):
         download_and_unpack_zipped_dataset("behavior-1k-assets")
 
 
+def download_2026_challenge_task_instances():
+    if not os.path.exists(get_dataset_path("2026-challenge-task-instances")):
+        download_and_unpack_zipped_dataset("2026-challenge-task-instances")
+    print("2026 BEHAVIOR Challenge Task Instances updated.")
+
+
 def download_2025_challenge_task_instances():
     if not os.path.exists(get_dataset_path("2025-challenge-task-instances")):
         download_and_unpack_zipped_dataset("2025-challenge-task-instances")
@@ -646,6 +649,11 @@ if __name__ == "__main__":
         action="store_true",
         help="download 2025 BEHAVIOR Challenge Tasks dataset",
     )
+    parser.add_argument(
+        "--download_2026_challenge_task_instances",
+        action="store_true",
+        help="download 2026 BEHAVIOR Challenge Tasks dataset",
+    )
     parser.add_argument("--accept_license", action="store_true", help="pre-accept the BEHAVIOR-1K dataset license")
     args = parser.parse_args()
 
@@ -657,5 +665,7 @@ if __name__ == "__main__":
         download_behavior_1k_assets(accept_license=args.accept_license)
     if args.download_2025_challenge_task_instances:
         download_2025_challenge_task_instances()
+    if args.download_2026_challenge_task_instances:
+        download_2026_challenge_task_instances()
 
     og.shutdown()

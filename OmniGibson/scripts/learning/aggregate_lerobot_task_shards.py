@@ -34,13 +34,10 @@ def ensure_shared_permissions(path: Path) -> None:
 
 def load_task_mapping(data_root: Path) -> dict[str, int]:
     task_mapping = {}
-    for year, filename in (("2025", "B50_task_misc.csv"), ("2026", "B100_task_misc.csv")):
-        task_misc_path = data_root / f"{year}-challenge-task-instances" / "metadata" / filename
-        if not task_misc_path.exists():
-            continue
-        with task_misc_path.open(newline="", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                task_mapping[row["Task"]] = int(row["Task ID"])
+    task_misc_path = data_root / "2026-challenge-task-instances" / "metadata" / "B100_task_misc.csv"
+    with task_misc_path.open(newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            task_mapping[row["Task"]] = int(row["Task ID"])
 
     return task_mapping
 
