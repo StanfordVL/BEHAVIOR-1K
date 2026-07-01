@@ -171,9 +171,10 @@ def stage_meshes(tree: ET.ElementTree, dest_dir: PathLike, invalid_chars: str = 
                 i += 1
             base = f"{stem}_{i}{suffix}"
         target = dest / base
-        if src.exists():
-            shutil.copy2(src, target)
-            copied += 1
+        if not src.exists():
+            raise FileNotFoundError(f"Mesh file referenced by URDF does not exist: {src}")
+        shutil.copy2(src, target)
+        copied += 1
         used_names[base] = str(src)
         src_to_dest[str(src)] = str(target)
         mesh.set("filename", str(target))
