@@ -122,19 +122,26 @@ def get_scene_path(scene_name, dataset_name="behavior-1k-assets"):
     return os.path.join(scenes_path, scene_name)
 
 
-def get_task_instance_path(scene_name, instance_name):
+def get_task_instance_path(scene_name, instance_name, mode="train"):
     """
     Get task instance path
 
     Args:
         scene_name (str): scene name, e.g., "Rs_int"
         instance_name (str): instance name, e.g., "house_double_floor_lower_task_turning_on_radio_0_0_template"
+        mode (str): Instance split to load. One of "train", "public_test", or "hidden_test".
 
     Returns:
         str: file path to the scene name
     """
+    mode_to_dir = {
+        "train": "scenes",
+        "public_test": os.path.join("scene_test", "public"),
+        "hidden_test": os.path.join("scene_test", "private"),
+    }
+    assert mode in mode_to_dir, f"Invalid task instance mode: {mode}"
     task_instances_path_2026 = os.path.join(
-        gm.DATA_PATH, "2026-challenge-task-instances", "scenes", scene_name, "json", f"{instance_name}.json"
+        gm.DATA_PATH, "2026-challenge-task-instances", mode_to_dir[mode], scene_name, "json", f"{instance_name}.json"
     )
     return task_instances_path_2026 if os.path.exists(task_instances_path_2026) else None
 

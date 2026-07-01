@@ -10,6 +10,7 @@ Example:
     python -m omnigibson.eval.eval \
         --task-name turning_on_radio \
         --robot-config omnigibson/eval/r1pro.yaml \
+        --mode public_test \
         --host 127.0.0.1 --port 8000 \
         --instance-indices 0 --max-steps 500 \
         --output-dir outputs/b1k_eval --write-video
@@ -47,7 +48,16 @@ def parse_args() -> argparse.Namespace:
         type=int,
         nargs="+",
         default=[0],
-        help="Indices into the task's 40 test instance IDs. Indices 0-19 are public; 20-39 are hidden.",
+        help=(
+            "Instance indices for the selected mode. For train these are direct train instance IDs; "
+            "for public_test / hidden_test these index into that 20-instance split."
+        ),
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("train", "public_test", "hidden_test"),
+        default="public_test",
+        help="Instance split to evaluate. Default: public_test.",
     )
     parser.add_argument("--num-rollouts", type=int, default=1, help="Rollouts per instance.")
     parser.add_argument(
@@ -90,8 +100,8 @@ def main() -> None:
 
     from omnigibson.eval.evaluator import Evaluator, resolve_instance_ids
 
-    instance_ids = resolve_instance_ids(args.task_name, args.instance_indices)
-    logger.info(f"Resolved test instance ids for {args.task_name}: {instance_ids}")
+    instance_ids = resolve_instance_ids(args.task_name, args.instance_indices, mode=args.mode)
+    logger.info(f"Resolved {args.mode} instance ids for {args.task_name}: {instance_ids}")
 
     robot_config = None
     if args.robot_config is not None:
@@ -112,6 +122,7 @@ def main() -> None:
             "partial_scene_load": True,
             "max_steps": args.max_steps,
             "write_video": args.write_video,
+            "mode": args.mode,
             "task": {"name": args.task_name},
             "robot": robot_config,
         }

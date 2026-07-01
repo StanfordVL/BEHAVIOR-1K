@@ -1,5 +1,4 @@
 import argparse
-import csv
 import json
 import os
 from collections import defaultdict
@@ -230,6 +229,7 @@ def _write_task_jsonl(totals: dict, task_names_by_idx: dict[int, str], output_pa
 NUM_TEST_INSTANCES = 40
 NUM_PUBLIC_TEST_INSTANCES = 20
 NUM_HIDDEN_TEST_INSTANCES = NUM_TEST_INSTANCES - NUM_PUBLIC_TEST_INSTANCES
+TEST_INSTANCE_IDS = list(range(301, 341))
 
 
 def sanity_check_filename(input_dir: str) -> None:
@@ -284,22 +284,13 @@ def compute_final_q_score(
     # get the root of the input dir to extract team, affiliation, date
     base_name = os.path.basename(os.path.normpath(input_dir))
     track, testset, team, affiliation, date = base_name.split(".")
-    task_instance_csv_path = os.path.join(
-        gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "test_instances.csv"
-    )
-    with open(task_instance_csv_path, newline="", encoding="utf-8") as f:
-        rows = {row["Task"]: row for row in csv.DictReader(f)}
     # get all possible filenames:
     possible_filenames = set()
     for task_name in TASK_NAMES_TO_INDICES:
-        test_instances = [int(x.strip()) for x in rows[task_name]["Test Instance IDs"].split(",")]
-        assert (
-            len(test_instances) == NUM_TEST_INSTANCES
-        ), f"Expected {NUM_TEST_INSTANCES} test instances for {task_name}, got {len(test_instances)}"
         test_instances = (
-            test_instances[:NUM_PUBLIC_TEST_INSTANCES]
+            TEST_INSTANCE_IDS[:NUM_PUBLIC_TEST_INSTANCES]
             if testset == "public"
-            else test_instances[NUM_PUBLIC_TEST_INSTANCES:]
+            else TEST_INSTANCE_IDS[NUM_PUBLIC_TEST_INSTANCES:]
         )
         for instance_id in test_instances:
             for rollout_id in range(1):  # 1 rollout per instance

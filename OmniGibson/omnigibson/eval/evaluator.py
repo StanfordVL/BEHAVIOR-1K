@@ -1,4 +1,3 @@
-import csv
 import cv2
 import json
 import logging
@@ -46,7 +45,11 @@ LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 EVAL_BASE_LINK_MASS = 250.0
 EVAL_HEAD_HORIZONTAL_APERTURE = 40.0
 NUM_TEST_INSTANCES = 40
+NUM_PUBLIC_TEST_INSTANCES = 20
+NUM_HIDDEN_TEST_INSTANCES = NUM_TEST_INSTANCES - NUM_PUBLIC_TEST_INSTANCES
+TEST_INSTANCE_IDS = list(range(301, 341))
 DEFAULT_ROBOT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "r1pro.yaml")
+EVAL_MODES = ("train", "public_test", "hidden_test")
 
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
@@ -63,19 +66,20 @@ def _to_plain_dict(cfg: Any) -> dict | None:
     return dict(cfg)
 
 
-def resolve_instance_ids(task_name: str, instance_indices: list[int]) -> list[int]:
-    task_instance_csv_path = os.path.join(
-        gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "test_instances.csv"
+def resolve_instance_ids(task_name: str, instance_indices: list[int], mode: str = "public_test") -> list[int]:
+    assert mode in EVAL_MODES, f"Mode must be one of {EVAL_MODES}, got {mode}"
+    if mode == "train":
+        return [int(instance_id) for instance_id in instance_indices]
+
+    test_instances = (
+        TEST_INSTANCE_IDS[:NUM_PUBLIC_TEST_INSTANCES]
+        if mode == "public_test"
+        else TEST_INSTANCE_IDS[NUM_PUBLIC_TEST_INSTANCES:]
     )
-    with open(task_instance_csv_path, newline="", encoding="utf-8") as f:
-        row = next(row for row in csv.DictReader(f) if row["Task"] == task_name)
-    test_instances = [int(instance_id.strip()) for instance_id in row["Test Instance IDs"].split(",")]
-    assert (
-        len(test_instances) == NUM_TEST_INSTANCES
-    ), f"Expected {NUM_TEST_INSTANCES} test instances for {task_name}, got {len(test_instances)}"
+    num_split_instances = NUM_PUBLIC_TEST_INSTANCES if mode == "public_test" else NUM_HIDDEN_TEST_INSTANCES
     assert set(instance_indices).issubset(
-        set(range(NUM_TEST_INSTANCES))
-    ), f"Instance indices must be in range({NUM_TEST_INSTANCES})"
+        set(range(num_split_instances))
+    ), f"Instance indices must be in range({num_split_instances}) for mode {mode}"
     return [int(test_instances[i]) for i in instance_indices]
 
 
@@ -276,12 +280,17 @@ class Evaluator:
             activity_definition_id=self.env.task.activity_definition_id,
             activity_instance_id=instance_id,
         )
-        tro_file_path = os.path.join(
-            get_task_instance_path(
-                scene_model,
-                f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
-            )
+        mode = self.cfg.get("mode", "public_test")
+        tro_file_path = get_task_instance_path(
+            scene_model,
+            f"{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state",
+            mode=mode,
         )
+        if tro_file_path is None:
+            raise FileNotFoundError(
+                f"Could not find 2026 {mode} task instance {instance_id} for "
+                f"{self.env.task.activity_name} in scene {scene_model}."
+            )
 
         with open(tro_file_path, "r") as f:
             tro_state = recursively_convert_to_torch(json.load(f))
