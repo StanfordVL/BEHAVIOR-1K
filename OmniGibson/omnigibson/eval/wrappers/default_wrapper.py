@@ -1,5 +1,5 @@
 from omnigibson.envs import Environment, EnvironmentWrapper
-from omnigibson.eval.utils.eval_utils import ROBOT_CAMERA_NAMES
+from omnigibson.eval.utils.eval_utils import set_sensor_modalities
 from omnigibson.utils.ui_utils import create_module_logger
 
 
@@ -17,9 +17,10 @@ class DefaultWrapper(EnvironmentWrapper):
     def __init__(self, env: Environment):
         super().__init__(env=env)
         robot = env.robots[0]
-        for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
-            sensor_name = camera_name.split("::")[1]
-            sensor = robot.sensors[sensor_name]
+        for sensor_name, sensor in robot.sensors.items():
+            if not hasattr(sensor, "image_height") or not hasattr(sensor, "image_width"):
+                continue
+            set_sensor_modalities(sensor, {"rgb"})
             sensor.image_height = 224
             sensor.image_width = 224
             sensor_space = sensor.load_observation_space()

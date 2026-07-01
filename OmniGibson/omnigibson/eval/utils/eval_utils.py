@@ -5,14 +5,6 @@ from collections import OrderedDict
 from omnigibson.macros import gm
 
 
-ROBOT_CAMERA_NAMES = {
-    "R1Pro": {
-        "left_wrist": "robot_r1::robot_r1:left_realsense_link:Camera:0",
-        "right_wrist": "robot_r1::robot_r1:right_realsense_link:Camera:0",
-        "head": "robot_r1::robot_r1:zed_link:Camera:0",
-    },
-}
-
 HEAD_RESOLUTION = (720, 720)
 WRIST_RESOLUTION = (480, 480)
 
@@ -97,6 +89,32 @@ PROPRIOCEPTION_INDICES = {
         }
     ),
 }
+
+
+def get_robot_camera_names(robot_name: str, robot_eval_config: dict | None) -> dict[str, str]:
+    """
+    Return flattened observation names for cameras configured by eval role.
+
+    Robot configs may include:
+        eval:
+          camera_sensor_names:
+            head: robot_r1:zed_link:Camera:0
+
+    Values are robot sensor names, i.e. keys in robot.sensors. The flattened
+    observation name adds the robot observation namespace.
+    """
+    robot_eval_config = robot_eval_config or {}
+    camera_sensor_names = robot_eval_config.get("camera_sensor_names", {})
+    return {camera_id: f"{robot_name}::{sensor_name}" for camera_id, sensor_name in camera_sensor_names.items()}
+
+
+def set_sensor_modalities(sensor, modalities: set[str]) -> None:
+    for modality in tuple(sensor.modalities):
+        if modality not in modalities:
+            sensor.remove_modality(modality)
+    for modality in modalities:
+        if modality not in sensor.modalities:
+            sensor.add_modality(modality)
 
 
 def generate_basic_environment_config(task_name, task_cfg):

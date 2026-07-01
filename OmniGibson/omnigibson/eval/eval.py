@@ -9,6 +9,7 @@ task it runs a rollout and writes a per-rollout result JSON compatible with
 Example:
     python -m omnigibson.eval.eval \
         --task-name turning_on_radio \
+        --robot-config omnigibson/eval/r1pro.yaml \
         --host 127.0.0.1 --port 8000 \
         --instance-indices 0 --max-steps 500 \
         --output-dir outputs/b1k_eval --write-video
@@ -18,6 +19,7 @@ import argparse
 import json
 import logging
 import os
+from pathlib import Path
 
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -31,6 +33,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--task-name", required=True, help="BEHAVIOR task name, e.g. turning_on_radio.")
     parser.add_argument("--host", default="127.0.0.1", help="Policy websocket server host.")
     parser.add_argument("--port", type=int, default=8000, help="Policy websocket server port.")
+    parser.add_argument(
+        "--robot-config",
+        type=str,
+        default=None,
+        help=(
+            "Optional path to YAML/JSON file containing one complete robot config dictionary with canonical "
+            "'model' and 'name' fields. Add eval.camera_sensor_names to configure eval camera roles."
+        ),
+    )
     parser.add_argument(
         "--instance-indices",
         type=int,
@@ -82,6 +93,12 @@ def main() -> None:
     instance_ids = resolve_instance_ids(args.task_name, args.instance_indices)
     logger.info(f"Resolved test instance ids for {args.task_name}: {instance_ids}")
 
+    robot_config = None
+    if args.robot_config is not None:
+        robot_config_path = Path(args.robot_config).expanduser()
+        robot_config = OmegaConf.load(str(robot_config_path))
+        logger.info(f"Loaded robot config from {robot_config_path}")
+
     cfg = OmegaConf.create(
         {
             "env_wrapper": {"_target_": args.env_wrapper},
@@ -96,7 +113,7 @@ def main() -> None:
             "max_steps": args.max_steps,
             "write_video": args.write_video,
             "task": {"name": args.task_name},
-            "robot": {"type": "R1Pro", "controllers": None},
+            "robot": robot_config,
         }
     )
 

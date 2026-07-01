@@ -20,17 +20,15 @@ import omnigibson.utils.transform_utils as T
 from gello.utils.og_teleop_cfg import DISABLED_TRANSITION_RULES
 from gello.utils.og_teleop_utils import (
     augment_rooms,
-    generate_robot_config,
     get_task_relevant_room_types,
     load_available_tasks,
 )
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.eval.utils.eval_utils import (
-    PROPRIOCEPTION_INDICES,
-    ROBOT_CAMERA_NAMES,
     TASK_NAMES_TO_INDICES,
     flatten_obs_dict,
     generate_basic_environment_config,
+    get_robot_camera_names,
 )
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.eval.utils.score_utils import load_human_stats
@@ -48,12 +46,21 @@ LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 EVAL_BASE_LINK_MASS = 250.0
 EVAL_HEAD_HORIZONTAL_APERTURE = 40.0
 NUM_TEST_INSTANCES = 40
+DEFAULT_ROBOT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "r1pro.yaml")
 
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 
 logger = create_module_logger(module_name=__name__)
 logger.setLevel(logging.INFO)
+
+
+def _to_plain_dict(cfg: Any) -> dict | None:
+    if cfg is None:
+        return None
+    if isinstance(cfg, DictConfig):
+        cfg = OmegaConf.to_container(cfg, resolve=True)
+    return dict(cfg)
 
 
 def resolve_instance_ids(task_name: str, instance_indices: list[int]) -> list[int]:
@@ -80,9 +87,14 @@ class Evaluator:
         self.n_success_trials = 0
         self.total_time = 0
         self.robot_action = dict()
+        self.robot_name = None
+        self.robot_eval_config = {}
+        self.robot_camera_names = {}
 
         self.env = self.load_env(env_wrapper=self.cfg.env_wrapper)
         self.robot = self.load_robot()
+        self.robot_camera_names = get_robot_camera_names(self.robot.name, self.robot_eval_config)
+        self._validate_robot_eval_config()
         self._apply_robot_eval_settings()
         self.policy = self.load_policy()
         self.metrics = self.load_metrics()
@@ -133,31 +145,15 @@ class Evaluator:
         self.human_stats = load_human_stats(task_name)
 
         task_cfg = available_tasks[task_name][0]
-        robot_type = self.cfg.robot.type
-        robot_model = robot_type.lower()
-        assert robot_model == "r1pro", f"Got invalid robot type: {robot_type}, only R1Pro is supported."
-
         cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg)
         if self.cfg.partial_scene_load:
             relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
             relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
             cfg["scene"]["load_room_types"] = relevant_rooms
 
-        cfg["robots"] = [
-            generate_robot_config(
-                robot_type=robot_model,
-                robot_name="robot_r1",
-                task_name=task_name,
-                task_cfg=task_cfg,
-            )
-        ]
-        cfg["robots"][0]["model"] = cfg["robots"][0].pop("type")
-        cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb"]
-        cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
-        if self.cfg.robot.controllers is not None:
-            cfg["robots"][0]["controller_config"].update(
-                OmegaConf.to_container(self.cfg.robot.controllers, resolve=True)
-            )
+        robot_cfg = self._build_robot_config(task_name=task_name, task_cfg=task_cfg)
+        self.robot_name = robot_cfg["name"]
+        cfg["robots"] = [robot_cfg]
 
         if self.cfg.max_steps is None:
             logger.info(
@@ -170,10 +166,50 @@ class Evaluator:
         cfg["task"]["include_obs"] = False
 
         env = og.Environment(configs=cfg)
+        env._eval_robot_config = self.robot_eval_config
         return instantiate(env_wrapper, env=env)
 
     def load_robot(self) -> Robot:
-        return self.env.scene.object_registry("name", "robot_r1")
+        if self.robot_name is not None:
+            return self.env.scene.object_registry("name", self.robot_name)
+        return self.env.robots[0]
+
+    def _validate_robot_eval_config(self) -> None:
+        missing_camera_sensors = []
+        for camera_id, camera_name in self.robot_camera_names.items():
+            sensor_name = camera_name.split("::", 1)[1]
+            if sensor_name not in self.robot.sensors:
+                missing_camera_sensors.append(f"{camera_id}: {sensor_name}")
+        if missing_camera_sensors:
+            raise ValueError(
+                "Configured eval.camera_sensor_names entries were not found in robot.sensors: "
+                f"{missing_camera_sensors}"
+            )
+
+        if self.cfg.get("write_video", False):
+            required_camera_ids = {"left_wrist", "right_wrist", "head"}
+            missing_camera_ids = sorted(required_camera_ids - set(self.robot_camera_names))
+            if missing_camera_ids:
+                raise ValueError(
+                    "--write-video requires eval.camera_sensor_names roles "
+                    f"{sorted(required_camera_ids)}; missing {missing_camera_ids}"
+                )
+
+    def _build_robot_config(self, task_name: str, task_cfg: dict) -> dict:
+        robot_cfg = _to_plain_dict(OmegaConf.select(self.cfg, "robot"))
+        if robot_cfg is None:
+            robot_cfg = _to_plain_dict(OmegaConf.load(DEFAULT_ROBOT_CONFIG_PATH))
+        else:
+            robot_cfg = dict(robot_cfg)
+        assert "model" in robot_cfg, "Robot config must include canonical 'model'"
+        assert "type" not in robot_cfg, "Robot config must use canonical 'model', not 'type'"
+        robot_cfg["model"] = robot_cfg["model"].lower()
+        assert "name" in robot_cfg, "Robot config must include 'name'"
+        self.robot_eval_config = _to_plain_dict(robot_cfg.pop("eval", None)) or {}
+        robot_cfg["position"] = task_cfg["robot_start_position"]
+        robot_cfg["orientation"] = task_cfg["robot_start_orientation"]
+
+        return robot_cfg
 
     def _apply_robot_eval_settings(self) -> None:
         if self.robot.model in ("r1", "r1pro"):
@@ -181,8 +217,11 @@ class Evaluator:
             self.robot.base_footprint_link.mass = EVAL_BASE_LINK_MASS
             og.sim.play()
 
-        head_sensor_name = ROBOT_CAMERA_NAMES["R1Pro"]["head"].split("::")[1]
-        self.robot.sensors[head_sensor_name].horizontal_aperture = EVAL_HEAD_HORIZONTAL_APERTURE
+        head_camera_name = self.robot_camera_names.get("head")
+        if head_camera_name is not None:
+            head_sensor_name = head_camera_name.split("::")[1]
+            if head_sensor_name in self.robot.sensors:
+                self.robot.sensors[head_sensor_name].horizontal_aperture = EVAL_HEAD_HORIZONTAL_APERTURE
 
     def load_policy(self) -> Any:
         policy = instantiate(self.cfg.model)
@@ -252,7 +291,7 @@ class Evaluator:
                 if "robot" in presampled_robot_poses:
                     available_poses = presampled_robot_poses["robot"]
                 elif self.robot.model in presampled_robot_poses:
-                    print("No generic presampled robot pose found, using robot-specific pose.")
+                    logger.info("No generic presampled robot pose found, using robot-specific pose.")
                     available_poses = presampled_robot_poses[self.robot.model]
                 else:
                     raise KeyError(f"No generic or model-specific presampled robot pose found for {self.robot.model}!")
@@ -282,8 +321,11 @@ class Evaluator:
         obs = flatten_obs_dict(obs)
         base_pose = self.robot.get_position_orientation()
         cam_rel_poses = []
-        for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
-            camera = self.robot.sensors[camera_name.split("::")[1]]
+        for camera_name in self.robot_camera_names.values():
+            sensor_name = camera_name.split("::")[1]
+            if sensor_name not in self.robot.sensors:
+                continue
+            camera = self.robot.sensors[sensor_name]
             direct_cam_pose = camera.camera_parameters["cameraViewTransform"]
             if np.allclose(direct_cam_pose, np.zeros(16)):
                 cam_rel_poses.append(
@@ -292,23 +334,27 @@ class Evaluator:
             else:
                 cam_pose = T.mat2pose(th.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=th.float32))
                 cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
-        obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
+        if cam_rel_poses:
+            obs[f"{self.robot.name}::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         obs["task_id"] = th.tensor([TASK_NAMES_TO_INDICES[self.cfg.task.name]], dtype=th.int64)
         return obs
 
     def _write_video(self) -> None:
-        if ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb" not in self.obs:
+        required_camera_ids = ("left_wrist", "right_wrist", "head")
+        if not all(camera_id in self.robot_camera_names for camera_id in required_camera_ids):
+            return
+        if self.robot_camera_names["head"] + "::rgb" not in self.obs:
             return
         left_wrist_rgb = cv2.resize(
-            self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
+            self.obs[self.robot_camera_names["left_wrist"] + "::rgb"].numpy(),
             (224, 224),
         )
         right_wrist_rgb = cv2.resize(
-            self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["right_wrist"] + "::rgb"].numpy(),
+            self.obs[self.robot_camera_names["right_wrist"] + "::rgb"].numpy(),
             (224, 224),
         )
         head_rgb = cv2.resize(
-            self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb"].numpy(),
+            self.obs[self.robot_camera_names["head"] + "::rgb"].numpy(),
             (448, 448),
         )
         frame = np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0)
