@@ -60,7 +60,7 @@ Key arguments:
     </tr>
     <tr>
       <td><code>--instance-indices</code></td>
-      <td>Indices into the task's test instance list. Indices <code>0-19</code> are public test instances; indices <code>20-39</code> are hidden instances reserved for final evaluation.</td>
+      <td>Indices into the task's test instance list. Use indices <code>0 1 2 3 4 5 6 7 8 9</code> for reported evaluation results. Indices <code>0-19</code> are public test instances; indices <code>20-39</code> are hidden instances reserved for final evaluation.</td>
     </tr>
     <tr>
       <td><code>--num-rollouts</code></td>
@@ -221,7 +221,11 @@ The success score (**Q**) is the metric used for ranking submissions. If two sub
     </tr>
     <tr>
       <td>Self-evaluation and report</td>
-      <td>In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the <strong>first 10</strong> instances for evaluation results. Participants should report their performance on these 10 instances through the process described on the <a href="./submission.html">submission page</a>. You should evaluate your policy 1 time on each instance, using the default time-outs provided by our evaluation script. We will update the leaderboard once we sanity-check the performance. The <strong>remaining 10</strong> instances are not used for leaderboard reporting and may serve as a test set before evaluating your final policy.</td>
+      <td>In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the <strong>first 10 public instances</strong>, corresponding to instance indices <code>0-9</code> (<code>--instance-indices 0 1 2 3 4 5 6 7 8 9</code>), for evaluation results. Participants should report their performance on these 10 instances through the process described on the <a href="./submission.html">submission page</a>. You should evaluate your policy 1 time on each instance, using the default time-outs provided by our evaluation script. We will update the leaderboard once we sanity-check the performance. The <strong>remaining 10 public instances</strong>, indices <code>10-19</code>, are not used for leaderboard reporting and may serve as a test set before evaluating your final policy.</td>
+    </tr>
+    <tr>
+      <td>Simulation nondeterminism</td>
+      <td>Because the simulator can be nondeterministic, different rollouts of the same policy may produce different results for a given instance. This is expected. Participants should not cherry-pick rollout results for individual instances or assemble the best outcomes across runs, instances, or tasks to improve the reported success rate. The challenge uses many tasks and multiple instances per task to reduce the effect of rollout-level nondeterminism.</td>
     </tr>
     <tr>
       <td>Final evaluation</td>

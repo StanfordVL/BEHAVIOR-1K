@@ -10,6 +10,7 @@
 - **Full evaluation size:** 100 tasks x 10 instances x 1 rollout = 1,000 rollout outputs.
 - **Partial submissions are allowed.** Missing rollout instances count as zero in the final score.
 - **Multiple checkpoints** from the same team and model family are considered one entry.
+- **No cherry-picking rollout results.** Simulation nondeterminism is expected, and different rollouts of the same policy may produce different results for a given instance. Submissions should report the prescribed rollout for each instance rather than selecting the best outcomes across repeated runs, instances, or tasks.
 - **Robot configuration must be reproducible.** If you use a custom robot config with `--robot-config`, include the exact YAML/JSON file in your submission package.
 
 ## Evaluation Outputs
