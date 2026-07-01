@@ -22,6 +22,11 @@ import logging
 import os
 from pathlib import Path
 
+from omegaconf import OmegaConf
+
+from omnigibson.eval.evaluator import Evaluator, resolve_instance_ids
+from omnigibson.eval.utils.eval_utils import DEFAULT_EVAL_SEED, seed_everything
+from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
 
 
@@ -71,6 +76,12 @@ def parse_args() -> argparse.Namespace:
         default="omnigibson.eval.wrappers.DefaultWrapper",
         help="Target path of the EnvironmentWrapper to apply.",
     )
+    parser.add_argument(
+        "--policy",
+        choices=("websocket", "local"),
+        default="local",
+        help="Policy backend to use. local emits zero actions and is intended for eval smoke tests.",
+    )
     parser.add_argument("--output-dir", default="/tmp/b1k_eval", help="Where to write result JSONs.")
     parser.add_argument(
         "--write-video",
@@ -91,14 +102,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    from omnigibson.macros import gm
-
     gm.HEADLESS = args.headless
 
-    # Imported after macros are set; this also pulls in OmniGibson + gello.
-    from omegaconf import OmegaConf
-
-    from omnigibson.eval.evaluator import Evaluator, resolve_instance_ids
+    seed = seed_everything(DEFAULT_EVAL_SEED)
+    logger.info(f"Seeded Python, NumPy, and Torch with seed={seed}")
 
     instance_ids = resolve_instance_ids(args.task_name, args.instance_indices, mode=args.mode)
     logger.info(f"Resolved {args.mode} instance ids for {args.task_name}: {instance_ids}")
@@ -109,20 +116,26 @@ def main() -> None:
         robot_config = OmegaConf.load(str(robot_config_path))
         logger.info(f"Loaded robot config from {robot_config_path}")
 
+    if args.policy == "websocket":
+        model_cfg = {
+            "_target_": "omnigibson.eval.policies.WebsocketPolicy",
+            "host": args.host,
+            "port": args.port,
+        }
+    else:
+        model_cfg = {"_target_": "omnigibson.eval.policies.LocalPolicy", "action_dim": None}
+
     cfg = OmegaConf.create(
         {
             "env_wrapper": {"_target_": args.env_wrapper},
-            "policy_name": "websocket",
-            "model": {
-                "_target_": "omnigibson.eval.policies.WebsocketPolicy",
-                "host": args.host,
-                "port": args.port,
-            },
+            "policy_name": args.policy,
+            "model": model_cfg,
             "headless": args.headless,
             "partial_scene_load": True,
             "max_steps": args.max_steps,
             "write_video": args.write_video,
             "mode": args.mode,
+            "seed": seed,
             "task": {"name": args.task_name},
             "robot": robot_config,
         }

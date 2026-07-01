@@ -1,12 +1,51 @@
 import csv
 import os
+import random
 import numpy as np
+import torch as th
 from collections import OrderedDict
 from omnigibson.macros import gm
 
 
 HEAD_RESOLUTION = (720, 720)
 WRIST_RESOLUTION = (480, 480)
+DEFAULT_EVAL_SEED = 0
+
+
+def seed_everything(seed: int, deterministic_torch: bool = False) -> int:
+    """
+    Seed Python, NumPy, and Torch RNGs used by eval.
+
+    Setting PYTHONHASHSEED here helps child processes and documents the intended seed, but
+    hash randomization for the current Python process is fixed at interpreter startup.
+    """
+    seed = int(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    th.manual_seed(seed)
+    if th.cuda.is_available():
+        th.cuda.manual_seed(seed)
+        th.cuda.manual_seed_all(seed)
+    try:
+        import warp as wp
+
+        wp.rand_init(seed)
+    except ImportError:
+        pass
+
+    if hasattr(th.backends, "cudnn"):
+        th.backends.cudnn.benchmark = False
+        th.backends.cudnn.deterministic = True
+
+    if deterministic_torch:
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        try:
+            th.use_deterministic_algorithms(True, warn_only=True)
+        except TypeError:
+            th.use_deterministic_algorithms(True)
+
+    return seed
 
 
 def _load_challenge_task_ids() -> dict[str, int]:
