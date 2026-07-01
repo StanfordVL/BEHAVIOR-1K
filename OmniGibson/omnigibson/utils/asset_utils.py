@@ -580,7 +580,7 @@ def download_behavior_1k_assets(accept_license=False):
 def download_2026_challenge_task_instances():
     if not os.path.exists(get_dataset_path("2026-challenge-task-instances")):
         download_and_unpack_zipped_dataset("2026-challenge-task-instances")
-    print("2026 BEHAVIOR Challenge Tasks Instances updated.")
+    print("2026 BEHAVIOR Challenge Task Instances updated.")
 
 
 def download_2025_challenge_task_instances():
