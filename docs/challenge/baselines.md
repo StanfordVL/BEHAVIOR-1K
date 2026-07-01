@@ -33,7 +33,7 @@ Throughout this tutorial, replace the placeholders below with your local paths a
 
 ```bash
 git clone https://github.com/wensi-ai/openpi.git -b behavior
-git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+git clone -b v3.9.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
 ```
 
 ### Installation
@@ -180,7 +180,7 @@ This tutorial provides a simplest version instruction to finetune GR00T N1.7 on 
 
 ```
 git clone https://github.com/wensi-ai/Isaac-GR00T
-git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+git clone -b v3.9.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
 ```
 
 This finetuning instruction is adapted from the original Isaac-GR00T repo. 
