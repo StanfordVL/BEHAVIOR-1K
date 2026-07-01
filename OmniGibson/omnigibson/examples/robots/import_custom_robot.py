@@ -831,9 +831,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
 
 def resolve_dataset_name(cfg):
     """Output dataset for the imported robot (config ``dataset_name`` key, default ``omnigibson-robot-assets``)."""
-    name = cfg.get("dataset_name", None)
-    # addict.Dict returns an empty Dict() for a missing key, so treat any falsy value as unset.
-    return name if name else "omnigibson-robot-assets"
+    return cfg.get("dataset_name", "omnigibson-robot-assets")
 
 
 def shift_prim_local_z(prim, z_offset):
