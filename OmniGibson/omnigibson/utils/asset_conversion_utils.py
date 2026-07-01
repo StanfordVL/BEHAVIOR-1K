@@ -1067,7 +1067,9 @@ def _ensure_geom_xform_ops(prim):
         )
         xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
 
-    xformable.SetXformOpOrder([xform_op_translate, xform_op_orient, xform_op_scale])
+    ordered_ops = xformable.GetOrderedXformOps()
+    if not ordered_ops:
+        xformable.SetXformOpOrder([xform_op_translate, xform_op_orient, xform_op_scale])
 
 
 def convert_urdf_to_usd(
