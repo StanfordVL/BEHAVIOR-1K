@@ -1,170 +1,135 @@
-# 🏆 **2025 BEHAVIOR Challenge**
+# 🏆 **2026 BEHAVIOR Challenge**
 
-**Join us and solve 50 full-length household tasks in the realistic BEHAVIOR-1K environment, with 10,000 teleoperated expert demonstrations (1200+ hours) available!** 🤖
+Join us for the second year of the BEHAVIOR Challenge: solve **100 full-length household tasks** in the realistic BEHAVIOR-1K environment. BEHAVIOR tests whether embodied agents can combine high-level reasoning, long-horizon navigation, and dexterous bimanual manipulation in house-scale scenes.
 
-- Event: Foundation Models Meet Embodied Agents Challenge @ NeurIPS 2025
-- Time: Dec. 7th, 11:00 AM – 1:45 PM PST
-- Location: Mezzanine Room 15AB, Convention Center, or [over zoom](https://us06web.zoom.us/j/84419017872?pwd=EeE71l6XbsjdU6kqy8jHJF45MSR9vM.1)
+<div class="challenge-teaser-player" data-youtube-src="https://www.youtube.com/embed/ihihRCf5NI4?autoplay=1&mute=1&playsinline=1&enablejsapi=1&modestbranding=1&showinfo=0&rel=0&controls=1">
+  <button class="challenge-teaser-button" type="button" aria-label="Play BEHAVIOR Challenge teaser video">
+    <img src="../assets/challenge_teaser_frame_240.png" alt="BEHAVIOR Challenge teaser">
+    <span class="challenge-teaser-play" aria-hidden="true"></span>
+  </button>
+</div>
 
+<script>
+document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
+  const button = player.querySelector(".challenge-teaser-button");
+  if (!button) {
+    return;
+  }
 
----
+  button.addEventListener("click", () => {
+    const iframe = document.createElement("iframe");
+    const videoUrl = new URL(player.dataset.youtubeSrc);
+    videoUrl.searchParams.set("origin", window.location.origin);
+    videoUrl.searchParams.set("widget_referrer", window.location.href);
+    iframe.src = videoUrl.toString();
+    iframe.title = "BEHAVIOR Challenge Video";
+    iframe.setAttribute("frameborder", "0");
+    iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+    iframe.setAttribute("allowfullscreen", "");
+    iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    player.replaceChildren(iframe);
+  }, { once: true });
+});
+</script>
 
-## 📣 **Announcements**
+<div class="challenge-action-grid">
+  <section class="challenge-action-card challenge-action-card--deadlines">
+    <h2>Important Dates</h2>
+    <ul class="challenge-action-list">
+      <li><strong>Challenge Launch:</strong> <span>07/01/2026</span></li>
+      <li><strong>Submission Deadline:</strong> <span>10/16/2026</span></li>
+      <li><strong>Winners Announcement:</strong> <span>11/4/2026</span></li>
+    </ul>
+    <div class="challenge-action-links">
+      <a href="https://behavior-1k-2026-challenge-leaderboard.hf.space/submit">Submission Portal</a>
+      <a href="./submission.html">Submission Guidelines</a>
+    </div>
+  </section>
 
-!!! info "🗓️ 12/01/2025 — Leaderboard Open"
+  <section class="challenge-action-card challenge-action-card--venue">
+    <h2>Event Details</h2>
+    <ul class="challenge-action-list">
+      <li><strong>Event:</strong> <span>To be announced</span></li>
+      <li><strong>Time:</strong> <span>To be announced</span></li>
+      <li><strong>Location:</strong> <span>To be announced</span></li>
+    </ul>
+    <div class="challenge-action-links">
+      <a href="https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard">Leaderboard</a>
+      <a href="./evaluation.html">Evaluation & Rules</a>
+    </div>
+  </section>
+</div>
 
-    [Leaderboard](./leaderboard.md) for the 2025 BEHAVIOR Challenge is now officially online! Congradulations to the winners, and huge thanks to the participants for all the impressive submissions!
+## :material-view-dashboard: **Challenge at a Glance**
 
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td>Tasks</td>
+      <td>100 full-length household tasks</td>
+    </tr>
+    <tr>
+      <td>Environments</td>
+      <td>7 scenes, including 4 new scenes</td>
+    </tr>
+    <tr>
+      <td>Evaluation track</td>
+      <td>One track using RGB + depth + proprioception</td>
+    </tr>
+    <tr>
+      <td>Demonstrations</td>
+      <td>20,000 human teleoperation demos, 1,950 hours in total</td>
+    </tr>
+    <tr>
+      <td>Baselines</td>
+      <td>π0.5 (pi0.5) and GR00T N1.7</td>
+    </tr>
+    <tr>
+      <td>Ranking metric</td>
+      <td>Average task success score with BDDL partial credit</td>
+    </tr>
+    <tr>
+      <td>Prizes</td>
+      <td>To be announced, with special prizes for outstanding open-source solutions</td>
+    </tr>
+  </tbody>
+</table>
 
-!!! info "🗓️ 11/17/2025 — Submissions Closed"
+Detailed specifications live on the canonical challenge pages: [Dataset](./dataset.md), [Baselines](./baselines.md), [Evaluation and Rules](./evaluation.md), and [Submission Guidelines](./submission.md). Browse the full task list in the [Demo Gallery](./tasks/index.md).
 
-    Submissions for the 2025 BEHAVIOR Challenge have officially closed! We are thrilled to announce that we have received submissions from 18 teams across academia, industry, and individuals; participating from 4 countries (US, China, Canada, South Korea) and including some multinational teams. Stay tuned as we verify results for the final leaderboard!
+## :material-database: **Demonstration Data**
 
+The challenge provides large-scale human teleoperation demonstrations for learning long-horizon household behaviors. The release includes RGB and depth observations, robot proprioception and actions, and skill/subtask annotations; the full dataset format and statistics are documented on the [Dataset](./dataset.md) page.
 
-!!! info "🗓️ 11/13/2025 — Deadline Extension"
+Demonstrations were collected with **JoyLo**, a whole-body teleoperation interface for controlling the robot base, torso, arms, and grippers. We thank [Simovation](https://www.linkedin.com/company/simovationinc/) for providing high-quality JoyLo teleoperation data in simulation.
 
-    To allow any final evaluations to complete, we're extending the submission deadline by 24 hours.
-    The new deadline will now be November 16th 11:59PM AoE. Please plan accordingly as we will not be able to accept any late submissions!
+<div class="challenge-video-grid">
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/oVr3IYnQiys?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Annotation Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/fFAtUzEETe4?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Data Quality Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+</div>
 
+## :material-lightbulb-on-outline: **Why Participate**
 
-!!! info "🗓️ 11/07/2025 — Rule Clarifications"
-    Key updates this week:
-    
-    - Documentation updates
-    - Bug fixes & Hidden test logic addition. 
+BEHAVIOR tasks go beyond short pick-and-place or navigation benchmarks. Agents must search across rooms, manipulate many objects, handle object state changes, and satisfy symbolic BDDL goal conditions after several minutes of autonomous execution.
 
-    [Read full details →](./updates.md#11072025)
+The 2026 challenge is intended as a shared benchmark for testing robot foundation models, imitation learning, reinforcement learning, task and motion planning, memory systems, SLAM, and LLM-assisted policies under the same realistic evaluation protocol.
 
+The tasks also exercise diverse object state changes and low-level skills, including opening, closing, pouring, wiping, spraying, attaching, toggling, cooking, and slicing.
 
-!!! info "🗓️ 10/30/2025 — Rule Clarifications & Features Update"
-    Key updates this week:
-    
-    - We have released language annotations for all 50 tasks.
-    - We have included task id as part of the observation dict that the policy will receive. 
-    - Added more utilities (HeavyRobotWrapper, score_utils, etc.)
+<div class="challenge-video-grid">
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/3XKhbg9_MS4?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Long-Horizon Task Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/FeD8_KgVOag?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Skills Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+</div>
 
-    [Read full details →](./updates.md#10302025)
+## :octicons-person-add-16: **Getting Started**
 
-!!! info "🗓️ 10/08/2025 — Rule Clarifications, Bug Fixes & NVIDIA Sponsorship"
-    Key updates this week:
-    
-    - Clarified evaluation setup: only task-relevant object poses and the robot’s initial pose will be randomized.  
-    - Privileged info allowed during training for both tracks.  
-    - Multiple bug fixes (`eval_utils.py`, USD asset format, partial credit).  
-    - Updated [submission guidelines](./submission.md) + sample Dockerfile.  
-    - **New sponsor:** [NVIDIA](https://www.nvidia.com/en-us/)!  
-    - 💰 Prize pool updated:
-        - 1st: $1,000 + GeForce 5080  
-        - 2nd: $500 + (Jetson Orin Nano Super or $1,000 Brev Credits)   
-        - 3rd: $300 + $500 Brev Credits  
-
-    [Read full details →](./updates.md#10082025)
-
-!!! info "🗓️ 09/28/2025 — Dataset Fixes & CLI Improvements"
-    Highlights:
-    
-    - No formal registration required — submit directly!  
-    - Fixed dataset sharding, robot start poses, and improved baseline checkpoints.  
-    - Added new CLI args for evaluation (`testing_on_train_instances`, `max_steps`, `partial_scene_load`).  
-
-    [Read full details →](./updates.md#09282025)
-
-!!! info "🗓️ 09/19/2025 — Rule Clarifications, Evaluation Protocol & Tutorial"
-    Highlights:
-    
-    - BDDL task definitions can be used for both tracks and are identical during evaluation.  
-    - Additional self-collected data allowed for both tracks.
-    - Defined evaluation timeout and success score metrics.  
-    - Various bug fixes (Windows setup, dataset timestamp, evaluation scripts).  
-    - Added new tutorial: [Configure robot action space](./evaluation.md#configure-robot-action-space).  
-
-    [Read full details →](./updates.md#09192025)
-
----
-
-## :material-graph-outline: **Overview**
-
-**BEHAVIOR** is a robotics challenge for everyday household tasks. It's a large-scale, human-grounded benchmark that tests a robot's capability in high-level reasoning, long-range locomotion, and dexterous bimanual manipulation in house-scale scenes.
-
-This year's challenge features:
-
-- **50 full-length household tasks** from our 1,000 activity collection, covering diverse activities like rearrangement, cooking, cleaning, and installation
-- **10,000 teleoperated demonstrations** (1200+ hours) for training
-
-BEHAVIOR challenge is co-hosted with the [Embodied Agent Interface Competition](https://foundation-models-meet-embodied-agents.github.io/eai_challenge/) at NeurIPS 2025.
-
----
-
-## :material-database: **Dataset & Baselines**
-
-### Teleoperated Demonstrations
-
-**10,000 expert demonstrations** (1200+ hours) collected via teleoperation:
-
-- Synchronized RGBD observations
-- Object and part-level segmentation
-- Ground-truth object states
-- Robot proprioception and actions
-- Skill and subtask annotations
-
-[Dataset details →](./dataset.md)
-
-### Baseline Methods
-
-Pre-implemented training & evaluation pipelines for:
-
-- **Behavioral Cloning baselines**: ACT, Diffusion Policy, BC-RNN, WB-VIMA - these are diverse imitation learning approaches that learn from the provided demonstrations.
-- **Pre-trained Visuo-Language Action models**: OpenVLA and π0. These models are pretrained by a large amount of demonstration data, giving an alternative to models that need to be trained from scratch.
-
-[Baselines details →](./baselines.md)
-
-## :material-chart-box: **Evaluation & Rules**
-
-The organizers reserve the right of final interpretation of the challenge rules. 
-
-### Challenge Tracks
-
-**Standard track:** Limited to provided robot onboard observations (RGB + depth + instance segmentation + proprioception).
-
-**Privileged information track:** May query simulator for any information (object poses, scene point clouds, etc.).
-
-🏆 **Prizes per track:**
-
-1. 🥇 $1,000 + GeForce 5080
-2. 🥈 $500 + (Jetson Orin Nano Super or $1,000 Brev Credits)
-3. 🥉 $300 + $500 Brev Credits
-
-Top 3 teams from each track will be invited to present at the workshop!
-
-### Evaluation Metrics
-
-**Primary metric (for ranking):** Task success rate averaged across 50 tasks. Partial credit given as fraction of satisfied BDDL goal predicates.
-
-**Secondary metrics (efficiency):**
-
-- **Simulated time** - Total simulation steps × time per step
-- **Distance navigated** - Total base movement distance
-- **Hand displacement** - Cumulative hand movement
-
-[Evaluation details & Full challenge rules →](./evaluation.md)
-
-
-## :octicons-person-add-16: **Participating**
-
-### Resources
-
-Join our community to ask questions and discuss the challenge:
-
-- **Discord**: [Join our Discord Server](https://discord.gg/bccR5vGFEx)
-- **Office Hours**: Monday and Thursday, 4:30-6pm PST via [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1)
+1. Join the [Discord community](https://discord.gg/bccR5vGFEx) for announcements and participant discussion.
+2. Attend office hours every Monday, 5-6pm Pacific Time, over [Zoom](https://stanford.zoom.us/j/98056621630?pwd=G3JqHl6lWB0qnMAV3BZMJaWgoiXeqT.1).
+3. Download the dataset and review the [dataset documentation](./dataset.md).
+4. Start from the [π0.5 and GR00T N1.7 baseline pipelines](./baselines.md).
+5. Run evaluation and prepare your submission using the [submission guidelines](./submission.md).
 
 Whether you're a robotics veteran or just entering the field, we're here to support you.
-
-### Important Dates
-
-- **Challenge Launch**: September 2, 2025
-- **Submission Deadline**: November 16th 11:59PM AoE, 2025
-- **Winners Announcement**: December 6-7, 2025 @ NeurIPS conference in San Diego
 
 ## :material-book-edit: **BibTeX**
 
@@ -180,24 +145,24 @@ To cite BEHAVIOR-1K, please use:
 
 ## :material-handshake: **Sponsors**
 
-High-quality simulation data provided by Simovation. 
+High-quality simulation data provided by Simovation.
 
 We gratefully acknowledge the support of our sponsors who make this challenge possible:
 
-<div style="display: flex; gap: 2rem; justify-content: center; align-items: center; margin: 1rem 0;">
-  <a href="https://www.linkedin.com/company/simovationinc/" title="Simovation" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 100px;">
+<div style="display: flex; flex-wrap: nowrap; gap: 1.5rem; justify-content: center; align-items: center; margin: 1rem 0;">
+  <a href="https://www.linkedin.com/company/simovationinc/" title="Simovation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/simovation_logo.png" alt="Simovation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
-  <a href="https://www.imda.gov.sg/" title="IMDA" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 100px;">
+  <a href="https://www.imda.gov.sg/" title="IMDA" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/imda_logo.png" alt="IMDA" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
-  <a href="https://hai.stanford.edu/" title="Stanford HAI" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 100px;">
+  <a href="https://hai.stanford.edu/" title="Stanford HAI" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/hai_logo.png" alt="Stanford HAI" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
-  <a href="https://tsffoundation.org/" title="Schmidt Family Foundation" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 100px;">
+  <a href="https://tsffoundation.org/" title="Schmidt Family Foundation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/schmidt_family_foundation_logo.png" alt="Schmidt Family Foundation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
-  <a href="https://www.nvidia.com/" title="NVIDIA" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 100px;">
-    <img src="../assets/challenge_2025/nvidia_logo.png" alt="NVIDIA" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
-  </a>
+  <span title="Calder" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2026/calder.png" alt="Calder" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </span>
 </div>

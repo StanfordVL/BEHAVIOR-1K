@@ -27,3 +27,387 @@
 .md-tabs__item i[class*="fa-"] {
     margin-right: 8px;
 }
+
+.challenge-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0 2rem;
+}
+
+.challenge-action-card {
+    border: 2px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    padding: 1.05rem;
+    background: var(--md-default-bg-color);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.035);
+}
+
+.challenge-action-card--deadlines {
+    border-color: #2f6f8f;
+}
+
+.challenge-action-card--venue {
+    border-color: #8c1515;
+}
+
+.challenge-action-card h2 {
+    margin: 0 0 0.75rem !important;
+    font-size: 1.15rem;
+    font-weight: 650;
+}
+
+.challenge-action-card--deadlines h2 {
+    color: #2f6f8f;
+}
+
+.challenge-action-card--venue h2 {
+    color: #8c1515;
+}
+
+.challenge-action-list {
+    margin: 0 0 0.9rem !important;
+    padding-left: 0 !important;
+    list-style: none !important;
+}
+
+.challenge-action-list li {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    margin: 0.3rem 0;
+}
+
+.challenge-action-list span {
+    color: var(--md-default-fg-color--light);
+    text-align: left;
+}
+
+.challenge-action-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+}
+
+.challenge-action-links a,
+.challenge-action-disabled {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 6px;
+    padding: 0.4rem 0.65rem;
+    font-weight: 600;
+}
+
+.challenge-action-links a {
+    background: var(--md-default-bg-color);
+    color: var(--md-default-fg-color) !important;
+}
+
+.challenge-action-card--deadlines .challenge-action-links a {
+    border-color: #2f6f8f;
+    color: #2f6f8f !important;
+}
+
+.challenge-action-card--venue .challenge-action-links a {
+    border-color: #8c1515;
+    color: #8c1515 !important;
+}
+
+.challenge-action-links a:hover {
+    opacity: 0.88;
+}
+
+.challenge-action-disabled {
+    color: var(--md-default-fg-color--light);
+    background: var(--md-code-bg-color);
+}
+
+.challenge-portal-cta {
+    display: flex;
+    margin: 1rem 0 1.5rem;
+}
+
+.challenge-portal-cta span,
+.challenge-portal-cta a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    border: 2px solid #2f6f8f;
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    background: rgba(47, 111, 143, 0.08);
+    color: #2f6f8f !important;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.md-typeset table.challenge-data-table {
+    display: table;
+    width: 100%;
+    margin: 0.9rem 0 1.4rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.035);
+    table-layout: fixed;
+}
+
+.md-typeset table.challenge-data-table th {
+    background: rgba(47, 111, 143, 0.1);
+    color: #245a75;
+    font-size: 0.72rem;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    font-weight: 700;
+    text-align: left;
+}
+
+.md-typeset table.challenge-data-table th,
+.md-typeset table.challenge-data-table td {
+    border-color: var(--md-default-fg-color--lightest);
+    padding: 0.7rem 0.85rem;
+    vertical-align: top;
+    text-align: left;
+}
+
+.md-typeset table.challenge-data-table tbody tr:nth-child(even) {
+    background: rgba(47, 111, 143, 0.035);
+}
+
+.md-typeset table.challenge-data-table td:first-child {
+    width: 32%;
+    font-weight: 650;
+    color: var(--md-default-fg-color);
+}
+
+.md-typeset table.challenge-data-table--stats td:last-child {
+    font-weight: 700;
+    color: #245a75;
+}
+
+.md-typeset table.challenge-data-table--dates td:last-child {
+    font-weight: 700;
+    color: #245a75;
+}
+
+.challenge-modality-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 0.9rem 0 1.6rem;
+}
+
+.challenge-modality-grid section {
+    display: grid;
+    grid-template-rows: minmax(17rem, auto) 1fr;
+    gap: 0.8rem;
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    padding: 0.95rem;
+    background: var(--md-default-bg-color);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.035);
+}
+
+.challenge-modality-grid h3 {
+    margin: 0 0 0.35rem !important;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #245a75;
+}
+
+.challenge-modality-grid p {
+    margin: 0 0 0.7rem;
+}
+
+.challenge-modality-grid dl {
+    display: grid;
+    grid-template-columns: 5.2rem minmax(0, 1fr);
+    gap: 0.28rem 0.7rem;
+    margin: 0;
+}
+
+.challenge-modality-grid dt {
+    font-weight: 700;
+    color: var(--md-default-fg-color);
+}
+
+.challenge-modality-grid dd {
+    margin: 0;
+    color: var(--md-default-fg-color--light);
+}
+
+.challenge-modality-grid img {
+    display: block;
+    max-width: 100%;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    align-self: end;
+    border-radius: 6px;
+    border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.challenge-plot-title {
+    margin: 1.2rem 0 0.45rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--md-default-fg-color);
+}
+
+.md-typeset iframe[src*="youtube.com/embed"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    margin: 1rem 0 1.4rem;
+    border-radius: 8px;
+}
+
+.md-typeset iframe[src*="player.vimeo.com"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    margin: 1rem 0 1.4rem;
+    border-radius: 8px;
+}
+
+.challenge-teaser-player {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    margin: 1rem 0 1.4rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--md-code-bg-color);
+}
+
+.challenge-teaser-player iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.challenge-teaser-button {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: #000;
+    cursor: pointer;
+}
+
+.challenge-teaser-button img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.challenge-teaser-button:hover img,
+.challenge-teaser-button:focus-visible img {
+    opacity: 0.88;
+    transform: scale(1.01);
+}
+
+.challenge-teaser-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4.25rem;
+    height: 4.25rem;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.72);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.challenge-teaser-play::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 54%;
+    width: 0;
+    height: 0;
+    border-top: 0.8rem solid transparent;
+    border-bottom: 0.8rem solid transparent;
+    border-left: 1.15rem solid #fff;
+    transform: translate(-50%, -50%);
+}
+
+.challenge-video-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 1.4rem;
+}
+
+.challenge-video-grid iframe[src*="youtube.com/embed"] {
+    margin: 0;
+}
+
+.challenge-submission-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 1.4rem;
+}
+
+.challenge-submission-grid section {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    padding: 0.95rem;
+    background: var(--md-default-bg-color);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.035);
+}
+
+.challenge-submission-grid h3 {
+    margin: 0 0 0.45rem !important;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #245a75;
+}
+
+.challenge-submission-grid p {
+    margin: 0 0 0.65rem;
+}
+
+.challenge-submission-grid p:last-child {
+    margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+    .challenge-action-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .challenge-modality-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .challenge-modality-grid dl {
+        grid-template-columns: 1fr;
+        gap: 0.15rem;
+    }
+
+    .challenge-modality-grid section {
+        grid-template-rows: auto auto;
+    }
+
+    .challenge-video-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .challenge-submission-grid {
+        grid-template-columns: 1fr;
+    }
+}
