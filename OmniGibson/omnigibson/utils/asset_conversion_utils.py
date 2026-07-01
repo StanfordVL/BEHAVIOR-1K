@@ -25,6 +25,7 @@ from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.urdfpy_utils import URDF
 from omnigibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.utils.urdf_preprocessing import link_has_dedicated_collision
 # from omnigibson.utils.python_utils import assert_valid_key
 
 # Create module logger
@@ -1257,8 +1258,6 @@ def convert_urdf_to_usd(
         # Move the child prim to the parent's path.
         assert lazy.pxr.Sdf.CopySpec(side_stage.GetRootLayer(), child_path, side_stage.GetRootLayer(), parent_path)
 
-        # Don't delete the source here -- multiple links can share one mesh. /meshes is cleared below.
-
     # Migrate materials from /meshes to /Looks before deleting the meshes hierarchy
     # This is necessary for IsaacSim 5.1+ where materials are now placed under /meshes
     _migrate_materials_to_looks(side_stage)
@@ -2150,7 +2149,6 @@ def get_collision_approximation_for_urdf(
     col_mesh_rel_folder = "meshes/collision"
     col_mesh_folder = pathlib.Path(urdf_dir) / col_mesh_rel_folder
     col_mesh_folder.mkdir(exist_ok=True, parents=True)
-    from omnigibson.utils.urdf_preprocessing import link_has_dedicated_collision
 
     for link in root.findall("link"):
         link_name = link.attrib["name"]
