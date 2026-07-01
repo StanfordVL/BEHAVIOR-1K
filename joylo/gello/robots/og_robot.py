@@ -301,8 +301,8 @@ class OGRobotServer:
 
         for obj in self.env.scene.objects:
             if ToggledOn in obj.states:
-                scale = obj.states[ToggledOn].visual_marker.scale
-                obj.states[ToggledOn].visual_marker.scale = scale
+                scale = obj.states[ToggledOn].marker.scale
+                obj.states[ToggledOn].marker.scale = scale
 
         # Create ZMQ server for communication
         self._zmq_server = ZMQRobotServer(
@@ -1130,12 +1130,14 @@ class OGRobotServer:
         if should_update_initial_file:
             # Try to ensure that all task-relevant objects are stable before caching a reset baseline.
             # They should already be stable from the sampled instance, but loading the state can cause jitter.
+            has_task_scope = isinstance(self.env.task, BehaviorTask)
             for _ in range(25):
                 og.sim.step_physics()
                 self.robot.keep_still()
-                for entity in self.env.task.object_scope[0].values():
-                    if entity is not None and not isinstance(entity, BaseSystem):
-                        entity.keep_still()
+                if has_task_scope:
+                    for entity in self.env.task.object_scope[0].values():
+                        if entity is not None and not isinstance(entity, BaseSystem):
+                            entity.keep_still()
             self.robot.keep_still()
             self.env.scene.update_initial_file()
             self._needs_initial_file_update = False

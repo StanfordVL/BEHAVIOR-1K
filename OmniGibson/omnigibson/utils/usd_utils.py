@@ -1070,9 +1070,18 @@ class ArticulatedObjectViewAPI:
 
         pattern = "/World/scene_*/articulated__*/*"
         cls._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
-        assert set(cls._VIEW.prim_paths) == set(
-            obj.articulation_root_path for obj in articulation_objs
-        ), "Articulation view prim paths mismatch!"
+        # The view is created from a USD prim pattern, so it may also pick up articulated prims that
+        # are not registered scene objects -- e.g. visual-only helper articulations added with
+        # register=False (such as the JoyLo teleop "ghost" robot). Those extra prims get their own
+        # rows in _JOINT_POSITIONS which are simply never looked up (consumers index by the
+        # articulation_root_path of registered objects via get_view_row). We only require that every
+        # registered non-robot articulated object is covered by the view.
+        # TODO (vector) find a more robust fix instead of this one
+        view_paths = set(cls._VIEW.prim_paths)
+        expected_paths = set(obj.articulation_root_path for obj in articulation_objs)
+        assert expected_paths.issubset(
+            view_paths
+        ), f"Articulation view is missing expected prim paths: {sorted(expected_paths - view_paths)}"
         cls._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(cls._VIEW.prim_paths)}
         # Allocate fixed pinned-CPU and CUDA wp.arrays of the right shape.
         seed_positions = cls._VIEW.get_dof_positions().contiguous()  # torch CPU, used only to seed
