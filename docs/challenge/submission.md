@@ -10,10 +10,11 @@
 - **Full evaluation size:** 100 tasks x 10 instances x 1 rollout = 1,000 rollout outputs.
 - **Partial submissions are allowed.** Missing rollout instances count as zero in the final score.
 - **Multiple checkpoints** from the same team and model family are considered one entry.
+- **Robot configuration must be reproducible.** If you use a custom robot config with `--robot-config`, include the exact YAML/JSON file in your submission package.
 
 ## Evaluation Outputs
 
-After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/eval/eval.py), each rollout produces:
+After running the evaluation script at `OmniGibson/omnigibson/eval/eval.py`, each rollout produces:
 
 <table class="challenge-data-table">
   <tbody>
@@ -23,34 +24,48 @@ After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/
     </tr>
     <tr>
       <td>Rollout MP4</td>
-      <td>Video recording of the evaluated trajectory.</td>
+      <td>Video recording of the evaluated trajectory. Run the evaluator with <code>--write-video</code>; rollout videos are required for challenge submissions.</td>
     </tr>
   </tbody>
 </table>
 
 See [Evaluation and Rules](./evaluation.md) for the evaluation protocol, wrappers, metrics, and command-line options.
 
+## Robot and Wrapper Configuration
+
+Final evaluation must be reproducible from the files you submit. Include the exact evaluation wrapper and robot configuration used to generate your reported results.
+
+- If you use the default robot setup, include the bundled `omnigibson/eval/r1pro.yaml` or clearly state that you used it unchanged.
+- If you use a custom robot setup, include the complete robot config passed through `--robot-config`. The file must contain canonical OmniGibson robot fields such as `model`, `name`, `controller_config`, observation settings, sensor settings, and any `eval.camera_sensor_names` needed by the evaluation wrappers or video writer.
+- The returned action array from your policy server must match the action space induced by the submitted robot config.
+- Custom wrappers must still expose only RGB, depth, and proprioception to the policy for challenge-track evaluation.
+
 ??? example "Sample output JSON"
 
     ```json
     {
+        "task": "turning_on_radio",
+        "instance_id": 0,
+        "rollout_id": 0,
+        "steps": 500,
+        "success": false,
         "agent_distance": {
-            "base": 9.703554042062024e-06,
-            "left": 0.019627160858362913,
-            "right": 0.015415858360938728
+            "base": 2.0,
+            "left": 1.5,
+            "right": 1.2
         },
         "normalized_agent_distance": {
-            "base": 4.93031697036899e-06,
-            "left": 0.006022007241065448,
-            "right": 0.0037894888066205374
+            "base": 1.5,
+            "left": 1.2,
+            "right": 1.1
         },
         "q_score": {
-            "final": 0.0
+            "final": 0.4
         },
         "time": {
-            "simulator_steps": 6,
-            "simulator_time": 0.2,
-            "normalized_time": 0.002791165032284476
+            "simulator_steps": 500,
+            "simulator_time": 16.6666666667,
+            "normalized_time": 1.6
         }
     }
     ```
@@ -83,12 +98,18 @@ There are two supported ways to submit your model for final evaluation.
 
 ### Docker Test Command
 
-We provide a sample Dockerfile that starts a dummy local policy with zero actions: [OmniGibson/docker/submission.Dockerfile](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/docker/submission.Dockerfile).
+We provide a sample Dockerfile that starts a dummy local policy with zero actions: `OmniGibson/docker/submission.Dockerfile`.
 
 1. Start an evaluation instance in another terminal:
 
     ```bash
-    python OmniGibson/omnigibson/learning/eval.py log_path=$LOG_PATH policy=websocket task.name=turning_on_radio
+    python -m omnigibson.eval.eval \
+      --task-name turning_on_radio \
+      --robot-config OmniGibson/omnigibson/eval/r1pro.yaml \
+      --host 127.0.0.1 \
+      --port 8000 \
+      --instance-indices 0 \
+      --output-dir outputs/b1k_eval
     ```
 
 2. Build the sample image:
@@ -123,11 +144,11 @@ Your final zip file should contain:
     </tr>
     <tr>
       <td>Robot config</td>
-      <td>The R1Pro <code>.yaml</code> config used during evaluation.</td>
+      <td>The exact robot <code>.yaml</code> or <code>.json</code> config used during evaluation, including any custom <code>controller_config</code>, sensor settings, observation settings, and <code>eval.camera_sensor_names</code>.</td>
     </tr>
     <tr>
       <td>README</td>
-      <td>Instructions for evaluating your policy, including Docker image details or IP address information. For IP address-based submissions, include at least 64 available ports.</td>
+      <td>Instructions for evaluating your policy, including the full evaluator command, wrapper path, robot config path, Docker image details or IP address information. For IP address-based submissions, include at least 64 available ports.</td>
     </tr>
   </tbody>
 </table>

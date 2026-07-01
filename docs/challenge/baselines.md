@@ -164,10 +164,12 @@ In a separate terminal, activate the `behavior` conda environment and run the ev
 ```bash
 conda activate behavior
 cd $PATH_TO_BEHAVIOR_1K
-OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/eval.py \
-    policy=websocket \
-    task.name=$TASK_NAME \
-    log_path=$LOG_PATH
+python -m omnigibson.eval.eval \
+    --task-name $TASK_NAME \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --output-dir $LOG_PATH \
+    --write-video
 ```
 
 ## GR00T N1.7
@@ -304,5 +306,8 @@ After finetuning, you can run evaluation by following the steps below:
     conda activate behavior
     python -m omnigibson.eval.eval \
         --task-name $TASK \
-        --output-dir $LOG_PATH
+        --host 127.0.0.1 \
+        --port 8000 \
+        --output-dir $LOG_PATH \
+        --write-video
   ```

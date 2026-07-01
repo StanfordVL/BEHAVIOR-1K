@@ -4,9 +4,22 @@
 
 For the 2026 BEHAVIOR Challenge, there is a single evaluation track:
 
-- **Challenge track:** Participants are restricted to robot onboard observations for policy inputs:
-    - RGB + depth + proprioception
-    - No ground-truth segmentation, object state, target object pose, full-scene point cloud, robot global pose, or other simulator-only privileged information during evaluation.
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td>Challenge track</td>
+      <td>Participants are restricted to robot onboard observations for policy inputs.</td>
+    </tr>
+    <tr>
+      <td>Allowed policy inputs</td>
+      <td>RGB + depth + proprioception</td>
+    </tr>
+    <tr>
+      <td>Not allowed during evaluation</td>
+      <td>No ground-truth segmentation, object state, target object pose, full-scene point cloud, robot global pose, or other simulator-only privileged information during evaluation.</td>
+    </tr>
+  </tbody>
+</table>
 
 You are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using it during challenge-track evaluation. BDDL task definitions can be used and are identical during evaluation. You may also collect additional data yourself via teleoperation, RL, scripted policies, or other approaches.
 
@@ -14,7 +27,7 @@ There are no restrictions on the type of policy used. Methods such as IL, RL, or
 
 ## Running Evaluations
 
-We provide [OmniGibson/omnigibson/eval/eval.py](https://github.com/StanfordVL/BEHAVIOR-1K/blob/my/eval/OmniGibson/omnigibson/eval/eval.py) as the command-line entry point for running websocket-based evaluations. Start your policy server first, then run the evaluator from the repository root:
+We provide `OmniGibson/omnigibson/eval/eval.py` as the command-line entry point for running websocket-based evaluations. Start your policy server first, then run the evaluator from the repository root:
 
 ```bash
 python -m omnigibson.eval.eval \
@@ -31,147 +44,160 @@ The evaluator connects to the policy server at `--host` and `--port`; the policy
 
 Key arguments:
 
-- `--task-name`: BEHAVIOR task id, e.g. `turning_on_radio`. The 2026 task list is available in the [Demo Gallery](./tasks/).
-- `--host` and `--port`: address of the websocket policy server. The default port is `8000`. The evaluator waits for the server health check at `/healthz`, then opens the websocket connection.
-- `--instance-indices`: indices into the task's test instance list. Indices `0-19` are public test instances; indices `20-39` are hidden instances reserved for final evaluation.
-- `--num-rollouts`: number of rollouts to run for each selected instance.
-- `--max-steps`: optional episode timeout in simulator steps. If omitted, the evaluator uses the default timeout based on human demonstration length.
-- `--env-wrapper`: full target path of the evaluation wrapper. The default is `omnigibson.eval.wrappers.DefaultWrapper`; use `omnigibson.eval.wrappers.RGBDFullResWrapper` for official RGB + depth challenge-track evaluation.
-- `--output-dir`: directory where rollout results are written. JSON metrics are written under `<output-dir>/json/`.
-- `--write-video`: save rollout MP4 videos under `<output-dir>/videos/`.
-- `--video-fps`: frame rate for saved rollout videos.
-- `--headless` / `--no-headless`: run OmniGibson headless or with rendering UI.
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td><code>--task-name</code></td>
+      <td>BEHAVIOR task id, e.g. <code>turning_on_radio</code>. The 2026 task list is available in the <a href="./tasks/index.html">Demo Gallery</a>.</td>
+    </tr>
+    <tr>
+      <td><code>--host</code> and <code>--port</code></td>
+      <td>Address of the websocket policy server. The default port is <code>8000</code>. The evaluator waits for the server health check at <code>/healthz</code>, then opens the websocket connection.</td>
+    </tr>
+    <tr>
+      <td><code>--instance-indices</code></td>
+      <td>Indices into the task's test instance list. Indices <code>0-19</code> are public test instances; indices <code>20-39</code> are hidden instances reserved for final evaluation.</td>
+    </tr>
+    <tr>
+      <td><code>--num-rollouts</code></td>
+      <td>Number of rollouts to run for each selected instance.</td>
+    </tr>
+    <tr>
+      <td><code>--max-steps</code></td>
+      <td>Optional episode timeout in simulator steps. If omitted, the evaluator uses the default timeout based on human demonstration length.</td>
+    </tr>
+    <tr>
+      <td><code>--env-wrapper</code></td>
+      <td>Full target path of the evaluation wrapper. The default is <code>omnigibson.eval.wrappers.DefaultWrapper</code>; use <code>omnigibson.eval.wrappers.RGBDFullResWrapper</code> for official RGB + depth challenge-track evaluation.</td>
+    </tr>
+    <tr>
+      <td><code>--output-dir</code></td>
+      <td>Directory where rollout results are written. JSON metrics are written under <code>&lt;output-dir&gt;/json/</code>.</td>
+    </tr>
+    <tr>
+      <td><code>--write-video</code></td>
+      <td>Save rollout MP4 videos under <code>&lt;output-dir&gt;/videos/</code>. This is required for challenge evaluation outputs because rollout videos are part of the submission.</td>
+    </tr>
+    <tr>
+      <td><code>--video-fps</code></td>
+      <td>Frame rate for saved rollout videos.</td>
+    </tr>
+    <tr>
+      <td><code>--headless</code> / <code>--no-headless</code></td>
+      <td>Run OmniGibson headless or with rendering UI.</td>
+    </tr>
+  </tbody>
+</table>
 
-The evaluator sends flattened observations to the policy server. The server should return a msgpack-encoded response containing an `action` array with the robot action for the current step. The helper server implementation is [WebsocketPolicyServer](https://github.com/StanfordVL/BEHAVIOR-1K/blob/my/eval/OmniGibson/omnigibson/eval/utils/network_utils.py), and the evaluator-side client is `omnigibson.eval.policies.WebsocketPolicy`.
+The evaluator sends flattened observations to the policy server. The server should return a msgpack-encoded response containing an `action` array with the robot action for the current step. The helper server implementation is `WebsocketPolicyServer` in `OmniGibson/omnigibson/eval/utils/network_utils.py`, and the evaluator-side client is `omnigibson.eval.policies.WebsocketPolicy`.
 
-Each successful rollout produces a JSON result containing `q_score`, `time`, `agent_distance`, and normalized efficiency metrics. If `--write-video` is enabled, the evaluator also records head and wrist camera videos for the rollout.
+Each successful rollout produces a JSON result containing `q_score`, `time`, `agent_distance`, and normalized efficiency metrics. For challenge submissions, run evaluation with `--write-video`; this records the head and wrist camera videos that must be submitted with the rollout metrics.
 
 Example wrappers live under `omnigibson.eval.wrappers`:
 
-- `DefaultWrapper`: low-resolution RGB observations at `224 x 224`, plus proprioception. This is useful for faster debugging but does not include depth.
-- `RGBDFullResWrapper`: official RGB + depth challenge observations, with a `720 x 720` head camera and `480 x 480` wrist cameras.
+<div class="challenge-submission-grid">
+  <section>
+    <h3><code>DefaultWrapper</code></h3>
+    <p>Low-resolution RGB observations at <code>224 x 224</code>, plus proprioception. This is useful for faster debugging but does not include depth.</p>
+  </section>
+  <section>
+    <h3><code>RGBDFullResWrapper</code></h3>
+    <p>Official RGB + depth challenge observations, with a <code>720 x 720</code> head camera and <code>480 x 480</code> wrist cameras.</p>
+  </section>
+</div>
 
 You are welcome to use the provided wrappers or implement a custom wrapper for your own policy. Submitted evaluation wrappers must expose only RGB, depth, and proprioception to the policy. Include the wrapper code in your submission; the organizers will manually inspect it to ensure the challenge-track observation restrictions are followed and that the environment is not manipulated directly, e.g. by teleporting the robot or changing object states.
 
-## Configure Robot Action Space
+## Custom Robot Configuration
 
-By default, the evaluator will take in absolute joint angles for all the robot joints (23-dim). Participants are allowed to modify the `controllers` section in the robot config yaml file [OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml) to suit their needs. By default the configuration is empty:
+By default, the evaluator loads the bundled R1Pro robot config at `OmniGibson/omnigibson/eval/r1pro.yaml`. You may instead pass a custom OmniGibson robot configuration file with `--robot-config`:
 
+```bash
+python -m omnigibson.eval.eval \
+  --task-name turning_on_radio \
+  --robot-config path/to/my_robot.yaml \
+  --host 127.0.0.1 \
+  --port 8000
 ```
-controllers:
-```
 
-Which is equivalant to absolute base velocity, absolute torso joint angles, absolute arm joint angles, 1-dim continuous gripper actions, as specified in [R1_CONTROLLER_CONFIG](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/joylo/gello/robots/sim_robot/og_teleop_cfg.py#L180-L232):
+The config file should contain one complete robot dictionary using canonical OmniGibson fields. In particular:
 
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td><code>model</code></td>
+      <td>Required and should be the lowercase OmniGibson robot model id, e.g. <code>r1pro</code>. Use <code>model</code>, not the deprecated <code>type</code> key.</td>
+    </tr>
+    <tr>
+      <td><code>name</code></td>
+      <td>Required. The default name is <code>robot_r1</code>.</td>
+    </tr>
+    <tr>
+      <td><code>controller_config</code></td>
+      <td>Controls the action space. You may use any robot controllers supported by OmniGibson, such as joint, IK, base, or gripper controllers, as long as the resulting action array returned by your policy matches <code>robot.action_dim</code>.</td>
+    </tr>
+    <tr>
+      <td>Standard robot fields</td>
+      <td><code>obs_modalities</code>, <code>proprio_obs</code>, <code>sensor_config</code>, <code>action_normalize</code>, <code>grasping_mode</code>, and other standard robot config fields may be customized as needed, subject to the challenge-track observation restrictions.</td>
+    </tr>
+    <tr>
+      <td>Runtime start pose</td>
+      <td>The evaluator overwrites the robot <code>position</code> and <code>orientation</code> at runtime with the task instance's prescribed start pose.</td>
+    </tr>
+    <tr>
+      <td>Submission requirement</td>
+      <td>Include the exact robot config file in your final submission.</td>
+    </tr>
+  </tbody>
+</table>
 
-```
-controllers:
+Minimal structure:
+
+```yaml
+model: r1pro
+name: robot_r1
+eval:
+  camera_sensor_names:
+    left_wrist: robot_r1:left_realsense_link:Camera:0
+    right_wrist: robot_r1:right_realsense_link:Camera:0
+    head: robot_r1:zed_link:Camera:0
+obs_modalities:
+  - proprio
+  - rgb
+controller_config:
   base:
     name: HolonomicBaseJointController
     motor_type: velocity
-    vel_kp: 150
-    command_input_limits: [[-1, -1, -1], [1, 1, 1]]
-    command_output_limits: [[-0.75, -0.75, -1], [1, 1, 1]]
-    use_impedances: false
-  trunk:
-    name: JointController
-    motor_type: position
-    pos_kp: 150
-    command_input_limits: null
-    command_output_limits: null
-    use_impedances: false
-    use_delta_commands: false
   arm_left:
     name: JointController
     motor_type: position
-    pos_kp: 150
-    command_input_limits: null
-    command_output_limits: null
-    use_impedances: false
-    use_delta_commands: false
   arm_right:
     name: JointController
     motor_type: position
-    pos_kp: 150
-    command_input_limits: null
-    command_output_limits: null
-    use_impedances: false
-    use_delta_commands: false
-  gripper_left:
-    name: MultiFingerGripperController
-    mode: smooth
-    command_input_limits: default
-    command_output_limits: default
-  gripper_right:
-    name: MultiFingerGripperController
-    mode: smooth
-    command_input_limits: default
-    command_output_limits: default
 ```
 
-For more information regarding how to set robot controllers, please take a look at our [robot controller documentation](https://behavior.stanford.edu/omnigibson/controllers.html). The robot configuration yaml file (`r1pro.yaml`) needs to be included in your final submission. Below we provide some examples on modifying this config:
-	
-1. delta arm joint angles:
+The optional `eval.camera_sensor_names` block maps evaluation camera roles to robot sensor names. It is used by the provided wrappers and video writer to identify the head and wrist cameras. `--write-video` requires the `head`, `left_wrist`, and `right_wrist` roles. The official `RGBDFullResWrapper` uses these roles to set the head camera to `720 x 720` and wrist cameras to `480 x 480`; all other vision sensors are treated as wrist-resolution sensors.
 
-    ```
-    arm_left:
-      name: JointController
-      motor_type: position
-      pos_kp: 150
-      command_input_limits: null
-      command_output_limits: null
-      use_impedances: false
-      use_delta_commands: true
-    ```
-
-    Notice the change in `use_delta_commands`.
-
-2. absolute EEF poses (in robot base frame) with IK Controller:
-
-    ```
-    arm_left:
-      name: InverseKinematicsController
-      command_input_limits: null
-      command_output_limits: null
-      mode: absolute_pose
-    ```
-
-3. delta EEF poses (in robot base frame) with IK Controller:
-  
-    ```
-    arm_left:
-      name: InverseKinematicsController
-      command_input_limits: null
-      mode: pose_delta_ori
-    ```
-
-    Notice the change in `mode`.
-
-4.  absolute normalized gripper joint angles
-
-    ```
-    gripper_left:
-      name: JointController
-      motor_type: position
-      command_input_limits: default
-      command_output_limits: default
-      use_impedances: false
-      use_delta_commands: false
-    ```
+For controller syntax and supported controller types, see the [OmniGibson controller documentation](https://behavior.stanford.edu/omnigibson/controllers.html). For the recommended R1Pro baseline config, start from the bundled `OmniGibson/omnigibson/eval/r1pro.yaml` and modify `controller_config` or other robot fields as needed.
 
 
 ## Metrics and Results
 
 We will calculate the following metric during policy rollout:
 
-### Primary Metric (Ranking)
-- **Task success score:** Averaged across 100 tasks.
-- **Calculation:** Partial successes = (Number of goal BDDL predicates satisfied at episode end) / (Total number of goal predicates).
-
-### Secondary Metrics (Efficiency)
-- **Simulated time:** Total simulation time (hardware-independent).
-- **Distance navigated:** Accumulated distance traveled by the agent’s base body. This metric evaluates the efficiency of the agent in navigating the environment.
-- **Displacement of end effectors/hands:** Accumulated displacement of the agent’s end effectors/hands. This metric evaluates the efficiency of the agent in its interaction with the environment.
+<div class="challenge-submission-grid">
+  <section>
+    <h3>Primary Metric (Ranking)</h3>
+    <p><strong>Task success score:</strong> Averaged across 100 tasks.</p>
+    <p><strong>Calculation:</strong> Partial successes = (Number of goal BDDL predicates satisfied at episode end) / (Total number of goal predicates).</p>
+  </section>
+  <section>
+    <h3>Secondary Metrics (Efficiency)</h3>
+    <p><strong>Simulated time:</strong> Total simulation time (hardware-independent).</p>
+    <p><strong>Distance navigated:</strong> Accumulated distance traveled by the agent’s base body. This metric evaluates the efficiency of the agent in navigating the environment.</p>
+    <p><strong>Displacement of end effectors/hands:</strong> Accumulated displacement of the agent’s end effectors/hands. This metric evaluates the efficiency of the agent in its interaction with the environment.</p>
+  </section>
+</div>
 
 *Secondary metrics will be normalized using human averages from 200 demonstrations per task.*
 
@@ -181,16 +207,26 @@ The success score (**Q**) is the metric used for ranking submissions. If two sub
 
 **Evaluation protocol:**
 
-- **Training:** The training instances and human demonstrations (200 per task) are released to the public.
-
-- **Self-evaluation and report:** In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the **first 10** instances for evaluation results. Participants should report their performance on these 10 instances through the process described on the [submission page](./submission.md). You should evaluate your policy 1 time on each instance, using the default time-outs provided by our evaluation script. We will update the leaderboard once we sanity-check the performance. The **remaining 10** instances are not used for leaderboard reporting and may serve as a test set before evaluating your final policy.
-
-
-- **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard upon submission deadline, we will evaluate the top-5 solutions on the leaderboard using these instances.
-
-- Each instance differs in terms of:
-    - Initial object states
-    - Initial robot poses
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td>Training</td>
+      <td>The training instances and human demonstrations (200 per task) are released to the public.</td>
+    </tr>
+    <tr>
+      <td>Self-evaluation and report</td>
+      <td>In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the <strong>first 10</strong> instances for evaluation results. Participants should report their performance on these 10 instances through the process described on the <a href="./submission.html">submission page</a>. You should evaluate your policy 1 time on each instance, using the default time-outs provided by our evaluation script. We will update the leaderboard once we sanity-check the performance. The <strong>remaining 10</strong> instances are not used for leaderboard reporting and may serve as a test set before evaluating your final policy.</td>
+    </tr>
+    <tr>
+      <td>Final evaluation</td>
+      <td>We will hold out 10 more instances for final evaluation. After we freeze the leaderboard upon submission deadline, we will evaluate the top-5 solutions on the leaderboard using these instances.</td>
+    </tr>
+    <tr>
+      <td>Instance variation</td>
+      <td>Each instance differs in terms of initial object states and initial robot poses.</td>
+    </tr>
+  </tbody>
+</table>
 
 <iframe 
   src="https://player.vimeo.com/video/1115082804?badge=0&autopause=0&autoplay=1&muted=1&loop=1&title=0&byline=0&portrait=0&controls=0" 
@@ -207,10 +243,26 @@ The success score (**Q**) is the metric used for ranking submissions. If two sub
 
 The following benchmarks were measured on:
 
-- **GPU:** NVIDIA RTX 4090 (24GB VRAM)
-- **CPU:** AMD Ryzen 9 7950X 16-Core Processor (32 threads)
-- **RAM:** 128GB
-- **OS:** Ubuntu 22.04.5 LTS
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td>GPU</td>
+      <td>NVIDIA RTX 4090 (24GB VRAM)</td>
+    </tr>
+    <tr>
+      <td>CPU</td>
+      <td>AMD Ryzen 9 7950X 16-Core Processor (32 threads)</td>
+    </tr>
+    <tr>
+      <td>RAM</td>
+      <td>128GB</td>
+    </tr>
+    <tr>
+      <td>OS</td>
+      <td>Ubuntu 22.04.5 LTS</td>
+    </tr>
+  </tbody>
+</table>
 
 **Scene Load Time:** Approximately 150-300 seconds (one-time cost per trial, varies by scene complexity)
 
@@ -218,9 +270,34 @@ The following benchmarks were measured on:
 
 The following table records the approximate frames per second (FPS) performance when running evaluation with random actions across different settings:
 
-| Sensor Modality | Resolution (Head, Wrist)| FPS |
-|---------|------------|-----|
-| RGB | 224x224, 224x224 | 24.55 |
-| RGB | 720x720, 480x480 | 20.62 |
-| RGB + depth | 224x224, 224x224 | 16.55 |
-| RGB + depth | 720x720, 480x480 | 13.52 |
+<table class="challenge-data-table">
+  <thead>
+    <tr>
+      <th>Sensor Modality</th>
+      <th>Resolution (Head, Wrist)</th>
+      <th>FPS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>RGB</td>
+      <td>224x224, 224x224</td>
+      <td>24.55</td>
+    </tr>
+    <tr>
+      <td>RGB</td>
+      <td>720x720, 480x480</td>
+      <td>20.62</td>
+    </tr>
+    <tr>
+      <td>RGB + depth</td>
+      <td>224x224, 224x224</td>
+      <td>16.55</td>
+    </tr>
+    <tr>
+      <td>RGB + depth</td>
+      <td>720x720, 480x480</td>
+      <td>13.52</td>
+    </tr>
+  </tbody>
+</table>

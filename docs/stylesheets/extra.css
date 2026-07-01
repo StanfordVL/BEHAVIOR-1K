@@ -268,6 +268,16 @@
     border-radius: 8px;
 }
 
+.md-typeset iframe[src*="player.vimeo.com"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    margin: 1rem 0 1.4rem;
+    border-radius: 8px;
+}
+
 .challenge-teaser-player {
     width: 100%;
     aspect-ratio: 16 / 9;

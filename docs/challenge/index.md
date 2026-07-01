@@ -2,7 +2,7 @@
 
 Join us for the second year of the BEHAVIOR Challenge: solve **100 full-length household tasks** in the realistic BEHAVIOR-1K environment. BEHAVIOR tests whether embodied agents can combine high-level reasoning, long-horizon navigation, and dexterous bimanual manipulation in house-scale scenes.
 
-<div class="challenge-teaser-player" data-youtube-src="https://www.youtube.com/embed/Vk6Obhe-dGE?autoplay=1&mute=1&playsinline=1&enablejsapi=1&modestbranding=1&showinfo=0&rel=0&controls=1">
+<div class="challenge-teaser-player" data-youtube-src="https://www.youtube.com/embed/ihihRCf5NI4?autoplay=1&mute=1&playsinline=1&enablejsapi=1&modestbranding=1&showinfo=0&rel=0&controls=1">
   <button class="challenge-teaser-button" type="button" aria-label="Play BEHAVIOR Challenge teaser video">
     <img src="../assets/challenge_teaser_frame_240.png" alt="BEHAVIOR Challenge teaser">
     <span class="challenge-teaser-play" aria-hidden="true"></span>
@@ -42,7 +42,7 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
     </ul>
     <div class="challenge-action-links">
       <a href="https://behavior-1k-2026-challenge-leaderboard.hf.space/submit">Submission Portal</a>
-      <a href="./submission/">Submission Guidelines</a>
+      <a href="./submission.html">Submission Guidelines</a>
     </div>
   </section>
 
@@ -55,7 +55,7 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
     </ul>
     <div class="challenge-action-links">
       <a href="https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard">Leaderboard</a>
-      <a href="./evaluation/">Evaluation & Rules</a>
+      <a href="./evaluation.html">Evaluation & Rules</a>
     </div>
   </section>
 </div>
