@@ -24,7 +24,10 @@ from gello.utils.og_teleop_utils import (
 )
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.eval.utils.eval_utils import (
+    NUM_HIDDEN_TEST_INSTANCES,
+    NUM_PUBLIC_TEST_INSTANCES,
     TASK_NAMES_TO_INDICES,
+    TEST_INSTANCE_IDS,
     flatten_obs_dict,
     generate_basic_environment_config,
     get_robot_camera_names,
@@ -44,10 +47,6 @@ from omnigibson.utils.ui_utils import create_module_logger
 LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 EVAL_BASE_LINK_MASS = 250.0
 EVAL_HEAD_HORIZONTAL_APERTURE = 40.0
-NUM_TEST_INSTANCES = 40
-NUM_PUBLIC_TEST_INSTANCES = 20
-NUM_HIDDEN_TEST_INSTANCES = NUM_TEST_INSTANCES - NUM_PUBLIC_TEST_INSTANCES
-TEST_INSTANCE_IDS = list(range(301, 341))
 DEFAULT_ROBOT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "r1pro.yaml")
 EVAL_MODES = ("train", "public_test", "hidden_test")
 

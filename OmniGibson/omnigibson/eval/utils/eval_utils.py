@@ -10,6 +10,10 @@ from omnigibson.macros import gm
 HEAD_RESOLUTION = (720, 720)
 WRIST_RESOLUTION = (480, 480)
 DEFAULT_EVAL_SEED = 0
+NUM_TEST_INSTANCES = 40
+NUM_PUBLIC_TEST_INSTANCES = 20
+NUM_HIDDEN_TEST_INSTANCES = NUM_TEST_INSTANCES - NUM_PUBLIC_TEST_INSTANCES
+TEST_INSTANCE_IDS = list(range(301, 341))
 
 
 def seed_everything(seed: int, deterministic_torch: bool = False) -> int:

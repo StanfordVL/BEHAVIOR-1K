@@ -4,7 +4,13 @@ import os
 from collections import defaultdict
 from pathlib import Path
 from omnigibson.macros import gm
-from omnigibson.eval.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_NAMES_TO_INDICES
+from omnigibson.eval.utils.eval_utils import (
+    NUM_HIDDEN_TEST_INSTANCES,
+    NUM_PUBLIC_TEST_INSTANCES,
+    PROPRIOCEPTION_INDICES,
+    TASK_NAMES_TO_INDICES,
+    TEST_INSTANCE_IDS,
+)
 
 
 HUMAN_STATS_KEYS = (
@@ -224,12 +230,6 @@ def _write_task_jsonl(totals: dict, task_names_by_idx: dict[int, str], output_pa
                 task_stats[key] = round(totals[task_idx][key] / num_episodes, 4)
             json.dump(task_stats, f)
             f.write("\n")
-
-
-NUM_TEST_INSTANCES = 40
-NUM_PUBLIC_TEST_INSTANCES = 20
-NUM_HIDDEN_TEST_INSTANCES = NUM_TEST_INSTANCES - NUM_PUBLIC_TEST_INSTANCES
-TEST_INSTANCE_IDS = list(range(301, 341))
 
 
 def sanity_check_filename(input_dir: str) -> None:

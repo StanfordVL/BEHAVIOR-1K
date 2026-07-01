@@ -81,16 +81,29 @@ controller_config:
   camera:
     name: NullJointController
 reset_joint_pos:
+  # Joint order follows the R1Pro low-level joint vector:
+  #   6 virtual/mobile base joints,
+  #   4 torso/trunk joints,
+  #   7 left arm joints,
+  #   7 right arm joints,
+  #   2 left gripper finger joints,
+  #   2 right gripper finger joints.
+  # Base virtual joints.
   - 0.0
   - 0.0
   - 0.0
   - 0.0
   - 0.0
   - 0.0
+  # Torso/trunk joints. These come from JoyLo's default trunk pose:
+  # DEFAULT_TRUNK_TRANSLATE = 0.5, interpolated halfway between
+  # torso_upright [0.45, -0.4, 0.0, 0.0] and
+  # torso_downward [1.6, -2.5, -0.94, 0.0].
   - 1.025
   - -1.45
   - -0.47
   - 0.0
+  # Left arm joints.
   - 0.0
   - 0.0
   - 0.0
@@ -98,6 +111,7 @@ reset_joint_pos:
   - 0.0
   - 0.0
   - 0.0
+  # Right arm joints.
   - 0.0
   - 0.0
   - 0.0
@@ -105,6 +119,7 @@ reset_joint_pos:
   - 0.0
   - 0.0
   - 0.0
+  # Gripper finger joints start open.
   - 0.05
   - 0.05
   - 0.05
