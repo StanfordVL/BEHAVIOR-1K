@@ -15,6 +15,10 @@ For the 2026 BEHAVIOR Challenge, there is a single evaluation track:
       <td>RGB + depth + proprioception</td>
     </tr>
     <tr>
+      <td>Robot embodiment</td>
+      <td>Not fixed. Participants may use the default R1Pro robot or provide their own OmniGibson-supported robot through a custom robot configuration file.</td>
+    </tr>
+    <tr>
       <td>Not allowed during evaluation</td>
       <td>No ground-truth segmentation, object state, target object pose, full-scene point cloud, robot global pose, or other simulator-only privileged information during evaluation.</td>
     </tr>
@@ -110,7 +114,7 @@ You are welcome to use the provided wrappers or implement a custom wrapper for y
 
 ## Custom Robot Configuration
 
-By default, the evaluator loads the bundled R1Pro robot config at `OmniGibson/omnigibson/eval/r1pro.yaml`. You may instead pass a custom OmniGibson robot configuration file with `--robot-config`:
+By default, the evaluator loads the bundled R1Pro robot config at `OmniGibson/omnigibson/eval/r1pro.yaml`. The 2026 challenge does not restrict participants to a fixed robot embodiment: you may instead pass a custom OmniGibson robot configuration file with `--robot-config`, as long as the robot and controllers are supported by OmniGibson and the policy still follows the challenge-track observation restrictions.
 
 ```bash
 python -m omnigibson.eval.eval \
@@ -150,6 +154,8 @@ The config file should contain one complete robot dictionary using canonical Omn
     </tr>
   </tbody>
 </table>
+
+If your robot is not already available in OmniGibson, see the [custom robot import tutorial](../tutorials/custom_robot_import.md) for how to import a new robot model into BEHAVIOR / OmniGibson before referencing it from a custom robot config.
 
 Minimal structure:
 
