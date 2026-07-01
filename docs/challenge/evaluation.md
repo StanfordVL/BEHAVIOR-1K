@@ -1,54 +1,57 @@
 # Evaluation and Rules
 
-!!! warning "🚧 Provisional"
-
-    This page is being updated for the 2026 challenge. Rules, metrics,
-    and the evaluation protocol are subject to change before launch.
-
----
-
 ## Challenge Track
 
 For the 2026 BEHAVIOR Challenge, there is a single evaluation track:
 
 - **Challenge track:** Participants are restricted to robot onboard observations for policy inputs:
     - RGB + depth + proprioception
-    - No segmentation, object state, target object pose, full-scene point cloud, robot global pose, or other simulator-only privileged information during evaluation.
+    - No ground-truth segmentation, object state, target object pose, full-scene point cloud, robot global pose, or other simulator-only privileged information during evaluation.
 
 You are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using it during challenge-track evaluation. BDDL task definitions can be used and are identical during evaluation. You may also collect additional data yourself via teleoperation, RL, scripted policies, or other approaches.
 
-There are no restrictions on the type of policy used. Methods such as IL, RL, or TAMP are all allowed. Additional components like SLAM or LLM-based querying are also permitted, provided the policy follows the challenge-track observation restrictions during evaluation.
+There are no restrictions on the type of policy used. Methods such as IL, RL, or TAMP are all allowed. Additional components like SLAM or LLM-based querying are also permitted, provided the policy follows the challenge-track observation restrictions during evaluation. If a submission depends on external model-query APIs, participants must provide the credentials, quota, and serving configuration needed for evaluation; the organizers will not cover external API usage costs.
 
 ## Running Evaluations
 
-We provide an [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) as a unified entry point for running evaluation:
+We provide [OmniGibson/omnigibson/eval/eval.py](https://github.com/StanfordVL/BEHAVIOR-1K/blob/my/eval/OmniGibson/omnigibson/eval/eval.py) as the command-line entry point for running websocket-based evaluations. Start your policy server first, then run the evaluator from the repository root:
+
+```bash
+python -m omnigibson.eval.eval \
+  --task-name turning_on_radio \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --instance-indices 0 \
+  --num-rollouts 1 \
+  --output-dir outputs/b1k_eval \
+  --write-video
 ```
-python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
-```
-Here is a brief explanation of the arguments:
 
-- `$LOG_PATH` is the path to where the evaluator will store the logs (metrics json file and recorded rollout videos)
+The evaluator connects to the policy server at `--host` and `--port`; the policy server is responsible for receiving observations and returning robot actions. The websocket interface is implemented by the evaluation utilities adapted from [openpi](https://github.com/Physical-Intelligence/openpi), and baseline servers such as OpenPI or GR00T can expose compatible endpoints.
 
-- `$TASK_NAME` is the name of the task, a full list of tasks can be found in the demo gallery, as well as `TASK_TO_NAME_INDICES` under `OmniGibson/omnigibson/learning/utils/eval_utils.py`
+Key arguments:
 
-- `$WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. By default, running the following command will use `omnigibson.learning.wrappers.RGBLowResWrapper`:
-    ```
-    python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME
-    ```
-which is a barebone wrapper that does not provide anything beyond low resolution RGB and proprioception info. There are example wrappers under `omnigibson.learning.wrappers`:
+- `--task-name`: BEHAVIOR task id, e.g. `turning_on_radio`. The 2026 task list is available in the [Demo Gallery](./tasks/).
+- `--host` and `--port`: address of the websocket policy server. The default port is `8000`. The evaluator waits for the server health check at `/healthz`, then opens the websocket connection.
+- `--instance-indices`: indices into the task's test instance list. Indices `0-19` are public test instances; indices `20-39` are hidden instances reserved for final evaluation.
+- `--num-rollouts`: number of rollouts to run for each selected instance.
+- `--max-steps`: optional episode timeout in simulator steps. If omitted, the evaluator uses the default timeout based on human demonstration length.
+- `--env-wrapper`: full target path of the evaluation wrapper. The default is `omnigibson.eval.wrappers.DefaultWrapper`; use `omnigibson.eval.wrappers.RGBDFullResWrapper` for official RGB + depth challenge-track evaluation.
+- `--output-dir`: directory where rollout results are written. JSON metrics are written under `<output-dir>/json/`.
+- `--write-video`: save rollout MP4 videos under `<output-dir>/videos/`.
+- `--video-fps`: frame rate for saved rollout videos.
+- `--headless` / `--no-headless`: run OmniGibson headless or with rendering UI.
 
-    - `RGBLowResWrapper`: uses low-resolution RGB and proprioception only. This wrapper is allowed for challenge-track evaluation, but does not expose depth.
-    - `DefaultWrapper`: uses the default observation config for challenge-track evaluation (RGB + depth + proprioception, 720p for head camera and 480p for wrist camera). Evaluation will be considerably slower compared to `RGBLowResWrapper`.
-    - `HeavyRobotWrapper`: uses the RGB low-resolution observation config and heavy robot base mass (250kg) used during data collection. This wrapper is allowed for challenge-track evaluation.
-    - `RichObservationWrapper`: loads additional observation modalities, such as normal and flow, as well as privileged task information. This wrapper is not allowed for challenge-track evaluation.
+The evaluator sends flattened observations to the policy server. The server should return a msgpack-encoded response containing an `action` array with the robot action for the current step. The helper server implementation is [WebsocketPolicyServer](https://github.com/StanfordVL/BEHAVIOR-1K/blob/my/eval/OmniGibson/omnigibson/eval/utils/network_utils.py), and the evaluator-side client is `omnigibson.eval.policies.WebsocketPolicy`.
 
-There are some more optional arguments, see [base_config.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/base_config.yaml). 
+Each successful rollout produces a JSON result containing `q_score`, `time`, `agent_distance`, and normalized efficiency metrics. If `--write-video` is enabled, the evaluator also records head and wrist camera videos for the rollout.
 
-After launching, the evaluator will try to listen to `0.0.0.0:80`. The IP and port can be changed in `omnigibson/learning.configs/policy/websocket.yaml`. You can then use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` (adapted from [openpi](https://github.com/Physical-Intelligence/openpi)) to serve your policy and communicate with the Evaluator. 
+Example wrappers live under `omnigibson.eval.wrappers`:
 
-There are other arguments that you can overwrite in CLI. For example, `partial_scene_load` will only load objects in the task-relevant rooms, which will help speed up loading and evaluation time. `testing_on_train_instances` will load the training instances instead of testing instances, which is helpful for debugging model overfitting. `max_steps` can be set to enable early stopping for rollouts (setting it to null will use the default timeout, which is 2 * average human task completion time within the demo dataset). See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. 
+- `DefaultWrapper`: low-resolution RGB observations at `224 x 224`, plus proprioception. This is useful for faster debugging but does not include depth.
+- `RGBDFullResWrapper`: official RGB + depth challenge observations, with a `720 x 720` head camera and `480 x 480` wrist cameras.
 
-You are welcome to use the wrappers we provided, or implement custom wrappers for your own use case. Submitted evaluation wrappers must expose only RGB, depth, and proprioception to the policy. We ask that you also include the wrapper code when submitting your result. The wrapper code will be manually inspected by our team to make sure the submission follows the challenge-track observation restrictions and has not abused the environment by any means (e.g. teleporting the robot, or changing object states directly).
+You are welcome to use the provided wrappers or implement a custom wrapper for your own policy. Submitted evaluation wrappers must expose only RGB, depth, and proprioception to the policy. Include the wrapper code in your submission; the organizers will manually inspect it to ensure the challenge-track observation restrictions are followed and that the environment is not manipulated directly, e.g. by teleporting the robot or changing object states.
 
 ## Configure Robot Action Space
 

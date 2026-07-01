@@ -36,7 +36,7 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
   <section class="challenge-action-card challenge-action-card--deadlines">
     <h2>Important Dates</h2>
     <ul class="challenge-action-list">
-      <li><strong>Challenge Launch:</strong> <span>06/30/2026</span></li>
+      <li><strong>Challenge Launch:</strong> <span>07/01/2026</span></li>
       <li><strong>Submission Deadline:</strong> <span>10/16/2026</span></li>
       <li><strong>Winners Announcement:</strong> <span>11/4/2026</span></li>
     </ul>
@@ -78,7 +78,7 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
     </tr>
     <tr>
       <td>Demonstrations</td>
-      <td>20,000 human teleoperation demos</td>
+      <td>20,000 human teleoperation demos, 1,950 hours in total</td>
     </tr>
     <tr>
       <td>Baselines</td>
@@ -124,7 +124,7 @@ The tasks also exercise diverse object state changes and low-level skills, inclu
 ## :octicons-person-add-16: **Getting Started**
 
 1. Join the [Discord community](https://discord.gg/bccR5vGFEx) for announcements and participant discussion.
-2. Attend office hours every Monday, 5-6pm PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
+2. Attend office hours every Monday, 5-6pm Pacific Time, over [Zoom](https://stanford.zoom.us/j/98056621630?pwd=G3JqHl6lWB0qnMAV3BZMJaWgoiXeqT.1).
 3. Download the dataset and review the [dataset documentation](./dataset.md).
 4. Start from the [π0.5 and GR00T N1.7 baseline pipelines](./baselines.md).
 5. Run evaluation and prepare your submission using the [submission guidelines](./submission.md).
@@ -145,4 +145,24 @@ To cite BEHAVIOR-1K, please use:
 
 ## :material-handshake: **Sponsors**
 
-*To be announced.*
+High-quality simulation data provided by Simovation.
+
+We gratefully acknowledge the support of our sponsors who make this challenge possible:
+
+<div style="display: flex; flex-wrap: nowrap; gap: 1.5rem; justify-content: center; align-items: center; margin: 1rem 0;">
+  <a href="https://www.linkedin.com/company/simovationinc/" title="Simovation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2025/simovation_logo.png" alt="Simovation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </a>
+  <a href="https://www.imda.gov.sg/" title="IMDA" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2025/imda_logo.png" alt="IMDA" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </a>
+  <a href="https://hai.stanford.edu/" title="Stanford HAI" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2025/hai_logo.png" alt="Stanford HAI" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </a>
+  <a href="https://tsffoundation.org/" title="Schmidt Family Foundation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2025/schmidt_family_foundation_logo.png" alt="Schmidt Family Foundation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </a>
+  <span title="Calder" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2026/calder.png" alt="Calder" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </span>
+</div>

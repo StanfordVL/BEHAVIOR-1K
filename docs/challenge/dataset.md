@@ -4,9 +4,9 @@
 
 For the 2026 challenge, we provide the following datasets hosted on HuggingFace:
 
-**Raw HDF5 replay data.** [2026-challenge-rawdata](https://huggingface.co/datasets/behavior-1k/2026-challenge-rawdata) contains the original raw HDF5 data for the 20k teleoperation demos. These files contain everything needed to replay exact trajectories in OmniGibson. Use them with `OmniGibson/scripts/learning/replay_obs.py` to replay trajectories and collect additional visual observations.
+**Raw HDF5 replay data.** [2026-challenge-rawdata](https://huggingface.co/datasets/behavior-1k/2026-challenge-rawdata) contains the original raw HDF5 data for the 20k teleoperation demos and is 1.44 TB in total. These files contain everything needed to replay exact trajectories in OmniGibson. Use them with `OmniGibson/scripts/learning/replay_obs.py` to replay trajectories and collect additional visual observations.
 
-**LeRobot demo dataset.** [2026-challenge-demos](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos) contains 20,000 human-collected teleoperation demos across 100 tasks. It follows the [LeRobot](https://github.com/huggingface/lerobot) V3 format with customizations for better data handling.
+**LeRobot demo dataset.** [2026-challenge-demos](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos) contains 20,000 human-collected teleoperation demos across 100 tasks and is 3.27 TB in total. It follows the [LeRobot](https://github.com/huggingface/lerobot) V3 format with customizations for better data handling.
 
 The demo dataset has the following structure:
 
