@@ -4,7 +4,7 @@ While OmniGibson assets includes a set of commonly-used robots, users might stil
 
 ## Preparation
 
-In order to import a custom robot, You will need to first prepare your robot model file. For the next section we will assume you have the URDF file for the robots ready with all the corresponding meshes and textures. If your robot file is in another format (e.g. MCJF), please convert it to URDF format. If you already have the robot model USD file, feel free to skip the next section and move onto [Author the Robot Definition](#author-the-robot-definition).
+In order to import a custom robot, You will need to first prepare your robot model file. For the next section we will assume you have the URDF file for the robots ready with all the corresponding meshes and textures. If your robot file is in another format (e.g. MJCF), please convert it to URDF format. If you already have the robot model USD file, feel free to skip the next section and move onto [Author the Robot Definition](#author-the-robot-definition).
 
 !!! note "Data-driven robots (no Python subclass needed)"
     Since the Isaac Sim 5.1 migration, a robot is defined entirely by data — an imported USD plus a single `RobotDefinition` YAML at `<gm.DATA_PATH>/<dataset>/models/<name>/<name>.yaml`, which OmniGibson auto-discovers at startup. The old "write `stretch.py` and edit `robots/__init__.py`" workflow is obsolete; see [Author the Robot Definition](#author-the-robot-definition).
