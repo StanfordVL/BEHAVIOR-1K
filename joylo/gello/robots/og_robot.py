@@ -115,7 +115,9 @@ class OGRobotServer:
             cfg["scene"]["load_room_types"] = relevant_rooms
 
         self.env = og.Environment(configs=cfg)
-        self.robot = self.env.robots[0]
+        # The vectorized Environment exposes robots as a per-scene list of lists
+        # (env.robots[scene_idx] -> list of robots). JoyLo drives a single scene/robot.
+        self.robot = self.env.robots[0][0]
 
         assert self.robot.is_manipulation, (
             f"Robot {robot} is not a manipulation robot! Cannot use GELLO"
@@ -241,7 +243,7 @@ class OGRobotServer:
         if isinstance(self.env.task, BehaviorTask):
             from omnigibson.systems.system_base import BaseSystem
 
-            for bddl_obj in self.env.task.object_scope.values():
+            for bddl_obj in self.env.task.object_scope[0].values():
                 if bddl_obj is not None and not isinstance(bddl_obj, BaseSystem):
                     for link in bddl_obj.links.values():
                         link.ccd_enabled = True
@@ -312,7 +314,7 @@ class OGRobotServer:
         """Set up cameras, visualizations, UI elements"""
         # Setup cameras
         self.camera_paths, self.viewports = utils.setup_cameras(
-            self.robot, self.env.external_sensors, RESOLUTION, self._teleop_config
+            self.robot, self.env.external_sensors[0], RESOLUTION, self._teleop_config
         )
         self.active_camera_id = 0
 
@@ -350,7 +352,7 @@ class OGRobotServer:
             }
 
             # Get task-relevant objects
-            task_objects = [obj for obj in self.env.task.object_scope.values() if obj is not None]
+            task_objects = [obj for obj in self.env.task.object_scope[0].values() if obj is not None]
 
             self.task_relevant_objects = [
                 obj
@@ -640,7 +642,11 @@ class OGRobotServer:
             else:
                 # Generate action and deploy
                 action = self.get_action()
+                # The raw vectorized Environment returns per-env lists; the single-env
+                # HDF5CollectionWrapper (used when recording) already unwraps to a dict.
                 _, _, _, _, info = self.env.step(action)
+                if isinstance(info, (list, tuple)):
+                    info = info[0]
 
                 # Update checkpoint if queued
                 if self._should_update_checkpoint:
@@ -758,7 +764,7 @@ class OGRobotServer:
         if button_a_state and not self._button_toggled_state["a"]:
             for obj in self.task_irrelevant_objects:
                 obj.visible = not obj.visible
-            task_objects = [obj for obj in self.env.task.object_scope.values() if obj is not None]
+            task_objects = [obj for obj in self.env.task.object_scope[0].values() if obj is not None]
             current_task_relevant_objects = [
                 obj
                 for obj in task_objects
@@ -767,7 +773,7 @@ class OGRobotServer:
                 and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES
             ]
             should_highlight = not any(self.object_beacons[key].visible for key in current_task_relevant_objects if key in self.object_beacons)
-            for entity in self.env.task.object_scope.values():
+            for entity in self.env.task.object_scope[0].values():
                 if entity is None:
                     continue
 
@@ -1111,7 +1117,7 @@ class OGRobotServer:
                     # Write robot poses to scene metadata
                     self.env.scene.write_task_metadata(key=tro_key, data=tro_state)
                 else:
-                    self.env.task.object_scope[tro_key].load_state(
+                    self.env.task.object_scope[0][tro_key].load_state(
                         tro_state, serialized=False
                     )
 
@@ -1127,7 +1133,7 @@ class OGRobotServer:
             for _ in range(25):
                 og.sim.step_physics()
                 self.robot.keep_still()
-                for entity in self.env.task.object_scope.values():
+                for entity in self.env.task.object_scope[0].values():
                     if entity is not None and not isinstance(entity, BaseSystem):
                         entity.keep_still()
             self.robot.keep_still()
