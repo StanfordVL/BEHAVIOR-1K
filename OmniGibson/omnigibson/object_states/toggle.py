@@ -441,10 +441,14 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 if state.marker is None:
                     continue
                 link = state.link  # safe: marker exists ⇒ _initialize completed ⇒ link valid
-                # Use the marker's local-frame offset stored in _initialize() to avoid reading
-                # world poses from Fabric, as _init_marker() can run mid-step during grasping.
+                # Compute marker center in link's local frame from current world poses. This reads
+                # Fabric world poses, so it must not run mid-step; the simulator defers the
+                # tensorized-state view rebuild past the physics step (see Simulator.update_handles /
+                # _on_post_physics_step) so _init_marker() is only ever reached with currently_stepping=False.
+                marker_pos, _ = state.marker.get_position_orientation()
+                link_pos, link_ori = link.get_position_orientation()
                 marker_parent_link_idx_cpu[marker_idx_flat] = RigidBodyViewAPI.get_flat_idx(link.prim_path)
-                marker_local_offset_cpu[marker_idx_flat] = state._marker_local_offset
+                marker_local_offset_cpu[marker_idx_flat] = T.quat2mat(link_ori).T @ (marker_pos - link_pos)
                 marker_radii_cpu[marker_idx_flat] = th.min(state.marker.extent * state.marker.scale).item()
 
         # Scalar-typed → create_tensor_from_list; vec3 has no helper, so use wp.array directly
@@ -476,9 +480,6 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         self._requires_closed_individual = requires_closed
 
         self.marker = None  # init as None, will be filled in initialize()
-        # Marker center expressed in the parent link's local frame. Stored once in _initialize()
-        # (outside any physics step).
-        self._marker_local_offset = None
 
         super().__init__(obj)
 
@@ -734,13 +735,6 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         self.marker.initialize()
         self.marker.visible = True
         self.marker.color = type(self).COLOR_OFF
-
-        # Store the marker's offset in the parent link's local frame now, outside any physics step.
-        # The offset will be read in _init_marker().
-        # The offset is rigid, so computing it once here is equivalent.
-        marker_pos, _ = self.marker.get_position_orientation()
-        link_pos, link_ori = self.link.get_position_orientation()
-        self._marker_local_offset = T.quat2mat(link_ori).T @ (marker_pos - link_pos)
 
     @staticmethod
     def get_texture_change_params():
