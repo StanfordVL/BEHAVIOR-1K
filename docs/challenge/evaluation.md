@@ -209,6 +209,31 @@ We will calculate the following metric during policy rollout:
 
 The success score (**Q**) is the metric used for ranking submissions. If two submissions achieve the same score, secondary metrics will be used to break ties. 
 
+## Prizes
+
+The 2026 BEHAVIOR Challenge has an $11,000 prize pool:
+
+<table class="challenge-data-table">
+  <tbody>
+    <tr>
+      <td>1st place</td>
+      <td>$5,000</td>
+    </tr>
+    <tr>
+      <td>2nd place</td>
+      <td>$3,000</td>
+    </tr>
+    <tr>
+      <td>3rd place</td>
+      <td>$2,000</td>
+    </tr>
+    <tr>
+      <td>Outstanding open-source solution</td>
+      <td>$1,000</td>
+    </tr>
+  </tbody>
+</table>
+
 ## Evaluation Protocol and Logistics
 
 **Evaluation protocol:**

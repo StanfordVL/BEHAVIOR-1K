@@ -143,6 +143,111 @@
     text-decoration: none;
 }
 
+.challenge-prize-panel {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1rem 0 1.8rem;
+}
+
+.challenge-prize-total {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.6rem;
+    border: 2px solid #8c1515;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, rgba(140, 21, 21, 0.08), rgba(184, 58, 75, 0.035));
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.035);
+}
+
+.challenge-prize-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+.challenge-prize-card {
+    display: grid;
+    min-height: 6rem;
+    grid-template-rows: 1.35rem 2.2rem auto;
+    align-content: center;
+    justify-items: center;
+    border: 2px solid var(--prize-accent);
+    border-radius: 8px;
+    padding: 0.75rem 0.8rem 0.8rem;
+    background: var(--prize-bg);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.035);
+    text-align: center;
+}
+
+.challenge-prize-card span {
+    padding-top: 0.38rem;
+}
+
+.challenge-prize-card--first {
+    --prize-accent: #b8860b;
+    --prize-bg: rgba(184, 134, 11, 0.08);
+}
+
+.challenge-prize-card--second {
+    --prize-accent: #6b7280;
+    --prize-bg: rgba(107, 114, 128, 0.08);
+}
+
+.challenge-prize-card--third {
+    --prize-accent: #9a5a22;
+    --prize-bg: rgba(154, 90, 34, 0.08);
+}
+
+.challenge-prize-card--open {
+    --prize-accent: #2f6f8f;
+    --prize-bg: rgba(47, 111, 143, 0.08);
+}
+
+.challenge-prize-panel span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.38rem;
+    color: var(--md-default-fg-color);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+    min-height: 1.65rem;
+    text-transform: uppercase;
+}
+
+.challenge-prize-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.45rem;
+    color: var(--prize-accent, #8c1515);
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    font-size: 1.25rem;
+    line-height: 1;
+    text-transform: none;
+}
+
+.challenge-prize-panel strong {
+    display: block;
+    margin-top: 0.2rem;
+    color: #8c1515;
+    font-size: 1.3rem;
+    line-height: 1.15;
+}
+
+.challenge-prize-total strong {
+    margin-top: 0;
+    font-size: 1.75rem;
+}
+
+.challenge-prize-card strong {
+    color: var(--prize-accent);
+}
+
 .md-typeset table.challenge-data-table {
     display: table;
     width: 100%;
@@ -387,6 +492,11 @@
 
 @media (max-width: 768px) {
     .challenge-action-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .challenge-prize-panel,
+    .challenge-prize-grid {
         grid-template-columns: 1fr;
     }
 

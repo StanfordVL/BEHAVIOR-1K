@@ -36,9 +36,9 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
   <section class="challenge-action-card challenge-action-card--deadlines">
     <h2>Important Dates</h2>
     <ul class="challenge-action-list">
-      <li><strong>Challenge Launch:</strong> <span>07/01/2026</span></li>
+      <li><strong>Challenge Launch:</strong> <span>07/02/2026</span></li>
       <li><strong>Submission Deadline:</strong> <span>10/16/2026</span></li>
-      <li><strong>Winners Announcement:</strong> <span>11/4/2026</span></li>
+      <li><strong>Winners Announcement:</strong> <span>11/04/2026</span></li>
     </ul>
     <div class="challenge-action-links">
       <a href="https://behavior-1k-2026-challenge-leaderboard.hf.space/submit">Submission Portal</a>
@@ -58,6 +58,37 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
       <a href="./evaluation.html">Evaluation & Rules</a>
     </div>
   </section>
+</div>
+
+## :material-trophy: **Prize Pool**
+
+<div class="challenge-prize-panel">
+  <div class="challenge-prize-total">
+    <span><b class="challenge-prize-icon">🏆</b> Total Prize Pool</span>
+    <strong>$11,000</strong>
+  </div>
+  <div class="challenge-prize-grid">
+    <div class="challenge-prize-card challenge-prize-card--first">
+      <b class="challenge-prize-icon">🥇</b>
+      <span>1st Place</span>
+      <strong>$5,000</strong>
+    </div>
+    <div class="challenge-prize-card challenge-prize-card--second">
+      <b class="challenge-prize-icon">🥈</b>
+      <span>2nd Place</span>
+      <strong>$3,000</strong>
+    </div>
+    <div class="challenge-prize-card challenge-prize-card--third">
+      <b class="challenge-prize-icon">🥉</b>
+      <span>3rd Place</span>
+      <strong>$2,000</strong>
+    </div>
+    <div class="challenge-prize-card challenge-prize-card--open">
+      <b class="challenge-prize-icon">🌐</b>
+      <span>Outstanding Open Source</span>
+      <strong>$1,000</strong>
+    </div>
+  </div>
 </div>
 
 ## :material-view-dashboard: **Challenge at a Glance**
@@ -87,10 +118,6 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
     <tr>
       <td>Ranking metric</td>
       <td>Average task success score with BDDL partial credit</td>
-    </tr>
-    <tr>
-      <td>Prizes</td>
-      <td>To be announced, with special prizes for outstanding open-source solutions</td>
     </tr>
   </tbody>
 </table>

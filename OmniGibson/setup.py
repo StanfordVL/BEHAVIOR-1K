@@ -77,6 +77,7 @@ setup(
         ],
         "primitives": [
             "ninja~=1.13.0",
+            "warp-lang>=0.9.0,<1.13",
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@78612f45cef52c3fa0298de243a54cd7ca614414",
         ],
         "eval": [
