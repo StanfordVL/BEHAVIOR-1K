@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
         "--max-steps",
         type=int,
         default=None,
-        help="Episode timeout in steps. Default (None) = 2x mean human-demo length.",
+        help="Episode timeout in steps. Default (None) = 1.5x mean human-demo length.",
     )
     parser.add_argument(
         "--env-wrapper",

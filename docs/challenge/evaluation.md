@@ -68,7 +68,7 @@ Key arguments:
     </tr>
     <tr>
       <td><code>--max-steps</code></td>
-      <td>Optional episode timeout in simulator steps. If omitted, the evaluator uses the default timeout based on human demonstration length.</td>
+      <td>Optional episode timeout in simulator steps. If omitted, the evaluator uses a task-specific default timeout equal to <code>1.5x</code> the mean human demonstration length.</td>
     </tr>
     <tr>
       <td><code>--env-wrapper</code></td>
@@ -246,7 +246,7 @@ The 2026 BEHAVIOR Challenge has an $11,000 prize pool:
     </tr>
     <tr>
       <td>Self-evaluation and report</td>
-      <td>In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the <strong>first 10 public instances</strong>, corresponding to instance indices <code>0-9</code> (<code>--instance-indices 0 1 2 3 4 5 6 7 8 9</code>), for evaluation results. Participants should report their performance on these 10 instances through the process described on the <a href="./submission.html">submission page</a>. You should evaluate your policy 1 time on each instance, using the default time-outs provided by our evaluation script. We will update the leaderboard once we sanity-check the performance. The <strong>remaining 10 public instances</strong>, indices <code>10-19</code>, are not used for leaderboard reporting and may serve as a test set before evaluating your final policy.</td>
+      <td>In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the <strong>first 10 public instances</strong>, corresponding to instance indices <code>0-9</code> (<code>--instance-indices 0 1 2 3 4 5 6 7 8 9</code>), for evaluation results. Participants should report their performance on these 10 instances through the process described on the <a href="./submission.html">submission page</a>. You should evaluate your policy 1 time on each instance, using the default <code>1.5x</code> mean-human-length timeouts provided by our evaluation script. We will update the leaderboard once we sanity-check the performance. The <strong>remaining 10 public instances</strong>, indices <code>10-19</code>, are not used for leaderboard reporting and may serve as a test set before evaluating your final policy.</td>
     </tr>
     <tr>
       <td>Simulation nondeterminism</td>

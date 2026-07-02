@@ -24,6 +24,7 @@ from gello.utils.og_teleop_utils import (
 )
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.eval.utils.eval_utils import (
+    EVAL_TIMEOUT_MULTIPLIER,
     NUM_HIDDEN_TEST_INSTANCES,
     NUM_PUBLIC_TEST_INSTANCES,
     TASK_NAMES_TO_INDICES,
@@ -159,10 +160,11 @@ class Evaluator:
         cfg["robots"] = [robot_cfg]
 
         if self.cfg.max_steps is None:
+            max_steps = int(self.human_stats["length"] * EVAL_TIMEOUT_MULTIPLIER)
             logger.info(
-                f"Setting timeout to be 2x the average length of human demos: {int(self.human_stats['length'] * 2)}"
+                f"Setting timeout to be {EVAL_TIMEOUT_MULTIPLIER}x the average length of human demos: {max_steps}"
             )
-            cfg["task"]["termination_config"]["max_steps"] = int(self.human_stats["length"] * 2)
+            cfg["task"]["termination_config"]["max_steps"] = max_steps
         else:
             logger.info(f"Setting timeout to be {self.cfg.max_steps} steps through config.")
             cfg["task"]["termination_config"]["max_steps"] = self.cfg.max_steps
