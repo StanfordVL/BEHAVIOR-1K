@@ -87,7 +87,7 @@ There are two supported ways to submit your model for final evaluation.
   </section>
   <section>
     <h3>IP address-based evaluation</h3>
-    <p>Serve your policy yourself and provide an IP address that allows us to query it for evaluation. We only accept IP address-based submissions that expose at least 64 ports for parallel evaluation.</p>
+    <p>Serve your policy yourself and provide an IP address that allows us to query it for evaluation. We only accept IP address-based submissions that expose at least 50 ports for parallel evaluation.</p>
     <p>Common serving options include TorchServe, LitServe, vLLM, NVIDIA Triton, or an equivalent model-serving stack.</p>
   </section>
 </div>
@@ -117,7 +117,7 @@ Your final zip file should contain:
     </tr>
     <tr>
       <td>README</td>
-      <td>Instructions for evaluating your policy, including the full evaluator command, wrapper path, robot config path, Docker image details or IP address information. For IP address-based submissions, include at least 64 available ports.</td>
+      <td>Instructions for evaluating your policy, including the full evaluator command, wrapper path, robot config path, Docker image details or IP address information. For IP address-based submissions, include at least 50 available ports.</td>
     </tr>
   </tbody>
 </table>

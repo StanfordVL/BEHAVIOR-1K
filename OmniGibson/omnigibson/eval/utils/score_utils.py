@@ -5,6 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 from omnigibson.macros import gm
 from omnigibson.eval.utils.eval_utils import (
+    EVAL_TIMEOUT_MULTIPLIER,
     NUM_HIDDEN_TEST_INSTANCES,
     NUM_PUBLIC_TEST_INSTANCES,
     PROPRIOCEPTION_INDICES,
@@ -317,7 +318,10 @@ def compute_final_q_score(
             result = json.load(f)
         # get score
         q_score[task_name][f"{instance_id}_{rollout_id}"] = result["q_score"]["final"]
-        time_score[task_name][f"{instance_id}_{rollout_id}"] = 2 - 1 / result["time"]["normalized_time"]
+        normalized_time = result["time"]["normalized_time"]
+        time_score[task_name][f"{instance_id}_{rollout_id}"] = EVAL_TIMEOUT_MULTIPLIER / (
+            EVAL_TIMEOUT_MULTIPLIER - 1.0
+        ) - 1 / ((EVAL_TIMEOUT_MULTIPLIER - 1.0) * normalized_time)
         base_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["base"]
         left_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["left"]
         right_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["right"]
