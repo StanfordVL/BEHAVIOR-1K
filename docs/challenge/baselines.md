@@ -13,11 +13,9 @@ Both walkthroughs share the same first steps ([Common setup](#common-setup)) and
 
 We provide fine-tuned checkpoints so participants can run evaluation without training:
 
-
-| Task               | π0.5                                                                                                | GR00T N1.7                              |
-| ------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `turning_on_radio` | [checkpoint](https://drive.google.com/file/d/1KojwNUz0HVwU3Ww2SVh3NKt-4asuI3y2/view?usp=drive_link) | [checkpoint](TODO: add checkpoint link) |
-
+| Task               | π0.5                                     | GR00T N1.7                               |
+| ------------------ | ---------------------------------------- | ---------------------------------------- |
+| `turning_on_radio` | [checkpoint](https://drive.google.com/file/d/1KojwNUz0HVwU3Ww2SVh3NKt-4asuI3y2/view?usp=sharing) | [checkpoint](https://drive.google.com/file/d/1OXNm3SPLvWOSJR1e8In6xHMHxOYDp789/view?usp=sharing) |
 
 !!! tip "Evaluation only?"
     Complete the [Common setup](#common-setup), then jump straight to the corresponding *Serve the policy* step and [Evaluation](#evaluation).
