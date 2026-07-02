@@ -79,7 +79,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--policy",
         choices=("websocket", "local"),
-        default="local",
+        default="websocket",
         help="Policy backend to use. local emits zero actions and is intended for eval smoke tests.",
     )
     parser.add_argument("--output-dir", default="/tmp/b1k_eval", help="Where to write result JSONs.")
