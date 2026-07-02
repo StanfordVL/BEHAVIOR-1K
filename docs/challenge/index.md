@@ -38,7 +38,7 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
     <ul class="challenge-action-list">
       <li><strong>Challenge Launch:</strong> <span>07/01/2026</span></li>
       <li><strong>Submission Deadline:</strong> <span>10/16/2026</span></li>
-      <li><strong>Winners Announcement:</strong> <span>11/4/2026</span></li>
+      <li><strong>Winners Announcement:</strong> <span>11/04/2026</span></li>
     </ul>
     <div class="challenge-action-links">
       <a href="https://behavior-1k-2026-challenge-leaderboard.hf.space/submit">Submission Portal</a>

@@ -97,38 +97,6 @@ There are two supported ways to submit your model for final evaluation.
 
     Submitted solutions will remain confidential unless participants explicitly grant permission for disclosure. We strongly encourage open-source submissions, as they help advance reproducible research and accelerate progress in embodied AI.
 
-### Docker Test Command
-
-We provide a sample Dockerfile that starts a dummy local policy with zero actions: `OmniGibson/docker/submission.Dockerfile`.
-
-1. Start an evaluation instance in another terminal:
-
-    ```bash
-    python -m omnigibson.eval.eval \
-      --task-name turning_on_radio \
-      --robot-config OmniGibson/omnigibson/eval/r1pro.yaml \
-      --host 127.0.0.1 \
-      --port 8000 \
-      --instance-indices 0 \
-      --output-dir outputs/b1k_eval
-    ```
-
-2. Build the sample image:
-
-    ```bash
-    docker build -f OmniGibson/docker/submission.Dockerfile -t b1k-challenge-example .
-    ```
-
-3. Run the container:
-
-    ```bash
-    docker run -p 8000:8000 b1k-challenge-example
-    ```
-
-!!! warning "Do not launch OmniGibson inside the submitted container"
-
-    The Docker image may include OmniGibson as a utility library for policy code, but Isaac Sim is not installed in the container. For evaluation, OmniGibson runs outside the container and communicates with the policy server.
-
 ## Final Submission Package
 
 Your final zip file should contain:
