@@ -36,7 +36,7 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
   <section class="challenge-action-card challenge-action-card--deadlines">
     <h2>Important Dates</h2>
     <ul class="challenge-action-list">
-      <li><strong>Challenge Launch:</strong> <span>07/01/2026</span></li>
+      <li><strong>Challenge Launch:</strong> <span>07/02/2026</span></li>
       <li><strong>Submission Deadline:</strong> <span>10/16/2026</span></li>
       <li><strong>Winners Announcement:</strong> <span>11/04/2026</span></li>
     </ul>
