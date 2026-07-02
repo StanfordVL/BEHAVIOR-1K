@@ -13,9 +13,11 @@ Both walkthroughs share the same first steps ([Common setup](#common-setup)) and
 
 We provide fine-tuned checkpoints so participants can run evaluation without training:
 
-| Task               | π0.5                                     | GR00T N1.7                               |
-| ------------------ | ---------------------------------------- | ---------------------------------------- |
-| `turning_on_radio` | [checkpoint](TODO: add checkpoint link)  | [checkpoint](TODO: add checkpoint link)  |
+
+| Task               | π0.5                                                                                                | GR00T N1.7                              |
+| ------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `turning_on_radio` | [checkpoint](https://drive.google.com/file/d/1KojwNUz0HVwU3Ww2SVh3NKt-4asuI3y2/view?usp=drive_link) | [checkpoint](TODO: add checkpoint link) |
+
 
 !!! tip "Evaluation only?"
     Complete the [Common setup](#common-setup), then jump straight to the corresponding *Serve the policy* step and [Evaluation](#evaluation).
@@ -104,47 +106,53 @@ Pick a unique experiment name `$EXP_NAME` for each run and start training from `
 
 === "Single GPU"
 
-    ```bash
-    XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/b1k/train_b1k.py pi05_b1k \
-        --exp_name=$EXP_NAME \
-        --overwrite \
-        --batch_size=64 \
-        --data.repo_id=$TASK_NAME \
-        --data.base_config.dataset_root=$DATASET_PATH
-    ```
+```
+```bash
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/b1k/train_b1k.py pi05_b1k \
+    --exp_name=$EXP_NAME \
+    --overwrite \
+    --batch_size=64 \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_PATH
+```
+```
 
 === "Multi-GPU (single node)"
 
-    Pass the GPU count and device list as positional arguments (e.g. `... pi05_b1k 8 0,1,2,3,4,5,6,7`):
+```
+Pass the GPU count and device list as positional arguments (e.g. `... pi05_b1k 8 0,1,2,3,4,5,6,7`):
 
-    ```bash
-    ./scripts/b1k/train_b1k.sh pi05_b1k $NUM_GPUS $CUDA_VISIBLE_DEVICES \
-        --data.repo_id=$TASK_NAME \
-        --data.base_config.dataset_root=$DATASET_PATH
-    ```
+```bash
+./scripts/b1k/train_b1k.sh pi05_b1k $NUM_GPUS $CUDA_VISIBLE_DEVICES \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_PATH
+```
+```
 
 === "SLURM"
 
-    Use `scripts/b1k/train_b1k.sbatch.sh`. Before submitting, edit the `#SBATCH` directives at the top of the script (account, partition, GPU type/count, memory, time limit) and update the virtual-environment activation line to point to the OpenPI install.
+```
+Use `scripts/b1k/train_b1k.sbatch.sh`. Before submitting, edit the `#SBATCH` directives at the top of the script (account, partition, GPU type/count, memory, time limit) and update the virtual-environment activation line to point to the OpenPI install.
 
-    Submit a new run:
+Submit a new run:
 
-    ```bash
-    EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
-        --overwrite \
-        --data.repo_id=$TASK_NAME \
-        --data.base_config.dataset_root=$DATASET_PATH
-    ```
+```bash
+EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
+    --overwrite \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_PATH
+```
 
-    Resume an existing run by omitting `--overwrite` (by default the script resumes from `outputs/checkpoints/pi05_b1k/$EXP_NAME/`):
+Resume an existing run by omitting `--overwrite` (by default the script resumes from `outputs/checkpoints/pi05_b1k/$EXP_NAME/`):
 
-    ```bash
-    EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
-        --data.repo_id=$TASK_NAME \
-        --data.base_config.dataset_root=$DATASET_PATH
-    ```
+```bash
+EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
+    --data.repo_id=$TASK_NAME \
+    --data.base_config.dataset_root=$DATASET_PATH
+```
 
-    Any extra arguments after the config name are passed through to `train_b1k.py`. Job logs are written to the path set by `#SBATCH --output`.
+Any extra arguments after the config name are passed through to `train_b1k.py`. Job logs are written to the path set by `#SBATCH --output`.
+```
 
 Checkpoints are saved under `outputs/checkpoints/pi05_b1k/$EXP_NAME/`.
 
@@ -188,7 +196,7 @@ source .venv/bin/activate
 ```
 
 !!! warning "Gated backbone"
-    The N1.7 backbone [`nvidia/Cosmos-Reason2-2B`](https://huggingface.co/nvidia/Cosmos-Reason2-2B) is gated. Accept the gate before training.
+    The N1.7 backbone `[nvidia/Cosmos-Reason2-2B](https://huggingface.co/nvidia/Cosmos-Reason2-2B)` is gated. Accept the gate before training.
 
 ### Prepare the dataset
 
@@ -204,34 +212,38 @@ Normalization statistics (`meta/stats.json`) are generated automatically on the 
 ??? note "Optional: convert the dataset to LeRobot v2.1"
     The GR00T loader reads both the released v3.0 demos and v2.1 natively — no conversion is needed to train. Convert only if downstream tooling requires v2.1.
 
-    The conversion runs **in place**: `$DATA_ROOT/$TASK_NAME` becomes v2.1 and the original v3.0 copy is backed up to `$DATA_ROOT/${TASK_NAME}_v3.0`.
+```
+The conversion runs **in place**: `$DATA_ROOT/$TASK_NAME` becomes v2.1 and the original v3.0 copy is backed up to `$DATA_ROOT/${TASK_NAME}_v3.0`.
 
-    ```bash
-    cd $GROOT_DIR/scripts/lerobot_conversion
-    uv venv --python 3.11 .venv && source .venv/bin/activate
-    GIT_LFS_SKIP_SMUDGE=1 uv pip install \
-      "lerobot @ git+https://github.com/huggingface/lerobot.git@c75455a6de5c818fa1bb69fb2d92423e86c70475" \
-      huggingface_hub jsonlines numpy pyarrow tqdm
-    python convert_v3_to_v2.py --root $DATA_ROOT --repo-id $TASK_NAME
-    cd $GROOT_DIR
-    source .venv/bin/activate      # re-activate the GR00T venv (conversion used its own)
-    ```
+```bash
+cd $GROOT_DIR/scripts/lerobot_conversion
+uv venv --python 3.11 .venv && source .venv/bin/activate
+GIT_LFS_SKIP_SMUDGE=1 uv pip install \
+  "lerobot @ git+https://github.com/huggingface/lerobot.git@c75455a6de5c818fa1bb69fb2d92423e86c70475" \
+  huggingface_hub jsonlines numpy pyarrow tqdm
+python convert_v3_to_v2.py --root $DATA_ROOT --repo-id $TASK_NAME
+cd $GROOT_DIR
+source .venv/bin/activate      # re-activate the GR00T venv (conversion used its own)
+```
 
-    Re-run `deploy_modality.py` afterwards — the conversion does not carry `modality.json` over.
+Re-run `deploy_modality.py` afterwards — the conversion does not carry `modality.json` over.
+```
 
 ??? tip "Optional: pre-cache the base models"
     Training downloads both models automatically on the first run; pre-cache them to fail fast on access or network issues:
 
-    ```bash
-    export HF_TOKEN=hf_xxx         # the account that accepted the Cosmos-Reason2-2B gate
-    python - <<'PY'
-    import os
-    from huggingface_hub import snapshot_download
-    tok = os.environ.get("HF_TOKEN")
-    snapshot_download("nvidia/GR00T-N1.7-3B", token=tok)
-    snapshot_download("nvidia/Cosmos-Reason2-2B", token=tok)  # gated backbone
-    PY
-    ```
+```
+```bash
+export HF_TOKEN=hf_xxx         # the account that accepted the Cosmos-Reason2-2B gate
+python - <<'PY'
+import os
+from huggingface_hub import snapshot_download
+tok = os.environ.get("HF_TOKEN")
+snapshot_download("nvidia/GR00T-N1.7-3B", token=tok)
+snapshot_download("nvidia/Cosmos-Reason2-2B", token=tok)  # gated backbone
+PY
+```
+```
 
 ### Train
 
