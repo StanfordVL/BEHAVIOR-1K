@@ -160,7 +160,6 @@ uv run scripts/b1k/serve_b1k.py \
     --robot b1k/R1Pro \
     --task b1k/$TASK_NAME \
     --repo-id $TASK_NAME \
-    policy:checkpoint \
     --policy.config pi05_b1k \
     --policy.dir $PATH_TO_CKPT \
     --control_mode receding_horizon \
