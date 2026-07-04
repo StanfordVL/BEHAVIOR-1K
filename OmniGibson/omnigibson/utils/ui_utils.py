@@ -25,7 +25,11 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.controllers import ControllerView
+
+try:
+    from omnigibson.controllers import ControllerView
+except ModuleNotFoundError:
+    ControllerView = None
 
 
 def print_icon():
@@ -140,6 +144,9 @@ class KeyboardEventHandler:
 
                 callback_fn() --> None
         """
+        if ControllerView is None:
+            cls.KEYBOARD_CALLBACKS[key] = callback_fn
+            return
         # Initialize the interface if not initialized yet
         if cls._CALLBACK_ID is None:
             cls.initialize()
@@ -597,6 +604,47 @@ class KeyboardRobotController:
         Args:
             robot (BaseRobot): robot to control
         """
+        if ControllerView is None:
+            self.robot = robot
+            self.action_dim = robot.action_dim
+            self.controller_info = {
+                name: {
+                    "name": controller.controller_type,
+                    "start_idx": controller.command_start,
+                    "dofs": th.tensor(controller.dof_idx, dtype=th.long),
+                    "command_dim": controller.command_dim,
+                    "motor_type": controller.motor_type,
+                    "use_delta_commands": controller.use_delta_commands,
+                }
+                for name, controller in robot.controllers.items()
+            }
+            self.joint_idx_to_group_key = {}
+            for group_key, controller in robot.controllers.items():
+                for idx in controller.dof_idx:
+                    self.joint_idx_to_group_key[idx] = group_key
+            self.joint_names = list(getattr(robot, "joint_names", robot.joints.keys()))
+            self.joint_types = [joint.joint_type for joint in robot.joints.values()]
+            self.joint_command_idx = None
+            self.joint_control_idx = None
+            self.active_joint_command_idx_idx = 0
+            self.current_joint = -1
+            self.ik_arms = []
+            self.active_arm_idx = 0
+            self.binary_grippers = []
+            self.active_gripper_idx = 0
+            self.gripper_direction = None
+            self.persistent_gripper_action = None
+            self.keypress_mapping = None
+            self.current_keypress = None
+            self.active_action = None
+            self._pending_release_key = None
+            self._newton_down_keys = set()
+            self.toggling_gripper = False
+            self.custom_keymapping = None
+            self._keyboard_sub = None
+            self.populate_keypress_mapping()
+            return
+
         # Store relevant info from robot
         self.robot = robot
         self.action_dim = robot.action_dim
@@ -650,10 +698,46 @@ class KeyboardRobotController:
         """
         Sets up the keyboard callback functionality with omniverse
         """
+        if ControllerView is None:
+            return
         appwindow = lazy.omni.appwindow.get_default_app_window()
         input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
         self._keyboard_sub = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+
+    def _poll_newton_keyboard(self):
+        """
+        Poll Newton's OpenGL viewer keyboard state and feed it through the same
+        teleoperation state machine used by the Isaac/Carb callback path.
+        """
+        if ControllerView is not None:
+            return
+
+        viewer = getattr(og.sim, "viewer", None)
+        if viewer is None:
+            return
+
+        keys = set(self.keypress_mapping) | set(self.custom_keymapping)
+        keys.update(
+            {
+                lazy.carb.input.KeyboardInput.KEY_1,
+                lazy.carb.input.KeyboardInput.KEY_2,
+                lazy.carb.input.KeyboardInput.KEY_3,
+                lazy.carb.input.KeyboardInput.KEY_4,
+                lazy.carb.input.KeyboardInput.KEY_5,
+                lazy.carb.input.KeyboardInput.KEY_6,
+                lazy.carb.input.KeyboardInput.M,
+                lazy.carb.input.KeyboardInput.ESCAPE,
+            }
+        )
+        down_keys = {key for key in keys if _newton_is_key_down(viewer, key)}
+
+        for key in down_keys - self._newton_down_keys:
+            self.keyboard_event_handler(_NewtonKeyboardEvent(lazy.carb.input.KeyboardEventType.KEY_PRESS, key))
+        for key in self._newton_down_keys - down_keys:
+            self.keyboard_event_handler(_NewtonKeyboardEvent(lazy.carb.input.KeyboardEventType.KEY_RELEASE, key))
+
+        self._newton_down_keys = down_keys
 
     def register_custom_keymapping(self, key, description, callback_fn):
         """
@@ -870,6 +954,7 @@ class KeyboardRobotController:
         Returns:
             n-array: Generated action vector based on received user inputs from the keyboard
         """
+        self._poll_newton_keyboard()
         action = th.zeros(self.action_dim)
 
         # Handle the action if any key is actively being pressed
@@ -890,10 +975,17 @@ class KeyboardRobotController:
                     from omnigibson.utils.constants import JointType
 
                     gk = self.joint_idx_to_group_key[joint_idx]
-                    if (
-                        self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC
-                        and ControllerView.get_use_delta_commands(gk)
-                        and ControllerView.get_motor_type(gk) == "position"
+                    if self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC and (
+                        (
+                            ControllerView is not None
+                            and ControllerView.get_use_delta_commands(gk)
+                            and ControllerView.get_motor_type(gk) == "position"
+                        )
+                        or (
+                            ControllerView is None
+                            and self.controller_info[gk].get("use_delta_commands", False)
+                            and self.controller_info[gk].get("motor_type") == "position"
+                        )
                     ):
                         val *= 0.2
 
@@ -986,6 +1078,42 @@ class KeyboardRobotController:
             print()
         print("*" * 30)
         print()
+
+
+class _NewtonKeyboardEvent:
+    def __init__(self, event_type, key):
+        self.type = event_type
+        self.input = key
+
+
+def _newton_is_key_down(viewer, key):
+    viewer_key = _newton_viewer_key(key)
+    return viewer_key is not None and viewer.is_key_down(viewer_key)
+
+
+def _newton_viewer_key(key):
+    try:
+        import pyglet
+    except Exception:
+        return None
+
+    key_name = str(key)
+    key_map = {
+        "KEY_0": "_0",
+        "KEY_1": "_1",
+        "KEY_2": "_2",
+        "KEY_3": "_3",
+        "KEY_4": "_4",
+        "KEY_5": "_5",
+        "KEY_6": "_6",
+        "KEY_7": "_7",
+        "KEY_8": "_8",
+        "KEY_9": "_9",
+        "LEFT_BRACKET": "BRACKETLEFT",
+        "RIGHT_BRACKET": "BRACKETRIGHT",
+    }
+    key_name = key_map.get(key_name, key_name)
+    return getattr(pyglet.window.key, key_name, None)
 
 
 def generate_box_edges(center, extents):

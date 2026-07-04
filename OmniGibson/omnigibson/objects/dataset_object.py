@@ -1,46 +1,15 @@
-import math
-import os
+"""Newton-native DatasetObject descriptor."""
+
+from __future__ import annotations
+
 import random
+from pathlib import Path
 
-import torch as th
-
-import omnigibson as og
-import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
-from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.asset_utils import (
-    check_minimum_behavior_1k_assets_version,
-    get_all_object_category_models,
-    get_avg_category_specs,
-    get_dataset_path,
-)
-from omnigibson.utils.constants import (
-    DEFAULT_PRISMATIC_JOINT_FRICTION,
-    DEFAULT_REVOLUTE_JOINT_FRICTION,
-    DEFAULT_PRISMATIC_JOINT_DAMPING,
-    DEFAULT_REVOLUTE_JOINT_DAMPING,
-    JointType,
-    PrimType,
-)
-from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import find_joint_prims
-
-# Create module logger
-log = create_module_logger(module_name=__name__)
-
-
-# Create settings for this module
-m = create_module_macros(module_path=__file__)
+from omnigibson.objects.usd_object import REGISTERED_OBJECTS, USDObject
 
 
 class DatasetObject(USDObject):
-    """
-    DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
-    dataset. These objects should contain additional metadata, including aggregate statistics across the
-    object's category, e.g., avg dims, bounding boxes, masses, etc.
-    """
+    """Object descriptor for BEHAVIOR dataset assets."""
 
     def __init__(
         self,
@@ -55,7 +24,7 @@ class DatasetObject(USDObject):
         visual_only=False,
         kinematic_only=None,
         self_collisions=False,
-        prim_type=PrimType.RIGID,
+        prim_type=None,
         link_physics_materials=None,
         load_config=None,
         abilities=None,
@@ -63,84 +32,34 @@ class DatasetObject(USDObject):
         bounding_box=None,
         in_rooms=None,
         expected_file_hash=None,
+        position=None,
+        orientation=None,
         **kwargs,
     ):
-        """
-        Args:
-            name (str): Name for the object. Names need to be unique per scene
-            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
-            category (str): Category for the object. Defaults to "object".
-            model (None or str): If specified, this is used in conjunction with
-                @category to infer the usd filepath to load for this object, which evaluates to the following:
-
-                    {gm.DATA_PATH}/{dataset_name}/objects/{category}/{model}/usd/{model}.usd
-
-                Otherwise, will randomly sample a model given @category
-            dataset_name (str): Dataset to search for this object. Default is behavior-1k-assets, corresponding to the
-                proprietary (encrypted) BEHAVIOR-1K dataset. Any other dataset names are searched for
-                under the gm.DATA_PATH directory.
-            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
-                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
-                3-array specifies per-axis scaling.
-            visible (bool): whether to render this object or not in the stage
-            fixed_base (bool): whether to fix the base of this object or not
-            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
-            kinematic_only (None or bool): Whether this object should be kinematic only (and not get affected by any
-                collisions). If None, then this value will be set to True if @fixed_base is True and some other criteria
-                are satisfied (see usd_object.py post_load function), else False.
-            self_collisions (bool): Whether to enable self collisions for this object
-            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
-            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
-                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
-                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
-                "dynamic_friction", and "restitution"
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime.
-            abilities (None or dict): If specified, manually adds specific object states to this object. It should be
-                a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
-                the object state instance constructor.
-            include_default_states (bool): whether to include the default object states from @get_default_states
-            bounding_box (None or 3-array): If specified, will scale this object such that it fits in the desired
-                (x,y,z) object-aligned bounding box. Note that EITHER @bounding_box or @scale may be specified
-                -- not both!
-            in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
-                a list of room type(s) or a single room type
-            expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
-            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
-        """
-        # Store variables
         if isinstance(in_rooms, str):
-            assert "," not in in_rooms
-        self._in_rooms = [in_rooms] if isinstance(in_rooms, str) else in_rooms
-
-        # Make sure only one of bounding_box and scale are specified
+            in_rooms = [in_rooms]
         if bounding_box is not None and scale is not None:
-            raise Exception("You cannot define both scale and bounding box size for an DatasetObject")
-
-        # Add info to load config
-        load_config = dict() if load_config is None else load_config
-        load_config["bounding_box"] = bounding_box
-        load_config["dataset_name"] = dataset_name
-        # All DatasetObjects should have xform properties pre-loaded
-        # TODO: enable this after next dataset release
-        load_config["xform_props_pre_loaded"] = False
-
-        # Infer the correct usd path to use
+            raise ValueError("Cannot define both scale and bounding_box for a DatasetObject.")
         if model is None:
-            available_models = get_all_object_category_models(category=category)
-            assert len(available_models) > 0, f"No available models found for category {category}!"
-            model = random.choice(available_models)
+            models = get_all_object_category_models(category=category, dataset_name=dataset_name)
+            if not models:
+                raise ValueError(f"No available models found for category {category!r}.")
+            model = random.choice(models)
 
         self._model = model
-        usd_path = self.get_usd_path(category=category, model=model, dataset_name=dataset_name)
+        self.dataset_name = dataset_name
+        self.bounding_box = bounding_box
+        self.in_rooms = [] if in_rooms is None else list(in_rooms)
 
-        # Run super init
+        load_config = {} if load_config is None else dict(load_config)
+        load_config["bounding_box"] = bounding_box
+        load_config["dataset_name"] = dataset_name
+
         super().__init__(
-            relative_prim_path=relative_prim_path,
-            usd_path=usd_path,
-            encrypted=dataset_name == "behavior-1k-assets",
             name=name,
+            usd_path=get_usd_path(category=category, model=model, dataset_name=dataset_name),
+            encrypted=dataset_name == "behavior-1k-assets",
+            relative_prim_path=relative_prim_path,
             category=category,
             scale=scale,
             visible=visible,
@@ -149,351 +68,67 @@ class DatasetObject(USDObject):
             kinematic_only=kinematic_only,
             self_collisions=self_collisions,
             prim_type=prim_type,
-            include_default_states=include_default_states,
             link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
+            include_default_states=include_default_states,
             expected_file_hash=expected_file_hash,
+            position=position,
+            orientation=orientation,
             **kwargs,
         )
-
-    @classmethod
-    def get_usd_path(cls, category, model, dataset_name="behavior-1k-assets"):
-        """
-        Grabs the USD path for a DatasetObject corresponding to @category and @model.
-
-        NOTE: This is the unencrypted path, NOT the encrypted path
-
-        Args:
-            category (str): Category for the object
-            model (str): Specific model ID of the object
-            dataset_name (str): Dataset type, used to infer dataset directory to search for @category and @model
-
-        Returns:
-            str: Absolute filepath to the corresponding USD asset file
-        """
-        dataset_path = get_dataset_path(dataset_name)
-
-        # Here, we assert the minimum version of the BEHAVIOR-1K dataset this is compatible with.
-        # This requirement was placed by the fact that we switched from USDZ back to USD due to
-        # speed and caching issues.
-        if dataset_name == "behavior-1k-assets":
-            assert check_minimum_behavior_1k_assets_version("3.7.2rc1"), (
-                "This version of BEHAVIOR-1K requires at least version 3.7.2rc1 of the behavior-1k-assets dataset! \n"
-                "Please update your dataset by deleting datasets/behavior-1k-assets and running the below command to reinstall. \n\n"
-                'python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=True)"'
-            )
-
-        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
-
-    def sample_orientation(self):
-        """
-        Samples an orientation in quaternion (x,y,z,w) form
-
-        Returns:
-            4-array: (x,y,z,w) sampled quaternion orientation for this object, based on self.orientations
-        """
-        if self.orientations is None:
-            raise ValueError("No orientation probabilities set")
-        if len(self.orientations) == 0:
-            # Set default value
-            chosen_orientation = th.tensor([0, 0, 0, 1.0])
-        else:
-            probabilities = [o["prob"] for o in self.orientations.values()]
-            probabilities = th.tensor(probabilities, dtype=th.float32) / th.sum(probabilities)
-            option = th.multinomial(probabilities, 1).item()
-            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"])
-
-        # Randomize yaw from -pi to pi
-        rot_lo, rot_hi = -1, 1
-        rot_num = (th.rand(1) * (rot_hi - rot_lo) + rot_lo).item()
-        rot_matrix = th.tensor(
-            [
-                [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],
-                [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
-                [0.0, 0.0, 1.0],
-            ]
-        )
-        rotated_quat = T.mat2quat(rot_matrix @ T.quat2mat(chosen_orientation))
-        return rotated_quat
-
-    def _initialize(self):
-        # Run super method first
-        super()._initialize()
-
-        # Apply any forced light intensity updates.
-        if gm.FORCE_LIGHT_INTENSITY is not None:
-
-            def recursive_light_update(child_prim):
-                if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
-                    child_prim.GetAttribute("inputs:intensity").Set(gm.FORCE_LIGHT_INTENSITY)
-                    child_prim.GetAttribute("inputs:normalize").Set(True)
-
-                for child_child_prim in child_prim.GetChildren():
-                    recursive_light_update(child_child_prim)
-
-            with og.sim.editing_usd():
-                recursive_light_update(self._prim)
-
-        # Set the joint frictions based on joint type
-        for joint in self._joints.values():
-            if joint.joint_type == JointType.JOINT_PRISMATIC:
-                joint.friction = DEFAULT_PRISMATIC_JOINT_FRICTION
-            elif joint.joint_type == JointType.JOINT_REVOLUTE:
-                joint.friction = DEFAULT_REVOLUTE_JOINT_FRICTION
-
-    def _get_preapply_scale(self, default_prim):
-        # If bounding_box is set, scale hasn't been computed yet (that happens in _post_load).
-        # Derive it here from ig:nativeBB so kinematic_only is computed correctly and
-        # PhysxArticulationAPI is pre-applied when needed.
-        bounding_box = self._load_config.get("bounding_box", None)
-        if bounding_box is not None and self._load_config.get("scale", None) is None:
-            native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
-            if native_bb_attr.IsValid():
-                native_bb = th.tensor(list(native_bb_attr.Get()))
-                bb = th.as_tensor(bounding_box, dtype=th.float32)
-                scale = th.ones(3)
-                valid_idxes = native_bb > 1e-4
-                scale[valid_idxes] = bb[valid_idxes] / native_bb[valid_idxes]
-                return scale
-        return super()._get_preapply_scale(default_prim)
-
-    def _post_load(self):
-        # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
-        # If neither was provided, default to ones(3) (no scaling).
-        if self._load_config.get("scale", None) is None:
-            self._load_config["scale"] = th.ones(3)
-        assert th.all(
-            th.abs(self._load_config["scale"]) > 1e-4
-        ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
-        # Run super last
-        super()._post_load()
-
-        category_mass = None
-        category_density = None
-        if self._load_config["dataset_name"] == "behavior-1k-assets":
-            # Get the average mass/density for this object category
-            avg_specs = get_avg_category_specs()
-            if self.category in avg_specs:
-                category_mass = avg_specs[self.category]["mass"]
-                category_density = avg_specs[self.category]["density"]
-            else:
-                log.warning(
-                    f"Category {self.category} not found in average object specs! Defaulting to unit mass or density."
-                )
-                category_mass = 1.0
-                category_density = 1.0
-
-        if self._prim_type == PrimType.RIGID:
-            if category_mass is not None:
-                total_volume = sum(link.volume for link in self._links.values())
-                for link in self._links.values():
-                    # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
-                    if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
-                        if gm.FORCE_CATEGORY_MASS:
-                            # Each link should get the appropriate fraction of the category mass
-                            # based on the link volume
-                            link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
-                            link.density = 0.0
-                        else:
-                            link.mass = 0.0
-                            link.density = category_density
-
-            # If there exists a center of mass annotation, apply it now
-            if self.prim.HasAttribute("ig:centerOfMass"):
-                center_of_mass_in_object_frame = th.tensor(self.get_attribute(attr="ig:centerOfMass"))
-
-                # Here we assume that the local frame of the object is the same as the local frame of the root link. We also do NOT need to apply a scale
-                # since the center of mass is already in the local frame of the object and thus the unscaled local frame of the root link.
-                self.root_link.center_of_mass = center_of_mass_in_object_frame
-
-            # For all joints under dataset objects,
-            # 1. we use "acceleration" drive type instead of "force" to properly account for link mass
-            # 2. we set non-zero damping to simulate dynamic friction:
-            #       the friction coefficient only accounts for static friction
-            from omnigibson.utils.asset_conversion_utils import find_all_prim_children_with_type
-
-            prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
-            revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
-            with og.sim.editing_usd():
-                for prismatic_joint in prismatic_joints:
-                    prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
-                    prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
-                    prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
-                    prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
-                    prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
-                for revolute_joint in revolute_joints:
-                    revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
-                    revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
-                    revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
-                    revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
-                    revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
-
-        elif self._prim_type == PrimType.CLOTH:
-            if category_mass is not None:
-                self.root_link.mass = (
-                    category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
-                )
-
-    def set_bbox_center_position_orientation(self, position=None, orientation=None):
-        """
-        Sets the center of the object's bounding box with respect to the world's frame.
-
-        Args:
-            position (None or 3-array): The desired global (x,y,z) position. None means it will not be changed
-            orientation (None or 4-array): The desired global (x,y,z,w) quaternion orientation.
-                None means it will not be changed
-        """
-        if orientation is None:
-            orientation = self.get_position_orientation()[1]
-        if position is not None:
-            rotated_offset = T.pose_transform(
-                th.tensor([0, 0, 0], dtype=th.float32),
-                orientation,
-                self.scaled_bbox_center_in_base_frame,
-                th.tensor([0, 0, 0, 1], dtype=th.float32),
-            )[0]
-            position = position + rotated_offset
-        self.set_position_orientation(position=position, orientation=orientation)
+        self.object_type = "DatasetObject"
 
     @property
     def model(self):
-        """
-        Returns:
-            str: Unique model ID for this object
-        """
         return self._model
 
     @property
-    def in_rooms(self):
-        """
-        Returns:
-            None or list of str: If specified, room(s) that this object should belong to
-        """
-        return self._in_rooms
+    def asset(self):
+        return self
 
-    @in_rooms.setter
-    def in_rooms(self, rooms):
-        """
-        Sets which room(s) this object should belong to. If no rooms, then should set to None
+    def get_init_info(self):
+        info = super().get_init_info()
+        info["args"].update(
+            {
+                "category": self.category,
+                "model": self.model,
+                "dataset_name": self.dataset_name,
+                "bounding_box": self.bounding_box,
+                "in_rooms": self.in_rooms,
+            }
+        )
+        return info
 
-        Args:
-            rooms (None or list of str): If specified, the room(s) this object should belong to
-        """
-        # Store the value to the internal variable and also update the init kwargs accordingly
-        self._init_info["args"]["in_rooms"] = rooms
-        self._in_rooms = rooms
+    @classmethod
+    def get_usd_path(cls, category, model, dataset_name="behavior-1k-assets"):
+        return get_usd_path(category=category, model=model, dataset_name=dataset_name)
 
-    @property
-    def native_bbox(self):
-        """
-        Get this object's native bounding box
 
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        assert (
-            "ig:nativeBB" in self.property_names
-        ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
-        return th.tensor(self.get_attribute(attr="ig:nativeBB"))
+def get_usd_path(category, model, dataset_name="behavior-1k-assets"):
+    base = _data_path() / dataset_name / "objects" / category / model / "usd"
+    usd_path = base / f"{model}.usd"
+    encrypted_usd_path = base / f"{model}.encrypted.usd"
+    if usd_path.exists():
+        return usd_path
+    if encrypted_usd_path.exists():
+        return encrypted_usd_path
+    raise FileNotFoundError(f"Could not find DatasetObject USD for {category}/{model} under {base}")
 
-    @property
-    def base_link_offset(self):
-        """
-        Get this object's native base link offset
 
-        Returns:
-            3-array: (x,y,z) base link offset if it exists
-        """
-        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"))
+def get_all_object_category_models(category, dataset_name="behavior-1k-assets"):
+    category_dir = _data_path() / dataset_name / "objects" / category
+    if not category_dir.exists():
+        return []
+    return sorted(entry.name for entry in category_dir.iterdir() if entry.is_dir() and not entry.name.startswith("."))
 
-    @property
-    def metadata(self):
-        """
-        Gets this object's metadata, if it exists
 
-        Returns:
-            None or dict: Nested dictionary of object's metadata if it exists, else None
-        """
-        return self.get_custom_data().get("metadata", None)
+def _data_path():
+    import os
 
-    @property
-    def orientations(self):
-        """
-        Returns:
-            None or dict: Possible orientation information for this object, if it exists. Otherwise, returns None
-        """
-        metadata = self.metadata
-        return None if metadata is None else metadata.get("orientations", None)
+    if "OMNIGIBSON_DATA_PATH" in os.environ:
+        return Path(os.environ["OMNIGIBSON_DATA_PATH"]).expanduser().resolve()
+    return Path(__file__).resolve().parents[3] / "datasets"
 
-    @property
-    def scale(self):
-        # Just super call
-        return super().scale
 
-    @scale.setter
-    def scale(self, scale):
-        # call super first
-        # A bit esoteric -- see https://gist.github.com/Susensio/979259559e2bebcd0273f1a95d7c1e79
-        super(DatasetObject, type(self)).scale.fset(self, scale)
-
-        # Remove bounding_box from scale if it's in our args
-        if "bounding_box" in self._init_info["args"]:
-            self._init_info["args"].pop("bounding_box")
-
-    @property
-    def scaled_bbox_center_in_base_frame(self):
-        """
-        where the base_link origin is wrt. the bounding box center. This allows us to place the model correctly
-        since the joint transformations given in the scene USD are wrt. the bounding box center.
-        We need to scale this offset as well.
-
-        Returns:
-            3-array: (x,y,z) location of bounding box, with respet to the base link's coordinate frame
-        """
-        return -self.scale * self.base_link_offset
-
-    @property
-    def scales_in_link_frame(self):
-        """
-        Returns:
-        dict: Keyword-mapped relative scales for each link of this object
-        """
-        scales = {self.root_link.body_name: self.scale}
-
-        # Collect every joint prim under this object's prim. We traverse manually this way instead of
-        # accessing the self._joints dictionary, because the dictionary only includes articulated
-        # joints and not fixed joints! Joints may live anywhere under the object's prim (recent Isaac
-        # Sim exports place them in a flat /joints scope rather than under body0).
-        joint_prims = list(find_joint_prims(self.prim))
-
-        # Propagate scale outwards from the root link. Fixed-point loop handles arbitrary joint order.
-        progress = True
-        while progress:
-            progress = False
-            for prim in joint_prims:
-                body0_targets = prim.GetProperty("physics:body0").GetTargets()
-                body1_targets = prim.GetProperty("physics:body1").GetTargets()
-                if not body0_targets or not body1_targets:
-                    continue
-                parent_name = body0_targets[0].pathString.split("/")[-1]
-                child_name = body1_targets[0].pathString.split("/")[-1]
-                if parent_name in scales and child_name not in scales:
-                    scale_in_parent_lf = scales[parent_name]
-                    # The location of the joint frame is scaled using the scale in the parent frame
-                    quat0 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
-                        prim.GetAttribute("physics:localRot0").Get()
-                    )[[1, 2, 3, 0]]
-                    quat1 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
-                        prim.GetAttribute("physics:localRot1").Get()
-                    )[[1, 2, 3, 0]]
-                    # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-                    local_ori = T.quat_multiply(
-                        quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
-                    )
-                    jnt_frame_rot = T.quat2mat(local_ori)
-                    scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
-                    scales[child_name] = scale_in_child_lf
-                    progress = True
-
-        return scales
+REGISTERED_OBJECTS["DatasetObject"] = DatasetObject

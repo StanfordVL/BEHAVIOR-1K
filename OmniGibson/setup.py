@@ -86,7 +86,11 @@ setup(
             "msgpack>=1.1.0",
             "gspread>=6.2.1",
             "open3d>=0.19.0",
-        ]
+        ],
+        "newton": [
+            "newton[examples]>=1.2.0",
+            "cryptography>=41.0.7",
+        ],
     },
     tests_require=[],
     python_requires=">=3",
