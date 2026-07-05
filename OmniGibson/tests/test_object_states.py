@@ -251,6 +251,73 @@ def test_rigid_contact_bodies(env, breakfast_table, bowl):
     )
 
 
+def test_is_in_contact_batch_warp_broadcast(env, breakfast_table, bowl):
+    """Regression for a Warp-kernel bug that broke ToggledOn (and SlicerActive) in any scene with more
+    than one toggle/slicer object.
+
+    ``is_in_contact_batch_warp`` must broadcast a single-row mask across the other operand's rows, exactly
+    like the torch ``is_in_contact_batch``. ToggledOn calls it with query=(1, R) (one finger set) and
+    with=(O, C) (O toggle objects), expecting O results; SlicerActive does the mirror (query=(O, R),
+    with=(1, C)). The kernel previously sized its launch off the query rows only and indexed both operands
+    with the same thread id, so with O>1 only object 0 was ever evaluated — every toggle object after the
+    first (e.g. a microwave) could never register finger contact and thus never toggled. This asserts both
+    broadcast directions match the torch reference, with the contacting object placed at row index 1.
+    """
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(bowl, breakfast_table)
+    for _ in range(5):
+        og.sim.step()
+
+    s = env.scene.idx
+    assert RigidContactAPI.is_in_contact(
+        scene_idx=s, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
+    ), "Precondition failed: bowl should be resting in contact with the table"
+
+    row_bowl = RigidContactAPI.get_contact_row_mask(s, [bowl])  # (R,) bool
+    col_table = RigidContactAPI.get_contact_col_mask(s, [breakfast_table])  # (C,) bool
+    R, C = row_bowl.shape[0], col_table.shape[0]
+
+    def run_warp(query_u8, filter_u8, n_out):
+        q_wp = wp.from_torch(query_u8.cuda().contiguous(), dtype=wp.uint8)
+        w_wp = wp.from_torch(filter_u8.cuda().contiguous(), dtype=wp.uint8)
+        out_wp = wp.zeros(n_out, dtype=wp.int32, device="cuda")
+        RigidContactAPI.is_in_contact_batch_warp(
+            scene_idx=s,
+            query_masks_wp=q_wp,
+            with_masks_wp=w_wp,
+            ignore_masks_wp=None,
+            current_only=False,
+            out_wp=out_wp,
+        )
+        return wp.to_torch(out_wp).cpu().tolist()
+
+    # ToggledOn-style: query=(1, R) broadcast across with=(2, C); the contacting object (table) is at row 1.
+    query1 = row_bowl.unsqueeze(0).to(th.uint8)  # (1, R)
+    with2 = th.stack([th.zeros(C, dtype=th.bool), col_table]).to(th.uint8)  # (2, C): row0 empty, row1 table
+    ref1 = RigidContactAPI.is_in_contact_batch(
+        scene_idx=s,
+        query_masks=query1.bool().cuda(),
+        with_masks=with2.bool().cuda(),
+        ignore_masks=None,
+        current_only=False,
+    )
+    assert ref1.cpu().tolist() == [False, True]
+    assert run_warp(query1, with2, 2) == [0, 1], "query-broadcast: object at with-mask row 1 was not evaluated"
+
+    # SlicerActive-style: query=(2, R) vs with=(1, C) broadcast; the contacting query (bowl) is at row 1.
+    query2 = th.stack([th.zeros(R, dtype=th.bool), row_bowl]).to(th.uint8)  # (2, R): row0 empty, row1 bowl
+    with1 = col_table.unsqueeze(0).to(th.uint8)  # (1, C)
+    ref2 = RigidContactAPI.is_in_contact_batch(
+        scene_idx=s,
+        query_masks=query2.bool().cuda(),
+        with_masks=with1.bool().cuda(),
+        ignore_masks=None,
+        current_only=False,
+    )
+    assert ref2.cpu().tolist() == [False, True]
+    assert run_warp(query2, with1, 2) == [0, 1], "filter-broadcast: query at row 1 was not evaluated"
+
+
 def test_next_to(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):

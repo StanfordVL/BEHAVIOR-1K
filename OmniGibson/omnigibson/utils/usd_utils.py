@@ -94,17 +94,28 @@ def _is_in_contact_batch_kernel(
     """
     i, r, c = wp.tid()
 
+    # Broadcast semantics matching the torch is_in_contact_batch: if query_masks (or col_filter)
+    # has a single row, it is shared across all N output queries. Without this, a single-row query
+    # broadcast over an O-row filter (ToggledOn), or a single-row filter broadcast over an O-row
+    # query (SlicerActive), silently evaluates only row 0 / reads out of bounds.
+    iq = i
+    if query_masks.shape[0] == 1:
+        iq = 0
+    ic = i
+    if col_filter.shape[0] == 1:
+        ic = 0
+
     # Column filter — early exit before touching query_masks/contact_matrix.
     if mode == wp.int32(0):  # with-mask: only count if filter is True
-        if col_filter[i, c] == wp.uint8(0):
+        if col_filter[ic, c] == wp.uint8(0):
             return
     elif mode == wp.int32(1):  # ignore-mask: only count if filter is False
-        if col_filter[i, c] != wp.uint8(0):
+        if col_filter[ic, c] != wp.uint8(0):
             return
     # mode == 2: no filter, fall through
 
-    # Row mask — does query i include row r?
-    if query_masks[i, r] == wp.uint8(0):
+    # Row mask — does query iq include row r?
+    if query_masks[iq, r] == wp.uint8(0):
         return
 
     # Contact lookup.
@@ -1862,7 +1873,12 @@ class RigidContactAPIImpl:
             col_filter = query_masks_wp
             mode = 2
 
-        N = query_masks_wp.shape[0]
+        # Output count is the broadcast of the query-mask rows and the filter-mask rows (mirrors
+        # torch broadcasting in is_in_contact_batch): whichever has >1 row drives N; a 1-row operand
+        # is shared across all N. mode==2 has no real filter, so N follows the query rows.
+        n_query_rows = query_masks_wp.shape[0]
+        n_filter_rows = 1 if mode == 2 else col_filter.shape[0]
+        N = max(n_query_rows, n_filter_rows)
         R = contact_matrix_wp.shape[0]
         C = contact_matrix_wp.shape[1]
 
