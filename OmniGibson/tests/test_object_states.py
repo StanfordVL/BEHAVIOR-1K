@@ -251,17 +251,9 @@ def test_rigid_contact_bodies(env, breakfast_table, bowl):
     )
 
 
-def test_is_in_contact_batch_warp_broadcast(env, breakfast_table, bowl):
-    """Regression for a Warp-kernel bug that broke ToggledOn (and SlicerActive) in any scene with more
-    than one toggle/slicer object.
-
-    ``is_in_contact_batch_warp`` must broadcast a single-row mask across the other operand's rows, exactly
-    like the torch ``is_in_contact_batch``. ToggledOn calls it with query=(1, R) (one finger set) and
-    with=(O, C) (O toggle objects), expecting O results; SlicerActive does the mirror (query=(O, R),
-    with=(1, C)). The kernel previously sized its launch off the query rows only and indexed both operands
-    with the same thread id, so with O>1 only object 0 was ever evaluated — every toggle object after the
-    first (e.g. a microwave) could never register finger contact and thus never toggled. This asserts both
-    broadcast directions match the torch reference, with the contacting object placed at row index 1.
+def test_multi_object_contact_broadcast(env, breakfast_table, bowl):
+    """
+    Test contact-detection for ToggledOn and SlicerActive when there are multiple toggle/slicer objects.
     """
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(bowl, breakfast_table)
