@@ -21,6 +21,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from time import perf_counter
 
 from omegaconf import OmegaConf
 
@@ -100,12 +101,18 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    t_main_start = perf_counter()
     args = parse_args()
 
     gm.HEADLESS = args.headless
 
     seed = seed_everything(DEFAULT_EVAL_SEED)
     logger.info(f"Seeded Python, NumPy, and Torch with seed={seed}")
+
+    import torch
+
+    if torch.cuda.is_available():
+        logger.info(f"[profile] GPU: {torch.cuda.get_device_name(0)}")
 
     instance_ids = resolve_instance_ids(args.task_name, args.instance_indices, mode=args.mode)
     logger.info(f"Resolved {args.mode} instance ids for {args.task_name}: {instance_ids}")
@@ -148,11 +155,17 @@ def main() -> None:
         os.makedirs(video_dir, exist_ok=True)
 
     results = []
+    t_init_start = perf_counter()
     with Evaluator(cfg) as evaluator:
+        logger.info(f"[profile] evaluator init (app launch + scene/task load): {perf_counter() - t_init_start:.2f}s")
         for instance_id in instance_ids:
             try:
+                t_load_start = perf_counter()
                 evaluator.reset()
                 evaluator.load_task_instance(int(instance_id))
+                logger.info(
+                    f"[profile] reset + load_task_instance({instance_id}): {perf_counter() - t_load_start:.2f}s"
+                )
             except Exception:
                 logger.exception(f"Failed to load task instance {instance_id}.")
                 raise
@@ -162,11 +175,15 @@ def main() -> None:
                     evaluator.reset()
                     if args.write_video:
                         evaluator.start_recording(video_path, rate=args.video_fps)
+                    evaluator.reset_profile()
+                    t_rollout_start = perf_counter()
                     terminated = truncated = False
                     steps = 0
                     while not (terminated or truncated):
                         terminated, truncated = evaluator.step()
                         steps += 1
+                    profile = evaluator.get_profile_summary(wall_time=perf_counter() - t_rollout_start)
+                    evaluator.log_profile_summary(profile)
 
                     success = bool(evaluator.env.task.success)
                     metrics = {}
@@ -179,6 +196,7 @@ def main() -> None:
                         "rollout_id": rollout_id,
                         "steps": steps,
                         "success": success,
+                        "profile": profile,
                         **metrics,
                     }
                     out_path = os.path.join(json_dir, f"{args.task_name}_{instance_id}_{rollout_id}.json")
@@ -202,6 +220,7 @@ def main() -> None:
     n_success = sum(r["success"] for r in results)
     mean_q = (sum(r.get("q_score", {}).get("final", 0.0) for r in results) / n) if n else 0.0
     logger.info(f"Eval summary: {n_success}/{n} success | mean q_score={mean_q:.3f} | task={args.task_name}")
+    logger.info(f"[profile] total wall time (excluding sim shutdown): {perf_counter() - t_main_start:.2f}s")
 
 
 if __name__ == "__main__":

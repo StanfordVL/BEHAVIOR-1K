@@ -5,6 +5,7 @@ import os
 import sys
 import traceback
 from signal import SIGINT, signal
+from time import perf_counter
 from typing import Any, List, Tuple
 
 import numpy as np
@@ -109,6 +110,8 @@ class Evaluator:
         # load_task_instance) can read/restore robot joint state.
         og.sim.update_handles()
 
+        self.reset_profile()
+
         self.env._current_episode = 0
         self._video_writer = None
         self._video_path = None
@@ -187,8 +190,7 @@ class Evaluator:
                 missing_camera_sensors.append(f"{camera_id}: {sensor_name}")
         if missing_camera_sensors:
             raise ValueError(
-                "Configured eval.camera_sensor_names entries were not found in robot.sensors: "
-                f"{missing_camera_sensors}"
+                f"Configured eval.camera_sensor_names entries were not found in robot.sensors: {missing_camera_sensors}"
             )
 
         if self.cfg.get("write_video", False):
@@ -243,8 +245,11 @@ class Evaluator:
         return [AgentMetric(self.human_stats), TaskMetric(self.human_stats)]
 
     def step(self) -> Tuple[bool, bool]:
+        t_start = perf_counter()
         self.robot_action = self.policy.forward(obs=self.obs)
+        t_policy = perf_counter()
         obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
+        t_env_step = perf_counter()
         obs = self._sync_lights_and_get_obs(obs)
         self.obs = self._preprocess_obs(obs)
 
@@ -258,7 +263,61 @@ class Evaluator:
 
         for metric in self.metrics:
             metric.step(self.env, self.robot_action, obs, 0.0, terminated, truncated, info)
+        t_end = perf_counter()
+        self._profile["policy_forward"] += t_policy - t_start
+        self._profile["env_step"] += t_env_step - t_policy
+        self._profile["obs_and_metrics"] += t_end - t_env_step
+        self._profile["steps"] += 1
         return terminated, truncated
+
+    def reset_profile(self) -> None:
+        """Clear per-step timing accumulators (including the simulator's built-in step profilers)."""
+        self._profile = {"policy_forward": 0.0, "env_step": 0.0, "obs_and_metrics": 0.0, "steps": 0}
+        for profiler_name in (
+            "_step_profiler",
+            "_pre_physics_step_profiler",
+            "_post_physics_step_profiler",
+            "_non_physics_step_profiler",
+        ):
+            getattr(og.sim, profiler_name).reset()
+
+    def get_profile_summary(self, wall_time: float) -> dict:
+        """Summarize per-step timings accumulated since the last reset_profile() call.
+
+        Args:
+            wall_time (float): Wall-clock seconds spent in the rollout loop, used to compute fps.
+        """
+        steps = self._profile["steps"]
+        sim_step_profiler = og.sim._step_profiler
+        summary = {
+            "steps": steps,
+            "wall_time": wall_time,
+            "fps": steps / wall_time if wall_time > 0 else 0.0,
+            "policy_forward": self._profile["policy_forward"],
+            "env_step": self._profile["env_step"],
+            "obs_and_metrics": self._profile["obs_and_metrics"],
+            "sim_step": sim_step_profiler.total_time,
+            "sim_step_avg_ms": sim_step_profiler.average_time * 1e3,
+            "env_pre_post_step": self._profile["env_step"] - sim_step_profiler.total_time,
+            "pre_physics_step": og.sim._pre_physics_step_profiler.total_time,
+            "post_physics_step": og.sim._post_physics_step_profiler.total_time,
+            "non_physics_step": og.sim._non_physics_step_profiler.total_time,
+        }
+        return summary
+
+    def log_profile_summary(self, summary: dict) -> None:
+        logger.info("========== ROLLOUT PROFILE ==========")
+        logger.info(f"steps: {summary['steps']}")
+        logger.info(f"rollout loop wall time: {summary['wall_time']:8.2f}s ({summary['fps']:.2f} fps)")
+        logger.info(f"  policy.forward:       {summary['policy_forward']:8.2f}s")
+        logger.info(f"  env.step:             {summary['env_step']:8.2f}s")
+        logger.info(f"    sim.step:           {summary['sim_step']:8.2f}s (avg {summary['sim_step_avg_ms']:.1f} ms)")
+        logger.info(f"      pre_physics:      {summary['pre_physics_step']:8.2f}s")
+        logger.info(f"      post_physics:     {summary['post_physics_step']:8.2f}s")
+        logger.info(f"      non_physics:      {summary['non_physics_step']:8.2f}s")
+        logger.info(f"    env pre/post (obs, reward, termination): {summary['env_pre_post_step']:8.2f}s")
+        logger.info(f"  obs preprocess + video + metrics:          {summary['obs_and_metrics']:8.2f}s")
+        logger.info("=====================================")
 
     @property
     def video_writer(self) -> Tuple[Container, Stream]:
