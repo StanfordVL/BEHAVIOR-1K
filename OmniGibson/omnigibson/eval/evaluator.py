@@ -50,7 +50,14 @@ EVAL_BASE_LINK_MASS = 250.0
 EVAL_HEAD_HORIZONTAL_APERTURE = 40.0
 DEFAULT_ROBOT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "r1pro.yaml")
 EVAL_MODES = ("train", "public_test", "hidden_test")
+TORCH_NUM_THREADS = None
+TORCH_NUM_INTEROP_THREADS = None
 
+if TORCH_NUM_THREADS is not None:
+    th.set_num_threads(TORCH_NUM_THREADS)
+if TORCH_NUM_INTEROP_THREADS is not None:
+    th.set_num_interop_threads(TORCH_NUM_INTEROP_THREADS)
+    
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 
