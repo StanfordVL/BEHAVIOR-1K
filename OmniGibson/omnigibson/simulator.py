@@ -29,6 +29,7 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
+from omnigibson.sensors.tiled_sensor import TiledVisionSensor
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.asset_utils import ensure_omnigibson_robot_assets_version, get_dataset_path
@@ -202,7 +203,11 @@ def _launch_app():
     # Otherwise it will inherit the arguments of the entrypoint script.
     _saved_argv = sys.argv[:]
     try:
-        sys.argv = []
+        # TODO Missed merge from main (PR #2178 / 00c69a807, 2026-05-07). Delete after merging with main
+        # without this we will recompile 216 Vulkan pipelines on every launch andmakeload time very long
+        sys.argv = [
+            _saved_argv[0]
+        ]  # The script filename needs to be included - otherwise the first arg will get skipped.
 
         # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
         if not gm.DEBUG:
@@ -278,6 +283,13 @@ def _launch_app():
         global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
         global_data_dir.mkdir(parents=True, exist_ok=True)
         sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
+
+        # Persist warp's JIT-compiled kernel cache under gm.APPDATA_PATH so it survives
+        # across runs (warp's default ~/.cache/warp is per-user/ephemeral on some
+        # self-hosted CI runners, which means every run pays the full NVRTC JIT cost).
+        global_warp_cache_dir = Path(gm.APPDATA_PATH) / "global" / "warp_cache"
+        global_warp_cache_dir.mkdir(parents=True, exist_ok=True)
+        wp.config.kernel_cache_dir = str(global_warp_cache_dir)
 
         with launch_context(None):
             app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
@@ -645,6 +657,15 @@ def _launch_simulator(*args, **kwargs):
 
         def _set_renderer_settings(self):
             settings = lazy.carb.settings.get_settings()
+            # Missed merge from main (PR #2183 / c83f35e12 "Enable RT2 and fractional opacity",
+            # 2026-05-07). Without them, RTX defaults to a different rendermode that
+            # invalidates the shipped Slang/Vulkan shader cache.
+            # TODO Delete after merging with main
+            settings.set_bool("/rtx/rtx/modes/rt/enabled", True)  # real-time 2.0 requires rt to be enabled as well
+            settings.set_bool("/rtx/rtx/modes/rt2/enabled", True)
+            settings.set("/rtx/rendermode", "RealTimePathTracing")
+            settings.set_bool("/rtx/raytracing/fractionalCutoutOpacity", True)
+
             settings.set_bool("/rtx/reflections/enabled", True)
             settings.set_bool("/rtx/indirectDiffuse/enabled", True)
             settings.set_int(
@@ -1067,9 +1088,11 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[USDObject]): list of objects to remove
             """
-            with self.removing_objects(objs=objs):
-                for obj in objs:
-                    obj.scene.remove_object(obj, _batched_call=True)
+            objs = list(objs)
+            if len(objs) > 0:
+                with self.removing_objects(objs=objs):
+                    for obj in objs:
+                        obj.scene.remove_object(obj, _batched_call=True)
 
         def remove_prim(self, prim):
             """
@@ -1236,7 +1259,7 @@ def _launch_simulator(*args, **kwargs):
 
             RigidBodyViewAPI.read_from_physx()
             ArticulatedObjectViewAPI.read_from_physx()
-            wp.synchronize()
+            wp.synchronize_stream(wp.get_stream())
 
             self._capture_warp_graph(dt)
 
@@ -1272,7 +1295,7 @@ def _launch_simulator(*args, **kwargs):
                 # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
                 RigidBodyViewAPI.update()
                 RigidContactAPI.update()
-                wp.synchronize()
+                wp.synchronize_stream(wp.get_stream())
                 TensorizedState.caches_dirty = False
                 return
 
@@ -1301,10 +1324,11 @@ def _launch_simulator(*args, **kwargs):
                             for state_type in tensorized_states:
                                 state_type.global_update()
                         self._state_graph = capture.graph
+                    TensorizedState.graph_dirty = False
                 if self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
 
-                wp.synchronize()
+                wp.synchronize_stream(wp.get_stream())
 
                 for state_type in tensorized_states:
                     state_type.post_update()
@@ -1563,7 +1587,7 @@ def _launch_simulator(*args, **kwargs):
                 # _refresh_state_caches), contacts accumulate per sub-step into pending
                 # buffers that update() later walks, so they must be drained here.
                 RigidContactAPI.read_from_physx()
-                wp.synchronize()
+                wp.synchronize_stream(wp.get_stream())
 
                 # Record that we are done with the step context. Joint-break callbacks below
                 # are post-step user code: they may call update_handles() / read Fabric, which
@@ -2096,6 +2120,10 @@ def _launch_simulator(*args, **kwargs):
             self._pre_physics_step_callback.unsubscribe()
             self._post_physics_step_callback.unsubscribe()
             self._simulation_event_callback.unsubscribe()
+
+            # Clear all tiled vision sensors first -- their render products reference per-scene cameras,
+            # so they must be destroyed before the scenes (and the cameras) are removed
+            TiledVisionSensor.clear()
 
             # Clear all scenes
             for scene in self.scenes:

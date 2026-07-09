@@ -65,7 +65,9 @@ class GraspReward(BaseRewardFunction):
 
         for env_idx in range(env.num_envs):
             obj = self._objs[env_idx]
-            robot = env.scenes[env_idx].robots[0]
+            scene = env.scenes[env_idx]
+            robot_idx = 0
+            robot = scene.robots[robot_idx]
             obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
             current_grasping = obj_in_hand == obj
 
@@ -75,9 +77,12 @@ class GraspReward(BaseRewardFunction):
             # and is currently grasping the desired object
             reward = 0.0
 
-            # Penalize large actions
-            # TODO(vector): This is currently wrong. It needs to key the action by scene + robot.
-            action_mag = th.sum(th.abs(action))
+            # Penalize large actions. action is shaped (num_envs, action_dim), so we must select
+            # this env's row and, within it, only the slice belonging to this robot (keyed by
+            # scene + robot, matching the action layout in Environment.step).
+            robot_action_start = sum(r.action_dim for r in scene.robots[:robot_idx])
+            robot_action = action[env_idx][robot_action_start : robot_action_start + robot.action_dim]
+            action_mag = th.sum(th.abs(robot_action))
             regularization_penalty = -(action_mag * self.regularization_coef)
             reward += regularization_penalty
             info["regularization_penalty_factor"] = action_mag

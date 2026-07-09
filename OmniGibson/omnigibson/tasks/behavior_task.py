@@ -176,7 +176,6 @@ class BehaviorTask(BaseTask):
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
         # PredicateGoal calls check_goal_fn(env_idx); thread env_idx through to the predicate evaluator
         # so the (singular) compiled task evaluates against the right env's object_scope binding.
-        # TODO(vector): This needs to be extensively tested.
         terminations["predicate"] = PredicateGoal(
             check_goal_fn=lambda env_idx: self.compiled_task.check_goal(
                 lambda predicate_name, *entities: self._evaluate_predicate(env_idx, predicate_name, *entities)
@@ -258,7 +257,8 @@ class BehaviorTask(BaseTask):
                 else:
                     robot_pose = available_poses[0]  # Use first presampled pose
 
-                robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"])
+                # Presampled poses are stored in scene-relative coordinates.
+                robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"], frame="scene")
 
         # Force wake objects
         for env_idx in env_indices:

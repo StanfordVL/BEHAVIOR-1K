@@ -11,7 +11,7 @@ from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.scenes import REGISTERED_SCENES
-from omnigibson.sensors import VisionSensor, create_sensor
+from omnigibson.sensors import TiledVisionSensor, VisionSensor, create_sensor
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.gym_utils import (
@@ -71,6 +71,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._automatic_reset = self.env_config["automatic_reset"]
         self._flatten_action_space = self.env_config["flatten_action_space"]
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
+        # Number of render steps performed after a reset so that camera observations reflect the reset state.
+        # Setting this to 0 skips the extra renders (IsaacLab's num_rerenders_on_reset convention): cheaper, but
+        # image observations returned by reset() will be stale (last pre-reset frame).
+        self._num_rerenders_on_reset = self.env_config["num_rerenders_on_reset"]
         self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
 
         physics_dt = 1.0 / self.env_config["physics_frequency"]
@@ -107,6 +111,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Initialize other placeholders that will be filled in later
         self._task = None
+        self._tiled_sensor = None
         self._external_sensors = None
         self._external_sensors_include_in_obs = None
         self._loaded = None
@@ -461,6 +466,20 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_task()
         self._load_external_sensors()
 
+        # When running multiple envs, batch all per-env robot cameras into a single tiled render product
+        # so that one render pass serves every env. Must be created before play (mirrors camera prims on the stage).
+        if self._tiled_sensor is not None:
+            # In case of a reload, remove the stale tiled sensor first (no-op if og.clear() already did)
+            self._tiled_sensor.remove()
+            self._tiled_sensor = None
+        has_vision_sensors = any(
+            isinstance(sensor, VisionSensor) for robot in self._scenes[0].robots for sensor in robot.sensors.values()
+        )
+        if self.num_envs > 1 and has_vision_sensors:
+            # Creating the tiled render product and attaching annotators edits the USD stage
+            with og.sim.editing_usd():
+                self._tiled_sensor = TiledVisionSensor(envs=self._scenes)
+
         # Play and complete loading
         og.sim.play()
         # Run any additional task post-loading behavior
@@ -476,6 +495,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Build sensor registry for get_obs()
         self._build_sensor_registry()
+
+        # Robot camera observations come from the tiled render product in multi-env mode, so hide the
+        # per-sensor viewports (their individual render products are unused for obs).
+        if self._tiled_sensor is not None:
+            for sensors in self._robot_sensor_map.values():
+                for sensor in sensors:
+                    if isinstance(sensor, VisionSensor):
+                        sensor.viewer_visibility = False
 
         self.reset()
 
@@ -535,6 +562,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         all_obs = [{} for _ in env_indices]
         all_info = [{} for _ in env_indices]
 
+        # Grab the batched tiled camera buffers once; per-env observations are slices (views) of these
+        tiled_obs = self._tiled_sensor.get_obs() if self._tiled_sensor is not None else None
+
         # --- Robot observations ---
         for robot_idx, robot_0 in enumerate(self._scenes[0].robots):
             robot_name = robot_0.name
@@ -550,7 +580,21 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for (rname, sensor_name), sensors in self._robot_sensor_map.items():
                 if rname != robot_name:
                     continue
-                # TODO: Replace with a single batched tiled rendering call
+                if tiled_obs is not None and sensor_name in tiled_obs:
+                    # Vision sensors in multi-env mode: slice the per-env tile out of the batched buffer.
+                    # NOTE: segmentation modalities are raw (unremapped) Replicator IDs in this path, and the
+                    # per-modality info dicts (e.g. seg ID mappings) are not available.
+                    for i, env_idx in enumerate(env_indices):
+                        s_obs = dict()
+                        for modality in self._tiled_sensor.modalities[sensor_name]:
+                            data = tiled_obs[sensor_name][modality][env_idx]
+                            # Match the per-sensor observation space: single-channel modalities are (H, W)
+                            if data.shape[-1] == 1:
+                                data = data.squeeze(-1)
+                            s_obs[modality] = data
+                        all_obs[i][robot_name][sensor_name] = s_obs
+                        all_info[i][robot_name][sensor_name] = dict()
+                    continue
                 for i, env_idx in enumerate(env_indices):
                     s_obs, s_info = sensors[env_idx].get_obs()
                     # Convert pointcloud from world frame to robot base frame
@@ -806,8 +850,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if get_obs:
             # Run a single simulator step and a replicator step
             og.sim.step()
-            # Render 3 times to make sure we can grab updated observations
-            for _ in range(3):
+            # Render to make sure we can grab updated observations. With 0 rerenders (IsaacLab-style),
+            # camera observations are one step stale; the default of 3 guarantees fresh annotator data.
+            for _ in range(self._num_rerenders_on_reset):
                 og.sim.render()
             # Grab and return observations
             obs_list, info_list = self.get_obs(env_indices=env_indices)
@@ -978,6 +1023,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "flatten_obs_space": False,
                 "external_sensors": None,
                 "num_envs": 1,
+                # Number of render steps after a reset before grabbing observations (see __init__)
+                "num_rerenders_on_reset": 3,
             },
             # Rendering kwargs
             "render": {
