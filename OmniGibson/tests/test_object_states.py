@@ -766,7 +766,7 @@ def test_toggled_on(env, stove, robot):
     q[jnt_idxs["r_gripper_finger_joint"]] = 0.0
     robot.set_joint_positions(q, drive=False)
 
-    steps = m.object_states.toggle.CAN_TOGGLE_STEPS
+    steps = math.ceil(m.object_states.toggle.CAN_TOGGLE_SECONDS / og.sim.get_sim_step_dt())
     for _ in range(steps):
         og.sim.step()
 

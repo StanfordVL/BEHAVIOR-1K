@@ -26,7 +26,8 @@ m = create_module_macros(module_path=__file__)
 
 m.TOGGLE_META_LINK_TYPE = "togglebutton"
 m.DEFAULT_SCALE = 0.1
-m.CAN_TOGGLE_STEPS = 5
+# Seconds a robot finger must stay in contact with the toggle marker before the state flips.
+m.CAN_TOGGLE_SECONDS = 0.15
 
 
 @wp.kernel
@@ -580,7 +581,10 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         values_flat_wp = wp.from_torch(values.view(-1).view(th.uint8), dtype=wp.uint8)
         time_flat = cls._robots_can_toggle_time.reshape((S * O,))
 
-        threshold_seconds = m.CAN_TOGGLE_STEPS * og.sim.get_sim_step_dt()
+        threshold_seconds = m.CAN_TOGGLE_SECONDS
+        assert (
+            threshold_seconds > og.sim.get_sim_step_dt()
+        ), f"m.CAN_TOGGLE_SECONDS ({threshold_seconds}s) must exceed one sim step dt ({og.sim.get_sim_step_dt()}s)"
 
         mask_flat.zero_()
 

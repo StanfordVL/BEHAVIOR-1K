@@ -83,17 +83,11 @@ class TensorizedState:
     # re-triggering a refresh. Set/cleared inside the simulator helper.
     _refresh_in_progress = False
 
-    # Simulator time (seconds) at the previous _update_values call. Used by pre_update
-    # to compute the seconds elapsed since the last tick and store it in _dt for subclasses
-    # that do time-dependent math (Temperature, ToggledOn, SlicerActive). Reset on initialize_view
-    # so a stop→play cycle (which resets og.sim.current_time to 0) does not produce a negative dt.
-    _last_update_time = 0.0
-
-    # Single-element wp.array on cuda holding the seconds elapsed since the last _update_values
-    # tick. Written in pre_update (outside the captured graph) and read by time-dependent
-    # subclasses' kernels inside the captured graph. We use a wp.array (not a wp.float32 scalar
-    # passed at launch) so per-frame mutation is visible to graph replays without re-capture —
-    # scalars passed via wp.float32(...) bake the value at capture time.
+    # Single-element wp.array on cuda holding the seconds elapsed for the current logical step
+    # (the caller-provided dt, see pre_update). Read by time-dependent subclasses' kernels
+    # (Temperature, ToggledOn, SlicerActive) inside the captured graph. We use a wp.array (not a
+    # wp.float32 scalar passed at launch) so per-frame mutation is visible to graph replays without
+    # re-capture — scalars passed via wp.float32(...) bake the value at capture time.
     _dt = None
 
     @classmethod
@@ -112,12 +106,8 @@ class TensorizedState:
         Δt-tracking setup shared across tensorized states. Subclasses' initialize_view should
         call ``super().initialize_view()`` after they finish allocating VALUES.
 
-        Snapshots the current sim time so the next _update_values invocation sees Δt=0, and
-        allocates the 1-element wp.array that pre_update writes into each step.
+        Allocates the 1-element wp.array that pre_update fills with the per-step dt each step.
         """
-        import omnigibson as og  # local import to avoid module-level cycle
-
-        cls._last_update_time = og.sim.current_time
         if cls._dt is None:
             cls._dt = wp.zeros(shape=(1,), dtype=wp.float32, device="cuda")
 
@@ -126,11 +116,12 @@ class TensorizedState:
         return super().get_value(*args, **kwargs)
 
     @classmethod
-    def pre_update(cls):
+    def pre_update(cls, dt=0.0):
         """
         CPU-side prep run BEFORE global_update each step. Snapshots VALUES_CPU into
         PREV_VALUES so post_update() can detect changes after the warp work completes,
-        and refreshes cls._dt with the seconds elapsed since the previous update.
+        and stores the caller-provided ``dt`` (seconds elapsed for this logical step) into
+        cls._dt for time-dependent kernels to read inside the captured graph.
 
         Lives outside the captured wp.graph.
 
@@ -141,15 +132,8 @@ class TensorizedState:
             return
         cls.PREV_VALUES.copy_(cls.VALUES_CPU)
 
-        # Refresh dt for time-dependent kernels. max(0, …) guards against a stop→play cycle,
-        # which resets Isaac's current_time to 0 — without the clamp the next dt would be negative.
-        import omnigibson as og  # local import to avoid module-level cycle
-
-        curr_time = og.sim.current_time
-        dt_value = max(0.0, curr_time - cls._last_update_time)
-        cls._last_update_time = curr_time
         if cls._dt is not None:
-            cls._dt.fill_(dt_value)
+            cls._dt.fill_(dt)
 
     @classmethod
     def global_update(cls):
