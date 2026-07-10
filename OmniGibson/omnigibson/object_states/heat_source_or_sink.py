@@ -8,7 +8,7 @@ from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
-from omnigibson.object_states.tensorized_state import TensorizedState, _wp_from_torch
+from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
@@ -23,18 +23,23 @@ m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
 m.DEFAULT_TEMPERATURE = 200
 m.DEFAULT_HEATING_RATE = 0.04
 m.DEFAULT_DISTANCE_THRESHOLD = 0.2
+m.DEFAULT_IGNITION_TEMPERATURE = 250
 
 
 @wp.kernel
 def _heatsource_is_active_kernel(
     requires_toggled_on: wp.array(dtype=wp.uint8),  # (N_hss,)
     requires_closed: wp.array(dtype=wp.uint8),  # (N_hss,)
+    requires_on_fire: wp.array(dtype=wp.uint8),  # (N_hss,)
     toggle_idx: wp.array(dtype=wp.int32),  # (N_hss,) into ToggledOn.OBJ_IDXS, -1 if missing
     open_idx: wp.array(dtype=wp.int32),  # (N_hss,) into Open.OBJ_IDXS, -1 if missing
-    toggle_values: wp.array2d(dtype=wp.uint8),  # (S, N_toggle)
-    open_values: wp.array2d(dtype=wp.uint8),  # (S, N_open)
-    has_toggle: wp.int32,  # 1 if toggle_values is non-empty
-    has_open: wp.int32,
+    onfire_idx: wp.array(dtype=wp.int32),  # (N_hss,) into OnFire.OBJ_IDXS, -1 if missing
+    toggle_values: wp.array2d(dtype=wp.uint8),  # (S_toggle, N_toggle)
+    open_values: wp.array2d(dtype=wp.uint8),  # (S_open, N_open)
+    onfire_values: wp.array2d(dtype=wp.uint8),  # (S_onfire, N_onfire) — PREVIOUS step's values
+    n_toggle_scenes: wp.int32,  # scene rows in toggle_values (0 if the state tracks nothing)
+    n_open_scenes: wp.int32,
+    n_onfire_scenes: wp.int32,
     out_values: wp.array2d(dtype=wp.uint8),  # (S, N_hss) — set to 1 if gate passes
 ):
     """
@@ -44,147 +49,74 @@ def _heatsource_is_active_kernel(
     Active iff:
       - !requires_toggled_on OR ToggledOn[scene, toggle_idx[h]] is True
       - !requires_closed OR Open[scene, open_idx[h]] is False
+      - !requires_on_fire OR OnFire[scene, onfire_idx[h]] is True (previous step's value —
+        OnFire runs after this state in the captured graph; see class docstring)
     """
     s, h = wp.tid()
     active = wp.uint8(1)
     if requires_toggled_on[h] != wp.uint8(0):
         ti = toggle_idx[h]
-        if ti < wp.int32(0) or has_toggle == wp.int32(0):
+        if ti < wp.int32(0) or s >= n_toggle_scenes:
             active = wp.uint8(0)
         elif toggle_values[s, ti] == wp.uint8(0):
             active = wp.uint8(0)
     if active == wp.uint8(1) and requires_closed[h] != wp.uint8(0):
         oi = open_idx[h]
-        if oi < wp.int32(0) or has_open == wp.int32(0):
+        if oi < wp.int32(0) or s >= n_open_scenes:
             active = wp.uint8(0)
         elif open_values[s, oi] != wp.uint8(0):
+            active = wp.uint8(0)
+    if active == wp.uint8(1) and requires_on_fire[h] != wp.uint8(0):
+        fi = onfire_idx[h]
+        if fi < wp.int32(0) or s >= n_onfire_scenes:
+            active = wp.uint8(0)
+        elif onfire_values[s, fi] == wp.uint8(0):
             active = wp.uint8(0)
     out_values[s, h] = active
 
 
-@wp.kernel
-def _heatsource_can_influence_kernel(
-    hss_values: wp.array2d(dtype=wp.uint8),  # (S, N_hss)
-    requires_inside: wp.array(dtype=wp.uint8),  # (N_hss,)
-    temperatures: wp.array(dtype=wp.float32),  # (N_hss,)
-    heating_rates: wp.array(dtype=wp.float32),  # (N_hss,)
-    distance_thresholds: wp.array(dtype=wp.float32),  # (N_hss,)
-    self_temp_idx: wp.array(dtype=wp.int32),  # (N_hss,) into Temperature N — to skip self
-    self_inside_idx: wp.array(dtype=wp.int32),  # (N_hss,) into Inside N (for requires_inside)
-    link_flat_idx: wp.array(dtype=wp.int32),  # (N_hss,) into POSE_MATRICES — -1 if N/A
-    link_local_offset: wp.array(dtype=wp.vec3),  # (N_hss,) heat element offset in link local frame
-    temp_to_aabb_idx: wp.array(dtype=wp.int32),  # (N_temp,) Temperature N → AABB N
-    temp_to_inside_idx: wp.array(dtype=wp.int32),  # (N_temp,) Temperature N → Inside N
-    pose_matrices: wp.array(dtype=wp.mat44),  # RigidBodyViewAPI.POSE_MATRICES
-    aabb_values: wp.array3d(dtype=wp.float32),  # AABB (S, N_aabb, 6)
-    inside_values: wp.array3d(dtype=wp.uint8),  # Inside (S, N_inside, N_inside) — uint8 view of bool
-    temperature_values: wp.array2d(dtype=wp.float32),  # Temperature (S, N_temp)
-    has_inside: wp.int32,
-    affected_mask: wp.array3d(dtype=wp.uint8),  # (S, N_hss, N_temp) — out
-    incoming_heat_rate: wp.array2d(dtype=wp.float32),  # Temperature.INCOMING_HEAT_RATE (S, N_temp) — out
-):
-    """
-    hss = heat_source_or_sink
-    Per (scene, hss, target) thread: if HSS h is active and target n is in range, write
-    affected_mask[s, h, n] = 1 and atomic_add (T_h - T_n) * rate into incoming_heat_rate[s, n].
-    """
-    s, h, n = wp.tid()
-    if hss_values[s, h] == wp.uint8(0):  # early return if hss not active
-        return
-    if self_temp_idx[h] == n:  # do not influence self
-        return
-    target_aabb_idx = temp_to_aabb_idx[n]
-    if target_aabb_idx < wp.int32(0):
-        return
-
-    # for require_inside items
-    if requires_inside[h] != wp.uint8(0):
-        if has_inside == wp.int32(0):  # check whether item is inside hss
-            return
-        hss_idx_in_inside = self_inside_idx[h]
-        target_idx_in_inside = temp_to_inside_idx[n]
-        if hss_idx_in_inside < wp.int32(0) or target_idx_in_inside < wp.int32(0):
-            return
-        # Check if target's AABB center lies in container's volume
-        if inside_values[s, target_idx_in_inside, hss_idx_in_inside] == wp.uint8(0):
-            return
-    # for other items
-    else:
-        # compute hss world position
-        li = link_flat_idx[h]
-        if li < wp.int32(0):
-            return
-        link_pose = pose_matrices[li]
-        local_offset = link_local_offset[h]
-        hss_world_position = wp.mul(
-            link_pose, wp.vec4(local_offset[0], local_offset[1], local_offset[2], wp.float32(1.0))
-        )
-        # get cx, cy, cz: center x, y, z of target's aabb bounding box
-        cx = (aabb_values[s, target_aabb_idx, 0] + aabb_values[s, target_aabb_idx, 3]) * wp.float32(0.5)
-        cy = (aabb_values[s, target_aabb_idx, 1] + aabb_values[s, target_aabb_idx, 4]) * wp.float32(0.5)
-        cz = (aabb_values[s, target_aabb_idx, 2] + aabb_values[s, target_aabb_idx, 5]) * wp.float32(0.5)
-        # get dx, dy, dz: delta of hss position and target's center on 3 directions
-        dx = hss_world_position[0] - cx
-        dy = hss_world_position[1] - cy
-        dz = hss_world_position[2] - cz
-        d2 = dx * dx + dy * dy + dz * dz
-        threshold = distance_thresholds[h]
-        if d2 > threshold * threshold:
-            return
-
-    affected_mask[s, h, n] = wp.uint8(1)
-    delta = (temperatures[h] - temperature_values[s, n]) * heating_rates[h]
-    wp.atomic_add(incoming_heat_rate, s, n, delta)
-
-
 class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
     """
-    Boolean state representing whether a heat source / sink is currently active. Active means
-    the activation gates (`requires_toggled_on`, `requires_closed`) are satisfied; spatial
-    affecting of specific objects is queried via `affects_obj(obj)` against `_affected_mask`.
+    Boolean state: whether this heat source / sink is currently active, i.e. whether all of its
+    activation gates are satisfied:
+      - requires_toggled_on → ToggledOn must be True
+      - requires_closed     → Open must be False
+      - requires_on_fire    → OnFire must be True. OnFire depends on Temperature, which depends
+        on this state, so inside the captured graph this gate reads the PREVIOUS step's OnFire
+        values — the deliberate one-step lag that breaks the fire feedback cycle.
 
-    Computation runs inside the captured Warp graph:
-      1. Per-HSS `_heatsource_is_active_kernel` writes VALUES based on ToggledOn / Open.
-      2. Per-(scene, hss, target) `_heatsource_can_influence_kernel` writes `_affected_mask`
-         and atomic_adds (T_h - T_n) * rate into Temperature.INCOMING_HEAT_RATE.
+    This state only computes its own gate. The actual heat propagation — which targets an
+    active source influences, by how much, and the self-sustaining fire clamp — is computed by
+    Temperature (which depends on this state) from the per-source config arrays published here.
+    `affects_obj()` queries Temperature's influence mask.
 
-    The Temperature decay kernel then consumes the accumulated rate and zeros INCOMING_HEAT_RATE
-    (see temperature.py for the consume-and-zero rationale). Cloth targets are handled by a
-    CPU post-pass in `_update` because cloth is not tracked by AABB / Inside and not supported now.
+    A flammable object is modeled by the `flammable` ability as an OnFire threshold detector
+    plus an instance of this state with requires_on_fire=True and temperature=fire_temperature.
     """
 
-    # Per-HSS config (N_hss,) — uploaded once in initialize_view as wp.arrays (single source of truth).
+    # Per-HSS config (N_hss,) — uploaded once in initialize_view as wp.arrays (single source of
+    # truth). Read by Temperature's kernels (Temperature depends on this state).
     _temperatures = None  # wp.array (N_hss,) float32
     _heating_rates = None  # wp.array (N_hss,) float32
     _distance_thresholds = None  # wp.array (N_hss,) float32
     _requires_toggled_on = None  # wp.array (N_hss,) uint8
     _requires_closed = None  # wp.array (N_hss,) uint8
     _requires_inside = None  # wp.array (N_hss,) uint8
+    _requires_on_fire = None  # wp.array (N_hss,) uint8
+    _ignition_temperatures = None  # wp.array (N_hss,) float32 — self-clamp threshold (requires_on_fire only)
     _link_flat_idx = None  # wp.array (N_hss,) int32 into RigidBodyViewAPI.POSE_MATRICES — -1 if requires_inside
     _link_local_offset = None  # wp.array (N_hss,) vec3 — offset of heat element in link frame
 
-    # Cross-state index maps — rebuilt in pre_update because Temperature.initialize_view
-    # runs after HSS.initialize_view (HSS is a dep of Temperature in the topo).
-    _self_temp_idx = None  # wp.array (N_hss,) int32 into Temperature.OBJ_IDXS
-    _self_inside_idx = None  # wp.array (N_hss,) int32 into Inside.OBJ_IDXS
+    # Index maps into the gate states' OBJ_IDXS — rebuilt in pre_update because OnFire's view
+    # initializes AFTER this state's (OnFire depends on Temperature, which depends on this state).
     _self_toggle_idx = None  # wp.array (N_hss,) int32 into ToggledOn.OBJ_IDXS
     _self_open_idx = None  # wp.array (N_hss,) int32 into Open.OBJ_IDXS
-    _temp_to_aabb_idx = None  # wp.array (N_temp,) int32 Temperature N → AABB N
-    _temp_to_inside_idx = None  # wp.array (N_temp,) int32 Temperature N → Inside N
+    _self_onfire_idx = None  # wp.array (N_hss,) int32 into OnFire.OBJ_IDXS
 
-    # _affected_mask: (S, N_hss, N_temp) — set by the propagate kernel, consumed via affects_obj().
-    # GPU is a uint8 wp.array (single source of truth); the CPU mirror keeps a torch
-    # tensor (for .item() reads) plus a wp view (for the graph-safe wp.copy), mirroring how the
-    # base class keeps VALUES_CPU + VALUES_CPU_WP.
-    _affected_mask = None  # wp.array (S, N_hss, N_temp) uint8 — GPU
-    _affected_mask_cpu = None  # torch bool (S, N_hss, N_temp), pinned — CPU mirror for affects_obj()
-    _affected_mask_cpu_wp = None  # wp.array uint8 view of _affected_mask_cpu
-
-    # Placeholder wp.array to fill into kernel arguments when an optional dependent state
-    # (like toggle, inside) is empty. Warp requires a valid wp.array of the correct dtype
-    # for the signature.
+    # Placeholder wp.array to fill into kernel arguments when an optional gate state
+    # (ToggledOn, Open, OnFire) tracks no objects. Warp requires a valid wp.array of the
+    # correct dtype for the signature.
     _placeholder_values = None  # wp.array (1, 1) uint8
-    _placeholder_inside = None  # wp.array (1, 1, 1) uint8
 
     def __init__(
         self,
@@ -195,6 +127,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         requires_toggled_on=False,
         requires_closed=False,
         requires_inside=False,
+        requires_on_fire=False,
+        ignition_temperature=None,
     ):
         """
         Args:
@@ -213,6 +147,14 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
                 heat source to receive heat. See the Inside state for details. This
                 will mean that the "heating element" link for the object will be
                 ignored.
+            requires_on_fire (bool): Whether this heat source is the object's own fire, i.e.
+                only active while the object's OnFire state is True. Set (together with
+                @ignition_temperature) by the flammable ability, which pairs this state with
+                OnFire. Requires the OnFire state if set to True.
+            ignition_temperature (float): Only relevant if @requires_on_fire. Threshold at /
+                above which the fire sustains itself: while active, Temperature holds this
+                object at @temperature unless it has been cooled below this threshold
+                (e.g. extinguished).
         """
         super().__init__(obj)
         self._temperature = temperature if temperature is not None else m.DEFAULT_TEMPERATURE
@@ -228,6 +170,17 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         self.requires_closed = requires_closed
 
         self.requires_inside = requires_inside
+
+        # OnFire is constructed after this state (it depends on Temperature, which depends on
+        # this state), so its presence is validated in _initialize instead of here.
+        self.requires_on_fire = requires_on_fire
+        self.ignition_temperature = (
+            ignition_temperature if ignition_temperature is not None else m.DEFAULT_IGNITION_TEMPERATURE
+        )
+        if requires_on_fire:
+            assert (
+                self._temperature > self.ignition_temperature
+            ), "fire temperature should be higher than ignition temperature."
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -255,13 +208,16 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
 
     @classmethod
     def requires_meta_link(cls, **kwargs):
-        # No meta link required if inside
-        return not kwargs.get("requires_inside", False)
+        # No meta link required for containment-based sources or fire sources (which fall back
+        # to the root link).
+        return not (kwargs.get("requires_inside", False) or kwargs.get("requires_on_fire", False))
 
     @property
     def _default_link(self):
-        # Only supported if we require inside
-        return self.obj.root_link if self.requires_inside else super()._default_link
+        # Fall back to the root link when no meta link is required
+        if self.requires_inside or self.requires_on_fire:
+            return self.obj.root_link
+        return super()._default_link
 
     @property
     def heating_rate(self):
@@ -282,12 +238,18 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
+        # AABB / Inside are consumed by Temperature's heat-gather kernel, but the source object
+        # itself must be registered with them (e.g. a target is heated by an oven only if it is
+        # Inside the oven), so they are required here.
         deps.update({AABB, Inside})
         return deps
 
     @classmethod
     def get_optional_dependencies(cls):
         deps = super().get_optional_dependencies()
+        # Gate states. NOTE: OnFire is deliberately NOT listed — it depends on Temperature,
+        # which depends on this state, so declaring it would create a cycle. Its values are
+        # read lag-1 instead (see class docstring).
         deps.update({ToggledOn, Open})
         return deps
 
@@ -302,6 +264,14 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
     def _initialize(self):
         super()._initialize()
         self.initialize_link_mixin()
+        if self.requires_on_fire:
+            # Local import to avoid a module-level cycle (on_fire imports temperature, which
+            # imports this module).
+            from omnigibson.object_states.on_fire import OnFire
+
+            assert (
+                OnFire in self.obj.states
+            ), f"{type(self).__name__} on {self.obj.name} has requires_on_fire but obj has no OnFire state!"
 
     @classmethod
     def global_initialize(cls):
@@ -312,22 +282,16 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         cls._requires_toggled_on = None
         cls._requires_closed = None
         cls._requires_inside = None
+        cls._requires_on_fire = None
+        cls._ignition_temperatures = None
         cls._link_flat_idx = None
         cls._link_local_offset = None
-        cls._self_temp_idx = None
-        cls._self_inside_idx = None
         cls._self_toggle_idx = None
         cls._self_open_idx = None
-        cls._temp_to_aabb_idx = None
-        cls._temp_to_inside_idx = None
-        cls._affected_mask = None
-        cls._affected_mask_cpu = None
-        cls._affected_mask_cpu_wp = None
+        cls._self_onfire_idx = None
 
-        # Placeholder wp.array to fill into kernel arguments when an optional dependent state
-        # (like toggle, inside) is empty.
+        # Placeholder wp.array to fill into kernel arguments when an optional gate state is empty.
         cls._placeholder_values = wp.zeros((1, 1), dtype=wp.uint8, device="cuda")
-        cls._placeholder_inside = wp.zeros((1, 1, 1), dtype=wp.uint8, device="cuda")
 
     @classmethod
     def initialize_view(cls):
@@ -342,17 +306,13 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             cls._requires_toggled_on = None
             cls._requires_closed = None
             cls._requires_inside = None
+            cls._requires_on_fire = None
+            cls._ignition_temperatures = None
             cls._link_flat_idx = None
             cls._link_local_offset = None
-            cls._self_temp_idx = None
-            cls._self_inside_idx = None
             cls._self_toggle_idx = None
             cls._self_open_idx = None
-            cls._temp_to_aabb_idx = None
-            cls._temp_to_inside_idx = None
-            cls._affected_mask = None
-            cls._affected_mask_cpu = None
-            cls._affected_mask_cpu_wp = None
+            cls._self_onfire_idx = None
             return
 
         temperatures = th.zeros(N, dtype=th.float32)
@@ -361,6 +321,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         requires_toggled_on = th.zeros(N, dtype=th.uint8)
         requires_closed = th.zeros(N, dtype=th.uint8)
         requires_inside = th.zeros(N, dtype=th.uint8)
+        requires_on_fire = th.zeros(N, dtype=th.uint8)
+        ignition_temperatures = th.zeros(N, dtype=th.float32)
         link_flat_idx = th.full((N,), -1, dtype=th.int32)
         link_local_offset = th.zeros((N, 3), dtype=th.float32)
 
@@ -378,9 +340,22 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             requires_toggled_on[hss_obj_idx] = 1 if hss_state_instance.requires_toggled_on else 0
             requires_closed[hss_obj_idx] = 1 if hss_state_instance.requires_closed else 0
             requires_inside[hss_obj_idx] = 1 if hss_state_instance.requires_inside else 0
-            if not hss_state_instance.requires_inside and hss_state_instance._links:
-                # store information of this hss' link position so later we can compute distance of item with hss
-                link_flat_idx[hss_obj_idx] = RigidBodyViewAPI.get_flat_idx(hss_state_instance.link.prim_path)
+            requires_on_fire[hss_obj_idx] = 1 if hss_state_instance.requires_on_fire else 0
+            ignition_temperatures[hss_obj_idx] = float(hss_state_instance.ignition_temperature)
+            if not hss_state_instance.requires_inside:
+                # Store this hss' heat element link so Temperature can compute source positions:
+                # the meta link when annotated (e.g. a candle wick), the root link for fire sources
+                # without one.
+                if hss_state_instance._links:
+                    link = hss_state_instance.link
+                elif hss_state_instance.requires_on_fire:
+                    link = hss_state_instance.obj.root_link
+                else:
+                    link = None
+                if link is not None:
+                    flat = RigidBodyViewAPI.get_flat_idx(link.prim_path)
+                    if flat is not None:
+                        link_flat_idx[hss_obj_idx] = int(flat)
 
         create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
         cls._temperatures = create_tensor_from_list(temperatures, "float32", device="cuda")
@@ -389,189 +364,105 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         cls._requires_toggled_on = create_tensor_from_list(requires_toggled_on, "uint8", device="cuda")
         cls._requires_closed = create_tensor_from_list(requires_closed, "uint8", device="cuda")
         cls._requires_inside = create_tensor_from_list(requires_inside, "uint8", device="cuda")
+        cls._requires_on_fire = create_tensor_from_list(requires_on_fire, "uint8", device="cuda")
+        cls._ignition_temperatures = create_tensor_from_list(ignition_temperatures, "float32", device="cuda")
         cls._link_flat_idx = create_tensor_from_list(link_flat_idx, "int32", device="cuda")
         # vec3 has no scalar-only helper — wp.array reinterprets the (N, 3) float32 CPU buffer as (N,) vec3.
         cls._link_local_offset = wp.array(link_local_offset, dtype=wp.vec3, device="cuda")
 
-        # Init of cross-state index maps + `_affected_mask` are deferred to pre_update because
-        # Temperature / Inside / ToggledOn / Open initialize_views may not have been called yet
-        # in the order Temperature depends on HSS.
-        cls._self_temp_idx = None
-        cls._self_inside_idx = None
+        # Gate index maps are deferred to pre_update — OnFire's view has not been rebuilt yet
+        # at this point (it initializes after Temperature, which initializes after this state).
         cls._self_toggle_idx = None
         cls._self_open_idx = None
-        cls._temp_to_aabb_idx = None
-        cls._temp_to_inside_idx = None
-        cls._affected_mask = None
-        cls._affected_mask_cpu = None
-        cls._affected_mask_cpu_wp = None
+        cls._self_onfire_idx = None
 
     @classmethod
     def _rebuild_cross_state_maps(cls):
         """
-        Build (or rebuild) the index tables that reference *other* states' OBJ_IDXS, and
-        allocate `_affected_mask` with the current number of object with temperature state.
-        Called from pre_update when needed.
+        Build (or rebuild) the index tables into the gate states' OBJ_IDXS. Called from
+        pre_update when the captured graph is being rebuilt, because OnFire's view initializes
+        AFTER this state's.
         """
-        # Local import to avoid circular dependency
-        from omnigibson.object_states.temperature import Temperature
+        # Local import to avoid a module-level cycle
+        from omnigibson.object_states.on_fire import OnFire
 
-        N_hss = len(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else 0
-        S_hss = len(cls.IDX_OBJS) if cls.IDX_OBJS is not None else 0
-        N_temp = len(Temperature.OBJ_IDXS) if Temperature.OBJ_IDXS is not None else 0
-
-        if N_hss == 0:
+        N = len(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else 0
+        if N == 0:
             return
 
-        # lookup table into other states
-        # hss' index in temp's obj_idx, to prevent influence self's temperature
-        self_temp_idx = th.full((N_hss,), -1, dtype=th.int32)
-        # hss' index in inside's obj_idx, to help find out whether an item is inside hss
-        self_inside_idx = th.full((N_hss,), -1, dtype=th.int32)
-        self_toggle_idx = th.full((N_hss,), -1, dtype=th.int32)
-        self_open_idx = th.full((N_hss,), -1, dtype=th.int32)
+        toggle_map = ToggledOn.OBJ_IDXS or {}
+        open_map = Open.OBJ_IDXS or {}
+        onfire_map = OnFire.OBJ_IDXS or {}
 
+        self_toggle_idx = th.full((N,), -1, dtype=th.int32)
+        self_open_idx = th.full((N,), -1, dtype=th.int32)
+        self_onfire_idx = th.full((N,), -1, dtype=th.int32)
         for rel_path, obj_idx in cls.OBJ_IDXS.items():
-            self_temp_idx[obj_idx] = Temperature.OBJ_IDXS.get(rel_path, -1)
-            self_inside_idx[obj_idx] = Inside.OBJ_IDXS.get(rel_path, -1)
-            self_toggle_idx[obj_idx] = ToggledOn.OBJ_IDXS.get(rel_path, -1)
-            self_open_idx[obj_idx] = Open.OBJ_IDXS.get(rel_path, -1)
+            self_toggle_idx[obj_idx] = toggle_map.get(rel_path, -1)
+            self_open_idx[obj_idx] = open_map.get(rel_path, -1)
+            self_onfire_idx[obj_idx] = onfire_map.get(rel_path, -1)
 
         create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
-        cls._self_temp_idx = create_tensor_from_list(self_temp_idx, "int32", device="cuda")
-        cls._self_inside_idx = create_tensor_from_list(self_inside_idx, "int32", device="cuda")
         cls._self_toggle_idx = create_tensor_from_list(self_toggle_idx, "int32", device="cuda")
         cls._self_open_idx = create_tensor_from_list(self_open_idx, "int32", device="cuda")
-
-        # Build Temperature to AABB / Inside look-up table
-        temp_to_aabb = th.full((N_temp,), -1, dtype=th.int32)
-        temp_to_inside = th.full((N_temp,), -1, dtype=th.int32)
-        for rel_path, temperature_idx in Temperature.OBJ_IDXS.items():
-            temp_to_aabb[temperature_idx] = AABB.OBJ_IDXS.get(rel_path, -1)
-            temp_to_inside[temperature_idx] = Inside.OBJ_IDXS.get(rel_path, -1)
-        if N_temp > 0:
-            cls._temp_to_aabb_idx = create_tensor_from_list(temp_to_aabb, "int32", device="cuda")
-            cls._temp_to_inside_idx = create_tensor_from_list(temp_to_inside, "int32", device="cuda")
-        else:
-            cls._temp_to_aabb_idx = None
-            cls._temp_to_inside_idx = None
-
-        # (Re)allocate `_affected_mask` if the shape changed
-        if S_hss > 0 and N_hss > 0 and N_temp > 0:
-            cls._affected_mask = wp.zeros((S_hss, N_hss, N_temp), dtype=wp.uint8, device="cuda")
-            cls._affected_mask_cpu = th.zeros((S_hss, N_hss, N_temp), dtype=th.bool).pin_memory()
-            cls._affected_mask_cpu_wp = _wp_from_torch(cls._affected_mask_cpu)
-        else:
-            cls._affected_mask = None
-            cls._affected_mask_cpu = None
-            cls._affected_mask_cpu_wp = None
+        cls._self_onfire_idx = create_tensor_from_list(self_onfire_idx, "int32", device="cuda")
 
     @classmethod
     def pre_update(cls):
         super().pre_update()
-        # Make sure that only rebuild when graph is dirty
+        # Only rebuild when the captured graph is being rebuilt. graph_dirty is the single
+        # trigger: every event that invalidates the index tables goes through some state's
+        # initialize_view, which sets graph_dirty. Rebuild reallocates GPU buffers that must be
+        # baked into the freshly-captured graph, so rebuild and recapture must stay coupled.
         if TensorizedState.graph_dirty:
             cls._rebuild_cross_state_maps()
 
-        # Zero _affected_mask every step so the propagate kernel only OR-writes hits.
-        if cls._affected_mask is not None:
-            cls._affected_mask.zero_()
-
     @classmethod
     def _update_values(cls, values):
-        # Local imports to keep module-load order safe
-        from omnigibson.object_states.temperature import Temperature
+        # Local import to avoid a module-level cycle
+        from omnigibson.object_states.on_fire import OnFire
 
-        if cls.VALUES_WP is None or cls._self_temp_idx is None:
+        if cls.VALUES_WP is None or cls._self_toggle_idx is None:
             return
         S, N = cls.VALUES.shape[:2]
         if S == 0 or N == 0:
             return
 
-        toggle_values_wp = ToggledOn.VALUES_WP
-        open_values_wp = Open.VALUES_WP
-        # It's possible that an optional state has no tracked objects,
-        # in that case we swap in a cached placeholder wp.array to satisfy
-        # kernel's signature.
-        if toggle_values_wp is None:
-            toggle_values_wp = cls._placeholder_values
-            has_toggle = 0
-        else:
-            has_toggle = 1
-        if open_values_wp is None:
-            open_values_wp = cls._placeholder_values
-            has_open = 0
-        else:
-            has_open = 1
+        # An optional gate state may track no objects; swap in a cached placeholder wp.array to
+        # satisfy the kernel's signature, with a scene count of 0 so it is never read.
+        def gate_values(state):
+            values_wp = state.VALUES_WP
+            if values_wp is None:
+                return cls._placeholder_values, 0
+            return values_wp, state.VALUES.shape[0]
 
-        # check whether HSS is active and update VALUES
+        toggle_values_wp, n_toggle_scenes = gate_values(ToggledOn)
+        open_values_wp, n_open_scenes = gate_values(Open)
+        # NOTE: lag-1 read — OnFire runs after this state in the captured graph, so these are
+        # the previous step's values. This is the deliberate one-step delay that breaks the
+        # OnFire → Temperature → HeatSourceOrSink dependency cycle.
+        onfire_values_wp, n_onfire_scenes = gate_values(OnFire)
+
         wp.launch(
             kernel=_heatsource_is_active_kernel,
             dim=(S, N),
             inputs=[
                 cls._requires_toggled_on,
                 cls._requires_closed,
+                cls._requires_on_fire,
                 cls._self_toggle_idx,
                 cls._self_open_idx,
+                cls._self_onfire_idx,
                 toggle_values_wp,
                 open_values_wp,
-                wp.int32(has_toggle),
-                wp.int32(has_open),
+                onfire_values_wp,
+                wp.int32(n_toggle_scenes),
+                wp.int32(n_open_scenes),
+                wp.int32(n_onfire_scenes),
                 cls.VALUES_WP,
             ],
             device="cuda",
         )
-
-        # check what TEMPERATURE obj will be influenced by hss
-        # write `_affected_mask` + INCOMING_HEAT_RATE
-        if (
-            cls._affected_mask is None
-            or Temperature.VALUES_WP is None
-            or Temperature.INCOMING_HEAT_RATE is None
-            or cls._temp_to_aabb_idx is None
-            or AABB.VALUES_WP is None
-        ):
-            return
-        N_temp = Temperature.VALUES.shape[1]
-        if N_temp == 0:
-            return
-
-        inside_values_wp = Inside.VALUES_WP
-        if inside_values_wp is None:
-            inside_values_wp = cls._placeholder_inside
-            has_inside = 0
-        else:
-            has_inside = 1
-
-        wp.launch(
-            kernel=_heatsource_can_influence_kernel,
-            dim=(S, N, N_temp),
-            inputs=[
-                cls.VALUES_WP,
-                cls._requires_inside,
-                cls._temperatures,
-                cls._heating_rates,
-                cls._distance_thresholds,
-                cls._self_temp_idx,
-                cls._self_inside_idx,
-                cls._link_flat_idx,
-                cls._link_local_offset,
-                cls._temp_to_aabb_idx,
-                cls._temp_to_inside_idx,
-                RigidBodyViewAPI.POSE_MATRICES,
-                AABB.VALUES_WP,
-                inside_values_wp,
-                Temperature.VALUES_WP,
-                wp.int32(has_inside),
-                cls._affected_mask,
-                Temperature.INCOMING_HEAT_RATE,
-            ],
-            device="cuda",
-        )
-
-        # Mirror `_affected_mask` → `_affected_mask_cpu` for affects_obj() CPU reads.
-        if cls._affected_mask_cpu_wp is not None:
-            wp.copy(cls._affected_mask_cpu_wp, cls._affected_mask)
 
     def _get_value(self):
         # Match base class semantics: bring caches into sync, then read CPU mirror
@@ -606,21 +497,6 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         # Local import to avoid circular dependency at module load time
         from omnigibson.object_states.temperature import Temperature
 
-        # Lazy refresh so the read sees this-step's state.
-        TensorizedState.maybe_refresh_caches()
-
-        if not self.get_value():
-            return False
-        cls = type(self)
-        if cls.OBJ_IDXS is None or self.obj.relative_prim_path not in cls.OBJ_IDXS:
-            return False
-        if Temperature.OBJ_IDXS is None or obj.relative_prim_path not in Temperature.OBJ_IDXS:
-            return False
-        if cls._affected_mask_cpu is None:
-            return False
-        h = cls.OBJ_IDXS[self.obj.relative_prim_path]
-        n = Temperature.OBJ_IDXS[obj.relative_prim_path]
-        s = self.obj.scene.idx
-        return bool(cls._affected_mask_cpu[s, h, n].item())
+        return Temperature.is_influenced_by(self.obj, obj)
 
     # Nothing needs to be done to save/load HeatSource
