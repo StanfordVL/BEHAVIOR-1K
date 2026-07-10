@@ -26,6 +26,7 @@ from omnigibson.object_states.factory import (
     get_texture_change_priority,
     get_texture_change_states,
     get_visual_states,
+    transform_ability_params_for_state,
 )
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
@@ -548,9 +549,18 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 if compatible:
                     params = self._abilities[ability]
                     for state_type in get_states_for_ability(ability):
+                        # Fail loudly instead of silently letting the last ability's params win —
+                        # a single state instance can't serve two abilities (e.g. an object that
+                        # is both a heatSource and flammable is not supported).
+                        assert state_type not in states_info, (
+                            f"Object {self.name}: state {state_type.__name__} is requested by multiple abilities "
+                            f"({states_info[state_type]['ability']} and {ability}); this is not supported."
+                        )
                         states_info[state_type] = {
                             "ability": ability,
-                            "params": state_type.postprocess_ability_params(params, self.scene),
+                            "params": state_type.postprocess_ability_params(
+                                transform_ability_params_for_state(ability, state_type, params), self.scene
+                            ),
                         }
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
@@ -598,8 +608,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if emitter_type == EmitterType.FIRE:
             fire_at_meta_link = True
             if OnFire in self.states:
-                # Note whether the heat source link is explicitly set
-                link = self.states[OnFire].link
+                # Flammable object: the fire is placed at the companion heat source's link
+                # (the heatsource meta link when annotated, e.g. a candle wick; the root link
+                # otherwise). OnFire itself is a pure threshold detector and carries no link.
+                heat_source = self.states.get(HeatSourceOrSink)
+                link = heat_source.link if heat_source is not None else self.root_link
                 fire_at_meta_link = link != self.root_link
             elif HeatSourceOrSink in self.states:
                 # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
