@@ -42,7 +42,8 @@ setup(
         "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
-        "pymeshlab~=2022.2; platform_machine!='aarch64'",
+        # 2023+ needed for cp312 (Python 3.12 / Isaac Sim 6.0) wheels; 2022.2 has no cp312 build.
+        "pymeshlab>=2023.12; platform_machine!='aarch64'",
         "pymeshlab>=2022.2; platform_machine=='aarch64'",
         "click>=8.1.3",
         "aenum>=3.1.15",

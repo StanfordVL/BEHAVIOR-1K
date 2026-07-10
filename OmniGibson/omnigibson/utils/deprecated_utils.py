@@ -590,8 +590,13 @@ class ArticulationView(_ArticulationView):
         return
 
     def _invalidate_physics_handle_callback(self, event):
-        # Overwrite super method, add additional de-initialization
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
+        # Overwrite super method, add additional de-initialization.
+        # Isaac Sim 6.0 delivers timeline events via carb.eventdispatcher, whose Event exposes the
+        # type as `.event_type` rather than the `.type` used by 5.1's carb.events.IEvent. Support both.
+        event_type = getattr(event, "type", None)
+        if event_type is None:
+            event_type = getattr(event, "event_type", None)
+        if event_type is not None and int(event_type) == int(omni.timeline.TimelineEventType.STOP):
             self._physics_view = None
             self._invalidate_physics_handle_event = None
             self._is_initialized = False

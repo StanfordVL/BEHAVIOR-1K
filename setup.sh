@@ -248,8 +248,8 @@ if [ "$NEW_ENV" = true ]; then
         exit 1
     fi
     
-    # Create environment with Python 3.11 and packaging tools used by this script
-    conda create -n "$NEW_ENV_NAME" python=3.11 pip "setuptools>=71,<81" wheel -c conda-forge -y
+    # Create environment with Python 3.12 (required by Isaac Sim 6.0) and packaging tools used by this script
+    conda create -n "$NEW_ENV_NAME" python=3.12 pip "setuptools>=71,<81" wheel -c conda-forge -y
     conda activate "$NEW_ENV_NAME"
     
     [[ "$CONDA_DEFAULT_ENV" != "$NEW_ENV_NAME" ]] && { echo "ERROR: Failed to activate environment '$NEW_ENV_NAME'"; exit 1; }
@@ -262,7 +262,10 @@ echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
 # Determine the CUDA version string for pip URL (e.g., cu128, cu126, etc.)
 CUDA_VER_SHORT=$(echo "$CUDA_VERSION" | sed 's/\.//g')  # e.g. convert 12.8 to 128
 
-python -m pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 torchcodec==0.5 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
+# Isaac Sim 6.0 requires torch 2.11.0. Install the +cuXXX build so the local-version tag survives
+# Isaac's `torch==2.11.0` dependency (otherwise pip replaces it with a plain build and torch-cluster
+# can't find a matching pyg wheel).
+python -m pip install torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 torchcodec==0.11.1 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
 
 echo "✓ PyTorch installation completed"
 
@@ -282,9 +285,9 @@ if [ "$OMNIGIBSON" = true ]; then
     echo "Installing OmniGibson..."
     [ ! -d "OmniGibson" ] && { echo "ERROR: OmniGibson directory not found"; exit 1; }
     
-    # Check Python version
+    # Check Python version (this script installs Isaac Sim 6.0, which requires Python 3.12)
     PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    [ "$PYTHON_VERSION" != "3.11" ] && { echo "ERROR: Python 3.11 required, found $PYTHON_VERSION"; exit 1; }
+    [ "$PYTHON_VERSION" != "3.12" ] && { echo "ERROR: This script installs Isaac Sim 6.0, which requires Python 3.12 (found $PYTHON_VERSION). Recreate the environment with Python 3.12 (e.g. via the --new-env flag), or use an earlier BEHAVIOR-1K release for the Isaac Sim 5.1 / Python 3.10 setup."; exit 1; }
     
     # Check for conflicting environment variables
     if [[ -n "$EXP_PATH" || -n "$CARB_APP_PATH" || -n "$ISAAC_PATH" ]]; then
@@ -334,82 +337,15 @@ if [ "$OMNIGIBSON" = true ]; then
     else
         echo "Installing Isaac Sim via pip..."
 
-        # For aarch, do alternative install via direct one-liner
-        if [ "$ARCH" = "aarch64" ]; then
-            python -m pip install isaacsim[all,extscache]==5.1.0 --extra-index-url https://pypi.nvidia.com
-        else
-            # Helper functions
-            check_glibc_old() {
-                ldd --version 2>&1 | grep -qE "2\.(31|32|33|34)"
-            }
-
-            install_isaac_packages() {
-                local temp_dir=$(mktemp -d)
-                local packages=(
-                    "omniverse_kit-107.3.1.206797"
-                    "isaacsim_kernel-5.1.0.0"
-                    "isaacsim_app-5.1.0.0"
-                    "isaacsim_core-5.1.0.0"
-                    "isaacsim_gui-5.1.0.0"
-                    "isaacsim_utils-5.1.0.0"
-                    "isaacsim_storage-5.1.0.0"
-                    "isaacsim_asset-5.1.0.0"
-                    "isaacsim_sensor-5.1.0.0"
-                    "isaacsim_robot_motion-5.1.0.0"
-                    "isaacsim_robot-5.1.0.0"
-                    "isaacsim_benchmark-5.1.0.0"
-                    "isaacsim_code_editor-5.1.0.0"
-                    "isaacsim_ros1-5.1.0.0"
-                    "isaacsim_cortex-5.1.0.0"
-                    "isaacsim_example-5.1.0.0"
-                    "isaacsim_replicator-5.1.0.0"
-                    "isaacsim_rl-5.1.0.0"
-                    "isaacsim_robot_setup-5.1.0.0"
-                    "isaacsim_ros2-5.1.0.0"
-                    "isaacsim_template-5.1.0.0"
-                    "isaacsim_test-5.1.0.0"
-                    "isaacsim-5.1.0.0"
-                    "isaacsim_extscache_physics-5.1.0.0"
-                    "isaacsim_extscache_kit-5.1.0.0"
-                    "isaacsim_extscache_kit_sdk-5.1.0.0"
-                )
-
-                local wheel_files=()
-                for pkg in "${packages[@]}"; do
-                    local pkg_name=${pkg%-*}
-                    local filename="${pkg}-cp311-none-manylinux_2_35_${ARCH}.whl"
-                    local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
-                    local filepath="$temp_dir/$filename"
-
-                    echo "Downloading $pkg..."
-                    if ! curl -sL "$url" -o "$filepath"; then
-                        echo "ERROR: Failed to download $pkg"
-                        rm -rf "$temp_dir"
-                        return 1
-                    fi
-
-                    # Rename for older GLIBC
-                    if check_glibc_old; then
-                        local new_filepath="${filepath/manylinux_2_35/manylinux_2_31}"
-                        mv "$filepath" "$new_filepath"
-                        filepath="$new_filepath"
-                    fi
-
-                    wheel_files+=("$filepath")
-                done
-
-                echo "Installing Isaac Sim packages..."
-                python -m pip install "${wheel_files[@]}"
-                rm -rf "$temp_dir"
-
-                # Verify installation
-                if ! python -c "import isaacsim" 2>/dev/null; then
-                    echo "ERROR: Isaac Sim installation verification failed"
-                    return 1
-                fi
-            }
-
-            install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
+        # Isaac Sim 6.0 is distributed as a single metapackage; kit is bundled inside the
+        # isaacsim-extscache-* wheels (no separate omniverse-kit wheel as in 5.1). Some deps
+        # are pre-releases (e.g. tinyobjloader, mujoco-usd-converter) and live only on the
+        # NVIDIA index, so --pre is required to let pip resolve them.
+        python -m pip install --pre "isaacsim[all,extscache]==6.0.0.1" \
+            --extra-index-url https://pypi.nvidia.com \
+            || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
+        if ! python -c "import isaacsim" 2>/dev/null; then
+            echo "ERROR: Isaac Sim installation verification failed"; exit 1
         fi
         
         # Extract ISAAC_PATH from isaacsim module
@@ -422,13 +358,18 @@ if [ "$OMNIGIBSON" = true ]; then
         fi
 
         # Fix packaging conflict - remove conflicting version
-        # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0
-        if [ -d "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging" ]; then
+        # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0.
+        # The pip_archive extscache dir is versioned (differs across Isaac releases), so glob for it.
+        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/extscache" ]; then
             echo "Fixing packaging conflict..."
-            rm -rf "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
+            find "$ISAAC_PATH/extscache" -type d -path "*omni.services.pip_archive*/pip_prebundle/packaging" -exec rm -rf {} + 2>/dev/null || true
         fi
     fi
     
+    # numba (pulled in transitively) imports coverage.types.Tracer, which only exists in coverage>=7.6;
+    # Isaac Sim ships an older coverage, so bump it or `import omnigibson` fails on Python 3.12.
+    # Also realign numba+llvmlite to a compatible pair for Python 3.12 (Isaac ships a stale llvmlite).
+    python -m pip install -U "coverage>=7.6" "numba>=0.60" "llvmlite>=0.43"
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     python -m pip install --force-reinstall cffi==1.17.1
     # Force reinstall websockets >= 15.0.1 because it's been overwritten by Isaac Sim with an older version

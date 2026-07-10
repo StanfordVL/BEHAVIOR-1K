@@ -37,6 +37,9 @@ class RGBDFullResWrapper(EnvironmentWrapper):
             else:
                 sensor.image_height = WRIST_RESOLUTION[0]
                 sensor.image_width = WRIST_RESOLUTION[1]
-        # reload observation space
-        env.load_observation_space()
-        logger.info("Reloaded observation space!")
+            # Reload only this sensor's observation space; a full env.load_observation_space()
+            # would also query proprio while physics views are not yet valid.
+            sensor_space = sensor.load_observation_space()
+            if env.observation_space is not None:
+                env.observation_space.spaces[robot.name].spaces[sensor_name] = sensor_space
+        logger.info("Reloaded camera observation spaces!")
