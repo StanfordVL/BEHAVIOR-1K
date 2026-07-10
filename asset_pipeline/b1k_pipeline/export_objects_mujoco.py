@@ -1,5 +1,6 @@
 import glob
 import json
+import multiprocessing
 import os
 import pathlib
 import re
@@ -8,15 +9,13 @@ import tempfile
 import traceback
 import xml.etree.ElementTree as ET
 import zipfile
+from concurrent import futures
 from xml.dom import minidom
 
 import numpy as np
 import trimesh
 from scipy.spatial.transform import Rotation as R
 
-import fs.copy
-from fs.tempfs import TempFS
-from dask.distributed import LocalCluster, as_completed
 import tqdm
 
 import b1k_pipeline.utils
@@ -493,53 +492,67 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+OBJECTS_ZIP_PATH = b1k_pipeline.utils.PIPELINE_ROOT / "artifacts" / "parallels" / "objects.zip"
+_SOURCE_ZIP = None
+
+
+def _get_source_zip():
+    # One lazily opened handle per worker process.
+    global _SOURCE_ZIP
+    if _SOURCE_ZIP is None:
+        _SOURCE_ZIP = zipfile.ZipFile(OBJECTS_ZIP_PATH)
+    return _SOURCE_ZIP
+
+
+def process_object(obj_prefix, members, out_obj_dir):
+    """Extract one object's files straight from objects.zip into a scratch
+    directory and export its MJZ."""
+    b1k_pipeline.utils.TMP_DIR.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=str(b1k_pipeline.utils.TMP_DIR)) as scratch_dir:
+        _get_source_zip().extractall(scratch_dir, members)
+        urdf_to_mjz(os.path.join(scratch_dir, obj_prefix), out_obj_dir)
+
+
 def main():
-    with (
-        b1k_pipeline.utils.ParallelZipFS("objects.zip") as source_fs,
-        TempFS(temp_dir=str(b1k_pipeline.utils.TMP_DIR)) as temp_fs,
-        b1k_pipeline.utils.ParallelZipFS("objects_mujoco.zip", write=True) as out_fs,
-    ):
-        # Copy everything over to the temp FS
-        print("Copying input to temp fs...")
-        objdir_glob = [item.path for item in source_fs.glob("objects/*/*/")]
-        for item in tqdm.tqdm(objdir_glob):
-            if (
-                source_fs.opendir(item).opendir("urdf").glob("*.urdf").count().files
-                == 0
-            ):
-                continue
-            fs.copy.copy_fs(
-                source_fs.opendir(item), temp_fs.makedirs(item, recreate=True)
-            )
+    with b1k_pipeline.utils.ParallelZipFS("objects_mujoco.zip", write=True) as out_fs:
+        # Group the zip members by object directory (objects/{category}/{model}).
+        members_by_object = {}
+        with zipfile.ZipFile(OBJECTS_ZIP_PATH) as zf:
+            for name in zf.namelist():
+                parts = name.split("/")
+                if len(parts) < 4 or parts[0] != "objects":
+                    continue
+                members_by_object.setdefault("/".join(parts[:3]), []).append(name)
 
-        cluster = LocalCluster()
-        dask_client = cluster.get_client()
-
-        obj_futures = {}
-
-        for objdir in tqdm.tqdm(
-            objdir_glob, desc="Processing targets to queue objects"
-        ):
-            obj_futures[
-                dask_client.submit(
-                    urdf_to_mjz,
-                    temp_fs.opendir(objdir).getsyspath("/"),
-                    out_fs.makedirs(objdir).getsyspath("/"),
-                    pure=False,
-                )
-            ] = objdir
+        # Skip objects that don't have a URDF.
+        members_by_object = {
+            prefix: members
+            for prefix, members in members_by_object.items()
+            if any(m.startswith(f"{prefix}/urdf/") and m.endswith(".urdf") for m in members)
+        }
 
         errors = {}
-        for future in tqdm.tqdm(
-            as_completed(obj_futures.keys()),
-            total=len(obj_futures),
-            desc="Processing objects",
-        ):
-            try:
-                future.result()
-            except:
-                errors[obj_futures[future]] = traceback.format_exc()
-                traceback.print_exc()
+        with futures.ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+            obj_futures = {
+                executor.submit(
+                    process_object,
+                    prefix,
+                    members,
+                    out_fs.makedirs(prefix).getsyspath("/"),
+                ): prefix
+                for prefix, members in members_by_object.items()
+            }
+
+            for future in tqdm.tqdm(
+                futures.as_completed(obj_futures),
+                total=len(obj_futures),
+                desc="Processing objects",
+            ):
+                try:
+                    future.result()
+                except:
+                    errors[obj_futures[future]] = traceback.format_exc()
+                    traceback.print_exc()
 
         print("Finished processing")
 
