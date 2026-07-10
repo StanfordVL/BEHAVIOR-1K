@@ -564,6 +564,26 @@ stages:
     - b1k_pipeline/check_success_aggregate.py
     outs:
     - artifacts/pipeline/export_meshes.success
+  export_objects_mujoco:
+    cmd: python -m b1k_pipeline.export_objects_mujoco
+    deps:
+    - artifacts/parallels/objects.zip
+    - artifacts/parallels/metadata.zip
+    - artifacts/pipeline/export_objs.success
+    - artifacts/pipeline/aggregate_metadata.success
+    - b1k_pipeline/export_objects_mujoco.py
+    - b1k_pipeline/export_glbs.py
+    outs:
+    - artifacts/parallels/objects_mujoco.zip
+    - artifacts/pipeline/export_objects_mujoco.json
+  export_objects_mujoco_success:
+    cmd: python -m b1k_pipeline.check_success artifacts/pipeline/export_objects_mujoco.json
+      artifacts/pipeline/export_objects_mujoco.success
+    deps:
+    - artifacts/pipeline/export_objects_mujoco.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/export_objects_mujoco.success
   export_objs_global:
     cmd: python -m b1k_pipeline.export_objs_global
     deps:
@@ -905,6 +925,26 @@ stages:
     - b1k_pipeline/check_success.py
     outs:
     - artifacts/pipeline/export_scenes.success
+  export_scenes_mujoco:
+    cmd: python -m b1k_pipeline.export_scenes_mujoco
+    deps:
+    - artifacts/parallels/scenes.zip
+    - artifacts/parallels/objects.zip
+    - artifacts/pipeline/export_scenes.success
+    - artifacts/pipeline/export_objs.success
+    - b1k_pipeline/export_scenes_mujoco.py
+    - params.yaml
+    outs:
+    - artifacts/parallels/scenes_mujoco.zip
+    - artifacts/pipeline/export_scenes_mujoco.json
+  export_scenes_mujoco_success:
+    cmd: python -m b1k_pipeline.check_success artifacts/pipeline/export_scenes_mujoco.json
+      artifacts/pipeline/export_scenes_mujoco.success
+    deps:
+    - artifacts/pipeline/export_scenes_mujoco.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/export_scenes_mujoco.success
   file_manifest:
     do:
       cmd: python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/file_manifest.py
@@ -1168,6 +1208,24 @@ stages:
     - artifacts/og_dataset.zip
     - artifacts/pipeline/pack_dataset.json
     - artifacts/pipeline/pack_dataset.success
+  pack_mujoco_dataset:
+    cmd: python -m b1k_pipeline.pack_dataset --mujoco
+    deps:
+    - artifacts/pipeline/aggregate_metadata.success
+    - artifacts/pipeline/export_objects_mujoco.success
+    - artifacts/pipeline/export_scenes_mujoco.success
+    - artifacts/pipeline/generate_systems.success
+    - artifacts/parallels/metadata.zip
+    - artifacts/parallels/objects.zip
+    - artifacts/parallels/objects_mujoco.zip
+    - artifacts/parallels/scenes_mujoco.zip
+    - artifacts/parallels/systems.zip
+    - VERSION
+    - b1k_pipeline/pack_dataset.py
+    outs:
+    - artifacts/og_dataset_mujoco.zip
+    - artifacts/pipeline/pack_mujoco_dataset.json
+    - artifacts/pipeline/pack_mujoco_dataset.success
   patch_sampled:
     cmd: b1k_pipeline/patch_sampled.sh og_dataset_demo && b1k_pipeline/patch_sampled.sh
       og_dataset && touch artifacts/pipeline/patch_sampled.success

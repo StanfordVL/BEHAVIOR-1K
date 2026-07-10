@@ -1,3 +1,4 @@
+import argparse
 import glob
 import json
 import logging
@@ -17,26 +18,11 @@ import b1k_pipeline.utils
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-OUTPUT_FILENAME = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
-    "artifacts",
-    "pipeline",
-    "pack_dataset.json",
-)
-SUCCESS_FILENAME = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
-    "artifacts",
-    "pipeline",
-    "pack_dataset.success",
-)
 IN_FILENAME_AGGREGATE = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "artifacts", "aggregate"
 )
 PARALLELS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "artifacts", "parallels"
-)
-OUT_FILENAME = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "artifacts", "og_dataset.zip"
 )
 DEMO_OUT_FILENAME = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "artifacts", "og_dataset_demo.zip"
@@ -49,16 +35,42 @@ PARALLELS = [
     "scenes_json.zip",
     "systems.zip",
 ]
+# The MuJoCo dataset replaces the USD objects and JSON scenes with the MJZ
+# objects and MJCF scenes.
+MUJOCO_PARALLELS = [
+    "objects.zip",
+    "objects_mujoco.zip",
+    "metadata.zip",
+    "scenes_mujoco.zip",
+    "systems.zip",
+]
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Pack the dataset into a single zip file.")
+    parser.add_argument(
+        "--mujoco",
+        action="store_true",
+        help="Pack a dataset that uses the MuJoCo (MJZ objects / MJCF scenes) data instead of USD.",
+    )
+    args = parser.parse_args()
+
+    artifacts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts")
+    stage_name = "pack_mujoco_dataset" if args.mujoco else "pack_dataset"
+    output_filename = os.path.join(artifacts_dir, "pipeline", f"{stage_name}.json")
+    success_filename = os.path.join(artifacts_dir, "pipeline", f"{stage_name}.success")
+    out_filename = os.path.join(
+        artifacts_dir, "og_dataset_mujoco.zip" if args.mujoco else "og_dataset.zip"
+    )
+    parallels = MUJOCO_PARALLELS if args.mujoco else PARALLELS
+
     success = True
     error_msg = ""
     try:
         # Get a multi-FS view over all of the parallel filesystems.
         multi_fs = fs.multifs.MultiFS()
         # multi_fs.add_fs('aggregate', fs.osfs.OSFS(IN_FILENAME_AGGREGATE), priority=0)
-        for parallel_zip_name in PARALLELS:
+        for parallel_zip_name in parallels:
             parallel_zip = os.path.join(PARALLELS_DIR, parallel_zip_name)
             print("Adding", parallel_zip)
             multi_fs.add_fs(
@@ -68,7 +80,7 @@ def main():
         # Copy all the files to the output zip filesystem.
         print("Copying files")
         total_files = sum(1 for f in multi_fs.walk.files())
-        with b1k_pipeline.utils.WriteOnly7ZipFS(OUT_FILENAME) as out_fs:
+        with b1k_pipeline.utils.WriteOnly7ZipFS(out_filename) as out_fs:
             with tqdm.tqdm(total=total_files) as pbar:
                 fs.copy.copy_fs(multi_fs, out_fs, on_copy=lambda *args: pbar.update(1))
 
@@ -139,11 +151,11 @@ def main():
         success = False
         error_msg = traceback.format_exc()
 
-    with open(OUTPUT_FILENAME, "w") as f:
+    with open(output_filename, "w") as f:
         json.dump({"success": success, "error_msg": error_msg}, f, indent=4)
 
     if success:
-        with open(SUCCESS_FILENAME, "w") as f:
+        with open(success_filename, "w") as f:
             pass
 
 
