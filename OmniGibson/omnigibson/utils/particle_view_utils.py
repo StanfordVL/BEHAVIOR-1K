@@ -12,11 +12,12 @@ flat buffer has every entry's particles positions laid end to end:
 So each particle carries (a) its scene index and (b) its entry index (which scene+system it belongs
 to), and entry_start[e] is where entry e's block begins in the flat buffer.
 
-The flat output buffers: allocated once and reused; only the first NUM_PARTICLES entries are valid
-    PARTICLE_POSITIONS    (capacity,) vec3f  — every particle's world position
-    PARTICLE_SCENE_INDEX  (capacity,) int32  — which scene each particle is in
-    PARTICLE_ENTRY_INDEX  (capacity,) int32  — which entry (scene+system) each particle belongs to
-    NUM_PARTICLES         int                — how many particles are valid this step
+The flat output buffers: allocated once and reused; only the first PARTICLE_COUNT entries are valid
+    PARTICLE_POSITIONS          (capacity,) vec3f  — every particle's world position
+    PARTICLE_SCENE_INDEX        (capacity,) int32  — which scene each particle is in
+    PARTICLE_ENTRY_INDEX        (capacity,) int32  — which entry (scene+system) each particle belongs to
+    VISUAL_PARTICLE_ORIENTATION (capacity,) quat   — world orientation, written only for macro-visual particles
+    PARTICLE_COUNT       (1,) int32 (GPU)   — how many particles are valid this step
 The buffers only grow (never shrink), and only when the particle count exceeds the current capacity.
 
 Particle systems come in three kinds, each stored very differently in the simulator, so each has its
@@ -110,10 +111,13 @@ def _get_macro_visual_positions_kernel(
     particle_local_index: wp.array(dtype=wp.int32),  # (K,) slot within the owning entry
     entry_start: wp.array(dtype=wp.int32),  # (num_entries,) start offset of each entry
     positions_out: wp.array(dtype=wp.vec3f),
+    orientations_out: wp.array(dtype=wp.quat),  # world orientation, written for these visual particles
 ):
     """Compute each attached visual particle's world position as
-    POSE_MATRICES[parent] @ diag(world_scale) @ local_matrix and take the translation. Scatter it into
-    its entry's slice at entry_start[entry] + local, so one launch covers every kernel-eligible particle."""
+    POSE_MATRICES[parent] @ diag(world_scale) @ local_matrix and take the translation. Also write the
+    world orientation (rotation part, columns normalized to strip scale) so downstream containment can
+    offset the check point. Scatter both into the entry's slice at entry_start[entry] + local, so one
+    launch covers every kernel-eligible particle."""
     particle = wp.tid()
     link = parent_link_index[particle]
     if link < 0:
@@ -140,6 +144,33 @@ def _get_macro_visual_positions_kernel(
     world = wp.mul(wp.mul(pose_matrices[link], scale_matrix), local_matrix[particle])
     destination = entry_start[particle_entry_index[particle]] + particle_local_index[particle]
     positions_out[destination] = wp.vec3f(world[0, 3], world[1, 3], world[2, 3])
+
+    # Pure rotation from world's 3x3 via Gram-Schmidt on the columns — matches the getter's
+    # decompose_mat exactly (strips both scale and shear from non-uniform scaling).
+    col0 = wp.vec3(world[0, 0], world[1, 0], world[2, 0])
+    col1 = wp.vec3(world[0, 1], world[1, 1], world[2, 1])
+    col2 = wp.vec3(world[0, 2], world[1, 2], world[2, 2])
+    e0 = wp.normalize(col0)
+    e1 = wp.normalize(col1 - wp.dot(e0, col1) * e0)
+    v2 = col2 - wp.dot(e0, col2) * e0
+    v2 = v2 - wp.dot(e1, v2) * e1
+    e2 = wp.normalize(v2)
+    if wp.dot(e0, wp.cross(e1, e2)) < 0.0:  # negative determinant -> flip to a proper rotation
+        e0 = -e0
+        e1 = -e1
+        e2 = -e2
+    rotation = wp.mat33(
+        e0[0],
+        e1[0],
+        e2[0],
+        e0[1],
+        e1[1],
+        e2[1],
+        e0[2],
+        e1[2],
+        e2[2],
+    )
+    orientations_out[destination] = wp.quat_from_matrix(rotation)
 
 
 @wp.kernel
@@ -199,12 +230,20 @@ class ParticleViewAPI:
     _entry_start = None  # wp.array (num_entries,) int32 cuda
     _entry_scene = None  # wp.array (num_entries,) int32 cuda
 
-    # Persistent flat GPU buffers (grow-on-demand, reused). Valid prefix is [:NUM_PARTICLES].
+    # Persistent flat GPU buffers (grow-on-demand, reused). Valid prefix is [:PARTICLE_COUNT].
     PARTICLE_POSITIONS = None  # wp.array (capacity,) wp.vec3f
     PARTICLE_SCENE_INDEX = None  # wp.array (capacity,) int32
     PARTICLE_ENTRY_INDEX = None  # wp.array (capacity,) int32
-    NUM_PARTICLES = 0
+    # Per-particle world orientation, written ONLY for macro-visual particles (other families' slots
+    # are unused). Downstream containment applies the visual-particle check offset along this
+    # orientation; non-visual consumers ignore it.
+    VISUAL_PARTICLE_ORIENTATION = None  # wp.array (capacity,) wp.quat
     _buffer_capacity = 0
+
+    # The number of valid particles this step, as a 1-element GPU array (single source of truth) so
+    # in-graph kernels launched over the fixed capacity can gate on the live count without a graph
+    # re-capture. Only rewritten on a layout change (in _ensure_layout).
+    PARTICLE_COUNT = None  # wp.array (1,) int32 cuda
 
     # Use this to detect if there is a layout change
     # value = tuple of per-entry particle counts the current layout was built for.
@@ -263,6 +302,9 @@ class ParticleViewAPI:
 
         # Build the single cross-scene macro-physical view + static per-particle tables (topology-time).
         cls._rebuild_macro_physical_view()
+
+        # 1-element device particle-count array (allocated once; written in _ensure_layout).
+        cls.PARTICLE_COUNT = wp.zeros(1, dtype=wp.int32, device="cuda")
 
         cls._particle_counts_at_last_layout = None  # force layout rebuild next update
 
@@ -332,7 +374,7 @@ class ParticleViewAPI:
         current_particle_counts = tuple(counts)
         if current_particle_counts != cls._particle_counts_at_last_layout:
             cls._ensure_layout(counts, current_particle_counts)
-        if cls.NUM_PARTICLES == 0:
+        if not any(counts):
             return
         cls._gather()
 
@@ -348,7 +390,8 @@ class ParticleViewAPI:
             entry_starts.append(offset)
             offset += counts[i]
         total = offset
-        cls.NUM_PARTICLES = total
+        # Mirror the valid count to the GPU (single source of truth; only changes here, on layout change).
+        cls.PARTICLE_COUNT.fill_(total)
 
         # Grow the flat buffers only when capacity is exceeded.
         if total > cls._buffer_capacity:
@@ -356,6 +399,7 @@ class ParticleViewAPI:
             cls.PARTICLE_POSITIONS = wp.zeros(cls._buffer_capacity, dtype=wp.vec3f, device="cuda")
             cls.PARTICLE_SCENE_INDEX = wp.zeros(cls._buffer_capacity, dtype=wp.int32, device="cuda")
             cls.PARTICLE_ENTRY_INDEX = wp.zeros(cls._buffer_capacity, dtype=wp.int32, device="cuda")
+            cls.VISUAL_PARTICLE_ORIENTATION = wp.zeros(cls._buffer_capacity, dtype=wp.quat, device="cuda")
 
         # Cache micro instancer path -> entry for the active (nonzero) micro systems.
         cls._micro_instancer_path_to_entry = {
@@ -392,7 +436,7 @@ class ParticleViewAPI:
 
     @classmethod
     def _gather(cls):
-        """Fill PARTICLE_POSITIONS[:NUM_PARTICLES] with current positions."""
+        """Fill PARTICLE_POSITIONS with current positions."""
         # micro-physical
         if cls._micro_instancer_path_to_entry:
             Usd, Sdf = lazy.usdrt.Usd, lazy.usdrt.Sdf
@@ -457,6 +501,7 @@ class ParticleViewAPI:
                     cls._macro_visual_particle_local_index,
                     cls._entry_start,
                     cls.PARTICLE_POSITIONS,
+                    cls.VISUAL_PARTICLE_ORIENTATION,
                 ],
                 device="cuda",
             )
@@ -598,7 +643,8 @@ class ParticleViewAPI:
         cls.PARTICLE_POSITIONS = None
         cls.PARTICLE_SCENE_INDEX = None
         cls.PARTICLE_ENTRY_INDEX = None
-        cls.NUM_PARTICLES = 0
+        cls.VISUAL_PARTICLE_ORIENTATION = None
+        cls.PARTICLE_COUNT = None
         cls._buffer_capacity = 0
         cls._particle_counts_at_last_layout = None
         cls._micro_instancer_path_to_entry = {}
