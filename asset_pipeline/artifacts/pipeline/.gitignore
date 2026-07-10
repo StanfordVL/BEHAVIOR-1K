@@ -40,3 +40,9 @@
 /combined_file_manifest.json
 /check_collisions_challenge.json
 /check_collisions_challenge.success
+/pack_mujoco_dataset.json
+/pack_mujoco_dataset.success
+/export_scenes_mujoco.json
+/export_scenes_mujoco.success
+/export_objects_mujoco.json
+/export_objects_mujoco.success
