@@ -1266,6 +1266,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         if not og.sim.is_playing() or og.sim.physics_sim_view is None:
             self.particles_view = None
             return
+        # TODO(vector) delete if we have batch version
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"
