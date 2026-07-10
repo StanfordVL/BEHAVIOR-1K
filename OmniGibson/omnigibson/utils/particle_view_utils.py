@@ -516,10 +516,17 @@ class ParticleViewAPI:
             start, count = cls._entry_ranges[key]
             if count == 0:
                 continue
-            positions = cls._entries[key]["system"].get_particles_position_orientation()[0]
+            # Copy BOTH position and orientation: downstream containment applies the visual-particle
+            # check offset along VISUAL_PARTICLE_ORIENTATION, so fallback slots must carry it too
+            # (otherwise the offset uses a stale/zero quat).
+            positions, orientations = cls._entries[key]["system"].get_particles_position_orientation()
             wp.copy(
                 cls.PARTICLE_POSITIONS[start : start + count],
                 wp.from_torch(positions.contiguous(), dtype=wp.vec3f),
+            )
+            wp.copy(
+                cls.VISUAL_PARTICLE_ORIENTATION[start : start + count],
+                wp.from_torch(orientations.contiguous(), dtype=wp.quat),
             )
 
     @classmethod
