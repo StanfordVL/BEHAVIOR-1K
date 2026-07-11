@@ -56,6 +56,7 @@ from omnigibson.utils.usd_utils import (
     clear as clear_usd_utils,
     triangularize_mesh,
 )
+from omnigibson.utils.particle_view_utils import ParticleViewAPI
 from omnigibson.controllers import ControllerView
 
 # Create module logger
@@ -1242,6 +1243,7 @@ def _launch_simulator(*args, **kwargs):
             RigidBodyViewAPI.initialize_view()
             ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+            ParticleViewAPI.initialize_view()
 
             if gm.ENABLE_OBJECT_STATES:
                 if self.currently_stepping:
@@ -1281,6 +1283,7 @@ def _launch_simulator(*args, **kwargs):
 
             RigidBodyViewAPI.read_from_physx()
             ArticulatedObjectViewAPI.read_from_physx()
+            ParticleViewAPI.update_particle_positions()
             wp.synchronize_stream(wp.get_stream())
 
             self._capture_warp_graph(dt)
@@ -2142,6 +2145,7 @@ def _launch_simulator(*args, **kwargs):
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
+            ParticleViewAPI.clear()
 
             # Clear all controller groups so robots re-register on next load
             ControllerView.clear()

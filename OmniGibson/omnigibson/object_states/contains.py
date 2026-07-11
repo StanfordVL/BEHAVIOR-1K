@@ -157,9 +157,6 @@ class ContainedParticles(TensorizedObjectSystemState, LinkBasedStateMixin):
     _entry_sys_index = None  # wp int32 (num_entries,) -> N_sys column, -1 if untracked
     _entry_is_visual = None  # wp int32 (num_entries,) 1 if a visual system
 
-    def __init__(self, obj):
-        super().__init__(obj)
-
     @classproperty
     def value_type(cls):
         return th.int32
@@ -339,13 +336,7 @@ class ContainedParticles(TensorizedObjectSystemState, LinkBasedStateMixin):
         return raw_positions, in_volume
 
     def _get_value(self, system):
-        # n_in_volume from the tensor (fast); positions/in_volume lazy via ContainedParticlesData.
-        if system.name not in self.SYS_IDXS or self.obj.relative_prim_path not in self.OBJ_IDXS:
-            # Not tracked yet (e.g. before the first initialize_view) -> compute directly.
-            _, in_volume = self._compute_positions_in_volume(system)
-            n_in_volume = int(in_volume.sum()) if in_volume.numel() > 0 else 0
-        else:
-            n_in_volume = int(super()._get_value(system))
+        n_in_volume = int(super()._get_value(system))
         return ContainedParticlesData(n_in_volume=n_in_volume, state=self, system=system)
 
     def _initialize(self):

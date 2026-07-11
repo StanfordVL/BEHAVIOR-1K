@@ -1104,6 +1104,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if not system.initialized and force_init:
             system.initialize(scene=self)
             self.system_registry.add(system)
+            # Activating a system changes the tensorized (object, system) state layout (e.g.
+            # ContainedParticles' SYS_IDXS), so rebuild the unified/tensorized views. No-op when not
+            # playing (the next play/update_handles rebuilds them anyway).
+            og.sim.update_handles()
         return system
 
     def clear_system(self, system_name):

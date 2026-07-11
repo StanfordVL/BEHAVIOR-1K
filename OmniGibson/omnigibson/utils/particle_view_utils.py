@@ -400,6 +400,13 @@ class ParticleViewAPI:
             cls.PARTICLE_SCENE_INDEX = wp.zeros(cls._buffer_capacity, dtype=wp.int32, device="cuda")
             cls.PARTICLE_ENTRY_INDEX = wp.zeros(cls._buffer_capacity, dtype=wp.int32, device="cuda")
             cls.VISUAL_PARTICLE_ORIENTATION = wp.zeros(cls._buffer_capacity, dtype=wp.quat, device="cuda")
+            # These buffers are reallocated (new device pointers), so any captured wp.graph that reads
+            # them (e.g. ContainedParticles.global_update) is now stale — force a re-capture. This grow
+            # happens per-step (outside update_handles), so nothing else flags it. Lazy import avoids an
+            # import cycle at module load.
+            from omnigibson.object_states.tensorized_state import TensorizedState
+
+            TensorizedState.graph_dirty = True
 
         # Cache micro instancer path -> entry for the active (nonzero) micro systems.
         cls._micro_instancer_path_to_entry = {
@@ -546,8 +553,10 @@ class ParticleViewAPI:
         """Rebuild the tables only when the visual particle set changed
         (detected by a per-entry particle-name comparison). This keeps them valid even though visual
         add/remove never calls og.sim.update_handles()."""
+        # `system.particles` is None until the first particle is added, so coerce to {} (an empty,
+        # initialized visual system is a valid state).
         current_particle_set = tuple(
-            (key, tuple(entry["system"].particles.keys()))
+            (key, tuple((entry["system"].particles or {}).keys()))
             for key, entry in cls._entries.items()
             if entry["family"] == FAMILY_MACRO_VISUAL
         )
@@ -570,7 +579,7 @@ class ParticleViewAPI:
             if entry["family"] != FAMILY_MACRO_VISUAL:
                 continue
             system = entry["system"]
-            names = list(system.particles.keys())
+            names = list((system.particles or {}).keys())  # None until first particle added
             if len(names) == 0:
                 continue
             # Gather this entry's particles into temporaries; commit only if the whole entry is eligible.
