@@ -204,7 +204,6 @@ def _launch_app():
     _saved_argv = sys.argv[:]
     try:
         # TODO Missed merge from main (PR #2178 / 00c69a807, 2026-05-07). Delete after merging with main
-        # without this we will recompile 216 Vulkan pipelines on every launch andmakeload time very long
         sys.argv = [
             _saved_argv[0]
         ]  # The script filename needs to be included - otherwise the first arg will get skipped.
