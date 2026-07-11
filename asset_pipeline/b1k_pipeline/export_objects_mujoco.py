@@ -288,21 +288,22 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
 
     def add_visual_assets(link, is_glass):
         """Create the visual mesh asset + PBR material for a link. Returns
-        (mesh_asset_name or None, material_name or None)."""
-        visual_meshes = list(_link_visual_meshes(link, urdf_dir))
-        if not visual_meshes:
-            return None, None
-        obj_paths = {obj_path for _, _, obj_path in visual_meshes}
-        assert len(obj_paths) == 1, f"Expected one visual OBJ per link, got {obj_paths}"
-        (obj_path,) = obj_paths
+        (mesh_asset_name or None, material_name or None, visual origin)."""
+        mesh_visuals = [v for v in link.visuals if v.geometry.mesh is not None]
+        if not mesh_visuals:
+            return None, None, None
+        assert len(mesh_visuals) == 1, f"Expected one visual mesh per link, got {len(mesh_visuals)}"
+        (visual,) = mesh_visuals
+        obj_path = os.path.normpath(os.path.join(urdf_dir, visual.geometry.mesh.filename))
 
         mesh_name = f"{link.name}_visual"
         archive_files[f"visual/{link.name}.obj"] = ("strip_obj", obj_path)
         # Shell inertia so that thin/non-watertight visual meshes compile; the
         # visual geoms are massless so the inertia is never used.
-        ET.SubElement(
-            asset_xml, "mesh", {"name": mesh_name, "file": f"visual/{link.name}.obj", "inertia": "shell"}
-        )
+        mesh_attrs = {"name": mesh_name, "file": f"visual/{link.name}.obj", "inertia": "shell"}
+        if visual.geometry.mesh.scale is not None and not np.allclose(visual.geometry.mesh.scale, 1.0):
+            mesh_attrs["scale"] = _fmt(visual.geometry.mesh.scale)
+        ET.SubElement(asset_xml, "mesh", mesh_attrs)
 
         material_name = f"{link.name}_material"
         if is_glass:
@@ -316,11 +317,11 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
                     "roughness": str(GLASS_MATERIAL_KWARGS["roughnessFactor"]),
                 },
             )
-            return mesh_name, material_name
+            return mesh_name, material_name, visual.origin
 
         maps = _get_material_maps(obj_path)
         if not maps:
-            return mesh_name, None
+            return mesh_name, None, visual.origin
         pbr = convert_vray_to_pbr_material(os.path.splitext(os.path.basename(obj_path))[0], maps)
         material_xml = ET.SubElement(asset_xml, "material", {"name": material_name})
         rgb_role = "rgba" if pbr.baseColorTexture.mode == "RGBA" else "rgb"
@@ -333,7 +334,7 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
             archive_images[texture_file] = image
             ET.SubElement(asset_xml, "texture", {"name": texture_name, "type": "2d", "file": texture_file})
             ET.SubElement(material_xml, "layer", {"texture": texture_name, "role": role})
-        return mesh_name, material_name
+        return mesh_name, material_name, visual.origin
 
     def add_regular_link(body_xml, link):
         link_mass = max(category_mass * (link_volumes[link.name] / total_volume), MIN_LINK_MASS)
@@ -341,9 +342,13 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
 
         # Visual geom (MuJoCo cannot load GLB, so the MJCF references the OBJ
         # with the converted PBR textures; the equivalent GLB is packed alongside).
-        mesh_name, material_name = add_visual_assets(link, is_glass)
+        mesh_name, material_name, visual_origin = add_visual_assets(link, is_glass)
         if mesh_name is not None:
             geom_attrs = {"class": "visual", "type": "mesh", "mesh": mesh_name, "name": f"{link.name}_visual"}
+            # The URDF places articulated links' frames at the joint and offsets
+            # the meshes via the visual origin (mesh_offset in export_objs_global),
+            # so the visual geom must carry that origin.
+            geom_attrs.update(_pose_attrs(visual_origin))
             if material_name is not None:
                 geom_attrs["material"] = material_name
             ET.SubElement(body_xml, "geom", geom_attrs)
@@ -530,6 +535,7 @@ def main():
             for prefix, members in members_by_object.items()
             if any(m.startswith(f"{prefix}/urdf/") and m.endswith(".urdf") for m in members)
         }
+
 
         errors = {}
         with futures.ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:

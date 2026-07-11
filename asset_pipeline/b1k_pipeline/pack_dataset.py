@@ -118,6 +118,10 @@ def main():
             urdf_dirs = {x.path for x in out_fs.glob("*/*/*/urdf/")} | {
                 x.path for x in out_fs.glob("*/*/*/shape/")
             }
+            if args.mujoco:
+                # The MJZ archives carry their own copies of the textures, so the
+                # material directories are not needed in the MuJoCo dataset.
+                urdf_dirs |= {x.path for x in out_fs.glob("*/*/*/material/")}
             for urdf_dir in urdf_dirs:
                 out_fs.removetree(urdf_dir)
 

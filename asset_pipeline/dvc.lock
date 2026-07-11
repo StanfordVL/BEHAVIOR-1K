@@ -22337,13 +22337,13 @@ stages:
       size: 12554
     - path: b1k_pipeline/export_objects_mujoco.py
       hash: md5
-      md5: f0d73a18ad07a27ed5298d869c8669f4
-      size: 24957
+      md5: 5f538eea5c10c4d4ca704c918a7d259c
+      size: 25550
     outs:
     - path: artifacts/parallels/objects_mujoco.zip
       hash: md5
-      md5: d0bb3081c06dbb8896df552814215112
-      size: 34285815451
+      md5: 792fdc9873f60dbe302ecdf9be81174f
+      size: 34285819480
     - path: artifacts/pipeline/export_objects_mujoco.json
       hash: md5
       md5: 664e2cb0fc4ca688ad97e1a8a3d8095a
@@ -22383,8 +22383,8 @@ stages:
       size: 28024803796
     - path: artifacts/parallels/objects_mujoco.zip
       hash: md5
-      md5: d0bb3081c06dbb8896df552814215112
-      size: 34285815451
+      md5: 792fdc9873f60dbe302ecdf9be81174f
+      size: 34285819480
     - path: artifacts/parallels/scenes_mujoco.zip
       hash: md5
       md5: 36e161b722d7dfc329494000b609561a
@@ -22411,13 +22411,13 @@ stages:
       size: 0
     - path: b1k_pipeline/pack_dataset.py
       hash: md5
-      md5: 2f0f6ad8242f09df3416a80468a79454
-      size: 6410
+      md5: 1a8c67a44c6dbd5a78e3fc578d685659
+      size: 6675
     outs:
     - path: artifacts/og_dataset_mujoco.zip
       hash: md5
-      md5: b3d35b2bb2657d96c6cc97aed7b2f359
-      size: 60398628812
+      md5: f5575a0dbeb2e119b1743ee8b90f172a
+      size: 33710153809
     - path: artifacts/pipeline/pack_mujoco_dataset.json
       hash: md5
       md5: 2ad066aadc9c024dff5e8d3c6587590d
