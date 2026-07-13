@@ -69,7 +69,7 @@ class Covered(RelativeObjectState, BooleanStateMixin):
                 ), "Cloth objects currently cannot be Covered by physical particles!"
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
                 # touching the object and are visible (the non-visible ones are considered already "removed")
-                n_near_particles = len(self.obj.states[ContactParticles].get_value(system))
+                n_near_particles = self.obj.states[ContactParticles].get_value(system).count
                 # Heuristic: If the number of near particles is above the threshold, we consdier this covered
                 value = n_near_particles >= m.PHYSICAL_PARTICLE_THRESHOLD
             else:
@@ -119,7 +119,9 @@ class Covered(RelativeObjectState, BooleanStateMixin):
                     )
                 else:
                     # We remove all particles touching this object
-                    system.remove_particles(idxs=list(self.obj.states[ContactParticles].get_value(system)))
+                    system.remove_particles(
+                        idxs=list(self.obj.states[ContactParticles].get_value(system).particle_indices)
+                    )
 
         else:
             raise ValueError(

@@ -1412,7 +1412,7 @@ class RecipeRule(BaseTransitionRule):
                         contained_particle_idx = obj.states[ContainedParticles].get_value(system).in_volume.nonzero()
                         relevant_systems[system_name] |= contained_particle_idx
                     elif state_class in [Covered]:
-                        covered_particle_idx = obj.states[ContactParticles].get_value(system)
+                        covered_particle_idx = obj.states[ContactParticles].get_value(system).particle_indices
                         relevant_systems[system_name] |= covered_particle_idx
 
         # Now we populate the execution info with the relevant objects and systems as well as the number of
