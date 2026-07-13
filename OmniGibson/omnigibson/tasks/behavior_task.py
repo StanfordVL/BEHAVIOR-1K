@@ -169,6 +169,37 @@ class BehaviorTask(BaseTask):
 
         return evaluate_bddl_predicate(predicate_name, *[self.object_scope[env_idx][ent] for ent in entities])
 
+    def get_goal_option_satisfaction(self, env_idx):
+        """
+        Per-env, per-goal-option predicate satisfaction, evaluated against env @env_idx's own object
+        scope. This is the env-aware building block for the partial-success (Q-score) metric in
+        vectorized evaluation: each goal-state option is evaluated independently so partial credit can
+        be computed (see ``omnigibson.metrics.task_metric.compute_q_score`` and ``TaskMetric``).
+
+        Unlike reading ``ground_goal_state_options[*].evaluate()`` directly (which binds the single,
+        shared ``compiled_task`` scope and therefore returns env 0's result for every env), this routes
+        evaluation through ``_evaluate_predicate(env_idx, ...)`` so each env reports its own state.
+
+        Args:
+            env_idx (int): Index of the environment whose object scope to evaluate against.
+
+        Returns:
+            list[list[bool]]: Outer list is one entry per grounded goal-state option; each inner list
+                has one bool per grounded predicate in that option (True iff currently satisfied for
+                this env).
+        """
+        from bddl.condition_evaluation import evaluate_state
+
+        def evaluate_fn(predicate_name, *entities):
+            return self._evaluate_predicate(env_idx, predicate_name, *entities)
+
+        option_masks = []
+        for option in self.ground_goal_state_options:
+            _, results = evaluate_state(option, evaluate_fn)
+            satisfied = set(results["satisfied"])
+            option_masks.append([i in satisfied for i in range(len(option))])
+        return option_masks
+
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
         terminations = dict()
