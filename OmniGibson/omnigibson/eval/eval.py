@@ -17,7 +17,6 @@ Example:
 """
 
 import argparse
-import json
 import logging
 import os
 from pathlib import Path
@@ -65,6 +64,12 @@ def parse_args() -> argparse.Namespace:
         help="Instance split to evaluate. Default: public_test.",
     )
     parser.add_argument("--num-rollouts", type=int, default=1, help="Rollouts per instance.")
+    parser.add_argument(
+        "--num-envs",
+        type=int,
+        default=1,
+        help="Number of parallel env slots; instances are evaluated this many at a time.",
+    )
     parser.add_argument(
         "--max-steps",
         type=int,
@@ -136,6 +141,7 @@ def main() -> None:
             "write_video": args.write_video,
             "mode": args.mode,
             "seed": seed,
+            "num_envs": args.num_envs,
             "task": {"name": args.task_name},
             "robot": robot_config,
         }
@@ -149,54 +155,18 @@ def main() -> None:
 
     results = []
     with Evaluator(cfg) as evaluator:
-        for instance_id in instance_ids:
-            try:
-                evaluator.reset()
-                evaluator.load_task_instance(int(instance_id))
-            except Exception:
-                logger.exception(f"Failed to load task instance {instance_id}.")
-                raise
-            for rollout_id in range(args.num_rollouts):
-                video_path = os.path.join(video_dir, f"{args.task_name}_{instance_id}_{rollout_id}.mp4")
-                try:
-                    evaluator.reset()
-                    if args.write_video:
-                        evaluator.start_recording(video_path, rate=args.video_fps)
-                    terminated = truncated = False
-                    steps = 0
-                    while not (terminated or truncated):
-                        terminated, truncated = evaluator.step()
-                        steps += 1
-
-                    success = bool(evaluator.env.task.success)
-                    metrics = {}
-                    for metric in evaluator.metrics:
-                        metrics.update(metric.aggregate(evaluator.env))
-
-                    result = {
-                        "task": args.task_name,
-                        "instance_id": int(instance_id),
-                        "rollout_id": rollout_id,
-                        "steps": steps,
-                        "success": success,
-                        **metrics,
-                    }
-                    out_path = os.path.join(json_dir, f"{args.task_name}_{instance_id}_{rollout_id}.json")
-                    with open(out_path, "w") as f:
-                        json.dump(result, f, indent=2, default=float)
-                    q_score = metrics.get("q_score", {}).get("final")
-                    video_msg = f" | video -> {video_path}" if args.write_video else ""
-                    logger.info(
-                        f"Result: instance={instance_id} rollout={rollout_id} steps={steps} "
-                        f"success={success} q_score={q_score} -> {out_path}{video_msg}"
-                    )
-                    results.append(result)
-                except Exception:
-                    logger.exception(f"Instance {instance_id} rollout {rollout_id} failed.")
-                    raise
-                finally:
-                    if args.write_video:
-                        evaluator.stop_recording()
+        # Each run() pass evaluates every instance once, num_envs at a time (the slot batching lives in
+        # evaluator.run -> evaluate_instances_batched). Outer loop repeats for additional rollouts.
+        for rollout_id in range(args.num_rollouts):
+            rollout_results = evaluator.run(
+                [int(i) for i in instance_ids],
+                write_video=args.write_video,
+                video_path=video_dir,
+                metrics_dir=json_dir,
+                rollout_id=rollout_id,
+                video_fps=args.video_fps,
+            )
+            results.extend(rollout_results.values())
 
     n = len(results)
     n_success = sum(r["success"] for r in results)
