@@ -22279,8 +22279,8 @@ stages:
       size: 0
     - path: b1k_pipeline/export_scenes_mujoco.py
       hash: md5
-      md5: 584c78c6610868e2c040230c124f335b
-      size: 8300
+      md5: be15a60c84d2ea6b3e07165e0b665036
+      size: 9038
     - path: params.yaml
       hash: md5
       md5: d06bb997f278646a03a4f108469d1b94
@@ -22288,8 +22288,8 @@ stages:
     outs:
     - path: artifacts/parallels/scenes_mujoco.zip
       hash: md5
-      md5: 36e161b722d7dfc329494000b609561a
-      size: 2680893
+      md5: 9c3bcbe71549020b9a902459e399fa5d
+      size: 2657524
     - path: artifacts/pipeline/export_scenes_mujoco.json
       hash: md5
       md5: 664e2cb0fc4ca688ad97e1a8a3d8095a
@@ -22337,13 +22337,13 @@ stages:
       size: 12554
     - path: b1k_pipeline/export_objects_mujoco.py
       hash: md5
-      md5: 5f538eea5c10c4d4ca704c918a7d259c
-      size: 25550
+      md5: fa992c52b35d50cbf4686ffcb15a0f68
+      size: 25809
     outs:
     - path: artifacts/parallels/objects_mujoco.zip
       hash: md5
-      md5: 792fdc9873f60dbe302ecdf9be81174f
-      size: 34285819480
+      md5: 9804b6e256878324dd471935bd585ca6
+      size: 34285727663
     - path: artifacts/pipeline/export_objects_mujoco.json
       hash: md5
       md5: 664e2cb0fc4ca688ad97e1a8a3d8095a
@@ -22383,12 +22383,12 @@ stages:
       size: 28024803796
     - path: artifacts/parallels/objects_mujoco.zip
       hash: md5
-      md5: 792fdc9873f60dbe302ecdf9be81174f
-      size: 34285819480
+      md5: 9804b6e256878324dd471935bd585ca6
+      size: 34285727663
     - path: artifacts/parallels/scenes_mujoco.zip
       hash: md5
-      md5: 36e161b722d7dfc329494000b609561a
-      size: 2680893
+      md5: 9c3bcbe71549020b9a902459e399fa5d
+      size: 2657524
     - path: artifacts/parallels/systems.zip
       hash: md5
       md5: e727f39b6fe35adb9262c4b32fdc7760
@@ -22416,8 +22416,8 @@ stages:
     outs:
     - path: artifacts/og_dataset_mujoco.zip
       hash: md5
-      md5: f5575a0dbeb2e119b1743ee8b90f172a
-      size: 33710153809
+      md5: 8dd959f86cd95581959b0620b8fc8149
+      size: 33710046011
     - path: artifacts/pipeline/pack_mujoco_dataset.json
       hash: md5
       md5: 2ad066aadc9c024dff5e8d3c6587590d
