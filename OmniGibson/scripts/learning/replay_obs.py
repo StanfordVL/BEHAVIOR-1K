@@ -2,18 +2,12 @@ import argparse
 import csv
 import omnigibson as og
 import os
-import time
 import yaml
 from omnigibson.envs import HDF5PlaybackWrapper, LeRobotPlaybackWrapper
-from omnigibson.learning.utils.dataset_utils import update_google_sheet, makedirs_with_mode
-from omnigibson.learning.utils.eval_utils import (
-    PROPRIOCEPTION_INDICES,
-    TASK_NAMES_TO_INDICES,
-    TASK_INDICES_TO_NAMES,
-    HEAD_RESOLUTION,
-    WRIST_RESOLUTION,
-)
+from omnigibson.eval.utils.dataset_utils import makedirs_with_mode
+from omnigibson.eval.utils.eval_utils import PROPRIOCEPTION_INDICES
 from omnigibson.macros import gm
+from omnigibson.eval.utils.light_utils import LightToggleSynchronizer
 from omnigibson.utils.ui_utils import create_module_logger
 
 
@@ -24,6 +18,53 @@ gm.RENDER_VIEWER_CAMERA = False
 gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
+LIGHT_REPLAY_TASKS = {"turning_out_all_lights_before_sleep"}
+
+
+def _load_challenge_available_tasks() -> dict:
+    task_cfg_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "available_tasks.yaml")
+    with open(task_cfg_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def _load_challenge_task_ids() -> dict[str, int]:
+    task_ids = {}
+    task_misc_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "B100_task_misc.csv")
+    with open(task_misc_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            task_ids[row["Task"]] = int(row["Task ID"])
+    return task_ids
+
+
+def _infer_task_id_from_demo_id(demo_id: int) -> int:
+    return demo_id // 10000
+
+
+def _get_task_name_from_task_id(task_id: int) -> str:
+    task_names_by_id = {task_id: task_name for task_name, task_id in _load_challenge_task_ids().items()}
+    if task_id not in task_names_by_id:
+        raise KeyError(f"Task ID {task_id} inferred from demo_id was not found in challenge task metadata")
+    return task_names_by_id[task_id]
+
+
+def _find_full_scene_file(task_name: str, scene_model: str) -> str:
+    task_scene_file_folder = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "scenes", scene_model, "json")
+    if os.path.isdir(task_scene_file_folder):
+        for file in os.listdir(task_scene_file_folder):
+            if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
+                return os.path.join(task_scene_file_folder, file)
+    raise FileNotFoundError(f"No full scene file found for task '{task_name}' and scene '{scene_model}'")
+
+
+def _load_room_instances(task_name: str) -> list[str]:
+    task_misc_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "B100_task_misc.csv")
+    with open(task_misc_path, newline="", encoding="utf-8") as f:
+        task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
+        for row in task_misc_csv:
+            if task_name in row[1]:
+                return row[2].strip().split("\n")
+    raise FileNotFoundError(f"No task misc room instances found for task '{task_name}'")
+
 
 def replay_hdf5_file(
     data_folder: str,
@@ -31,6 +72,10 @@ def replay_hdf5_file(
     demo_id: int,
     output_format: str,
     flush_every_n_steps: int,
+    lerobot_repo_id: str | None = None,
+    lerobot_root_dir: str | None = None,
+    overwrite_lerobot: bool = True,
+    use_longest_demo: bool = False,
 ) -> int:
     """
     Replays a single HDF5 file and saves data to the specified format.
@@ -41,11 +86,12 @@ def replay_hdf5_file(
         demo_id: ID of the demo to replay
         output_format: Output format, "hdf5" or "lerobot"
         flush_every_n_steps: Number of steps to flush the data after
+        use_longest_demo: If True, replay the demo with the most steps instead of the last demo group
 
     Returns:
         episode_id: ID of the episode
     """
-    task_name = TASK_INDICES_TO_NAMES[task_id]
+    task_name = _get_task_name_from_task_id(task_id)
     replay_dir = os.path.join(data_folder, "replayed")
     makedirs_with_mode(replay_dir)
 
@@ -54,44 +100,24 @@ def replay_hdf5_file(
     robot_sensor_config = {
         "VisionSensor": {
             "sensor_kwargs": {
-                "image_height": WRIST_RESOLUTION[0],
-                "image_width": WRIST_RESOLUTION[1],
+                "image_height": 480,
+                "image_width": 480,
             },
         },
         "zed_link:Camera:0": {
             "sensor_kwargs": {
                 "horizontal_aperture": 40.0,
-                "image_height": HEAD_RESOLUTION[0],
-                "image_width": HEAD_RESOLUTION[1],
+                "image_height": 720,
+                "image_width": 720,
             },
         },
     }
-    with open(f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/available_tasks.yaml", "r") as f:
-        available_tasks = yaml.safe_load(f)
+    available_tasks = _load_challenge_available_tasks()
+    if task_name not in available_tasks:
+        raise KeyError(f"Task '{task_name}' not found in available challenge task metadata")
     scene_model = available_tasks[task_name][0]["scene_model"]
-    task_scene_file_folder = os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_model, "json")
-    full_scene_file = None
-    for file in os.listdir(task_scene_file_folder):
-        if task_name in file and file.endswith(".json") and "partial_rooms" not in file:
-            full_scene_file = os.path.join(task_scene_file_folder, file)
-    assert full_scene_file is not None, f"No full scene file found in {task_scene_file_folder}"
-
-    load_room_instances = None
-    try:
-        with open(
-            f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv", newline="", encoding="utf-8"
-        ) as f:
-            task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
-            for row in task_misc_csv:
-                if task_name in row[1]:
-                    load_room_instances = row[2].strip().split("\n")
-                    break
-    except FileNotFoundError as e:
-        log.error(
-            "No B50_task_misc.csv file found in 2025-challenge-task-instances/metadata folder. Please ensure the dataset is up to date."
-        )
-        raise e
-    assert load_room_instances is not None, "load room instance not found!"
+    full_scene_file = _find_full_scene_file(task_name=task_name, scene_model=scene_model)
+    load_room_instances = _load_room_instances(task_name=task_name)
 
     input_path = f"{data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5"
 
@@ -119,24 +145,49 @@ def replay_hdf5_file(
         env = HDF5PlaybackWrapper.create_from_hdf5(**kwargs)
     else:
         output_path = f"b1k/{task_name}"
-        root_dir = os.path.join(data_folder, "lerobot")
+        if lerobot_repo_id is not None:
+            output_path = lerobot_repo_id
+        root_dir = lerobot_root_dir or os.path.join(data_folder, "lerobot")
         makedirs_with_mode(root_dir)
         kwargs = dict(
             **common_kwargs,
             output_path=output_path,
             root_dir=root_dir,
+            overwrite=overwrite_lerobot,
             robot_type="R1Pro",
             task_name=task_name,
+            include_task_obs=False,
         )
         env = LeRobotPlaybackWrapper.create_from_hdf5(**kwargs)
 
     env.load_observation_space()
 
-    num_samples = [env.input_hdf5["data"][key].attrs["num_samples"] for key in env.input_hdf5["data"].keys()]
-    episode_id = num_samples.index(max(num_samples))
-    log.info(f" >>> Replaying episode {episode_id} with {num_samples[episode_id]} steps")
+    demo_ids = sorted(int(key.split("_", 1)[1]) for key in env.input_hdf5["data"].keys() if key.startswith("demo_"))
+    if not demo_ids:
+        raise ValueError(f"No demo groups found in {input_path}")
 
-    env.playback_episode(episode_id=episode_id, record_data=True)
+    if use_longest_demo:
+        episode_id = max(
+            demo_ids,
+            key=lambda cur_episode_id: env.input_hdf5["data"][f"demo_{cur_episode_id}"].attrs["num_samples"],
+        )
+        selection_reason = "most steps"
+    else:
+        episode_id = demo_ids[-1]
+        selection_reason = "last demo"
+    num_samples = env.input_hdf5["data"][f"demo_{episode_id}"].attrs["num_samples"]
+    log.info(f" >>> Replaying episode {episode_id} ({selection_reason}) with {num_samples} steps")
+
+    post_state_update_callback = None
+    if task_name in LIGHT_REPLAY_TASKS:
+        light_synchronizer = LightToggleSynchronizer(env.scene)
+        post_state_update_callback = light_synchronizer.sync_from_current_state
+
+    env.playback_episode(
+        episode_id=episode_id,
+        record_data=True,
+        post_state_update_callback=post_state_update_callback,
+    )
 
     log.info("Playback complete. Saving data...")
     env.save_data()
@@ -148,8 +199,6 @@ def replay_hdf5_file(
 def main():
     parser = argparse.ArgumentParser(description="Replay HDF5 files and save data")
     parser.add_argument("--data_folder", type=str, required=True, help="Path to the data folder")
-    parser.add_argument("--data_url", type=str, default="", required=False, help="URL to raw data")
-    parser.add_argument("--task_name", type=str, required=True, help="Task name to process")
     parser.add_argument("--demo_id", type=int, required=True, help="Demo ID to process")
     parser.add_argument(
         "--output_format",
@@ -159,25 +208,37 @@ def main():
         help="Output format: hdf5, lerobot",
     )
     parser.add_argument("--flush_every_n_steps", type=int, default=1000, help="Flush data every N steps")
-    parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
-    parser.add_argument("--row", type=int, required=False, help="Row number to update")
+    parser.add_argument(
+        "--lerobot_repo_id",
+        type=str,
+        default=None,
+        help="LeRobot repo id / relative output path. Defaults to b1k/<task_name>.",
+    )
+    parser.add_argument(
+        "--lerobot_root_dir",
+        type=str,
+        default=None,
+        help="Root directory for LeRobot output. Defaults to <data_folder>/lerobot.",
+    )
+    parser.add_argument(
+        "--resume_lerobot",
+        action="store_true",
+        help="Append to an existing LeRobot dataset instead of overwriting it.",
+    )
+    parser.add_argument(
+        "--use_longest_demo",
+        "--use-longest-demo",
+        action="store_true",
+        help="Replay the demo with the most steps instead of the last demo group.",
+    )
 
     args = parser.parse_args()
-    task_id = TASK_NAMES_TO_INDICES[args.task_name]
+    task_id = _infer_task_id_from_demo_id(args.demo_id)
 
     if not os.path.exists(
         f"{args.data_folder}/2026-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
     ):
-        if args.data_url:
-            from omnigibson.learning.utils.dataset_utils import download_and_extract_data
-
-            instance_id = int((args.demo_id % 1e4) // 10)
-            traj_id = int(args.demo_id % 10)
-            download_and_extract_data(args.data_url, args.data_folder, args.task_name, instance_id, traj_id)
-        else:
-            raise FileNotFoundError(
-                f"Error: File episode_{args.demo_id:08d}.hdf5 does not exists under {args.data_folder}"
-            )
+        raise FileNotFoundError(f"Error: File episode_{args.demo_id:08d}.hdf5 does not exist under {args.data_folder}")
 
     _ = replay_hdf5_file(
         data_folder=args.data_folder,
@@ -185,26 +246,11 @@ def main():
         demo_id=args.demo_id,
         output_format=args.output_format,
         flush_every_n_steps=args.flush_every_n_steps,
+        lerobot_repo_id=args.lerobot_repo_id,
+        lerobot_root_dir=args.lerobot_root_dir,
+        overwrite_lerobot=not args.resume_lerobot,
+        use_longest_demo=args.use_longest_demo,
     )
-
-    if args.update_sheet:
-        try:
-            import gspread
-        except ImportError:
-            log.warning("gspread not installed, skipping Google Sheet update")
-        else:
-            credentials_path = f"{os.environ.get('HOME')}/Documents/credentials"
-            sheet_update_success = False
-            for _ in range(5):
-                try:
-                    update_google_sheet(credentials_path, args.task_name, args.row)
-                    sheet_update_success = True
-                    break
-                except gspread.exceptions.APIError as e:
-                    log.error(f"Failed to update Google Sheet: {e}")
-                    time.sleep(60)
-            if not sheet_update_success:
-                update_google_sheet(credentials_path, args.task_name, args.row)
 
     log.info("All done!")
     og.shutdown()

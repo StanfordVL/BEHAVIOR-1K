@@ -4,17 +4,21 @@
     (:objects
         table_lamp.n.01_1 - table_lamp.n.01
         floor.n.01_1 - floor.n.01
-        computer.n.01_1 - computer.n.01
+        monitor.n.04_1 - monitor.n.04
+        mouse.n.04_1 - mouse.n.04
         router.n.02_1 - router.n.02
         carton.n.02_1 - carton.n.02
         table.n.02_1 - table.n.02
+        desktop_computer.n.01_1 - desktop_computer.n.01
         agent.n.01_1 - agent.n.01
     )
     
     (:init 
-        (inside table_lamp.n.01_1 carton.n.02_1) 
-        (inside computer.n.01_1 carton.n.02_1) 
+        (ontop table_lamp.n.01_1 carton.n.02_1) 
+        (ontop desktop_computer.n.01_1 table.n.02_1)
+        (ontop monitor.n.04_1 floor.n.01_1) 
         (inside router.n.02_1 carton.n.02_1) 
+        (inside mouse.n.04_1 carton.n.02_1)
         (ontop carton.n.02_1 floor.n.01_1)
         (inroom floor.n.01_1 garage)
         (ontop table.n.02_1 floor.n.01_1)
@@ -24,8 +28,10 @@
     (:goal 
         (and 
             (ontop ?table_lamp.n.01_1 ?table.n.02_1) 
-            (ontop ?computer.n.01_1 ?table.n.02_1) 
+            (ontop ?monitor.n.04_1 ?table.n.02_1) 
             (ontop ?router.n.02_1 ?floor.n.01_1)
+            (ontop ?mouse.n.04_1 ?table.n.02_1)
+            (toggled_on ?desktop_computer.n.01_1)
         )
     )
 )

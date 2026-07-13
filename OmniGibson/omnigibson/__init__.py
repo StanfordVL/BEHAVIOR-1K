@@ -41,15 +41,18 @@ class LogFormatter(logging.Formatter):
 
 
 formatter = LogFormatter("[%(relativeCreated_hms)s] [%(levelname)s] [%(name)s] %(message)s")
-logging.basicConfig()
-logging.root.handlers[0].setFormatter(formatter)
+_og_handler = logging.StreamHandler()
+_og_handler.setFormatter(formatter)
+_og_logger = logging.getLogger("omnigibson")
+_og_logger.addHandler(_og_handler)
+_og_logger.propagate = False  # prevent Isaac Sim's Carbonite handler from double-printing
 log = logging.getLogger(__name__)
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
 
-__version__ = "3.8.0"
+__version__ = "3.9.0"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 

@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="3.8.0",
+    version="3.9.0",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -55,7 +55,7 @@ setup(
         "pillow~=11.0.0",
         "websockets>=15.0.1",
         "omegaconf>=2.3.0",
-        "lerobot @ git+https://github.com/wensi-ai/lerobot@release/b1k",
+        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@release/b1k",
     ],
     extras_require={
         "dev": [
@@ -77,6 +77,7 @@ setup(
         ],
         "primitives": [
             "ninja~=1.13.0",
+            "warp-lang>=0.9.0,<1.13",
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@78612f45cef52c3fa0298de243a54cd7ca614414",
         ],
         "eval": [

@@ -4,13 +4,13 @@ import json
 import logging
 import os
 import torch as th
-from typing import Any
+from typing import Any, Callable
 
 import omnigibson as og
 from omnigibson.controllers import ControllerView, ControlType
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
-from omnigibson.learning.utils.obs_utils import create_video_writer, write_video
+from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.macros import gm, macros
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.data_utils import merge_scene_files
@@ -20,6 +20,36 @@ from omnigibson.utils.ui_utils import create_module_logger
 # Create module logger
 log = create_module_logger(module_name=__name__)
 log.setLevel(logging.INFO)
+
+
+def _is_system_particle_template_info(obj_info: dict, system_names: set[str]) -> bool:
+    args = obj_info.get("args", {})
+    category = args.get("category")
+    return (
+        category in system_names
+        and args.get("name") == f"{category}_template"
+        and args.get("relative_prim_path") == f"/{category}/template"
+    )
+
+
+def _is_system_particle_template_name(obj_name: str, system_names: set[str]) -> bool:
+    return any(obj_name == f"{system_name}_template" for system_name in system_names)
+
+
+def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: dict) -> None:
+    state = recorded_scene_file.get("state", {})
+    object_registry_state = (
+        state.get("registry", {}).get("object_registry", {})
+        if "registry" in state
+        else state.get("object_registry", {})
+    )
+
+    for obj_name, recorded_obj_state in object_registry_state.items():
+        obj = scene.object_registry("name", obj_name, None)
+        if obj is None or obj.states is None:
+            continue
+
+        obj._recorded_non_kin_state_names = set(recorded_obj_state.get("non_kin", {}))
 
 
 class DataWrapper(EnvironmentWrapper):
@@ -504,7 +534,8 @@ class DataPlaybackWrapper(DataWrapper):
         self._fps = int(
             input_config.get("env", dict()).get("rendering_frequency", env.env_config["rendering_frequency"])
         )
-        self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        self.recorded_scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        self.scene_file = self.recorded_scene_file
         assert not (
             load_room_instances and not full_scene_file
         ), "Full scene file must be specified in order to load room instances"
@@ -516,6 +547,7 @@ class DataPlaybackWrapper(DataWrapper):
                 # we loaded more room than the stored scene file, but still not the full scene
                 # we need to save the current scene file here to avoid errors
                 self.scene_file = env.scene.save(as_dict=True)
+        _align_scene_object_states_with_recorded_schema(scene=env.scene, recorded_scene_file=self.recorded_scene_file)
 
         # check flush parameters
         if flush_every_n_steps > 0:
@@ -604,6 +636,7 @@ class DataPlaybackWrapper(DataWrapper):
         episode_id: int,
         record_data: bool = True,
         video_keys: dict = None,
+        post_state_update_callback: Callable[[], None] | None = None,
     ) -> None:
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
@@ -615,6 +648,9 @@ class DataPlaybackWrapper(DataWrapper):
             video_keys (dict): Optional dictionary of video keys to record during playback. If provided, will recreate
                 video writers at the start of playback (useful if they were flushed after a previous episode)
                 It should be a dict mapping from obs keys to the desired output video file name.
+            post_state_update_callback (None or Callable): Optional callback called after playback restores recorded
+                state, and after each playback step updates simulator state. This can be used to resync visual state
+                that is derived from recorded object state but is not directly serialized.
         """
 
         # Recreate video writers if video_keys are provided
@@ -648,14 +684,19 @@ class DataPlaybackWrapper(DataWrapper):
         self.scene.restore(self.scene_file, update_initial_file=True)
 
         # Reset object attributes from the stored metadata
-        with og.sim.stopped():
+        og.sim.stop()
+        for attr, vals in init_metadata.items():
+            assert len(vals) == self.scene.n_objects
+        for i, obj in enumerate(self.scene.objects):
             for attr, vals in init_metadata.items():
-                assert len(vals) == self.scene.n_objects
-            for i, obj in enumerate(self.scene.objects):
-                for attr, vals in init_metadata.items():
-                    val = vals[i]
-                    setattr(obj, attr, val.item() if val.ndim == 0 else val)
+                val = vals[i]
+                setattr(obj, attr, val.item() if val.ndim == 0 else val)
+        og.sim.play()
         self.reset()
+        _align_scene_object_states_with_recorded_schema(
+            scene=self.scene,
+            recorded_scene_file=self.recorded_scene_file,
+        )
 
         # If not controlling robots, disable for all robots
         if not self.include_robot_control:
@@ -673,45 +714,37 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Restore to initial state
         og.sim.load_state(state[0, : int(state_size[0])], serialized=True)
+        if post_state_update_callback is not None:
+            post_state_update_callback()
+        # take one sim step to propagate
+        og.sim.step()
+        if post_state_update_callback is not None:
+            post_state_update_callback()
 
         # If record, record initial observations
-        if record_data:
+        if record_data or self.video_writers:
             # Grab initial observations directly from restored state[0], before any action is applied.
             first_time_load_n_iteration = 10
             for _ in range(first_time_load_n_iteration):
                 og.sim.render()
             obs_list, init_info = self.env.get_obs()
             self.current_obs = obs_list[0]
-
             assert len(self.current_traj_history) == 1 and set(self.current_traj_history[-1].keys()) == {
                 "obs"
             }, "Expected reset() to have inserted an initial obs-only entry into the trajectory history!"
             self.current_traj_history[-1]["obs"] = self._process_obs(self.current_obs, init_info)
-
+            # Write the initial frame if video_writers are configured
+            if self.video_writers:
+                self._write_video_frames()
         for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
+            # Here, state i is the state before taking action i, and reward, terminated, truncated are the results of taking action i
             if i % 1000 == 0:
                 log.info(f"Playing back episode {episode_id}, step {i}/{len(action)}")
-            # Execute any transitions that should occur at this current step
-            if str(i) in transitions:
-                cur_transitions = transitions[str(i)]
-                scene = og.sim.scenes[0]
-                for add_sys_name in cur_transitions["systems"]["add"]:
-                    scene.get_system(add_sys_name, force_init=True)
-                for remove_sys_name in cur_transitions["systems"]["remove"]:
-                    scene.clear_system(remove_sys_name)
-                for remove_obj_name in cur_transitions["objects"]["remove"]:
-                    obj = scene.object_registry("name", remove_obj_name)
-                    scene.remove_object(obj)
-                for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
-                    obj = create_object_from_init_info(add_obj_info)
-                    scene.add_object(obj)
-                    obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
-                # Step physics to initialize any new objects
-                og.sim.step()
-
             # Restore the sim state, and take a very small step with the action to make sure physics are
             # properly propagated after the sim state update
             og.sim.load_state(s[: int(ss)], serialized=True)
+            if post_state_update_callback is not None:
+                post_state_update_callback()
             if not self.include_contacts:
                 # When all objects/systems are visual-only, keep them still on every step
                 for obj in self.scene.objects:
@@ -722,9 +755,40 @@ class DataPlaybackWrapper(DataWrapper):
                         system.set_particles_velocities(
                             lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
                         )
+            # Take a small step with the action to propagate physics after loading the state
             obs_list, _, _, _, infos = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
             self.current_obs = obs_list[0]
             info = infos[0]
+            if post_state_update_callback is not None:
+                post_state_update_callback()
+                og.sim.render()
+                obs_list, _ = self.env.get_obs()
+                self.current_obs = obs_list[0]
+
+            # Execute any transitions that should occur at this current step
+            if str(i) in transitions:
+                cur_transitions = transitions[str(i)]
+                scene = og.sim.scenes[0]
+                added_systems = set(cur_transitions["systems"]["add"])
+                removed_systems = set(cur_transitions["systems"]["remove"])
+                for add_sys_name in cur_transitions["systems"]["add"]:
+                    scene.get_system(add_sys_name, force_init=True)
+                for remove_sys_name in cur_transitions["systems"]["remove"]:
+                    scene.clear_system(remove_sys_name)
+                for remove_obj_name in cur_transitions["objects"]["remove"]:
+                    if _is_system_particle_template_name(remove_obj_name, removed_systems):
+                        continue
+                    obj = scene.object_registry("name", remove_obj_name)
+                    scene.remove_object(obj)
+                for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
+                    if _is_system_particle_template_info(add_obj_info, added_systems):
+                        continue
+                    obj = create_object_from_init_info(add_obj_info)
+                    scene.add_object(obj)
+                    obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
+                # Step physics to initialize any new objects
+                og.sim.step()
+
             # Write videos if video_writers are configured
             if self.video_writers:
                 self._write_video_frames()

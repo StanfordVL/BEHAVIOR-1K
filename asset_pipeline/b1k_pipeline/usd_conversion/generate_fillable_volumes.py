@@ -6,6 +6,7 @@ import subprocess
 from dask.distributed import Client, as_completed
 import fs.copy
 from fs.multifs import MultiFS
+from fs.osfs import OSFS
 import fs.path
 from fs.tempfs import TempFS
 import tqdm
@@ -76,23 +77,34 @@ def main():
         with pipeline_fs.makedirs(
             "artifacts/parallels/fillable_volumes", recreate=True
         ) as out_fs:
-            # Copy everything over to the dataset FS
+            # Copy everything over to the dataset FS, under a behavior-1k-assets/ subdir
+            # so that OmniGibson's get_dataset_path("behavior-1k-assets") (which resolves
+            # to gm.DATA_PATH/behavior-1k-assets) finds the assets.
             print("Copying input to dataset fs...")
-            fs.copy.copy_fs(metadata_fs, dataset_fs)
-            fs.copy.copy_fs(systems_fs, dataset_fs)
+            staged_fs = dataset_fs.makedirs("behavior-1k-assets")
+            fs.copy.copy_fs(metadata_fs, staged_fs)
+            fs.copy.copy_fs(systems_fs, staged_fs)
             objdir_glob = list(objects_fs.glob("objects/*/*/"))
             for item in tqdm.tqdm(objdir_glob):
                 if fs.path.parts(item.path)[-1] not in ids:
                     continue
                 fs.copy.copy_fs(
-                    objects_fs.opendir(item.path), dataset_fs.makedirs(item.path)
+                    objects_fs.opendir(item.path), staged_fs.makedirs(item.path)
                 )
+
+            # Copy omnigibson-robot-assets/ and the key alongside the dataset (at gm.DATA_PATH root).
+            fs.copy.copy_fs(
+                OSFS("/scr/BEHAVIOR-1K/datasets/omnigibson-robot-assets"),
+                dataset_fs.makedirs("omnigibson-robot-assets"),
+            )
+            with open("/scr/BEHAVIOR-1K/datasets/omnigibson.key", "rb") as f:
+                dataset_fs.writefile("omnigibson.key", f)
 
             print("Launching cluster...")
             dask_client = launch_cluster(WORKER_COUNT)
 
             # Start the batched run
-            object_glob = [x.path for x in dataset_fs.glob("objects/*/*/")]
+            object_glob = [x.path for x in staged_fs.glob("objects/*/*/")]
             print("Queueing batches.")
             print("Total count: ", len(object_glob))
 
@@ -172,7 +184,7 @@ def main():
                 for item in batch:
                     dirpath = fs.path.dirname(item)
                     basename = fs.path.basename(item)
-                    dataset_dir = dataset_fs.opendir(dirpath)
+                    dataset_dir = staged_fs.opendir(dirpath)
                     if dataset_dir.exists(basename):
                         fs.copy.copy_file(
                             dataset_dir,
@@ -182,7 +194,7 @@ def main():
                         )
 
             # Finish up.
-            usd_glob = [x.path for x in dataset_fs.glob("objects/*/*/*.obj")]
+            usd_glob = [x.path for x in staged_fs.glob("objects/*/*/*.obj")]
             print(
                 f"Done processing. Added {len(usd_glob)} objects. Archiving things now."
             )

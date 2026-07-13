@@ -248,8 +248,8 @@ if [ "$NEW_ENV" = true ]; then
         exit 1
     fi
     
-    # Create environment with only Python 3.11
-    conda create -n "$NEW_ENV_NAME" python=3.11 -c conda-forge -y
+    # Create environment with Python 3.11 and packaging tools used by this script
+    conda create -n "$NEW_ENV_NAME" python=3.11 pip "setuptools>=71,<81" wheel -c conda-forge -y
     conda activate "$NEW_ENV_NAME"
     
     [[ "$CONDA_DEFAULT_ENV" != "$NEW_ENV_NAME" ]] && { echo "ERROR: Failed to activate environment '$NEW_ENV_NAME'"; exit 1; }
@@ -262,19 +262,19 @@ echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
 # Determine the CUDA version string for pip URL (e.g., cu128, cu126, etc.)
 CUDA_VER_SHORT=$(echo "$CUDA_VERSION" | sed 's/\.//g')  # e.g. convert 12.8 to 128
 
-pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
+python -m pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 torchcodec==0.5 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
 
 echo "✓ PyTorch installation completed"
 
 # Install numpy <2 to avoid conflicts
 echo "Installing numpy..."
-pip install "numpy<2"
+python -m pip install "numpy<2"
 
 # Install BDDL
 if [ "$BDDL" = true ]; then
     echo "Installing BDDL..."
     [ ! -d "bddl3" ] && { echo "ERROR: bddl directory not found"; exit 1; }
-    pip install -e "$WORKDIR/bddl3"
+    python -m pip install -e "$WORKDIR/bddl3"
 fi
 
 # Install OmniGibson with Isaac Sim
@@ -309,7 +309,7 @@ if [ "$OMNIGIBSON" = true ]; then
         EXTRAS="[${EXTRAS%,}]"
     fi
 
-    pip install -e "$WORKDIR/OmniGibson$EXTRAS" --no-build-isolation
+    python -m pip install -e "$WORKDIR/OmniGibson$EXTRAS" --no-build-isolation
 
     # Install pre-commit for dev setup
     if [ "$DEV" = true ]; then
@@ -336,7 +336,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
         # For aarch, do alternative install via direct one-liner
         if [ "$ARCH" = "aarch64" ]; then
-            pip install isaacsim[all,extscache]==5.1.0 --extra-index-url https://pypi.nvidia.com
+            python -m pip install isaacsim[all,extscache]==5.1.0 --extra-index-url https://pypi.nvidia.com
         else
             # Helper functions
             check_glibc_old() {
@@ -399,7 +399,7 @@ if [ "$OMNIGIBSON" = true ]; then
                 done
 
                 echo "Installing Isaac Sim packages..."
-                pip install "${wheel_files[@]}"
+                python -m pip install "${wheel_files[@]}"
                 rm -rf "$temp_dir"
 
                 # Verify installation
@@ -430,9 +430,9 @@ if [ "$OMNIGIBSON" = true ]; then
     fi
     
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
-    pip install --force-reinstall cffi==1.17.1
+    python -m pip install --force-reinstall cffi==1.17.1
     # Force reinstall websockets >= 15.0.1 because it's been overwritten by Isaac Sim with an older version
-    pip install --force-reinstall "websockets>=15.0.1"
+    python -m pip install --force-reinstall "websockets>=15.0.1"
 
     echo "OmniGibson installation completed successfully!"
 fi
@@ -441,23 +441,21 @@ fi
 if [ "$JOYLO" = true ]; then
     echo "Installing JoyLo..."
     [ ! -d "joylo" ] && { echo "ERROR: joylo directory not found"; exit 1; }
-    pip install -e "$WORKDIR/joylo"
+    python -m pip install -e "$WORKDIR/joylo"
 fi
 
 # Install Eval
 if [ "$EVAL" = true ]; then
     # get torch version via pip and install corresponding torch-cluster
-    TORCH_VERSION=$(pip show torch | grep Version | cut -d " " -f 2)
-    pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
-    # install av and ffmpeg
-    conda install av "numpy<2" -c conda-forge -y
+    TORCH_VERSION=$(python -m pip show torch | grep Version | cut -d " " -f 2)
+    python -m pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
 fi
 
 # Install asset pipeline
 if [ "$ASSET_PIPELINE" = true ]; then
     echo "Installing asset pipeline..."
     [ ! -d "asset_pipeline" ] && { echo "ERROR: asset_pipeline directory not found"; exit 1; }
-    pip install -r "$WORKDIR/asset_pipeline/requirements.txt"
+    python -m pip install -r "$WORKDIR/asset_pipeline/requirements.txt"
 fi
 
 # Install datasets
@@ -491,9 +489,9 @@ if [ "$DATASET" = true ]; then
         exit 1
     }
 
-    echo "Downloading 2025 BEHAVIOR Challenge Task Instances..."
-    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()" || {
-        echo "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
+    echo "Downloading 2026 BEHAVIOR Challenge Task Instances..."
+    python -c "from omnigibson.utils.asset_utils import download_2026_challenge_task_instances; download_2026_challenge_task_instances()" || {
+        echo "ERROR: 2026 BEHAVIOR Challenge Task Instances installation failed"
         exit 1
     }
 fi

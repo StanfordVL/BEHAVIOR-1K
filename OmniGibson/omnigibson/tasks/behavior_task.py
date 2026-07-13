@@ -816,7 +816,7 @@ class BehaviorTask(BaseTask):
         Args:
             env (og.Environment): OmniGibson active environment
             save_dir (None or str): If specified, absolute fpath to the desired directory to write the .json. Default is
-                {gm.DATA_PATH}/2025-challenge-task-instances/scenes/<SCENE_MODEL>/json/...>
+                {gm.DATA_PATH}/2026-challenge-task-instances/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
             task_relevant_only (bool): Whether to only save the task relevant object scope states. If True, will only
                 call dump_state() on all the BDDL instances in self.object_scope, else will save the entire sim state
@@ -824,7 +824,7 @@ class BehaviorTask(BaseTask):
             suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
         save_dir = (
-            os.path.join(get_dataset_path("2025-challenge-task-instances"), "scenes", self.scene_name, "json")
+            os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", self.scene_name, "json")
             if save_dir is None
             else save_dir
         )

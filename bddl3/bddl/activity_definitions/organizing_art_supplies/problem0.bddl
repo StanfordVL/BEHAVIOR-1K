@@ -2,37 +2,34 @@
     (:domain behavior-1k)
 
     (:objects
-     	pencil.n.01_1 - pencil.n.01
-    	floor.n.01_1 - floor.n.01
-    	carryall.n.01_1 - carryall.n.01
-    	sofa.n.01_1 - sofa.n.01
-    	paintbrush.n.01_1 - paintbrush.n.01
-    	marker.n.03_1 - marker.n.03
-    	pen.n.01_1 pen.n.01_2 - pen.n.01
-    	agent.n.01_1 - agent.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        carryall.n.01_1 - carryall.n.01
+        glue_stick.n.01_1 - glue_stick.n.01
+        rubber_eraser.n.01_1 - rubber_eraser.n.01
+        paintbrush.n.01_1 - paintbrush.n.01
+        marker.n.03_1 - marker.n.03
+        agent.n.01_1 - agent.n.01
     )
     
     (:init 
-        (ontop pencil.n.01_1 floor.n.01_1) 
-        (ontop carryall.n.01_1 sofa.n.01_1) 
-        (ontop paintbrush.n.01_1 sofa.n.01_1) 
-        (ontop marker.n.03_1 floor.n.01_1) 
-        (ontop pen.n.01_2 floor.n.01_1) 
-        (ontop pen.n.01_1 floor.n.01_1) 
-        (inroom floor.n.01_1 living_room) 
-        (inroom sofa.n.01_1 living_room) 
+        (ontop carryall.n.01_1 floor.n.01_1)
+        (ontop glue_stick.n.01_1 desk.n.01_1)
+        (ontop rubber_eraser.n.01_1 desk.n.01_1)
+        (ontop paintbrush.n.01_1 desk.n.01_1)
+        (ontop marker.n.03_1 desk.n.01_1)
+        (inroom floor.n.01_1 bedroom)
+        (inroom desk.n.01_1 bedroom)
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
     (:goal 
         (and 
-            (inside ?pencil.n.01_1 ?carryall.n.01_1)
-            (inside ?paintbrush.n.01_1 ?carryall.n.01_1)
-            (forall
-                (?pen.n.01 - pen.n.01)
-                (inside ?pen.n.01 ?carryall.n.01_1)
-            )
-            (ontop ?carryall.n.01_1 ?sofa.n.01_1)
+            (inside glue_stick.n.01_1 carryall.n.01_1)
+            (inside rubber_eraser.n.01_1 carryall.n.01_1)
+            (inside paintbrush.n.01_1 carryall.n.01_1)
+            (inside marker.n.03_1 carryall.n.01_1)
+            (ontop carryall.n.01_1 desk.n.01_1)
         )
     )
 )

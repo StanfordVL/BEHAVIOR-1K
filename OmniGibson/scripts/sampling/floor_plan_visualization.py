@@ -75,7 +75,7 @@ def _downsample_to(img, target_size, interpolation):
     return cv2.resize(img, (new_w, new_h), interpolation=interpolation)
 
 
-def render_floor_plan(scene_dir, output_path, floor=0, target_size=1500, dpi=200, crop_margin_px=80):
+def get_floor_plan_data(scene_dir, floor=0, target_size=1500, crop_margin_px=80):
     ins, _, ins_id_to_name = _parse_segmentation(scene_dir, floor)
     trav = _load_trav(scene_dir, floor)
 
@@ -120,6 +120,28 @@ def render_floor_plan(scene_dir, output_path, floor=0, target_size=1500, dpi=200
     # Walls (black in trav, outside any room) render as solid black for contrast.
     wall_mask = (trav == 0) & (ins == 0)
     canvas[wall_mask] = 0.0
+
+    return {
+        "canvas": canvas,
+        "ins": ins,
+        "trav": trav,
+        "ins_id_to_name": ins_id_to_name,
+        "ins_id_to_color": ins_id_to_color,
+    }
+
+
+def render_floor_plan(scene_dir, output_path, floor=0, target_size=1500, dpi=200, crop_margin_px=80):
+    plan = get_floor_plan_data(
+        scene_dir=scene_dir,
+        floor=floor,
+        target_size=target_size,
+        crop_margin_px=crop_margin_px,
+    )
+    canvas = plan["canvas"]
+    ins = plan["ins"]
+    ins_id_to_name = plan["ins_id_to_name"]
+    ins_id_to_color = plan["ins_id_to_color"]
+    ins_ids = sorted(ins_id_to_name.keys())
 
     fig, ax = plt.subplots(figsize=(14, 14))
     ax.imshow(canvas, interpolation="nearest")

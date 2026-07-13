@@ -11,12 +11,10 @@ This preparation step needs only be done once.
     ```bash
     python OmniGibson/omnigibson/utils/asset_utils.py --update_omnigibson_robot_assets
     ```
-- Go inside `2025-challenge-task-instances` and `git pull`
 - Clone [2026-challenge-task-instances](https://github.com/wensi-ai/2026-challenge-task-instances.git) into `BEHAVIOR-1K/datasets`
 
 **Outcome:** You should see the following folders under `BEHAVIOR-1K/datasets`:
 
-- `2025-challenge-task-instances`
 - `2026-challenge-task-instances`
 - `behavior-1k-assets`
 - `omnigibson-robot-assets`
@@ -52,4 +50,10 @@ Run the following script to replay the trajectory. This will create one `video.m
 
 ```bash
 python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa
+```
+
+If the HDF5 contains multiple saved demos, the replay script prints an episode-selection table with each `demo_N` episode ID and its trajectory length. The episode ID is the number in `demo_N`, so episode ID `2` replays `demo_2`. Press Enter to replay the longest trajectory, or enter an episode ID to replay a specific demo. For non-interactive runs, pass the episode explicitly:
+
+```bash
+python joylo/scripts/replay_data.py HDF_PATH --task TASK_NAME --qa --episode_id EPISODE_ID
 ```

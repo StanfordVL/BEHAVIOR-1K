@@ -221,6 +221,9 @@ class Robot(USDObject, GymObservable):
         merged_definition = OmegaConf.merge(schema, yaml_definition)
         self._definition: RobotDefinition = OmegaConf.to_object(merged_definition)
 
+        if self._definition.self_collisions is not None:
+            self_collisions = self._definition.self_collisions
+
         if self.has_end_effector_variants:
             self.end_effector = end_effector
             grasping_direction = "lower" if end_effector == "gripper" else "upper"
