@@ -54,15 +54,17 @@ def process_target(target, scenes_dir):
             root.append(
                 ET.Comment(
                     " Scene MJCF referencing per-object MJZ archives (see export_objects_mujoco.py). "
-                    "Loaders must unpack each MJZ and apply the per-instance scale stored in "
-                    "the custom section (e.g. via mjSpec), since MJCF attach has no native "
-                    "scaling. Fixed (non-loose) objects are welded to the world; a loader may "
-                    "instead remove the attached body's freejoint. "
+                    "Each attach carries the per-instance scale via the scale attribute, following "
+                    "the proposed MuJoCo attach-scaling feature (see mujoco-design.md). Until that "
+                    "feature is available, loaders must unpack each MJZ and apply the scale (also "
+                    "stored in the custom section) by transforming the child spec (mesh scales, "
+                    "geom/body/joint/site positions and sizes) before attaching. Fixed (non-loose) "
+                    "objects are attached statically (no freejoint); loose objects are attached "
+                    "under a freejointed wrapper body. "
                 )
             )
             asset_xml = ET.SubElement(root, "asset")
             worldbody_xml = ET.SubElement(root, "worldbody")
-            equality_xml = ET.SubElement(root, "equality")
             custom_xml = ET.SubElement(root, "custom")
 
             declared_models = set()
@@ -114,26 +116,31 @@ def process_target(target, scenes_dir):
                     )
                     declared_models.add(model_asset_name)
 
-                # Instantiate the object at its base link pose.
-                frame_xml = ET.SubElement(
-                    worldbody_xml,
-                    "frame",
-                    {"name": obj_name, "pos": _fmt(base_link_pos), "quat": _fmt(quat_wxyz)},
-                )
-                ET.SubElement(
-                    frame_xml,
-                    "attach",
-                    {"model": model_asset_name, "body": "base_link", "prefix": f"{obj_name}_"},
-                )
-
-                # Fixedness: non-loose objects are welded to the world (the object
-                # MJZs carry a freejoint on their base link).
+                # Instantiate the object at its base link pose. The object MJZs
+                # have no freejoint: fixed objects are attached statically under
+                # a frame (exactly rigid, unlike a soft weld constraint), while
+                # loose objects get a freejointed wrapper body.
+                pose_attrs = {"name": obj_name, "pos": _fmt(base_link_pos), "quat": _fmt(quat_wxyz)}
                 if is_fixed:
-                    ET.SubElement(
-                        equality_xml,
-                        "weld",
-                        {"name": f"fix_{obj_name}", "body1": f"{obj_name}_base_link"},
-                    )
+                    parent_xml = ET.SubElement(worldbody_xml, "frame", pose_attrs)
+                else:
+                    parent_xml = ET.SubElement(worldbody_xml, "body", pose_attrs)
+                    ET.SubElement(parent_xml, "freejoint")
+                # The scale attribute follows the proposed MuJoCo attach-scaling
+                # feature (see mujoco-design.md). Current MuJoCo releases ignore
+                # unknown attach attributes, so until the feature ships, loaders
+                # must apply the scale themselves (also mirrored in the custom
+                # section below).
+                ET.SubElement(
+                    parent_xml,
+                    "attach",
+                    {
+                        "model": model_asset_name,
+                        "body": "base_link",
+                        "prefix": f"{obj_name}_",
+                        "scale": _fmt(scale),
+                    },
+                )
 
                 # Per-instance data that MJCF cannot express natively.
                 ET.SubElement(
@@ -145,7 +152,7 @@ def process_target(target, scenes_dir):
                     ET.SubElement(custom_xml, "text", {"name": f"rooms::{obj_name}", "data": obj_rooms})
 
             # Drop empty sections for cleanliness.
-            for section in [equality_xml, custom_xml]:
+            for section in [custom_xml]:
                 if len(section) == 0:
                     root.remove(section)
 
