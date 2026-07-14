@@ -772,19 +772,21 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         )
 
     @property
-    def default_particle_instancer(self):
+    def particle_instancer(self):
         """
         Returns:
-            PhysxParticleInstancer: Default particle instancer for this particle system
+            None or PhysxParticleInstancer: This system's sole particle instancer, or None if it has
+                none yet.
+
+        Non-mutating: reading this NEVER creates USD/PhysX state (unlike creating an instancer,
+        which only happens during particle generation or state restoration). A
+        MicroPhysicalParticleSystem owns at most one instancer (enforced at creation/load), so this
+        is the canonical way to reach it for reads, removals, and the batched reader.
         """
-        # Default instancer is the 0th ID instancer
-        name = self.particle_instancer_idn_to_name(idn=self.default_instancer_idn)
-        # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
-        return (
-            self.particle_instancers[name]
-            if name in self.particle_instancers
-            else self.generate_particle_instancer(n_particles=0, idn=self.default_instancer_idn)
-        )
+        assert (
+            len(self.particle_instancers) <= 1
+        ), f"{self.name} has {len(self.particle_instancers)} particle instancers; at most one is supported."
+        return next(iter(self.particle_instancers.values()), None)
 
     @property
     def particle_contact_radius(self):
@@ -829,14 +831,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             instancer_idn (None or int): Unique identification number of the particle instancer to delete the particles
                 from. If None, this system will delete particles from the default particle instancer
         """
-        # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
+        # Use the sole instancer (non-mutating) when no ID is requested; never create one just to remove.
         inst = (
-            self.default_particle_instancer
+            self.particle_instancer
             if instancer_idn is None
             else self.particle_instancers.get(self.particle_instancer_idn_to_name(idn=instancer_idn), None)
         )
 
-        assert inst is not None, f"No instancer with ID {inst} exists!"
+        assert inst is not None, "No particle instancer exists to remove particles from!"
 
         inst.remove_particles(idxs=idxs)
 
@@ -879,9 +881,12 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         if not isinstance(positions, th.Tensor):
             positions = th.tensor(positions, dtype=th.float32)
 
-        # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
+        # Reuse the system's sole instancer (whatever its ID) when no specific ID is requested; only
+        # create one below (via generate_particle_instancer) if none exists yet. Using the non-mutating
+        # accessor here means a sole instancer with a non-zero ID (e.g. from a restored state) is reused
+        # rather than triggering an ID-0 creation that would break the at-most-one invariant.
         inst = (
-            self.default_particle_instancer
+            self.particle_instancer
             if instancer_idn is None
             else self.particle_instancers.get(self.particle_instancer_idn_to_name(idn=instancer_idn), None)
         )
@@ -962,10 +967,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Run sanity checks
         assert self.initialized, "Must initialize system before generating particle instancers!"
 
-        # Multiple particle instancers is NOT supported currently, since there is no clear use case for multiple
+        # A MicroPhysicalParticleSystem owns at most one instancer (there is no use case for multiple,
+        # and the vectorized reader relies on this invariant).
         assert self.n_instancers == 0, (
-            f"Cannot create multiple instancers for the same system! "
-            f"There is already {self.n_instancers} pre-existing instancers."
+            f"Cannot create a second particle instancer for system '{self.name}': it already owns "
+            f"{self.n_instancers} (only one is supported)."
         )
 
         # Automatically generate an identification number for this instancer if none is specified
@@ -1140,7 +1146,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return f"{self.name}Instancer{idn}"
 
     def get_particles_position_orientation(self):
-        return self.default_particle_instancer.particle_positions, self.default_particle_instancer.particle_orientations
+        # Non-mutating: an empty system (no instancer) reports zero particles rather than creating one.
+        inst = self.particle_instancer
+        if inst is None:
+            return th.empty((0, 3)), th.empty((0, 4))
+        return inst.particle_positions, inst.particle_orientations
 
     def get_particles_local_pose(self):
         return self.get_particles_position_orientation()
@@ -1153,23 +1163,33 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return self.get_particle_position_orientation(idx=idx)
 
     def set_particles_position_orientation(self, positions=None, orientations=None):
+        inst = self.particle_instancer
+        if inst is None:
+            # No instancer => no particles. This is only a valid no-op if there's nothing to set;
+            # non-empty inputs mean the caller is confused (there are no particles to move), so fail loud.
+            assert (positions is None or len(positions) == 0) and (
+                orientations is None or len(orientations) == 0
+            ), "Cannot set particle poses: this system has no particle instancer (no particles exist)."
+            return
         if positions is not None:
-            self.default_particle_instancer.particle_positions = positions
+            inst.particle_positions = positions
         if orientations is not None:
-            self.default_particle_instancer.particle_orientations = orientations
+            inst.particle_orientations = orientations
 
     def set_particles_local_pose(self, positions=None, orientations=None):
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     def set_particle_position_orientation(self, idx, position=None, orientation=None):
+        inst = self.particle_instancer
+        assert inst is not None, "No particle instancer exists to set a particle pose on!"
         if position is not None:
-            positions = self.default_particle_instancer.particle_positions
+            positions = inst.particle_positions
             positions[idx] = position
-            self.default_particle_instancer.particle_positions = positions
+            inst.particle_positions = positions
         if orientation is not None:
-            orientations = self.default_particle_instancer.particle_orientations
+            orientations = inst.particle_orientations
             orientations[idx] = orientation
-            self.default_particle_instancer.particle_orientations = orientations
+            inst.particle_orientations = orientations
 
     def set_particle_local_pose(self, idx, position=None, orientation=None):
         self.set_particle_position_orientation(idx=idx, position=position, orientation=orientation)
@@ -1185,6 +1205,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             particle_counts (list of int): Desired particle counts that should exist per instancer. Length of this
                 list should be the same length as @idns
         """
+        # A MicroPhysicalParticleSystem owns at most one instancer. Reject any state (dumped, loaded,
+        # or deserialized) that asks for more than one rather than silently reinterpreting it. A
+        # zero- or one-instancer request (including a legacy non-zero ID) is fine.
+        assert len(idns) <= 1, (
+            f"System '{self.name}' supports at most one particle instancer, but the requested state "
+            f"specifies {len(idns)} (idns={list(idns)}). Multi-instancer states are not supported."
+        )
+
         # We have to be careful here -- some particle instancers may have been deleted / are mismatched, so we need
         # to update accordingly, potentially deleting stale instancers and creating new instancers as needed
         idn_to_info_mapping = {

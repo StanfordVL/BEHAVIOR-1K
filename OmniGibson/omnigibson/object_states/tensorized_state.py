@@ -115,6 +115,14 @@ class TensorizedState:
         self.maybe_refresh_caches()
         return super().get_value(*args, **kwargs)
 
+    def clear_cache(self):
+        # Tensorized states serve values from VALUES_CPU, so a "clear cache" (meaning: recompute on the
+        # next read) must also force the class-level tensors to refresh — otherwise the next get_value
+        # returns the stale mirror. This matters when the world changed without a sim step (e.g. a
+        # caller removes particles, clears the cache, then re-reads).
+        super().clear_cache()
+        TensorizedState.caches_dirty = True
+
     @classmethod
     def pre_update(cls, dt=0.0):
         """

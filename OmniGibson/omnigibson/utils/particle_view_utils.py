@@ -408,12 +408,17 @@ class ParticleViewAPI:
 
             TensorizedState.graph_dirty = True
 
-        # Cache micro instancer path -> entry for the active (nonzero) micro systems.
-        cls._micro_instancer_path_to_entry = {
-            entry["system"].default_particle_instancer.prim_path: key
-            for key, entry in cls._entries.items()
-            if entry["family"] == FAMILY_MICRO_PHYSICAL and entry["system"].n_particles > 0
-        }
+        # Cache micro instancer path -> entry for the active (nonzero) micro systems. Use the
+        # non-mutating sole-instancer accessor (each micro system owns at most one instancer): reading
+        # it never creates a phantom ID-0 instancer, and it maps whatever ID the sole instancer
+        # actually has (so a restored non-default-ID instancer is gathered correctly).
+        cls._micro_instancer_path_to_entry = {}
+        for key, entry in cls._entries.items():
+            if entry["family"] != FAMILY_MICRO_PHYSICAL or entry["system"].n_particles == 0:
+                continue
+            instancer = entry["system"].particle_instancer
+            if instancer is not None:
+                cls._micro_instancer_path_to_entry[instancer.prim_path] = key
         # Largest micro instancer count -> the particle dimension of the single 2-D micro scatter launch.
         micro_counts = [
             count
@@ -456,8 +461,13 @@ class ParticleViewAPI:
             paths = selection.GetPaths()
             num_instancers = len(paths)
             if num_instancers > 0 and cls._micro_max_particles_per_instancer > 0:
-                # Fill the per-instancer destination map in place (tiny; GetPaths order need not be
-                # stable), copy it to the GPU once, then a single 2-D launch scatters every instancer.
+                # Map each Fabric row (instancer) to its destination slice. The path -> entry lookup
+                # table is cached and only rebuilt on layout change; this per-step loop is just tiny
+                # dict lookups (one per active micro instancer, i.e. per active micro system across
+                # scenes) into it, NOT per-particle work. It can't be fully cached away because
+                # SelectPrims' GetPaths() row order is not guaranteed stable across steps, so we
+                # re-resolve the row->destination array each step. Particle positions themselves still
+                # come from the single Fabric selection above + one batched scatter launch below.
                 cls._ensure_micro_instancer_capacity(num_instancers)
                 destination_start = cls._micro_instancer_destination_start_host.numpy()
                 for instancer, path in enumerate(paths):

@@ -215,8 +215,17 @@ def create_physx_particleset_pointinstancer(
         particle_mass = 0.0 if particle_mass is None else particle_mass
         particle_density = 0.0 if particle_density is None else particle_density
 
-        # Set particle states
-        instancer.GetProtoIndicesAttr().Set(prototype_indices)
+        # Set particle states. Wrap the prototype indices in a Vt.IntArray (like the sibling
+        # attributes below) so both Python-list and torch-tensor inputs set the expected VtArray<int>
+        # type; a raw tensor is rejected by USD as a TfPyObjWrapper. Convert a tensor to a host list in
+        # ONE bulk transfer (.cpu().tolist()) — a per-element int() over a CUDA tensor would force one
+        # device sync per particle.
+        proto_indices = (
+            prototype_indices.to(dtype=th.int32, device="cpu").tolist()
+            if isinstance(prototype_indices, th.Tensor)
+            else [int(idx) for idx in prototype_indices]
+        )
+        instancer.GetProtoIndicesAttr().Set(lazy.pxr.Vt.IntArray(proto_indices))
         instancer.GetPositionsAttr().Set(lazy.pxr.Vt.Vec3fArray(positions.tolist()))
         instancer.GetOrientationsAttr().Set(lazy.pxr.Vt.QuathArray.FromNumpy(orientations.cpu().numpy()))
         instancer.GetVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(velocities.tolist()))
