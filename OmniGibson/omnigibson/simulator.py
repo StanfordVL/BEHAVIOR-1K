@@ -1283,7 +1283,7 @@ def _launch_simulator(*args, **kwargs):
 
             RigidBodyViewAPI.read_from_physx()
             ArticulatedObjectViewAPI.read_from_physx()
-            ParticleViewAPI.update_particle_positions()
+            ParticleViewAPI.read_particle_positions()
             wp.synchronize_stream(wp.get_stream())
 
             self._capture_warp_graph(dt)
@@ -1319,6 +1319,9 @@ def _launch_simulator(*args, **kwargs):
                 # No tensorized-state pipeline → still refresh GPU view-API mirrors so
                 # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
                 RigidBodyViewAPI.update()
+                # After POSE_MATRICES is fresh, run the macro-visual particle kernel so attached
+                # particles track their parent's current pose.
+                ParticleViewAPI.update()
                 RigidContactAPI.update()
                 wp.synchronize_stream(wp.get_stream())
                 TensorizedState.caches_dirty = False

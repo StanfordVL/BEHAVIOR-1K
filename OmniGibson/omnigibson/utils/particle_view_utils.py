@@ -35,17 +35,27 @@ own read that fills its slice of PARTICLE_POSITIONS:
     (K = the total number of such particles the kernel handles). The rare particles glued onto CLOTH
     can't use this and fall back to their own system's slower, one-system-at-a-time getter.
 
+Each step refreshes positions in TWO phases, mirroring RigidBodyViewAPI's read_from_physx()/update()
+split — one is a host read that CAN'T be captured, the other is GPU work that runs INSIDE the graph:
+    read_particle_positions()  — HOST phase (out of the captured graph). If particle counts changed,
+                                recompute the layout (entry offsets, buffer sizes, per-particle labels)
+                                via _ensure_layout; then fill PARTICLE_POSITIONS for the families whose
+                                reads can't be captured — micro (SelectPrims/Fabric), macro-physical
+                                (get_transforms), and the cloth/untracked visual getter fallback — plus
+                                rebuild the macro-visual tables. Does NOT run the macro-visual kernel.
+    update()                   — GRAPH phase (inside the captured graph). Launches ONLY the
+                                macro-visual position kernel, which needs the current-step POSE_MATRICES,
+                                so it must run after RigidBodyViewAPI.update() and before the tensorized
+                                particle states' global_update(). Emits only a kernel launch (capturable).
+
 Important functions:
     initialize_view()           — call when the set of systems or particles changes (a scene loads,
                                 or particles are added/removed): rebuilds the entry registry and
                                 the per-family lookup tables.
-    update_particle_positions() — call every step: if particle counts changed, recompute the layout
-                                (entry offsets, buffer sizes, per-particle labels) via
-                                _ensure_layout; then _gather() refills PARTICLE_POSITIONS from the
-                                three families.
     get_particle_positions(scene, system) — convenience: the slice of PARTICLE_POSITIONS for one entry.
 
-Note: SelectPrims, get_transforms, the cloth's getters can't be put into captured graph.
+Note: SelectPrims, get_transforms, the cloth's getters can't be put into a captured graph — that's
+exactly why the read/update split exists.
 """
 
 import torch as th
@@ -367,7 +377,7 @@ class ParticleViewAPI:
         )
 
     @classmethod
-    def update_particle_positions(cls):
+    def read_particle_positions(cls):
         """Per-step update. Rebuilds layout if per-system particle counts changed.
         then gathers current positions into the flat buffers."""
         counts = [entry["system"].n_particles for entry in cls._entries.values()]
@@ -377,6 +387,40 @@ class ParticleViewAPI:
         if not any(counts):
             return
         cls._gather()
+
+    @classmethod
+    def update(cls):
+        """Graph-safe per-step GPU update: launch the macro-visual attached-body position kernel.
+
+        MUST be invoked from inside the captured simulation graph, AFTER RigidBodyViewAPI.update() (so
+        POSE_MATRICES holds this step's link poses) and BEFORE the tensorized particle states'
+        global_update() (so ContainedParticles / ContactParticles read fresh positions). Emits only a
+        Warp kernel launch (no host allocation), so it is capture-safe. The flat tables it reads are
+        (re)built out of the graph in read_particle_positions(); any reallocation of those tables or
+        of _entry_start / the flat buffers sets TensorizedState.graph_dirty (in _ensure_layout /
+        _rebuild_macro_visual_tables) so the graph re-captures against the new pointers / launch dim.
+
+        Micro and macro-physical positions are already written by read_particle_positions() (out of
+        graph) — they don't depend on POSE_MATRICES, so only the macro-visual kernel needs to run here.
+        """
+        if RigidBodyViewAPI.POSE_MATRICES is None or cls._macro_visual_num_particles == 0:
+            return
+        wp.launch(
+            _get_macro_visual_positions_kernel,
+            dim=cls._macro_visual_num_particles,
+            inputs=[
+                RigidBodyViewAPI.POSE_MATRICES,
+                cls._macro_visual_parent_link_index,
+                cls._macro_visual_world_scale,
+                cls._macro_visual_local_matrix,
+                cls._macro_visual_particle_entry_index,
+                cls._macro_visual_particle_local_index,
+                cls._entry_start,
+                cls.PARTICLE_POSITIONS,
+                cls.VISUAL_PARTICLE_ORIENTATION,
+            ],
+            device="cuda",
+        )
 
     @classmethod
     def _ensure_layout(cls, counts, particle_counts):
@@ -432,6 +476,12 @@ class ParticleViewAPI:
         # Refill per-particle labels into the reused buffers (kernel). entry_starts is tiny (num_entries).
         if total > 0:
             cls._entry_start = wp.array(th.tensor(entry_starts, dtype=th.int32), dtype=wp.int32, device="cuda")
+            # _entry_start is a freshly-allocated device array read by the in-graph macro-visual kernel
+            # (update()), so any layout change must force a graph re-capture — even when the flat buffers
+            # didn't grow (the growth branch above only covers the grow case).
+            from omnigibson.object_states.tensorized_state import TensorizedState
+
+            TensorizedState.graph_dirty = True
             wp.launch(
                 _fill_particle_labels_kernel,
                 dim=total,
@@ -503,25 +553,11 @@ class ParticleViewAPI:
                 device="cuda",
             )
 
-        # macro-visual
+        # macro-visual: (re)build the flat tables here (host allocation, out of graph). The actual
+        # position KERNEL is launched from the graph-safe update() below, AFTER RigidBodyViewAPI.update()
+        # has written this step's POSE_MATRICES, so attached particles reflect their parent's pose in the
+        # same refresh (no one-frame lag).
         cls._ensure_macro_visual_tables()
-        if RigidBodyViewAPI.POSE_MATRICES is not None and cls._macro_visual_num_particles > 0:
-            wp.launch(
-                _get_macro_visual_positions_kernel,
-                dim=cls._macro_visual_num_particles,
-                inputs=[
-                    RigidBodyViewAPI.POSE_MATRICES,
-                    cls._macro_visual_parent_link_index,
-                    cls._macro_visual_world_scale,
-                    cls._macro_visual_local_matrix,
-                    cls._macro_visual_particle_entry_index,
-                    cls._macro_visual_particle_local_index,
-                    cls._entry_start,
-                    cls.PARTICLE_POSITIONS,
-                    cls.VISUAL_PARTICLE_ORIENTATION,
-                ],
-                device="cuda",
-            )
 
         # Cloth/untracked entries (rare) fall back to the per-entry getter. If POSE_MATRICES isn't ready
         # yet (transient startup), every visual entry falls back for that step.
@@ -622,6 +658,13 @@ class ParticleViewAPI:
 
         cls._macro_visual_fallback_keys = fallback_keys
         cls._macro_visual_num_particles = len(parent_link_index)
+        # This rebuild replaces the device arrays read by the in-graph macro-visual kernel (update())
+        # and can change its launch dimension, so the captured graph must re-capture — otherwise
+        # adding/removing visual particles after capture leaves the graph pointing at freed arrays
+        # (notably when the flat buffer does not need to grow). Lazy import avoids a module cycle.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.graph_dirty = True
         if cls._macro_visual_num_particles == 0:
             cls._macro_visual_parent_link_index = None
             cls._macro_visual_world_scale = None
