@@ -408,8 +408,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         cls._self_onfire_idx = create_tensor_from_list(self_onfire_idx, "int32", device="cuda")
 
     @classmethod
-    def pre_update(cls):
-        super().pre_update()
+    def pre_update(cls, dt=0.0):
+        super().pre_update(dt)
         # Only rebuild when the captured graph is being rebuilt. graph_dirty is the single
         # trigger: every event that invalidates the index tables goes through some state's
         # initialize_view, which sets graph_dirty. Rebuild reallocates GPU buffers that must be

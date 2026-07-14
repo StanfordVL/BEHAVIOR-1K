@@ -296,8 +296,8 @@ class Temperature(TensorizedAbsoluteState):
         cls.INFLUENCE_MASK_CPU_WP = _wp_from_torch(cls.INFLUENCE_MASK_CPU)
 
     @classmethod
-    def pre_update(cls):
-        super().pre_update()
+    def pre_update(cls, dt=0.0):
+        super().pre_update(dt)
         # Zero the influence mask every step so _incoming_heat_kernel only OR-writes hits.
         if cls.INFLUENCE_MASK is not None:
             cls.INFLUENCE_MASK.zero_()
