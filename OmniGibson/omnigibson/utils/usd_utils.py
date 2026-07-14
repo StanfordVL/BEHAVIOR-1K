@@ -845,7 +845,6 @@ class RigidBodyViewAPI:
         # Copy PhysX output into the fixed pinned wp.array via a torch view
         N_physx_tracked = transforms.shape[0]
         wp.to_torch(cls.POSES)[:N_physx_tracked] = transforms
-        wp.copy(cls.POSES_GPU, cls.POSES)
 
     @classmethod
     def get_flat_idx(cls, abs_prim_path):
@@ -1009,6 +1008,7 @@ class RigidBodyViewAPI:
         N = cls.POSES_GPU.shape[0]
         if N == 0:
             return
+        wp.copy(cls.POSES_GPU, cls.POSES)
         wp.launch(
             _poses_to_matrices_kernel,
             dim=N,

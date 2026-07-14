@@ -47,6 +47,13 @@ class BaseSystem(Serializable):
         # Whether this system has been initialized or not
         self.initialized = False
 
+        # Invalidates structural / static metadata cached by ParticleViewAPI. Subclasses must mark
+        # this when particle topology, ordering, instancer identity, or cached macro-visual attachment
+        # transforms change. Live physical poses and velocities do not invalidate metadata because
+        # ParticleViewAPI fetches them every refresh. ParticleViewAPI clears this only after a
+        # successful metadata refresh.
+        self._particle_metadata_dirty = True
+
         self.min_scale = min_scale if min_scale is not None else th.ones(3)
         self.max_scale = max_scale if max_scale is not None else th.ones(3)
 
@@ -63,6 +70,19 @@ class BaseSystem(Serializable):
     @property
     def uuid(self):
         return self._uuid
+
+    @property
+    def particle_metadata_dirty(self):
+        """Whether ParticleViewAPI's cached metadata for this system may be stale."""
+        return self._particle_metadata_dirty
+
+    def mark_particle_metadata_dirty(self):
+        """Mark ParticleViewAPI's cached metadata for this system as stale."""
+        self._particle_metadata_dirty = True
+
+    def clear_particle_metadata_dirty(self):
+        """Mark ParticleViewAPI's cached metadata for this system as current."""
+        self._particle_metadata_dirty = False
 
     @property
     def prim_path(self):
@@ -198,6 +218,8 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
+        self.mark_particle_metadata_dirty()
+
         for callback in og.sim.get_callbacks_on_system_clear().values():
             callback(self)
 

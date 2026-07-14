@@ -249,12 +249,14 @@ class MacroParticleSystem(BaseSystem):
 
         # Increment counter
         self._particle_counter += 1
+        self.mark_particle_metadata_dirty()
 
         return new_particle
 
     def remove_particle_by_name(self, name):
         assert name in self.particles, f"Got invalid name for particle to remove {name}"
         particle = self.particles.pop(name)
+        self.mark_particle_metadata_dirty()
         og.sim.remove_prim(particle)
 
     def remove_particles(
@@ -903,8 +905,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         local_pos, local_quat = T.mat2pose(mat)
         particle.set_position_orientation(position=local_pos, orientation=local_quat, frame="parent")
 
-        # Store updated value
+        # Store the updated value and invalidate ParticleViewAPI's cached local matrix.
         self._particles_local_mat[name] = mat
+        self.mark_particle_metadata_dirty()
 
     def _sync_particle_groups(
         self,
@@ -950,6 +953,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # Sanity check the common groups, we will recreate any where there is a mismatch
         for name in common_groups:
             info = name_to_info_mapping[name]
+            # TODO: Compare attachment references too. A same-ID state with different link / face
+            # references currently leaves the existing attachments unchanged instead of recreating the group.
             current_idns = {self.particle_name2idn(p_name) for p_name in self._group_particles[name]}
             desired_idns = {int(idn) for idn in info["particle_idns"]}
             if current_idns != desired_idns:

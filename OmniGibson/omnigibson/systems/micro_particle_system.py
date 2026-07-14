@@ -841,6 +841,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         assert inst is not None, "No particle instancer exists to remove particles from!"
 
         inst.remove_particles(idxs=idxs)
+        if len(idxs) > 0:
+            self.mark_particle_metadata_dirty()
 
     def generate_particles(
         self,
@@ -920,6 +922,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 scales=scales,
                 prototype_indices=prototype_indices,
             )
+            if n_particles > 0:
+                self.mark_particle_metadata_dirty()
 
         # Update semantics
         prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
@@ -1012,6 +1016,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         instancer.load(self.scene)
         instancer.initialize()
         self.particle_instancers[name] = instancer
+        self.mark_particle_metadata_dirty()
 
         return instancer
 
@@ -1125,6 +1130,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         assert_valid_key(key=name, valid_keys=self.particle_instancers, name="particle instancer")
         # Remove instancer from our tracking and delete its prim
         instancer = self.particle_instancers.pop(name)
+        self.mark_particle_metadata_dirty()
         og.sim.remove_prim(instancer)
 
     def particle_instancer_name_to_idn(self, name):
@@ -1235,9 +1241,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             if count_diff > 0:
                 # We need to add more particles to this group
                 instancer.add_particles(positions=th.zeros((count_diff, 3)))
+                self.mark_particle_metadata_dirty()
             elif count_diff < 0:
                 # We need to remove particles from this group
                 instancer.remove_particles(idxs=th.arange(-count_diff))
+                self.mark_particle_metadata_dirty()
 
         # Delete any instancers we no longer want
         for name in instancers_to_delete:

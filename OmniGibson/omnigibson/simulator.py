@@ -1243,7 +1243,7 @@ def _launch_simulator(*args, **kwargs):
             RigidBodyViewAPI.initialize_view()
             ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
-            ParticleViewAPI.initialize_view()
+            ParticleViewAPI.rebuild_topology()
 
             if gm.ENABLE_OBJECT_STATES:
                 if self.currently_stepping:
@@ -1283,7 +1283,7 @@ def _launch_simulator(*args, **kwargs):
 
             RigidBodyViewAPI.read_from_physx()
             ArticulatedObjectViewAPI.read_from_physx()
-            ParticleViewAPI.read_particle_positions()
+            ParticleViewAPI.prepare_step_host()
             wp.synchronize_stream(wp.get_stream())
 
             self._capture_warp_graph(dt)
@@ -1319,9 +1319,9 @@ def _launch_simulator(*args, **kwargs):
                 # No tensorized-state pipeline → still refresh GPU view-API mirrors so
                 # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
                 RigidBodyViewAPI.update()
-                # After POSE_MATRICES is fresh, run the macro-visual particle kernel so attached
-                # particles track their parent's current pose.
-                ParticleViewAPI.update()
+                # Run captured-safe particle copies/kernels after POSE_MATRICES is fresh so attached
+                # visual particles track their parent's current pose.
+                ParticleViewAPI.update_positions_gpu()
                 RigidContactAPI.update()
                 wp.synchronize_stream(wp.get_stream())
                 TensorizedState.caches_dirty = False
@@ -1348,6 +1348,7 @@ def _launch_simulator(*args, **kwargs):
                         # stream guarantees they see fresh values.
                         with wp.ScopedCapture(device="cuda") as capture:
                             RigidBodyViewAPI.update()
+                            ParticleViewAPI.update_positions_gpu()
                             RigidContactAPI.update()
                             for state_type in tensorized_states:
                                 state_type.global_update()
@@ -1355,6 +1356,13 @@ def _launch_simulator(*args, **kwargs):
                     TensorizedState.graph_dirty = False
                 if self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
+                else:
+                    # No captured graph (tensorized states are registered but hold no values yet, e.g. a
+                    # scene with particles but no containers/physical contacts). Still refresh the view
+                    # APIs directly so particle positions / poses stay fresh for non-tensorized consumers.
+                    RigidBodyViewAPI.update()
+                    ParticleViewAPI.update_positions_gpu()
+                    RigidContactAPI.update()
 
                 wp.synchronize_stream(wp.get_stream())
 
