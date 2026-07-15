@@ -52,6 +52,12 @@ class Covered(RelativeObjectState, BooleanStateMixin):
         # Grab group name
         self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
 
+    def get_value(self, system):
+        # ContactParticles.VALUES_CPU (or the visual group count) is the source of truth;
+        # caching this threshold separately could hide a same-step particle change.
+        assert self._initialized
+        return self._get_value(system)
+
     def _get_value(self, system):
         # Value is false by default
         value = False

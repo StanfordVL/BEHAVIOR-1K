@@ -112,16 +112,9 @@ class TensorizedState:
             cls._dt = wp.zeros(shape=(1,), dtype=wp.float32, device="cuda")
 
     def get_value(self, *args, **kwargs):
+        assert self._initialized
         self.maybe_refresh_caches()
-        return super().get_value(*args, **kwargs)
-
-    def clear_cache(self):
-        # Tensorized states serve values from VALUES_CPU, so a "clear cache" (meaning: recompute on the
-        # next read) must also force the class-level tensors to refresh — otherwise the next get_value
-        # returns the stale mirror. This matters when the world changed without a sim step (e.g. a
-        # caller removes particles, clears the cache, then re-reads).
-        super().clear_cache()
-        TensorizedState.caches_dirty = True
+        return self._get_value(*args, **kwargs)
 
     @classmethod
     def pre_update(cls, dt=0.0):

@@ -13,6 +13,11 @@ m.N_MAX_MICRO_PARTICLE_SAMPLES = 100000
 
 
 class Filled(RelativeObjectState, BooleanStateMixin):
+    def get_value(self, system):
+        # ContainedParticles.VALUES_CPU is the cache; this volume threshold is cheap to recompute.
+        assert self._initialized
+        return self._get_value(system)
+
     def _get_value(self, system):
         # Sanity check to make sure system is valid
         assert self.obj.scene.is_physical_particle_system(

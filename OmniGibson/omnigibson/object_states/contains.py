@@ -349,6 +349,12 @@ class ContainedParticles(TensorizedObjectSystemState, LinkBasedStateMixin):
 
 
 class Contains(RelativeObjectState, BooleanStateMixin):
+    def get_value(self, system):
+        # ContainedParticles.VALUES_CPU is the cache. Do not memoize this cheap interpretation
+        # separately because that could hide a same-step particle metadata change.
+        assert self._initialized
+        return self._get_value(system)
+
     def _get_value(self, system):
         # Grab value from Contains state; True if value is greater than 0
         return self.obj.states[ContainedParticles].get_value(system=system).n_in_volume > 0

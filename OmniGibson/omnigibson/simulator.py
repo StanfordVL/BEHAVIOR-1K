@@ -1260,6 +1260,10 @@ def _launch_simulator(*args, **kwargs):
                         if issubclass(state_type, TensorizedState):
                             state_type.initialize_view()
 
+        def mark_tensorized_state_values_dirty(self):
+            """Mark VALUES_CPU stale after a world mutation outside the normal step refresh."""
+            TensorizedState.caches_dirty = True
+
         def _refresh_state_caches(self, dt=0.0):
             """
             Run a full update for tensorized object state and view API.

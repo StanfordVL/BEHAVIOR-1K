@@ -77,8 +77,10 @@ class BaseSystem(Serializable):
         return self._particle_metadata_dirty
 
     def mark_particle_metadata_dirty(self):
-        """Mark ParticleViewAPI's cached metadata for this system as stale."""
+        """Mark ParticleViewAPI metadata and its dependent tensorized values as stale."""
         self._particle_metadata_dirty = True
+        if og.sim is not None:
+            og.sim.mark_tensorized_state_values_dirty()
 
     def clear_particle_metadata_dirty(self):
         """Mark ParticleViewAPI's cached metadata for this system as current."""
