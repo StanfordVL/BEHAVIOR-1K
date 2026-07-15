@@ -49,6 +49,7 @@ RENDER_SETTLE_STEPS = 3
 
 def get_original_resolution(room_dir, filenames):
     """Detect original video resolution from an image in the room directory."""
+    return 1920, 1080
     for fn in filenames:
         img_path = room_dir / "images" / fn
         if img_path.exists():
@@ -128,16 +129,15 @@ def render_scene(room_dir, output_dir, scene_id, render_w=None, render_h=None):
     env = og.Environment(configs=cfg)
     og.sim.step()
 
-    # ── Configure renderer ──
-    lazy.carb.settings.get_settings().set_string("/rtx/rendermode", "RaytracedLighting")
-    lazy.carb.settings.get_settings().set_bool("/rtx/useViewLightingMode", True)
-    lazy.carb.settings.get_settings().set_bool("/rtx/post/histogram/enabled", True)
-    lazy.carb.settings.get_settings().set_float("/rtx/post/histogram/whiteScale", 5.0)
-
     # ── Set camera intrinsics ──
     cam = og.sim.viewer_camera
     cam.focal_length = focal_length_mm
     cam.horizontal_aperture = h_aperture_mm
+
+    # Make the ceiling invisible to light rays
+    for ceiling in env.scene.object_registry("category", "ceilings"):
+        for vm in ceiling.root_link.visual_meshes.values():
+            vm.prim.CreateAttribute("primvars:invisibleToSecondaryRays", lazy.pxr.Sdf.ValueTypeNames.Bool).Set(True)
 
     for _ in range(RENDER_WARMUP_STEPS):
         og.sim.render()

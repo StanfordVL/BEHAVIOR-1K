@@ -20,7 +20,7 @@ policy_names = {
     "vid2room-50",
 }
 
-outputs_path = pathlib.Path("/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/eval_jobs_norgb")
+outputs_path = pathlib.Path("/cvgl2/u/cgokmen/BEHAVIOR-1K/slurm/eval_jobs_no_rgb")
 assert not outputs_path.exists(), f"Outputs path already exists: {outputs_path}"
 outputs_path.mkdir(parents=True, exist_ok=True)
 
@@ -30,7 +30,7 @@ def main():
 
     all_eval_jobs = []
     for policy_name in policy_names:
-        policy_checkpoint_path = pathlib.Path("/vision/group/vid2room/vid2room_pick_policies_norgb") / policy_name / "checkpoints" / "step_03000.pt"
+        policy_checkpoint_path = pathlib.Path("/vision/group/vid2room/vid2room_pick_policies_no_rgb") / policy_name / "checkpoints" / "step_01500.pt"
         assert os.path.exists(policy_checkpoint_path), f"Policy checkpoint path does not exist: {policy_checkpoint_path}"
 
         for eval_configuration in eval_configurations:

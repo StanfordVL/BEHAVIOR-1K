@@ -157,7 +157,7 @@ gm.USE_NUMPY_CONTROLLER_BACKEND = True
 gm.GUI_VIEWPORT_ONLY = False
 
 # Whether to use the viewer camera or not
-gm.RENDER_VIEWER_CAMERA = True
+gm.RENDER_VIEWER_CAMERA = False
 
 # Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
 # This includes extra information for things such as object sampling, and also any debug
@@ -205,8 +205,8 @@ gm.ENABLE_OBJECT_STATES = True
 gm.ENABLE_TRANSITION_RULES = True
 
 # Default settings for the omni UI viewer
-gm.DEFAULT_VIEWER_WIDTH = 1280
-gm.DEFAULT_VIEWER_HEIGHT = 720
+gm.DEFAULT_VIEWER_WIDTH = 1920
+gm.DEFAULT_VIEWER_HEIGHT = 1080
 
 # Default physics / rendering / sim step frequencies (Hz)
 # rendering must be a multiple of physics frequency, and sim_step must be a multiple of rendering frequency

@@ -17,9 +17,9 @@ TOTAL_JOBS=351
 
 # Paths - adjust these as needed
 PROJECT_ROOT="/cvgl2/u/cgokmen/BEHAVIOR-1K"
-EVAL_JOBS_DIR="${PROJECT_ROOT}/slurm/eval_jobs"
-EVAL_SUCCESSES_DIR="${PROJECT_ROOT}/slurm/eval_successes_shorter"
-OUTPUT_BASE="/vision/group/vid2room/eval_results_shorter"
+EVAL_JOBS_DIR="${PROJECT_ROOT}/slurm/eval_jobs_no_rgb"
+EVAL_SUCCESSES_DIR="${PROJECT_ROOT}/slurm/eval_successes_no_rgb_longer"
+OUTPUT_BASE="/vision/group/vid2room/eval_results_no_rgb_longer"
 GPU_ID=$(nvidia-smi --query-gpu=uuid --format=csv,noheader | tail -n 1)
 mkdir -p ${OUTPUT_BASE}
 mkdir -p ${EVAL_SUCCESSES_DIR}
@@ -66,7 +66,8 @@ while [ ${PROCESS_ID} -lt ${TOTAL_JOBS} ]; do
       --episodes-file "${JOB_FILE}" \
       --output-dir "${JOB_OUTPUT_PATH}" \
       --success-file "${SUCCESS_FILE}" \
-      --max-steps-multiplier 1.1
+      --observation-mode no_rgb \
+      --max-steps-multiplier 2
   done
 
   if [ ! -f "${SUCCESS_FILE}" ]; then

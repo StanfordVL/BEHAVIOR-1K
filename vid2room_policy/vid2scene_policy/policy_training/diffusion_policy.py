@@ -13,7 +13,7 @@ from diffusers.training_utils import EMAModel
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from data_loader import PickDataset
+from vid2scene_policy.policy_training.data_loader import PickDataset
 
 
 def get_resnet(name: str, weights=None, in_channels: int = 3, **kwargs) -> nn.Module:
