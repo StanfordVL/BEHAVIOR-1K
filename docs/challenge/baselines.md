@@ -51,16 +51,24 @@ See the [installation guide](../getting_started/installation.md) for prerequisit
 
 ### Download the demonstrations
 
-The demos ship as a [LeRobot](https://github.com/huggingface/lerobot) v3.0 dataset on HuggingFace: [behavior-1k/2026-challenge-demos](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos). Download only the relevant task folder — the full dataset is 3.27 TB:
+The demos ship as a [LeRobot](https://github.com/huggingface/lerobot) v3.0 dataset on HuggingFace: [behavior-1k/2026-challenge-demos](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos). Tasks are stored as numbered chunks (`chunk-000` is the first task, `chunk-001` the second, and so on). Download only the relevant chunk — the full dataset is 3.27 TB:
 
 ```bash
+export TASK_ID=0    # 0-indexed task id; maps to chunk-000, chunk-001, ...
+CHUNK=$(printf "chunk-%03d" $TASK_ID)
+
 huggingface-cli download behavior-1k/2026-challenge-demos \
     --repo-type dataset \
     --local-dir "$(dirname $DATA_ROOT)" \
-    --include "b1k/$TASK_NAME/**"
+    --include "data/$CHUNK/**" \
+    --include "meta/episodes/$CHUNK/**" \
+    --include "videos/*/$CHUNK/**" \
+    --include "meta/info.json" \
+    --include "meta/stats.json" \
+    --include "meta/tasks.parquet"
 ```
 
-This places the demos at `$DATASET_PATH`. Drop the `--include` filter to download all 100 tasks. See the [dataset page](./dataset.md) for details on the data format.
+This places the demos under `$(dirname $DATA_ROOT)` in LeRobot's `data/`, `meta/`, and `videos/` layout. Drop the `--include` filters to download all 100 tasks. See the [dataset page](./dataset.md) for details on the data format.
 
 ## π0.5
 
