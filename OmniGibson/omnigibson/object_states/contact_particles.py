@@ -155,15 +155,17 @@ class ContactParticlesData:
         count (int): number of the system's particles in contact with the object.
         particle_indices (set[int]): system-local indices of those contacting particles.
 
-    `count` comes from the tensor (fast, per step). `particle_indices` is computed lazily by the SAME
-    GPU contact test over that (scene, system)'s particle slice, so the two stay consistent. A
-    link-specific query derives count from len(particle_indices)."""
+    Reading `count` alone is cheap: it comes straight from the tensor and does NOT build the index set.
+    `particle_indices` is computed lazily by the SAME GPU contact test over that (scene, system)'s
+    particle slice. Building the indices re-derives `count` from them (len), so the two always describe
+    the same state — building the list is what makes count reflect that same GPU pass. A link-specific
+    query has no tensor count and always derives count from its indices."""
 
     def __init__(self, state, system, link, count):
         self._state = state
         self._system = system
         self._link = link
-        self._count = count  # None for a link-specific query -> derive from particle_indices
+        self._count = count  # None for a link-specific query -> derived from particle_indices on demand
         self._particle_indices = None
         self._particle_indices_computed = False
 
@@ -172,11 +174,16 @@ class ContactParticlesData:
         if not self._particle_indices_computed:
             self._particle_indices = self._state._compute_contact_particle_indices(self._system, self._link)
             self._particle_indices_computed = True
+            # Building the set defines the count; keep count consistent with it (same GPU pass / state).
+            self._count = len(self._particle_indices)
         return self._particle_indices
 
     @property
     def count(self):
-        return len(self.particle_indices) if self._count is None else self._count
+        # A link query has no tensor count, so derive it by building the index set (which sets _count).
+        if self._count is None:
+            return len(self.particle_indices)
+        return self._count
 
 
 class ContactParticles(TensorizedObjectSystemState, KinematicsMixin):

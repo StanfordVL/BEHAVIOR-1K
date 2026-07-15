@@ -25,9 +25,11 @@ class ContainedParticlesData:
         positions (th.tensor): (N, 3) raw global particle positions.
         in_volume (th.tensor): (N,) boolean, whether each particle is inside the container volume.
 
-    positions/in_volume are computed LAZILY the original per-object way (system getter +
-    link.check_points_in_volume) only when accessed, so the common callers (Contains/Filled, which
-    only read n_in_volume) pay nothing while the rare callers (transition rules, set_value) still work.
+    Reading n_in_volume alone is cheap: it comes straight from the tensor and does NOT build the
+    positions / in_volume arrays. positions/in_volume are computed LAZILY the original per-object way
+    (system getter + link.check_points_in_volume) only when accessed. Building them re-derives
+    n_in_volume from the in_volume mask (its sum), so the count and the per-particle mask always
+    describe the same state — building the arrays is what makes the count reflect that same pass.
     """
 
     def __init__(self, n_in_volume, state, system):
@@ -41,6 +43,8 @@ class ContainedParticlesData:
     def _compute(self):
         if not self._computed:
             self._positions, self._in_volume = self._state._compute_positions_in_volume(self._system)
+            # Building the mask defines the count; keep n_in_volume consistent with it (same state).
+            self.n_in_volume = int(self._in_volume.sum().item())
             self._computed = True
 
     @property
