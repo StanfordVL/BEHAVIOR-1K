@@ -71,6 +71,17 @@ def parse_args() -> argparse.Namespace:
         help="Number of parallel env slots; instances are evaluated this many at a time.",
     )
     parser.add_argument(
+        "--render-every",
+        type=int,
+        default=1,
+        help=(
+            "Render (and feed the policy fresh camera images) every N steps; step physics-only in "
+            "between. Set to the policy's action horizon K for chunked policies (skip-render mode) to "
+            "skip drawing on steps the policy replays. 1 = render every step (for policies that look "
+            "every step, e.g. temporal_ensemble). Ignored while writing video."
+        ),
+    )
+    parser.add_argument(
         "--max-steps",
         type=int,
         default=None,
@@ -142,6 +153,7 @@ def main() -> None:
             "mode": args.mode,
             "seed": seed,
             "num_envs": args.num_envs,
+            "render_every": args.render_every,
             "task": {"name": args.task_name},
             "robot": robot_config,
         }

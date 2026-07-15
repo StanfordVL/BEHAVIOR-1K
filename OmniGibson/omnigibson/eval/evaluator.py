@@ -166,11 +166,17 @@ class Evaluator:
         self.robot_camera_names = get_robot_camera_names(self.robots[0].name, self.robot_eval_config)
         self._validate_robot_eval_config()
         self._apply_robot_eval_settings()
-        self.policies = self.load_policies()
+        self.policy = self.load_policy()
         self.metrics = self.load_metrics()
         self.obs = [None] * self.num_envs
         self._video_writers = [None] * self.num_envs
         self.light_synchronizers = [None] * self.num_envs
+        # Render cadence. Render (and feed the policy fresh camera images) every ``render_every`` steps;
+        # step physics-only in between, reusing the last frame -- valid because a chunked policy replays
+        # its plan and only looks at images when it re-infers (every K steps). 1 = render every step
+        # (safe default / policies that look every step). Rendering is the dominant per-step cost.
+        self.render_every = max(1, int(cfg.get("render_every", 1)))
+        self._rollout_step = 0
 
         # Initialize the physics views so the first reset()/load can read/restore robot joint state.
         og.sim.update_handles()
@@ -308,20 +314,19 @@ class Evaluator:
                 if head_sensor_name in robot.sensors:
                     robot.sensors[head_sensor_name].horizontal_aperture = EVAL_HEAD_HORIZONTAL_APERTURE
 
-    def load_policies(self) -> List[Any]:
-        # One independent (possibly stateful) policy instance per env slot.
-        policies = []
-        for _ in range(self.num_envs):
-            policy = instantiate(self.cfg.model)
-            if hasattr(policy, "set_action_dim"):
-                policy.set_action_dim(self.robots[0].action_dim)
-            policies.append(policy)
+    def load_policy(self) -> Any:
+        # A SINGLE policy that serves all env slots in one batched call (num_envs robots at once),
+        # instead of one policy per slot. The policy accepts a batched obs (leading num_envs dim) and
+        # returns batched actions; it keeps per-env internal state indexed by position.
+        policy = instantiate(self.cfg.model)
+        if hasattr(policy, "set_action_dim"):
+            policy.set_action_dim(self.robots[0].action_dim)
         logger.info("")
         logger.info("=" * 50)
-        logger.info(f"Loaded {self.num_envs} policy instance(s): {self.cfg.policy_name}")
+        logger.info(f"Loaded {self.num_envs} policy instance(s) (batched): {self.cfg.policy_name}")
         logger.info("=" * 50)
         logger.info("")
-        return policies
+        return policy
 
     def load_metrics(self) -> List[List[MetricBase]]:
         return [
@@ -329,15 +334,16 @@ class Evaluator:
             for i in range(self.num_envs)
         ]
 
-    def _apply_actions(self, actions: th.Tensor, active_slots: List[int]):
+    def _apply_actions(self, actions: th.Tensor, active_slots: List[int], render: bool = True):
         """
         Step all env slots one step with the given ``(num_envs, action_dim)`` actions, then update the
         observations and metrics for the @active_slots only (frozen slots are still stepped by the
-        shared simulator but their obs/metrics are not advanced). Returns ``(terminated, truncated,
-        info)`` straight from the env (``terminated``/``truncated`` are ``(num_envs,)`` tensors, ``info``
-        a per-slot list).
+        shared simulator but their obs/metrics are not advanced). If ``render`` is False, physics steps
+        without drawing the cameras (images stay stale, proprio is still fresh) -- the render cadence
+        uses this to skip drawing on steps the policy is not looking. Returns ``(terminated, truncated,
+        info)`` straight from the env.
         """
-        obs_list, _, terminated, truncated, info = self.env.step(actions, n_render_iterations=1)
+        obs_list, _, terminated, truncated, info = self.env.step(actions, n_render_iterations=1, render=render)
         if self.should_sync_lights:
             # Re-derive visual light state (toggles drive lights that aren't directly serialized) for
             # the active slots, then re-read obs so the recorded frame matches the synced lights.
@@ -361,16 +367,33 @@ class Evaluator:
                 )
         return terminated, truncated, info
 
+    def _batch_obs(self) -> dict:
+        """
+        Stack every env slot's preprocessed obs into one ``(num_envs, ...)`` batch for a SINGLE policy
+        call. All slots share the same keys. Frozen/finished slots keep their last obs and ride along so
+        the batch size stays ``num_envs`` (the policy indexes its per-env buffers by position).
+        """
+        keys = self.obs[0].keys()
+        return {k: th.stack([self.obs[slot][k] for slot in range(self.num_envs)], dim=0) for k in keys}
+
     def _step_fn(self, active_slots: List[int]) -> Tuple[th.Tensor, th.Tensor]:
         """
-        ``step_fn`` consumed by :func:`evaluate_instances_batched`: drive active slots with their own
-        policies (frozen slots get a zero action but are still stepped by the shared simulator).
+        ``step_fn`` consumed by :func:`evaluate_instances_batched`: query the policy ONCE with all env
+        slots batched together, then step. Renders only every ``render_every`` steps (physics-only in
+        between). Frozen slots get a zero action but are still stepped by the shared simulator.
         """
         action_dim = self.robots[0].action_dim
+        batched_action = self.policy.forward(obs=self._batch_obs())  # (num_envs, action_dim)
+        if batched_action.ndim == 1:
+            batched_action = batched_action.unsqueeze(0)
         actions = th.zeros((self.num_envs, action_dim), dtype=th.float32)
         for slot in active_slots:
-            actions[slot] = self.policies[slot].forward(obs=self.obs[slot])
-        terminated, truncated, _ = self._apply_actions(actions, active_slots)
+            actions[slot] = batched_action[slot].to(actions.dtype)
+        # Render on the step whose fresh obs the NEXT policy query will consume, so re-inference steps
+        # get fresh images. render_every == 1 => render every step (unchanged behavior).
+        render = ((self._rollout_step + 1) % self.render_every) == 0
+        terminated, truncated, _ = self._apply_actions(actions, active_slots, render=render)
+        self._rollout_step += 1
         return terminated, truncated
 
     def _set_video_writer(self, env_idx: int, video_writer) -> None:
@@ -494,9 +517,12 @@ class Evaluator:
                 og.sim.render()
             obs_list, _ = self.env.get_obs(env_indices=th.tensor(ordered_slots, dtype=th.long))
         task_name = self.cfg.task.name
+        # One batched policy for all slots: reset its per-env state once, and restart the render-cadence
+        # counter for this group (the step-0 obs below is freshly rendered by env.reset above).
+        self.policy.reset()
+        self._rollout_step = 0
         for i, slot in enumerate(ordered_slots):
             self.obs[slot] = self._preprocess_obs(obs_list[i], env_idx=slot)
-            self.policies[slot].reset()
             for metric in self.metrics[slot]:
                 metric.reset(self.env)
             if write_video:
@@ -562,11 +588,12 @@ class Evaluator:
             for _ in range(3):
                 og.sim.render()
             obs_list, _ = self.env.get_obs()
+        self.policy.reset()
+        self._rollout_step = 0
         for env_idx in range(self.num_envs):
             self.obs[env_idx] = self._preprocess_obs(obs_list[env_idx], env_idx=env_idx)
             for metric in self.metrics[env_idx]:
                 metric.reset(self.env)
-            self.policies[env_idx].reset()
         self.n_success_trials, self.n_trials = 0, 0
 
     def run(
@@ -623,13 +650,20 @@ class Evaluator:
             )
             return result
 
-        return evaluate_instances_batched(
-            list(instances_to_run),
-            self.num_envs,
-            load_fn=load_fn,
-            step_fn=step_fn,
-            record_fn=record_fn,
-        )
+        # Video needs a rendered frame every step, so disable render-skipping while recording.
+        saved_render_every = self.render_every
+        if write_video:
+            self.render_every = 1
+        try:
+            return evaluate_instances_batched(
+                list(instances_to_run),
+                self.num_envs,
+                load_fn=load_fn,
+                step_fn=step_fn,
+                record_fn=record_fn,
+            )
+        finally:
+            self.render_every = saved_render_every
 
     def __enter__(self):
         signal(SIGINT, self._sigint_handler)

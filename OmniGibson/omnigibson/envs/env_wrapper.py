@@ -46,13 +46,15 @@ class EnvironmentWrapper(Wrapper, Registerable):
         # Run super
         super().__init__(obj=env)
 
-    def step(self, action, n_render_iterations=1):
+    def step(self, action, n_render_iterations=1, render=True):
         """
         By default, run the normal environment step() function
 
         Args:
             action (th.tensor): action to take in environment
             n_render_iterations (int): Number of rendering iterations to use before returning observations
+            render (bool): If False, step physics without rendering the cameras this step (see
+                Environment.step). Forwarded to the wrapped environment.
 
         Returns:
             4-tuple:
@@ -62,7 +64,7 @@ class EnvironmentWrapper(Wrapper, Registerable):
                 - (bool) whether the current episode is truncated
                 - (dict) misc information
         """
-        return self.env.step(action, n_render_iterations=n_render_iterations)
+        return self.env.step(action, n_render_iterations=n_render_iterations, render=render)
 
     def reset(self, **kwargs):
         """

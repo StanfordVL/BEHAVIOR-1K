@@ -708,7 +708,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             return action
         return action
 
-    def step(self, action, n_render_iterations=1):
+    def step(self, action, n_render_iterations=1, render=True):
         """
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
@@ -719,6 +719,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 concatenated set of actions. For multi-env, should be (num_envs, action_dim) shaped for tensors,
                 or a list of dicts (one per env) for dict actions.
             n_render_iterations (int): Number of rendering iterations to use before returning observations
+            render (bool): If False, step physics (and non-physics/object-state updates) WITHOUT rendering
+                the cameras this step. Vision sensors keep their previous frame, so callers must be reusing
+                stale image observations (e.g. mid action-chunk, when the policy is replaying and not looking
+                at fresh pixels). Proprioception is still fresh (it comes from physics, not rendering).
+                Rendering is the dominant per-step cost, so skipping it on non-observation steps is the main
+                eval speedup. Default True (unchanged behavior).
 
         Returns:
             5-tuple:
@@ -753,11 +759,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     robot.apply_action(action_dict[robot.name])
 
         # Step simulation
-        og.sim.step()
+        if render:
+            og.sim.step()
 
-        # Render any additional times requested
-        for _ in range(n_render_iterations - 1):
-            og.sim.render()
+            # Render any additional times requested
+            for _ in range(n_render_iterations - 1):
+                og.sim.render()
+        else:
+            # Skip rendering this step: physics + non-physics/object-state updates only. The cameras
+            # retain their last rendered frame, so downstream obs will carry stale images.
+            with og.sim.render_on_step(False):
+                og.sim.step()
 
         # Grab observations
         obs_list, obs_info_list = self.get_obs()
