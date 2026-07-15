@@ -21,6 +21,7 @@ m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
 
 # TODO: Delete default values for this and make them required.
 m.DEFAULT_TEMPERATURE = 200
+m.DEFAULT_FIRE_TEMPERATURE = 1000
 m.DEFAULT_HEATING_RATE = 0.04
 m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 m.DEFAULT_IGNITION_TEMPERATURE = 250
@@ -133,7 +134,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         """
         Args:
             obj (StatefulObject): The object with the heat source ability.
-            temperature (float): The temperature of the heat source.
+            temperature (float): The temperature of the heat source. Defaults to
+                DEFAULT_FIRE_TEMPERATURE when @requires_on_fire, otherwise DEFAULT_TEMPERATURE.
             heating_rate (float): Fraction in [0, 1] of the temperature difference with the
                 heat source temperature should be received every step, per second.
             distance_threshold (float): The distance threshold which an object needs
@@ -157,7 +159,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
                 (e.g. extinguished).
         """
         super().__init__(obj)
-        self._temperature = temperature if temperature is not None else m.DEFAULT_TEMPERATURE
+        default_temperature = m.DEFAULT_FIRE_TEMPERATURE if requires_on_fire else m.DEFAULT_TEMPERATURE
+        self._temperature = temperature if temperature is not None else default_temperature
         self._heating_rate = heating_rate if heating_rate is not None else m.DEFAULT_HEATING_RATE
         self.distance_threshold = distance_threshold if distance_threshold is not None else m.DEFAULT_DISTANCE_THRESHOLD
 
