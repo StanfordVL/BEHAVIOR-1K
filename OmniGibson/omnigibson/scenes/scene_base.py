@@ -54,11 +54,12 @@ class SceneRobotSpec:
 
     name: str
     asset: object
-    position: tuple[float, float, float] = (-1.0, 0.0, 0.15)
+    position: tuple[float, float, float] = (-1.0, 0.0, 0.0)
     orientation: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
     asset_path: Path | None = None
     fixed_base: bool = False
     action_normalize: bool = True
+    obs_modalities: tuple[str, ...] = ("rgb",)
 
     @property
     def category(self):

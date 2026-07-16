@@ -5,6 +5,7 @@ This file provides guidance to AI coding agents when working with code in this r
 ## General Guidelines
 
 - **Use `behavior` conda environment by default** when running Python commands, unless explicitly told otherwise. You can do this by using the `conda run` command. The conda binary is usually available as ~/miniconda3/condabin/conda.
+- **Exception: the Newton migration (`feat/newton` line of work) uses the `newton-b1k` conda environment** instead of `behavior`, since it runs without Isaac Sim. See `docs/other/newton_migration.md` for setup and constraints.
 - **Make minimal changes** - prefer small, targeted edits over large rewrites. Avoid unnecessary stylistic changes (e.g., reformatting code that isn't relevant to the task).
 
 ## Project Overview

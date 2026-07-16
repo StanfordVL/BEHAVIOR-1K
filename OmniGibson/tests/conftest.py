@@ -420,4 +420,13 @@ def pytest_addoption(parser):
 
 
 def pytest_unconfigure(config):
-    og.shutdown()
+    # og.shutdown() calls exit(0) when no Isaac app is running (e.g. on the
+    # Newton path), which would overwrite pytest's failure exit code. Only shut
+    # down if a simulator was actually launched, and never let SystemExit
+    # replace the test-run status.
+    if og.sim is None:
+        return
+    try:
+        og.shutdown()
+    except SystemExit:
+        pass

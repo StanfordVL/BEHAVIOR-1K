@@ -2,6 +2,10 @@
 
 ## **Upcoming Features**
 
+### Newton Physics Migration
+Track the current implementation, known limitations, workarounds, and planned
+feature restoration in the [Newton migration engineering record](newton_migration.md).
+
 ### ⚡ GPU-Accelerated Simulation
 Speed up simulation performance with GPU computing.
 

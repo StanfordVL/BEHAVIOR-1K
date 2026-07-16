@@ -64,7 +64,7 @@ def scene_from_config(config, *, data_path=None, dataset_usd_path=None, robot_as
         scene_cfg.get("use_floor_plane", scene_cfg.get("use_ground_plane", True)),
     )
     default_object_position = tuple(simulation_cfg.get("object_position", (1.0, 0.0, 0.5)))
-    default_robot_position = tuple(simulation_cfg.get("robot_position", (-1.0, 0.0, 0.15)))
+    default_robot_position = tuple(simulation_cfg.get("robot_position", (-1.0, 0.0, 0.0)))
 
     objects_cfg = _object_configs(cfg, newton_cfg)
     robots_cfg = _robot_configs(cfg, newton_cfg)
@@ -273,7 +273,14 @@ def _newton_robot_instance(robot_cfg, idx, default_position, robot_asset_path):
         asset_path=Path(asset_path).expanduser().resolve() if asset_path is not None else None,
         fixed_base=fixed_base,
         action_normalize=bool(robot_cfg.get("action_normalize", True)),
+        obs_modalities=_normalized_obs_modalities(robot_cfg.get("obs_modalities", ("rgb",))),
     )
+
+
+def _normalized_obs_modalities(modalities):
+    if isinstance(modalities, str):
+        modalities = (modalities,)
+    return tuple(modalities)
 
 
 def _newton_light_instance(light_cfg, idx):

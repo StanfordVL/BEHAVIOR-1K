@@ -1,16 +1,21 @@
 """Newton-backed runtime entity handles."""
 
+import logging
 from dataclasses import dataclass, field
 from functools import cached_property
 import math
 from pathlib import Path
 from typing import Any
 
+import gymnasium as gym
 import newton
+import numpy as np
 import torch as th
 import warp as wp
 
 from omnigibson.runtime.entity import SimBody, SimEntity, SimJoint, SimShape
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -286,7 +291,7 @@ class NewtonEntity(SimEntity):
                     qd[self._joint_dofs[local_idx]["target_index"]] = 0.0
 
         if drive:
-            target = _array_to_tensor(getattr(self.simulator.control, "joint_target_pos", None))
+            target = _control_target_array(self.simulator.control, "position")
             if target is not None:
                 values = positions.to(device=target.device)
                 for local_idx, value in zip(indices, values):
@@ -323,7 +328,7 @@ class NewtonEntity(SimEntity):
                 qd[self._joint_dofs[local_idx]["target_index"]] = value
 
         if drive:
-            target = _array_to_tensor(getattr(self.simulator.control, "joint_target_vel", None))
+            target = _control_target_array(self.simulator.control, "velocity")
             if target is not None:
                 values = velocities.to(device=target.device)
                 for local_idx, value in zip(indices, values):
@@ -339,13 +344,28 @@ class NewtonEntity(SimEntity):
             for body_idx in self.body_indices:
                 other_body_qd[body_idx] = 0.0
 
+    @cached_property
+    def _base_body_index(self):
+        """Index of the body used as the entity's reported world pose.
+
+        Floating-base robots mount ``base_link`` on a chain of virtual footprint
+        joints, so ``body_indices[0]`` is a non-moving virtual link. Report the
+        canonical ``base_link`` when present; otherwise fall back to the first
+        imported body (correct for fixed-base and single-body assets).
+        """
+        labels = _array_to_list(getattr(self.simulator.model, "body_label", []))
+        for body_idx in self.body_indices:
+            if body_idx < len(labels) and str(labels[body_idx]).split("/")[-1] == "base_link":
+                return body_idx
+        return self.body_indices[0] if self.body_indices else None
+
     def _root_pose_tensor(self):
-        if not self.body_indices:
+        if self._base_body_index is None:
             return None
         body_q = _array_to_tensor(self.simulator.state_0.body_q)
         if body_q is None:
             return None
-        return body_q[self.body_indices[0]]
+        return body_q[self._base_body_index]
 
     def _scale_shape_array(self, attr_name, ratio):
         array = getattr(self.simulator.model, attr_name, None)
@@ -497,6 +517,10 @@ class NewtonRobotEntity(NewtonEntity):
     wheel_radius: float | None = None
     wheel_axle_length: float | None = None
     eef_link_names: tuple[str, ...] = ()
+    obs_modalities: tuple[str, ...] = ("rgb",)
+    _observation_space: Any = field(default=None, init=False, repr=False)
+    _warned_obs_modalities: set = field(default_factory=set, init=False, repr=False)
+    _fk_scratch: Any = field(default=None, init=False, repr=False)
     _controller_config: dict = field(default_factory=dict, init=False, repr=False)
     _controllers: dict = field(default_factory=dict, init=False, repr=False)
     _control_joint_cache: tuple[dict, ...] | None = field(default=None, init=False, repr=False)
@@ -518,8 +542,55 @@ class NewtonRobotEntity(NewtonEntity):
     @property
     def action_space(self):
         if self._action_space is None:
-            self._action_space = _NewtonBoxActionSpace(self.action_dim)
+            self._action_space = _make_action_space(self.action_dim)
         return self._action_space
+
+    def get_proprioception(self):
+        """Return the flat proprioceptive observation tensor.
+
+        Composition: joint positions, joint velocities, base position (3), base
+        orientation quaternion (4), base linear velocity (3), base angular
+        velocity (3).
+        """
+        parts = [self.get_joint_positions(), self.get_joint_velocities()]
+        base_pos, base_quat = self.get_position_orientation()
+        parts.extend([base_pos, base_quat])
+        body_qd = _array_to_tensor(self.simulator.state_0.body_qd)
+        if body_qd is not None and self._base_body_index is not None and self._base_body_index < len(body_qd):
+            root_qd = body_qd[self._base_body_index].detach().cpu()
+            parts.extend([root_qd[3:6], root_qd[0:3]])
+        else:
+            parts.extend([th.zeros(3), th.zeros(3)])
+        return th.cat([part.reshape(-1).detach().cpu().to(dtype=th.float32) for part in parts])
+
+    def load_observation_space(self):
+        spaces = {}
+        for modality in self.obs_modalities:
+            if modality == "proprio":
+                dim = int(self.get_proprioception().numel())
+                spaces["proprio"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(dim,), dtype=np.float32)
+            elif modality not in self._warned_obs_modalities:
+                log.warning(
+                    f"Observation modality {modality!r} is not supported on the Newton path yet; skipping it "
+                    f"for robot {self.name!r}."
+                )
+                self._warned_obs_modalities.add(modality)
+        self._observation_space = gym.spaces.Dict(spaces)
+        return self._observation_space
+
+    @property
+    def observation_space(self):
+        if self._observation_space is None:
+            return self.load_observation_space()
+        return self._observation_space
+
+    def get_obs(self):
+        obs = {}
+        info = {}
+        if "proprio" in self.observation_space.spaces:
+            obs["proprio"] = self.get_proprioception()
+            info["proprio"] = {}
+        return obs, info
 
     @property
     def controllers(self):
@@ -534,29 +605,42 @@ class NewtonRobotEntity(NewtonEntity):
         config = {}
         groups = self._joint_groups
         if groups.get("base"):
-            config["base"] = {
-                "DifferentialDriveController": {"name": "DifferentialDriveController"},
-                "JointController": {"name": "JointController"},
-                "NullJointController": {"name": "NullJointController"},
-            }
+            base_names = [self._control_joints[i]["name"].lower() for i in groups["base"]]
+            if base_names and all("footprint" in name for name in base_names):
+                # Virtual footprint joints (x/y/z/rx/ry/rz) drive a holonomic
+                # base, not differential wheels.
+                config["base"] = {
+                    "HolonomicBaseJointController": {"name": "HolonomicBaseJointController"},
+                    "JointController": {"name": "JointController"},
+                    "NullJointController": {"name": "NullJointController"},
+                }
+            else:
+                config["base"] = {
+                    "DifferentialDriveController": {"name": "DifferentialDriveController"},
+                    "JointController": {"name": "JointController"},
+                    "NullJointController": {"name": "NullJointController"},
+                }
         if groups.get("trunk"):
             config["trunk"] = {
                 "JointController": {"name": "JointController"},
                 "NullJointController": {"name": "NullJointController"},
             }
-        if groups.get("arm_0"):
-            config["arm_0"] = {
-                "JointController": {"name": "JointController"},
-                "InverseKinematicsController": {"name": "InverseKinematicsController"},
-                "OperationalSpaceController": {"name": "OperationalSpaceController"},
-                "NullJointController": {"name": "NullJointController"},
-            }
-        if groups.get("gripper_0"):
-            config["gripper_0"] = {
-                "MultiFingerGripperController": {"name": "MultiFingerGripperController"},
-                "JointController": {"name": "JointController"},
-                "NullJointController": {"name": "NullJointController"},
-            }
+        for group, indices in groups.items():
+            if not indices:
+                continue
+            if group.startswith("arm"):
+                config[group] = {
+                    "JointController": {"name": "JointController"},
+                    "InverseKinematicsController": {"name": "InverseKinematicsController"},
+                    "OperationalSpaceController": {"name": "OperationalSpaceController"},
+                    "NullJointController": {"name": "NullJointController"},
+                }
+            elif group.startswith("gripper"):
+                config[group] = {
+                    "MultiFingerGripperController": {"name": "MultiFingerGripperController"},
+                    "JointController": {"name": "JointController"},
+                    "NullJointController": {"name": "NullJointController"},
+                }
         if groups.get("camera"):
             config["camera"] = {
                 "JointController": {"name": "JointController"},
@@ -618,7 +702,7 @@ class NewtonRobotEntity(NewtonEntity):
             )
             command_start += command_dim
 
-        self._action_space = _NewtonBoxActionSpace(self.action_dim)
+        self._action_space = _make_action_space(self.action_dim)
         self._ensure_joint_drives()
         self._sync_targets_to_current_position()
 
@@ -671,7 +755,7 @@ class NewtonRobotEntity(NewtonEntity):
 
         lower, upper = self._joint_limits(indices=indices)
         positions = th.clamp(positions, lower, upper)
-        target = _array_to_tensor(getattr(self.simulator.control, "joint_target_pos", None))
+        target = _control_target_array(self.simulator.control, "position")
         if target is not None:
             values = positions.to(device=target.device)
             for local_idx, value in zip(indices, values):
@@ -768,7 +852,7 @@ class NewtonRobotEntity(NewtonEntity):
                     qd[self._control_joints[local_idx]["target_index"]] = 0.0
 
         if drive:
-            target = _array_to_tensor(getattr(self.simulator.control, "joint_target_pos", None))
+            target = _control_target_array(self.simulator.control, "position")
             if target is not None:
                 values = positions.to(device=target.device)
                 for local_idx, value in zip(indices, values):
@@ -839,15 +923,29 @@ class NewtonRobotEntity(NewtonEntity):
                 group = "base"
             elif "head" in name or "camera" in name:
                 group = "camera"
-            elif "gripper" in name or "finger" in name:
+            elif any(token in name for token in ("gripper", "finger", "knuckle", "claw")):
+                # Parallel-jaw grippers name their linkage joints per finger
+                # (knuckle/finger); all belong to the gripper mechanism.
                 group = "gripper_0"
             elif "torso" in name or "trunk" in name:
                 group = "trunk"
-            elif any(token in name for token in ("shoulder", "upperarm", "elbow", "forearm", "wrist", "arm")):
-                group = "arm_0"
             else:
                 group = "arm_0"
             groups[group].append(idx)
+
+        # A robot is bilateral only when its arm joints carry both side
+        # prefixes. Detect from arm joints alone: a single arm whose gripper
+        # fingers are named left/right must not be split into two arms.
+        arm_sides = {_joint_side(self._control_joints[i]["name"]) for i in groups["arm_0"]}
+        if "left" in arm_sides and "right" in arm_sides:
+            for prefix in ("arm", "gripper"):
+                indices = groups.pop(f"{prefix}_0")
+                sided = {"left": [], "right": []}
+                for idx in indices:
+                    side = _joint_side(self._control_joints[idx]["name"]) or "left"
+                    sided[side].append(idx)
+                groups[f"{prefix}_left"] = sided["left"]
+                groups[f"{prefix}_right"] = sided["right"]
         return {group: tuple(indices) for group, indices in groups.items()}
 
     def _default_controller_selection(self):
@@ -882,8 +980,8 @@ class NewtonRobotEntity(NewtonEntity):
             return _controller_defaults(
                 motor_type="position",
                 use_delta_commands=True,
-                position_kp=1200.0,
-                position_kd=120.0,
+                position_kp=3000.0,
+                position_kd=300.0,
             )
         if controller_type == "MultiFingerGripperController":
             return _controller_defaults(
@@ -910,7 +1008,7 @@ class NewtonRobotEntity(NewtonEntity):
                     position_kd=0.0,
                     velocity_kd=80.0,
                 )
-            if group == "gripper_0":
+            if group.startswith("gripper"):
                 # Newton/MuJoCo accepts pure velocity targets for imported USD
                 # finger joints, but the Panda prismatic finger drives barely
                 # move in that mode. Use small position deltas to preserve the
@@ -921,17 +1019,29 @@ class NewtonRobotEntity(NewtonEntity):
                     position_kp=800.0,
                     position_kd=80.0,
                 )
+            if group == "trunk":
+                # Gravity-loaded prismatic trunks (e.g. torso_lift) carry the
+                # whole upper body; the steady-state servo gap is load/kp, so
+                # they need MuJoCo-Menagerie-scale stiffness to hold pose.
+                return _controller_defaults(
+                    motor_type="position",
+                    use_delta_commands=True,
+                    position_kp=20000.0,
+                    position_kd=2000.0,
+                )
             return _controller_defaults(
                 motor_type="position",
                 use_delta_commands=True,
-                position_kp=1200.0,
-                position_kd=120.0,
+                position_kp=3000.0,
+                position_kd=300.0,
             )
         return _controller_defaults()
 
     def _apply_controller_command(self, controller, command):
         if controller.controller_type == "DifferentialDriveController":
             self._apply_differential_drive(command, controller.dof_idx)
+        elif controller.controller_type == "HolonomicBaseJointController":
+            self._apply_holonomic_base(command, controller.dof_idx)
         elif controller.controller_type in {"InverseKinematicsController", "OperationalSpaceController"}:
             self._apply_cartesian_delta(command, controller)
         elif controller.controller_type == "MultiFingerGripperController" and controller.command_dim == 1:
@@ -949,6 +1059,32 @@ class NewtonRobotEntity(NewtonEntity):
                     use_delta_commands=controller.use_delta_commands,
                 )
                 self._set_joint_position_targets(target, indices=controller.dof_idx)
+
+    def _apply_holonomic_base(self, command, indices):
+        """Map a (vx, vy, vyaw) command onto planar virtual footprint joints.
+
+        Holonomic bases expose a chain of prismatic/revolute virtual joints
+        (x/y/z/rx/ry/rz). Drive only the planar ones; the base starts at
+        identity orientation so world-frame x/y coincide with robot forward/
+        lateral. Vertical and roll/pitch joints are held at zero velocity.
+        """
+        cmd = _to_1d_tensor(command)
+        if self.action_normalize:
+            cmd = th.clamp(cmd, -1.0, 1.0)
+        axis_to_component = {"x": 0, "y": 1, "rz": 2}
+        for local_idx in indices:
+            name = self._control_joints[local_idx]["name"].lower()
+            component = None
+            for axis, comp in axis_to_component.items():
+                if name.endswith(f"_{axis}_joint") or name.endswith(f"_{axis}"):
+                    component = comp
+                    break
+            if component is None or component >= cmd.numel():
+                velocity = th.zeros(1)
+            else:
+                lower, upper = self._joint_velocity_limits(indices=(local_idx,))
+                velocity = cmd[component] * upper
+            self._set_joint_velocity_targets(velocity.reshape(1), (local_idx,))
 
     def _apply_differential_drive(self, command, indices):
         if len(indices) < 2:
@@ -980,36 +1116,74 @@ class NewtonRobotEntity(NewtonEntity):
         cmd = _to_1d_tensor(command)
         if th.allclose(cmd, th.zeros_like(cmd)):
             return
-        eef_body = self._eef_body()
+        side = _joint_side(self._control_joints[indices[0]]["name"]) if indices else None
+        eef_body = self._eef_body(side)
         if eef_body is None:
-            self._apply_arm_delta(command, indices)
+            if "cartesian" not in self._warned_obs_modalities:
+                log.warning(f"Robot {self.name!r} has no resolvable end-effector link; Cartesian commands ignored.")
+                self._warned_obs_modalities.add("cartesian")
             return
 
-        pos_delta = th.clamp(cmd[:3], -1.0, 1.0) * 0.2
-        if th.linalg.norm(pos_delta) <= 1.0e-8:
+        cmd = th.clamp(cmd, -1.0, 1.0)
+        pos_delta = cmd[:3] * 0.05
+        rot_delta = cmd[3:6] * 0.15 if cmd.numel() >= 6 else th.zeros(3)
+        twist = th.cat([pos_delta, rot_delta]).to(dtype=th.float32)
+        if float(twist.abs().max()) <= 1.0e-8:
             return
 
-        current = self.get_joint_positions()
-        current_subset = current[list(indices)]
-        base_pos = self._body_position(eef_body.index).detach().cpu()
-        jacobian_cols = []
-        eps = 1.0e-3
-        for local_idx in indices:
-            perturbed = current_subset.clone()
-            column_idx = indices.index(local_idx)
-            perturbed[column_idx] += eps
-            self.set_joint_positions(perturbed, indices=indices, drive=False)
-            jacobian_cols.append((self._body_position(eef_body.index).detach().cpu() - base_pos) / eps)
-
-        self.set_joint_positions(current_subset, indices=indices, drive=False)
-        jacobian = th.stack(jacobian_cols, dim=1)
-        try:
-            dq = th.linalg.pinv(jacobian) @ pos_delta
-        except RuntimeError:
-            self._apply_arm_delta(command, indices)
+        jacobian, current_subset = self._eef_jacobian(eef_body.index, indices)
+        if jacobian is None:
             return
+        # Damped least squares keeps joint deltas bounded near singularities.
+        damping = 1.0e-2
+        jt = jacobian.transpose(0, 1)
+        dq = jt @ th.linalg.solve(jacobian @ jt + damping * th.eye(jacobian.shape[0]), twist)
         dq = th.clamp(dq, -0.12, 0.12)
-        self._set_joint_position_targets(current_subset + dq, indices=indices)
+        # Integrate on the previous target, not the current positions:
+        # re-anchoring to lagging joints drops their servo pull every step and
+        # lets low-inertia joints (wrists) ratchet away instead.
+        if self._last_joint_target is not None and self._last_joint_target.numel() == self.n_dof:
+            anchor = self._last_joint_target[list(indices)].clone()
+        else:
+            anchor = current_subset
+        self._set_joint_position_targets(anchor + dq, indices=indices)
+
+    def _eef_jacobian(self, eef_body_index, indices, eps=1.0e-4):
+        """6xN world-frame end-effector Jacobian by finite differences.
+
+        Runs forward kinematics on a scratch state with a copy of the joint
+        coordinates so the live simulation state, joint velocities, and model
+        defaults are never modified.
+        """
+        model = self.simulator.model
+        state = self.simulator.state_0
+        if state.joint_q is None:
+            return None, None
+        if self._fk_scratch is None:
+            self._fk_scratch = model.state()
+        scratch = self._fk_scratch
+
+        joint_q = wp.clone(state.joint_q)
+        q_view = wp.to_torch(joint_q)
+
+        newton.eval_fk(model, joint_q, state.joint_qd, scratch)
+        base = wp.to_torch(scratch.body_q)[eef_body_index].detach().cpu().clone()
+        base_pos, base_quat = base[:3], base[3:7]
+
+        current_subset = self.get_joint_positions()[list(indices)]
+
+        columns = []
+        for local_idx in indices:
+            q_index = self._control_joints[local_idx]["q_index"]
+            original = float(q_view[q_index])
+            q_view[q_index] = original + eps
+            newton.eval_fk(model, joint_q, state.joint_qd, scratch)
+            perturbed = wp.to_torch(scratch.body_q)[eef_body_index].detach().cpu()
+            q_view[q_index] = original
+            dpos = (perturbed[:3] - base_pos) / eps
+            drot = _quat_delta_rotvec(base_quat, perturbed[3:7]) / eps
+            columns.append(th.cat([dpos, drot]))
+        return th.stack(columns, dim=1).to(dtype=th.float32), current_subset
 
     def _apply_arm_delta(self, command, indices):
         if not indices:
@@ -1047,7 +1221,7 @@ class NewtonRobotEntity(NewtonEntity):
         return th.clamp(velocity, lower, upper)
 
     def _set_joint_velocity_targets(self, velocities, indices):
-        target = _array_to_tensor(getattr(self.simulator.control, "joint_target_vel", None))
+        target = _control_target_array(self.simulator.control, "velocity")
         if target is None:
             return
         values = _to_1d_tensor(velocities).to(device=target.device)
@@ -1091,19 +1265,21 @@ class NewtonRobotEntity(NewtonEntity):
                     values.append(min(bound, 30.0))
         return min(values) if values else 10.0
 
-    def _eef_body(self):
-        for name in self.eef_link_names:
+    def _eef_body(self, side=None):
+        names = []
+        if side:
+            names.extend([f"{side}_eef_link", f"{side}_gripper_link", f"{side}_hand"])
+        names.extend(self.eef_link_names)
+        names.extend(["eef_link", "gripper_link", "panda_hand", "wrist_roll_link"])
+        for name in names:
             body = self.links.get(name)
-            if body is not None:
-                return body
-        for fallback in ("eef_link", "gripper_link", "panda_hand", "wrist_roll_link"):
-            body = self.links.get(fallback)
             if body is not None:
                 return body
         arm_links = [
             body
             for name, body in self.links.items()
-            if any(token in name.lower() for token in ("eef", "gripper", "wrist", "hand"))
+            if (side is None or _joint_side(name) == side)
+            and any(token in name.lower() for token in ("eef", "gripper", "wrist", "hand"))
         ]
         return arm_links[-1] if arm_links else None
 
@@ -1117,6 +1293,7 @@ class NewtonRobotEntity(NewtonEntity):
         ke = _array_to_tensor(getattr(self.simulator.model, "joint_target_ke", None))
         kd = _array_to_tensor(getattr(self.simulator.model, "joint_target_kd", None))
         mode = _array_to_tensor(getattr(self.simulator.model, "joint_target_mode", None))
+        armature = _array_to_tensor(getattr(self.simulator.model, "joint_armature", None))
         if ke is None:
             return
 
@@ -1132,7 +1309,9 @@ class NewtonRobotEntity(NewtonEntity):
             controller = controller_by_dof.get(local_idx)
             if controller is None:
                 continue
-            is_gripper = local_idx in self._joint_groups.get("gripper_0", ())
+            is_gripper = any(
+                local_idx in indices for group, indices in self._joint_groups.items() if group.startswith("gripper")
+            )
             is_velocity = controller.motor_type == "velocity"
             if mode is not None and target_index < len(mode):
                 target_mode = newton.JointTargetMode.VELOCITY if is_velocity else newton.JointTargetMode.POSITION
@@ -1142,12 +1321,29 @@ class NewtonRobotEntity(NewtonEntity):
                 if kd is not None and target_index < len(kd):
                     kd[target_index] = controller.velocity_kd
             else:
-                ke[target_index] = 800.0 if is_gripper else controller.position_kp
+                stiffness = 800.0 if is_gripper else controller.position_kp
+                ke[target_index] = stiffness
                 if kd is not None and target_index < len(kd):
                     kd[target_index] = 80.0 if is_gripper else controller.position_kd
+                # A stiff position servo on a light gripper-linkage joint (tiny
+                # joint-space inertia) is numerically unstable at the substep and
+                # diverges past its limits. Add rotor armature so the servo's
+                # natural frequency omega = sqrt(ke/armature) stays well under
+                # the substep rate: armature = 5*ke*dt^2 gives omega*dt ~= 0.45.
+                # Arm joints have real link inertia and are left untouched.
+                if is_gripper and armature is not None and target_index < len(armature):
+                    stable_armature = 5.0 * stiffness * self.simulator.sim_dt * self.simulator.sim_dt
+                    armature[target_index] = max(float(armature[target_index]), stable_armature)
+
+        # The MuJoCo solver bakes gains at construction; when controllers are
+        # reloaded after build, push the new dof properties to the solver.
+        # Actuator modes (position vs velocity) remain baked at build time.
+        solver = getattr(self.simulator, "solver", None)
+        if solver is not None and hasattr(solver, "notify_model_changed"):
+            solver.notify_model_changed(newton.ModelFlags.JOINT_DOF_PROPERTIES)
 
     def _sync_targets_to_current_position(self):
-        target = _array_to_tensor(getattr(self.simulator.control, "joint_target_pos", None))
+        target = _control_target_array(self.simulator.control, "position")
         q = _array_to_tensor(getattr(self.simulator.state_0, "joint_q", None))
         if target is None or q is None:
             return
@@ -1195,14 +1391,51 @@ def _controller_defaults(
     }
 
 
-class _NewtonBoxActionSpace:
-    def __init__(self, action_dim):
-        self.shape = (action_dim,)
-        self.low = -th.ones(action_dim, dtype=th.float32).numpy()
-        self.high = th.ones(action_dim, dtype=th.float32).numpy()
+def _make_action_space(action_dim):
+    return gym.spaces.Box(low=-1.0, high=1.0, shape=(action_dim,), dtype=np.float32)
 
-    def sample(self):
-        return (th.rand(self.shape[0]) * 2.0 - 1.0).numpy()
+
+def _joint_side(name):
+    """Return 'left'/'right' for side-prefixed joint or link names, else None."""
+    lowered = str(name).lower()
+    if lowered.startswith("left_") or "_left" in lowered:
+        return "left"
+    if lowered.startswith("right_") or "_right" in lowered:
+        return "right"
+    return None
+
+
+def _quat_delta_rotvec(q0, q1):
+    """Rotation vector (world frame) taking xyzw quaternion q0 to q1."""
+    x0, y0, z0, w0 = (float(v) for v in q0)
+    x1, y1, z1, w1 = (float(v) for v in q1)
+    # dq = q1 * conjugate(q0)
+    dw = w1 * w0 + x1 * x0 + y1 * y0 + z1 * z0
+    dx = -w1 * x0 + w0 * x1 - y1 * z0 + z1 * y0
+    dy = -w1 * y0 + w0 * y1 - z1 * x0 + x1 * z0
+    dz = -w1 * z0 + w0 * z1 - x1 * y0 + y1 * x0
+    if dw < 0.0:
+        dw, dx, dy, dz = -dw, -dx, -dy, -dz
+    vector_norm = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if vector_norm < 1.0e-12:
+        return th.zeros(3)
+    angle = 2.0 * math.atan2(vector_norm, dw)
+    return th.tensor([dx, dy, dz], dtype=th.float32) * (angle / vector_norm)
+
+
+def _control_target_array(control, kind):
+    """Return the joint target view, preferring the current Newton array names.
+
+    ``joint_target_pos`` / ``joint_target_vel`` are deprecated aliases of
+    ``joint_target_q`` / ``joint_target_qd`` on the pinned Newton and may be
+    removed upstream (see W12 in docs/other/newton_migration.md).
+    """
+    names = ("joint_target_q", "joint_target_pos") if kind == "position" else ("joint_target_qd", "joint_target_vel")
+    for name in names:
+        array = getattr(control, name, None)
+        if array is not None:
+            return _array_to_tensor(array)
+    return None
 
 
 def make_newton_entity(
@@ -1245,6 +1478,7 @@ def make_newton_entity_from_labels(
     default_joint_pos=None,
     controller_metadata=None,
     action_normalize=True,
+    obs_modalities=("rgb",),
 ) -> NewtonEntity:
     """Create an entity by matching finalized Newton labels and ownership arrays."""
     model = simulator.model
@@ -1277,6 +1511,7 @@ def make_newton_entity_from_labels(
             "wheel_radius": controller_metadata.get("wheel_radius"),
             "wheel_axle_length": controller_metadata.get("wheel_axle_length"),
             "eef_link_names": tuple(controller_metadata.get("eef_link_names") or ()),
+            "obs_modalities": tuple(obs_modalities),
         }
 
     return entity_cls(

@@ -1,15 +1,11 @@
-"""Newton backend entry points.
-
-This package is the first native Newton integration point for OmniGibson. It is
-kept independent from Isaac Sim so it can run in a Newton-only environment.
-"""
+"""Newton backend entry points independent from the Isaac Sim runtime."""
 
 import os
 
-# Newton 1.2.0 uses OpenUSD's UsdPhysics.LoadUsdPhysicsFromRange during USD
-# import. That OpenUSD helper has a known thread-safety crash for collider-dense
-# assets; Newton's own test runner applies the same workaround. This must be set
-# before any pxr module initializes, so keep it at the top of the Newton package.
+# Collider-dense BEHAVIOR USD imports have produced native failures during
+# parallel OpenUSD physics traversal. Keep PXR single-threaded until the load
+# stress tests in docs/other/newton_migration.md pass with the default limit.
+# This must be set before any pxr module initializes.
 os.environ.setdefault("PXR_WORK_THREAD_LIMIT", "1")
 
 from omnigibson.newton.assets import (

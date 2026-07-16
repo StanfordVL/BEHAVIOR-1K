@@ -1,4 +1,4 @@
-"""Minimal Newton simulator wrapper for native OmniGibson assets."""
+"""Newton simulator implementation for native OmniGibson assets."""
 
 from copy import deepcopy
 from dataclasses import dataclass
@@ -9,8 +9,8 @@ import os
 import warnings
 
 # Newton's USD importer can initialize PXR while importing the Newton package.
-# Keep this guard in the simulator module so it is set before ``import newton``
-# even though the implementation now lives outside ``omnigibson.newton``.
+# Keep this guard before ``import newton`` until the W1 load stress tests in
+# docs/other/newton_migration.md pass with OpenUSD's default thread limit.
 os.environ.setdefault("PXR_WORK_THREAD_LIMIT", "1")
 
 import newton
@@ -48,7 +48,10 @@ class NewtonSimulationConfig:
     sim_substeps: int = 8
     device: str | None = None
     object_position: tuple[float, float, float] = (1.0, 0.0, 0.5)
-    robot_position: tuple[float, float, float] = (-1.0, 0.0, 0.15)
+    # Robots spawn at ground level like the legacy default. Spawning above the
+    # ground drops mobile bases onto their chassis with the wheels sunk in the
+    # floor, which pins them in place under wheel commands.
+    robot_position: tuple[float, float, float] = (-1.0, 0.0, 0.0)
     solver: str = "mujoco"
     # BEHAVIOR scenes are dense contact scenes imported from USD. These MuJoCo-
     # Warp defaults are deliberately more conservative than Newton's examples so
@@ -120,12 +123,7 @@ class NewtonSimulationConfig:
 
 
 class NewtonSceneSimulator(AbstractSimulator):
-    """Load a Newton scene spec into a Newton model.
-
-    This is a native backend scaffold, not an OmniGibson Environment replacement
-    yet. It owns Newton model/state/solver objects and can run headless or attach
-    the default OpenGL viewer.
-    """
+    """Build and run an OmniGibson scene with Newton."""
 
     def __init__(
         self,
@@ -153,6 +151,7 @@ class NewtonSceneSimulator(AbstractSimulator):
         self._prepared_dataset_usd_cache = {}
         self._object_builder_cache = {}
         self._visual_mesh_sources = []
+        self._low_friction_chassis_bodies = set()
         self.model = None
         self.solver = None
         self.state_0 = None
@@ -221,8 +220,8 @@ class NewtonSceneSimulator(AbstractSimulator):
 
         if isinstance(action, dict):
             for robot in robots:
-                if hasattr(robot, "apply_action"):
-                    robot.apply_action(action)
+                if robot.name in action and hasattr(robot, "apply_action"):
+                    robot.apply_action(action[robot.name])
             return
 
         if len(robots) == 1:
@@ -247,8 +246,9 @@ class NewtonSceneSimulator(AbstractSimulator):
         pending_visual_imports = []
         hidden_collision_shape_indices = []
 
-        # Importing the articulation first avoids instability in Newton's USD
-        # physics parser for larger robots such as R1Pro.
+        # Import robot articulations before object resources accumulate. This
+        # ordering remains until workaround W2 in the migration record passes
+        # equivalent robot-last stress tests.
         for robot in self.scene.robot_specs:
             if robot.asset.asset_format != "usd":
                 raise ValueError("The Newton-first OmniGibson path imports robots through USD only.")
@@ -264,6 +264,8 @@ class NewtonSceneSimulator(AbstractSimulator):
                 hide_collision_shapes=False,
             )
             _disable_imported_self_collisions(builder, robot_import_info)
+            _apply_authored_robot_mass_properties(builder, robot_asset_path, robot_import_info)
+            self._low_friction_chassis_bodies |= _apply_chassis_caster_friction(builder, robot_import_info)
             pending_visual_imports.append(
                 {
                     "usd_path": robot_asset_path,
@@ -283,6 +285,7 @@ class NewtonSceneSimulator(AbstractSimulator):
                     "default_joint_pos": resolve_robot_default_joint_positions(robot.asset, self.data_path),
                     "controller_metadata": resolve_robot_controller_metadata(robot.asset, self.data_path),
                     "action_normalize": robot.action_normalize,
+                    "obs_modalities": tuple(getattr(robot, "obs_modalities", ("rgb",))),
                 }
             )
 
@@ -321,10 +324,9 @@ class NewtonSceneSimulator(AbstractSimulator):
                 }
             )
 
-        # BEHAVIOR scene USDs can trigger native parser failures if visual mesh
-        # resources are accumulated while later objects are still being parsed
-        # for physics. Finish all collision/body/joint imports first, then add
-        # visible-only meshes to the already assembled scene builder.
+        # Combined visual and physics import has produced native failures in full
+        # BEHAVIOR scenes. Finish physics imports first, then add visible-only
+        # meshes as documented by workaround W3 in the migration record.
         for visual_import in pending_visual_imports:
             visual_result = add_usd_visual_shapes(
                 builder,
@@ -388,6 +390,9 @@ class NewtonSceneSimulator(AbstractSimulator):
             self.contacts = newton.Contacts(self.solver.get_max_contact_count(), 0)
         else:
             self.contacts = self.model.contacts()
+
+        if self._low_friction_chassis_bodies and isinstance(self.solver, newton.solvers.SolverMuJoCo):
+            _elevate_mjc_geom_priority(self.solver, self.model, self._low_friction_chassis_bodies)
 
         return self
 
@@ -473,6 +478,88 @@ class NewtonSceneSimulator(AbstractSimulator):
             "shape_count": self.model.shape_count,
             "entities": [entity.summary() for entity in self.entities],
         }
+
+    _STATE_SNAPSHOT_ARRAYS = ("body_q", "body_qd", "joint_q", "joint_qd")
+    _CONTROL_SNAPSHOT_ARRAYS = ("joint_f", "joint_target_q", "joint_target_qd", "joint_act")
+
+    def dump_state(self, serialized=False):
+        if self.model is None:
+            raise RuntimeError("Build the Newton model before dumping simulator state.")
+        state = {
+            "format": 1,
+            "sim_time": float(self.sim_time),
+            "state": {
+                name: _snapshot_wp_array(getattr(self.state_0, name, None)) for name in self._STATE_SNAPSHOT_ARRAYS
+            },
+            "control": {
+                name: _snapshot_wp_array(getattr(self.control, name, None)) for name in self._CONTROL_SNAPSHOT_ARRAYS
+            },
+        }
+        return self.serialize(state) if serialized else state
+
+    def load_state(self, state, serialized=False):
+        if self.model is None:
+            raise RuntimeError("Build the Newton model before loading simulator state.")
+        if serialized:
+            state = self.deserialize(state)
+        if state.get("format") != 1:
+            raise ValueError(f"Unsupported Newton simulator state format: {state.get('format')!r}")
+
+        for sim_state in (self.state_0, self.state_1):
+            for name in self._STATE_SNAPSHOT_ARRAYS:
+                _restore_wp_array(getattr(sim_state, name, None), state["state"].get(name), name)
+        for name in self._CONTROL_SNAPSHOT_ARRAYS:
+            _restore_wp_array(getattr(self.control, name, None), state["control"].get(name), name)
+
+        # MuJoCo derives body poses from joint coordinates on the next step;
+        # refresh them immediately so entity pose queries reflect the restored
+        # state without stepping.
+        if self.state_0.joint_q is not None:
+            for sim_state in (self.state_0, self.state_1):
+                newton.eval_fk(self.model, sim_state.joint_q, sim_state.joint_qd, sim_state)
+
+        # Clear solver buffers that persist between steps (contact warm-starts,
+        # applied forces, actuator activations). With flags=0 the solver leaves
+        # the restored joint coordinates untouched and only clears buffers.
+        if isinstance(self.solver, newton.solvers.SolverMuJoCo):
+            self.solver.reset(self.state_0, flags=newton.StateFlags(0))
+
+        # Controller adapters accumulate joint targets across steps; drop the
+        # caches so post-restore commands start from the restored state.
+        for robot in self.robots:
+            if hasattr(robot, "_last_joint_target"):
+                robot._last_joint_target = None
+
+        self.sim_time = float(state["sim_time"])
+
+    def serialize(self, state):
+        parts = [th.tensor([float(state["format"]), float(state["sim_time"])], dtype=th.float32)]
+        for group, names in (("state", self._STATE_SNAPSHOT_ARRAYS), ("control", self._CONTROL_SNAPSHOT_ARRAYS)):
+            for name in names:
+                tensor = state[group].get(name)
+                if tensor is not None:
+                    parts.append(tensor.detach().reshape(-1).to(dtype=th.float32, device="cpu"))
+        return th.cat(parts)
+
+    def deserialize(self, state):
+        flat = state.detach().reshape(-1).to(dtype=th.float32, device="cpu")
+        result = {"format": int(flat[0].item()), "sim_time": float(flat[1].item()), "state": {}, "control": {}}
+        cursor = 2
+        for group, owner, names in (
+            ("state", self.state_0, self._STATE_SNAPSHOT_ARRAYS),
+            ("control", self.control, self._CONTROL_SNAPSHOT_ARRAYS),
+        ):
+            for name in names:
+                view = _wp_array_view(getattr(owner, name, None))
+                if view is None:
+                    result[group][name] = None
+                    continue
+                count = view.numel()
+                result[group][name] = flat[cursor : cursor + count].reshape(view.shape).to(view.device)
+                cursor += count
+        if cursor != flat.numel():
+            raise ValueError(f"Serialized state has {flat.numel()} values, expected {cursor}.")
+        return result
 
     def close(self):
         if self.viewer is not None:
@@ -622,6 +709,25 @@ class NewtonSceneSimulator(AbstractSimulator):
     def get_rendering_dt(self):
         return self.frame_dt
 
+    @property
+    def gravity(self):
+        """Gravity magnitude along -z, matching the legacy simulator attribute."""
+        if self.model is None or self.model.gravity is None:
+            return 9.81
+        return float(-_wp_array_view(self.model.gravity).reshape(-1)[2])
+
+    @property
+    def n_physics_timesteps_per_render(self):
+        return self.config.sim_substeps
+
+    @property
+    def current_time(self):
+        return self.sim_time
+
+    @property
+    def current_time_step_index(self):
+        return int(round(self.sim_time / self.sim_dt))
+
     def step_physics(self):
         self.step(render=False)
 
@@ -669,7 +775,7 @@ class NewtonSceneSimulator(AbstractSimulator):
 
 
 class NewtonObjectRobotSimulator(NewtonSceneSimulator):
-    """Compatibility wrapper around NewtonSceneSimulator for the initial demo."""
+    """Compatibility wrapper for callers that provide one object and one robot."""
 
     def __init__(
         self,
@@ -702,6 +808,30 @@ class NewtonObjectRobotSimulator(NewtonSceneSimulator):
             ),
         )
         super().__init__(scene, data_path=data_path, config=sim_config)
+
+
+def _wp_array_view(array):
+    if array is None:
+        return None
+    return wp.to_torch(array)
+
+
+def _snapshot_wp_array(array):
+    view = _wp_array_view(array)
+    return None if view is None else view.detach().clone()
+
+
+def _restore_wp_array(array, saved, name):
+    view = _wp_array_view(array)
+    if view is None and saved is None:
+        return
+    if view is None or saved is None:
+        raise ValueError(f"Simulator state entry {name!r} does not match the current model.")
+    if tuple(saved.shape) != tuple(view.shape):
+        raise ValueError(
+            f"Simulator state entry {name!r} has shape {tuple(saved.shape)}, expected {tuple(view.shape)}."
+        )
+    view.copy_(saved.to(device=view.device, dtype=view.dtype))
 
 
 def _xform(position, orientation=(0.0, 0.0, 0.0, 1.0)):
@@ -999,13 +1129,13 @@ def _insert_fixed_base_anchor_body(builder, object_name):
 
     Isaac/PhysX represents a fixed-base object as a base link fixed to the
     scene, with child joints such as drawers and doors attached to that base.
-    Newton's USD importer currently collapses some authored ``base_link`` bodies
-    when ``floating=False`` and leaves each child joint parented directly to
-    world. Insert one local zero-mass base before imported bodies, add a fixed
-    joint from world to that base, then reparent only imported root movable
-    joints to it. Child links stay dynamic and interactable. Do not use
+    Some fixed-base BEHAVIOR imports leave movable root joints parented directly
+    to world instead of preserving one fixed base and its child articulation.
+    Insert one local zero-mass base before imported bodies, add a fixed joint
+    from world to that base, then reparent only imported root movable joints to
+    it. Child links stay dynamic and interactable. Do not use
     ``BodyFlags.KINEMATIC`` here: MuJoCo-Warp skips kinematic bodies while
-    building child joint mappings, so a fixed joint is the compatible anchor.
+    building child joint mappings. See workaround W7 in the migration record.
     """
     skipped_types = {newton.JointType.FIXED.value, newton.JointType.FREE.value}
     root_joint_indices = [
@@ -1248,6 +1378,138 @@ def _scene_camera_target(simulator):
     centers = [entity.aabb_center for entity in entities]
     center = th.stack(centers).mean(dim=0)
     return _to_float_tuple(center, 3)
+
+
+def _apply_authored_robot_mass_properties(builder, usd_path, import_info):
+    """Align robot body inertia and center of mass with the authored USD mass.
+
+    Newton's importer keeps the authored ``UsdPhysics.MassAPI`` mass when
+    inertia is not authored, but computes the inertia tensor from collision
+    geometry at the default density. The later mass/inertia consistency repair
+    then raises the mass to match the oversized inertia — Fetch inflated to
+    3.5x its authored weight and saturated its actuators. Rebuild each robot
+    body's inertia as a solid box at the authored mass (the same conservative
+    approximation used for scaled scene objects) so mass and inertia stay
+    consistent through validation. See workaround W13 in
+    docs/other/newton_migration.md.
+    """
+    from pxr import Usd, UsdPhysics
+
+    body_map = import_info.get("path_body_map") or {}
+    if not body_map:
+        return
+    stage = Usd.Stage.Open(str(usd_path))
+    if stage is None:
+        return
+
+    body_indices = {int(idx) for idx in body_map.values()}
+    body_bounds = {}
+    for shape_idx, body_idx in enumerate(getattr(builder, "shape_body", ())):
+        body_idx = int(body_idx)
+        if body_idx not in body_indices:
+            continue
+        bounds = _shape_body_bounds(builder, shape_idx)
+        if bounds is None:
+            continue
+        lower, upper = bounds
+        if body_idx not in body_bounds:
+            body_bounds[body_idx] = [lower, upper]
+        else:
+            body_bounds[body_idx][0] = np.minimum(body_bounds[body_idx][0], lower)
+            body_bounds[body_idx][1] = np.maximum(body_bounds[body_idx][1], upper)
+
+    min_extent = 1.0e-3
+    min_inertia = 1.0e-6
+    for path, body_idx in body_map.items():
+        body_idx = int(body_idx)
+        if body_idx < 0 or body_idx >= len(builder.body_mass):
+            continue
+        prim = stage.GetPrimAtPath(str(path))
+        if not prim or not prim.HasAPI(UsdPhysics.MassAPI):
+            continue
+        mass_api = UsdPhysics.MassAPI(prim)
+        if not mass_api.GetMassAttr().HasAuthoredValue():
+            continue
+        mass = float(mass_api.GetMassAttr().Get())
+        if mass <= 0.0:
+            continue
+
+        builder.body_mass[body_idx] = mass
+        builder.body_inv_mass[body_idx] = 1.0 / mass
+
+        if mass_api.GetDiagonalInertiaAttr().HasAuthoredValue():
+            di = mass_api.GetDiagonalInertiaAttr().Get()
+            inertia = wp.mat33(float(di[0]), 0.0, 0.0, 0.0, float(di[1]), 0.0, 0.0, 0.0, float(di[2]))
+        elif body_idx in body_bounds:
+            lower, upper = body_bounds[body_idx]
+            extent = np.maximum(upper - lower, min_extent)
+            ix = max(mass * (extent[1] * extent[1] + extent[2] * extent[2]) / 12.0, min_inertia)
+            iy = max(mass * (extent[0] * extent[0] + extent[2] * extent[2]) / 12.0, min_inertia)
+            iz = max(mass * (extent[0] * extent[0] + extent[1] * extent[1]) / 12.0, min_inertia)
+            inertia = wp.mat33(ix, 0.0, 0.0, 0.0, iy, 0.0, 0.0, 0.0, iz)
+        else:
+            inertia = _symmetrized_mat33(builder.body_inertia[body_idx])
+        builder.body_inertia[body_idx] = inertia
+        builder.body_inv_inertia[body_idx] = wp.inverse(inertia) if _mat33_has_values(inertia) else wp.mat33(0.0)
+
+        if mass_api.GetCenterOfMassAttr().HasAuthoredValue():
+            com = mass_api.GetCenterOfMassAttr().Get()
+            builder.body_com[body_idx] = wp.vec3(float(com[0]), float(com[1]), float(com[2]))
+
+
+def _apply_chassis_caster_friction(builder, import_info):
+    """Give wheeled-robot chassis shapes near-zero contact friction.
+
+    Robot USDs bake caster pads into the base link's collision mesh instead of
+    modeling caster links. Those pads rest on the ground with default friction
+    and pin the base in place, so drive-wheel commands cannot move the robot.
+    Real casters roll freely; approximate them by dropping friction on the
+    root-body shapes of robots that have wheel joints, while the wheels keep
+    their default traction. See workaround W14 in
+    docs/other/newton_migration.md.
+    """
+    joint_map = import_info.get("path_joint_map") or {}
+    wheel_joints = [int(idx) for path, idx in joint_map.items() if "wheel" in str(path).lower()]
+    if not wheel_joints:
+        return set()
+
+    # The chassis carrying the caster pads is the parent body of the wheels.
+    joint_parent = getattr(builder, "joint_parent", ())
+    chassis_bodies = {int(joint_parent[j]) for j in wheel_joints if 0 <= j < len(joint_parent)}
+    chassis_bodies.discard(-1)
+    if not chassis_bodies:
+        return set()
+
+    for shape_idx, body_idx in enumerate(getattr(builder, "shape_body", ())):
+        if int(body_idx) in chassis_bodies and shape_idx < len(builder.shape_material_mu):
+            builder.shape_material_mu[shape_idx] = 0.02
+    return chassis_bodies
+
+
+def _elevate_mjc_geom_priority(solver, model, body_indices):
+    """Make low-friction chassis geoms win MuJoCo's contact-parameter mix.
+
+    MuJoCo combines contact friction from the two geoms' values (the larger
+    wins at equal priority), so a 0.02 chassis pad against a 0.9 ground plane
+    still produces a 0.9 contact. Raising the chassis geom priority makes its
+    friction authoritative; MuJoCo-Warp honors ``geom_priority`` in its
+    contact kernels.
+    """
+    import mujoco
+
+    mj_model = solver.mj_model
+    if mj_model is None:
+        return
+    labels = [str(label) for label in model.body_label]
+    names = {labels[int(i)].replace("/", "_") for i in body_indices if 0 <= int(i) < len(labels)}
+    changed = False
+    for geom_idx in range(mj_model.ngeom):
+        body_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_BODY, int(mj_model.geom_bodyid[geom_idx])) or ""
+        if body_name in names:
+            mj_model.geom_priority[geom_idx] = 1
+            changed = True
+    if changed and getattr(solver, "mjw_model", None) is not None:
+        solver.mjw_model.geom_priority.assign(mj_model.geom_priority)
 
 
 def _import_label_prefix(import_info, fallback_name):

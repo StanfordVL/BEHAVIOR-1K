@@ -21,11 +21,10 @@ class VisualImportResult:
 def add_usd_visual_shapes(builder, usd_path, import_info, *, root_xform=None, root_scale=None, label_prefix=None):
     """Add visible-only USD meshes for an object already imported for physics.
 
-    Newton's USD importer can load visual geometry directly, but BEHAVIOR assets
-    currently expose native importer crashes when full scenes combine many
-    visual and collision meshes. Keep the stable collision-only physics import
-    and add render-only meshes in a separate pass, bound to the body indices
-    returned by that import.
+    Newton's USD importer can load visual geometry directly, but combined visual
+    and collision imports have produced native failures in full BEHAVIOR scenes.
+    Keep the two-pass path until the removal tests for workaround W3 in
+    docs/other/newton_migration.md pass.
     """
     stage = Usd.Stage.Open(str(usd_path))
     if stage is None:
@@ -44,6 +43,11 @@ def add_usd_visual_shapes(builder, usd_path, import_info, *, root_xform=None, ro
         has_particle_collision=False,
         is_visible=True,
         is_solid=True,
+        # Render-only shapes must not contribute mass: the ShapeConfig default
+        # density (1000) silently added each visual mesh's volume in kilograms
+        # to its body, inflating every object and robot in the scene. See
+        # workaround W13 in docs/other/newton_migration.md.
+        density=0.0,
     )
 
     for prim in stage.Traverse():

@@ -285,12 +285,11 @@ def _apply_root_scale(usd_path, scale):
 
 
 def _ensure_authored_mass_properties(usd_path, refresh_existing=False):
-    # Newton 1.2.0 can abort in UsdPhysics.ComputeMassProperties for some
-    # BEHAVIOR assets. Authoring missing mass properties on the temporary USD
-    # keeps the importer on the direct authored-mass path without touching
-    # source data. Use a coarse bounding-box inertia instead of a tiny sentinel:
-    # large floating furniture in contact-rich scenes becomes numerically
-    # unstable if MuJoCo sees near-zero rotational inertia.
+    # Some BEHAVIOR rigid bodies omit mass properties accepted by Newton/MuJoCo,
+    # and native mass-property computation has failed for affected assets.
+    # Author them on the temporary USD only, using a coarse bounding-box inertia
+    # because near-zero rotational inertia destabilizes awakened furniture. See
+    # workaround W5 in docs/other/newton_migration.md.
     from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
     stage = Usd.Stage.Open(str(usd_path))
@@ -407,9 +406,10 @@ def prepared_dataset_object_usd(source_path, data_path=None, scale=None):
     if not source_path.exists():
         raise FileNotFoundError(f"DatasetObject USD does not exist: {source_path}")
 
-    # Newton may retain native references to imported USD-backed mesh data after
-    # ModelBuilder finalization. Deleting these prepared directories during
-    # simulator close can trigger native memory corruption for large scenes.
+    # Imported mesh resources have retained native references to these USD-backed
+    # files after model finalization. Keep them for the process lifetime until
+    # repeated build/close memory tests satisfy workaround W4 in the migration
+    # record.
     temp_dir = Path(tempfile.mkdtemp(prefix="og-newton-object-"))
     if source_path.name.endswith(".encrypted.usd"):
         yield _decrypt_usd(source_path, data_path, temp_dir, scale=scale)

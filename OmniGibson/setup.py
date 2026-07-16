@@ -88,7 +88,9 @@ setup(
             "open3d>=0.19.0",
         ],
         "newton": [
-            "newton[examples]>=1.2.0",
+            # Newton dev APIs and their Warp / MuJoCo-Warp versions evolve together, so keep this commit reproducible.
+            "newton[examples] @ "
+            "git+https://github.com/newton-physics/newton.git@8447545335aa264ef79bc7cd386bcdbb4f26eec3",
             "cryptography>=41.0.7",
         ],
     },
