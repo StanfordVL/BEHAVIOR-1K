@@ -1105,9 +1105,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             system.initialize(scene=self)
             self.system_registry.add(system)
             # Activating a system changes the tensorized (object, system) state layout (e.g.
-            # ContainedParticles' SYS_IDXS), so rebuild the unified/tensorized views. No-op when not
-            # playing (the next play/update_handles rebuilds them anyway).
-            og.sim.update_handles()
+            # ContainedParticles' SYS_IDXS), so rebuild the unified/tensorized views once the current
+            # structural mutation is complete. During object initialization, rebuilding here would
+            # expose partially initialized object states; _non_physics_step calls update_handles()
+            # after the full initialization batch instead.
+            if not og.sim._objects_to_initialize:
+                og.sim.update_handles()
         return system
 
     def clear_system(self, system_name):
