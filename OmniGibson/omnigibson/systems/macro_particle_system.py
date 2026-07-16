@@ -1185,6 +1185,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         )
 
         # Physics rigid body view for keeping track of all particles' state
+        self.particles_sim_view = None
         self.particles_view = None
 
         # Approximate radius of the macro particle, and distance from particle frame to approximate center
@@ -1264,24 +1265,46 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
     def update_handles(self):
         """
-        Internal helper method to update the particles' rigid body view to grab state
+        Refresh this system's dedicated particle rigid-body view.
 
-        This is called through og.sim.update_handles when the physx object count etc. changes.
+        The dedicated SimulationView keeps macro-particle membership changes from invalidating the
+        simulator's object/contact views. ParticleViewAPI owns a separate cross-scene view for its
+        batched reader.
         """
-        if not og.sim.is_playing() or og.sim.physics_sim_view is None:
+        self.particles_sim_view = None
+        if not og.sim.is_playing():
             self.particles_view = None
             return
-        # TODO(vector) delete if we have batch version
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
+            self.particles_sim_view = lazy.omni.physics.tensors.create_simulation_view(
+                "torch", stage_id=og.sim.stage_id
+            )
+            self.particles_sim_view.set_subspace_roots("/")
+            self.particles_view = self.particles_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"
             )
+
+    def _refresh_particle_handles_after_membership_change(self):
+        """Refresh membership locally once this system is part of the unified registry."""
+        if not og.sim.is_playing():
+            return
+        with og.sim.editing_usd():
+            og.sim.psi.flush_changes()
+        from omnigibson.utils.particle_view_utils import ParticleViewAPI
+
+        if (self.scene.idx, self.name) not in ParticleViewAPI.entries():
+            # Activating a system changes the entry registry and dependent tensorized system indices.
+            # That is a real topology change; only later count changes can stay on the local path.
+            og.sim.update_handles()
+        else:
+            self.update_handles()
 
     def _clear(self):
         # Run super method first
         super()._clear()
 
         # Clear internal variables
+        self.particles_sim_view = None
         self.particles_view = None
         self._particle_radius = None
         self._particle_offset = None
@@ -1290,18 +1313,20 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         og.sim.remove_callback_on_play(name=f"{self.name}_particles_view")
 
     def remove_particle_by_name(self, name):
-        # Run super first
-        super().remove_particle_by_name(name=name)
-
-        # Update the handles
-        og.sim.update_handles()
+        # Do not use Simulator.remove_prim(): it rebuilds every simulator/tensorized view. These
+        # rigid bodies are owned only by the macro-particle views, which are refreshed locally.
+        assert name in self.particles, f"Got invalid name for particle to remove {name}"
+        particle = self.particles.pop(name)
+        self.mark_particle_metadata_dirty()
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            particle.remove()
+        self._refresh_particle_handles_after_membership_change()
 
     def add_particle(self, relative_prim_path, scale, idn=None):
         # Run super first
         particle = super().add_particle(relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
-        # Update the handles
-        og.sim.update_handles()
+        self._refresh_particle_handles_after_membership_change()
 
         return particle
 

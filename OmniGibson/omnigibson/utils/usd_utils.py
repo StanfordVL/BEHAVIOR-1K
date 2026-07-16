@@ -826,7 +826,7 @@ class RigidBodyViewAPI:
         """
         Read the latest PhysX transforms into the pinned-CPU staging buffer (cls.POSES).
         Stays on the host: PhysX returns a CPU torch tensor, and graph capture freezes the
-        call (see scripts/test_physx_in_warp_graph.py). The H2D copy + pose2mat kernel run
+        call. The H2D copy + pose2mat kernel run
         inside the captured wp.graph via update().
 
         physx_untracked links are never touched here; they are updated only by invalidate_kinematic().

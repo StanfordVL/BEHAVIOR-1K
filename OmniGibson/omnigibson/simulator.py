@@ -942,6 +942,7 @@ def _launch_simulator(*args, **kwargs):
             for scene in scenes:
                 scene.initialize()
             # One step is needed for particle systems to work.
+            # TODO(vector) why?
             self.step()
             self.stop()
 
@@ -1243,7 +1244,7 @@ def _launch_simulator(*args, **kwargs):
             RigidBodyViewAPI.initialize_view()
             ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
-            ParticleViewAPI.rebuild_topology()
+            ParticleViewAPI.initialize_view()
 
             if gm.ENABLE_OBJECT_STATES:
                 if self.currently_stepping:
@@ -1361,6 +1362,7 @@ def _launch_simulator(*args, **kwargs):
                 if self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
                 else:
+                    # TODO(vector) it's impossible to have graph dirty=flase and state graph=none at same time? so should not need this?
                     # No captured graph (tensorized states are registered but hold no values yet, e.g. a
                     # scene with particles but no containers/physical contacts). Still refresh the view
                     # APIs directly so particle positions / poses stay fresh for non-tensorized consumers.

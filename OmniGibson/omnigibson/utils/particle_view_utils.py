@@ -47,13 +47,12 @@ Each step refreshes positions in TWO explicit phases:
                                 visual particles read this step's parent-link matrices.
 
 Important functions:
-    rebuild_topology()          — rebuilds the complete registry, layout, and family metadata. It
+    initialize_view()          — rebuilds the complete registry, layout, and family metadata. It
                                 returns with a usable view; the first position read does not finish
                                 initialization lazily.
-    initialize_view()           — compatibility alias for rebuild_topology().
+    prepare_step_host()         — per-step host phase (out of the captured graph).
+    update_positions_gpu()      — per-step captured phase (H2D copies + position kernels).
     get_particle_positions(scene, system) — convenience: the slice of PARTICLE_POSITIONS for one entry.
-
-Compatibility aliases read_particle_positions() and update() retain the old public API.
 """
 
 import torch as th
@@ -76,6 +75,7 @@ FAMILY_MICRO_PHYSICAL = "micro_physical"
 
 # Minimum capacity to allocate when growing the flat buffers (avoids frequent regrowth for small counts).
 _MIN_BUFFER_CAPACITY = 1024
+_MIN_MACRO_PHYSICAL_METADATA_CAPACITY = 64
 _MIN_VISUAL_METADATA_CAPACITY = 64
 
 
@@ -194,11 +194,14 @@ def _scatter_macro_physical_positions_kernel(
     particle_local_index: wp.array(dtype=wp.int32),  # (M,) slot within the owning entry (system getter row order)
     particle_offset: wp.array(dtype=wp.vec3),  # (M,) owning system's _particle_offset
     entry_start: wp.array(dtype=wp.int32),  # (num_entries,) start offset of each entry
+    particle_count: wp.array(dtype=wp.int32),  # (1,) live number of valid rows
     positions_out: wp.array(dtype=wp.vec3f),
 ):
     """Replicate each system's getter (pos + quat2mat(ori) @ _particle_offset) and scatter each
     particle into its entry's slice: positions_out[entry_start[entry] + local] = world_pos."""
     particle = wp.tid()
+    if particle >= particle_count[0]:
+        return
     entry = particle_entry_index[particle]
     if entry < 0:
         return
@@ -233,7 +236,7 @@ def _fill_particle_labels_kernel(
 
 
 class ParticleViewAPI:
-    # Registry (rebuilt only on change in rebuild_topology).
+    # Registry (rebuilt only on change in initialize_view).
     _entries = {}  # {(scene_idx, system_name): {"family", "system", "scene_idx"}}
     _family_keys = {}  # family -> ordered list of entry keys; avoids reconstructing family lists every step
     _entry_ranges = {}  # {(scene_idx, system_name): (start, count)} slices into the flat buffers
@@ -256,7 +259,7 @@ class ParticleViewAPI:
 
     # The number of valid particles this step, as a 1-element GPU array (single source of truth) so
     # in-graph kernels launched over the fixed capacity can gate on the live count without a graph
-    # re-capture. Only rewritten on a layout change (in _rebuild_flat_layout).
+    # re-capture. Only rewritten on a layout change (in _rebuild_layout).
     PARTICLE_COUNT = None  # wp.array (1,) int32 cuda
 
     # Use this to detect if there is a layout change
@@ -281,24 +284,23 @@ class ParticleViewAPI:
     _macro_visual_particle_local_index = None  # wp int32 (capacity,) -> slot within the owning entry
     _macro_visual_fallback_keys = []  # entries with cloth/untracked parents, they need to use system's own getter
 
-    # macro-physical: ONE cross-scene rigid-body view over every macro-physical particle prim, plus
-    # static per-particle tables (rebuilt only on topology in initialize_view). Per step this yields
-    # one get_transforms() + one H2D copy + one scatter kernel (no per-system loop).
+    # macro-physical: ONE refreshable cross-scene rigid-body view over every macro-physical particle
+    # prim, plus grow-only metadata/staging buffers. The backend view is rebuilt when membership
+    # changes, but an in-capacity rebuild updates the existing buffers and reuses the captured graph.
+    _macro_physical_sim_view = None  # dedicated SimulationView; particle changes do not invalidate global views
     _macro_physical_view = None  # rigid-body view over /World/scene_*/*/particles/*, or None
-    _macro_physical_num_particles = 0  # M = number of view rows
-    _macro_physical_particle_entry_index = None  # wp int32 (M,) -> entry index in _entries order (-1 to skip)
-    _macro_physical_particle_local_index = None  # wp int32 (M,) -> slot within the owning entry (system getter order)
-    _macro_physical_particle_offset = None  # wp vec3 (M,) -> owning system's _particle_offset
-    _macro_physical_transforms_host = None  # pinned CPU staging buffer filled by get_transforms()
-    _macro_physical_transforms = None  # wp float32 (M,7) GPU, copied/scattered inside the graph
+    _macro_physical_num_particles = 0  # M = live number of view rows
+    _macro_physical_capacity = 0
+    _macro_physical_count = None  # wp int32 (1,) live M, read by the fixed-capacity captured kernel
+    _macro_physical_particle_entry_index = None  # wp int32 (capacity,) -> entry index (-1 to skip)
+    _macro_physical_particle_local_index = None  # wp int32 (capacity,) -> slot within the owning entry
+    _macro_physical_particle_offset = None  # wp vec3 (capacity,) -> owning system's _particle_offset
+    _macro_physical_transforms_host = None  # pinned CPU (capacity,7), valid prefix filled by get_transforms()
+    _macro_physical_transforms = None  # CUDA (capacity,7), copied/scattered inside the graph
 
     @classmethod
-    def rebuild_topology(cls):
-        """Rebuild the complete registry, flat layout, and family metadata.
-
-        Unlike the old lazy lifecycle, this method returns with all metadata tables valid. Runtime
-        mutations are still coalesced and processed by prepare_step_host() before the next consumer.
-        """
+    def initialize_view(cls):
+        """Rebuild the complete registry, flat layout, and family metadata."""
         cls.clear()
         entries = {}
         for scene_idx, scene in enumerate(og.sim.scenes):
@@ -326,102 +328,24 @@ class ParticleViewAPI:
 
         # Count scalars have stable pointers and let captured kernels use capacity-sized launches.
         cls.PARTICLE_COUNT = wp.zeros(1, dtype=wp.int32, device="cuda")
+        cls._macro_physical_count = wp.zeros(1, dtype=wp.int32, device="cuda")
         cls._macro_visual_count = wp.zeros(1, dtype=wp.int32, device="cuda")
 
         counts = [entry["system"].n_particles for entry in entries.values()]
-        cls._rebuild_flat_layout(counts, tuple(counts))
-        cls._rebuild_micro_metadata()
-        cls._rebuild_macro_physical_view()
-        cls._rebuild_macro_visual_tables()
+        cls._rebuild_layout(counts, tuple(counts))
+        cls._rebuild_micro_physical_metadata()
+        cls._rebuild_macro_physical_metadata()
+        cls._rebuild_macro_visual_metadata()
         cls._clear_all_tracked_metadata_dirty()
         cls._mark_graph_dirty()
-
-    @classmethod
-    def initialize_view(cls):
-        """Compatibility alias for rebuild_topology()."""
-        cls.rebuild_topology()
-
-    @classmethod
-    def _rebuild_macro_physical_view(cls):
-        """Build cross-scene rigid-body view over every macro-physical particle prim across all
-        scenes, plus static per-particle (entry index, local slot, offset) tables. Runs only on
-        topology (macro-physical particle add/remove goes through og.sim.update_handles). Leaves the
-        view as None when no macro-physical particles exist (an empty pattern would fail to create)."""
-        cls._macro_physical_view = None
-        cls._macro_physical_num_particles = 0
-        cls._macro_physical_particle_entry_index = None
-        cls._macro_physical_particle_local_index = None
-        cls._macro_physical_particle_offset = None
-        cls._macro_physical_transforms_host = None
-        cls._macro_physical_transforms = None
-        macro_physical_keys = [
-            key for key in cls._family_keys[FAMILY_MACRO_PHYSICAL] if cls._entries[key]["system"].n_particles > 0
-        ]
-        if len(macro_physical_keys) == 0:
-            cls._clear_family_metadata_dirty(FAMILY_MACRO_PHYSICAL)
-            return
-
-        entry_index_by_key = {key: i for i, key in enumerate(cls._entries.keys())}
-
-        # abs particle prim path -> (entry_index, local_index, offset). local_index is the row order of
-        # the system's OWN particles_view -> matches its getter exactly, giving bit-for-bit parity.
-        path_to_particle = {}
-        for key in macro_physical_keys:
-            system = cls._entries[key]["system"]
-            offset = system._particle_offset.to(th.float32)
-            for local_index, abs_path in enumerate(system.particles_view.prim_paths):
-                path_to_particle[abs_path] = (entry_index_by_key[key], local_index, offset)
-
-        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            cls._macro_physical_view = og.sim.physics_sim_view.create_rigid_body_view(
-                pattern="/World/scene_*/*/particles/*"
-            )
-        view_paths = list(cls._macro_physical_view.prim_paths)
-        cls._macro_physical_num_particles = len(view_paths)
-        if cls._macro_physical_num_particles == 0:
-            cls._clear_family_metadata_dirty(FAMILY_MACRO_PHYSICAL)
-            return
-
-        entry_indices, local_indices, offsets = [], [], []
-        for abs_path in view_paths:
-            match = path_to_particle.get(abs_path)
-            if match is None:  # pattern over-match (not a tracked macro-physical particle) -> skip in kernel
-                entry_indices.append(-1)
-                local_indices.append(0)
-                offsets.append(th.zeros(3, dtype=th.float32))
-            else:
-                entry_index, local_index, offset = match
-                entry_indices.append(entry_index)
-                local_indices.append(local_index)
-                offsets.append(offset)
-
-        cls._macro_physical_particle_entry_index = wp.array(
-            th.tensor(entry_indices, dtype=th.int32), dtype=wp.int32, device="cuda"
-        )
-        cls._macro_physical_particle_local_index = wp.array(
-            th.tensor(local_indices, dtype=th.int32), dtype=wp.int32, device="cuda"
-        )
-        cls._macro_physical_particle_offset = wp.array(th.stack(offsets), dtype=wp.vec3, device="cuda")
-        cls._macro_physical_transforms_host = wp.zeros(
-            (cls._macro_physical_num_particles, 7), dtype=wp.float32, device="cpu", pinned=True
-        )
-        cls._macro_physical_transforms = wp.zeros(
-            (cls._macro_physical_num_particles, 7), dtype=wp.float32, device="cuda"
-        )
-        cls._clear_family_metadata_dirty(FAMILY_MACRO_PHYSICAL)
 
     @classmethod
     def prepare_step_host(cls):
         """Prepare non-capturable sources and metadata before the per-step GPU graph runs."""
         cls._refresh_dirty_metadata()
-        cls._prepare_micro_positions_outside_graph()
-        cls._stage_macro_physical_transforms()
-        cls._prepare_macro_visual_fallback()
-
-    @classmethod
-    def read_particle_positions(cls):
-        """Compatibility alias for prepare_step_host()."""
-        cls.prepare_step_host()
+        cls._prepare_micro_physical_positions()
+        cls._prepare_macro_physical_positions()
+        cls._prepare_macro_visual_positions_fallback()
 
     @classmethod
     def update_positions_gpu(cls):
@@ -432,17 +356,18 @@ class ParticleViewAPI:
         global_update(). Macro-physical H2D and scatter are captured here. Micro remains outside the
         graph because its Fabric wrapper is transient across steps.
         """
-        if cls._macro_physical_num_particles > 0:
+        if cls._macro_physical_capacity > 0 and cls.PARTICLE_POSITIONS is not None:
             wp.copy(cls._macro_physical_transforms, cls._macro_physical_transforms_host)
             wp.launch(
                 _scatter_macro_physical_positions_kernel,
-                dim=cls._macro_physical_num_particles,
+                dim=cls._macro_physical_capacity,
                 inputs=[
                     cls._macro_physical_transforms,
                     cls._macro_physical_particle_entry_index,
                     cls._macro_physical_particle_local_index,
                     cls._macro_physical_particle_offset,
                     cls._entry_start,
+                    cls._macro_physical_count,
                     cls.PARTICLE_POSITIONS,
                 ],
                 device="cuda",
@@ -472,9 +397,93 @@ class ParticleViewAPI:
             )
 
     @classmethod
-    def update(cls):
-        """Compatibility alias for update_positions_gpu()."""
-        cls.update_positions_gpu()
+    def _rebuild_macro_physical_metadata(cls):
+        """Refresh the cross-scene PhysX view and its capacity-backed scatter metadata.
+
+        Particle add/remove changes the backend view membership, but it does not change the entry
+        registry. Rebuild that host-side view and update the valid metadata prefix in place; only
+        capacity growth changes captured pointers or launch dimensions and requires graph recapture.
+        """
+        cls._macro_physical_sim_view = None
+        cls._macro_physical_view = None
+        cls._macro_physical_num_particles = 0
+        macro_physical_keys = [
+            key for key in cls._family_keys[FAMILY_MACRO_PHYSICAL] if cls._entries[key]["system"].n_particles > 0
+        ]
+        reserve = _MIN_MACRO_PHYSICAL_METADATA_CAPACITY if cls._family_keys[FAMILY_MACRO_PHYSICAL] else 0
+        cls._ensure_macro_physical_capacity(reserve)
+        if len(macro_physical_keys) == 0:
+            cls._macro_physical_count.fill_(0)
+            cls._clear_family_metadata_dirty(FAMILY_MACRO_PHYSICAL)
+            return
+
+        entry_index_by_key = {key: i for i, key in enumerate(cls._entries.keys())}
+
+        # abs particle prim path -> (entry_index, local_index, offset). local_index is the row order of
+        # the system's OWN particles_view -> matches its getter exactly, giving bit-for-bit parity.
+        path_to_particle = {}
+        for key in macro_physical_keys:
+            system = cls._entries[key]["system"]
+            offset = system._particle_offset.to(th.float32)
+            for local_index, abs_path in enumerate(system.particles_view.prim_paths):
+                path_to_particle[abs_path] = (entry_index_by_key[key], local_index, offset)
+
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            cls._macro_physical_sim_view = lazy.omni.physics.tensors.create_simulation_view(
+                "torch", stage_id=og.sim.stage_id
+            )
+            cls._macro_physical_sim_view.set_subspace_roots("/")
+            cls._macro_physical_view = cls._macro_physical_sim_view.create_rigid_body_view(
+                pattern="/World/scene_*/*/particles/*"
+            )
+        view_paths = list(cls._macro_physical_view.prim_paths)
+        cls._macro_physical_num_particles = len(view_paths)
+        cls._ensure_macro_physical_capacity(max(cls._macro_physical_num_particles, reserve))
+        cls._macro_physical_count.fill_(cls._macro_physical_num_particles)
+        if cls._macro_physical_num_particles == 0:
+            cls._clear_family_metadata_dirty(FAMILY_MACRO_PHYSICAL)
+            return
+
+        entry_indices, local_indices, offsets = [], [], []
+        for abs_path in view_paths:
+            match = path_to_particle.get(abs_path)
+            if match is None:  # pattern over-match (not a tracked macro-physical particle) -> skip in kernel
+                entry_indices.append(-1)
+                local_indices.append(0)
+                offsets.append(th.zeros(3, dtype=th.float32))
+            else:
+                entry_index, local_index, offset = match
+                entry_indices.append(entry_index)
+                local_indices.append(local_index)
+                offsets.append(offset)
+
+        wp.copy(
+            cls._macro_physical_particle_entry_index[: cls._macro_physical_num_particles],
+            wp.from_torch(th.tensor(entry_indices, dtype=th.int32)),
+        )
+        wp.copy(
+            cls._macro_physical_particle_local_index[: cls._macro_physical_num_particles],
+            wp.from_torch(th.tensor(local_indices, dtype=th.int32)),
+        )
+        wp.copy(
+            cls._macro_physical_particle_offset[: cls._macro_physical_num_particles],
+            wp.from_torch(th.stack(offsets).contiguous(), dtype=wp.vec3),
+        )
+        cls._clear_family_metadata_dirty(FAMILY_MACRO_PHYSICAL)
+
+    @classmethod
+    def _ensure_macro_physical_capacity(cls, required_capacity):
+        if required_capacity <= cls._macro_physical_capacity:
+            return
+        cls._macro_physical_capacity = max(required_capacity, cls._macro_physical_capacity * 2)
+        cls._macro_physical_particle_entry_index = wp.zeros(cls._macro_physical_capacity, dtype=wp.int32, device="cuda")
+        cls._macro_physical_particle_local_index = wp.zeros(cls._macro_physical_capacity, dtype=wp.int32, device="cuda")
+        cls._macro_physical_particle_offset = wp.zeros(cls._macro_physical_capacity, dtype=wp.vec3, device="cuda")
+        cls._macro_physical_transforms_host = wp.zeros(
+            (cls._macro_physical_capacity, 7), dtype=wp.float32, device="cpu", pinned=True
+        )
+        cls._macro_physical_transforms = wp.zeros((cls._macro_physical_capacity, 7), dtype=wp.float32, device="cuda")
+        cls._mark_graph_dirty()
 
     @classmethod
     def _refresh_dirty_metadata(cls):
@@ -489,23 +498,20 @@ class ParticleViewAPI:
         counts = [entry["system"].n_particles for entry in cls._entries.values()]
         particle_counts = tuple(counts)
         if particle_counts != cls._particle_counts_at_last_layout:
-            cls._rebuild_flat_layout(counts, particle_counts)
+            cls._rebuild_layout(counts, particle_counts)
 
         if dirty_families[FAMILY_MICRO_PHYSICAL]:
-            cls._rebuild_micro_metadata()
+            cls._rebuild_micro_physical_metadata()
         if dirty_families[FAMILY_MACRO_PHYSICAL]:
-            # Normal macro-physical topology mutations reach rebuild_topology() through update_handles().
-            # Keep this defensive cold path for callers that explicitly refresh without doing so.
-            cls._rebuild_macro_physical_view()
-            cls._mark_graph_dirty()
+            cls._rebuild_macro_physical_metadata()
         if dirty_families[FAMILY_MACRO_VISUAL]:
             # TODO(vector): Keep the full-family logical rebuild for correctness. A future packed layout
             # can update stable per-system slices, but should retain the capacity-sized device buffers.
-            cls._rebuild_macro_visual_tables()
+            cls._rebuild_macro_visual_metadata()
             cls._clear_family_metadata_dirty(FAMILY_MACRO_VISUAL)
 
     @classmethod
-    def _rebuild_flat_layout(cls, counts, particle_counts):
+    def _rebuild_layout(cls, counts, particle_counts):
         """Recompute per-entry offsets + total, grow buffers if needed, and refill the label
         buffers. Runs only when the per-entry particle counts change."""
         cls._entry_ranges = {}
@@ -519,9 +525,11 @@ class ParticleViewAPI:
         # Mirror the valid count to the GPU (single source of truth; only changes here, on layout change).
         cls.PARTICLE_COUNT.fill_(total)
 
-        # Grow the flat buffers only when capacity is exceeded.
-        if total > cls._buffer_capacity:
-            cls._buffer_capacity = max(total, cls._buffer_capacity * 2, _MIN_BUFFER_CAPACITY)
+        # Reserve an initial block for an active-but-empty registry, then grow geometrically. This
+        # lets the first particle additions reuse the graph just like later in-capacity mutations.
+        required_capacity = max(total, _MIN_BUFFER_CAPACITY if cls._entries else 0)
+        if required_capacity > cls._buffer_capacity:
+            cls._buffer_capacity = max(required_capacity, cls._buffer_capacity * 2)
             cls.PARTICLE_POSITIONS = wp.zeros(cls._buffer_capacity, dtype=wp.vec3f, device="cuda")
             cls.PARTICLE_SCENE_INDEX = wp.zeros(cls._buffer_capacity, dtype=wp.int32, device="cuda")
             cls.PARTICLE_ENTRY_INDEX = wp.zeros(cls._buffer_capacity, dtype=wp.int32, device="cuda")
@@ -551,7 +559,7 @@ class ParticleViewAPI:
             )
 
     @classmethod
-    def _rebuild_micro_metadata(cls):
+    def _rebuild_micro_physical_metadata(cls):
         """Rebuild micro instancer identity mapping and the maximum 2-D scatter width."""
         cls._micro_instancer_path_to_entry = {}
         for key in cls._family_keys[FAMILY_MICRO_PHYSICAL]:
@@ -567,7 +575,7 @@ class ParticleViewAPI:
         cls._clear_family_metadata_dirty(FAMILY_MICRO_PHYSICAL)
 
     @classmethod
-    def _prepare_micro_positions_outside_graph(cls):
+    def _prepare_micro_physical_positions(cls):
         """Resolve Fabric's transient rows and scatter all micro positions outside the graph."""
         if cls._micro_instancer_path_to_entry:
             Usd, Sdf = lazy.usdrt.Usd, lazy.usdrt.Sdf
@@ -604,15 +612,15 @@ class ParticleViewAPI:
                 )
 
     @classmethod
-    def _stage_macro_physical_transforms(cls):
+    def _prepare_macro_physical_positions(cls):
         """Read one cross-scene PhysX batch into fixed pinned host memory."""
         if cls._macro_physical_view is not None and cls._macro_physical_num_particles > 0:
             transforms = cls._macro_physical_view.get_transforms()  # (M,7) CPU torch, single batched read
-            wp.to_torch(cls._macro_physical_transforms_host).copy_(transforms)
+            wp.to_torch(cls._macro_physical_transforms_host)[: cls._macro_physical_num_particles].copy_(transforms)
 
     @classmethod
-    def _prepare_macro_visual_fallback(cls):
-        """Refresh visual entries whose cloth/untracked parents cannot use the captured rigid kernel."""
+    def _prepare_macro_visual_positions_fallback(cls):
+        """Refresh visual entries whose cloth/untracked parents require individual getters."""
         # Cloth/untracked entries (rare) fall back to the per-entry getter. If POSE_MATRICES isn't ready
         # yet (transient startup), every visual entry falls back for that step.
         if RigidBodyViewAPI.POSE_MATRICES is None:
@@ -659,7 +667,7 @@ class ParticleViewAPI:
             cls._clear_family_metadata_dirty(family)
 
     @classmethod
-    def _rebuild_macro_visual_tables(cls):
+    def _rebuild_macro_visual_metadata(cls):
         """Collect, for every kernel-eligible visual particle across all scenes/systems, its parent
         link index, world scale, static local matrix, and (entry, slot) destination into flat arrays
         for one kernel launch. An entry whose particles are cloth-parented or lack a rigid-body link is
@@ -801,8 +809,11 @@ class ParticleViewAPI:
         cls._macro_visual_particle_entry_index = None
         cls._macro_visual_particle_local_index = None
         cls._macro_visual_fallback_keys = []
+        cls._macro_physical_sim_view = None
         cls._macro_physical_view = None
         cls._macro_physical_num_particles = 0
+        cls._macro_physical_capacity = 0
+        cls._macro_physical_count = None
         cls._macro_physical_particle_entry_index = None
         cls._macro_physical_particle_local_index = None
         cls._macro_physical_particle_offset = None
