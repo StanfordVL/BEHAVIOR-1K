@@ -1236,24 +1236,20 @@ def _launch_simulator(*args, **kwargs):
                     if issubclass(state_type, TensorizedState):
                         state_type.initialize_view()
 
-        # TODO(vector) Calling this actually makes most time-sensitive states
-        # (temperature, toggle, sliceractive...) think a new step has happened.
-        # should update all of those states to track last-updated-time, and
-        # compare it against og.sim.current_timestep to compute how much delta
-        # should be applied to things
-        def _refresh_state_caches(self):
+        def _refresh_state_caches(self, dt=0.0):
             """
-            Run a full tensorized-state refresh outside the normal step path.
+            Run a full update for tensorized object state and view API.
 
-            This is the same pre/global/post pass that ``_non_physics_step`` runs once per
-            sim step, factored out so that callers which mutate poses/joints between sim
-            steps (``sample_kinematics``, ``Inside._set_value``, ad-hoc
-            ``set_position_orientation`` / ``JointPrim.set_pos``) can bring caches back into
-            sync without waiting for the next ``sim.step()``.
+            This function will be called in the following cases:
+            - in usual step, in ``_non_physics_step`` (passes the sim-step dt)
+            - in ``step_physics`` (passes dt=0)
+            - anywhere that poses/joints are set between sim steps (sample_kinematics,
+            Inside._set_value, set_position_orientation / JointPrim.set_pos) and
+            any TensorizedAbsoluteState need to get_value (default dt=0)
 
-            Triggered automatically from ``TensorizedAbsoluteState._get_value`` /
-            ``TensorizedRelativeState._get_value`` when ``TensorizedState.caches_dirty`` is
-            set, so callers don't have to remember to call it.
+            ``dt`` is the seconds elapsed for this logical step; it is forwarded to each
+            tensorized state's ``pre_update`` so time-dependent states advance by exactly the
+            sim-step dt on a real step and by 0 on physics-only / out-of-step refreshes.
 
             Always clears ``TensorizedState.caches_dirty`` on completion.
             """
@@ -1265,11 +1261,11 @@ def _launch_simulator(*args, **kwargs):
             ArticulatedObjectViewAPI.read_from_physx()
             wp.synchronize_stream(wp.get_stream())
 
-            self._capture_warp_graph()
+            self._capture_warp_graph(dt)
 
             RigidContactAPI._PENDING_STEPS = 0
 
-        def _capture_warp_graph(self):
+        def _capture_warp_graph(self, dt=0.0):
             """
             Manage the per-step warp graph end-to-end (gating, pre/post bookkeeping, capture,
             and launch all live here so ``_refresh_state_caches`` stays thin).
@@ -1279,7 +1275,7 @@ def _launch_simulator(*args, **kwargs):
                  If the list is empty (object states disabled or none registered), run the
                  view-API ``update()``s directly and return — there is no pre/global/post
                  pipeline to drive.
-              2. Otherwise, run ``pre_update`` for each state, then either (re-)capture or
+              2. Otherwise, run ``pre_update(dt)`` for each state, then either (re-)capture or
                  replay the per-step graph (view-API H2D + tensorized state global_updates).
                  ``wp.ScopedCapture`` only RECORDS ops — the captured graph must be launched
                  explicitly via ``wp.capture_launch`` for its kernels to run this frame.
@@ -1310,7 +1306,7 @@ def _launch_simulator(*args, **kwargs):
                 TensorizedState.caches_dirty = True
 
                 for state_type in tensorized_states:
-                    state_type.pre_update()
+                    state_type.pre_update(dt)
 
                 if TensorizedState.graph_dirty:
                     if all(s.VALUES is None or s.VALUES.numel() == 0 for s in tensorized_states):
@@ -1383,8 +1379,10 @@ def _launch_simulator(*args, **kwargs):
                     for system in scene.active_systems.values():
                         system.update()
 
-                # Update view API data and tensorized states
-                self._refresh_state_caches()
+                # Update view API data and tensorized states. One _non_physics_step runs per
+                # og.sim.step(), which spans get_sim_step_dt() seconds — advance time-dependent
+                # states by exactly that.
+                self._refresh_state_caches(dt=self.get_sim_step_dt())
 
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
@@ -1544,7 +1542,8 @@ def _launch_simulator(*args, **kwargs):
 
             # Accumulate contact data from this physics step and then flush to cache.
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-            self._refresh_state_caches()
+            # dt=0: a bare physics step must not advance time-dependent states (matches legacy behavior).
+            self._refresh_state_caches(dt=0.0)
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
@@ -1583,7 +1582,10 @@ def _launch_simulator(*args, **kwargs):
                     ControllableObjectViewAPI.post_physics_step()
 
                 # Pull the contact sensor data — must run while currently_stepping is True,
-                # since RigidContactAPI.read_from_physx asserts on it.
+                # since RigidContactAPI.read_from_physx asserts on it. Unlike the pose/DOF
+                # view APIs (snapshot-only, drained once per render-step in
+                # _refresh_state_caches), contacts accumulate per sub-step into pending
+                # buffers that update() later walks, so they must be drained here.
                 RigidContactAPI.read_from_physx()
                 wp.synchronize_stream(wp.get_stream())
 

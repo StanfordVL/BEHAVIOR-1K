@@ -26,7 +26,8 @@ m = create_module_macros(module_path=__file__)
 
 m.TOGGLE_META_LINK_TYPE = "togglebutton"
 m.DEFAULT_SCALE = 0.1
-m.CAN_TOGGLE_STEPS = 5
+# Seconds a robot finger must stay in contact with the toggle marker before the state flips.
+m.CAN_TOGGLE_SECONDS = 0.15
 
 
 @wp.kernel
@@ -86,18 +87,18 @@ def _check_requires_closed_kernel(
     requires_closed_idx_in_open: wp.array(dtype=wp.int32),  # (R,) flat idx into Open.VALUES
     open_values: wp.array(dtype=wp.uint8),  # Open.VALUES_WP flattened (S*O_open,)
     toggle_values: wp.array(dtype=wp.uint8),  # VALUES.view(-1) (S*O_toggle,)
-    robots_can_toggle_steps: wp.array(dtype=wp.float32),  # (S*O,)
+    robots_can_toggle_time: wp.array(dtype=wp.float32),  # (S*O,) — seconds accumulated
     mask_can_toggle: wp.array(dtype=wp.int32),  # (S*O,)
 ):
     """
     Each thread checks 1 object in 1 scene.
-    If Open.VALUES == True, Toggle.VALUES = False, robots_can_toggle_steps = 0, mask_can_toggle = False.
+    If Open.VALUES == True, Toggle.VALUES = False, robots_can_toggle_time = 0, mask_can_toggle = False.
     """
     thread_id = wp.tid()
     if open_values[requires_closed_idx_in_open[thread_id]] != wp.uint8(0):
         idx = requires_closed_idx_in_this[thread_id]
         toggle_values[idx] = wp.uint8(0)
-        robots_can_toggle_steps[idx] = 0.0
+        robots_can_toggle_time[idx] = 0.0
         mask_can_toggle[idx] = wp.int32(0)
 
 
@@ -105,14 +106,15 @@ def _check_requires_closed_kernel(
 def _set_toggle_value_kernel(
     values: wp.array2d(dtype=wp.uint8),  # (S, O)
     mask_can_toggle_flat: wp.array(dtype=wp.int32),  # (S*O,) — single cached 1D view (see _update_values)
-    robots_can_toggle_steps: wp.array2d(dtype=wp.float32),  # (S, O)
+    robots_can_toggle_time: wp.array2d(dtype=wp.float32),  # (S, O) — seconds accumulated this hold
     O: wp.int32,  # second dim of `values` — to flatten (s, o) → s*O+o for the mask
-    can_toggle_threshold: wp.float32,
+    can_toggle_threshold_seconds: wp.float32,
+    dt: wp.array(dtype=wp.float32),
 ):
     """
     Each thread works on 1 object in 1 scene.
     When mask == 2, all three requirements passed (contact, requires_closed, overlaps).
-    Increment step and flip values where the step reach threshold.
+    Accumulate dt seconds and flip values when the counter first crosses the threshold.
     Reset mask to 0.
     """
     s, o = wp.tid()
@@ -121,13 +123,15 @@ def _set_toggle_value_kernel(
     if mask_can_toggle_flat[idx] == wp.int32(2):
         eligible = wp.int32(1)
 
+    prev_time = robots_can_toggle_time[s, o]
     if eligible != wp.int32(0):
-        robots_can_toggle_steps[s, o] = robots_can_toggle_steps[s, o] + 1.0
+        robots_can_toggle_time[s, o] = prev_time + dt[0]
     else:
-        robots_can_toggle_steps[s, o] = 0.0
+        robots_can_toggle_time[s, o] = 0.0
 
+    new_time = robots_can_toggle_time[s, o]
     flip = wp.int32(0)
-    if robots_can_toggle_steps[s, o] == can_toggle_threshold:
+    if prev_time < can_toggle_threshold_seconds and new_time >= can_toggle_threshold_seconds:
         flip = eligible
 
     mask_can_toggle_flat[idx] = wp.int32(0)
@@ -144,8 +148,9 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
     # S = number of scenes
     # O = number of toggleable objects
 
-    # wp.array2d (S, O) float32 — robot finger-in-marker step counter
-    _robots_can_toggle_steps = None
+    # wp.array2d (S, O) float32 — seconds the robot finger has been overlapping the marker for
+    # the current hold session. Reset to 0 when eligibility breaks.
+    _robots_can_toggle_time = None
 
     # (O_requires_closed,) int32 — flat-index lookups into Open.VALUES and ToggledOn.VALUES.
     _requires_closed_obj_idxes_in_open_values = None
@@ -198,7 +203,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
     def global_initialize(cls):
         super().global_initialize()
 
-        cls._robots_can_toggle_steps = None
+        cls._robots_can_toggle_time = None
         cls._requires_closed_obj_idxes_in_open_values = None
         cls._requires_closed_obj_idxes_in_this_values = None
         cls.visual_markers = []
@@ -219,8 +224,8 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         # Snapshot existing states. wp.to_torch shares storage with the wp array;
         # .cpu() forces a single GPU→CPU copy so the per-element carry-over reads stay on CPU.
         prev_obj_idxs = dict(cls.OBJ_IDXS) if cls.OBJ_IDXS is not None else {}
-        prev_steps_cpu = (
-            wp.to_torch(cls._robots_can_toggle_steps).cpu() if cls._robots_can_toggle_steps is not None else None
+        prev_time_cpu = (
+            wp.to_torch(cls._robots_can_toggle_time).cpu() if cls._robots_can_toggle_time is not None else None
         )
 
         # Base class rebuilds OBJ_IDXS, IDX_OBJS, VALUES (with value carry-over for toggle bool)
@@ -234,18 +239,18 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
             cls._init_empty_states()
             return
 
-        # Carry over _can_toggle_steps for surviving objects via a CPU scratch tensor,
+        # Carry over _robots_can_toggle_time for surviving objects via a CPU scratch tensor,
         # then ship to a fresh GPU wp.array.
-        new_steps_cpu = th.zeros((S, O), dtype=th.float32)
-        if prev_steps_cpu is not None:
+        new_time_cpu = th.zeros((S, O), dtype=th.float32)
+        if prev_time_cpu is not None:
             for relative_prim_path, obj_idx_old in prev_obj_idxs.items():
                 if relative_prim_path not in cls.OBJ_IDXS:
                     continue
                 obj_idx = cls.OBJ_IDXS[relative_prim_path]
-                for scene_idx in range(min(prev_steps_cpu.shape[0], S)):
-                    new_steps_cpu[scene_idx, obj_idx] = prev_steps_cpu[scene_idx, obj_idx_old]
-        cls._robots_can_toggle_steps = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            new_steps_cpu, "float32", device="cuda"
+                for scene_idx in range(min(prev_time_cpu.shape[0], S)):
+                    new_time_cpu[scene_idx, obj_idx] = prev_time_cpu[scene_idx, obj_idx_old]
+        cls._robots_can_toggle_time = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            new_time_cpu, "float32", device="cuda"
         )
 
         marker_finger_pairs = cls._init_finger(S, O)
@@ -295,7 +300,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         Empty-scene (S == 0 or O == 0) early-init: clear every per-scene/per-marker buffer
         to a safe default (None or empty list) so `_update_values` short-circuits cleanly.
         """
-        cls._robots_can_toggle_steps = None
+        cls._robots_can_toggle_time = None
         cls._finger_query_mask = []
         cls._toggable_objs_with_mask = []
         cls._mask_can_toggle = None
@@ -559,14 +564,14 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
         Stages (all run inside wp.graph):
         1. Zero the mask.
-        2. use is_in_contact_batch_warp to check whether finger and marekr is in contact,
+        2. use is_in_contact_batch_warp to check whether finger and marker is in contact,
             writes mask in {0, 1}.
         3. requires_closed: for objects that are Open yet require closed, force values=0,
-           steps=0, mask=0.
+           robots_can_toggle_time=0, mask=0.
         4. check_overlap kernel: for mask==1, run BVH point-mesh query; on hit, atomic_max
            the cell to 2.
-        5. Finalize: if mask == 2, increment step counter, XOR-flip values
-           when counter hits the threshold, then normalize mask back to {0, 1}.
+        5. Finalize: if mask == 2, accumulate dt seconds; flip values the first step the
+           counter crosses the seconds threshold; normalize mask back to {0, 1}.
         """
         if cls._mask_can_toggle_flat is None:
             return
@@ -574,7 +579,12 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
         mask_flat = cls._mask_can_toggle_flat
         values_flat_wp = wp.from_torch(values.view(-1).view(th.uint8), dtype=wp.uint8)
-        steps_flat = cls._robots_can_toggle_steps.reshape((S * O,))
+        time_flat = cls._robots_can_toggle_time.reshape((S * O,))
+
+        threshold_seconds = m.CAN_TOGGLE_SECONDS
+        assert (
+            threshold_seconds > og.sim.get_sim_step_dt()
+        ), f"m.CAN_TOGGLE_SECONDS ({threshold_seconds}s) must exceed one sim step dt ({og.sim.get_sim_step_dt()}s)"
 
         mask_flat.zero_()
 
@@ -606,7 +616,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                     cls._requires_closed_obj_idxes_in_open_values,
                     open_flat_wp,
                     values_flat_wp,
-                    steps_flat,
+                    time_flat,
                     mask_flat,
                 ],
                 device="cuda",
@@ -630,16 +640,17 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 device="cuda",
             )
 
-        # flip value and increment step
+        # accumulate dt seconds onto the per-object counter; flip values on threshold crossing
         wp.launch(
             kernel=_set_toggle_value_kernel,
             dim=(S, O),
             inputs=[
                 cls.VALUES_WP,
                 cls._mask_can_toggle_flat,
-                cls._robots_can_toggle_steps,
+                cls._robots_can_toggle_time,
                 wp.int32(O),
-                wp.float32(m.CAN_TOGGLE_STEPS),
+                wp.float32(threshold_seconds),
+                cls._dt,
             ],
             device="cuda",
         )
@@ -731,32 +742,34 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
     @property
     def state_size(self):
-        # Two floats: toggle_state + robot_can_toggle_steps. Same as the pre-tensorized value.
+        # Two floats: toggle_state + robot_can_toggle_time (seconds).
         return 2
 
     def _dump_state(self):
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
-            return dict(value=False, hand_in_marker_steps=0)
+            return dict(value=False, hand_in_marker_steps=0.0)
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
         # wp.to_torch is a zero-copy view of the wp.array storage.
-        steps_view = wp.to_torch(type(self)._robots_can_toggle_steps)
+        time_view = wp.to_torch(type(self)._robots_can_toggle_time)
         return dict(
             value=bool(self.VALUES[s, obj_idx].item()),
-            hand_in_marker_steps=int(steps_view[s, obj_idx].item()),
+            hand_in_marker_steps=float(time_view[s, obj_idx].item()),
         )
 
     def _load_state(self, state):
         # Restore toggle via _set_value so the visual marker color is also updated.
         self._set_value(state["value"])
-        # Restore step counter directly into the wp.array via a zero-copy torch view.
+        if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
+            return
         s = self.obj.scene.idx
         obj_idx = self.OBJ_IDXS[self.obj.relative_prim_path]
-        wp.to_torch(type(self)._robots_can_toggle_steps)[s, obj_idx] = float(state["hand_in_marker_steps"])
+        # Restore the seconds counter directly into the wp.array via a zero-copy torch view.
+        wp.to_torch(type(self)._robots_can_toggle_time)[s, obj_idx] = float(state["hand_in_marker_steps"])
 
     def serialize(self, state):
-        # [toggle_state, can_toggle_steps] as float32
+        # [toggle_state, can_toggle_time (seconds)] as float32
         return th.tensor([state["value"], state["hand_in_marker_steps"]], dtype=th.float32)
 
     def deserialize(self, state):
-        return dict(value=bool(state[0].item()), hand_in_marker_steps=int(state[1].item())), 2
+        return dict(value=bool(state[0].item()), hand_in_marker_steps=float(state[1].item())), 2

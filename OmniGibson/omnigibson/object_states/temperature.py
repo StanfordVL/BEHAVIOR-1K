@@ -13,14 +13,14 @@ def _temperature_decay_kernel(
     values: wp.array2d(dtype=wp.float32),
     default_temp: wp.float32,
     decay_rate: wp.float32,
-    dt: wp.float32,
+    dt: wp.array(dtype=wp.float32),
 ):
     """
     In-place exponential decay toward `default_temp`. One thread per (scene, obj).
-    Equivalent to: values += (default_temp - values) * decay_rate * dt
+    Equivalent to: values += (default_temp - values) * decay_rate * dt[0]
     """
     s, o = wp.tid()
-    values[s, o] = values[s, o] + (default_temp - values[s, o]) * decay_rate * dt
+    values[s, o] = values[s, o] + (default_temp - values[s, o]) * decay_rate * dt[0]
 
 
 # Create settings for this module
@@ -83,7 +83,9 @@ class Temperature(TensorizedAbsoluteState):
 
     @classmethod
     def _update_values(cls, values):
-        # Apply temperature decay via Warp kernel
+        # Apply temperature decay via Warp kernel. dt is read from cls._dt at kernel-launch
+        # time inside the captured graph, so the per-frame value written in pre_update is
+        # visible without re-capturing the graph.
         if cls.VALUES_WP is None:
             return
         S, O = cls.VALUES.shape[:2]
@@ -94,7 +96,7 @@ class Temperature(TensorizedAbsoluteState):
                 cls.VALUES_WP,
                 wp.float32(m.DEFAULT_TEMPERATURE),
                 wp.float32(m.TEMPERATURE_DECAY_SPEED),
-                wp.float32(og.sim.get_sim_step_dt()),
+                cls._dt,
             ],
             device="cuda",
         )

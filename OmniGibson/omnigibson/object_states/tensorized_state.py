@@ -83,6 +83,13 @@ class TensorizedState:
     # re-triggering a refresh. Set/cleared inside the simulator helper.
     _refresh_in_progress = False
 
+    # Single-element wp.array on cuda holding the seconds elapsed for the current logical step
+    # (the caller-provided dt, see pre_update). Read by time-dependent subclasses' kernels
+    # (Temperature, ToggledOn, SlicerActive) inside the captured graph. We use a wp.array (not a
+    # wp.float32 scalar passed at launch) so per-frame mutation is visible to graph replays without
+    # re-capture — scalars passed via wp.float32(...) bake the value at capture time.
+    _dt = None
+
     @classmethod
     def maybe_refresh_caches(cls):
         """Helper for `get_value`: if caches are dirty (and we're not already
@@ -93,15 +100,28 @@ class TensorizedState:
 
             og.sim._refresh_state_caches()
 
+    @classmethod
+    def initialize_view(cls):
+        """
+        Δt-tracking setup shared across tensorized states. Subclasses' initialize_view should
+        call ``super().initialize_view()`` after they finish allocating VALUES.
+
+        Allocates the 1-element wp.array that pre_update fills with the per-step dt each step.
+        """
+        if cls._dt is None:
+            cls._dt = wp.zeros(shape=(1,), dtype=wp.float32, device="cuda")
+
     def get_value(self, *args, **kwargs):
         self.maybe_refresh_caches()
         return super().get_value(*args, **kwargs)
 
     @classmethod
-    def pre_update(cls):
+    def pre_update(cls, dt=0.0):
         """
         CPU-side prep run BEFORE global_update each step. Snapshots VALUES_CPU into
-        PREV_VALUES so post_update() can detect changes after the warp work completes.
+        PREV_VALUES so post_update() can detect changes after the warp work completes,
+        and stores the caller-provided ``dt`` (seconds elapsed for this logical step) into
+        cls._dt for time-dependent kernels to read inside the captured graph.
 
         Lives outside the captured wp.graph.
 
@@ -111,6 +131,9 @@ class TensorizedState:
         if cls.VALUES_CPU is None or cls.VALUES_CPU.numel() == 0:
             return
         cls.PREV_VALUES.copy_(cls.VALUES_CPU)
+
+        if cls._dt is not None:
+            cls._dt.fill_(dt)
 
     @classmethod
     def global_update(cls):
