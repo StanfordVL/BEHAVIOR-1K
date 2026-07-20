@@ -759,6 +759,7 @@ def test_heated(env, bagel, cookable_dishtowel):
 
 
 def test_on_fire(env, plywood):
+    assert plywood.states[OnFire].temperature == m.object_states.heat_source_or_sink.DEFAULT_FIRE_TEMPERATURE
     assert not plywood.states[OnFire].get_value()
 
     plywood.states[Temperature].set_value(plywood.states[OnFire].ignition_temperature + 1)

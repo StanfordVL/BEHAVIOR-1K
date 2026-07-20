@@ -205,6 +205,31 @@ def get_states_for_ability(ability):
     return _ABILITY_DEPENDENCIES[ability].states
 
 
+def get_states_and_params_for_ability(ability, params):
+    """
+    Enumerate the (state_type, params) pairs an @ability contributes, with the per-(ability, state)
+    param transform (see @transform_ability_params_for_state) applied to each.
+
+    Both object hydration (USDObject) and asset model-validation
+    (get_all_object_category_models_with_abilities) must instantiate an ability's states with the
+    SAME kwargs, otherwise a model can pass one path and fail the other. They therefore share this
+    helper so the two never drift apart -- e.g. `flammable` injects requires_on_fire=True into
+    HeatSourceOrSink, which flips its meta-link requirement; without the transform, validation
+    would demand a heatsource meta link that hydration does not.
+
+    Args:
+        ability (str): Ability name
+        params (dict): Raw ability params
+
+    Returns:
+        list of (type, dict): (state_type, transformed_params) for each state @ability contributes
+    """
+    return [
+        (state_type, transform_ability_params_for_state(ability, state_type, params))
+        for state_type in get_states_for_ability(ability)
+    ]
+
+
 def get_requirements_for_ability(ability):
     if ability not in _ABILITY_DEPENDENCIES:
         return []

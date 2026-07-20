@@ -21,6 +21,7 @@ m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
 
 # TODO: Delete default values for this and make them required.
 m.DEFAULT_TEMPERATURE = 200
+m.DEFAULT_FIRE_TEMPERATURE = 1000
 m.DEFAULT_HEATING_RATE = 0.04
 m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 m.DEFAULT_IGNITION_TEMPERATURE = 250
@@ -133,7 +134,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         """
         Args:
             obj (StatefulObject): The object with the heat source ability.
-            temperature (float): The temperature of the heat source.
+            temperature (float): The temperature of the heat source. Defaults to
+                DEFAULT_FIRE_TEMPERATURE when @requires_on_fire, otherwise DEFAULT_TEMPERATURE.
             heating_rate (float): Fraction in [0, 1] of the temperature difference with the
                 heat source temperature should be received every step, per second.
             distance_threshold (float): The distance threshold which an object needs
@@ -157,7 +159,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
                 (e.g. extinguished).
         """
         super().__init__(obj)
-        self._temperature = temperature if temperature is not None else m.DEFAULT_TEMPERATURE
+        default_temperature = m.DEFAULT_FIRE_TEMPERATURE if requires_on_fire else m.DEFAULT_TEMPERATURE
+        self._temperature = temperature if temperature is not None else default_temperature
         self._heating_rate = heating_rate if heating_rate is not None else m.DEFAULT_HEATING_RATE
         self.distance_threshold = distance_threshold if distance_threshold is not None else m.DEFAULT_DISTANCE_THRESHOLD
 
@@ -408,8 +411,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         cls._self_onfire_idx = create_tensor_from_list(self_onfire_idx, "int32", device="cuda")
 
     @classmethod
-    def pre_update(cls):
-        super().pre_update()
+    def pre_update(cls, dt=0.0):
+        super().pre_update(dt)
         # Only rebuild when the captured graph is being rebuilt. graph_dirty is the single
         # trigger: every event that invalidates the index tables goes through some state's
         # initialize_view, which sets graph_dirty. Rebuild reallocates GPU buffers that must be
@@ -465,8 +468,10 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         )
 
     def _get_value(self):
-        # Match base class semantics: bring caches into sync, then read CPU mirror
-        TensorizedState.maybe_refresh_caches()
+        # Raw read of the CPU mirror. Freshness is handled by the public get_value() wrapper
+        # (TensorizedState.get_value -> maybe_refresh_caches), matching AABB/ToggledOn. Refreshing
+        # here would also fire on the _dump_state path (e.g. prim_base.initialize's state-size
+        # probe), forcing a mid-init cache refresh + post_update.
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
             return False
         s = self.obj.scene.idx
