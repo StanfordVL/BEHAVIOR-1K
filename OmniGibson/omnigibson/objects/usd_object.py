@@ -20,13 +20,12 @@ from omnigibson.object_states.factory import (
     get_fire_states,
     get_requirements_for_ability,
     get_state_name,
+    get_states_and_params_for_ability,
     get_states_by_dependency_order,
-    get_states_for_ability,
     get_steam_states,
     get_texture_change_priority,
     get_texture_change_states,
     get_visual_states,
-    transform_ability_params_for_state,
 )
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
@@ -548,7 +547,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                         break
                 if compatible:
                     params = self._abilities[ability]
-                    for state_type in get_states_for_ability(ability):
+                    for state_type, state_params in get_states_and_params_for_ability(ability, params):
                         if state_type in states_info:
                             # An object carries at most one instance of a given state, so two
                             # abilities requesting the same state must be reconciled. The only
@@ -576,9 +575,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                                 continue
                         states_info[state_type] = {
                             "ability": ability,
-                            "params": state_type.postprocess_ability_params(
-                                transform_ability_params_for_state(ability, state_type, params), self.scene
-                            ),
+                            "params": state_type.postprocess_ability_params(state_params, self.scene),
                         }
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
