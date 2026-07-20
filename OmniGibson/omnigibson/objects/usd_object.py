@@ -26,7 +26,6 @@ from omnigibson.object_states.factory import (
     get_texture_change_priority,
     get_texture_change_states,
     get_visual_states,
-    transform_ability_params_for_state,
 )
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
