@@ -14,6 +14,14 @@ from av.stream import Stream
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
+TORCH_NUM_THREADS = None
+TORCH_NUM_INTEROP_THREADS = None
+
+if TORCH_NUM_THREADS is not None:
+    th.set_num_threads(TORCH_NUM_THREADS)
+if TORCH_NUM_INTEROP_THREADS is not None:
+    th.set_num_interop_threads(TORCH_NUM_INTEROP_THREADS)
+
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from gello.utils.og_teleop_cfg import DISABLED_TRANSITION_RULES
@@ -43,7 +51,6 @@ from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.eval.utils.light_utils import LightToggleSynchronizer, set_light_control_toggles
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
-
 
 LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 EVAL_BASE_LINK_MASS = 250.0
