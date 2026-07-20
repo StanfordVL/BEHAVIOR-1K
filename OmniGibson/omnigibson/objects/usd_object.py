@@ -20,8 +20,8 @@ from omnigibson.object_states.factory import (
     get_fire_states,
     get_requirements_for_ability,
     get_state_name,
+    get_states_and_params_for_ability,
     get_states_by_dependency_order,
-    get_states_for_ability,
     get_steam_states,
     get_texture_change_priority,
     get_texture_change_states,
@@ -547,10 +547,35 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                         break
                 if compatible:
                     params = self._abilities[ability]
-                    for state_type in get_states_for_ability(ability):
+                    for state_type, state_params in get_states_and_params_for_ability(ability, params):
+                        if state_type in states_info:
+                            # An object carries at most one instance of a given state, so two
+                            # abilities requesting the same state must be reconciled. The only
+                            # supported overlap is HeatSourceOrSink: an explicit heat/cold source
+                            # ability and `flammable` both request it (flammable pairs OnFire with
+                            # a requires_on_fire heat source). The explicit source owns the single
+                            # instance — its toggled heating is the object's task-relevant behavior
+                            # — and `flammable` then contributes only its OnFire detector. Any other
+                            # overlap is unsupported and fails loudly.
+                            # (charcoal_grill and space_heater are both heatSource + flammable.)
+                            prev_ability = states_info[state_type]["ability"]
+                            conflict = {prev_ability, ability}
+                            is_source_vs_flammable = (
+                                state_type is HeatSourceOrSink
+                                and "flammable" in conflict
+                                and bool(conflict & {"heatSource", "coldSource"})
+                            )
+                            assert is_source_vs_flammable, (
+                                f"Object {self.name}: state {state_type.__name__} is requested by multiple abilities "
+                                f"({prev_ability} and {ability}); this is not supported."
+                            )
+                            # `flammable` yields the heat source to the explicit source, whether the
+                            # explicit source was registered already or overwrites flammable below.
+                            if ability == "flammable":
+                                continue
                         states_info[state_type] = {
                             "ability": ability,
-                            "params": state_type.postprocess_ability_params(params, self.scene),
+                            "params": state_type.postprocess_ability_params(state_params, self.scene),
                         }
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
@@ -598,8 +623,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if emitter_type == EmitterType.FIRE:
             fire_at_meta_link = True
             if OnFire in self.states:
-                # Note whether the heat source link is explicitly set
-                link = self.states[OnFire].link
+                # Flammable object: the fire is placed at the companion heat source's link
+                # (the heatsource meta link when annotated, e.g. a candle wick; the root link
+                # otherwise). OnFire itself is a pure threshold detector and carries no link.
+                heat_source = self.states.get(HeatSourceOrSink)
+                link = heat_source.link if heat_source is not None else self.root_link
                 fire_at_meta_link = link != self.root_link
             elif HeatSourceOrSink in self.states:
                 # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
