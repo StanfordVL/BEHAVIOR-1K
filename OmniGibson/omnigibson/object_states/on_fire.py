@@ -5,7 +5,6 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
-from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.utils.python_utils import classproperty
 
@@ -158,7 +157,6 @@ class OnFire(TensorizedAbsoluteState):
         )
 
     def _get_value(self):
-        TensorizedState.maybe_refresh_caches()
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
             return False
         s = self.obj.scene.idx

@@ -468,8 +468,10 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         )
 
     def _get_value(self):
-        # Match base class semantics: bring caches into sync, then read CPU mirror
-        TensorizedState.maybe_refresh_caches()
+        # Raw read of the CPU mirror. Freshness is handled by the public get_value() wrapper
+        # (TensorizedState.get_value -> maybe_refresh_caches), matching AABB/ToggledOn. Refreshing
+        # here would also fire on the _dump_state path (e.g. prim_base.initialize's state-size
+        # probe), forcing a mid-init cache refresh + post_update.
         if self.OBJ_IDXS is None or self.obj.relative_prim_path not in self.OBJ_IDXS:
             return False
         s = self.obj.scene.idx
