@@ -248,8 +248,8 @@ if [ "$NEW_ENV" = true ]; then
         exit 1
     fi
     
-    # Create environment with Python 3.11 and packaging tools used by this script
-    conda create -n "$NEW_ENV_NAME" python=3.11 pip "setuptools>=71,<81" wheel -c conda-forge -y
+    # Create environment with Python 3.12 and packaging tools used by this script
+    conda create -n "$NEW_ENV_NAME" python=3.12 pip "setuptools>=71,<81" wheel -c conda-forge -y
     conda activate "$NEW_ENV_NAME"
     
     [[ "$CONDA_DEFAULT_ENV" != "$NEW_ENV_NAME" ]] && { echo "ERROR: Failed to activate environment '$NEW_ENV_NAME'"; exit 1; }
@@ -284,7 +284,7 @@ if [ "$OMNIGIBSON" = true ]; then
     
     # Check Python version
     PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    [ "$PYTHON_VERSION" != "3.11" ] && { echo "ERROR: Python 3.11 required, found $PYTHON_VERSION"; exit 1; }
+    [ "$PYTHON_VERSION" != "3.12" ] && { echo "ERROR: Python 3.12 required, found $PYTHON_VERSION"; exit 1; }
     
     # Check for conflicting environment variables
     if [[ -n "$EXP_PATH" || -n "$CARB_APP_PATH" || -n "$ISAAC_PATH" ]]; then
@@ -336,7 +336,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
         # For aarch, do alternative install via direct one-liner
         if [ "$ARCH" = "aarch64" ]; then
-            python -m pip install isaacsim[all,extscache]==5.1.0 --extra-index-url https://pypi.nvidia.com
+            python -m pip install isaacsim[all,extscache]==6.0.1.0 --extra-index-url https://pypi.nvidia.com
         else
             # Helper functions
             check_glibc_old() {
@@ -346,38 +346,38 @@ if [ "$OMNIGIBSON" = true ]; then
             install_isaac_packages() {
                 local temp_dir=$(mktemp -d)
                 local packages=(
-                    "omniverse_kit-107.3.1.206797"
-                    "isaacsim_kernel-5.1.0.0"
-                    "isaacsim_app-5.1.0.0"
-                    "isaacsim_core-5.1.0.0"
-                    "isaacsim_gui-5.1.0.0"
-                    "isaacsim_utils-5.1.0.0"
-                    "isaacsim_storage-5.1.0.0"
-                    "isaacsim_asset-5.1.0.0"
-                    "isaacsim_sensor-5.1.0.0"
-                    "isaacsim_robot_motion-5.1.0.0"
-                    "isaacsim_robot-5.1.0.0"
-                    "isaacsim_benchmark-5.1.0.0"
-                    "isaacsim_code_editor-5.1.0.0"
-                    "isaacsim_ros1-5.1.0.0"
-                    "isaacsim_cortex-5.1.0.0"
-                    "isaacsim_example-5.1.0.0"
-                    "isaacsim_replicator-5.1.0.0"
-                    "isaacsim_rl-5.1.0.0"
-                    "isaacsim_robot_setup-5.1.0.0"
-                    "isaacsim_ros2-5.1.0.0"
-                    "isaacsim_template-5.1.0.0"
-                    "isaacsim_test-5.1.0.0"
-                    "isaacsim-5.1.0.0"
-                    "isaacsim_extscache_physics-5.1.0.0"
-                    "isaacsim_extscache_kit-5.1.0.0"
-                    "isaacsim_extscache_kit_sdk-5.1.0.0"
+                    "omniverse_kit-110.1.1.305458"
+                    "isaacsim_kernel-6.0.1.0"
+                    "isaacsim_app-6.0.1.0"
+                    "isaacsim_core-6.0.1.0"
+                    "isaacsim_gui-6.0.1.0"
+                    "isaacsim_utils-6.0.1.0"
+                    "isaacsim_storage-6.0.1.0"
+                    "isaacsim_asset-6.0.1.0"
+                    "isaacsim_sensor-6.0.1.0"
+                    "isaacsim_robot_motion-6.0.1.0"
+                    "isaacsim_robot-6.0.1.0"
+                    "isaacsim_benchmark-6.0.1.0"
+                    "isaacsim_code_editor-6.0.1.0"
+                    "isaacsim_ros1-6.0.1.0"
+                    "isaacsim_cortex-6.0.1.0"
+                    "isaacsim_example-6.0.1.0"
+                    "isaacsim_replicator-6.0.1.0"
+                    "isaacsim_rl-6.0.1.0"
+                    "isaacsim_robot_setup-6.0.1.0"
+                    "isaacsim_ros2-6.0.1.0"
+                    "isaacsim_template-6.0.1.0"
+                    "isaacsim_test-6.0.1.0"
+                    "isaacsim-6.0.1.0"
+                    "isaacsim_extscache_physics-6.0.1.0"
+                    "isaacsim_extscache_kit-6.0.1.0"
+                    "isaacsim_extscache_kit_sdk-6.0.1.0"
                 )
 
                 local wheel_files=()
                 for pkg in "${packages[@]}"; do
                     local pkg_name=${pkg%-*}
-                    local filename="${pkg}-cp311-none-manylinux_2_35_${ARCH}.whl"
+                    local filename="${pkg}-cp312-none-manylinux_2_35_${ARCH}.whl"
                     local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
                     local filepath="$temp_dir/$filename"
 
@@ -423,16 +423,21 @@ if [ "$OMNIGIBSON" = true ]; then
 
         # Fix packaging conflict - remove conflicting version
         # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0
-        if [ -d "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging" ]; then
-            echo "Fixing packaging conflict..."
-            rm -rf "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
-        fi
+        for pip_archive_packaging in "$CONDA_PREFIX"/lib/python3.*/site-packages/isaacsim/extscache/omni.services.pip_archive-*/pip_prebundle/packaging; do
+            if [ -d "$pip_archive_packaging" ]; then
+                echo "Fixing packaging conflict..."
+                rm -rf "$pip_archive_packaging"
+            fi
+        done
     fi
     
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     python -m pip install --force-reinstall cffi==1.17.1
-    # Force reinstall websockets >= 15.0.1 because it's been overwritten by Isaac Sim with an older version
-    python -m pip install --force-reinstall "websockets>=15.0.1"
+
+    # isaacsim-kernel 6.0.1 pins coverage==7.4.4, llvmlite==0.46 and websockets==12.0,
+    # which break numba (needs newer coverage/llvmlite) and omnigibson.eval
+    # (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
+    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48" "websockets>=15.0.1"
 
     echo "OmniGibson installation completed successfully!"
 fi
