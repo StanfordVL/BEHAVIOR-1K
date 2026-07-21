@@ -385,6 +385,28 @@ def main():
         for k, v in sorted(attachment_pairs.items())
     }
 
+    # Accumulate the scene camera poses. These are the viewport cameras (e.g.
+    # "camera-diag") used by generate_camera_images.py, identified by their
+    # camera superclass rather than by parse_name (their names don't follow the
+    # object naming convention). Positions are stored in max units (mm), matching
+    # bounding_boxes and portals. The rotation uses the node's obj.rotation
+    # property (like portals), which is already the correct world rotation and
+    # does not require the .inv() correction that obj.transform.rotation does.
+    cameras = {}
+    for cam in rt.objects:
+        if rt.superClassOf(cam) != rt.Camera:
+            continue
+        camera_id = cam.name
+        if camera_id.startswith("camera-"):
+            camera_id = camera_id[len("camera-") :]
+        cameras[camera_id] = {
+            "position": list(cam.position),
+            "rotation": quat2arr(cam.rotation).tolist(),
+            # Room assignment via layer name (comma-separated), like objects. A
+            # layer of "0" means the camera is global (not tied to any room).
+            "room": cam.layer.name,
+        }
+
     # Start storing the data
     results = {
         "success": success,
@@ -397,6 +419,7 @@ def main():
         "object_counts": counts,
         "bounding_boxes": bounding_boxes,
         "mesh_fingerprints": mesh_fingerprints,
+        "cameras": cameras,
         "error_invalid_name": sorted(nomatch),
         "error_bad_attachment": bad_attachments,
     }

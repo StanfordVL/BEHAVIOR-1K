@@ -144,6 +144,37 @@ def process_target(target, scenes_dir):
                 if obj_rooms:
                     ET.SubElement(custom_xml, "text", {"name": f"rooms::{obj_name}", "data": obj_rooms})
 
+            # Emit the scene cameras (stored as custom <camera> elements in the
+            # scene URDF by export_scenes_global.py) as native MuJoCo cameras.
+            for camera in scene_urdf.findall("camera"):
+                cam_name = camera.attrib["name"]
+                cam_pos = np.fromstring(camera.attrib["xyz"], sep=" ")
+                cam_quat_xyzw = np.fromstring(camera.attrib["quat"], sep=" ")
+                cam_quat_wxyz = [
+                    cam_quat_xyzw[3],
+                    cam_quat_xyzw[0],
+                    cam_quat_xyzw[1],
+                    cam_quat_xyzw[2],
+                ]
+                mj_cam_name = f"camera_{cam_name}"
+                ET.SubElement(
+                    worldbody_xml,
+                    "camera",
+                    {
+                        "name": mj_cam_name,
+                        "pos": _fmt(cam_pos),
+                        "quat": _fmt(cam_quat_wxyz),
+                    },
+                )
+                # Room assignment (empty means the camera is global).
+                cam_rooms = camera.attrib.get("rooms", "")
+                if cam_rooms:
+                    ET.SubElement(
+                        custom_xml,
+                        "text",
+                        {"name": f"rooms::{mj_cam_name}", "data": cam_rooms},
+                    )
+
             # Drop empty sections for cleanliness.
             for section in [equality_xml, custom_xml]:
                 if len(section) == 0:

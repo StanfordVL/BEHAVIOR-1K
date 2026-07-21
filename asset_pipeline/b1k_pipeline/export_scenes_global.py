@@ -34,6 +34,9 @@ def process_target(target, scenes_dir):
         world_link.attrib = {"name": "world"}
         scene_tree_roots[suffix] = scene_tree_root
 
+    # Accumulate the scene cameras (in the combined scene frame) across all parts.
+    scene_cameras = {}
+
     # Load info about the scene parts.
     target_output_fs = pipeline_fs.target_output(target)
     scene_parts = {scene_name: None}
@@ -75,6 +78,30 @@ def process_target(target, scenes_dir):
             assert np.allclose(
                 rot_axis, [0, 0, 1]
             ), f"Relative transform should only be a Z rotation. Current axis: {rot_axis}"
+
+        # Collect the scene cameras from this part and move them into the combined
+        # scene frame, mirroring how objects are relocated via rel_transform.
+        with partial_scene_output_fs.open("object_list.json", "r") as f:
+            part_object_list = json.load(f)
+        for camera_id, camera_info in part_object_list.get("cameras", {}).items():
+            camera_transform = np.eye(4)
+            # The camera rotation is stored from the node's obj.rotation property
+            # (like portals), which is already the correct world rotation, so no
+            # inversion is needed here (unlike bbox rotations, which come from
+            # obj.transform.rotation and require .inv() in mesh_tree.py).
+            camera_transform[:3, :3] = R.from_quat(camera_info["rotation"]).as_matrix()
+            camera_transform[:3, 3] = np.array(camera_info["position"]) / 1000.0
+            corrected_camera_transform = rel_transform @ camera_transform
+            camera_name = (
+                camera_id
+                if partial_scene_name == scene_name
+                else f"{partial_scene_name}-{camera_id}"
+            )
+            # Room assignment via layer name; "0" means the camera is global.
+            camera_room = camera_info.get("room", "0")
+            if camera_room == "0":
+                camera_room = ""
+            scene_cameras[camera_name] = (corrected_camera_transform, camera_room)
 
         # Build the mesh tree using our mesh tree library.
         # We don't need the upper side joints since we will only use these objects for bboxes.
@@ -151,6 +178,21 @@ def process_target(target, scenes_dir):
                 joint_parent.attrib = {"link": "world"}
                 joint_child = ET.SubElement(joint, "child")
                 joint_child.attrib = {"link": obj_name_in_scene}
+
+    # Add the scene cameras to both scene versions. These are stored as custom
+    # <camera> elements (ignored by the URDF-to-scene importer) so that downstream
+    # exporters (e.g. export_scenes_mujoco.py) can emit them natively.
+    for camera_name, (camera_transform, camera_room) in scene_cameras.items():
+        camera_pos = camera_transform[:3, 3]
+        camera_quat = R.from_matrix(camera_transform[:3, :3]).as_quat()  # xyzw
+        for scene_tree_root in scene_tree_roots.values():
+            camera_element = ET.SubElement(scene_tree_root, "camera")
+            camera_element.attrib = {
+                "name": camera_name,
+                "xyz": " ".join(str(item) for item in camera_pos.tolist()),
+                "quat": " ".join(str(item) for item in camera_quat.tolist()),
+                "rooms": camera_room,
+            }
 
     # Write, reparse, and write with header, using the XML library,
     urdf_dir = OSFS(scenes_dir).makedir(scene_name).makedir("urdf")

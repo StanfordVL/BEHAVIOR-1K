@@ -32,14 +32,14 @@ def main():
     assert rt.renderpresets.Load(0, RENDER_PRESET_FILENAME, preset_categories)
 
     # Unhide everything
-    # for x in rt.objects:
-    #     x.isHidden = False
+    for x in rt.objects:
+        x.isHidden = False
 
-    # Hide the upper joints
+    # Hide the upper joints and meta links
     for x in rt.objects:
         match = PATTERN.fullmatch(x.name)
         if match is not None and (
-            match.group("joint_side") == "upper" or "light" in match.group("category")
+            match.group("joint_side") == "upper" or match.group("meta_type") is not None
         ):
             x.isHidden = True
 
