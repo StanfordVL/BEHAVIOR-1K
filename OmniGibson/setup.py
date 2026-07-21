@@ -54,7 +54,7 @@ setup(
         "pillow>=11.0.0",
         "websockets>=15.0.1",
         "omegaconf>=2.3.0",
-        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@release/b1k",
+        "lerobot[dataset] @ git+https://github.com/huggingface/lerobot@1427d35ef58ab46651dc7ef78bde81642090c861",
     ],
     extras_require={
         "dev": [
