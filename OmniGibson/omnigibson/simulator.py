@@ -203,8 +203,6 @@ def _launch_app():
     # Otherwise it will inherit the arguments of the entrypoint script.
     _saved_argv = sys.argv[:]
     try:
-        # TODO Missed merge from main (PR #2178 / 00c69a807, 2026-05-07). Delete after merging with main
-        # without this we will recompile 216 Vulkan pipelines on every launch andmakeload time very long
         sys.argv = [
             _saved_argv[0]
         ]  # The script filename needs to be included - otherwise the first arg will get skipped.
@@ -657,10 +655,6 @@ def _launch_simulator(*args, **kwargs):
 
         def _set_renderer_settings(self):
             settings = lazy.carb.settings.get_settings()
-            # Missed merge from main (PR #2183 / c83f35e12 "Enable RT2 and fractional opacity",
-            # 2026-05-07). Without them, RTX defaults to a different rendermode that
-            # invalidates the shipped Slang/Vulkan shader cache.
-            # TODO Delete after merging with main
             settings.set_bool("/rtx/rtx/modes/rt/enabled", True)  # real-time 2.0 requires rt to be enabled as well
             settings.set_bool("/rtx/rtx/modes/rt2/enabled", True)
             settings.set("/rtx/rendermode", "RealTimePathTracing")
@@ -878,7 +872,8 @@ def _launch_simulator(*args, **kwargs):
                 sim_step_dt (float, optional): Internal simulation step timestep
                     If None, will default to the current value
             """
-            self._sim_context.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+            with self.editing_usd():
+                self._sim_context.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
             current_physics_dt = self.get_physics_dt()
             current_rendering_dt = self.get_rendering_dt()
 
@@ -1045,6 +1040,19 @@ def _launch_simulator(*args, **kwargs):
                         obj.name in obj_registry
                     ):  # a particle system template object might not exist in the registry when it's empty
                         obj_registry.pop(obj.name)
+                    # Remove stale articulated-grasp constraints for any robot arm targeting this object.
+                    for robot in obj.scene.robots:
+                        robot_state = obj_registry.get(robot.name)
+                        ag_params = None if robot_state is None else robot_state.get("ag_obj_constraint_params")
+                        if ag_params is None:
+                            continue
+                        for arm, arm_params in ag_params.items():
+                            if not arm_params:
+                                continue
+                            target_obj = arm_params.get("target_obj")
+                            target_obj_name = target_obj.name if hasattr(target_obj, "name") else target_obj
+                            if target_obj_name == obj.name or arm_params.get("ag_obj_prim_path") == obj.prim_path:
+                                ag_params[arm] = None
 
             # Run the main method
             try:
@@ -1672,54 +1680,6 @@ def _launch_simulator(*args, **kwargs):
             self._render_on_step = value
             yield
             self._render_on_step = original_value
-
-        @contextlib.contextmanager
-        def stopped(self):
-            """
-            A context scope for making sure the simulator is stopped during execution within this scope.
-            Upon leaving the scope, the prior simulator state is restored.
-            """
-            # Infer what state we're currently in, then stop, yield, and then restore the original state
-            sim_is_playing, sim_is_paused = self.is_playing(), self.is_paused()
-            if sim_is_playing or sim_is_paused:
-                self.stop()
-            yield
-            if sim_is_playing:
-                self.play()
-            elif sim_is_paused:
-                self.pause()
-
-        @contextlib.contextmanager
-        def playing(self):
-            """
-            A context scope for making sure the simulator is playing during execution within this scope.
-            Upon leaving the scope, the prior simulator state is restored.
-            """
-            # Infer what state we're currently in, then stop, yield, and then restore the original state
-            sim_is_stopped, sim_is_paused = self.is_stopped(), self.is_paused()
-            if sim_is_stopped or sim_is_paused:
-                self.play()
-            yield
-            if sim_is_stopped:
-                self.stop()
-            elif sim_is_paused:
-                self.pause()
-
-        @contextlib.contextmanager
-        def paused(self):
-            """
-            A context scope for making sure the simulator is paused during execution within this scope.
-            Upon leaving the scope, the prior simulator state is restored.
-            """
-            # Infer what state we're currently in, then stop, yield, and then restore the original state
-            sim_is_stopped, sim_is_playing = self.is_stopped(), self.is_playing()
-            if sim_is_stopped or sim_is_playing:
-                self.pause()
-            yield
-            if sim_is_stopped:
-                self.stop()
-            elif sim_is_playing:
-                self.play()
 
         @contextlib.contextmanager
         def slowed(self, slow_dt=1e-6):

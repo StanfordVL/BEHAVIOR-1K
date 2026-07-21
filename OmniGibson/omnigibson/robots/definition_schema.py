@@ -112,6 +112,8 @@ class RobotDefinition:
     curobo_path: Optional[str] = None
     base_footprint_link_name: Optional[str] = None
     visual_only_eef_links: bool = False
+
+    self_collisions: Optional[bool] = None
     linear_velocity_gain_for_primitives: Optional[float] = None
     angular_velocity_gain_for_primitives: Optional[float] = None
 

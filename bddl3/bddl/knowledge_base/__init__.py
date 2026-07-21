@@ -21,6 +21,7 @@ from bddl.knowledge_base.models import (
 from bddl.knowledge_base.knowledgebase import KnowledgeBase
 
 from bddl.knowledge_base.utils import SynsetState
+from bddl.predicates import Predicate
 
 from bddl.transition_rules import (
     CookingRecipe,

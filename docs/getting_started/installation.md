@@ -4,7 +4,7 @@
 
 Please make sure your system meets the following specs:
 
-- [x] **OS:** Ubuntu 20.04+ / Windows 10+
+- [x] **OS:** Ubuntu 22.04+ / Windows 10+
 - [x] **RAM:** 32GB+
 - [x] **GPU:** NVIDIA RTX 2070+
 - [x] **VRAM:** 8GB+
@@ -36,7 +36,7 @@ Choose your installation method:
             Clone the latest stable release (recommended):
 
             ```shell
-            git clone -b v3.7.2 https://github.com/StanfordVL/BEHAVIOR-1K.git
+            git clone -b v3.9.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
             cd BEHAVIOR-1K
             ```
             

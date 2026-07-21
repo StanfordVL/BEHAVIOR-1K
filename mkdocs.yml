@@ -6,7 +6,7 @@ site_name: BEHAVIOR
 repo_name: StanfordVL/BEHAVIOR-1K
 site_url: https://behavior.stanford.edu
 repo_url: https://github.com/StanfordVL/BEHAVIOR-1K
-theme: 
+theme:
   name: material
   logo: assets/behavior_logo3.png
   favicon: assets/behavior_logo3.png
@@ -80,6 +80,7 @@ plugins:
         'omnigibson/behavior_components/behavior_knowledgebase.md': 'https://behavior.stanford.edu/knowledgebase/'
         'behavior-100.md': 'behavior_100/overview.md'
         'challenge/rules.md': 'challenge/evaluation.md'
+        'workshops/overview.md': 'challenge/archive/index.md'
   - mkdocstrings:
       handlers:
         python:
@@ -101,16 +102,15 @@ plugins:
 
 nav:
   - Home: index.md
-  - 🏆 2025 BEHAVIOR Challenge: 
+  - 🏆 2026 BEHAVIOR Challenge:
     - challenge/index.md
-    - Call for Participation: challenge/call_for_participation.md
     - Announcements / Updates: challenge/updates.md
-    - Leaderboard: challenge/leaderboard.md
+    - Leaderboard: https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard
     - Dataset: challenge/dataset.md
     - Baselines: challenge/baselines.md
     - Evaluation and Rules: challenge/evaluation.md
     - Submission Guidelines: challenge/submission.md
-    - Demo Gallery: challenge/tasks/
+    - Demo Gallery: challenge/tasks/index.md
   - Documentation:
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md
@@ -136,7 +136,7 @@ nav:
     - Tutorials:
       - Demo Collection: tutorials/demo_collection.md
       - Running on a Compute Cluster: tutorials/running_on_a_compute_cluster.md
-      - Remote Streaming: tutorials/remote_streaming.md    
+      - Remote Streaming: tutorials/remote_streaming.md
       - Saving and Loading Simulation State: tutorials/save_load.md
       - Customizing Robots: tutorials/customizing_robots.md
       - Custom Robot Import: tutorials/custom_robot_import.md
@@ -145,13 +145,13 @@ nav:
         - Task Definitions: behavior_components/behavior_tasks.md
         - Noun Hierarchy: behavior_components/noun_hierarchy.md
         - Knowledgebase: behavior_components/behavior_knowledgebase.md
-      - 3D Assets: 
+      - 3D Assets:
         - Scenes: behavior_components/scenes.md
         - Objects: behavior_components/objects.md
         - Annotation process: behavior_components/annotation_process.md
         - Asset pipeline: behavior_components/asset_pipeline.md
         - Asset sources: behavior_components/asset_sources.md
-      - Teleoperation: 
+      - Teleoperation:
         - JoyLo: behavior_components/joylo.md
         - VR: behavior_components/vr.md
         - Task Sampling: behavior_components/task_sampling.md
@@ -166,15 +166,17 @@ nav:
     - Changelog: https://github.com/StanfordVL/OmniGibson/releases
   - Knowledgebase: https://behavior.stanford.edu/knowledgebase/
   - Research: other/related_research.md
-  - Workshops:
-    - workshops/overview.md
-    - 1st BEHAVIOR Workshop @ ICCV 2021: workshops/iccv21.md
-    - 1st BEHAVIOR Tutorial @ ECCV 2022: workshops/eccv22.md
+  - Past Events: challenge/archive/index.md
   - BEHAVIOR-100:
     - behavior_100/overview.md
     - VR Dataset: behavior_100/dataset.md
     - Demo Gallery: behavior_100/demo_gallery.md
   - <i class="fa-brands fa-discord"></i>  Support: https://discord.gg/bccR5vGFEx
+
+not_in_nav: |
+  challenge/tasks/**
+  challenge/archive/2025/**
+  workshops/**
 
 extra:
   analytics:
@@ -195,4 +197,4 @@ extra:
       link: https://discord.gg/bccR5vGFEx
       name: Discord
 
-copyright: © 2025 Stanford Vision and Learning Lab
+copyright: © 2026 Stanford Vision and Learning Lab

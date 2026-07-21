@@ -5,6 +5,7 @@ import re
 import sys
 import yaml
 import hashlib
+import json
 
 OBJS_DIR = "../cad/objects"
 SCENES_DIR = "../cad/scenes"
@@ -70,6 +71,16 @@ FINAL_SCENES = [
     "gates_bedroom",
 ]
 
+CHALLENGE_SCENES = [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "house_double_floor_upper",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right",
+    "Rs_int",
+]
+
 APPROVED_OBJS = {
     ".*",
 }
@@ -89,20 +100,33 @@ VERIFIED_SCENES = {
 }
 
 
+def get_challenge_scene_deps(challenge_scenes, approved_scenes):
+    challenge_scenes_and_deps = set(challenge_scenes)
+    for scene_name in sorted(challenge_scenes):
+        object_list_path = os.path.join(
+            os.path.dirname(__file__),
+            SCENES_DIR,
+            scene_name,
+            "artifacts",
+            "object_list.json",
+        )
+        if not os.path.exists(object_list_path):
+            print(f"Missing object list for challenge scene: {scene_name}")
+            continue
+
+        with open(object_list_path, "r") as f:
+            room_object_list = json.load(f)
+
+        challenge_scenes_and_deps.update(room_object_list.get("outgoing_portals", {}).keys())
+
+    missing_challenge_deps = challenge_scenes_and_deps - set(approved_scenes)
+    if missing_challenge_deps:
+        print(f"Missing challenge scene dependencies: {missing_challenge_deps}")
+
+    return sorted(challenge_scenes_and_deps & set(approved_scenes))
+
+
 def main():
-    if len(sys.argv) > 1:
-        # Work-division system for multiple clients
-        salt, your_id, total_ids = sys.argv[1:]
-        your_id = int(your_id)
-        total_ids = int(total_ids)
-    else:
-        salt = ""
-        your_id = 0
-        total_ids = 1
-    assert 0 <= your_id < total_ids, f"Invalid ID {your_id}"
-
-    root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ROOT_PATH))
-
     objects_path = os.path.join(os.path.dirname(__file__), OBJS_DIR)
     all_object_list = [
         x
@@ -116,14 +140,8 @@ def main():
         and not any(re.fullmatch(exp, x) for exp in REJECTED_OBJS)
     )
     objects = sorted(
-        [
-            "objects/" + x
-            for x in approved_objects
-            if int(hashlib.md5((x + salt).encode()).hexdigest(), 16) % total_ids
-            == your_id
-        ]
+        ["objects/" + x for x in approved_objects]
     )
-    objects_unfiltered = sorted(["objects/" + x for x in all_object_list])
 
     scenes_path = os.path.join(os.path.dirname(__file__), SCENES_DIR)
     all_scenes_list = [
@@ -138,16 +156,24 @@ def main():
         and not any(re.fullmatch(exp, x) for exp in REJECTED_SCENES)
     )
     scenes = sorted(["scenes/" + x for x in approved_scenes])  #
-    scenes_unfiltered = sorted(["scenes/" + x for x in all_scenes_list])  #
 
     combined = objects + scenes
-    combined_unfiltered = objects_unfiltered + scenes_unfiltered
 
     found_final_scenes = set(FINAL_SCENES) & set(approved_scenes)
     missing_final_scene_paths = set(FINAL_SCENES) - found_final_scenes
     if missing_final_scene_paths:
         print(f"Missing scenes: {missing_final_scene_paths}")
     final_scenes = sorted(["scenes/" + x for x in found_final_scenes])
+
+    found_challenge_scenes = set(CHALLENGE_SCENES) & set(approved_scenes)
+    missing_challenge_scene_paths = set(CHALLENGE_SCENES) - found_challenge_scenes
+    if missing_challenge_scene_paths:
+        print(f"Missing challenge scenes: {missing_challenge_scene_paths}")
+    challenge_scenes = sorted(["scenes/" + x for x in found_challenge_scenes])
+    challenge_scenes_and_deps = sorted(
+        "scenes/" + x
+        for x in get_challenge_scene_deps(found_challenge_scenes, approved_scenes)
+    )
 
     found_verified_scenes = set(
         x
@@ -159,13 +185,12 @@ def main():
     out_path = os.path.join(os.path.dirname(__file__), OUT_PATH)
     params = {
         "objects": objects,
-        # "objects_unfiltered": objects_unfiltered,
         "scenes": scenes,
-        # "scenes_unfiltered": scenes_unfiltered,
         "final_scenes": final_scenes,
+        "challenge_scenes": challenge_scenes,
+        "challenge_scenes_and_deps": challenge_scenes_and_deps,
         "verified_scenes": verified_scenes,
         "combined": combined,
-        # "combined_unfiltered": combined_unfiltered,
     }
     with open(out_path, "w") as f:
         yaml.dump(params, f)

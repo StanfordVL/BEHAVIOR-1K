@@ -2,27 +2,34 @@
     (:domain behavior-1k)
 
     (:objects
-        battery.n.02_1 battery.n.02_2 - battery.n.02
-        shelf.n.01_1 - shelf.n.01
-        cabinet.n.01_1 - cabinet.n.01
+        battery.n.02_1 battery.n.02_2 battery.n.02_3 - battery.n.02
+        coffee_table.n.01_1 - coffee_table.n.01
+        cabinet.n.01_1 cabinet.n.01_2 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
     
     (:init 
-        (ontop battery.n.02_1 shelf.n.01_1)
-        (ontop battery.n.02_2 shelf.n.01_1)
-        (inroom shelf.n.01_1 bathroom) 
+        (ontop battery.n.02_1 coffee_table.n.01_1)
+        (ontop battery.n.02_2 coffee_table.n.01_1)
+        (ontop battery.n.02_3 countertop.n.01_1)
+        (inroom coffee_table.n.01_1 living_room) 
         (inroom cabinet.n.01_1 living_room) 
-        (inroom floor.n.01_1 bathroom) 
+        (inroom cabinet.n.01_2 living_room) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 living_room) 
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
     (:goal 
         (and 
-            (forall 
-                (?battery.n.02 - battery.n.02)
-                (inside ?battery.n.02 ?cabinet.n.01_1)
+            (exists 
+                (?cabinet.n.01 - cabinet.n.01)
+                (forall 
+                    (?battery.n.02 - battery.n.02)
+                    (inside ?battery.n.02 ?cabinet.n.01)
+                )
             )
         )
     )

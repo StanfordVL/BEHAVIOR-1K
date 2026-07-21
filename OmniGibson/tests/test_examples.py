@@ -16,20 +16,16 @@ EXAMPLES = [
     "environments.vector_env_demo",
     "object_states.attachment_demo",
     "object_states.dicing_demo",
-    "object_states.folded_unfolded_state_demo",
-    "object_states.heat_source_or_sink_demo",
     "object_states.heated_state_demo",
     "object_states.onfire_demo",
     "object_states.overlaid_demo",
     "object_states.particle_applier_remover_demo",
-    "object_states.particle_source_sink_demo",
     "object_states.sample_kinematics_demo",
     "object_states.slicing_demo",
     "object_states.temperature_demo",
     "objects.draw_bounding_box",
     "objects.highlight_objects",
     "objects.load_object_selector",
-    "objects.view_cloth_configurations",
     "objects.visualize_object",
     "robots.all_robots_visualizer",
     "robots.grasping_mode_example",
@@ -44,17 +40,22 @@ EXAMPLES = [
 
 # Examples excluded from automated testing
 EXAMPLES_TO_SKIP = [
-    "action_primitives.rs_int_example",
-    "action_primitives.solve_simple_task",
-    "action_primitives.wip_solve_behavior_task",
     "environments.behavior_env_demo",  # requires pre-sampled cached BEHAVIOR activity scene
     "learning.navigation_policy_demo",
     "teleoperation.robot_teleoperate_demo",
     "teleoperation.vr_robot_control_demo",  # does not support headless mode
     "teleoperation.vr_scene_tour_demo",  # does not support headless mode
-    "robots.curobo_example",  # requires CuRobo and CUDA support
     "objects.import_custom_object",  # CLI conversion tool, requires demo / test asset files
     "object_states.object_state_texture_demo",  # disable temporarily due to contact API bug
+    # WIP examples: currently broken, to be supported again in the future
+    "wip.curobo_example",
+    "wip.folded_unfolded_state_demo",
+    "wip.heat_source_or_sink_demo",
+    "wip.particle_source_sink_demo",
+    "wip.rs_int_primitives_example",
+    "wip.solve_behavior_task",
+    "wip.solve_simple_task",
+    "wip.view_cloth_configurations",
 ]
 
 

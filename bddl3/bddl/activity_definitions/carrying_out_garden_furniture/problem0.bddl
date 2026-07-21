@@ -2,8 +2,8 @@
     (:domain behavior-1k)
 
     (:objects
-        lawn_chair.n.01_1 lawn_chair.n.01_2 - lawn_chair.n.01
-        floor.n.01_1 - floor.n.01
+        lawn_chair.n.01_1 - lawn_chair.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
         barrow.n.03_1 - barrow.n.03
         lawn.n.01_1 - lawn.n.01
         agent.n.01_1 - agent.n.01
@@ -11,20 +11,20 @@
     
     (:init 
         (ontop lawn_chair.n.01_1 floor.n.01_1)
-        (ontop lawn_chair.n.01_2 floor.n.01_1)
         (ontop barrow.n.03_1 floor.n.01_1) 
         (inroom lawn.n.01_1 garden) 
-        (inroom floor.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room)
+        (inroom floor.n.01_2 garden) 
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
-    (:goal 
-        (and 
-            (forall 
-                (?lawn_chair.n.01 - lawn_chair.n.01)
-                (ontop ?lawn_chair.n.01 ?lawn.n.01_1)
-            ) 
-            (ontop ?barrow.n.03_1 ?lawn.n.01_1)
+    (:goal
+        (and
+            (ontop ?lawn_chair.n.01_1 ?floor.n.01_2)
+            (exists
+                (?lawn.n.01 - lawn.n.01)
+                (ontop ?barrow.n.03_1 ?lawn.n.01)
+            )
         )
     )
 )

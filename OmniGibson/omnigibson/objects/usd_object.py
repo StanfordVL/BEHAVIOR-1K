@@ -43,6 +43,7 @@ from omnigibson.utils.usd_utils import (
     compute_kinematic_only,
     count_joints,
     create_joint,
+    find_joint_prims,
 )
 from omnigibson.utils.vision_utils import add_semantic_label
 
@@ -280,22 +281,18 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._load_config["kinematic_only"] = kinematic_only
 
         # Find root link: the Xform child that is not body1 of any joint that also has a body0.
+        # Joints can live anywhere under default_prim (recent Isaac Sim exports place them in a flat
+        # /joints scope rather than under their body0 link), so traverse the full subtree.
+        link_names = [prim.GetName() for prim in default_prim.GetChildren() if prim.GetTypeName() == "Xform"]
         joint_children = set()
-        link_names = []
-        for prim in default_prim.GetChildren():
-            if prim.GetTypeName() != "Xform":
+        for joint in find_joint_prims(default_prim):
+            rels = {r.GetName(): r for r in joint.GetRelationships()}
+            body0_rel = rels.get("physics:body0")
+            body1_rel = rels.get("physics:body1")
+            if body0_rel is None or body1_rel is None:
                 continue
-            link_names.append(prim.GetName())
-            for child in prim.GetChildren():
-                if "joint" not in child.GetTypeName().lower():
-                    continue
-                rels = {r.GetName(): r for r in child.GetRelationships()}
-                body0_rel = rels.get("physics:body0")
-                body1_rel = rels.get("physics:body1")
-                if body0_rel is None or body1_rel is None:
-                    continue
-                if len(body0_rel.GetTargets()) > 0 and len(body1_rel.GetTargets()) > 0:
-                    joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
+            if len(body0_rel.GetTargets()) > 0 and len(body1_rel.GetTargets()) > 0:
+                joint_children.add(body1_rel.GetTargets()[0].pathString.split("/")[-1])
         valid_roots = list(set(link_names) - joint_children)
         assert len(valid_roots) == 1, (
             f"Exactly one root link should have been found for {default_prim.GetName()}, "
@@ -489,7 +486,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # If there is a file hash already in the init info, compare against it to see if the file has changed
         if self._expected_file_hash is not None:
             if file_hash != self._expected_file_hash:
-                log.warn(
+                log.debug(
                     f"Object {self.name} was expected to have USD file hash {self._expected_file_hash} but loaded with {file_hash}. The saved state might be incompatible."
                 )
         else:
@@ -1156,8 +1153,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Iterate over all states and deserialize their states if they're stateful
         non_kin_state_dic = dict()
+        recorded_non_kin_state_names = getattr(self, "_recorded_non_kin_state_names", None)
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
+            if recorded_non_kin_state_names is not None and state_name not in recorded_non_kin_state_names:
+                continue
             if state_instance.stateful:
                 non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
                 idx += deserialized_items
