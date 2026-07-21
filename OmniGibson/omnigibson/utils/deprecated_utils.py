@@ -590,11 +590,12 @@ class ArticulationView(_ArticulationView):
         return
 
     def _invalidate_physics_handle_callback(self, event):
-        # Overwrite super method, add additional de-initialization
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
-            self._invalidate_physics_handle_event = None
-            self._is_initialized = False
+        # Overwrite super method, add additional de-initialization.
+        # The subscription is registered against GLOBAL_EVENT_STOP only (Kit 110 event
+        # dispatcher), so no event-type check is needed here.
+        self._physics_view = None
+        self._invalidate_physics_handle_event = None
+        self._is_initialized = False
 
     @property
     def initialized(self):
