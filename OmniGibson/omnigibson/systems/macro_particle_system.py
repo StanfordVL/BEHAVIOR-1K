@@ -1267,9 +1267,12 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         """
         Refresh this system's dedicated particle rigid-body view.
 
-        The dedicated SimulationView keeps macro-particle membership changes from invalidating the
-        simulator's object/contact views. ParticleViewAPI owns a separate cross-scene view for its
-        batched reader.
+        The dedicated SimulationView keeps particle prims out of the simulator's unified views'
+        TRACKED SETS (so membership changes never resize their buffers or force graph recapture).
+        It does NOT protect their handles: PhysX invalidates every existing view when a rigid body
+        is deleted, which is why particle removal routes through og.sim.refresh_physics_view_handles.
+        ParticleViewAPI owns a separate cross-scene view for its batched reader, rebuilt via the
+        metadata-dirty path in the next prepare_step_host.
         """
         self.particles_sim_view = None
         if not og.sim.is_playing():
@@ -1284,19 +1287,31 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 pattern=f"{self.prim_path}/particles/*"
             )
 
-    def _refresh_particle_handles_after_membership_change(self):
-        """Refresh membership locally once this system is part of the unified registry."""
+    def _refresh_particle_handles_after_membership_change(self, removed_particles=False):
+        """Refresh handles after a particle prim was added or removed.
+
+        Args:
+            removed_particles (bool): Whether the membership change deleted particle prims. PhysX
+                invalidates EVERY existing tensor view when a rigid body is deleted from the stage
+                (creations are safe), so removals must re-attach all view handles — not just this
+                system's. refresh_physics_view_handles() does that without reallocating warp
+                buffers, so the captured per-step graph stays valid (no recapture).
+        """
         if not og.sim.is_playing():
             return
-        with og.sim.editing_usd():
-            og.sim.psi.flush_changes()
         from omnigibson.utils.particle_view_utils import ParticleViewAPI
 
         if (self.scene.idx, self.name) not in ParticleViewAPI.entries():
             # Activating a system changes the entry registry and dependent tensorized system indices.
             # That is a real topology change; only later count changes can stay on the local path.
             og.sim.update_handles()
+        elif removed_particles:
+            og.sim.refresh_physics_view_handles()
         else:
+            # Particle creation leaves existing PhysX views valid; only this system's own view
+            # needs to pick up the new prim.
+            with og.sim.editing_usd():
+                og.sim.psi.flush_changes()
             self.update_handles()
 
     def _clear(self):
@@ -1313,14 +1328,15 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         og.sim.remove_callback_on_play(name=f"{self.name}_particles_view")
 
     def remove_particle_by_name(self, name):
-        # Do not use Simulator.remove_prim(): it rebuilds every simulator/tensorized view. These
-        # rigid bodies are owned only by the macro-particle views, which are refreshed locally.
+        # Do not use Simulator.remove_prim(): it rebuilds every simulator/tensorized view (and
+        # recaptures the graph). Deleting the prim still invalidates every PhysX view, so the
+        # membership-change refresh below re-attaches all handles without touching warp buffers.
         assert name in self.particles, f"Got invalid name for particle to remove {name}"
         particle = self.particles.pop(name)
         self.mark_particle_metadata_dirty()
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             particle.remove()
-        self._refresh_particle_handles_after_membership_change()
+        self._refresh_particle_handles_after_membership_change(removed_particles=True)
 
     def add_particle(self, relative_prim_path, scale, idn=None):
         # Run super first

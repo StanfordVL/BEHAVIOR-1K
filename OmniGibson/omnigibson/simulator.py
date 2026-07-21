@@ -1216,10 +1216,34 @@ def _launch_simulator(*args, **kwargs):
 
             self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
-        def update_handles(self):
+        def refresh_physics_view_handles(self, reattach_unified_views=True):
+            """
+            Re-attach every PhysX view handle to a freshly created simulation view.
+
+            PhysX invalidates ALL existing tensor views whenever a rigid body is deleted from the
+            stage (creations are safe), even when the deleted body is not tracked by any view —
+            e.g. macro-physical particle prims. In that case only the view handles must be
+            recreated: the tracked prim sets are unchanged, so — unlike update_handles() — this
+            does NOT reallocate the view APIs' warp buffers or re-initialize tensorized states.
+            Device pointers stay stable and the captured per-step graph stays valid (no recapture).
+
+            Args:
+                reattach_unified_views (bool): Whether to re-attach the unified view APIs' PhysX
+                    views in place (each asserts its tracked prim set is unchanged).
+                    update_handles() passes False because it fully rebuilds those views right
+                    after — a changed tracked set is a real topology change and only that path
+                    handles it.
+            """
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
+
+            # The standalone reattach path must not run mid-physics-step: a freshly-created contact
+            # view would report empty data for the in-flight substep. (The shared prefix below MUST
+            # stay mid-step-callable — update_handles() is legitimately reached from physics
+            # callbacks, e.g. assisted-grasping joint creation, and defers only the tensorized part.)
+            if reattach_unified_views:
+                assert not self.currently_stepping, "Cannot reattach physics views during a physics step!"
 
             # Flush any USD changes to PhysX
             with self.editing_usd():
@@ -1238,6 +1262,22 @@ def _launch_simulator(*args, **kwargs):
                     for system in scene.active_systems.values():
                         if isinstance(system, MacroPhysicalParticleSystem):
                             system.update_handles()
+
+            if reattach_unified_views:
+                RigidContactAPI.reattach_physx_views()
+                RigidBodyViewAPI.reattach_physx_views()
+                ArticulatedObjectViewAPI.reattach_physx_views()
+                ControllableObjectViewAPI.reattach_physx_views()
+
+        def update_handles(self):
+            # Handles are only relevant when physx is running
+            if not self.is_playing():
+                return
+
+            # Shared PhysX-handle refresh (flush + sim view + per-object / per-system handles).
+            # The unified views are NOT re-attached here: they are fully rebuilt below, since
+            # update_handles() is the path for true topology changes (tracked sets may differ).
+            self.refresh_physics_view_handles(reattach_unified_views=False)
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()

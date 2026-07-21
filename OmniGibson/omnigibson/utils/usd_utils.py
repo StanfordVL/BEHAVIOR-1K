@@ -847,6 +847,30 @@ class RigidBodyViewAPI:
         wp.to_torch(cls.POSES)[:N_physx_tracked] = transforms
 
     @classmethod
+    def reattach_physx_views(cls):
+        """
+        Recreate this API's PhysX rigid-body view on the current og.sim.physics_sim_view, keeping
+        every buffer (POSES / POSES_GPU / POSE_MATRICES, meshes, index maps) untouched.
+
+        PhysX invalidates all existing tensor views whenever a rigid body is deleted from the stage,
+        even when the deleted body is not part of this view (e.g. macro-physical particle prims,
+        which are excluded from the tracked set). In that case only the view handle must be
+        recreated — the tracked prim set is unchanged, so device pointers stay stable and the
+        captured per-step graph stays valid. Asserts the tracked set really is unchanged; a changed
+        set is a true topology change and must go through og.sim.update_handles() instead.
+        """
+        if cls._RIGID_BODY_VIEW is None:
+            return
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            new_view = og.sim.physics_sim_view.create_rigid_body_view(pattern="/World/scene_*/*/*")
+        new_paths = list(new_view.prim_paths)
+        assert new_paths == cls._IDX_TO_PATH[: len(new_paths)], (
+            "RigidBodyViewAPI.reattach_physx_views: tracked rigid-body set changed — this is a real "
+            "topology change and requires og.sim.update_handles()."
+        )
+        cls._RIGID_BODY_VIEW = new_view
+
+    @classmethod
     def get_flat_idx(cls, abs_prim_path):
         """
         Return the flat index into POSE_MATRICES for a link's absolute prim path, or None.
@@ -1088,6 +1112,25 @@ class ArticulatedObjectViewAPI:
         wp.copy(cls._JOINT_POSITIONS, wp.from_torch(seed_positions))
 
     @classmethod
+    def reattach_physx_views(cls):
+        """
+        Recreate the articulation view on the current og.sim.physics_sim_view, keeping
+        _JOINT_POSITIONS and the row mapping untouched. See RigidBodyViewAPI.reattach_physx_views
+        for when this is needed (rigid-body deletion invalidates all PhysX views). Asserts the
+        tracked articulation set/order is unchanged.
+        """
+        if cls._VIEW is None:
+            return
+        expected_paths = [path for path, _ in sorted(cls._OBJ_TO_VIEW_IDX.items(), key=lambda kv: kv[1])]
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            new_view = og.sim.physics_sim_view.create_articulation_view(expected_paths)
+        assert list(new_view.prim_paths) == expected_paths, (
+            "ArticulatedObjectViewAPI.reattach_physx_views: tracked articulation set changed — this "
+            "is a real topology change and requires og.sim.update_handles()."
+        )
+        cls._VIEW = new_view
+
+    @classmethod
     def read_from_physx(cls):
         """Pull latest DOF positions from PhysX into the pinned CPU staging buffer.
         Stays on the host (PhysX returns CPU torch tensor). H2D happens inside the captured
@@ -1142,6 +1185,10 @@ class RigidContactAPIImpl:
 
         # Rigid body view for batched body transform reads used by persistence logic
         self._RIGID_BODY_VIEW = dict()
+
+        # Exact prim-path order of each per-scene rigid body view, so reattach_physx_views can
+        # verify the tracked set is unchanged when recreating views on a fresh simulation view
+        self._RIGID_BODY_VIEW_PATHS = dict()
 
         # Precomputed tensors mapping row/col indices to rigid body view indices
         self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS = dict()
@@ -1326,7 +1373,10 @@ class RigidContactAPIImpl:
                 self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_body_view(
                     pattern=f"/World/scene_{scene_idx}/*/*"
                 )
-                path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
+                # Remember the exact path order so reattach_physx_views can verify the tracked set
+                # is unchanged when it recreates the view on a fresh simulation view.
+                self._RIGID_BODY_VIEW_PATHS[scene_idx] = list(self._RIGID_BODY_VIEW[scene_idx].prim_paths)
+                path_to_view_idx = {path: i for i, path in enumerate(self._RIGID_BODY_VIEW_PATHS[scene_idx])}
                 self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
                     [path_to_view_idx[path] for path in row_paths], dtype=th.long, device="cuda"
                 )
@@ -1916,6 +1966,34 @@ class RigidContactAPIImpl:
             self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] if current_only else self._CONTACT_MATRIX_GPU_WP[scene_idx]
         )
 
+    def reattach_physx_views(self):
+        """
+        Recreate the per-scene contact + rigid-body views on the current og.sim.physics_sim_view,
+        keeping every matrix / index tensor untouched. See RigidBodyViewAPI.reattach_physx_views
+        for when this is needed (rigid-body deletion invalidates all PhysX views). Asserts the
+        tracked row/column sets are unchanged.
+        """
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            for scene_idx in list(self._CONTACT_VIEW.keys()):
+                col_paths = self._COL_IDX_TO_PATH[scene_idx]
+                new_contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
+                    pattern=f"/World/scene_{scene_idx}/*/*",
+                    filter_patterns=col_paths,
+                    max_contact_data_count=self.get_max_contact_data_count(len(col_paths)),
+                )
+                assert list(new_contact_view.sensor_paths) == self._ROW_IDX_TO_PATH[scene_idx], (
+                    "RigidContactAPI.reattach_physx_views: contact-view row set changed — this is a "
+                    "real topology change and requires og.sim.update_handles()."
+                )
+                self._CONTACT_VIEW[scene_idx] = new_contact_view
+
+                new_body_view = og.sim.physics_sim_view.create_rigid_body_view(pattern=f"/World/scene_{scene_idx}/*/*")
+                assert list(new_body_view.prim_paths) == self._RIGID_BODY_VIEW_PATHS[scene_idx], (
+                    "RigidContactAPI.reattach_physx_views: rigid-body set changed — this is a real "
+                    "topology change and requires og.sim.update_handles()."
+                )
+                self._RIGID_BODY_VIEW[scene_idx] = new_body_view
+
     def clear(self):
         """
         Clears internal contact views, mappings, and caches.
@@ -1926,6 +2004,7 @@ class RigidContactAPIImpl:
         self._COL_IDX_TO_PATH = dict()
         self._CONTACT_VIEW = dict()
         self._RIGID_BODY_VIEW = dict()
+        self._RIGID_BODY_VIEW_PATHS = dict()
         self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
@@ -2366,6 +2445,23 @@ class BatchControlViewAPIImpl:
             for obj in controllable_objects
             if obj.articulation_root_path in expected_prim_paths
         }
+
+    def reattach_physx_view(self):
+        """
+        Recreate this batch view on the current og.sim.physics_sim_view, keeping the index maps and
+        pending read/write caches untouched (cached values are plain host tensors; pending control
+        targets are flushed through the new view). See RigidBodyViewAPI.reattach_physx_views for
+        when this is needed. Asserts the tracked robot set/order is unchanged.
+        """
+        if self._view is None:
+            return
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            new_view = og.sim.physics_sim_view.create_articulation_view(self._pattern)
+        assert {prim_path: i for i, prim_path in enumerate(new_view.prim_paths)} == self._idx, (
+            "BatchControlViewAPIImpl.reattach_physx_view: tracked robot set changed — this is a real "
+            "topology change and requires og.sim.update_handles()."
+        )
+        self._view = new_view
 
     def set_joint_position_targets(self, prim_path, positions, indices):
         assert len(indices) == len(positions), "Indices and values must have the same length"
@@ -2943,6 +3039,13 @@ class ControllableObjectViewAPI:
 
         more_than_once = {prim_path: count for prim_path, count in counts.items() if count > 1}
         assert len(more_than_once) == 0, f"Prim paths {more_than_once} are present in multiple views!"
+
+    @classmethod
+    def reattach_physx_views(cls):
+        """Recreate every batch view's PhysX handle on the current og.sim.physics_sim_view (buffers
+        and caches untouched). See RigidBodyViewAPI.reattach_physx_views for when this is needed."""
+        for view in cls._VIEWS_BY_PATTERN.values():
+            view.reattach_physx_view()
 
     @classmethod
     def set_joint_position_targets(cls, prim_path, positions, indices):

@@ -220,6 +220,11 @@ class ContainedParticles(TensorizedObjectSystemState, LinkBasedStateMixin):
             for obj_idx, obj in enumerate(scene_row):
                 if obj is None or cls not in obj.states or obj.prim_type == PrimType.CLOTH:
                     continue
+                if not obj.initialized:
+                    # An object added mid-play (scene.add_object) reaches update_handles before its
+                    # states initialize, so the link mixin has no links yet. Skip it — the object
+                    # initializes in the next non-physics step, which runs update_handles again.
+                    continue
                 link = obj.states[cls].link
                 parent_flat = RigidBodyViewAPI.get_flat_idx(link.prim_path)
                 if parent_flat is None:
