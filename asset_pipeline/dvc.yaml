@@ -955,6 +955,83 @@ stages:
       - cad/${item}/artifacts/file_manifest.json
       - cad/${item}/artifacts/file_manifest_deep.json
     foreach: ${combined}
+  generate_camera_images:
+    do:
+      cmd: python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/generate_camera_images.py
+      deps:
+      - b1k_pipeline/max/generate_camera_images.py
+      - cad/${item}/processed.max
+      - artifacts/pipeline/sanitycheck.success
+      outs:
+      - cad/${item}/artifacts/camera_images
+      - cad/${item}/artifacts/generate_camera_images.json
+    foreach: ${scenes}
+  generate_camera_images_success:
+    cmd: python -m b1k_pipeline.check_success_aggregate artifacts/generate_camera_images.json
+      artifacts/pipeline/generate_camera_images.success scenes
+    deps:
+    - cad/scenes/Beechwood_0_garden/artifacts/generate_camera_images.json
+    - cad/scenes/Beechwood_0_int/artifacts/generate_camera_images.json
+    - cad/scenes/Beechwood_1_int/artifacts/generate_camera_images.json
+    - cad/scenes/Benevolence_0_int/artifacts/generate_camera_images.json
+    - cad/scenes/Benevolence_1_int/artifacts/generate_camera_images.json
+    - cad/scenes/Benevolence_2_int/artifacts/generate_camera_images.json
+    - cad/scenes/Ihlen_0_int/artifacts/generate_camera_images.json
+    - cad/scenes/Ihlen_1_int/artifacts/generate_camera_images.json
+    - cad/scenes/Merom_0_garden/artifacts/generate_camera_images.json
+    - cad/scenes/Merom_0_int/artifacts/generate_camera_images.json
+    - cad/scenes/Merom_1_int/artifacts/generate_camera_images.json
+    - cad/scenes/Pomaria_0_garden/artifacts/generate_camera_images.json
+    - cad/scenes/Pomaria_0_int/artifacts/generate_camera_images.json
+    - cad/scenes/Pomaria_1_int/artifacts/generate_camera_images.json
+    - cad/scenes/Pomaria_2_int/artifacts/generate_camera_images.json
+    - cad/scenes/Rs_garden/artifacts/generate_camera_images.json
+    - cad/scenes/Rs_int/artifacts/generate_camera_images.json
+    - cad/scenes/Wainscott_0_garden/artifacts/generate_camera_images.json
+    - cad/scenes/Wainscott_0_int/artifacts/generate_camera_images.json
+    - cad/scenes/Wainscott_1_int/artifacts/generate_camera_images.json
+    - cad/scenes/commercial_kitchen_fire_extinguisher/artifacts/generate_camera_images.json
+    - cad/scenes/commercial_kitchen_pans/artifacts/generate_camera_images.json
+    - cad/scenes/gates_bedroom/artifacts/generate_camera_images.json
+    - cad/scenes/grocery_store_asian/artifacts/generate_camera_images.json
+    - cad/scenes/grocery_store_cafe/artifacts/generate_camera_images.json
+    - cad/scenes/grocery_store_convenience/artifacts/generate_camera_images.json
+    - cad/scenes/grocery_store_half_stocked/artifacts/generate_camera_images.json
+    - cad/scenes/hall_arch_wood/artifacts/generate_camera_images.json
+    - cad/scenes/hall_conference_large/artifacts/generate_camera_images.json
+    - cad/scenes/hall_glass_ceiling/artifacts/generate_camera_images.json
+    - cad/scenes/hall_train_station/artifacts/generate_camera_images.json
+    - cad/scenes/hotel_gym_spa/artifacts/generate_camera_images.json
+    - cad/scenes/hotel_suite_large/artifacts/generate_camera_images.json
+    - cad/scenes/hotel_suite_small/artifacts/generate_camera_images.json
+    - cad/scenes/house_double_floor_lower/artifacts/generate_camera_images.json
+    - cad/scenes/house_double_floor_upper/artifacts/generate_camera_images.json
+    - cad/scenes/house_single_floor/artifacts/generate_camera_images.json
+    - cad/scenes/office_bike/artifacts/generate_camera_images.json
+    - cad/scenes/office_cubicles_left/artifacts/generate_camera_images.json
+    - cad/scenes/office_cubicles_right/artifacts/generate_camera_images.json
+    - cad/scenes/office_large/artifacts/generate_camera_images.json
+    - cad/scenes/office_vendor_machine/artifacts/generate_camera_images.json
+    - cad/scenes/public_restroom_blue/artifacts/generate_camera_images.json
+    - cad/scenes/public_restroom_brown/artifacts/generate_camera_images.json
+    - cad/scenes/public_restroom_futuristic/artifacts/generate_camera_images.json
+    - cad/scenes/public_restroom_marble/artifacts/generate_camera_images.json
+    - cad/scenes/public_restroom_white/artifacts/generate_camera_images.json
+    - cad/scenes/restaurant_asian/artifacts/generate_camera_images.json
+    - cad/scenes/restaurant_brunch/artifacts/generate_camera_images.json
+    - cad/scenes/restaurant_cafeteria/artifacts/generate_camera_images.json
+    - cad/scenes/restaurant_diner/artifacts/generate_camera_images.json
+    - cad/scenes/restaurant_hotel/artifacts/generate_camera_images.json
+    - cad/scenes/restaurant_urban/artifacts/generate_camera_images.json
+    - cad/scenes/school_biology/artifacts/generate_camera_images.json
+    - cad/scenes/school_chemistry/artifacts/generate_camera_images.json
+    - cad/scenes/school_computer_lab_and_infirmary/artifacts/generate_camera_images.json
+    - cad/scenes/school_geography/artifacts/generate_camera_images.json
+    - cad/scenes/school_gym/artifacts/generate_camera_images.json
+    - b1k_pipeline/check_success_aggregate.py
+    - params.yaml
+    outs:
+    - artifacts/pipeline/generate_camera_images.success
   generate_systems:
     cmd: python -m b1k_pipeline.generate_systems
     deps:

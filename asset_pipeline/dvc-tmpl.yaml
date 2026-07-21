@@ -175,6 +175,28 @@ stages:
     outs:
     - artifacts/pipeline/export_meshes.success
 
+  generate_camera_images:
+    # Render preview images from the scene cameras (e.g. camera-diag).
+    foreach: ${scenes}
+    do:
+      cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/generate_camera_images.py'
+      deps:
+      - b1k_pipeline/max/generate_camera_images.py
+      - cad/${item}/processed.max
+      - artifacts/pipeline/sanitycheck.success
+      outs:
+      - cad/${item}/artifacts/camera_images
+      - cad/${item}/artifacts/generate_camera_images.json
+
+  generate_camera_images_success:
+    cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/generate_camera_images.json artifacts/pipeline/generate_camera_images.success scenes'
+    deps:
+    - cad/#{scenes}/artifacts/generate_camera_images.json
+    - b1k_pipeline/check_success_aggregate.py
+    - params.yaml
+    outs:
+    - artifacts/pipeline/generate_camera_images.success
+
   # generate_max_object_images:
   #   # List the objects found in the entry.
   #   foreach: ${combined}

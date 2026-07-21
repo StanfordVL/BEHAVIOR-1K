@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from collections import Counter
+import traceback
 
 import pymxs
 
@@ -12,7 +12,7 @@ PATTERN = re.compile(
 )
 OUTPUT_DIR = "camera_images"
 OUTPUT_FILENAME = "{0}.png"
-SUCCESS_FILENAME = "generate_camera_images.success"
+JSON_FILENAME = "generate_camera_images.json"
 RENDER_PRESET_FILENAME = os.path.abspath(
     os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "render_presets", "scene_camera.rps"
@@ -20,9 +20,7 @@ RENDER_PRESET_FILENAME = os.path.abspath(
 )
 
 
-def main():
-    success = False
-
+def render_camera_images():
     artifacts_dir = os.path.join(rt.maxFilePath, "artifacts")
     output_dir = os.path.join(artifacts_dir, OUTPUT_DIR)
     os.makedirs(output_dir, exist_ok=True)
@@ -73,8 +71,28 @@ def main():
     print("Saving to", image_path)
     assert pymxs.runtime.render(outputFile=image_path)
 
-    with open(os.path.join(artifacts_dir, SUCCESS_FILENAME), "w") as f:
-        pass
+
+def main():
+    artifacts_dir = os.path.join(rt.maxFilePath, "artifacts")
+    os.makedirs(artifacts_dir, exist_ok=True)
+
+    success = True
+    error_msg = ""
+    try:
+        render_camera_images()
+    except:
+        success = False
+        error_msg = traceback.format_exc()
+
+    json_file = os.path.join(artifacts_dir, JSON_FILENAME)
+    with open(json_file, "w") as f:
+        json.dump({"success": success, "error_msg": error_msg}, f)
+
+    if success:
+        print("Camera image generation successful!")
+    else:
+        print("Camera image generation failed.")
+        print(error_msg)
 
 
 if __name__ == "__main__":
