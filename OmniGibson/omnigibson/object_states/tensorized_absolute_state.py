@@ -46,7 +46,7 @@ class TensorizedAbsoluteState(TensorizedState, AbsoluteObjectState):
         Called from ``simulator.py`` after scene changes. Child classes should call
         ``super().initialize_view()`` first, then extend with their own initialization.
 
-        Values for objects whose relative_prim_path still exists are carry-overed;
+        Values for objects whose relative_prim_path still exists are carried over;
         new slots are initialized to zero (subclasses override to set correct defaults).
         """
         # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)

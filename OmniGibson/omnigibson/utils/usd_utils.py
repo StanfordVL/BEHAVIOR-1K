@@ -1100,7 +1100,7 @@ class ArticulatedObjectViewAPI:
             return
 
         # Build the view from the exact articulation root paths of the registered objects.
-        # If directly use "/World/scene_*/articulated__*/*" it wil also include visual-only
+        # If directly use "/World/scene_*/articulated__*/*" it will also include visual-only
         # articulations which have register=False (such as the JoyLo teleop "ghost" robot).
         expected_paths = [obj.articulation_root_path for obj in articulation_objs]
         cls._VIEW = og.sim.physics_sim_view.create_articulation_view(expected_paths)
