@@ -143,7 +143,17 @@ def get_task_instance_path(scene_name, instance_name, mode="train"):
     task_instances_path_2026 = os.path.join(
         gm.DATA_PATH, "2026-challenge-task-instances", mode_to_dir[mode], scene_name, "json", f"{instance_name}.json"
     )
-    return task_instances_path_2026 if os.path.exists(task_instances_path_2026) else None
+    if os.path.exists(task_instances_path_2026):
+        return task_instances_path_2026
+
+    if mode != "train":
+        return None
+
+    # TODO: Remove this fallback after the self-hosted CI runners download the 2026 challenge task instances.
+    task_instances_path_2025 = os.path.join(
+        gm.DATA_PATH, "2025-challenge-task-instances", "scenes", scene_name, "json", f"{instance_name}.json"
+    )
+    return task_instances_path_2025 if os.path.exists(task_instances_path_2025) else None
 
 
 def get_category_path(category_name, dataset_name="behavior-1k-assets"):

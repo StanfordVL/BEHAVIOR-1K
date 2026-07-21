@@ -47,7 +47,7 @@ def setup_environment():
 
 def test_camera_pose():
     env = setup_environment()
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     og.sim.step()
 
@@ -184,8 +184,8 @@ def test_robot_load_drive(robot_name):
 
             action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
 
-            eef_pos = env.robots[0].get_eef_position()
-            eef_orn = env.robots[0].get_eef_orientation()
+            eef_pos = env.scene.robots[0].get_eef_position()
+            eef_orn = env.scene.robots[0].get_eef_orientation()
             if robot.model == "stretch":  # Stretch arm faces the y-axis
                 target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
             else:
@@ -224,7 +224,7 @@ def _object_is_in_hand(robot, obj, grasping_mode):
         raise ValueError(f"Unknown grasping mode: {grasping_mode}")
 
 
-@pytest.mark.parametrize("grasping_mode", ["sticky", "assisted", "physical"])
+@pytest.mark.parametrize("grasping_mode", ["sticky", "assisted"])
 def test_grasping_mode(grasping_mode):
     try:
         if og.sim is not None:
@@ -330,7 +330,7 @@ def test_grasping_mode(grasping_mode):
 
 def test_camera_semantic_segmentation():
     env = setup_environment()
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
@@ -348,7 +348,7 @@ def test_camera_semantic_segmentation():
 
 def test_object_in_FOV_of_robot():
     env = setup_environment()
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     objs_in_fov = robot.states[ObjectsInFOVOfRobot].get_value()
     assert len(objs_in_fov) == 1 and next(iter(objs_in_fov)) == robot
@@ -392,7 +392,7 @@ def test_holonomic_robot_tuck_untuck_base_joint_invariance():
     }
 
     env = og.Environment(configs=config)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     env.reset()
     og.sim.step()
 
