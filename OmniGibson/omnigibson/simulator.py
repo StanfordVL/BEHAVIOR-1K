@@ -515,6 +515,10 @@ def _launch_simulator(*args, **kwargs):
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
             self._deferred_joint_breaks = []
+            # Set when update_handles() is called mid-step (currently_stepping): the tensorized
+            # object-state views read world poses from Fabric in their initialize_view(), which is
+            # forbidden during a physics step, so the rebuild is deferred to _on_post_physics_step.
+            self._deferred_tensorized_view_init = False
 
             # Maps callback name to callback
             self._callbacks_on_play = dict()
@@ -1240,9 +1244,19 @@ def _launch_simulator(*args, **kwargs):
             ControllableObjectViewAPI.initialize_view()
 
             if gm.ENABLE_OBJECT_STATES:
-                for state_type in og.sim.object_state_types_requiring_update:
-                    if issubclass(state_type, TensorizedState):
-                        state_type.initialize_view()
+                if self.currently_stepping:
+                    # update_handles() is reached mid-step when a joint is created during a physics
+                    # callback (e.g. assisted grasping or on-contact attachment). Tensorized state
+                    # views bake static geometry from Fabric world poses in initialize_view(), which
+                    # is forbidden while currently_stepping=True. These views are only consumed by the
+                    # post-physics state update, so defer the rebuild until currently_stepping clears
+                    # (mirrors the deferred joint-break handling in _on_post_physics_step). The physics
+                    # views above are refreshed immediately so the new joint is registered.
+                    self._deferred_tensorized_view_init = True
+                else:
+                    for state_type in og.sim.object_state_types_requiring_update:
+                        if issubclass(state_type, TensorizedState):
+                            state_type.initialize_view()
 
         def _refresh_state_caches(self, dt=0.0):
             """
@@ -1601,6 +1615,18 @@ def _launch_simulator(*args, **kwargs):
                 # are post-step user code: they may call update_handles() / read Fabric, which
                 # is forbidden while currently_stepping=True.
                 self.currently_stepping = False
+
+                # Run any tensorized-state view rebuild that was deferred from a mid-step
+                # update_handles() (e.g. a joint created during grasping). Now that
+                # currently_stepping is False, the Fabric world-pose reads in initialize_view()
+                # are allowed. Do this before joint-break callbacks so they observe fresh views.
+                if self._deferred_tensorized_view_init:
+                    self._deferred_tensorized_view_init = False
+                    if gm.ENABLE_OBJECT_STATES:
+                        for state_type in og.sim.object_state_types_requiring_update:
+                            if issubclass(state_type, TensorizedState):
+                                state_type.initialize_view()
+                    TensorizedState.caches_dirty = True
 
                 if self._deferred_joint_breaks:
                     # Copy the current deferred joint breaks and clear the shared list

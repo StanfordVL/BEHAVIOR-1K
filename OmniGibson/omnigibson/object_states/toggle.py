@@ -441,7 +441,10 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 if state.marker is None:
                     continue
                 link = state.link  # safe: marker exists ⇒ _initialize completed ⇒ link valid
-                # Compute marker center in link's local frame from current world poses:
+                # Compute marker center in link's local frame from current world poses. This reads
+                # Fabric world poses, so it must not run mid-step; the simulator defers the
+                # tensorized-state view rebuild past the physics step (see Simulator.update_handles /
+                # _on_post_physics_step) so _init_marker() is only ever reached with currently_stepping=False.
                 marker_pos, _ = state.marker.get_position_orientation()
                 link_pos, link_ori = link.get_position_orientation()
                 marker_parent_link_idx_cpu[marker_idx_flat] = RigidBodyViewAPI.get_flat_idx(link.prim_path)

@@ -46,7 +46,7 @@ class TensorizedAbsoluteState(TensorizedState, AbsoluteObjectState):
         Called from ``simulator.py`` after scene changes. Child classes should call
         ``super().initialize_view()`` first, then extend with their own initialization.
 
-        Carry-over: values for objects whose relative_prim_path still exists are preserved;
+        Values for objects whose relative_prim_path still exists are carried over;
         new slots are initialized to zero (subclasses override to set correct defaults).
         """
         # Snapshot for carry-over (OBJ_IDXS / VALUES are None on the very first call)
@@ -65,38 +65,52 @@ class TensorizedAbsoluteState(TensorizedState, AbsoluteObjectState):
 
                 # Extend scene dimension if this is a new scene index
                 while len(cls.IDX_OBJS) <= scene_idx:
-                    obj_idx = len(cls.OBJ_IDXS)
-                    cls.IDX_OBJS.append([None] * obj_idx)
-                    cls.VALUES = th.cat(
-                        [cls.VALUES, th.zeros((1, obj_idx, *cls.value_shape), dtype=cls.value_type, device="cuda")],
-                        dim=0,
-                    )
+                    cls.IDX_OBJS.append([None] * len(cls.OBJ_IDXS))
 
                 # Register new relative path if first seen across all scenes
                 if rel_path not in cls.OBJ_IDXS:
-                    obj_idx = len(cls.OBJ_IDXS)
-                    cls.OBJ_IDXS[rel_path] = obj_idx
+                    cls.OBJ_IDXS[rel_path] = len(cls.OBJ_IDXS)
                     for s_row in cls.IDX_OBJS:
                         s_row.append(None)
-                    cls.VALUES = th.cat(
-                        [
-                            cls.VALUES,
-                            th.zeros((len(cls.IDX_OBJS), 1, *cls.value_shape), dtype=cls.value_type, device="cuda"),
-                        ],
-                        dim=1,
-                    )
 
                 cls.IDX_OBJS[scene_idx][cls.OBJ_IDXS[rel_path]] = obj
 
-        # Carry over values for surviving objects (same relative path present before and after)
-        if prev_values is not None and cls.VALUES.numel() > 0:
-            for rel_path, obj_idx_old in prev_obj_idxs.items():
-                if rel_path not in cls.OBJ_IDXS:
-                    continue
-                obj_idx_new = cls.OBJ_IDXS[rel_path]
-                for s_idx in range(min(prev_values.shape[0], len(cls.IDX_OBJS))):
-                    if cls.IDX_OBJS[s_idx][obj_idx_new] is not None:  # Only retain initialized obj's value
-                        cls.VALUES[s_idx, obj_idx_new] = prev_values[s_idx, obj_idx_old]
+        # Allocate VALUES once then fill carry-over values.
+        S = len(cls.IDX_OBJS)
+        N = len(cls.OBJ_IDXS)
+        if S > 0 and N > 0:
+            cls.VALUES = th.zeros((S, N, *cls.value_shape), dtype=cls.value_type, device="cuda")
+
+            if prev_values is not None and prev_values.numel() > 0:
+                # Fast path if we have identical object layout across scenes.
+                # Used for topology changes that add/remove no objects and preserve ordering — e.g. an
+                # assisted-grasp/attachment joint.
+                if prev_obj_idxs == cls.OBJ_IDXS and prev_values.shape == cls.VALUES.shape:
+                    cls.VALUES.copy_(prev_values)
+                else:
+                    # General carry-over, vectorized: for each scene, gather the surviving objects'
+                    # previous values into their new slots.
+                    # "surviving" = objects present both before and after this re-init, as
+                    # (old_index, new_index) pairs — old_index into prev_values, new_index into VALUES.
+                    surviving = [
+                        (old_index, cls.OBJ_IDXS[rel_path])
+                        for rel_path, old_index in prev_obj_idxs.items()
+                        if rel_path in cls.OBJ_IDXS
+                    ]
+                    for scene_idx in range(min(prev_values.shape[0], S)):
+                        # Restrict to survivors that actually exist in THIS scene.
+                        in_scene = [
+                            (old_i, new_i) for (old_i, new_i) in surviving if cls.IDX_OBJS[scene_idx][new_i] is not None
+                        ]
+                        if in_scene:
+                            old_idx = th.tensor(
+                                [old_i for old_i, _ in in_scene], dtype=th.long, device=cls.VALUES.device
+                            )
+                            new_idx = th.tensor(
+                                [new_i for _, new_i in in_scene], dtype=th.long, device=cls.VALUES.device
+                            )
+                            # VALUES[scene, new_i] = prev_values[scene, old_i] for every surviving object.
+                            cls.VALUES[scene_idx][new_idx] = prev_values[scene_idx][old_idx]
 
         # Rebuild pinned CPU mirror — synchronous copy so _get_value() is valid before first async copy
         cls.VALUES_CPU = th.zeros(cls.VALUES.shape, dtype=cls.value_type).pin_memory()

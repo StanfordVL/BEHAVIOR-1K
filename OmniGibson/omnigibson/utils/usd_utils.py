@@ -94,17 +94,24 @@ def _is_in_contact_batch_kernel(
     """
     i, r, c = wp.tid()
 
+    # If query_masks or col_filter has a single row, it is shared across all N output queries.
+    query_row = i
+    if query_masks.shape[0] == 1:
+        query_row = 0
+    filter_row = i
+    if col_filter.shape[0] == 1:
+        filter_row = 0
+
     # Column filter — early exit before touching query_masks/contact_matrix.
     if mode == wp.int32(0):  # with-mask: only count if filter is True
-        if col_filter[i, c] == wp.uint8(0):
+        if col_filter[filter_row, c] == wp.uint8(0):
             return
     elif mode == wp.int32(1):  # ignore-mask: only count if filter is False
-        if col_filter[i, c] != wp.uint8(0):
+        if col_filter[filter_row, c] != wp.uint8(0):
             return
-    # mode == 2: no filter, fall through
 
-    # Row mask — does query i include row r?
-    if query_masks[i, r] == wp.uint8(0):
+    # Row mask — does query query_row include row r?
+    if query_masks[query_row, r] == wp.uint8(0):
         return
 
     # Contact lookup.
@@ -1068,11 +1075,11 @@ class ArticulatedObjectViewAPI:
         if not articulation_objs:
             return
 
-        pattern = "/World/scene_*/articulated__*/*"
-        cls._VIEW = og.sim.physics_sim_view.create_articulation_view(pattern)
-        assert set(cls._VIEW.prim_paths) == set(
-            obj.articulation_root_path for obj in articulation_objs
-        ), "Articulation view prim paths mismatch!"
+        # Build the view from the exact articulation root paths of the registered objects.
+        # If directly use "/World/scene_*/articulated__*/*" it will also include visual-only
+        # articulations which have register=False (such as the JoyLo teleop "ghost" robot).
+        expected_paths = [obj.articulation_root_path for obj in articulation_objs]
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view(expected_paths)
         cls._OBJ_TO_VIEW_IDX = {abs_path: row for row, abs_path in enumerate(cls._VIEW.prim_paths)}
         # Allocate fixed pinned-CPU and CUDA wp.arrays of the right shape.
         seed_positions = cls._VIEW.get_dof_positions().contiguous()  # torch CPU, used only to seed
@@ -1853,7 +1860,12 @@ class RigidContactAPIImpl:
             col_filter = query_masks_wp
             mode = 2
 
-        N = query_masks_wp.shape[0]
+        # Output count is the broadcast of the query-mask rows and the filter-mask rows,
+        # whichever has >1 row drives N; a 1-row operand
+        # is shared across all N. mode==2 has no real filter, so N follows the query rows.
+        n_query_rows = query_masks_wp.shape[0]
+        n_filter_rows = 1 if mode == 2 else col_filter.shape[0]
+        N = max(n_query_rows, n_filter_rows)
         R = contact_matrix_wp.shape[0]
         C = contact_matrix_wp.shape[1]
 
