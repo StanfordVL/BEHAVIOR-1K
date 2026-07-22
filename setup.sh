@@ -314,7 +314,11 @@ if [ "$OMNIGIBSON" = true ]; then
     # Install pre-commit for dev setup
     if [ "$DEV" = true ]; then
         echo "Setting up pre-commit..."
-        conda install -c conda-forge pre-commit -y
+        # Installed via pip, not conda: conda's own dependency resolver doesn't know about the
+        # packages pip just installed above (e.g. typing_extensions), so `conda install` here can
+        # silently downgrade/replace one of them with a version other already-installed pip packages
+        # don't expect (seen breaking typeguard's `from typing_extensions import NoExtraItems`).
+        python -m pip install pre-commit
         cd "$WORKDIR/OmniGibson"
         pre-commit install || true  # Ignore errors here in case the directory is not a git repo
         cd "$WORKDIR"
