@@ -121,32 +121,32 @@ prompt_for_terms() {
     echo ""
     echo "=== TERMS OF SERVICE AND LICENSING AGREEMENTS ==="
     echo ""
-    
+
     # Check what terms need to be accepted
     NEEDS_CONDA_TOS=false
     NEEDS_NVIDIA_EULA=false
     NEEDS_DATASET_TOS=false
-    
+
     if [ "$NEW_ENV" = true ] && [ "$ACCEPT_CONDA_TOS" = false ]; then
         NEEDS_CONDA_TOS=true
     fi
-    
+
     if [ "$OMNIGIBSON" = true ] && [ "$ACCEPT_NVIDIA_EULA" = false ]; then
         NEEDS_NVIDIA_EULA=true
     fi
-    
+
     if [ "$DATASET" = true ] && [ "$ACCEPT_DATASET_TOS" = false ]; then
         NEEDS_DATASET_TOS=true
     fi
-    
+
     # If nothing needs acceptance, return early
     if [ "$NEEDS_CONDA_TOS" = false ] && [ "$NEEDS_NVIDIA_EULA" = false ] && [ "$NEEDS_DATASET_TOS" = false ]; then
         return 0
     fi
-    
+
     echo "This installation requires acceptance of the following terms:"
     echo ""
-    
+
     if [ "$NEEDS_CONDA_TOS" = true ]; then
         cat << EOF
 1. CONDA TERMS OF SERVICE
@@ -156,7 +156,7 @@ prompt_for_terms() {
 
 EOF
     fi
-    
+
     if [ "$NEEDS_NVIDIA_EULA" = true ]; then
         cat << EOF
 2. NVIDIA ISAAC SIM EULA
@@ -166,40 +166,40 @@ EOF
 
 EOF
     fi
-    
+
     if [ "$NEEDS_DATASET_TOS" = true ]; then
         cat << EOF
 3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
     Last revision: December 8, 2022
     This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/BEHAVIOR-1K.
-    The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. 
-    It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
+    The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution.
+    It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use.
     Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):
         1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.
         2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.
         3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.
         4. You may only use the Data within OmniGibson.
         5. You may not redistribute the key or any other Data or elements in whole or part.
-        6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+        6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
             IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.
 
 EOF
     fi
-    
+
     echo "Do you accept ALL of the above terms? (y/N)"
     read -r response
-    
+
     if [[ ! "$response" =~ ^[Yy]$ ]]; then
         echo "Terms not accepted. Installation cancelled."
         echo "You can bypass these prompts by using --accept-conda-tos, --accept-nvidia-eula, and --accept-dataset-tos flags."
         exit 1
     fi
-    
+
     # Set acceptance flags
     [ "$NEEDS_CONDA_TOS" = true ] && ACCEPT_CONDA_TOS=true
     [ "$NEEDS_NVIDIA_EULA" = true ] && ACCEPT_NVIDIA_EULA=true
     [ "$NEEDS_DATASET_TOS" = true ] && ACCEPT_DATASET_TOS=true
-    
+
     echo ""
     echo "✓ All terms accepted. Proceeding with installation..."
     echo ""
@@ -229,13 +229,13 @@ fi
 if [ "$NEW_ENV" = true ]; then
     echo "Creating conda environment '$NEW_ENV_NAME'..."
     command -v conda >/dev/null || { echo "ERROR: Conda not found"; exit 1; }
-    
+
     # Set auto-accept environment variable if user agreed to TOS
     if [ "$ACCEPT_CONDA_TOS" = true ]; then
         export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
         echo "✓ Conda TOS auto-acceptance enabled"
     fi
-    
+
     source "$(conda info --base)/etc/profile.d/conda.sh"
 
     # Check if environment already exists and exit with instructions
@@ -247,11 +247,11 @@ if [ "$NEW_ENV" = true ]; then
         echo ""
         exit 1
     fi
-    
+
     # Create environment with Python 3.12 and packaging tools used by this script
     conda create -n "$NEW_ENV_NAME" python=3.12 pip "setuptools>=71,<81" wheel -c conda-forge -y
     conda activate "$NEW_ENV_NAME"
-    
+
     [[ "$CONDA_DEFAULT_ENV" != "$NEW_ENV_NAME" ]] && { echo "ERROR: Failed to activate environment '$NEW_ENV_NAME'"; exit 1; }
 
 fi
@@ -281,11 +281,11 @@ fi
 if [ "$OMNIGIBSON" = true ]; then
     echo "Installing OmniGibson..."
     [ ! -d "OmniGibson" ] && { echo "ERROR: OmniGibson directory not found"; exit 1; }
-    
+
     # Check Python version
     PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     [ "$PYTHON_VERSION" != "3.12" ] && { echo "ERROR: Python 3.12 required, found $PYTHON_VERSION"; exit 1; }
-    
+
     # Check for conflicting environment variables
     if [[ -n "$EXP_PATH" || -n "$CARB_APP_PATH" || -n "$ISAAC_PATH" ]]; then
         echo "ERROR: Found existing Isaac Sim environment variables."
@@ -319,7 +319,7 @@ if [ "$OMNIGIBSON" = true ]; then
         pre-commit install || true  # Ignore errors here in case the directory is not a git repo
         cd "$WORKDIR"
     fi
-    
+
     # Isaac Sim installation via pip
     if [ "$ACCEPT_NVIDIA_EULA" = true ]; then
         export OMNI_KIT_ACCEPT_EULA=YES
@@ -327,7 +327,7 @@ if [ "$OMNIGIBSON" = true ]; then
         echo "ERROR: NVIDIA EULA not accepted. Cannot install Isaac Sim."
         exit 1
     fi
-    
+
     # Check if already installed
     if python -c "import isaacsim" 2>/dev/null; then
         echo "Isaac Sim already installed, skipping..."
@@ -387,18 +387,11 @@ if [ "$OMNIGIBSON" = true ]; then
                     local attempt
 
                     echo "Downloading $pkg..."
-                    for attempt in 1 2 3 4 5; do
-                        if curl "${curl_opts[@]}" "$url" -o "$filepath"; then
-                            break
-                        fi
-                        if [ "$attempt" -eq 5 ]; then
-                            echo "ERROR: Failed to download $pkg"
-                            rm -rf "$temp_dir"
-                            return 1
-                        fi
-                        echo "Retrying $pkg ($attempt/5)..."
-                        sleep 5
-                    done
+                    if ! curl -sL --fail --retry 5 --retry-all-errors --retry-connrefused "$url" -o "$filepath"; then
+                        echo "ERROR: Failed to download $pkg"
+                        rm -rf "$temp_dir"
+                        return 1
+                    fi
 
                     # Rename for older GLIBC
                     if check_glibc_old; then
@@ -423,7 +416,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
             install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
         fi
-        
+
         # Extract ISAAC_PATH from isaacsim module
         ISAAC_PATH=$(python -c "import isaacsim, os; print(os.environ.get('ISAAC_PATH', ''))" 2>/dev/null)
 
@@ -442,7 +435,7 @@ if [ "$OMNIGIBSON" = true ]; then
             fi
         done
     fi
-    
+
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     python -m pip install --force-reinstall cffi==1.17.1
 
@@ -495,9 +488,9 @@ if [ "$DATASET" = true ]; then
     else
         DATASET_ACCEPT_FLAG="False"
     fi
-    
+
     export OMNI_KIT_ACCEPT_EULA=YES
-    
+
     echo "Downloading OmniGibson robot assets..."
     python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()" || {
         echo "ERROR: OmniGibson robot assets installation failed"
