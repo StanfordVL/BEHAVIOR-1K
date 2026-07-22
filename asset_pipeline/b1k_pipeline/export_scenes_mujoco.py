@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import shutil
 import traceback
 import xml.etree.ElementTree as ET
 from concurrent import futures
@@ -15,6 +16,17 @@ import b1k_pipeline.utils
 # Relative path from scenes/{scene_name}/mjcf/ to an object's MJZ, mirroring the
 # original dataset layout with the usd subdirectory replaced by mjz.
 OBJECT_MJZ_PATH_TEMPLATE = "../../../objects/{category}/{model}/mjz/{model}.mjz"
+
+# Bright midday sky skybox, shipped at the root of the archive and shared by every
+# scene. Derived from the CC0 Poly Haven HDRI "Kloofendal 48d Partly Cloudy (Pure
+# Sky)" (https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky), resampled
+# into a cube map laid out as a 3x4 grid. The faces are authored in the Y-up frame
+# MuJoCo expects for skyboxes (it draws them rotated 90 degrees about +X).
+SKYBOX_SOURCE = b1k_pipeline.utils.PIPELINE_ROOT / "b1k_pipeline" / "assets" / "skybox.png"
+SKYBOX_FILENAME = "skybox.png"
+SKYBOX_PATH = f"../../../{SKYBOX_FILENAME}"
+SKYBOX_GRIDSIZE = "3 4"
+SKYBOX_GRIDLAYOUT = ".U..LFRB.D.."
 
 
 def _fmt(values):
@@ -66,6 +78,19 @@ def process_target(target, scenes_dir):
             asset_xml = ET.SubElement(root, "asset")
             worldbody_xml = ET.SubElement(root, "worldbody")
             custom_xml = ET.SubElement(root, "custom")
+
+            # Shared skybox, stored once at the root of the archive.
+            ET.SubElement(
+                asset_xml,
+                "texture",
+                {
+                    "name": "skybox",
+                    "type": "skybox",
+                    "file": SKYBOX_PATH,
+                    "gridsize": SKYBOX_GRIDSIZE,
+                    "gridlayout": SKYBOX_GRIDLAYOUT,
+                },
+            )
 
             declared_models = set()
             for link in scene_urdf.findall("link"):
@@ -197,6 +222,7 @@ def process_target(target, scenes_dir):
 def main():
     with b1k_pipeline.utils.ParallelZipFS("scenes_mujoco.zip", write=True) as archive_fs:
         scenes_dir = archive_fs.makedir("scenes").getsyspath("/")
+        shutil.copyfile(SKYBOX_SOURCE, archive_fs.getsyspath(SKYBOX_FILENAME))
         errors = {}
         target_futures = {}
 

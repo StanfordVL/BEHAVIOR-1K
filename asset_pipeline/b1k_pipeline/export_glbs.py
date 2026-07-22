@@ -5,9 +5,13 @@ import traceback
 os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
 
 import cv2
+import io
 import json
+import xml.etree.ElementTree as ET
+
 import numpy as np
 from PIL import Image
+from scipy.spatial.transform import Rotation as R
 from b1k_pipeline.urdfpy import URDF
 import b1k_pipeline.utils
 import trimesh
@@ -20,6 +24,127 @@ import glob
 # glTF's fixed normal-incidence reflectance for dielectrics (IOR 1.5).
 GLTF_DIELECTRIC_SPECULAR = 0.04
 EPSILON = 1e-6
+
+# Object lights (metadata "lights" meta links) are emitted as KHR_lights_punctual
+# point lights. Their annotated per-light intensity is ignored and replaced with
+# this single fixed value, mirroring OmniGibson forcing gm.FORCE_LIGHT_INTENSITY
+# on every dataset-object light at load time. The unit here is candela (the glTF
+# punctual unit), so the numeric value differs from OmniGibson's USD intensity.
+LIGHT_INTENSITY = 5000.0
+
+# Scene cameras carry no field-of-view in the scene URDF, so we emit a sensible
+# fixed perspective. yfov is in radians; znear in meters (scene GLBs are metric).
+CAMERA_YFOV = float(np.radians(45.0))
+CAMERA_ZNEAR = 0.01
+
+# A KHR_lights_punctual light is invisible geometry, so we also add an emissive
+# mesh at each light, shaped and sized to match the annotated emitter. The light
+# "type" field maps as in OmniGibson's _LIGHT_MAPPING (0=Rect, 2=Sphere, 4=Disk);
+# for Rect the emitter is length x width, for Disk/Sphere the radius is length
+# (see _generate_meshes_for_primitive_meta_links in asset_conversion_utils.py).
+_LIGHT_TYPE_RECT = 0
+_LIGHT_TYPE_SPHERE = 2
+_LIGHT_TYPE_DISK = 4
+# Thickness of the flat (rect/disk) emitter marker meshes, and fallback size for
+# lights missing dimensions or of an unknown type.
+LIGHT_MESH_THICKNESS = 0.01
+LIGHT_MESH_FALLBACK_RADIUS = 0.05
+
+# TODO: Temporary filter for a quick test run -- set to an empty set to export
+# every scene. These two scenes have cameras in the current scenes.zip.
+SCENES_TO_EXPORT = {"house_double_floor_lower", "restaurant_diner"}
+
+# glTF has no native skybox, so scenes get a large inward-facing emissive cube
+# textured with the same cube-cross image the MJCF skybox uses. The grid layout
+# mirrors the MJCF gridsize "3 4" / gridlayout ".U..LFRB.D..".
+SKYBOX_SOURCE = b1k_pipeline.utils.PIPELINE_ROOT / "b1k_pipeline" / "assets" / "skybox.png"
+SKYBOX_GRID = (4, 3)  # (cols, rows)
+SKYBOX_CELLS = {"U": (1, 0), "D": (1, 2), "L": (0, 1), "F": (1, 1), "R": (2, 1), "B": (3, 1)}
+# Skybox half-size as a multiple of the scene's half-extent, with a floor (m).
+SKYBOX_MARGIN = 10.0
+SKYBOX_MIN_HALF_SIZE = 50.0
+
+
+def _skybox_mesh(center, half_size, image):
+    """A large inward-facing emissive cube (skybox) centered at the scene.
+
+    Each cube face maps to a cell of the cube-cross image with +Z as world up.
+    The image top (sky) maps to the higher v (trimesh/glTF v origin is bottom),
+    so world-up corners get v_up. Side azimuth/rotation is unconstrained since
+    the sky faces are near-uniform. The material is emissive (unlit-looking) and
+    double-sided so it renders from inside.
+    """
+    cols, rows = SKYBOX_GRID
+    vertices, faces, uvs = [], [], []
+
+    def add_face(corners, letter):
+        # corners = (bottom-left, bottom-right, top-right, top-left); "top" is +Z.
+        col, row = SKYBOX_CELLS[letter]
+        u0, u1 = col / cols, (col + 1) / cols
+        v_up, v_down = 1 - row / rows, 1 - (row + 1) / rows
+        base = len(vertices)
+        vertices.extend(corners)
+        uvs.extend([(u0, v_down), (u1, v_down), (u1, v_up), (u0, v_up)])
+        faces.extend([[base, base + 1, base + 2], [base, base + 2, base + 3]])
+
+    h = half_size
+    add_face([(-h, h, -h), (h, h, -h), (h, h, h), (-h, h, h)], "F")  # +Y
+    add_face([(h, -h, -h), (h, h, -h), (h, h, h), (h, -h, h)], "R")  # +X
+    add_face([(h, -h, -h), (-h, -h, -h), (-h, -h, h), (h, -h, h)], "B")  # -Y
+    add_face([(-h, h, -h), (-h, -h, -h), (-h, -h, h), (-h, h, h)], "L")  # -X
+    add_face([(-h, -h, h), (h, -h, h), (h, h, h), (-h, h, h)], "U")  # +Z (top)
+    add_face([(-h, h, -h), (h, h, -h), (h, -h, -h), (-h, -h, -h)], "D")  # -Z (bottom)
+
+    mesh = trimesh.Trimesh(
+        vertices=np.array(vertices, dtype=np.float64) + np.asarray(center, dtype=np.float64),
+        faces=np.array(faces),
+        process=False,
+    )
+    mesh.visual = trimesh.visual.TextureVisuals(
+        uv=np.array(uvs, dtype=np.float64),
+        material=trimesh.visual.material.PBRMaterial(
+            name="skybox",
+            baseColorFactor=(0, 0, 0, 255),
+            emissiveFactor=(1.0, 1.0, 1.0),
+            emissiveTexture=image,
+            doubleSided=True,
+        ),
+    )
+    return mesh
+
+
+def _emissive_light_mesh(light):
+    """An emissive mesh marking a light source, shaped/sized/oriented to match it.
+
+    Rect lights become a thin box (length x width), disk lights a thin cylinder of
+    radius=length, sphere lights a sphere of radius=length. The mesh is placed at
+    the light's base-frame pose. Flat emitters are double-sided so they read from
+    either side.
+    """
+    light_type = light["type"]
+    length = light["length"] if light["length"] > 1e-4 else LIGHT_MESH_FALLBACK_RADIUS
+    width = light["width"] if light["width"] > 1e-4 else LIGHT_MESH_FALLBACK_RADIUS
+
+    if light_type == _LIGHT_TYPE_SPHERE:
+        mesh = trimesh.creation.icosphere(subdivisions=2, radius=length)
+    elif light_type == _LIGHT_TYPE_DISK:
+        mesh = trimesh.creation.cylinder(radius=length, height=LIGHT_MESH_THICKNESS, sections=24)
+    elif light_type == _LIGHT_TYPE_RECT:
+        mesh = trimesh.creation.box(extents=(length, width, LIGHT_MESH_THICKNESS))
+    else:
+        mesh = trimesh.creation.icosphere(subdivisions=2, radius=LIGHT_MESH_FALLBACK_RADIUS)
+
+    mesh.apply_transform(np.array(light["pose"], dtype=np.float64))
+    emissive = tuple(float(min(max(c, 0.0), 1.0)) for c in light["color"])
+    mesh.visual = trimesh.visual.TextureVisuals(
+        material=trimesh.visual.material.PBRMaterial(
+            name="light_emissive",
+            baseColorFactor=(0, 0, 0, 255),
+            emissiveFactor=emissive,
+            doubleSided=True,
+        )
+    )
+    return mesh
 
 # Map keys emitted into the per-link MTL files by export_objs_global.py.
 MTL_CHANNELS = {
@@ -212,6 +337,116 @@ def _apply_material(mesh, material):
         mesh.visual = trimesh.visual.TextureVisuals(material=factors)
 
 
+def _make_lights_cameras_postprocessor(lights, cameras):
+    """Build a trimesh export tree_postprocessor that injects KHR_lights_punctual
+    point lights and perspective cameras into the glTF header.
+
+    trimesh's glTF exporter cannot write lights (no KHR_lights_punctual support)
+    and writes at most one camera, so we mutate the raw header dict on the way
+    out. Lights and cameras are pure-JSON additions (no buffer/accessor data), so
+    this needs no extra dependency and produces spec-valid glTF.
+
+    Args:
+        lights (list): dicts with "position" (xyz), "color" (linear rgb 0-1), and
+            optional "name". Emitted as omnidirectional point lights, so their
+            orientation is irrelevant.
+        cameras (list): dicts with "position" (xyz), "quat_xyzw", and "name".
+            glTF cameras look down -Z with +Y up, matching the scene camera
+            convention used elsewhere in the pipeline.
+    """
+
+    def postprocessor(tree):
+        nodes = tree["nodes"]
+        scene_node_indices = tree["scenes"][0].setdefault("nodes", [])
+        added_node_indices = []
+
+        for camera in cameras:
+            camera_array = tree.setdefault("cameras", [])
+            camera_index = len(camera_array)
+            camera_array.append(
+                {
+                    "type": "perspective",
+                    "name": camera["name"],
+                    "perspective": {"yfov": CAMERA_YFOV, "znear": CAMERA_ZNEAR},
+                }
+            )
+            nodes.append(
+                {
+                    "name": camera["name"],
+                    "translation": [float(v) for v in camera["position"]],
+                    "rotation": [float(v) for v in camera["quat_xyzw"]],
+                    "camera": camera_index,
+                }
+            )
+            added_node_indices.append(len(nodes) - 1)
+
+        if lights:
+            punctual = tree.setdefault("extensions", {}).setdefault("KHR_lights_punctual", {})
+            light_array = punctual.setdefault("lights", [])
+            for light in lights:
+                light_index = len(light_array)
+                name = light.get("name", f"light_{light_index}")
+                light_array.append(
+                    {
+                        "type": "point",
+                        "name": name,
+                        "color": [float(v) for v in light["color"]],
+                        "intensity": LIGHT_INTENSITY,
+                    }
+                )
+                nodes.append(
+                    {
+                        "name": name,
+                        "translation": [float(v) for v in light["position"]],
+                        "extensions": {"KHR_lights_punctual": {"light": light_index}},
+                    }
+                )
+                added_node_indices.append(len(nodes) - 1)
+            tree["extensionsUsed"] = sorted(set(tree.get("extensionsUsed", [])) | {"KHR_lights_punctual"})
+
+        scene_node_indices.extend(added_node_indices)
+
+    return postprocessor
+
+
+def _object_lights_in_base_frame(links, link_fk, meta_links):
+    """Collect an object's light meta links, expressed in its base link frame.
+
+    metadata.json stores lights per parent link as
+    meta_links[link_name]["lights"][light_id] = [ {position, orientation, color,
+    type, length, width, ...}, ... ] with poses in that parent link's frame. We
+    fold in link_fk (rest pose) so the result (full pose plus emitter dimensions)
+    is in the object's base frame, matching the object GLB geometry.
+    """
+    name_to_link = {link.name: link for link in links}
+    lights = []
+    for link_name, meta_types in meta_links.items():
+        if "lights" not in meta_types:
+            continue
+        link = name_to_link.get(link_name)
+        if link is None:
+            continue
+        link_transform = link_fk[link]
+        for light_list in meta_types["lights"].values():
+            for light in light_list:
+                pose = np.eye(4)
+                pose[:3, :3] = R.from_quat(light.get("orientation", [0, 0, 0, 1])).as_matrix()
+                pose[:3, 3] = light["position"]
+                pose_base = link_transform @ pose
+                color = (np.array(light["color"], dtype=np.float64) / 255.0).tolist()
+                lights.append(
+                    {
+                        "pose": pose_base.tolist(),
+                        "position": pose_base[:3, 3].tolist(),  # used to place the punctual light
+                        "color": color,
+                        "type": int(light.get("type", _LIGHT_TYPE_SPHERE)),
+                        "length": float(light.get("length", 0.0)),
+                        "width": float(light.get("width", 0.0)),
+                    }
+                )
+    return lights
+
+
 def urdf_to_glb(in_obj_dir, out_obj_dir):
     # Get the URDF file
     urdf_files = glob.glob(in_obj_dir + "/urdf/*.urdf")
@@ -222,12 +457,15 @@ def urdf_to_glb(in_obj_dir, out_obj_dir):
     urdf_file = urdf_files[0]
     urdf_dir = os.path.dirname(urdf_file)
 
-    # Load the link tags so that Tglass-tagged links can be overridden.
+    # Load the link tags (for Tglass overrides) and light meta links.
     link_tags = {}
+    meta_links = {}
     metadata_file = os.path.join(in_obj_dir, "misc", "metadata.json")
     if os.path.exists(metadata_file):
         with open(metadata_file, "r") as f:
-            link_tags = json.load(f).get("link_tags") or {}
+            metadata = json.load(f)
+        link_tags = metadata.get("link_tags") or {}
+        meta_links = metadata.get("meta_links") or {}
 
     robot = URDF.load(urdf_file)
     links = [l for l in robot.links if "meta__" not in l.name]
@@ -262,38 +500,200 @@ def urdf_to_glb(in_obj_dir, out_obj_dir):
                     _apply_material(m, material)
                 scene.add_geometry(m)
 
+    # Object lights, in the base frame; also baked into the per-object GLB. Each
+    # gets an emissive marker sphere (part of the geometry, so it rides along when
+    # the object is instanced into a scene) plus a punctual light for illumination.
+    lights = _object_lights_in_base_frame(links, link_fk, meta_links)
+    for light in lights:
+        scene.add_geometry(_emissive_light_mesh(light))
+
     model_id = os.path.splitext(os.path.basename(urdf_file))[0]
     out_file = os.path.join(out_obj_dir, f"{model_id}.glb")
-    scene.export(out_file)
+    data = scene.export(file_type="glb", tree_postprocessor=_make_lights_cameras_postprocessor(lights, []))
+    with open(out_file, "wb") as f:
+        f.write(data)
+
+    # Returned to the scene phase so it can place these lights per instance.
+    return lights
+
+
+def _instance_transform(bbox_center, bbox_rot, scale):
+    """Transform placing an object GLB (in its unscaled base frame) into the scene.
+
+    Mirrors DatasetObject: the object is scaled in its local frame, rotated, then
+    positioned so its bounding-box center lands at the scene pose.
+    """
+    transform = np.eye(4)
+    transform[:3, :3] = bbox_rot.as_matrix() @ np.diag(scale)
+    transform[:3, 3] = bbox_center
+    return transform
+
+
+def scene_urdf_to_glb(urdf_str, obj_glb_root, obj_src_root, lights_by_model, out_file):
+    """Compose a full scene GLB from the per-object GLBs referenced by a scene URDF.
+
+    Objects are instanced (shared mesh, one node per instance) at their per-instance
+    scaled pose; each object's lights are placed per instance, and the scene cameras
+    are emitted as glTF cameras.
+
+    Args:
+        urdf_str (str): The scene URDF (as written by export_scenes_global.py).
+        obj_glb_root (str): Directory holding objects/{cat}/{model}/{model}.glb.
+        obj_src_root (str): Directory holding objects/{cat}/{model}/misc/metadata.json.
+        lights_by_model (dict): {"{cat}/{model}": [ {position, color}, ... ]} in base frame.
+        out_file (str): Output scene GLB path.
+    """
+    root = ET.parse(io.StringIO(urdf_str)).getroot()
+    joints_by_child = {joint.find("child").attrib["link"]: joint for joint in root.findall("joint")}
+
+    scene = trimesh.Scene()
+    model_geom_names = {}  # (cat, model) -> [shared geometry name, ...] registered in the scene
+    metadata_cache = {}  # (cat, model) -> (native_bbox, base_link_offset)
+    scene_lights = []
+
+    for link in root.findall("link"):
+        if link.attrib.get("name") == "world":
+            continue
+        obj_category = link.attrib["category"]
+        obj_model = link.attrib["model"]
+        obj_name = link.attrib["name"]
+        model_key = (obj_category, obj_model)
+
+        try:
+            glb_path = os.path.join(obj_glb_root, "objects", obj_category, obj_model, f"{obj_model}.glb")
+            if not os.path.exists(glb_path):
+                print(f"Skipping {obj_name}: no object GLB at {glb_path}")
+                continue
+
+            bbox_size = np.fromstring(link.attrib["bounding_box"], sep=" ")
+            joint = joints_by_child[obj_name]
+            origin = joint.find("origin")
+            bbox_center = np.fromstring(origin.attrib["xyz"], sep=" ")
+            bbox_rot = R.from_euler("xyz", np.fromstring(origin.attrib["rpy"], sep=" "))
+
+            # Per-instance scale relative to the object's native bbox (as DatasetObject).
+            if model_key not in metadata_cache:
+                metadata_path = os.path.join(obj_src_root, "objects", obj_category, obj_model, "misc", "metadata.json")
+                with open(metadata_path, "r") as f:
+                    obj_metadata = json.load(f)
+                metadata_cache[model_key] = (
+                    np.array(obj_metadata["bbox_size"], dtype=np.float64),
+                    np.array(obj_metadata["base_link_offset"], dtype=np.float64),
+                )
+            native_bbox, base_link_offset = metadata_cache[model_key]
+            scale = np.ones(3)
+            valid = native_bbox > 1e-4
+            scale[valid] = bbox_size[valid] / native_bbox[valid]
+
+            # The scene URDF places the bbox center; the object GLB is in the base
+            # frame, so offset by the scaled base link offset.
+            base_link_pos = bbox_center - bbox_rot.apply(scale * base_link_offset)
+            transform = _instance_transform(base_link_pos, bbox_rot, scale)
+
+            # Register the object's geometry once, then instance it per occurrence.
+            if model_key not in model_geom_names:
+                template = trimesh.load(glb_path)
+                names = []
+                for geom_name, geometry in template.geometry.items():
+                    shared_name = f"{obj_category}-{obj_model}::{geom_name}"
+                    scene.geometry[shared_name] = geometry
+                    names.append(shared_name)
+                model_geom_names[model_key] = names
+            for shared_name in model_geom_names[model_key]:
+                scene.graph.update(
+                    frame_from="world",
+                    frame_to=f"{obj_name}::{shared_name}",
+                    matrix=transform,
+                    geometry=shared_name,
+                )
+
+            # Place this object's lights (base frame) into the world frame.
+            for i, light in enumerate(lights_by_model.get(f"{obj_category}/{obj_model}", [])):
+                position = np.array(light["position"], dtype=np.float64)
+                world_position = (transform @ np.append(position, 1.0))[:3]
+                scene_lights.append(
+                    {"position": world_position.tolist(), "color": light["color"], "name": f"{obj_name}_light_{i}"}
+                )
+        except Exception:
+            print(f"Failed to place {obj_name}:")
+            traceback.print_exc()
+
+    # Skybox: a large emissive cube enclosing the placed geometry (glTF has no
+    # native skybox), reusing the same image as the MJCF skybox.
+    if scene.geometry and os.path.exists(SKYBOX_SOURCE):
+        bounds = scene.bounds
+        center = bounds.mean(axis=0)
+        half_size = max((bounds[1] - bounds[0]).max() / 2.0 * SKYBOX_MARGIN, SKYBOX_MIN_HALF_SIZE)
+        scene.add_geometry(
+            _skybox_mesh(center, half_size, Image.open(SKYBOX_SOURCE).convert("RGB")),
+            geom_name="skybox",
+        )
+
+    # Scene cameras (stored as <camera> elements by export_scenes_global.py). The
+    # stored quaternion is xyzw in the -Z-forward/+Y-up convention glTF expects.
+    cameras = []
+    for camera in root.findall("camera"):
+        cameras.append(
+            {
+                "name": f"camera_{camera.attrib['name']}",
+                "position": np.fromstring(camera.attrib["xyz"], sep=" ").tolist(),
+                "quat_xyzw": np.fromstring(camera.attrib["quat"], sep=" ").tolist(),
+            }
+        )
+
+    data = scene.export(file_type="glb", tree_postprocessor=_make_lights_cameras_postprocessor(scene_lights, cameras))
+    with open(out_file, "wb") as f:
+        f.write(data)
 
 
 def main():
     with (
         b1k_pipeline.utils.ParallelZipFS("objects.zip") as source_fs,
+        b1k_pipeline.utils.ParallelZipFS("scenes.zip") as scenes_fs,
         TempFS(temp_dir=str(b1k_pipeline.utils.TMP_DIR)) as temp_fs,
         b1k_pipeline.utils.ParallelZipFS("objects_glb.zip", write=True) as out_fs,
     ):
-        # Copy everything over to the temp FS
+        # Read the target scene URDFs up front, collecting the models they use.
+        scene_urdfs = {}  # (scene_name, suffix) -> urdf string
+        needed_models = set()  # (cat, model) referenced by the target scenes
+        for target in b1k_pipeline.utils.get_targets("final_scenes"):
+            scene_name = target.split("/")[-1]
+            if SCENES_TO_EXPORT and scene_name not in SCENES_TO_EXPORT:
+                continue
+            for suffix in ["best", "with_clutter"]:
+                urdf_path = f"scenes/{scene_name}/urdf/{scene_name}_{suffix}.urdf"
+                if not scenes_fs.exists(urdf_path):
+                    continue
+                urdf_str = scenes_fs.readtext(urdf_path)
+                scene_urdfs[(scene_name, suffix)] = urdf_str
+                for link in ET.fromstring(urdf_str).findall("link"):
+                    if link.attrib.get("name") != "world":
+                        needed_models.add((link.attrib["category"], link.attrib["model"]))
+
+        # When exporting only a subset of scenes, build just the object GLBs those
+        # scenes need. A full run (empty filter) builds every object.
+        restrict_objects = bool(SCENES_TO_EXPORT)
+
+        # Copy the object sources over to the temp FS (also used by the scene phase
+        # to read object metadata).
         print("Copying input to temp fs...")
         objdir_glob = [item.path for item in source_fs.glob("objects/*/*/")]
+        objdirs_to_build = []
         for item in tqdm.tqdm(objdir_glob):
-            if (
-                source_fs.opendir(item).opendir("urdf").glob("*.urdf").count().files
-                == 0
-            ):
+            cat, model = item.strip("/").split("/")[-2:]
+            if restrict_objects and (cat, model) not in needed_models:
                 continue
-            fs.copy.copy_fs(
-                source_fs.opendir(item), temp_fs.makedirs(item, recreate=True)
-            )
+            if source_fs.opendir(item).opendir("urdf").glob("*.urdf").count().files == 0:
+                continue
+            fs.copy.copy_fs(source_fs.opendir(item), temp_fs.makedirs(item, recreate=True))
+            objdirs_to_build.append(item)
 
         cluster = LocalCluster()
         dask_client = cluster.get_client()
 
+        # Phase 1: export a GLB per object and collect each object's lights.
         obj_futures = {}
-
-        for objdir in tqdm.tqdm(
-            objdir_glob, desc="Processing targets to queue objects"
-        ):
+        for objdir in tqdm.tqdm(objdirs_to_build, desc="Queueing objects"):
             obj_futures[
                 dask_client.submit(
                     urdf_to_glb,
@@ -303,10 +703,43 @@ def main():
                 )
             ] = objdir
 
+        lights_by_model = {}  # "{cat}/{model}" -> lights in base frame
         for future in tqdm.tqdm(
-            as_completed(obj_futures.keys()),
-            total=len(obj_futures),
-            desc="Processing objects",
+            as_completed(obj_futures.keys()), total=len(obj_futures), desc="Processing objects"
+        ):
+            objdir = obj_futures[future]
+            try:
+                lights = future.result()
+                if lights:
+                    # objdir is /objects/{cat}/{model}/
+                    cat, model = objdir.strip("/").split("/")[-2:]
+                    lights_by_model[f"{cat}/{model}"] = lights
+            except:
+                traceback.print_exc()
+
+        # Phase 2: compose a GLB per scene from the object GLBs, adding lights/cameras.
+        obj_glb_root = out_fs.getsyspath("/")
+        obj_src_root = temp_fs.getsyspath("/")
+        scene_futures = {}
+        for (scene_name, suffix), urdf_str in scene_urdfs.items():
+            out_file = os.path.join(
+                out_fs.makedirs(f"scenes/{scene_name}").getsyspath("/"),
+                f"{scene_name}_{suffix}.glb",
+            )
+            scene_futures[
+                dask_client.submit(
+                    scene_urdf_to_glb,
+                    urdf_str,
+                    obj_glb_root,
+                    obj_src_root,
+                    lights_by_model,
+                    out_file,
+                    pure=False,
+                )
+            ] = f"{scene_name}_{suffix}"
+
+        for future in tqdm.tqdm(
+            as_completed(scene_futures.keys()), total=len(scene_futures), desc="Processing scenes"
         ):
             try:
                 future.result()

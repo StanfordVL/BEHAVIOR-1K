@@ -312,10 +312,13 @@ stages:
   #   - artifacts/pipeline/validate_scenes.success
 
   export_glbs:
+    # Export a GLB per object and a composed GLB per scene (with cameras + lights).
     cmd: 'python -m b1k_pipeline.export_glbs'
     deps:
     - artifacts/parallels/objects.zip
+    - artifacts/parallels/scenes.zip
     - artifacts/pipeline/export_objs.success
+    - artifacts/pipeline/export_scenes.success
     - b1k_pipeline/export_glbs.py
     outs:
     - artifacts/parallels/objects_glb.zip
@@ -351,6 +354,7 @@ stages:
     - artifacts/pipeline/export_scenes.success
     - artifacts/pipeline/export_objs.success
     - b1k_pipeline/export_scenes_mujoco.py
+    - b1k_pipeline/assets/skybox.png
     - params.yaml
     outs:
     - artifacts/parallels/scenes_mujoco.zip
