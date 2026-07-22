@@ -382,7 +382,10 @@ if [ "$OMNIGIBSON" = true ]; then
                     local filepath="$temp_dir/$filename"
 
                     echo "Downloading $pkg..."
-                    if ! curl -sL "$url" -o "$filepath"; then
+                    # --retry: these wheels are large and pulled from a single upstream host, so under
+                    # concurrent installs (e.g. several CI jobs at once) transient download failures are
+                    # common. Retry with backoff before giving up.
+                    if ! curl -sL --fail --retry 5 --retry-all-errors --retry-connrefused "$url" -o "$filepath"; then
                         echo "ERROR: Failed to download $pkg"
                         rm -rf "$temp_dir"
                         return 1
