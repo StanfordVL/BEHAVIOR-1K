@@ -453,7 +453,11 @@ fi
 if [ "$EVAL" = true ]; then
     # get torch version via pip and install corresponding torch-cluster
     TORCH_VERSION=$(python -m pip show torch | grep Version | cut -d " " -f 2)
-    python -m pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
+    # torch-cluster's prebuilt wheel index (data.pyg.org) lags behind the newest torch releases, so
+    # a matching wheel may not exist yet for TORCH_VERSION. This is optional: omnigibson.eval already
+    # falls back to `fps = None` when torch_cluster isn't importable, so don't hard-fail setup here.
+    python -m pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html || \
+        echo "WARNING: No torch-cluster wheel found for torch ${TORCH_VERSION}; skipping (optional, eval fps support will be unavailable)."
 fi
 
 # Install asset pipeline
