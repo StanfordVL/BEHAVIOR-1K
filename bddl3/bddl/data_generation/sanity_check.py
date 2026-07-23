@@ -64,10 +64,12 @@ def sanity_check_no_flammable_heat_sources(object_taxonomy):
         if "flammable" not in abilities:
             continue
         conflicting = {"heatSource", "coldSource"} & set(abilities)
-        assert not conflicting, (
-            f"Synset {synset} is annotated as both flammable and {sorted(conflicting)}; "
-            "these abilities conflict because both claim the object's HeatSourceOrSink state."
-        )
+        # Raise instead of assert so the check also runs under python -O.
+        if conflicting:
+            raise ValueError(
+                f"Synset {synset} is annotated as both flammable and {sorted(conflicting)}; "
+                "these abilities conflict because both claim the object's HeatSourceOrSink state."
+            )
 
 
 def sanity_check_transition_rules(object_taxonomy):

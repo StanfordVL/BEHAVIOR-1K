@@ -548,11 +548,13 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                         # Fail loudly instead of silently letting the last ability's params win —
                         # a single state instance can't serve two abilities (e.g. an object that
                         # is both a heatSource and flammable is not supported; the BDDL data
-                        # generation sanity checks enforce this at the synset level).
-                        assert state_type not in states_info, (
-                            f"Object {self.name}: state {state_type.__name__} is requested by multiple abilities "
-                            f"({states_info[state_type]['ability']} and {ability}); this is not supported."
-                        )
+                        # generation sanity checks enforce this at the synset level). Raised
+                        # unconditionally (not an assert) so python -O cannot skip it.
+                        if state_type in states_info:
+                            raise ValueError(
+                                f"Object {self.name}: state {state_type.__name__} is requested by multiple abilities "
+                                f"({states_info[state_type]['ability']} and {ability}); this is not supported."
+                            )
                         states_info[state_type] = {
                             "ability": ability,
                             "params": state_type.postprocess_ability_params(state_params, self.scene),
