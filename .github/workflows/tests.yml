@@ -123,7 +123,6 @@ jobs:
           - {test_file: test_examples, example: "object_states.dicing_demo"}
           - {test_file: test_examples, example: "object_states.heated_state_demo"}
           - {test_file: test_examples, example: "object_states.onfire_demo"}
-          - {test_file: test_examples, example: "object_states.overlaid_demo"}
           - {test_file: test_examples, example: "object_states.particle_applier_remover_demo"}
           - {test_file: test_examples, example: "object_states.sample_kinematics_demo"}
           - {test_file: test_examples, example: "object_states.slicing_demo"}

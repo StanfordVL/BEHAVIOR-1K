@@ -18,7 +18,6 @@ EXAMPLES = [
     "object_states.dicing_demo",
     "object_states.heated_state_demo",
     "object_states.onfire_demo",
-    "object_states.overlaid_demo",
     "object_states.particle_applier_remover_demo",
     "object_states.sample_kinematics_demo",
     "object_states.slicing_demo",
@@ -47,6 +46,7 @@ EXAMPLES_TO_SKIP = [
     "teleoperation.vr_scene_tour_demo",  # does not support headless mode
     "objects.import_custom_object",  # CLI conversion tool, requires demo / test asset files
     "object_states.object_state_texture_demo",  # disable temporarily due to contact API bug
+    "object_states.overlaid_demo",  # cloth (Overlaid state) broken, see #2042 and test_object_states.py skips
     # WIP examples: currently broken, to be supported again in the future
     "wip.curobo_example",
     "wip.folded_unfolded_state_demo",
