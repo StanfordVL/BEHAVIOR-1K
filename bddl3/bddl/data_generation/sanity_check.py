@@ -55,6 +55,21 @@ def sanity_check_object_hierarchy(object_taxonomy):
                                 ), f"In ParticleModifier annotation, {condition[1]} is not a leaf substance synset."
 
 
+def sanity_check_no_flammable_heat_sources(object_taxonomy):
+    # flammable and heatSource/coldSource each require the object's single
+    # HeatSourceOrSink state in OmniGibson (flammable via OnFire's flame heat
+    # source), so no synset may be annotated with both.
+    for synset in object_taxonomy.get_descendants("entity.n.01"):
+        abilities = object_taxonomy.get_abilities(synset)
+        if "flammable" not in abilities:
+            continue
+        conflicting = {"heatSource", "coldSource"} & set(abilities)
+        assert not conflicting, (
+            f"Synset {synset} is annotated as both flammable and {sorted(conflicting)}; "
+            "these abilities conflict because both claim the object's HeatSourceOrSink state."
+        )
+
+
 def sanity_check_transition_rules(object_taxonomy):
     leaf_synsets = object_taxonomy.get_leaf_descendants("entity.n.01")
     valid_keys = set()
@@ -108,6 +123,7 @@ def sanity_check():
     # Needs to refresh to use the latest version of the taxonomy
     object_taxonomy.refresh_hierarchy_file()
     sanity_check_object_hierarchy(object_taxonomy)
+    sanity_check_no_flammable_heat_sources(object_taxonomy)
     sanity_check_transition_rules(object_taxonomy)
     sanity_check_transition_rules_washer(object_taxonomy)
 
