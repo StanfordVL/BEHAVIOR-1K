@@ -477,9 +477,7 @@ def _launch_simulator(*args, **kwargs):
                 order=0,
             )
             self._simulation_event_callback = (
-                physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
-                    self._on_simulation_event
-                )
+                physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(self._on_simulation_event)
             )
 
             # List of objects that need to be initialized during whenever the next sim step occurs
