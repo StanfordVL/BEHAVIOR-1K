@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from collections.abc import Iterable
 from copy import deepcopy
+import os
 
 import gymnasium as gym
 import torch as th
@@ -496,13 +497,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Build sensor registry for get_obs()
         self._build_sensor_registry()
 
-        # Robot camera observations come from the tiled render product in multi-env mode, so hide the
-        # per-sensor viewports (their individual render products are unused for obs).
-        if self._tiled_sensor is not None:
-            for sensors in self._robot_sensor_map.values():
-                for sensor in sensors:
-                    if isinstance(sensor, VisionSensor):
-                        sensor.viewer_visibility = False
+        # Robot camera observations come from the tiled render product in multi-env mode. Pause the
+        # individual render products: hiding their UI viewports is a no-op in headless mode and leaves
+        # those unused products rendering every frame alongside the tiled product.
+        keep_individual_render_products = os.getenv("OMNIGIBSON_KEEP_INDIVIDUAL_RENDER_PRODUCTS", "0") == "1"
+        if self._tiled_sensor is not None and not keep_individual_render_products:
+            with og.sim.editing_usd():
+                for sensors in self._robot_sensor_map.values():
+                    for sensor in sensors:
+                        if isinstance(sensor, VisionSensor):
+                            sensor.viewer_visibility = False
+                            sensor.render_product.hydra_texture.updates_enabled = False
 
         self.reset()
 
@@ -708,7 +713,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             return action
         return action
 
-    def step(self, action, n_render_iterations=1, render=True):
+    def step(self, action, n_render_iterations=1):
         """
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
@@ -719,13 +724,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 concatenated set of actions. For multi-env, should be (num_envs, action_dim) shaped for tensors,
                 or a list of dicts (one per env) for dict actions.
             n_render_iterations (int): Number of rendering iterations to use before returning observations
-            render (bool): If False, step physics (and non-physics/object-state updates) WITHOUT rendering
-                the cameras this step. Vision sensors keep their previous frame, so callers must be reusing
-                stale image observations (e.g. mid action-chunk, when the policy is replaying and not looking
-                at fresh pixels). Proprioception is still fresh (it comes from physics, not rendering).
-                Rendering is the dominant per-step cost, so skipping it on non-observation steps is the main
-                eval speedup. Default True (unchanged behavior).
-
         Returns:
             5-tuple:
                 - list[dict]: states, i.e. next observations per env
@@ -759,17 +757,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     robot.apply_action(action_dict[robot.name])
 
         # Step simulation
-        if render:
-            og.sim.step()
+        og.sim.step()
 
-            # Render any additional times requested
-            for _ in range(n_render_iterations - 1):
-                og.sim.render()
-        else:
-            # Skip rendering this step: physics + non-physics/object-state updates only. The cameras
-            # retain their last rendered frame, so downstream obs will carry stale images.
-            with og.sim.render_on_step(False):
-                og.sim.step()
+        # Render any additional times requested
+        for _ in range(n_render_iterations - 1):
+            og.sim.render()
 
         # Grab observations
         obs_list, obs_info_list = self.get_obs()

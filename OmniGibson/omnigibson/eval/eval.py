@@ -71,14 +71,12 @@ def parse_args() -> argparse.Namespace:
         help="Number of parallel env slots; instances are evaluated this many at a time.",
     )
     parser.add_argument(
-        "--render-every",
+        "--replay-action-chunk-size",
         type=int,
-        default=1,
+        default=0,
         help=(
-            "Render (and feed the policy fresh camera images) every N steps; step physics-only in "
-            "between. Set to the policy's action horizon K for chunked policies (skip-render mode) to "
-            "skip drawing on steps the policy replays. 1 = render every step (for policies that look "
-            "every step, e.g. temporal_ensemble). Ignored while writing video."
+            "Opt in to exact client-side replay of a complete server-returned action chunk. "
+            "Use the receding-horizon length (for example 16); 0 keeps one websocket request per step."
         ),
     )
     parser.add_argument(
@@ -119,6 +117,12 @@ def main() -> None:
     args = parse_args()
 
     gm.HEADLESS = args.headless
+    # Headless evaluation consumes robot-camera observations through VisionSensor / TiledVisionSensor render
+    # products, not the separate 1280x720 debug viewport. Avoid constructing that unused viewer product: at
+    # N=10 it accounts for two of five RTX tile passes while policy camera shapes and traces remain unchanged.
+    # The environment override restores the old path only for controlled performance A/B runs.
+    if args.headless and os.getenv("OMNIGIBSON_KEEP_VIEWER_CAMERA", "0") != "1":
+        gm.RENDER_VIEWER_CAMERA = False
 
     seed = seed_everything(DEFAULT_EVAL_SEED)
     logger.info(f"Seeded Python, NumPy, and Torch with seed={seed}")
@@ -137,6 +141,7 @@ def main() -> None:
             "_target_": "omnigibson.eval.policies.WebsocketPolicy",
             "host": args.host,
             "port": args.port,
+            "action_chunk_size": args.replay_action_chunk_size,
         }
     else:
         model_cfg = {"_target_": "omnigibson.eval.policies.LocalPolicy", "action_dim": None}
@@ -153,7 +158,6 @@ def main() -> None:
             "mode": args.mode,
             "seed": seed,
             "num_envs": args.num_envs,
-            "render_every": args.render_every,
             "task": {"name": args.task_name},
             "robot": robot_config,
         }

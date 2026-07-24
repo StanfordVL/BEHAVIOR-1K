@@ -171,12 +171,6 @@ class Evaluator:
         self.obs = [None] * self.num_envs
         self._video_writers = [None] * self.num_envs
         self.light_synchronizers = [None] * self.num_envs
-        # Render cadence. Render (and feed the policy fresh camera images) every ``render_every`` steps;
-        # step physics-only in between, reusing the last frame -- valid because a chunked policy replays
-        # its plan and only looks at images when it re-infers (every K steps). 1 = render every step
-        # (safe default / policies that look every step). Rendering is the dominant per-step cost.
-        self.render_every = max(1, int(cfg.get("render_every", 1)))
-        self._rollout_step = 0
 
         # Initialize the physics views so the first reset()/load can read/restore robot joint state.
         og.sim.update_handles()
@@ -334,16 +328,14 @@ class Evaluator:
             for i in range(self.num_envs)
         ]
 
-    def _apply_actions(self, actions: th.Tensor, active_slots: List[int], render: bool = True):
+    def _apply_actions(self, actions: th.Tensor, active_slots: List[int]):
         """
         Step all env slots one step with the given ``(num_envs, action_dim)`` actions, then update the
         observations and metrics for the @active_slots only (frozen slots are still stepped by the
-        shared simulator but their obs/metrics are not advanced). If ``render`` is False, physics steps
-        without drawing the cameras (images stay stale, proprio is still fresh) -- the render cadence
-        uses this to skip drawing on steps the policy is not looking. Returns ``(terminated, truncated,
+        shared simulator but their obs/metrics are not advanced). Returns ``(terminated, truncated,
         info)`` straight from the env.
         """
-        obs_list, _, terminated, truncated, info = self.env.step(actions, n_render_iterations=1, render=render)
+        obs_list, _, terminated, truncated, info = self.env.step(actions, n_render_iterations=1)
         if self.should_sync_lights:
             # Re-derive visual light state (toggles drive lights that aren't directly serialized) for
             # the active slots, then re-read obs so the recorded frame matches the synced lights.
@@ -379,8 +371,8 @@ class Evaluator:
     def _step_fn(self, active_slots: List[int]) -> Tuple[th.Tensor, th.Tensor]:
         """
         ``step_fn`` consumed by :func:`evaluate_instances_batched`: query the policy ONCE with all env
-        slots batched together, then step. Renders only every ``render_every`` steps (physics-only in
-        between). Frozen slots get a zero action but are still stepped by the shared simulator.
+        slots batched together, then step. Frozen slots get a zero action but are still stepped by the
+        shared simulator.
         """
         action_dim = self.robots[0].action_dim
         batched_action = self.policy.forward(obs=self._batch_obs())  # (num_envs, action_dim)
@@ -389,11 +381,7 @@ class Evaluator:
         actions = th.zeros((self.num_envs, action_dim), dtype=th.float32)
         for slot in active_slots:
             actions[slot] = batched_action[slot].to(actions.dtype)
-        # Render on the step whose fresh obs the NEXT policy query will consume, so re-inference steps
-        # get fresh images. render_every == 1 => render every step (unchanged behavior).
-        render = ((self._rollout_step + 1) % self.render_every) == 0
-        terminated, truncated, _ = self._apply_actions(actions, active_slots, render=render)
-        self._rollout_step += 1
+        terminated, truncated, _ = self._apply_actions(actions, active_slots)
         return terminated, truncated
 
     def _set_video_writer(self, env_idx: int, video_writer) -> None:
@@ -487,7 +475,8 @@ class Evaluator:
                         entity.keep_still()
         for slot in slots:
             self.env.scenes[slot].update_initial_file()
-            self.env.scenes[slot].reset()
+        # load_batch immediately calls env.reset(), whose task reset restores every selected scene
+        # from this initial file. Avoid doing the same hard restore and physics step twice.
 
     def load_batch(
         self,
@@ -517,10 +506,8 @@ class Evaluator:
                 og.sim.render()
             obs_list, _ = self.env.get_obs(env_indices=th.tensor(ordered_slots, dtype=th.long))
         task_name = self.cfg.task.name
-        # One batched policy for all slots: reset its per-env state once, and restart the render-cadence
-        # counter for this group (the step-0 obs below is freshly rendered by env.reset above).
+        # One batched policy for all slots: reset its per-env state once.
         self.policy.reset()
-        self._rollout_step = 0
         for i, slot in enumerate(ordered_slots):
             self.obs[slot] = self._preprocess_obs(obs_list[i], env_idx=slot)
             for metric in self.metrics[slot]:
@@ -536,20 +523,14 @@ class Evaluator:
         obs = flatten_obs_dict(obs)
         base_pose = robot.get_position_orientation()
         cam_rel_poses = []
-        # The first camera-parameter query returns zeros; fall back to get_position_orientation() then.
+        # Camera extrinsics come directly from the sensor prim. Querying camera_parameters just for
+        # cameraViewTransform lazily creates an annotator and forces global renders per camera.
         for camera_name in self.robot_camera_names.values():
             sensor_name = camera_name.split("::")[1]
             if sensor_name not in robot.sensors:
                 continue
             camera = robot.sensors[sensor_name]
-            direct_cam_pose = camera.camera_parameters["cameraViewTransform"]
-            if np.allclose(direct_cam_pose, np.zeros(16)):
-                cam_rel_poses.append(
-                    th.cat(T.relative_pose_transform(*(camera.get_position_orientation()), *base_pose))
-                )
-            else:
-                cam_pose = T.mat2pose(th.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=th.float32))
-                cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
+            cam_rel_poses.append(th.cat(T.relative_pose_transform(*(camera.get_position_orientation()), *base_pose)))
         if cam_rel_poses:
             obs[f"{robot.name}::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         obs["task_id"] = th.tensor([TASK_NAMES_TO_INDICES[self.cfg.task.name]], dtype=th.int64)
@@ -589,7 +570,6 @@ class Evaluator:
                 og.sim.render()
             obs_list, _ = self.env.get_obs()
         self.policy.reset()
-        self._rollout_step = 0
         for env_idx in range(self.num_envs):
             self.obs[env_idx] = self._preprocess_obs(obs_list[env_idx], env_idx=env_idx)
             for metric in self.metrics[env_idx]:
@@ -650,20 +630,13 @@ class Evaluator:
             )
             return result
 
-        # Video needs a rendered frame every step, so disable render-skipping while recording.
-        saved_render_every = self.render_every
-        if write_video:
-            self.render_every = 1
-        try:
-            return evaluate_instances_batched(
-                list(instances_to_run),
-                self.num_envs,
-                load_fn=load_fn,
-                step_fn=step_fn,
-                record_fn=record_fn,
-            )
-        finally:
-            self.render_every = saved_render_every
+        return evaluate_instances_batched(
+            list(instances_to_run),
+            self.num_envs,
+            load_fn=load_fn,
+            step_fn=step_fn,
+            record_fn=record_fn,
+        )
 
     def __enter__(self):
         signal(SIGINT, self._sigint_handler)
