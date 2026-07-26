@@ -361,7 +361,44 @@ class VisionSensor(BaseSensor):
         """
         raw_obs = self._annotators[modality].get_data(device=og.sim.device)
         obs_value = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+
+        # Right after the render product is destroyed and recreated (see _recreate_render_product), Replicator's
+        # backing AOVs / instance mappings can take a few frames to catch up, so the first few reads can come back
+        # stale: an image-shaped modality may report the wrong shape, and a semantic modality's idToLabels mapping
+        # may come back empty even though the scene has labeled prims in view. Render a few more frames and retry
+        # until the data looks valid.
+        for _ in range(4):
+            if not self._is_stale_obs(modality, raw_obs, obs_value):
+                break
+            og.sim.render()
+            raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+            obs_value = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+
         return raw_obs, self._preprocess_obs_for_device(obs_value, modality)
+
+    def _is_stale_obs(self, modality, raw_obs, obs_value):
+        """
+        Checks whether a freshly-fetched observation for @modality looks like it was read before Replicator caught
+        up to a render product recreation (see _recreate_render_product), as opposed to a legitimate reading (e.g.
+        genuinely zero bounding boxes because nothing is in view).
+
+        Args:
+            modality (str): Name of the modality @raw_obs / @obs_value belongs to
+            raw_obs (dict or array): Raw annotator output, as returned by the annotator's get_data()
+            obs_value (th.Tensor or array): Extracted observation value (raw_obs["data"] if @raw_obs is a dict)
+
+        Returns:
+            bool: Whether this observation should be re-fetched after another render
+        """
+        if self._is_semantic_modality(modality):
+            # A freshly-rebuilt instance mapping is never truly empty -- every scene has at least one labeled prim
+            # (e.g. the floor) in view of a sensibly-posed camera, so an empty mapping means Replicator hasn't
+            # caught up yet.
+            return len(raw_obs["info"]["idToLabels"]) == 0
+        elif modality not in ("pointcloud", "camera_params"):
+            return obs_value.shape[0] != self.image_height or obs_value.shape[1] != self.image_width
+        else:
+            return False
 
     def _preprocess_obs_for_device(self, obs_value, modality):
         """
