@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 import torch as th
-from lerobot.configs import DepthEncoderConfig, VideoEncoderConfig
+from lerobot.configs import DepthEncoderConfig, RGBEncoderConfig
 from lerobot.datasets import LeRobotDataset
 from lerobot.utils.constants import HF_LEROBOT_HOME
 
@@ -80,7 +80,7 @@ class LeRobotDataWrapper(DataWrapper):
             "robot_type": env.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
             "use_videos": True,
             "streaming_encoding": True,
-            "camera_encoder": VideoEncoderConfig(
+            "rgb_encoder": RGBEncoderConfig(
                 vcodec="hevc",
                 pix_fmt="yuv420p",
                 g=8,
@@ -96,7 +96,6 @@ class LeRobotDataWrapper(DataWrapper):
                 depth_max=MAX_DEPTH,
                 shift=DEPTH_SHIFT,
                 use_log=True,
-                output_unit="m",
                 extra_options={"x265-params": "log-level=0:bframes=0"},
             ),
         }
@@ -283,7 +282,7 @@ class LeRobotDataWrapper(DataWrapper):
 
         obs_mapping, obs_features = self.get_lerobot_obs_mapping(
             env=env,
-            depth_output_unit=self.lerobot_dataset_kwargs["depth_encoder"].output_unit,
+            depth_output_unit="m",
         )
         self.obs_mapping = obs_mapping
         features.update(obs_features)

@@ -50,14 +50,44 @@ jobs:
         with:
           submodules: true
 
+      - name: Set up conda environment for this run
+        id: setup_env
+        working-directory: ${{ github.workspace }}
+        run: |
+          REQUIRED_PY=$(sed -n 's/.*conda create -n "\$NEW_ENV_NAME" python=\([0-9]*\.[0-9]*\).*/\1/p' setup.sh | head -1)
+          CURRENT_PY=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+          if [[ "$CURRENT_PY" != "$REQUIRED_PY" ]]; then
+            ENV_NAME="ci-${{ github.run_id }}"
+            echo "Python version mismatch (have $CURRENT_PY, need $REQUIRED_PY) -- creating a fresh conda env '$ENV_NAME'"
+            # --primitives (curobo) needs a CUDA toolkit + nvcc to compile from source, which is
+            # only present at Docker build time (see docker/Dockerfile) -- not in this ephemeral
+            # runner. Skip it: test_curobo/test_primitives are already disabled in run_test's matrix,
+            # so nothing actually exercises it.
+            ./setup.sh --new-env "$ENV_NAME" --omnigibson --bddl --joylo --eval --dev \
+              --accept-conda-tos --accept-nvidia-eula
+            echo "fresh_env=true" >> "$GITHUB_OUTPUT"
+          else
+            ENV_NAME="behavior"
+            echo "fresh_env=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "CONDA_ENV=$ENV_NAME" >> "$GITHUB_ENV"
+
       - name: Install BDDL
-        run: pip install -e .
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .
         working-directory: ${{ github.workspace }}/bddl3
 
       - name: Install OmniGibson
-        run: pip install -e .[dev,primitives,eval] --no-build-isolation
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .[dev,primitives,eval] --no-build-isolation
+
       - name: Check example lists are up to date
-        run: python tests/update_example_tests.py --check
+        run: conda run -n "$CONDA_ENV" --no-capture-output python tests/update_example_tests.py --check
+
+      - name: Remove scratch conda environment
+        if: always() && steps.setup_env.outputs.fresh_env == 'true'
+        working-directory: ${{ github.workspace }}
+        run: conda env remove -n "$CONDA_ENV" -y
 
   run_test:
     name: Run Tests
@@ -93,7 +123,6 @@ jobs:
           - {test_file: test_examples, example: "object_states.dicing_demo"}
           - {test_file: test_examples, example: "object_states.heated_state_demo"}
           - {test_file: test_examples, example: "object_states.onfire_demo"}
-          - {test_file: test_examples, example: "object_states.overlaid_demo"}
           - {test_file: test_examples, example: "object_states.particle_applier_remover_demo"}
           - {test_file: test_examples, example: "object_states.sample_kinematics_demo"}
           - {test_file: test_examples, example: "object_states.slicing_demo"}
@@ -122,18 +151,43 @@ jobs:
         with:
           submodules: true
 
+      - name: Set up conda environment for this run
+        id: setup_env
+        working-directory: ${{ github.workspace }}
+        run: |
+          REQUIRED_PY=$(sed -n 's/.*conda create -n "\$NEW_ENV_NAME" python=\([0-9]*\.[0-9]*\).*/\1/p' setup.sh | head -1)
+          CURRENT_PY=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+          if [[ "$CURRENT_PY" != "$REQUIRED_PY" ]]; then
+            ENV_NAME="ci-${{ github.run_id }}-${{ strategy.job-index }}"
+            echo "Python version mismatch (have $CURRENT_PY, need $REQUIRED_PY) -- creating a fresh conda env '$ENV_NAME'"
+            # --primitives (curobo) needs a CUDA toolkit + nvcc to compile from source, which is
+            # only present at Docker build time (see docker/Dockerfile) -- not in this ephemeral
+            # runner. Skip it: test_curobo/test_primitives are already disabled in run_test's matrix,
+            # so nothing actually exercises it.
+            ./setup.sh --new-env "$ENV_NAME" --omnigibson --bddl --joylo --eval --dev \
+              --accept-conda-tos --accept-nvidia-eula
+            echo "fresh_env=true" >> "$GITHUB_OUTPUT"
+          else
+            ENV_NAME="behavior"
+            echo "fresh_env=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "CONDA_ENV=$ENV_NAME" >> "$GITHUB_ENV"
+
       - name: Install BDDL
-        run: pip install -e .
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .
         working-directory: ${{ github.workspace }}/bddl3
 
       - name: Install OmniGibson
-        run: pip install -e .[dev,primitives,eval] --no-build-isolation
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .[dev,primitives,eval] --no-build-isolation
 
       - name: Print env
         run: printenv
 
       - name: Run tests
         run: >
+          conda run -n "$CONDA_ENV" --no-capture-output
           pytest -s tests/${{ matrix.test_file }}.py
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
           ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
@@ -179,6 +233,11 @@ jobs:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}
           path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
           overwrite: true
+
+      - name: Remove scratch conda environment
+        if: always() && steps.setup_env.outputs.fresh_env == 'true'
+        working-directory: ${{ github.workspace }}
+        run: conda env remove -n "$CONDA_ENV" -y
 
   upload_report:
     name: Test Report

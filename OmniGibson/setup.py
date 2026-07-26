@@ -23,7 +23,7 @@ setup(
     install_requires=[
         "huggingface-hub[cli]>=0.34.4",
         "gymnasium>=0.28.1",
-        "numpy<2.0.0,>=1.23.5",
+        "numpy>=2.0.0",
         "scipy>=1.10.1",
         "GitPython>=3.1.40",
         "transforms3d>=0.4.1",
@@ -42,8 +42,7 @@ setup(
         "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
-        "pymeshlab~=2022.2; platform_machine!='aarch64'",
-        "pymeshlab>=2022.2; platform_machine=='aarch64'",
+        "pymeshlab>=2022.2",
         "click>=8.1.3",
         "aenum>=3.1.15",
         "rtree>=1.2.0",
@@ -52,10 +51,10 @@ setup(
         "lxml>=5.2.2",
         "numba>=0.59.1",
         "cffi==1.17.1",
-        "pillow~=11.0.0",
+        "pillow>=11.0.0",
         "websockets>=15.0.1",
         "omegaconf>=2.3.0",
-        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@release/b1k",
+        "lerobot[dataset] @ git+https://github.com/huggingface/lerobot@1427d35ef58ab46651dc7ef78bde81642090c861",
     ],
     extras_require={
         "dev": [
