@@ -66,27 +66,50 @@ jobs:
         with:
           submodules: true
 
+      - name: Set up conda environment for this run
+        id: setup_env
+        working-directory: ${{ github.workspace }}
+        run: |
+          REQUIRED_PY=$(sed -n 's/.*conda create -n "\$NEW_ENV_NAME" python=\([0-9]*\.[0-9]*\).*/\1/p' setup.sh | head -1)
+          CURRENT_PY=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+          if [[ "$CURRENT_PY" != "$REQUIRED_PY" ]]; then
+            ENV_NAME="ci-${{ github.run_id }}-${{ strategy.job-index }}"
+            echo "Python version mismatch (have $CURRENT_PY, need $REQUIRED_PY) -- creating a fresh conda env '$ENV_NAME'"
+            # --primitives (curobo) needs a CUDA toolkit + nvcc to compile from source, which is
+            # only present at Docker build time (see docker/Dockerfile) -- not in this ephemeral
+            # runner. Skip it: the profiling matrix doesn't exercise curobo/primitives.
+            ./setup.sh --new-env "$ENV_NAME" --omnigibson --bddl --joylo --eval --dev \
+              --accept-conda-tos --accept-nvidia-eula
+            echo "fresh_env=true" >> "$GITHUB_OUTPUT"
+          else
+            ENV_NAME="behavior"
+            echo "fresh_env=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "CONDA_ENV=$ENV_NAME" >> "$GITHUB_ENV"
+
       - name: Install BDDL
-        run: pip install -e .
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .
         working-directory: ${{ github.workspace }}/bddl3
 
       - name: Install OmniGibson
-        run: pip install -e .[dev,primitives,eval] --no-build-isolation
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .[dev,primitives,eval] --no-build-isolation
 
       - name: Install deep profiling dependencies
         if: matrix.deep_profile
-        run: pip install snakeviz
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install snakeviz
 
       - name: Run profiling
         run: |
           rm -f output.json
-          python tests/benchmark/profiling.py ${{ matrix.args }}
+          conda run -n "$CONDA_ENV" --no-capture-output python tests/benchmark/profiling.py ${{ matrix.args }}
 
       - name: Convert deep profile to HTML
         if: matrix.deep_profile
         run: |
           for prof in load.prof step.prof pre_physics_step.prof post_physics_step.prof non_physics_step.prof; do
-            python ../.github/scripts/cprofile_to_html.py \
+            conda run -n "$CONDA_ENV" --no-capture-output python ../.github/scripts/cprofile_to_html.py \
               --profile "$prof" \
               --output "${prof%.prof}.html"
           done
@@ -116,6 +139,11 @@ jobs:
             OmniGibson/non_physics_step.prof
             OmniGibson/non_physics_step.html
           if-no-files-found: warn
+
+      - name: Remove scratch conda environment
+        if: always() && steps.setup_env.outputs.fresh_env == 'true'
+        working-directory: ${{ github.workspace }}
+        run: conda env remove -n "$CONDA_ENV" -y
 
   report:
     name: Compile Profiling Report
