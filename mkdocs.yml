@@ -159,6 +159,9 @@ nav:
     - Other:
       - Speed Optimization: other/speed_optimization.md
       - Newton Migration: other/newton_migration.md
+      - Newton Solver Strategy: other/newton_solver_strategy.md
+      - Newton Renderer Architecture: other/newton_renderer_architecture.md
+      - Newton GPU Pipeline Architecture: other/newton_gpu_pipeline_architecture.md
       - Roadmap: other/roadmap.md
       - FAQ: other/faq.md
       - Known Issues & Troubleshooting: other/known_issues.md
