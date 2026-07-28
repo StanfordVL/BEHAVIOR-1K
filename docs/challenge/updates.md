@@ -8,8 +8,7 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 **Challenge rule clarifications:**
 
-1. Please use the latest `main` branch of the `BEHAVIOR-1K` repository for evaluation and replay workflows. Do not rely on the older `v3.9.0` tag for challenge evaluation, since important evaluation and dataset compatibility fixes are being pushed to `main`.
-2. Since `v3.9.0`, `main` has also received updates for LeRobot v3 / Hugging Face demo download instructions, evaluator Torch thread configuration, sponsor-page content, synchronized BDDL generated data, and synchronized asset synset metadata. These changes are not included in the `v3.9.0` tag.
+1. Please use the latest `main` branch of the `BEHAVIOR-1K` repository for evaluation and replay workflows, rather than the older `v3.9.0` tag. Since `v3.9.0`, `main` has received important challenge updates, including LeRobot v3 / Hugging Face demo download instructions, evaluator Torch thread configuration, sponsor-page content, synchronized BDDL generated data, and synchronized asset synset metadata.
 
 **Bug fixes:**
 
