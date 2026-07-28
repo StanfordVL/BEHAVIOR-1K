@@ -135,6 +135,27 @@ PROPRIOCEPTION_INDICES = {
 }
 
 
+def holonomic_base_qvel_to_robot_frame(base_qpos, base_qvel):
+    """
+    Convert holonomic base joint velocities to robot-local [vx, vy, wz].
+
+    Args:
+        base_qpos: Base joint positions containing x, y, rz, or the full 6-DoF base virtual joints.
+        base_qvel: Matching base joint velocities containing x, y, rz, or the full 6-DoF base virtual joints.
+    """
+    yaw = base_qpos[..., -1]
+    c = np.cos(yaw)
+    s = np.sin(yaw)
+    return np.stack(
+        [
+            c * base_qvel[..., 0] + s * base_qvel[..., 1],
+            -s * base_qvel[..., 0] + c * base_qvel[..., 1],
+            base_qvel[..., -1],
+        ],
+        axis=-1,
+    )
+
+
 def get_robot_camera_names(robot_name: str, robot_eval_config: dict | None) -> dict[str, str]:
     """
     Return flattened observation names for cameras configured by eval role.
