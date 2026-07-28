@@ -31,8 +31,8 @@ There are no restrictions on the type of policy used. Methods such as IL, RL, or
 
 ## Running Evaluations
 
-!!! warning "Use the latest `main` branch"
-    Run challenge evaluation from the latest `main` branch of `BEHAVIOR-1K`, not the older `v3.9.0` tag. The challenge evaluator and dataset interfaces may receive compatibility fixes on `main`, and the organizers will use the latest `main` branch for evaluation.
+!!! warning "Use the `v3.9.1` tag"
+    Run challenge evaluation from the `v3.9.1` tag of `BEHAVIOR-1K`, not the older `v3.9.0` tag. The challenge evaluator and dataset interfaces in `v3.9.1` include the latest compatibility fixes that the organizers will use for evaluation.
 
 We provide `OmniGibson/omnigibson/eval/eval.py` as the command-line entry point for running websocket-based evaluations. Start your policy server first, then run the evaluator from the repository root:
 

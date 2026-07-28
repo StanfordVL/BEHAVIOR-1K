@@ -40,10 +40,10 @@ See the [dataset page](./dataset.md) for the full task list.
 
 ### Install BEHAVIOR-1K
 
-Clone the latest `main` branch of BEHAVIOR-1K and run the setup script. It creates a `behavior` conda environment with OmniGibson, the simulation assets, and the evaluation dependencies. Do not use the older `v3.9.0` tag for challenge evaluation workflows because dataset and evaluator compatibility fixes are shipped on `main`.
+Clone the `v3.9.1` tag of BEHAVIOR-1K and run the setup script. It creates a `behavior` conda environment with OmniGibson, the simulation assets, and the evaluation dependencies. Do not use the older `v3.9.0` tag for challenge evaluation workflows because dataset and evaluator compatibility fixes are shipped in `v3.9.1`.
 
 ```bash
-git clone https://github.com/StanfordVL/BEHAVIOR-1K.git $PATH_TO_BEHAVIOR_1K
+git clone -b v3.9.1 https://github.com/StanfordVL/BEHAVIOR-1K.git $PATH_TO_BEHAVIOR_1K
 cd $PATH_TO_BEHAVIOR_1K
 ./setup.sh --new-env --omnigibson --bddl --joylo --dataset --eval
 ```
