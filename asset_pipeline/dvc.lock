@@ -22300,7 +22300,7 @@ stages:
     outs:
     - path: artifacts/parallels/scenes_mujoco.zip
       hash: md5
-      md5: 60e6233bb0c5dfc4695781738f59bd14
+      md5: 22749bb71f08bdd141954d96ec854068
       size: 6188637
     - path: artifacts/pipeline/export_scenes_mujoco.json
       hash: md5
