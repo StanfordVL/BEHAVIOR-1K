@@ -523,8 +523,11 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
         for child_joint in children.get(link.name, []):
             add_body(body_xml, link_map[child_joint.child], child_joint)
 
+    # No freejoint on the base body: scene MJCFs (export_scenes_mujoco.py) add
+    # one at attach time for loose objects, while fixed objects are attached
+    # statically. A soft weld on a freejointed base would drift; a static
+    # attach is exact. Standalone, the object loads as a fixed-base model.
     base_body_xml = ET.SubElement(worldbody_xml, "body", {"name": robot.base_link.name})
-    ET.SubElement(base_body_xml, "freejoint")
     meta_match = META_LINK_NAME_PATTERN.fullmatch(robot.base_link.name)
     assert not meta_match, f"Base link {robot.base_link.name} should not be a meta link"
     add_regular_link(base_body_xml, robot.base_link)
