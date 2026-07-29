@@ -192,14 +192,18 @@ def _add_meta_sites_from_metadata(body_xml, link_name, meta_links):
                         )
                     else:
                         site_attrs.update(
-                            type="sphere", size=_fmt([DIMENSIONLESS_SITE_RADIUS]), pos=_fmt(pos)
+                            type="ellipsoid",
+                            size=_fmt([DIMENSIONLESS_SITE_RADIUS] * 3),
+                            pos=_fmt(pos),
                         )
                     site_attrs["quat"] = _fmt(_xyzw_to_wxyz(orn.as_quat()))
                 else:  # primitive
                     shape_type = mesh_info["type"]
                     size = np.asarray(mesh_info.get("size", [0.01, 0.01, 0.01]), dtype=np.float64)
                     if shape_type == "sphere":
-                        site_attrs.update(type="sphere", size=_fmt([size[0]]), pos=_fmt(pos))
+                        site_attrs.update(
+                            type="ellipsoid", size=_fmt([size[0]] * 3), pos=_fmt(pos)
+                        )
                         site_attrs["quat"] = _fmt(_xyzw_to_wxyz(orn.as_quat()))
                     elif shape_type == "box":
                         center = pos + orn.apply([0, 0, size[2] / 2.0])
@@ -223,6 +227,60 @@ def _add_meta_sites_from_metadata(body_xml, link_name, meta_links):
                     else:
                         raise ValueError(f"Unknown meta link primitive type {shape_type} for {name}")
                 ET.SubElement(body_xml, "site").attrib = site_attrs
+
+
+# Supported element types for mjs_scaleElement. Any MJCF element outside this
+# set will cause non-uniform scaling to silently produce wrong geometry, so we
+# validate at export time to fail fast.
+_SCALABLE_GEOM_TYPES = {"mesh"}
+_SCALABLE_SITE_TYPES = {"box", "cylinder", "ellipsoid"}
+_SCALABLE_JOINT_TYPES = {"hinge", "slide"}
+
+
+def _validate_scalable_mjcf(root):
+    """Validate that the assembled MJCF only contains element types that the
+    MuJoCo attach-scale system can handle correctly.
+
+    Raises ValueError if any unsupported element is found, so errors are caught
+    at export time rather than at scene-assembly time.
+    """
+    model_id = root.attrib.get("model", "<unknown>")
+
+    for body_xml in root.iter("body"):
+        for geom_xml in body_xml.findall("geom"):
+            geom_type = geom_xml.attrib.get("type", "sphere")  # MuJoCo default
+            geom_name = geom_xml.attrib.get("name", "<unnamed>")
+            if geom_type not in _SCALABLE_GEOM_TYPES:
+                raise ValueError(
+                    f"[{model_id}] Geom '{geom_name}' has type '{geom_type}', "
+                    f"only {_SCALABLE_GEOM_TYPES} geom types are supported for scaling"
+                )
+
+        for site_xml in body_xml.findall("site"):
+            site_type = site_xml.attrib.get("type", "sphere")  # MuJoCo default
+            site_name = site_xml.attrib.get("name", "<unnamed>")
+            if site_type not in _SCALABLE_SITE_TYPES:
+                raise ValueError(
+                    f"[{model_id}] Site '{site_name}' has type '{site_type}', "
+                    f"only {_SCALABLE_SITE_TYPES} site types are supported for scaling"
+                )
+
+        for joint_xml in body_xml.findall("joint"):
+            joint_type = joint_xml.attrib.get("type", "hinge")  # MuJoCo default
+            joint_name = joint_xml.attrib.get("name", "<unnamed>")
+            if joint_type not in _SCALABLE_JOINT_TYPES:
+                raise ValueError(
+                    f"[{model_id}] Joint '{joint_name}' has type '{joint_type}', "
+                    f"only {_SCALABLE_JOINT_TYPES} joint types are supported for scaling"
+                )
+
+    # Reject elements that the scaling system does not handle at all.
+    for tag in ("actuator", "tendon", "equality", "sensor"):
+        if root.find(f".//{tag}") is not None:
+            raise ValueError(
+                f"[{model_id}] MJCF contains <{tag}> elements which are not "
+                f"supported for scaling"
+            )
 
 
 def urdf_to_mjz(in_obj_dir, out_obj_dir):
@@ -472,6 +530,10 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
     add_regular_link(base_body_xml, robot.base_link)
     for child_joint in children.get(robot.base_link.name, []):
         add_body(base_body_xml, link_map[child_joint.child], child_joint)
+
+    # Validate the assembled MJCF only contains scalable element types before
+    # writing the MJZ, so problems are caught at export time.
+    _validate_scalable_mjcf(root)
 
     # Write the MJZ: the MJCF plus all referenced assets and per-link GLBs. The
     # mjz subdirectory mirrors the usd subdirectory of the USD dataset layout,
