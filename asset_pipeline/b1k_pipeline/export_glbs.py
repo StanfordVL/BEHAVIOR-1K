@@ -7,7 +7,9 @@ os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
 import cv2
 import io
 import json
+import multiprocessing
 import xml.etree.ElementTree as ET
+from concurrent import futures
 
 import numpy as np
 from PIL import Image
@@ -17,7 +19,6 @@ import b1k_pipeline.utils
 import trimesh
 import fs.copy
 from fs.tempfs import TempFS
-from dask.distributed import LocalCluster, as_completed
 import tqdm
 import glob
 
@@ -25,12 +26,53 @@ import glob
 GLTF_DIELECTRIC_SPECULAR = 0.04
 EPSILON = 1e-6
 
-# Object lights (metadata "lights" meta links) are emitted as KHR_lights_punctual
-# point lights. Their annotated per-light intensity is ignored and replaced with
-# this single fixed value, mirroring OmniGibson forcing gm.FORCE_LIGHT_INTENSITY
-# on every dataset-object light at load time. The unit here is candela (the glTF
-# punctual unit), so the numeric value differs from OmniGibson's USD intensity.
-LIGHT_INTENSITY = 5000.0
+# --- Lighting -----------------------------------------------------------------
+# glTF punctual lights carry *physical photometric* units (candela for point/
+# spot, lux for directional) and emissive is a surface's own emitted luminance.
+# This is the portable representation: physically-based renderers (Mitsuba,
+# Filament, Blender) agree on it, and real-time viewers (three.js, <model-viewer>)
+# match once their exposure/tone-mapping is set. The large apparent brightness
+# differences between renderers are an *exposure* (camera) setting, not something
+# to bake into the asset -- so we author real-world-ish values for a well-lit
+# daytime interior and expect ONE exposure setting per viewer.
+#
+# What is exposure-invariant (and therefore what we actually tune here) is the
+# RATIO between emitters and lit surfaces. With the values below, a wall lit by
+# key+fill sits around ~1000 cd/m^2 and the sky/fixtures read a few times
+# brighter -- a believable balance under any exposure.
+#
+# IMPORTANT: emissive surfaces do NOT illuminate anything in glTF; the skybox and
+# the per-light marker meshes only glow. All real lighting comes from the
+# punctual lights below. Because those are physical (thousands of lux), the
+# emissives use KHR_materials_emissive_strength so they read as bright emitters
+# (not near-black) under a physical exposure; renderers lacking that extension
+# just clamp emissive to 1.0 (dimmer backdrop, still valid).
+
+# Base key/fill/up directional lights (lux) give even illumination independent of
+# which objects happen to carry fixtures. Directions are the world-space vectors
+# the light travels along (scenes are +Z up). Up-fill lifts undersides for
+# real-time viewers that have no global illumination; GI renderers add their own.
+KEY_LIGHT = {"intensity": 5000.0, "direction": (0.3, 0.4, -1.0), "color": (1.0, 0.97, 0.92)}
+FILL_LIGHT = {"intensity": 2000.0, "direction": (-0.4, -0.3, -0.7), "color": (0.9, 0.94, 1.0)}
+UP_FILL_LIGHT = {"intensity": 800.0, "direction": (0.0, 0.0, 1.0), "color": (0.95, 0.95, 0.95)}
+SCENE_DIRECTIONAL_LIGHTS = [KEY_LIGHT, FILL_LIGHT, UP_FILL_LIGHT]
+
+# Per-fixture point lights (object "lights" meta links), candela. A physical
+# ceiling fixture is ~100-300 cd; these are local accents on top of the base.
+# The annotated per-light intensity is ignored (fixed value), mirroring
+# OmniGibson forcing gm.FORCE_LIGHT_INTENSITY on every dataset-object light.
+POINT_LIGHT_INTENSITY = 200.0
+
+# The punctual light is nudged this far (meters) out of its opaque emissive marker
+# mesh, along the emitter's emission direction (local -Z), so the mesh doesn't
+# self-occlude it in shadow-computing renderers (Blender, Filament, three.js).
+POINT_LIGHT_OFFSET = 0.05
+
+# KHR_materials_emissive_strength applied to the emissive skybox and light-marker
+# meshes so they read as bright emitters (cd/m^2) against the physically-lit
+# surfaces instead of being crushed to ~1 nit.
+EMISSIVE_STRENGTH = 5000.0
+EMISSIVE_MATERIAL_NAMES = {"skybox", "light_emissive"}
 
 # Scene cameras carry no field-of-view in the scene URDF, so we emit a sensible
 # fixed perspective. yfov is in radians; znear in meters (scene GLBs are metric).
@@ -234,11 +276,20 @@ def convert_vray_to_pbr_material(name, maps):
       - roughness = (1 - glossiness)^2
       - R0 = ((1 - ior) / (1 + ior))^2, per-texel from the EXR IOR bake
       - dielectric specular F0 = R0 * reflection filter color
-    The per-texel F0 is folded into the metallic-roughness model using the Khronos
-    specular-glossiness -> metallic-roughness solve, then blended with VRay's
-    explicit metalness channel. The refraction filter becomes base color alpha.
-    8-bit PNG channels are sRGB-decoded before the math, matching how the MDL
-    samples them (auto colorspace); the EXR IOR map is already linear.
+    In the MDL, the specular lobe is *scaled by the reflection filter*: a texel
+    with reflection = 0 is fully matte no matter what the glossiness bake says
+    (VRay bakes glossiness = 1.0, its parameter default, on non-reflective
+    materials). Core glTF cannot lower dielectric F0 below its fixed 0.04, so we
+    express weak-or-absent specular by pushing roughness toward 1 with
+    spec_scale = clamp(F0 / 0.04, 0, 1). F0 here never exceeds ~0.07, so the
+    small excess above 0.04 is simply accepted (no fake metallic: the Khronos
+    specular->metallic solve turns dark low-F0 texels into visibly reflective
+    metal, which is what made walls/floors mirror-like). Explicit metals come
+    only from the metalness bake and keep their full glossiness.
+
+    The refraction filter becomes base color alpha. 8-bit PNG channels are
+    sRGB-decoded before the math, matching how the MDL samples them (auto
+    colorspace); the EXR IOR map is already linear.
     """
     assert "diffuse" in maps, f"Material {name} has no diffuse map: {maps}"
     diffuse_srgb = _load_image(maps["diffuse"])
@@ -260,27 +311,19 @@ def convert_vray_to_pbr_material(name, maps):
     roughness = (1.0 - gloss) ** 2
     r0 = ((1.0 - ior) / np.maximum(1.0 + ior, EPSILON)) ** 2
     f0 = r0[..., None] * refl_lin
-
-    # Khronos KHR_materials_pbrSpecularGlossiness -> metallic-roughness solve.
     spec_max = f0.max(axis=-1)
-    one_minus_spec = 1.0 - spec_max
-    diff_lum = diffuse_lin @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
-    a = GLTF_DIELECTRIC_SPECULAR
-    b = diff_lum * one_minus_spec / (1.0 - a) + spec_max - 2.0 * a
-    c = a - spec_max
-    d = np.maximum(b * b - 4.0 * a * c, 0.0)
-    metal_solved = np.clip((-b + np.sqrt(d)) / (2.0 * a), 0.0, 1.0)
-    metal_solved = np.where(spec_max < a, 0.0, metal_solved)
 
-    base_from_diff = diffuse_lin * (one_minus_spec / (1.0 - a) / np.maximum(1.0 - metal_solved, EPSILON))[..., None]
-    base_from_spec = (f0 - a * (1.0 - metal_solved)[..., None]) / np.maximum(metal_solved, EPSILON)[..., None]
-    t = (metal_solved**2)[..., None]
-    base_solved = np.clip(base_from_diff * (1.0 - t) + base_from_spec * t, 0.0, 1.0)
+    # Fold the specular strength into roughness: glTF dielectrics always reflect
+    # at F0 >= 0.04, so texels whose VRay specular is weaker than that (down to
+    # reflection = 0, i.e. fully matte) are expressed by pushing roughness to 1.
+    # Explicit metals (metalness bake) are not scaled by the reflection filter in
+    # the MDL, so they keep their baked glossiness.
+    spec_scale = np.clip(spec_max / GLTF_DIELECTRIC_SPECULAR, 0.0, 1.0)
+    spec_scale = spec_scale + (1.0 - spec_scale) * metal_vray
+    roughness = 1.0 - (1.0 - roughness) * spec_scale
 
-    # VRay's explicit metalness reflects with the Diffuse color as tint, which is
-    # exactly the glTF metal model, so blend the solved dielectric toward that.
-    metallic = np.clip(metal_vray + (1.0 - metal_vray) * metal_solved, 0.0, 1.0)
-    base_lin = base_solved * (1.0 - metal_vray)[..., None] + diffuse_lin * metal_vray[..., None]
+    metallic = np.clip(metal_vray, 0.0, 1.0)
+    base_lin = diffuse_lin
 
     # glTF core has no transmission; approximate the refraction filter with alpha.
     alpha = np.clip(1.0 - refr_lin.mean(axis=-1), 0.0, 1.0)
@@ -337,19 +380,29 @@ def _apply_material(mesh, material):
         mesh.visual = trimesh.visual.TextureVisuals(material=factors)
 
 
+def _direction_to_quat_xyzw(direction):
+    """Rotation (xyzw) orienting a glTF light so its local -Z travels along `direction`."""
+    d = np.asarray(direction, dtype=np.float64)
+    d = d / np.linalg.norm(d)
+    rotation, _ = R.align_vectors([d], [[0.0, 0.0, -1.0]])
+    return [float(v) for v in rotation.as_quat()]
+
+
 def _make_lights_cameras_postprocessor(lights, cameras):
     """Build a trimesh export tree_postprocessor that injects KHR_lights_punctual
-    point lights and perspective cameras into the glTF header.
+    lights + perspective cameras into the glTF header, and lifts the emissive
+    skybox/light-marker materials with KHR_materials_emissive_strength.
 
-    trimesh's glTF exporter cannot write lights (no KHR_lights_punctual support)
-    and writes at most one camera, so we mutate the raw header dict on the way
-    out. Lights and cameras are pure-JSON additions (no buffer/accessor data), so
-    this needs no extra dependency and produces spec-valid glTF.
+    trimesh's glTF exporter cannot write lights (no KHR_lights_punctual support),
+    writes at most one camera, and cannot set emissive strength, so we mutate the
+    raw header dict on the way out. These are pure-JSON additions (no buffer/
+    accessor data), so this needs no extra dependency and produces spec-valid glTF.
 
     Args:
-        lights (list): dicts with "position" (xyz), "color" (linear rgb 0-1), and
-            optional "name". Emitted as omnidirectional point lights, so their
-            orientation is irrelevant.
+        lights (list): light dicts, each with "kind" ("point" or "directional"),
+            "color" (linear rgb 0-1), "intensity" (candela for point, lux for
+            directional), "name", and either "position" (point) or "direction"
+            (directional; world vector the light travels along).
         cameras (list): dicts with "position" (xyz), "quat_xyzw", and "name".
             glTF cameras look down -Z with +Y up, matching the scene camera
             convention used elsewhere in the pipeline.
@@ -359,6 +412,7 @@ def _make_lights_cameras_postprocessor(lights, cameras):
         nodes = tree["nodes"]
         scene_node_indices = tree["scenes"][0].setdefault("nodes", [])
         added_node_indices = []
+        extensions_used = set(tree.get("extensionsUsed", []))
 
         for camera in cameras:
             camera_array = tree.setdefault("cameras", [])
@@ -388,22 +442,32 @@ def _make_lights_cameras_postprocessor(lights, cameras):
                 name = light.get("name", f"light_{light_index}")
                 light_array.append(
                     {
-                        "type": "point",
+                        "type": light["kind"],
                         "name": name,
                         "color": [float(v) for v in light["color"]],
-                        "intensity": LIGHT_INTENSITY,
+                        "intensity": float(light["intensity"]),
                     }
                 )
-                nodes.append(
-                    {
-                        "name": name,
-                        "translation": [float(v) for v in light["position"]],
-                        "extensions": {"KHR_lights_punctual": {"light": light_index}},
-                    }
-                )
+                node = {"name": name, "extensions": {"KHR_lights_punctual": {"light": light_index}}}
+                if light["kind"] == "directional":
+                    node["rotation"] = _direction_to_quat_xyzw(light["direction"])
+                else:
+                    node["translation"] = [float(v) for v in light["position"]]
+                nodes.append(node)
                 added_node_indices.append(len(nodes) - 1)
-            tree["extensionsUsed"] = sorted(set(tree.get("extensionsUsed", [])) | {"KHR_lights_punctual"})
+            extensions_used.add("KHR_lights_punctual")
 
+        # Lift emissive backdrops/markers so they read as bright emitters against
+        # the physically-lit surfaces (renderers without the extension clamp to 1).
+        for material in tree.get("materials", []):
+            if material.get("name") in EMISSIVE_MATERIAL_NAMES:
+                material.setdefault("extensions", {})["KHR_materials_emissive_strength"] = {
+                    "emissiveStrength": EMISSIVE_STRENGTH
+                }
+                extensions_used.add("KHR_materials_emissive_strength")
+
+        if extensions_used:
+            tree["extensionsUsed"] = sorted(extensions_used)
         scene_node_indices.extend(added_node_indices)
 
     return postprocessor
@@ -434,13 +498,29 @@ def _object_lights_in_base_frame(links, link_fk, meta_links):
                 pose[:3, 3] = light["position"]
                 pose_base = link_transform @ pose
                 color = (np.array(light["color"], dtype=np.float64) / 255.0).tolist()
+                light_type = int(light.get("type", _LIGHT_TYPE_SPHERE))
+                length = float(light.get("length", 0.0))
+
+                # Push the punctual light out of its (opaque) marker mesh along the
+                # emitter's -Z so the mesh can't self-occlude it. The clearance is
+                # the mesh's half-extent along that axis, matching _emissive_light_mesh.
+                if light_type == _LIGHT_TYPE_SPHERE:
+                    clearance = length if length > 1e-4 else LIGHT_MESH_FALLBACK_RADIUS
+                elif light_type in (_LIGHT_TYPE_DISK, _LIGHT_TYPE_RECT):
+                    clearance = LIGHT_MESH_THICKNESS / 2.0
+                else:
+                    clearance = LIGHT_MESH_FALLBACK_RADIUS
+                emit_dir = pose_base[:3, :3] @ np.array([0.0, 0.0, -1.0])
+                emit_position = pose_base[:3, 3] + emit_dir * (clearance + POINT_LIGHT_OFFSET)
+
                 lights.append(
                     {
                         "pose": pose_base.tolist(),
-                        "position": pose_base[:3, 3].tolist(),  # used to place the punctual light
+                        "position": pose_base[:3, 3].tolist(),  # marker-mesh location
+                        "emit_position": emit_position.tolist(),  # offset punctual-light location
                         "color": color,
-                        "type": int(light.get("type", _LIGHT_TYPE_SPHERE)),
-                        "length": float(light.get("length", 0.0)),
+                        "type": light_type,
+                        "length": length,
                         "width": float(light.get("width", 0.0)),
                     }
                 )
@@ -506,10 +586,14 @@ def urdf_to_glb(in_obj_dir, out_obj_dir):
     lights = _object_lights_in_base_frame(links, link_fk, meta_links)
     for light in lights:
         scene.add_geometry(_emissive_light_mesh(light))
+    point_specs = [
+        {"kind": "point", "position": light["emit_position"], "color": light["color"], "intensity": POINT_LIGHT_INTENSITY}
+        for light in lights
+    ]
 
     model_id = os.path.splitext(os.path.basename(urdf_file))[0]
     out_file = os.path.join(out_obj_dir, f"{model_id}.glb")
-    data = scene.export(file_type="glb", tree_postprocessor=_make_lights_cameras_postprocessor(lights, []))
+    data = scene.export(file_type="glb", tree_postprocessor=_make_lights_cameras_postprocessor(point_specs, []))
     with open(out_file, "wb") as f:
         f.write(data)
 
@@ -607,12 +691,19 @@ def scene_urdf_to_glb(urdf_str, obj_glb_root, obj_src_root, lights_by_model, out
                     geometry=shared_name,
                 )
 
-            # Place this object's lights (base frame) into the world frame.
+            # Place this object's fixtures (base frame) into the world frame. Use
+            # the offset emit_position so the punctual light clears its marker mesh.
             for i, light in enumerate(lights_by_model.get(f"{obj_category}/{obj_model}", [])):
-                position = np.array(light["position"], dtype=np.float64)
+                position = np.array(light["emit_position"], dtype=np.float64)
                 world_position = (transform @ np.append(position, 1.0))[:3]
                 scene_lights.append(
-                    {"position": world_position.tolist(), "color": light["color"], "name": f"{obj_name}_light_{i}"}
+                    {
+                        "kind": "point",
+                        "position": world_position.tolist(),
+                        "color": light["color"],
+                        "intensity": POINT_LIGHT_INTENSITY,
+                        "name": f"{obj_name}_light_{i}",
+                    }
                 )
         except Exception:
             print(f"Failed to place {obj_name}:")
@@ -641,7 +732,23 @@ def scene_urdf_to_glb(urdf_str, obj_glb_root, obj_src_root, lights_by_model, out
             }
         )
 
-    data = scene.export(file_type="glb", tree_postprocessor=_make_lights_cameras_postprocessor(scene_lights, cameras))
+    # Base key/fill/up directional lights give even illumination regardless of
+    # which objects carry fixtures; the per-fixture point lights are accents.
+    base_lights = [
+        {
+            "kind": "directional",
+            "direction": spec["direction"],
+            "color": spec["color"],
+            "intensity": spec["intensity"],
+            "name": name,
+        }
+        for name, spec in zip(("key_light", "fill_light", "up_fill_light"), SCENE_DIRECTIONAL_LIGHTS)
+    ]
+
+    data = scene.export(
+        file_type="glb",
+        tree_postprocessor=_make_lights_cameras_postprocessor(base_lights + scene_lights, cameras),
+    )
     with open(out_file, "wb") as f:
         f.write(data)
 
@@ -660,7 +767,8 @@ def main():
             scene_name = target.split("/")[-1]
             if SCENES_TO_EXPORT and scene_name not in SCENES_TO_EXPORT:
                 continue
-            for suffix in ["best", "with_clutter"]:
+            # TODO: Temporarily exporting only the "best" (uncluttered) version.
+            for suffix in ["best"]:
                 urdf_path = f"scenes/{scene_name}/urdf/{scene_name}_{suffix}.urdf"
                 if not scenes_fs.exists(urdf_path):
                     continue
@@ -688,63 +796,58 @@ def main():
             fs.copy.copy_fs(source_fs.opendir(item), temp_fs.makedirs(item, recreate=True))
             objdirs_to_build.append(item)
 
-        cluster = LocalCluster()
-        dask_client = cluster.get_client()
-
-        # Phase 1: export a GLB per object and collect each object's lights.
-        obj_futures = {}
-        for objdir in tqdm.tqdm(objdirs_to_build, desc="Queueing objects"):
-            obj_futures[
-                dask_client.submit(
+        with futures.ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+            # Phase 1: export a GLB per object and collect each object's lights.
+            obj_futures = {
+                executor.submit(
                     urdf_to_glb,
                     temp_fs.opendir(objdir).getsyspath("/"),
-                    out_fs.makedirs(objdir).getsyspath("/"),
-                    pure=False,
+                    out_fs.makedirs(objdir, recreate=True).getsyspath("/"),
+                ): objdir
+                for objdir in objdirs_to_build
+            }
+
+            lights_by_model = {}  # "{cat}/{model}" -> lights in base frame
+            for future in tqdm.tqdm(
+                futures.as_completed(obj_futures), total=len(obj_futures), desc="Processing objects"
+            ):
+                objdir = obj_futures[future]
+                try:
+                    lights = future.result()
+                    if lights:
+                        # objdir is /objects/{cat}/{model}/
+                        cat, model = objdir.strip("/").split("/")[-2:]
+                        lights_by_model[f"{cat}/{model}"] = lights
+                except:
+                    traceback.print_exc()
+
+            # Phase 2: compose a GLB per scene from the object GLBs, adding lights/cameras.
+            obj_glb_root = out_fs.getsyspath("/")
+            obj_src_root = temp_fs.getsyspath("/")
+            scene_futures = {}
+            for (scene_name, suffix), urdf_str in scene_urdfs.items():
+                out_file = os.path.join(
+                    out_fs.makedirs(f"scenes/{scene_name}", recreate=True).getsyspath("/"),
+                    f"{scene_name}_{suffix}.glb",
                 )
-            ] = objdir
+                scene_futures[
+                    executor.submit(
+                        scene_urdf_to_glb,
+                        urdf_str,
+                        obj_glb_root,
+                        obj_src_root,
+                        lights_by_model,
+                        out_file,
+                    )
+                ] = f"{scene_name}_{suffix}"
 
-        lights_by_model = {}  # "{cat}/{model}" -> lights in base frame
-        for future in tqdm.tqdm(
-            as_completed(obj_futures.keys()), total=len(obj_futures), desc="Processing objects"
-        ):
-            objdir = obj_futures[future]
-            try:
-                lights = future.result()
-                if lights:
-                    # objdir is /objects/{cat}/{model}/
-                    cat, model = objdir.strip("/").split("/")[-2:]
-                    lights_by_model[f"{cat}/{model}"] = lights
-            except:
-                traceback.print_exc()
-
-        # Phase 2: compose a GLB per scene from the object GLBs, adding lights/cameras.
-        obj_glb_root = out_fs.getsyspath("/")
-        obj_src_root = temp_fs.getsyspath("/")
-        scene_futures = {}
-        for (scene_name, suffix), urdf_str in scene_urdfs.items():
-            out_file = os.path.join(
-                out_fs.makedirs(f"scenes/{scene_name}").getsyspath("/"),
-                f"{scene_name}_{suffix}.glb",
-            )
-            scene_futures[
-                dask_client.submit(
-                    scene_urdf_to_glb,
-                    urdf_str,
-                    obj_glb_root,
-                    obj_src_root,
-                    lights_by_model,
-                    out_file,
-                    pure=False,
-                )
-            ] = f"{scene_name}_{suffix}"
-
-        for future in tqdm.tqdm(
-            as_completed(scene_futures.keys()), total=len(scene_futures), desc="Processing scenes"
-        ):
-            try:
-                future.result()
-            except:
-                traceback.print_exc()
+            for future in tqdm.tqdm(
+                futures.as_completed(scene_futures), total=len(scene_futures), desc="Processing scenes"
+            ):
+                try:
+                    future.result()
+                except:
+                    traceback.print_exc()
 
         print("Finished processing")
 

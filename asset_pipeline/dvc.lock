@@ -22138,21 +22138,29 @@ stages:
     deps:
     - path: artifacts/parallels/objects.zip
       hash: md5
-      md5: 4e9972811b9042041f83faa4c13abb8a
-      size: 28289303296
+      md5: 9e6ab3630ae3684d31b94f67cb6ce128
+      size: 28024803796
+    - path: artifacts/parallels/scenes.zip
+      hash: md5
+      md5: 14393e21a1e855e3324e0fe6f088a452
+      size: 2485478
     - path: artifacts/pipeline/export_objs.success
+      hash: md5
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 0
+    - path: artifacts/pipeline/export_scenes.success
       hash: md5
       md5: d41d8cd98f00b204e9800998ecf8427e
       size: 0
     - path: b1k_pipeline/export_glbs.py
       hash: md5
-      md5: 7997dd21fcae458da6cb5af1f4f60c66
-      size: 2567
+      md5: d02511eff032631e83d380ca9523e65d
+      size: 33057
     outs:
     - path: artifacts/parallels/objects_glb.zip
       hash: md5
-      md5: 410a47f37bd93c46fa9a740dfb3dcdc7
-      size: 13652398451
+      md5: fd468fe40a972469c099c430e906ff26
+      size: 1898130807
   check_collisions_challenge:
     cmd: python -m b1k_pipeline.check_collisions_challenge
     deps:
