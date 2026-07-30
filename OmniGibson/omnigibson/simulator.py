@@ -514,6 +514,10 @@ def _launch_simulator(*args, **kwargs):
 
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
+            # True only while _non_physics_step is actively running obj.initialize() on the queued
+            # batch. Distinct from "queue non-empty": objects can sit queued between steps without
+            # anyone initializing them, and refreshing handles is safe then.
+            self._initializing_objects = False
             self._objects_require_joint_break_callback = False
             self._deferred_joint_breaks = []
             # Set when update_handles() is called mid-step (currently_stepping): the tensorized
@@ -1129,6 +1133,18 @@ def _launch_simulator(*args, **kwargs):
             return self._sim_context.get_physics_context()
 
         @property
+        def initializing_objects(self):
+            """
+            Returns:
+                bool: True only while _non_physics_step is actively running obj.initialize() on the
+                    queued object batch. Handle rebuilds must be deferred during this window (the
+                    mid-initialization objects' states are half-built); the batch-end
+                    update_handles() covers them. A merely non-empty queue between steps does NOT
+                    set this — refreshing handles is safe then.
+            """
+            return self._initializing_objects
+
+        @property
         def _physics_context(self):
             return self._sim_context._physics_context
 
@@ -1216,34 +1232,22 @@ def _launch_simulator(*args, **kwargs):
 
             self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
-        def refresh_physics_view_handles(self, reattach_unified_views=True):
+        def refresh_physics_view_handles(self):
             """
-            Re-attach every PhysX view handle to a freshly created simulation view.
+            Refresh every PhysX view on a freshly created simulation view.
 
             PhysX invalidates ALL existing tensor views whenever a rigid body is deleted from the
             stage (creations are safe), even when the deleted body is not tracked by any view —
-            e.g. macro-physical particle prims. In that case only the view handles must be
-            recreated: the tracked prim sets are unchanged, so — unlike update_handles() — this
-            does NOT reallocate the view APIs' warp buffers or re-initialize tensorized states.
-            Device pointers stay stable and the captured per-step graph stays valid (no recapture).
-
-            Args:
-                reattach_unified_views (bool): Whether to re-attach the unified view APIs' PhysX
-                    views in place (each asserts its tracked prim set is unchanged).
-                    update_handles() passes False because it fully rebuilds those views right
-                    after — a changed tracked set is a real topology change and only that path
-                    handles it.
+            e.g. macro-physical particle prims. Each unified view API's initialize_view
+            self-detects whether its tracked prim set changed: unchanged → it only re-attaches its
+            PhysX handle (device buffers/pointers stay stable, so the captured per-step graph stays
+            valid without recapture); changed → it does a full rebuild. Unlike update_handles(),
+            this method does NOT rebuild ParticleViewAPI or re-initialize tensorized states, so it
+            never forces a graph recapture by itself.
             """
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
-
-            # The standalone reattach path must not run mid-physics-step: a freshly-created contact
-            # view would report empty data for the in-flight substep. (The shared prefix below MUST
-            # stay mid-step-callable — update_handles() is legitimately reached from physics
-            # callbacks, e.g. assisted-grasping joint creation, and defers only the tensorized part.)
-            if reattach_unified_views:
-                assert not self.currently_stepping, "Cannot reattach physics views during a physics step!"
 
             # Flush any USD changes to PhysX
             with self.editing_usd():
@@ -1263,27 +1267,22 @@ def _launch_simulator(*args, **kwargs):
                         if isinstance(system, MacroPhysicalParticleSystem):
                             system.update_handles()
 
-            if reattach_unified_views:
-                RigidContactAPI.reattach_physx_views()
-                RigidBodyViewAPI.reattach_physx_views()
-                ArticulatedObjectViewAPI.reattach_physx_views()
-                ControllableObjectViewAPI.reattach_physx_views()
+            # Refresh the unified views
+            RigidContactAPI.initialize_view()
+            RigidBodyViewAPI.initialize_view()
+            ArticulatedObjectViewAPI.initialize_view()
+            ControllableObjectViewAPI.initialize_view()
 
         def update_handles(self):
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
 
-            # Shared PhysX-handle refresh (flush + sim view + per-object / per-system handles).
-            # The unified views are NOT re-attached here: they are fully rebuilt below, since
-            # update_handles() is the path for true topology changes (tracked sets may differ).
-            self.refresh_physics_view_handles(reattach_unified_views=False)
+            # Refresh the sim view, per-object / per-system handles, and the unified views.
+            self.refresh_physics_view_handles()
 
-            # Finally update any unified views
-            RigidContactAPI.initialize_view()
-            RigidBodyViewAPI.initialize_view()
-            ArticulatedObjectViewAPI.initialize_view()
-            ControllableObjectViewAPI.initialize_view()
+            # ParticleViewAPI's registry/layout depends on the active-system topology, and the
+            # tensorized states (below) depend on that in turn — both rebuild only on this path.
             ParticleViewAPI.initialize_view()
 
             if gm.ENABLE_OBJECT_STATES:
@@ -1438,13 +1437,20 @@ def _launch_simulator(*args, **kwargs):
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
                     scenes_modified = set()
-                    for i in range(n_objects_to_initialize):
-                        obj = self._objects_to_initialize[i]
-                        obj.initialize()
-                        scenes_modified.add(obj.scene)
-                        if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
-                            self._objects_require_joint_break_callback = True
-                        obj.keep_still()
+                    # While this flag is set, handle rebuilds are deferred (scene.get_system checks
+                    # it): a rebuild here would read the mid-initialization objects' half-built
+                    # states, and the update_handles() right after this loop covers everything.
+                    self._initializing_objects = True
+                    try:
+                        for i in range(n_objects_to_initialize):
+                            obj = self._objects_to_initialize[i]
+                            obj.initialize()
+                            scenes_modified.add(obj.scene)
+                            if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
+                                self._objects_require_joint_break_callback = True
+                            obj.keep_still()
+                    finally:
+                        self._initializing_objects = False
 
                     self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 

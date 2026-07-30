@@ -1306,6 +1306,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             # That is a real topology change; only later count changes can stay on the local path.
             og.sim.update_handles()
         elif removed_particles:
+            # Never reached mid-physics-step (removals run in _non_physics_step / between steps);
+            # a freshly-created contact view would report empty data for an in-flight substep.
+            assert not og.sim.currently_stepping, "Cannot remove macro particles during a physics step!"
             og.sim.refresh_physics_view_handles()
         else:
             # Particle creation leaves existing PhysX views valid; only this system's own view

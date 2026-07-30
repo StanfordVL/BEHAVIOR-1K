@@ -14,7 +14,12 @@ m.N_MAX_MICRO_PARTICLE_SAMPLES = 100000
 
 class Filled(RelativeObjectState, BooleanStateMixin):
     def get_value(self, system):
-        # ContainedParticles.VALUES_CPU is the cache; this volume threshold is cheap to recompute.
+        # Bypass BaseObjectState.get_value's per-timestep memoization (its cache_is_valid returns
+        # True for any second call within the same sim step). This state is a cheap threshold over
+        # ContainedParticles' tensorized VALUES_CPU, which can legitimately change WITHIN a step
+        # (generating/removing particles marks it stale; the next read refreshes it). Memoizing here
+        # would return the pre-mutation answer on a second same-step call, so freshness is delegated
+        # entirely to the tensorized cache contract.
         assert self._initialized
         return self._get_value(system)
 

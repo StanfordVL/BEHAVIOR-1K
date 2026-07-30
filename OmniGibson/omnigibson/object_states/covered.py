@@ -53,8 +53,12 @@ class Covered(RelativeObjectState, BooleanStateMixin):
         self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
 
     def get_value(self, system):
-        # ContactParticles.VALUES_CPU (or the visual group count) is the source of truth;
-        # caching this threshold separately could hide a same-step particle change.
+        # Bypass BaseObjectState.get_value's per-timestep memoization (its cache_is_valid returns
+        # True for any second call within the same sim step). This state is a cheap threshold over
+        # ContactParticles' tensorized VALUES_CPU (or the visual group count), and VALUES_CPU can
+        # legitimately change WITHIN a step: generating/removing particles marks it stale and the
+        # next read refreshes it. Memoizing here would return the pre-mutation answer on a second
+        # same-step call, so freshness is delegated entirely to the tensorized cache contract.
         assert self._initialized
         return self._get_value(system)
 
