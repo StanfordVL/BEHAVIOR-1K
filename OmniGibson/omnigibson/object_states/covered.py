@@ -52,6 +52,16 @@ class Covered(RelativeObjectState, BooleanStateMixin):
         # Grab group name
         self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
 
+    def get_value(self, system):
+        # Bypass BaseObjectState.get_value's per-timestep memoization (its cache_is_valid returns
+        # True for any second call within the same sim step). This state is a cheap threshold over
+        # ContactParticles' tensorized VALUES_CPU (or the visual group count), and VALUES_CPU can
+        # legitimately change WITHIN a step: generating/removing particles marks it stale and the
+        # next read refreshes it. Memoizing here would return the pre-mutation answer on a second
+        # same-step call, so freshness is delegated entirely to the tensorized cache contract.
+        assert self._initialized
+        return self._get_value(system)
+
     def _get_value(self, system):
         # Value is false by default
         value = False
@@ -69,7 +79,7 @@ class Covered(RelativeObjectState, BooleanStateMixin):
                 ), "Cloth objects currently cannot be Covered by physical particles!"
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
                 # touching the object and are visible (the non-visible ones are considered already "removed")
-                n_near_particles = len(self.obj.states[ContactParticles].get_value(system))
+                n_near_particles = self.obj.states[ContactParticles].get_value(system).count
                 # Heuristic: If the number of near particles is above the threshold, we consdier this covered
                 value = n_near_particles >= m.PHYSICAL_PARTICLE_THRESHOLD
             else:
@@ -119,7 +129,9 @@ class Covered(RelativeObjectState, BooleanStateMixin):
                     )
                 else:
                     # We remove all particles touching this object
-                    system.remove_particles(idxs=list(self.obj.states[ContactParticles].get_value(system)))
+                    system.remove_particles(
+                        idxs=list(self.obj.states[ContactParticles].get_value(system).particle_indices)
+                    )
 
         else:
             raise ValueError(

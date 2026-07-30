@@ -1104,6 +1104,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if not system.initialized and force_init:
             system.initialize(scene=self)
             self.system_registry.add(system)
+            # Activating a system changes the tensorized (object, system) state layout (e.g.
+            # ContainedParticles' SYS_IDXS), so rebuild the unified/tensorized views. Defer ONLY
+            # while an object-initialization batch is actively running (systems are commonly
+            # activated from within obj.initialize(), and rebuilding then would read the
+            # mid-initialization objects' half-built states) — _non_physics_step calls
+            # update_handles() right after the batch. Outside that window, refresh eagerly so the
+            # newly activated system is immediately visible to the tensorized states.
+            if not og.sim.initializing_objects:
+                og.sim.update_handles()
         return system
 
     def clear_system(self, system_name):

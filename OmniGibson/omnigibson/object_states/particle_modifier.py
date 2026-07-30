@@ -944,7 +944,7 @@ class ParticleRemover(ParticleModifier):
             inbound_idxs = (
                 self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()
                 if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION
-                else th.tensor(list(self.obj.states[ContactParticles].get_value(system, self.link)))
+                else th.tensor(list(self.obj.states[ContactParticles].get_value(system, self.link).particle_indices))
             )
             modification_limit = self.physical_particle_modification_limit
 

@@ -112,8 +112,9 @@ class TensorizedState:
             cls._dt = wp.zeros(shape=(1,), dtype=wp.float32, device="cuda")
 
     def get_value(self, *args, **kwargs):
+        assert self._initialized
         self.maybe_refresh_caches()
-        return super().get_value(*args, **kwargs)
+        return self._get_value(*args, **kwargs)
 
     @classmethod
     def pre_update(cls, dt=0.0):

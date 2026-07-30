@@ -681,6 +681,12 @@ class RigidBodyViewAPI:
         # subsequent calls are no-ops once the runtime has been constructed.
         wp.init()
 
+        # Cheap path: if the tracked body set is unchanged (e.g. a macro particle prim was deleted,
+        # which invalidates every PhysX view but tracks no row here), just re-attach the handle and
+        # keep all buffers — no pointer changes, so no graph recapture is needed.
+        if cls._try_reattach():
+            return
+
         # Snapshot existing kinematic-link poses ton reuse them below.
         # cls.POSES is now a wp.array, convert to a torch view for the per-row
         # indexing/unsqueeze below.
@@ -826,7 +832,7 @@ class RigidBodyViewAPI:
         """
         Read the latest PhysX transforms into the pinned-CPU staging buffer (cls.POSES).
         Stays on the host: PhysX returns a CPU torch tensor, and graph capture freezes the
-        call (see scripts/test_physx_in_warp_graph.py). The H2D copy + pose2mat kernel run
+        call. The H2D copy + pose2mat kernel run
         inside the captured wp.graph via update().
 
         physx_untracked links are never touched here; they are updated only by invalidate_kinematic().
@@ -845,7 +851,50 @@ class RigidBodyViewAPI:
         # Copy PhysX output into the fixed pinned wp.array via a torch view
         N_physx_tracked = transforms.shape[0]
         wp.to_torch(cls.POSES)[:N_physx_tracked] = transforms
-        wp.copy(cls.POSES_GPU, cls.POSES)
+
+    @classmethod
+    def _try_reattach(cls):
+        """
+        Cheap path for initialize_view: if the tracked rigid-body set is unchanged, recreate only
+        the PhysX view handle on the current og.sim.physics_sim_view and keep every buffer
+        (POSES / POSES_GPU / POSE_MATRICES, meshes, index maps) untouched.
+
+        PhysX invalidates all existing tensor views whenever a rigid body is deleted from the stage,
+        even when the deleted body is not part of this view (e.g. macro-physical particle prims,
+        which are excluded from the tracked set). In that case only the handle must be recreated —
+        device pointers stay stable, so the captured per-step graph stays valid without recapture.
+
+        Returns:
+            bool: True if the view was re-attached in place (initialize_view can return early);
+                False if the tracked set changed and a full rebuild is required.
+        """
+        if cls._RIGID_BODY_VIEW is None or cls.POSES is None:
+            return False
+        try:
+            with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+                new_view = og.sim.physics_sim_view.create_rigid_body_view(pattern="/World/scene_*/*/*")
+            new_paths = list(new_view.prim_paths)
+        except Exception:
+            # View creation fails when the pattern matches nothing (e.g. the last object was just
+            # removed) — Isaac returns a wrapper with a None backend. Not cheap-path material; the
+            # full rebuild below has its own has_rigid_bodies guard for exactly this.
+            return False
+        if new_paths != cls._IDX_TO_PATH[: len(new_paths)]:
+            return False
+        # The physx_untracked kinematic links occupy the suffix of the flat layout; recompute the
+        # expected suffix (same iteration order as the full rebuild) and require an exact match.
+        tracked = set(new_paths)
+        expected_untracked = []
+        for scene in og.sim.scenes:
+            for obj in scene.objects:
+                if obj.kinematic_only and obj.prim_type != PrimType.CLOTH:
+                    for link in obj.links.values():
+                        if link.prim_path not in tracked:
+                            expected_untracked.append(link.prim_path)
+        if expected_untracked != cls._IDX_TO_PATH[len(new_paths) :]:
+            return False
+        cls._RIGID_BODY_VIEW = new_view
+        return True
 
     @classmethod
     def get_flat_idx(cls, abs_prim_path):
@@ -1009,6 +1058,7 @@ class RigidBodyViewAPI:
         N = cls.POSES_GPU.shape[0]
         if N == 0:
             return
+        wp.copy(cls.POSES_GPU, cls.POSES)
         wp.launch(
             _poses_to_matrices_kernel,
             dim=N,
@@ -1059,6 +1109,10 @@ class ArticulatedObjectViewAPI:
 
     @classmethod
     def initialize_view(cls):
+        # Cheap path: tracked articulation set unchanged — re-attach the handle, keep all buffers.
+        if cls._try_reattach():
+            return
+
         cls.clear()
 
         if len(og.sim.scenes) == 0:
@@ -1086,6 +1140,46 @@ class ArticulatedObjectViewAPI:
         N, max_dof = seed_positions.shape
         cls._JOINT_POSITIONS = wp.zeros(shape=(N, max_dof), dtype=wp.float32, device="cuda")
         wp.copy(cls._JOINT_POSITIONS, wp.from_torch(seed_positions))
+
+    @classmethod
+    def _try_reattach(cls):
+        """
+        Cheap path for initialize_view: if the tracked articulation set is unchanged, recreate only
+        the PhysX view handle and keep _JOINT_POSITIONS and the row mapping untouched. See
+        RigidBodyViewAPI._try_reattach for when this matters (rigid-body deletion invalidates all
+        PhysX views without changing tracked sets).
+
+        Returns:
+            bool: True if re-attached in place; False if a full rebuild is required.
+        """
+        if cls._VIEW is None or cls._JOINT_POSITIONS is None:
+            return False
+        from omnigibson.robots import Robot
+
+        expected_objs = [
+            obj
+            for scene in og.sim.scenes
+            for obj in scene.objects
+            if obj.relative_prim_path.startswith("/articulated__") and not isinstance(obj, Robot)
+        ]
+        expected_paths = [obj.articulation_root_path for obj in expected_objs]
+        stored_paths = [path for path, _ in sorted(cls._OBJ_TO_VIEW_IDX.items(), key=lambda kv: kv[1])]
+        if set(expected_paths) != set(stored_paths):
+            return False
+        try:
+            with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+                new_view = og.sim.physics_sim_view.create_articulation_view(stored_paths)
+            if list(new_view.prim_paths) != stored_paths:
+                return False
+            # DOF layout must match the retained buffer (a joint change could alter max_dof).
+            if tuple(new_view.get_dof_positions().shape) != tuple(cls._JOINT_POSITIONS.shape):
+                return False
+        except Exception:
+            # A failed creation (Isaac returns a None-backend wrapper when nothing matches) means
+            # the cheap path is unavailable — fall through to the full rebuild and its guards.
+            return False
+        cls._VIEW = new_view
+        return True
 
     @classmethod
     def read_from_physx(cls):
@@ -1142,6 +1236,10 @@ class RigidContactAPIImpl:
 
         # Rigid body view for batched body transform reads used by persistence logic
         self._RIGID_BODY_VIEW = dict()
+
+        # Exact prim-path order of each per-scene rigid body view, so _try_reattach can
+        # verify the tracked set is unchanged when recreating views on a fresh simulation view
+        self._RIGID_BODY_VIEW_PATHS = dict()
 
         # Precomputed tensors mapping row/col indices to rigid body view indices
         self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS = dict()
@@ -1246,6 +1344,10 @@ class RigidContactAPIImpl:
         """
         assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
 
+        # Cheap path: tracked row/column sets unchanged — re-attach the handles, keep all matrices.
+        if self._try_reattach():
+            return
+
         # Snapshot the old contact matrices and path mappings so we can carry over
         # cached contact state for pairs of bodies that already existed.
         prev_contact_matrix = dict(self._CONTACT_MATRIX)
@@ -1326,7 +1428,10 @@ class RigidContactAPIImpl:
                 self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_body_view(
                     pattern=f"/World/scene_{scene_idx}/*/*"
                 )
-                path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
+                # Remember the exact path order so _try_reattach can verify the tracked set
+                # is unchanged when it recreates the view on a fresh simulation view.
+                self._RIGID_BODY_VIEW_PATHS[scene_idx] = list(self._RIGID_BODY_VIEW[scene_idx].prim_paths)
+                path_to_view_idx = {path: i for i, path in enumerate(self._RIGID_BODY_VIEW_PATHS[scene_idx])}
                 self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS[scene_idx] = th.tensor(
                     [path_to_view_idx[path] for path in row_paths], dtype=th.long, device="cuda"
                 )
@@ -1916,6 +2021,74 @@ class RigidContactAPIImpl:
             self._CURRENT_CONTACT_MATRIX_GPU_WP[scene_idx] if current_only else self._CONTACT_MATRIX_GPU_WP[scene_idx]
         )
 
+    def _try_reattach(self):
+        """
+        Cheap path for initialize_view: if every scene's tracked row/column sets are unchanged,
+        recreate only the per-scene contact + rigid-body view handles, keeping every matrix /
+        index tensor untouched. See RigidBodyViewAPI._try_reattach for when this matters
+        (rigid-body deletion invalidates all PhysX views without changing tracked sets).
+
+        New views are staged and committed only after every scene passes, so a mismatch can never
+        leave a half-swapped state.
+
+        Returns:
+            bool: True if all views were re-attached in place; False if a full rebuild is required.
+        """
+        if not self._CONTACT_VIEW:
+            return False
+        from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+
+        body_filters = self.get_body_filters()
+        expected_scene_idxs = set()
+        for scene_idx, _ in enumerate(og.sim.scenes):
+            filters = body_filters[scene_idx]
+            if len(filters) == 0:
+                continue
+            dynamic_paths = []
+            for obj in og.sim.scenes[scene_idx].objects:
+                if obj.prim_type == PrimType.RIGID:
+                    for link in obj.links.values():
+                        if isinstance(link, RigidDynamicPrim) and link.contact_reporting_enabled:
+                            dynamic_paths.append(link.prim_path)
+            if len(dynamic_paths) == 0:
+                continue
+            expected_scene_idxs.add(scene_idx)
+            if (
+                scene_idx not in self._CONTACT_VIEW
+                or set(filters) != set(self._COL_IDX_TO_PATH[scene_idx])
+                or set(dynamic_paths) != set(self._ROW_IDX_TO_PATH[scene_idx])
+            ):
+                return False
+        if expected_scene_idxs != set(self._CONTACT_VIEW.keys()):
+            return False
+
+        new_contact_views, new_body_views = {}, {}
+        try:
+            with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+                for scene_idx in self._CONTACT_VIEW:
+                    col_paths = self._COL_IDX_TO_PATH[scene_idx]
+                    new_contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
+                        pattern=f"/World/scene_{scene_idx}/*/*",
+                        filter_patterns=col_paths,
+                        max_contact_data_count=self.get_max_contact_data_count(len(col_paths)),
+                    )
+                    if list(new_contact_view.sensor_paths) != self._ROW_IDX_TO_PATH[scene_idx]:
+                        return False
+                    new_body_view = og.sim.physics_sim_view.create_rigid_body_view(
+                        pattern=f"/World/scene_{scene_idx}/*/*"
+                    )
+                    if list(new_body_view.prim_paths) != self._RIGID_BODY_VIEW_PATHS[scene_idx]:
+                        return False
+                    new_contact_views[scene_idx] = new_contact_view
+                    new_body_views[scene_idx] = new_body_view
+        except Exception:
+            # A failed creation (Isaac returns a None-backend wrapper when nothing matches) means
+            # the cheap path is unavailable — fall through to the full rebuild and its guards.
+            return False
+        self._CONTACT_VIEW.update(new_contact_views)
+        self._RIGID_BODY_VIEW.update(new_body_views)
+        return True
+
     def clear(self):
         """
         Clears internal contact views, mappings, and caches.
@@ -1926,6 +2099,7 @@ class RigidContactAPIImpl:
         self._COL_IDX_TO_PATH = dict()
         self._CONTACT_VIEW = dict()
         self._RIGID_BODY_VIEW = dict()
+        self._RIGID_BODY_VIEW_PATHS = dict()
         self._CONTACT_MATRIX_ROWS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_TO_RIGID_BODY_ROWS = dict()
         self._CONTACT_MATRIX_COLS_HAS_RIGID_BODY = dict()
@@ -2366,6 +2540,36 @@ class BatchControlViewAPIImpl:
             for obj in controllable_objects
             if obj.articulation_root_path in expected_prim_paths
         }
+
+    def _try_reattach(self):
+        """
+        Cheap path for initialize_view: if the tracked robot set and per-robot link layout are
+        unchanged, recreate only the PhysX view handle, keeping the index maps and read/write
+        caches untouched (cached values are plain host tensors; pending control targets are
+        flushed through the new view). See RigidBodyViewAPI._try_reattach for when this matters.
+
+        Returns:
+            bool: True if re-attached in place; False if a full rebuild is required.
+        """
+        if self._view is None:
+            return False
+        try:
+            with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+                new_view = og.sim.physics_sim_view.create_articulation_view(self._pattern)
+            if {prim_path: i for i, prim_path in enumerate(new_view.prim_paths)} != self._idx:
+                return False
+            new_link_idx = [
+                {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
+                for articulation_link_paths in new_view.link_paths
+            ]
+            if new_link_idx != self._link_idx:
+                return False
+        except Exception:
+            # A failed creation (Isaac returns a None-backend wrapper when nothing matches) means
+            # the cheap path is unavailable — fall through to the full rebuild and its guards.
+            return False
+        self._view = new_view
+        return True
 
     def set_joint_position_targets(self, prim_path, positions, indices):
         assert len(indices) == len(positions), "Indices and values must have the same length"
@@ -2909,7 +3113,39 @@ class ControllableObjectViewAPI:
             view.flush_control()
 
     @classmethod
+    def _try_reattach(cls):
+        """
+        Cheap path for initialize_view: if the tracked robot set is unchanged, re-attach every
+        batch view's PhysX handle in place, keeping the impl objects and their caches. See
+        RigidBodyViewAPI._try_reattach for when this matters.
+
+        Returns:
+            bool: True if all batch views were re-attached in place; False if a full rebuild is
+                required. (An impl swapped before a later mismatch is still valid — its tracked set
+                was verified identical — and the caller's full rebuild replaces everything anyway.)
+        """
+        if not cls._VIEWS_BY_PATTERN:
+            return False
+        from omnigibson.robots import Robot
+
+        controllable_objects = [obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, Robot)]
+        expected_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
+        patterns = {get_robot_kinematic_tree_pattern(prim_path) for prim_path in expected_prim_paths}
+        if patterns != set(cls._VIEWS_BY_PATTERN.keys()):
+            return False
+        tracked_prim_paths = set()
+        for view in cls._VIEWS_BY_PATTERN.values():
+            tracked_prim_paths.update(view._idx.keys())
+        if tracked_prim_paths != expected_prim_paths:
+            return False
+        return all(view._try_reattach() for view in cls._VIEWS_BY_PATTERN.values())
+
+    @classmethod
     def initialize_view(cls):
+        # Cheap path: same robot set — re-attach each batch view in place, keep impls + caches.
+        if cls._try_reattach():
+            return
+
         cls._VIEWS_BY_PATTERN = {}
 
         # First, get all of the controllable objects in the scene (avoiding circular import)

@@ -56,6 +56,7 @@ from omnigibson.utils.usd_utils import (
     clear as clear_usd_utils,
     triangularize_mesh,
 )
+from omnigibson.utils.particle_view_utils import ParticleViewAPI
 from omnigibson.controllers import ControllerView
 
 # Create module logger
@@ -513,6 +514,10 @@ def _launch_simulator(*args, **kwargs):
 
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
+            # True only while _non_physics_step is actively running obj.initialize() on the queued
+            # batch. Distinct from "queue non-empty": objects can sit queued between steps without
+            # anyone initializing them, and refreshing handles is safe then.
+            self._initializing_objects = False
             self._objects_require_joint_break_callback = False
             self._deferred_joint_breaks = []
             # Set when update_handles() is called mid-step (currently_stepping): the tensorized
@@ -941,6 +946,7 @@ def _launch_simulator(*args, **kwargs):
             for scene in scenes:
                 scene.initialize()
             # One step is needed for particle systems to work.
+            # TODO(vector) why?
             self.step()
             self.stop()
 
@@ -1127,6 +1133,18 @@ def _launch_simulator(*args, **kwargs):
             return self._sim_context.get_physics_context()
 
         @property
+        def initializing_objects(self):
+            """
+            Returns:
+                bool: True only while _non_physics_step is actively running obj.initialize() on the
+                    queued object batch. Handle rebuilds must be deferred during this window (the
+                    mid-initialization objects' states are half-built); the batch-end
+                    update_handles() covers them. A merely non-empty queue between steps does NOT
+                    set this — refreshing handles is safe then.
+            """
+            return self._initializing_objects
+
+        @property
         def _physics_context(self):
             return self._sim_context._physics_context
 
@@ -1214,7 +1232,19 @@ def _launch_simulator(*args, **kwargs):
 
             self._sim_context._physx_fabric_interface.update(self.current_time, self.get_physics_dt())
 
-        def update_handles(self):
+        def refresh_physics_view_handles(self):
+            """
+            Refresh every PhysX view on a freshly created simulation view.
+
+            PhysX invalidates ALL existing tensor views whenever a rigid body is deleted from the
+            stage (creations are safe), even when the deleted body is not tracked by any view —
+            e.g. macro-physical particle prims. Each unified view API's initialize_view
+            self-detects whether its tracked prim set changed: unchanged → it only re-attaches its
+            PhysX handle (device buffers/pointers stay stable, so the captured per-step graph stays
+            valid without recapture); changed → it does a full rebuild. Unlike update_handles(),
+            this method does NOT rebuild ParticleViewAPI or re-initialize tensorized states, so it
+            never forces a graph recapture by itself.
+            """
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
@@ -1237,11 +1267,23 @@ def _launch_simulator(*args, **kwargs):
                         if isinstance(system, MacroPhysicalParticleSystem):
                             system.update_handles()
 
-            # Finally update any unified views
+            # Refresh the unified views
             RigidContactAPI.initialize_view()
             RigidBodyViewAPI.initialize_view()
             ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+
+        def update_handles(self):
+            # Handles are only relevant when physx is running
+            if not self.is_playing():
+                return
+
+            # Refresh the sim view, per-object / per-system handles, and the unified views.
+            self.refresh_physics_view_handles()
+
+            # ParticleViewAPI's registry/layout depends on the active-system topology, and the
+            # tensorized states (below) depend on that in turn — both rebuild only on this path.
+            ParticleViewAPI.initialize_view()
 
             if gm.ENABLE_OBJECT_STATES:
                 if self.currently_stepping:
@@ -1257,6 +1299,10 @@ def _launch_simulator(*args, **kwargs):
                     for state_type in og.sim.object_state_types_requiring_update:
                         if issubclass(state_type, TensorizedState):
                             state_type.initialize_view()
+
+        def mark_tensorized_state_values_dirty(self):
+            """Mark VALUES_CPU stale after a world mutation outside the normal step refresh."""
+            TensorizedState.caches_dirty = True
 
         def _refresh_state_caches(self, dt=0.0):
             """
@@ -1281,6 +1327,7 @@ def _launch_simulator(*args, **kwargs):
 
             RigidBodyViewAPI.read_from_physx()
             ArticulatedObjectViewAPI.read_from_physx()
+            ParticleViewAPI.prepare_step_host()
             wp.synchronize_stream(wp.get_stream())
 
             self._capture_warp_graph(dt)
@@ -1316,6 +1363,9 @@ def _launch_simulator(*args, **kwargs):
                 # No tensorized-state pipeline → still refresh GPU view-API mirrors so
                 # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
                 RigidBodyViewAPI.update()
+                # Run captured-safe particle copies/kernels after POSE_MATRICES is fresh so attached
+                # visual particles track their parent's current pose.
+                ParticleViewAPI.update_positions_gpu()
                 RigidContactAPI.update()
                 wp.synchronize_stream(wp.get_stream())
                 TensorizedState.caches_dirty = False
@@ -1342,6 +1392,7 @@ def _launch_simulator(*args, **kwargs):
                         # stream guarantees they see fresh values.
                         with wp.ScopedCapture(device="cuda") as capture:
                             RigidBodyViewAPI.update()
+                            ParticleViewAPI.update_positions_gpu()
                             RigidContactAPI.update()
                             for state_type in tensorized_states:
                                 state_type.global_update()
@@ -1349,6 +1400,14 @@ def _launch_simulator(*args, **kwargs):
                     TensorizedState.graph_dirty = False
                 if self._state_graph is not None:
                     wp.capture_launch(self._state_graph)
+                else:
+                    # TODO(vector) it's impossible to have graph dirty=flase and state graph=none at same time? so should not need this?
+                    # No captured graph (tensorized states are registered but hold no values yet, e.g. a
+                    # scene with particles but no containers/physical contacts). Still refresh the view
+                    # APIs directly so particle positions / poses stay fresh for non-tensorized consumers.
+                    RigidBodyViewAPI.update()
+                    ParticleViewAPI.update_positions_gpu()
+                    RigidContactAPI.update()
 
                 wp.synchronize_stream(wp.get_stream())
 
@@ -1378,13 +1437,20 @@ def _launch_simulator(*args, **kwargs):
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
                     scenes_modified = set()
-                    for i in range(n_objects_to_initialize):
-                        obj = self._objects_to_initialize[i]
-                        obj.initialize()
-                        scenes_modified.add(obj.scene)
-                        if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
-                            self._objects_require_joint_break_callback = True
-                        obj.keep_still()
+                    # While this flag is set, handle rebuilds are deferred (scene.get_system checks
+                    # it): a rebuild here would read the mid-initialization objects' half-built
+                    # states, and the update_handles() right after this loop covers everything.
+                    self._initializing_objects = True
+                    try:
+                        for i in range(n_objects_to_initialize):
+                            obj = self._objects_to_initialize[i]
+                            obj.initialize()
+                            scenes_modified.add(obj.scene)
+                            if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
+                                self._objects_require_joint_break_callback = True
+                            obj.keep_still()
+                    finally:
+                        self._initializing_objects = False
 
                     self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
@@ -2142,6 +2208,7 @@ def _launch_simulator(*args, **kwargs):
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
+            ParticleViewAPI.clear()
 
             # Clear all controller groups so robots re-register on next load
             ControllerView.clear()
