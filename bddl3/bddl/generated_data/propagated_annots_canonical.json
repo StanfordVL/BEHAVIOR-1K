@@ -20159,7 +20159,6 @@
   "grill.n.02": {
     "disinfectable": {},
     "dustyable": {},
-    "flammable": {},
     "grassyable": {},
     "heatSource": {},
     "moldyable": {},
@@ -39109,7 +39108,6 @@
     "breakable": {},
     "disinfectable": {},
     "dustyable": {},
-    "flammable": {},
     "grassyable": {},
     "heatSource": {},
     "moldyable": {},

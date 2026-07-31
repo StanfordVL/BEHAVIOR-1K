@@ -31,18 +31,19 @@ The commands on this page use a few shell variables. Set them once per terminal,
 ```bash
 export PATH_TO_BEHAVIOR_1K=~/BEHAVIOR-1K       # path to the BEHAVIOR-1K checkout
 export TASK_NAME=turning_on_radio              # any challenge task
-export DATA_ROOT=~/2026-challenge-demos/b1k    # holds one demo folder per task
-export DATASET_PATH=$DATA_ROOT/$TASK_NAME      # the LeRobot dataset for $TASK_NAME
+export DATA_ROOT=~/2026-challenge-demos        # local LeRobot v3 root (data/, meta/, videos/)
+export DATASET_PATH=$DATA_ROOT                 # OpenPI dataset_root
+export REPO_ID=behavior-1k/2026-challenge-demos  # OpenPI repo_id / norm stats (HF hub id, not a local path)
 ```
 
 See the [dataset page](./dataset.md) for the full task list.
 
 ### Install BEHAVIOR-1K
 
-Clone the challenge release of BEHAVIOR-1K and run the setup script. It creates a `behavior` conda environment with OmniGibson, the simulation assets, and the evaluation dependencies:
+Clone the `v3.9.1` tag of BEHAVIOR-1K and run the setup script. It creates a `behavior` conda environment with OmniGibson, the simulation assets, and the evaluation dependencies. Do not use the older `v3.9.0` tag for challenge evaluation workflows because dataset and evaluator compatibility fixes are shipped in `v3.9.1`.
 
 ```bash
-git clone -b v3.9.0 https://github.com/StanfordVL/BEHAVIOR-1K.git $PATH_TO_BEHAVIOR_1K
+git clone -b v3.9.1 https://github.com/StanfordVL/BEHAVIOR-1K.git $PATH_TO_BEHAVIOR_1K
 cd $PATH_TO_BEHAVIOR_1K
 ./setup.sh --new-env --omnigibson --bddl --joylo --dataset --eval
 ```
@@ -51,16 +52,24 @@ See the [installation guide](../getting_started/installation.md) for prerequisit
 
 ### Download the demonstrations
 
-The demos ship as a [LeRobot](https://github.com/huggingface/lerobot) v3.0 dataset on HuggingFace: [behavior-1k/2026-challenge-demos](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos). Download only the relevant task folder — the full dataset is 3.27 TB:
+The demos ship as a [LeRobot](https://github.com/huggingface/lerobot) v3.0 dataset on HuggingFace: [behavior-1k/2026-challenge-demos](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos). Tasks are stored as numbered chunks (`chunk-000` is the first task, `chunk-001` the second, and so on). Download only the relevant chunk — the full dataset is 3.27 TB:
 
 ```bash
+export TASK_ID=0    # 0-indexed task id; maps to chunk-000, chunk-001, ...
+CHUNK=$(printf "chunk-%03d" $TASK_ID)
+
 huggingface-cli download behavior-1k/2026-challenge-demos \
     --repo-type dataset \
-    --local-dir "$(dirname $DATA_ROOT)" \
-    --include "b1k/$TASK_NAME/**"
+    --local-dir "$DATA_ROOT" \
+    --include "data/$CHUNK/**" \
+    --include "meta/episodes/$CHUNK/**" \
+    --include "videos/*/$CHUNK/**" \
+    --include "meta/info.json" \
+    --include "meta/stats.json" \
+    --include "meta/tasks.parquet"
 ```
 
-This places the demos at `$DATASET_PATH`. Drop the `--include` filter to download all 100 tasks. See the [dataset page](./dataset.md) for details on the data format.
+This places the demos under `$DATA_ROOT` in LeRobot's `data/`, `meta/`, and `videos/` layout. Drop the `--include` filters to download all 100 tasks. See the [dataset page](./dataset.md) for details on the data format.
 
 ## π0.5
 
@@ -83,18 +92,18 @@ GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 
 ### Prepare the dataset
 
-Every command below passes the dataset location explicitly via `--data.repo_id=$TASK_NAME --data.base_config.dataset_root=$DATASET_PATH`. Alternatively, set `repo_id` and `dataset_root` once in the `pi05_b1k` block of `src/openpi/training/config.py` and drop those flags.
+Every command below passes the dataset location explicitly via `--data.repo_id=$REPO_ID --data.base_config.dataset_root=$DATASET_PATH`. Alternatively, set `repo_id` and `dataset_root` once in the `pi05_b1k` block of `src/openpi/training/config.py` and drop those flags.
 
 Before training, compute normalization statistics for the dataset:
 
 ```bash
 cd $OPENPI_DIR
 uv run scripts/compute_norm_stats.py pi05_b1k \
-    --data.repo_id=$TASK_NAME \
+    --data.repo_id=$REPO_ID \
     --data.base_config.dataset_root=$DATASET_PATH
 ```
 
-This writes `norm_stats.json` under `outputs/assets/pi05_b1k/$TASK_NAME`.
+This writes `norm_stats.json` under `outputs/assets/pi05_b1k/$REPO_ID`.
 
 ### Train
 
@@ -110,7 +119,7 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/b1k/train_b1k.py pi05_b1k \
     --exp_name=$EXP_NAME \
     --overwrite \
     --batch_size=64 \
-    --data.repo_id=$TASK_NAME \
+    --data.repo_id=$REPO_ID \
     --data.base_config.dataset_root=$DATASET_PATH
 ```
 ```
@@ -122,7 +131,7 @@ Pass the GPU count and device list as positional arguments (e.g. `... pi05_b1k 8
 
 ```bash
 ./scripts/b1k/train_b1k.sh pi05_b1k $NUM_GPUS $CUDA_VISIBLE_DEVICES \
-    --data.repo_id=$TASK_NAME \
+    --data.repo_id=$REPO_ID \
     --data.base_config.dataset_root=$DATASET_PATH
 ```
 ```
@@ -137,7 +146,7 @@ Submit a new run:
 ```bash
 EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
     --overwrite \
-    --data.repo_id=$TASK_NAME \
+    --data.repo_id=$REPO_ID \
     --data.base_config.dataset_root=$DATASET_PATH
 ```
 
@@ -145,7 +154,7 @@ Resume an existing run by omitting `--overwrite` (by default the script resumes 
 
 ```bash
 EXP_NAME=my_run sbatch scripts/b1k/train_b1k.sbatch.sh pi05_b1k \
-    --data.repo_id=$TASK_NAME \
+    --data.repo_id=$REPO_ID \
     --data.base_config.dataset_root=$DATASET_PATH
 ```
 
@@ -165,7 +174,7 @@ CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.85 \
 uv run scripts/b1k/serve_b1k.py \
     --robot b1k/R1Pro \
     --task b1k/$TASK_NAME \
-    --repo-id $TASK_NAME \
+    --repo-id $REPO_ID \
     --policy.config pi05_b1k \
     --policy.dir $PATH_TO_CKPT \
     --control_mode receding_horizon \
