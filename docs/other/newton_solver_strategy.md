@@ -125,13 +125,46 @@ in both a two-layer drape and a denser four-quadrant fold. The self-contact
 disabled rows are the control; they interpenetrate, which is what makes the
 enabled result meaningful rather than vacuous.
 
-Cost: self-contact adds about 1.45x. The absolute figure is the open concern —
-about 79 ms/frame for a single 1089-particle cloth is roughly 12 fps for one
-cloth in one environment, which does not yet fit a vectorized training budget.
-Substep count, solver iterations, and the O(n^2) `nxn` broad phase are the
-untested levers; the measurement above deliberately reuses the stiff
-poker-card configuration from Newton's own example and is not tuned for
-fabric. Grasping with an actuated gripper remains unvalidated.
+Cost: self-contact adds about 1.45x. The 79 ms/frame single-world figure is
+not the throughput limit, because one cloth does not saturate the GPU. Total
+frame time is flat as worlds are added (20 substeps x 10 iterations, same
+scenario replicated):
+
+| worlds | ms/frame | ms/world | speedup |
+| --- | --- | --- | --- |
+| 1 | 80.5 | 80.5 | 1.00x |
+| 4 | 79.0 | 19.8 | 4.07x |
+| 16 | 80.0 | 5.00 | 16.09x |
+| 32 | 98.0 | 3.06 | 26.26x |
+
+Scaling is essentially free to 16 worlds and still 26x at 32, so vectorized
+cloth costs roughly one world's GPU time up to the point of saturation. This
+is cloth alone; rigid dynamics and rendering compete for the same GPU, so
+these figures do not compose additively with a full scene.
+
+Substep and iteration count are a false economy, and this is the sharpest
+lesson from the experiment. Cost is close to linear in substeps x iterations
+(4x4 costs 7.5 ms/frame against 79.3 for 20x10), and **every** configuration
+from 4x4 upward held zero interpenetration — so the self-contact test alone
+would have endorsed the cheapest one. Comparing settled state against the
+20x10 reference shows why that would be wrong:
+
+| substeps x iters | ms/frame | cloth centre of mass z | outcome |
+| --- | --- | --- | --- |
+| 20x10 | 79.3 | 0.169 m | drapes on the post (reference) |
+| 12x10 | 47.3 | 0.149 m | drapes, noticeably different extent |
+| 8x4 | 15.0 | 0.009 m | slides off, lands on the floor |
+| 4x4 | 7.5 | 0.004 m | slides off, lands on the floor |
+
+Mean stretch stays near 1.0 in all configurations, so the cheap ones are not
+stretching; they are slipping, because contact friction is under-resolved.
+Cloth lying on the floor does not self-intersect, which is exactly why the
+penetration metric passes it. Any future substep tuning must be validated
+against settled configuration, not non-penetration alone.
+
+Note that 20x10 is the most resolved configuration tested, not a converged
+one; whether it matches a higher-resolution reference is unverified. Grasping
+with an actuated gripper also remains unvalidated.
 
 This result is what makes IPC unnecessary for now: the reason to want IPC was
 guaranteed non-penetration under folding, and VBD's mollified barrier already
