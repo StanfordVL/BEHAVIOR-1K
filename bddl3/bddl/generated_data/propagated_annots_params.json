@@ -35357,12 +35357,6 @@
     "grill.n.02": {
         "disinfectable": {},
         "dustyable": {},
-        "flammable": {
-            "ignition_temperature": 250.0,
-            "fire_temperature": 1000.0,
-            "heating_rate": 0.04,
-            "distance_threshold": 0.2
-        },
         "grassyable": {},
         "heatSource": {
             "requires_toggled_on": 1.0,
@@ -72926,12 +72920,6 @@
         "breakable": {},
         "disinfectable": {},
         "dustyable": {},
-        "flammable": {
-            "ignition_temperature": 250.0,
-            "fire_temperature": 1000.0,
-            "heating_rate": 0.04,
-            "distance_threshold": 0.2
-        },
         "grassyable": {},
         "heatSource": {
             "requires_toggled_on": 1.0,
