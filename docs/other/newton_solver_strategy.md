@@ -108,6 +108,36 @@ speed baseline. Self-contact, thin-shell collision, friction, grasping, and
 highly folded cloth need dedicated validation; a stable unconstrained cloth
 drop is not sufficient evidence for manipulation tasks.
 
+Self-contact validation, August 2, 2026 (`OmniGibson/tests/test_newton_cloth.py`,
+RTX 5090, 0.4 m cloth at 32x32, 1089 particles, 2 mm contact radius, 20
+substeps x 10 iterations, 3 s settle):
+
+| scenario | self-contact | min layer gap | interpenetrating pairs | ms/frame |
+| --- | --- | --- | --- | --- |
+| drape over rod | on | 1.95 mm | 0 | 79.8 |
+| drape over rod | off | 0.31 mm | 4 | 55.2 |
+| fold around post | on | 1.99 mm | 0 | 78.0 |
+| fold around post | off | 0.15 mm | 16 | 54.6 |
+
+VBD self-contact holds: layers settle at essentially the authored contact
+radius (1.95-1.99 mm against a 2 mm radius) with zero interpenetrating pairs,
+in both a two-layer drape and a denser four-quadrant fold. The self-contact
+disabled rows are the control; they interpenetrate, which is what makes the
+enabled result meaningful rather than vacuous.
+
+Cost: self-contact adds about 1.45x. The absolute figure is the open concern —
+about 79 ms/frame for a single 1089-particle cloth is roughly 12 fps for one
+cloth in one environment, which does not yet fit a vectorized training budget.
+Substep count, solver iterations, and the O(n^2) `nxn` broad phase are the
+untested levers; the measurement above deliberately reuses the stiff
+poker-card configuration from Newton's own example and is not tuned for
+fabric. Grasping with an actuated gripper remains unvalidated.
+
+This result is what makes IPC unnecessary for now: the reason to want IPC was
+guaranteed non-penetration under folding, and VBD's mollified barrier already
+delivers it in these cases. See the decision log entry on deformable solver
+selection.
+
 ### Implicit MPM
 
 The Material Point Method is the broadest current Newton representation for
@@ -383,7 +413,11 @@ has not yet been selected or integrated. The leading evaluation stack is:
 The following questions must be answered experimentally:
 
 1. Can VBD contact handle B1K cloth folding and robot grasping without an IPC
-   implementation?
+   implementation? Folding: answered yes, see the self-contact validation under
+   VBD above (zero interpenetration in a two-layer drape and a four-quadrant
+   fold). Grasping with an actuated gripper, and the throughput needed for
+   vectorized environments, are still open. Newton's own
+   `example_cloth_franka.py` is the reference for the grasping half.
 2. Which MPM material models and resolutions preserve pouring, filling,
    scooping, and container loading at useful vector throughput?
 3. Does proxy coupling remain stable across the mass ratios and stiffnesses in
