@@ -484,6 +484,8 @@ def _launch_simulator(*args, **kwargs):
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
             self._deferred_joint_breaks = []
+            # USD edits that must run between physics steps (not inside a physics callback)
+            self._deferred_usd_actions = []
 
             # Maps callback name to callback
             self._callbacks_on_play = dict()
@@ -1372,6 +1374,13 @@ def _launch_simulator(*args, **kwargs):
             # step() may not step physics
             if len(self._objects_to_initialize) > 0:
                 self.render()
+
+            # Run any USD edits that were deferred from inside physics callbacks
+            if self._deferred_usd_actions:
+                actions, self._deferred_usd_actions = self._deferred_usd_actions, []
+                for action in actions:
+                    action()
+                self.update_handles()
 
             # Clear all scenes' updated objects
             for scene in self.scenes:
