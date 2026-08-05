@@ -63,6 +63,14 @@ parser.add_argument(
     default=None,
     help="Output directory for sampled tasks (default: gm.DATA_PATH/2026-challenge-task-instances)",
 )
+parser.add_argument(
+    "-u",
+    "--unique_models",
+    action="store_true",
+    help="If set, each instance of the same synset (e.g. book.n.02_1..6) will be assigned a distinct "
+    "object model from the whitelist (sampling without replacement). Fails if the whitelist for a "
+    "synset has fewer entries than instances.",
+)
 
 # gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
@@ -184,8 +192,10 @@ def main(random_selection=False, headless=False, short_exec=False):
         whitelist, blacklist = None, None
     env.task_config["sampling_whitelist"] = whitelist
     env.task_config["sampling_blacklist"] = blacklist
+    env.task_config["use_unique_models_per_synset"] = args.unique_models
     log.info(f"white_list: {whitelist}")
     log.info(f"black_list: {blacklist}")
+    log.info(f"use_unique_models_per_synset: {args.unique_models}")
     assert whitelist is not None, "whitelist should not be None for manual sampling"
     BehaviorTask.get_cached_activity_scene_filename(
         scene_model=scene_model,

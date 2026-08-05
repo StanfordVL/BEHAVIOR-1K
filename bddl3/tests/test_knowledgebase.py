@@ -611,3 +611,35 @@ class TestWildcardExpansion:
         ok, results = ct.check_goal(lambda cls, *e: False)
         assert isinstance(ok, bool)
         assert "satisfied" in results and "unsatisfied" in results
+
+    def test_compile_base_strips_wildcards(self, kb):
+        """compile_base produces a CompiledTask with the wildcard tokens removed."""
+        ct = kb.get_task("carrying_in_groceries-0").compile_base()
+        assert "electric_refrigerator.n.01_*" not in ct.object_scope
+        assert "electric_refrigerator.n.01_1" in ct.object_scope
+        # Wildcard-only extras must not appear before expansion.
+        assert "electric_refrigerator.n.01_2" not in ct.object_scope
+
+    def test_expand_wildcards_from_inst_to_name(self, kb):
+        """compile_from_inst_to_name pulls expanded instances from the cache mapping."""
+        task = kb.get_task("carrying_in_groceries-0")
+        inst_to_name = {
+            "electric_refrigerator.n.01_1": "fridge_0",
+            "electric_refrigerator.n.01_2": "fridge_1",
+            "electric_refrigerator.n.01_3": "fridge_2",
+        }
+        ct = task.compile_from_inst_to_name(inst_to_name)
+        fridge_instances = sorted(n for n in ct.object_scope if "electric_refrigerator" in n)
+        assert fridge_instances == [
+            "electric_refrigerator.n.01_1",
+            "electric_refrigerator.n.01_2",
+            "electric_refrigerator.n.01_3",
+        ]
+        inroom = {cond[1] for cond in ct.conditions.parsed_initial_conditions if cond[0] == "inroom"}
+        assert "electric_refrigerator.n.01_2" in inroom
+        assert "electric_refrigerator.n.01_3" in inroom
+
+    def test_wildcard_synsets(self, kb):
+        """wildcard_synsets enumerates synsets that have a wildcard in the definition."""
+        task = kb.get_task("carrying_in_groceries-0")
+        assert "electric_refrigerator.n.01" in task.wildcard_synsets
