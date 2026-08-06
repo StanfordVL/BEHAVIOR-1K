@@ -1,5 +1,6 @@
 import random
 import string
+import sys
 from collections import OrderedDict
 from collections.abc import Iterable
 from copy import deepcopy
@@ -445,6 +446,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Denote that the scene is loaded
         self._loaded = True
+        sys.stdout.write("\a")
+        sys.stdout.flush()
 
     def update_task(self, task_config):
         """
