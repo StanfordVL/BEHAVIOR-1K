@@ -12582,7 +12582,6 @@
         "disinfectable": {}
     },
     "grill.n.02": {
-        "flammable": {},
         "toggleable": {},
         "heatSource": {},
         "sceneObject": {},
@@ -22941,7 +22940,6 @@
     },
     "space_heater.n.01": {
         "breakable": {},
-        "flammable": {},
         "toggleable": {},
         "heatSource": {},
         "rigidBody": {},

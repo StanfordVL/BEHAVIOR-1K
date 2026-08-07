@@ -1598,7 +1598,7 @@ class Robot(USDObject, GymObservable):
             dic["base_qpos"] = joint_positions[self.base_control_idx]
             dic["base_qpos_sin"] = th.sin(joint_positions[self.base_control_idx])
             dic["base_qpos_cos"] = th.cos(joint_positions[self.base_control_idx])
-            dic["base_qvel"] = joint_velocities[self.base_control_idx]
+            dic["base_qvel"] = self._get_base_qvel_for_proprioception(joint_positions, joint_velocities)
         if self.is_two_wheel:
             # Grab wheel joint velocity info
             l_vel, r_vel = joint_velocities[self.base_control_idx].tolist()
@@ -1619,6 +1619,27 @@ class Robot(USDObject, GymObservable):
             dic["camera_qvel"] = joint_velocities[self.camera_control_idx]
 
         return dic
+
+    def _get_base_qvel_for_proprioception(self, joint_positions, joint_velocities):
+        """
+        Returns:
+            th.Tensor: base velocity exposed through proprioception.
+        """
+        base_qvel = joint_velocities[self.base_control_idx]
+        if not self.is_holonomic_base:
+            return base_qvel
+
+        base_qpos_6dof = joint_positions[self.base_idx]
+        yaw = base_qpos_6dof[5]
+        c = th.cos(yaw)
+        s = th.sin(yaw)
+        return th.stack(
+            [
+                c * base_qvel[0] + s * base_qvel[1],
+                -s * base_qvel[0] + c * base_qvel[1],
+                base_qvel[2],
+            ]
+        )
 
     def _load_observation_space(self):
         # We compile observation spaces from our sensors

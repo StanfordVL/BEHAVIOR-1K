@@ -189,7 +189,4 @@ We gratefully acknowledge the support of our sponsors who make this challenge po
   <a href="https://tsffoundation.org/" title="Schmidt Family Foundation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/schmidt_family_foundation_logo.png" alt="Schmidt Family Foundation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
-  <span title="Calder" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
-    <img src="../assets/challenge_2026/calder.png" alt="Calder" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
-  </span>
 </div>

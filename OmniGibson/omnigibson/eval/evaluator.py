@@ -44,6 +44,14 @@ from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
 
 
+TORCH_NUM_THREADS = None
+TORCH_NUM_INTEROP_THREADS = None
+
+if TORCH_NUM_THREADS is not None:
+    th.set_num_threads(TORCH_NUM_THREADS)
+if TORCH_NUM_INTEROP_THREADS is not None:
+    th.set_num_interop_threads(TORCH_NUM_INTEROP_THREADS)
+
 LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 EVAL_BASE_LINK_MASS = 250.0
 EVAL_HEAD_HORIZONTAL_APERTURE = 40.0
