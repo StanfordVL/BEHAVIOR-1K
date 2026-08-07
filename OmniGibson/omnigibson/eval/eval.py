@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
         "--num-envs",
         type=int,
         default=1,
-        help="Number of parallel env slots; instances are evaluated this many at a time.",
+        help="Number of parallel env slots. Must equal the number of selected instance indices.",
     )
     parser.add_argument(
         "--replay-action-chunk-size",
@@ -129,6 +129,11 @@ def main() -> None:
 
     instance_ids = resolve_instance_ids(args.task_name, args.instance_indices, mode=args.mode)
     logger.info(f"Resolved {args.mode} instance ids for {args.task_name}: {instance_ids}")
+    if len(instance_ids) != args.num_envs:
+        raise ValueError(
+            "Evaluation requires exactly one instance per environment slot: "
+            f"got {len(instance_ids)} instance indices and --num-envs={args.num_envs}."
+        )
 
     robot_config = None
     if args.robot_config is not None:
@@ -171,8 +176,8 @@ def main() -> None:
 
     results = []
     with Evaluator(cfg) as evaluator:
-        # Each run() pass evaluates every instance once, num_envs at a time (the slot batching lives in
-        # evaluator.run -> evaluate_instances_batched). Outer loop repeats for additional rollouts.
+        # Each run() pass evaluates the selected instances together in one parallel batch. The outer
+        # loop repeats that same batch for additional rollouts.
         for rollout_id in range(args.num_rollouts):
             rollout_results = evaluator.run(
                 [int(i) for i in instance_ids],

@@ -90,45 +90,45 @@ def evaluate_instances_batched(
     max_steps: Optional[int] = None,
 ) -> "Dict[object, object]":
     """
-    Drive evaluation of @instances in groups of @num_envs. Pure orchestration: all sim work is
-    delegated to the injected load_fn / step_fn / record_fn, and a slot that finishes early is dropped
-    from the active list (frozen) until the whole group is done -- loading an instance settles physics
-    for ALL scenes at once, so refilling one slot mid-group would disturb the slots still running.
-    Returns {instance id -> record_fn's return}.
+    Drive one parallel evaluation batch with exactly one instance per environment slot. Pure
+    orchestration: all sim work is delegated to the injected load_fn / step_fn / record_fn, and a slot
+    that finishes early is dropped from the active list (frozen) until the whole batch is done. Returns
+    {instance id -> record_fn's return}.
     """
     if num_envs < 1:
         raise ValueError(f"num_envs must be >= 1, got {num_envs}")
 
+    instances = list(instances)
+    if len(instances) != num_envs:
+        raise ValueError(
+            f"Evaluation requires exactly one instance per environment slot: "
+            f"got {len(instances)} instances and num_envs={num_envs}."
+        )
+
     results: Dict[object, object] = {}
-    pending = list(instances)
+    slot_to_instance: Dict[int, object] = {slot: inst for slot, inst in enumerate(instances)}
+    load_fn(dict(slot_to_instance))
 
-    while pending:
-        batch = pending[:num_envs]
-        pending = pending[num_envs:]
+    active = {slot: True for slot in slot_to_instance}
+    step = 0
+    while any(active.values()):
+        active_slots = sorted(slot for slot, is_active in active.items() if is_active)
+        terminated, truncated = step_fn(active_slots)
+        step += 1
 
-        slot_to_instance: Dict[int, object] = {slot: inst for slot, inst in enumerate(batch)}
-        load_fn(dict(slot_to_instance))
-
-        active = {slot: True for slot in slot_to_instance}
-        step = 0
-        while any(active.values()):
-            active_slots = sorted(slot for slot, is_active in active.items() if is_active)
-            terminated, truncated = step_fn(active_slots)
-            step += 1
-
-            hit_cap = max_steps is not None and step >= max_steps
-            for slot in active_slots:
-                term = bool(terminated[slot])
-                trunc = bool(truncated[slot]) or hit_cap
-                if term or trunc:
-                    results[slot_to_instance[slot]] = record_fn(
-                        slot=slot,
-                        instance=slot_to_instance[slot],
-                        step=step,
-                        terminated=term,
-                        truncated=trunc,
-                    )
-                    active[slot] = False
+        hit_cap = max_steps is not None and step >= max_steps
+        for slot in active_slots:
+            term = bool(terminated[slot])
+            trunc = bool(truncated[slot]) or hit_cap
+            if term or trunc:
+                results[slot_to_instance[slot]] = record_fn(
+                    slot=slot,
+                    instance=slot_to_instance[slot],
+                    step=step,
+                    terminated=term,
+                    truncated=trunc,
+                )
+                active[slot] = False
 
     return results
 
@@ -586,11 +586,10 @@ class Evaluator:
         video_fps: int = 30,
     ) -> dict:
         """
-        Offline driver: evaluate every instance in @instances_to_run, processing them ``num_envs`` at a
-        time. The whole group finishes before the next group loads, and an early-finishing slot waits
-        idle rather than getting a new instance. Writes one result JSON per instance to @metrics_dir if
-        given. Returns {instance id -> result dict} (result is score_utils-compatible: q_score/time/
-        agent_distance plus task/instance/success/steps).
+        Offline driver for one batch containing exactly ``num_envs`` instances. An early-finishing slot
+        waits idle rather than getting a new instance. Writes one result JSON per instance to
+        @metrics_dir if given. Returns {instance id -> result dict} (result is score_utils-compatible:
+        q_score/time/agent_distance plus task/instance/success/steps).
         """
         task_name = self.cfg.task.name
 

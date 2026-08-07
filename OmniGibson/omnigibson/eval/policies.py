@@ -49,7 +49,10 @@ class LocalPolicy:
 
 class WebsocketPolicy:
     """
-    Websocket policy for controlling the robot over a websocket connection.
+    Websocket policy for controlling the robot over a websocket connection. ``action_chunk_size`` opts
+    into the action-chunk protocol documented in ``docs/challenge/evaluation.md``; it is disabled by
+    default because replaying a chunk is correct only for servers that return actions intended for
+    open-loop execution from one observation.
     """
 
     def __init__(

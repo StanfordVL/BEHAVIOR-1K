@@ -55,6 +55,9 @@ class WebsocketClientPolicy:
             allow_reconnect (bool): Whether to allow automatic reconnection if the websocket connection is lost.
                 If False, the client will raise an error if the connection is lost.
                 If True, the client will attempt to reconnect indefinitely with a delay between attempts.
+            action_chunk_size (int): Number of server-returned actions to execute before requesting a new
+                observation-conditioned action. Values <= 1 disable chunk requests. Only enable this when the
+                server returns an exact open-loop action sequence produced from the current observation.
         """
         self._uri = f"{scheme}://{host}:{port}"
         self._packer = Packer()
