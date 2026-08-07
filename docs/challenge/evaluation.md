@@ -60,7 +60,11 @@ Key arguments:
     </tr>
     <tr>
       <td><code>--instance-indices</code></td>
-      <td>Indices into the task's test instance list. Use indices <code>0 1 2 3 4 5 6 7 8 9</code> for reported evaluation results. Indices <code>0-19</code> are public test instances; indices <code>20-39</code> are hidden instances reserved for final evaluation.</td>
+      <td>Indices into the task's test instance list. Use indices <code>0 1 2 3 4 5 6 7 8 9</code> for reported evaluation results. Indices <code>0-19</code> are public test instances; indices <code>20-39</code> are hidden instances reserved for final evaluation. Select exactly one instance per logical environment in the evaluation batch.</td>
+    </tr>
+    <tr>
+      <td><code>--num-envs</code></td>
+      <td>Number of logical environments processed together as one evaluation batch. This must equal the number of values passed to <code>--instance-indices</code>.</td>
     </tr>
     <tr>
       <td><code>--num-rollouts</code></td>
@@ -94,6 +98,30 @@ Key arguments:
 </table>
 
 The evaluator sends flattened observations to the policy server. The server should return a msgpack-encoded response containing an `action` array with the robot action for the current step. The helper server implementation is `WebsocketPolicyServer` in `OmniGibson/omnigibson/eval/utils/network_utils.py`, and the evaluator-side client is `omnigibson.eval.policies.WebsocketPolicy`.
+
+### Optional action-chunk replay protocol
+
+Action-chunk replay is disabled by default. Setting <code>--replay-action-chunk-size K</code> with
+<code>K &gt; 1</code> asks a compatible policy server for <code>K</code> actions by adding the reserved
+<code>__action_chunk_size__</code> field to the observation request. The server response must contain:
+
+```python
+{
+    "action": ...,        # shape: (..., action_dim)
+    "action_chunk": ...,  # shape: (..., K, action_dim)
+}
+```
+
+The first action in <code>action_chunk</code> must exactly equal <code>action</code>. The client returns that first
+action immediately, then executes the remaining <code>K - 1</code> actions without another websocket request.
+The cached chunk is cleared on episode reset. If a server omits <code>action_chunk</code>, the client logs a warning
+and falls back to one request per simulator step. The generic <code>WebsocketPolicyServer</code> implements this
+fallback protocol; a chunk-capable policy server must implement the optional response field itself.
+
+Only enable replay when the server returns an action sequence intended to be executed open-loop from the current
+observation, such as one receding-horizon policy chunk, and choose <code>K</code> so replay never crosses the policy's
+replanning boundary. Do not enable it for temporal ensembling or for a server that repeatedly re-runs or blends the
+policy on the same stale observation; those actions are not equivalent to normal closed-loop evaluation.
 
 Each successful rollout produces a JSON result containing `q_score`, `time`, `agent_distance`, and normalized efficiency metrics. For challenge submissions, run evaluation with `--write-video`; this records the head and wrist camera videos that must be submitted with the rollout metrics.
 

@@ -112,8 +112,18 @@ class TiledVisionSensor:
 
     def _create_buffers(self, device: str = "cuda:0") -> None:
         self._output_buffer = dict()
+        self._output_warp_buffer = dict()
+        self._reshape_dims = dict()
+        self._num_tiles_x = dict()
         for sensor_name in self._camera_prims:
             self._output_buffer[sensor_name] = dict()
+            self._output_warp_buffer[sensor_name] = dict()
+            self._reshape_dims[sensor_name] = (
+                self._camera_count(sensor_name=sensor_name),
+                self._camera_resolution[sensor_name][1],
+                self._camera_resolution[sensor_name][0],
+            )
+            self._num_tiles_x[sensor_name] = self._tiled_grid_shape(sensor_name=sensor_name)[0]
             for modality in self.modalities[sensor_name]:
                 if modality == "rgb":
                     self._output_buffer[sensor_name][modality] = th.zeros(
@@ -177,6 +187,11 @@ class TiledVisionSensor:
                     ).contiguous()
                 else:
                     raise ValueError(f"Unsupported modality {modality} for tiled vision sensor!")
+                # The output tensors are persistent. Cache their zero-copy Warp aliases instead of
+                # recreating Python/Warp wrappers on every rendered frame.
+                self._output_warp_buffer[sensor_name][modality] = lazy.warp.from_torch(
+                    self._output_buffer[sensor_name][modality]
+                )
 
     def _camera_count(self, sensor_name: str) -> int:
         return len(self._camera_prims[sensor_name])
@@ -203,16 +218,12 @@ class TiledVisionSensor:
                     tiled_data_buffer = tiled_data_buffer[:, :, :2].contiguous()
                 lazy.warp.launch(
                     kernel=reshape_tiled_image,
-                    dim=(
-                        self._camera_count(sensor_name=sensor_name),
-                        self._camera_resolution[sensor_name][1],
-                        self._camera_resolution[sensor_name][0],
-                    ),
+                    dim=self._reshape_dims[sensor_name],
                     inputs=[
                         tiled_data_buffer.flatten(),
-                        lazy.warp.from_torch(self._output_buffer[sensor_name][modality]),  # zero-copy alias
+                        self._output_warp_buffer[sensor_name][modality],
                         *list(self._output_buffer[sensor_name][modality].shape[1:]),  # height, width, num_channels
-                        self._tiled_grid_shape(sensor_name=sensor_name)[0],  # num_tiles_x
+                        self._num_tiles_x[sensor_name],
                     ],
                     device="cuda:0",
                 )

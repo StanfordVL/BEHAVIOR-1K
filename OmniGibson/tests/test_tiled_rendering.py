@@ -75,7 +75,7 @@ def _camera_sensor_name(robot):
 
 def _place_markers(env, distances):
     """Teleport each scene's marker cube directly in front of that env's camera at the given distance."""
-    for env_idx, scene in enumerate(env.scenes):
+    for env_idx, scene in enumerate(env._scenes):
         robot = scene.robots[0]
         cam = robot.sensors[_camera_sensor_name(robot)]
         cam_pos, cam_quat = cam.get_position_orientation()
@@ -102,13 +102,18 @@ def test_tiled_rendering_core():
             obs_modalities=["rgb", "depth_linear", "proprio"],
             objects_cfg=MARKER_CFG,
         )
-        robot_name = env.scenes[0].robots[0].name
-        cam_name = _camera_sensor_name(env.scenes[0].robots[0])
+        robot_name = env._scenes[0].robots[0].name
+        cam_name = _camera_sensor_name(env._scenes[0].robots[0])
 
         # --- Tiled sensor is active and covers the camera with the requested modalities ---
         assert env._tiled_sensor is not None, "Tiled sensor should be created when num_envs > 1"
         assert cam_name in env._tiled_sensor.modalities
         assert {"rgb", "depth_linear"} == set(env._tiled_sensor.modalities[cam_name])
+        for scene in env._scenes:
+            camera = scene.robots[0].sensors[cam_name]
+            assert (
+                not camera.render_product.hydra_texture.updates_enabled
+            ), "Individual camera render products must be paused when tiled rendering supplies observations"
 
         # --- Knob plumbing: default number of re-renders on reset ---
         assert env._num_rerenders_on_reset == 3
@@ -149,14 +154,26 @@ def test_tiled_rendering_core():
 
         # --- Parity with per-sensor rendering. Depth is the strict geometric check; rgb is loose since
         # the tiled and per-sensor render products denoise/accumulate samples differently ---
-        for i in range(NUM_ENVS):
-            sensor = env.scenes[i].robots[0].sensors[cam_name]
-            s_obs, _ = sensor.get_obs()
-            tiled_rgb = obs_list[i][robot_name][cam_name]["rgb"].float().cpu()
+        individual_sensors = [scene.robots[0].sensors[cam_name] for scene in env._scenes]
+        individual_obs = []
+        with og.sim.editing_usd():
+            for sensor in individual_sensors:
+                sensor.render_product.hydra_texture.updates_enabled = True
+        try:
+            for _ in range(8):
+                og.sim.render()
+            parity_tiled_obs, _ = env.get_obs()
+            individual_obs = [sensor.get_obs()[0] for sensor in individual_sensors]
+        finally:
+            with og.sim.editing_usd():
+                for sensor in individual_sensors:
+                    sensor.render_product.hydra_texture.updates_enabled = False
+        for i, s_obs in enumerate(individual_obs):
+            tiled_rgb = parity_tiled_obs[i][robot_name][cam_name]["rgb"].float().cpu()
             sensor_rgb = s_obs["rgb"].float().cpu()
             mean_diff = (tiled_rgb - sensor_rgb).abs().mean().item()
             assert mean_diff < 40.0, f"env {i}: tiled vs per-sensor rgb mean abs diff {mean_diff:.1f}"
-            tiled_depth_center = _center_patch(obs_list[i][robot_name][cam_name]["depth_linear"].cpu()).median()
+            tiled_depth_center = _center_patch(parity_tiled_obs[i][robot_name][cam_name]["depth_linear"].cpu()).median()
             sensor_depth_center = _center_patch(s_obs["depth_linear"].cpu()).median()
             assert abs(tiled_depth_center - sensor_depth_center) < 0.2, f"env {i}: tiled vs per-sensor depth mismatch"
 
@@ -174,12 +191,13 @@ def test_tiled_rendering_core():
 
         # --- step() returns tiled observations as well ---
         actions = th.stack(
-            [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(env.num_envs)]
+            [th.from_numpy(env._scenes[i].robots[0].action_space.sample()).float() for i in range(env.num_envs)]
         )
         obs_list, _, _, _, _ = env.step(actions)
         assert obs_list[0][robot_name][cam_name]["rgb"].shape == (128, 128, 4)
     finally:
-        og.clear()
+        if og.sim is not None:
+            og.clear()
 
 
 def test_tiled_rendering_empty_scene():
@@ -196,27 +214,28 @@ def test_tiled_rendering_empty_scene():
         assert env._num_rerenders_on_reset == 2
 
         # --- Scene offsets must be finite and strictly increasing along x ---
-        xs = [scene.get_position_orientation()[0][0].item() for scene in env.scenes]
+        xs = [scene.get_position_orientation()[0][0].item() for scene in env._scenes]
         assert all(th.isfinite(th.tensor(xs))), f"Non-finite scene positions: {xs}"
         assert xs[0] == pytest.approx(0.0, abs=1e-3)
         assert xs[1] > xs[0] and xs[2] > xs[1], f"Scene positions not increasing: {xs}"
 
         # --- Robots must be placed apart accordingly ---
-        robot_xs = [scene.robots[0].get_position_orientation()[0][0].item() for scene in env.scenes]
+        robot_xs = [scene.robots[0].get_position_orientation()[0][0].item() for scene in env._scenes]
         assert robot_xs[1] > robot_xs[0] and robot_xs[2] > robot_xs[1], f"Robot positions not increasing: {robot_xs}"
 
         # --- Stepping and tiled observations work in empty scenes ---
-        robot_name = env.scenes[0].robots[0].name
-        cam_name = _camera_sensor_name(env.scenes[0].robots[0])
+        robot_name = env._scenes[0].robots[0].name
+        cam_name = _camera_sensor_name(env._scenes[0].robots[0])
         actions = th.stack(
-            [th.from_numpy(env.scenes[i].robots[0].action_space.sample()).float() for i in range(env.num_envs)]
+            [th.from_numpy(env._scenes[i].robots[0].action_space.sample()).float() for i in range(env.num_envs)]
         )
         obs_list, _, _, _, _ = env.step(actions)
         for i in range(3):
             rgb = obs_list[i][robot_name][cam_name]["rgb"]
             assert rgb.shape == (128, 128, 4) and rgb.dtype == th.uint8
     finally:
-        og.clear()
+        if og.sim is not None:
+            og.clear()
 
 
 def test_tiled_rendering_unsupported_modality():

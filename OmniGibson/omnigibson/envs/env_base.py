@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from collections.abc import Iterable
 from copy import deepcopy
+import os
 
 import gymnasium as gym
 import torch as th
@@ -496,13 +497,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Build sensor registry for get_obs()
         self._build_sensor_registry()
 
-        # Robot camera observations come from the tiled render product in multi-env mode, so hide the
-        # per-sensor viewports (their individual render products are unused for obs).
-        if self._tiled_sensor is not None:
-            for sensors in self._robot_sensor_map.values():
-                for sensor in sensors:
-                    if isinstance(sensor, VisionSensor):
-                        sensor.viewer_visibility = False
+        # Robot camera observations come from the tiled render product in multi-env mode. Pause the
+        # individual render products: hiding their UI viewports is a no-op in headless mode and leaves
+        # those unused products rendering every frame alongside the tiled product.
+        keep_individual_render_products = os.getenv("OMNIGIBSON_KEEP_INDIVIDUAL_RENDER_PRODUCTS", "0") == "1"
+        if self._tiled_sensor is not None and not keep_individual_render_products:
+            with og.sim.editing_usd():
+                for sensors in self._robot_sensor_map.values():
+                    for sensor in sensors:
+                        if isinstance(sensor, VisionSensor):
+                            sensor.viewer_visibility = False
+                            sensor.render_product.hydra_texture.updates_enabled = False
 
         self.reset()
 
@@ -719,7 +724,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 concatenated set of actions. For multi-env, should be (num_envs, action_dim) shaped for tensors,
                 or a list of dicts (one per env) for dict actions.
             n_render_iterations (int): Number of rendering iterations to use before returning observations
-
         Returns:
             5-tuple:
                 - list[dict]: states, i.e. next observations per env
