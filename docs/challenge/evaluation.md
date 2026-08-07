@@ -60,11 +60,11 @@ Key arguments:
     </tr>
     <tr>
       <td><code>--instance-indices</code></td>
-      <td>Indices into the task's test instance list. Use indices <code>0 1 2 3 4 5 6 7 8 9</code> for reported evaluation results. Indices <code>0-19</code> are public test instances; indices <code>20-39</code> are hidden instances reserved for final evaluation. Select exactly one instance per parallel environment slot.</td>
+      <td>Indices into the task's test instance list. Use indices <code>0 1 2 3 4 5 6 7 8 9</code> for reported evaluation results. Indices <code>0-19</code> are public test instances; indices <code>20-39</code> are hidden instances reserved for final evaluation. Select exactly one instance per logical environment in the evaluation batch.</td>
     </tr>
     <tr>
       <td><code>--num-envs</code></td>
-      <td>Number of parallel environment slots. This must equal the number of values passed to <code>--instance-indices</code>.</td>
+      <td>Number of logical environments processed together as one evaluation batch. This must equal the number of values passed to <code>--instance-indices</code>.</td>
     </tr>
     <tr>
       <td><code>--num-rollouts</code></td>

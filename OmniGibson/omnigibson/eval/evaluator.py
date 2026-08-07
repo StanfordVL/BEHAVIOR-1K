@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import traceback
+from dataclasses import dataclass, field
 from signal import SIGINT, signal
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -90,10 +91,10 @@ def evaluate_instances_batched(
     max_steps: Optional[int] = None,
 ) -> "Dict[object, object]":
     """
-    Drive one parallel evaluation batch with exactly one instance per environment slot. Pure
-    orchestration: all sim work is delegated to the injected load_fn / step_fn / record_fn, and a slot
-    that finishes early is dropped from the active list (frozen) until the whole batch is done. Returns
-    {instance id -> record_fn's return}.
+    Drive one parallel evaluation batch with exactly one instance per logical environment. Pure
+    orchestration: all sim work is delegated to the injected load_fn / step_fn / record_fn. When an
+    instance finishes, its environment is removed from the active list and remains frozen until the
+    complete batch finishes. Returns {instance id -> record_fn's return}.
     """
     if num_envs < 1:
         raise ValueError(f"num_envs must be >= 1, got {num_envs}")
@@ -101,45 +102,90 @@ def evaluate_instances_batched(
     instances = list(instances)
     if len(instances) != num_envs:
         raise ValueError(
-            f"Evaluation requires exactly one instance per environment slot: "
+            f"Evaluation requires exactly one instance per logical environment: "
             f"got {len(instances)} instances and num_envs={num_envs}."
         )
 
     results: Dict[object, object] = {}
-    slot_to_instance: Dict[int, object] = {slot: inst for slot, inst in enumerate(instances)}
-    load_fn(dict(slot_to_instance))
+    env_idx_to_instance: Dict[int, object] = {env_idx: instance for env_idx, instance in enumerate(instances)}
+    load_fn(dict(env_idx_to_instance))
 
-    active = {slot: True for slot in slot_to_instance}
+    active = {env_idx: True for env_idx in env_idx_to_instance}
     step = 0
     while any(active.values()):
-        active_slots = sorted(slot for slot, is_active in active.items() if is_active)
-        terminated, truncated = step_fn(active_slots)
+        active_env_indices = sorted(env_idx for env_idx, is_active in active.items() if is_active)
+        terminated, truncated = step_fn(active_env_indices)
         step += 1
 
         hit_cap = max_steps is not None and step >= max_steps
-        for slot in active_slots:
-            term = bool(terminated[slot])
-            trunc = bool(truncated[slot]) or hit_cap
+        for env_idx in active_env_indices:
+            term = bool(terminated[env_idx])
+            trunc = bool(truncated[env_idx]) or hit_cap
             if term or trunc:
-                results[slot_to_instance[slot]] = record_fn(
-                    slot=slot,
-                    instance=slot_to_instance[slot],
+                results[env_idx_to_instance[env_idx]] = record_fn(
+                    env_idx=env_idx,
+                    instance=env_idx_to_instance[env_idx],
                     step=step,
                     terminated=term,
                     truncated=trunc,
                 )
-                active[slot] = False
+                active[env_idx] = False
 
     return results
 
 
-class Evaluator:
+@dataclass(frozen=True)
+class InstanceEnvAccessor:
+    """Read-only access to one logical environment inside a shared vectorized environment."""
+
+    shared_env: EnvironmentWrapper
+    env_idx: int
+
+    @property
+    def scene(self):
+        return self.shared_env.scenes[self.env_idx]
+
+    @property
+    def robot(self) -> Robot:
+        robots = self.scene.robots
+        assert len(robots) == 1, f"Evaluation assumes one robot per environment, got {len(robots)}."
+        return robots[0]
+
+    @property
+    def object_scope(self):
+        return self.shared_env.task.object_scope[self.env_idx]
+
+    @property
+    def success(self) -> bool:
+        return bool(self.shared_env.task.success[self.env_idx])
+
+    def get_goal_option_satisfaction(self):
+        return self.shared_env.task.get_goal_option_satisfaction(self.env_idx)
+
+
+@dataclass
+class InstanceEvaluationState:
+    """Mutable rollout state for one task instance assigned to one logical environment."""
+
+    env_accessor: InstanceEnvAccessor
+    metrics: List[MetricBase] = field(default_factory=list)
+    instance_id: Optional[int] = None
+    obs: Optional[dict] = None
+    video_writer: Any = None
+    light_synchronizer: Optional[LightToggleSynchronizer] = None
+    active: bool = False
+
+    @property
+    def env_idx(self) -> int:
+        return self.env_accessor.env_idx
+
+
+class BatchedEvaluator:
     """
-    Vectorized evaluator engine for BEHAVIOR tasks. Holds a single OmniGibson environment with
-    ``num_envs`` parallel scene slots (one task instance per slot) and per-slot robots, policies,
-    metrics, observations and video writers (index everything by ``env_idx``). ``num_envs=1``
-    reproduces single-env evaluation. All sim interaction lives here; the offline driver (:meth:`run`)
-    is a thin layer on top of :func:`evaluate_instances_batched`.
+    Batched evaluator engine for BEHAVIOR tasks. Owns one shared vectorized OmniGibson environment and
+    one batched policy. Each batch entry is represented by an :class:`InstanceEvaluationState`,
+    which binds one task instance to one logical environment through an
+    :class:`InstanceEnvAccessor`. ``num_envs=1`` reproduces single-environment evaluation.
     """
 
     def __init__(self, cfg: DictConfig) -> None:
@@ -152,25 +198,24 @@ class Evaluator:
         self.robot_eval_config = {}
         self.robot_camera_names = {}
 
-        # Number of parallel env slots (instances evaluated concurrently). Defaults to 1.
+        # Number of logical environments evaluated concurrently. Defaults to 1.
         self.num_envs = int(cfg.get("num_envs", 1))
         self.env = self.load_env(env_wrapper=self.cfg.env_wrapper)
         assert (
             self.env.num_envs == self.num_envs
-        ), f"Env created with num_envs={self.env.num_envs} but Evaluator expected {self.num_envs}."
+        ), f"Env created with num_envs={self.env.num_envs} but BatchedEvaluator expected {self.num_envs}."
 
-        # Per-slot robots / policies / metrics / observations / video writers / light synchronizers.
-        self.robots = self.load_robots()
-        # All slots share the same robot config, so resolve eval camera names once (from slot 0) and
+        self.instance_eval_states = self._create_instance_eval_states()
+        # All environments share the same robot config, so resolve eval camera names once and
         # validate that the configured camera sensors exist on the robot.
-        self.robot_camera_names = get_robot_camera_names(self.robots[0].name, self.robot_eval_config)
+        self.robot_camera_names = get_robot_camera_names(
+            self.instance_eval_states[0].env_accessor.robot.name, self.robot_eval_config
+        )
         self._validate_robot_eval_config()
         self._apply_robot_eval_settings()
         self.policy = self.load_policy()
-        self.metrics = self.load_metrics()
-        self.obs = [None] * self.num_envs
-        self._video_writers = [None] * self.num_envs
-        self.light_synchronizers = [None] * self.num_envs
+        for instance_eval_state in self.instance_eval_states:
+            instance_eval_state.metrics = self.load_metrics(instance_eval_state.env_accessor)
 
         # Initialize the physics views so the first reset()/load can read/restore robot joint state.
         og.sim.update_handles()
@@ -180,13 +225,13 @@ class Evaluator:
     def should_sync_lights(self) -> bool:
         return self.env.task.activity_name in LIGHT_EVAL_TASKS
 
-    def _reset_light_synchronizer(self, env_idx: int) -> None:
+    def _reset_light_synchronizer(self, instance_eval_state: InstanceEvaluationState) -> None:
         if self.should_sync_lights:
-            synchronizer = LightToggleSynchronizer(self.env.scenes[env_idx])
+            synchronizer = LightToggleSynchronizer(instance_eval_state.env_accessor.scene)
             synchronizer.reset_from_current_state()
-            self.light_synchronizers[env_idx] = synchronizer
+            instance_eval_state.light_synchronizer = synchronizer
         else:
-            self.light_synchronizers[env_idx] = None
+            instance_eval_state.light_synchronizer = None
 
     def load_env(self, env_wrapper: DictConfig) -> EnvironmentWrapper:
         for rule in DISABLED_TRANSITION_RULES:
@@ -238,7 +283,7 @@ class Evaluator:
             cfg["task"]["termination_config"]["max_steps"] = self.cfg.max_steps
         cfg["task"]["include_obs"] = False
 
-        # Run num_envs instances of the same scene model + task in parallel slots.
+        # Run num_envs instances of the same scene model + task in parallel environments.
         cfg.setdefault("env", {})
         cfg["env"]["num_envs"] = self.num_envs
 
@@ -246,19 +291,17 @@ class Evaluator:
         env._eval_robot_config = self.robot_eval_config
         return instantiate(env_wrapper, env=env)
 
-    def load_robots(self) -> List[Robot]:
-        # env.robots is list[list[Robot]] (one inner list per scene). The eval pipeline assumes a single
-        # robot per scene (load_env configures exactly one robot; _preprocess_obs uses its name) --
-        # assert it so a multi-robot config fails loudly instead of silently using robot 0.
-        for scene_robots in self.env.robots:
-            assert len(scene_robots) == 1, f"Eval assumes one robot per scene, got {len(scene_robots)}."
-        return [scene_robots[0] for scene_robots in self.env.robots]
+    def _create_instance_eval_states(self) -> List[InstanceEvaluationState]:
+        return [
+            InstanceEvaluationState(env_accessor=InstanceEnvAccessor(shared_env=self.env, env_idx=env_idx))
+            for env_idx in range(self.num_envs)
+        ]
 
     def _validate_robot_eval_config(self) -> None:
         missing_camera_sensors = []
         for camera_id, camera_name in self.robot_camera_names.items():
             sensor_name = camera_name.split("::", 1)[1]
-            if sensor_name not in self.robots[0].sensors:
+            if sensor_name not in self.instance_eval_states[0].env_accessor.robot.sensors:
                 missing_camera_sensors.append(f"{camera_id}: {sensor_name}")
         if missing_camera_sensors:
             raise ValueError(
@@ -294,9 +337,10 @@ class Evaluator:
     def _apply_robot_eval_settings(self) -> None:
         # Heavier base so contact with the (heavy) world does not shove the robot around during eval.
         # base mass writes require the sim stopped; do all robots inside a single stop/play (global op).
-        if any(robot.model in ("r1", "r1pro") for robot in self.robots):
+        robots = [instance_eval_state.env_accessor.robot for instance_eval_state in self.instance_eval_states]
+        if any(robot.model in ("r1", "r1pro") for robot in robots):
             og.sim.stop()
-            for robot in self.robots:
+            for robot in robots:
                 if robot.model in ("r1", "r1pro"):
                     robot.base_footprint_link.mass = EVAL_BASE_LINK_MASS
             og.sim.play()
@@ -304,17 +348,16 @@ class Evaluator:
         head_camera_name = self.robot_camera_names.get("head")
         if head_camera_name is not None:
             head_sensor_name = head_camera_name.split("::")[1]
-            for robot in self.robots:
+            for robot in robots:
                 if head_sensor_name in robot.sensors:
                     robot.sensors[head_sensor_name].horizontal_aperture = EVAL_HEAD_HORIZONTAL_APERTURE
 
     def load_policy(self) -> Any:
-        # A SINGLE policy that serves all env slots in one batched call (num_envs robots at once),
-        # instead of one policy per slot. The policy accepts a batched obs (leading num_envs dim) and
-        # returns batched actions; it keeps per-env internal state indexed by position.
+        # A single policy serves all logical environments in one batched call. It accepts observations
+        # with a leading num_envs dimension and keeps per-environment state positionally aligned.
         policy = instantiate(self.cfg.model)
         if hasattr(policy, "set_action_dim"):
-            policy.set_action_dim(self.robots[0].action_dim)
+            policy.set_action_dim(self.instance_eval_states[0].env_accessor.robot.action_dim)
         logger.info("")
         logger.info("=" * 50)
         logger.info(f"Loaded {self.num_envs} policy instance(s) (batched): {self.cfg.policy_name}")
@@ -322,85 +365,90 @@ class Evaluator:
         logger.info("")
         return policy
 
-    def load_metrics(self) -> List[List[MetricBase]]:
+    def load_metrics(self, env_accessor: InstanceEnvAccessor) -> List[MetricBase]:
         return [
-            [AgentMetric(self.human_stats, env_idx=i), TaskMetric(self.human_stats, env_idx=i)]
-            for i in range(self.num_envs)
+            AgentMetric(self.human_stats, env_accessor=env_accessor),
+            TaskMetric(self.human_stats, env_accessor=env_accessor),
         ]
 
-    def _apply_actions(self, actions: th.Tensor, active_slots: List[int]):
+    def _apply_actions(self, actions: th.Tensor, active_env_indices: List[int]):
         """
-        Step all env slots one step with the given ``(num_envs, action_dim)`` actions, then update the
-        observations and metrics for the @active_slots only (frozen slots are still stepped by the
-        shared simulator but their obs/metrics are not advanced). Returns ``(terminated, truncated,
-        info)`` straight from the env.
+        Step the complete environment batch with the given ``(num_envs, action_dim)`` actions, then
+        update observations and metrics only for @active_env_indices. Finished environments are still
+        advanced by the shared simulator, but their evaluation state is frozen.
         """
         obs_list, _, terminated, truncated, info = self.env.step(actions, n_render_iterations=1)
         if self.should_sync_lights:
             # Re-derive visual light state (toggles drive lights that aren't directly serialized) for
-            # the active slots, then re-read obs so the recorded frame matches the synced lights.
-            for slot in active_slots:
-                if self.light_synchronizers[slot] is not None:
-                    self.light_synchronizers[slot].sync_from_current_state()
+            # active environments, then re-read obs so recorded frames match the synced lights.
+            for env_idx in active_env_indices:
+                light_synchronizer = self.instance_eval_states[env_idx].light_synchronizer
+                if light_synchronizer is not None:
+                    light_synchronizer.sync_from_current_state()
             for _ in range(3):
                 og.sim.render()
             obs_list, _ = self.env.get_obs()
-        for slot in active_slots:
-            self.obs[slot] = self._preprocess_obs(obs_list[slot], env_idx=slot)
-            for metric in self.metrics[slot]:
+        for env_idx in active_env_indices:
+            instance_eval_state = self.instance_eval_states[env_idx]
+            instance_eval_state.obs = self._preprocess_obs(obs_list[env_idx], instance_eval_state)
+            for metric in instance_eval_state.metrics:
                 metric.step(
-                    self.env,
-                    actions[slot],
-                    obs_list[slot],
-                    0.0,
-                    bool(terminated[slot]),
-                    bool(truncated[slot]),
-                    info[slot],
+                    action=actions[env_idx],
+                    obs=obs_list[env_idx],
+                    reward=0.0,
+                    terminated=bool(terminated[env_idx]),
+                    truncated=bool(truncated[env_idx]),
+                    info=info[env_idx],
                 )
         return terminated, truncated, info
 
     def _batch_obs(self) -> dict:
         """
-        Stack every env slot's preprocessed obs into one ``(num_envs, ...)`` batch for a SINGLE policy
-        call. All slots share the same keys. Frozen/finished slots keep their last obs and ride along so
-        the batch size stays ``num_envs`` (the policy indexes its per-env buffers by position).
+        Stack every instance's preprocessed observation into one ``(num_envs, ...)`` batch for a
+        single policy call. Finished instances keep their last observation so the batch size remains
+        fixed and the policy's per-environment state remains positionally aligned.
         """
-        keys = self.obs[0].keys()
-        return {k: th.stack([self.obs[slot][k] for slot in range(self.num_envs)], dim=0) for k in keys}
+        keys = self.instance_eval_states[0].obs.keys()
+        return {
+            key: th.stack([instance_eval_state.obs[key] for instance_eval_state in self.instance_eval_states], dim=0)
+            for key in keys
+        }
 
-    def _step_fn(self, active_slots: List[int]) -> Tuple[th.Tensor, th.Tensor]:
+    def _step_fn(self, active_env_indices: List[int]) -> Tuple[th.Tensor, th.Tensor]:
         """
-        ``step_fn`` consumed by :func:`evaluate_instances_batched`: query the policy ONCE with all env
-        slots batched together, then step. Frozen slots get a zero action but are still stepped by the
-        shared simulator.
+        ``step_fn`` consumed by :func:`evaluate_instances_batched`: query the policy once with all
+        logical environments batched together, then step. Finished environments get a zero action but are
+        still advanced by the shared simulator.
         """
-        action_dim = self.robots[0].action_dim
+        action_dim = self.instance_eval_states[0].env_accessor.robot.action_dim
         batched_action = self.policy.forward(obs=self._batch_obs())  # (num_envs, action_dim)
         if batched_action.ndim == 1:
             batched_action = batched_action.unsqueeze(0)
         actions = th.zeros((self.num_envs, action_dim), dtype=th.float32)
-        for slot in active_slots:
-            actions[slot] = batched_action[slot].to(actions.dtype)
-        terminated, truncated, _ = self._apply_actions(actions, active_slots)
+        for env_idx in active_env_indices:
+            actions[env_idx] = batched_action[env_idx].to(actions.dtype)
+        terminated, truncated, _ = self._apply_actions(actions, active_env_indices)
         return terminated, truncated
 
-    def _set_video_writer(self, env_idx: int, video_writer) -> None:
-        existing = self._video_writers[env_idx]
+    def _set_video_writer(self, instance_eval_state: InstanceEvaluationState, video_writer) -> None:
+        existing = instance_eval_state.video_writer
         if existing is not None:
             container, stream = existing
             for packet in stream.encode():
                 container.mux(packet)
             container.close()
-        self._video_writers[env_idx] = video_writer
+        instance_eval_state.video_writer = video_writer
 
-    def _load_instance_state(self, instance_id: int, env_idx: int) -> None:
+    def _load_instance_state(self, instance_id: int, instance_eval_state: InstanceEvaluationState) -> None:
         """
-        Load a task instance's object/robot state into slot @env_idx. Does NOT settle physics or
+        Load a task instance into its assigned logical environment. Does NOT settle physics or
         finalize the scene -- that happens once for the whole batch in :meth:`_settle_and_finalize` so
-        settling does not disturb already-loaded sibling slots.
+        settling does not disturb the other logical environments.
         """
-        robot = self.robots[env_idx]
-        scene = self.env.scenes[env_idx]
+        env_accessor = instance_eval_state.env_accessor
+        env_idx = env_accessor.env_idx
+        robot = env_accessor.robot
+        scene = env_accessor.scene
         # Start every instance from a CLEAN robot: reset joints / controllers / velocities (and release
         # grasp) to the default config -- the instance TRO only restores the robot's base pose below.
         # 2285 got this for free from evaluator.reset() (env.reset) before each load_task_instance; in
@@ -438,7 +486,7 @@ class Evaluator:
                     available_poses = presampled_robot_poses[robot.model]
                 else:
                     raise KeyError(f"No generic or model-specific presampled robot pose found for {robot.model}!")
-                # Presampled poses are scene-relative; frame="scene" puts slot N's robot in its own
+                # Presampled poses are scene-relative; frame="scene" puts environment N's robot in its own
                 # scene rather than env 0's geometry (cf. #2257).
                 robot.set_position_orientation(
                     available_poses[0]["position"], available_poses[0]["orientation"], frame="scene"
@@ -449,19 +497,19 @@ class Evaluator:
                 # scene-relative (env 0) coordinates. For multi envs (env_idx != 0) the scene prim is
                 # shifted by its world offset, so add that offset to the root-link position up front --
                 # load_state then places the object correctly in a single write.
-                obj = self.env.task.object_scope[env_idx][tro_key]
+                obj = env_accessor.object_scope[tro_key]
                 if env_idx != 0 and isinstance(tro_state, dict) and "root_link" in tro_state:
                     scene_offset = scene._scene_prim.get_position_orientation()[0]
                     tro_state["root_link"]["pos"] = tro_state["root_link"]["pos"] + scene_offset
                 obj.load_state(tro_state, serialized=False)
 
         if self.should_sync_lights:
-            set_light_control_toggles(self.env.task.object_scope[env_idx].values(), True)
+            set_light_control_toggles(env_accessor.object_scope.values(), True)
         og.sim.update_handles()
 
-    def _settle_and_finalize(self, slots: List[int]) -> None:
+    def _settle_and_finalize(self, env_indices: List[int]) -> None:
         """
-        Settle physics for all freshly-loaded @slots together and finalize each one's scene. Loading
+        Settle physics for all freshly-loaded environments together and finalize each scene. Loading
         state can introduce jitter, so keep all loaded task-relevant entities (including the robot,
         which _load_instance_state just reset to a clean config) still for a few sub-steps before
         snapshotting each scene's initial state -- otherwise the robot drifts under gravity before the
@@ -469,57 +517,61 @@ class Evaluator:
         """
         for _ in range(25):
             og.sim.step_physics()
-            for slot in slots:
-                for inst, entity in self.env.task.object_scope[slot].items():
+            for env_idx in env_indices:
+                for inst, entity in self.instance_eval_states[env_idx].env_accessor.object_scope.items():
                     if not is_system_bddl_inst(inst) and entity is not None:
                         entity.keep_still()
-        for slot in slots:
-            self.env.scenes[slot].update_initial_file()
+        for env_idx in env_indices:
+            self.instance_eval_states[env_idx].env_accessor.scene.update_initial_file()
         # load_batch immediately calls env.reset(), whose task reset restores every selected scene
         # from this initial file. Avoid doing the same hard restore and physics step twice.
 
     def load_batch(
         self,
-        slot_to_instance: dict,
+        env_idx_to_instance: dict,
         write_video: bool = False,
         video_path: str = None,
         rollout_id: int = 0,
         video_fps: int = 30,
     ) -> None:
         """
-        Load a batch of instances (one per slot) into their slots, settle the whole batch together,
-        then refresh observations and reset per-slot policy / metrics / light synchronizers (and video
-        writers). Consumed by :meth:`run` via :func:`evaluate_instances_batched`.
+        Load one instance per logical environment, settle the complete batch, refresh observations,
+        and reset policy, metrics, light synchronizers, and video writers.
         """
-        ordered_slots = sorted(slot_to_instance)
-        for slot in ordered_slots:
-            self._load_instance_state(slot_to_instance[slot], env_idx=slot)
-        self._settle_and_finalize(ordered_slots)
-        obs_list, _ = self.env.reset(env_indices=th.tensor(ordered_slots, dtype=th.long))
-        for slot in ordered_slots:
-            self._reset_light_synchronizer(slot)
+        env_indices = sorted(env_idx_to_instance)
+        for env_idx in env_indices:
+            instance_eval_state = self.instance_eval_states[env_idx]
+            instance_eval_state.instance_id = int(env_idx_to_instance[env_idx])
+            instance_eval_state.active = True
+            self._load_instance_state(instance_eval_state.instance_id, instance_eval_state)
+        self._settle_and_finalize(env_indices)
+        obs_list, _ = self.env.reset(env_indices=th.tensor(env_indices, dtype=th.long))
+        for env_idx in env_indices:
+            self._reset_light_synchronizer(self.instance_eval_states[env_idx])
         # Light toggles change visibility after the reset obs was captured; re-render + re-fetch so the
         # first obs reflects the synced lights (mirrors single-env _sync_lights_and_get_obs). No-op for
         # non-light tasks.
         if self.should_sync_lights:
             for _ in range(3):
                 og.sim.render()
-            obs_list, _ = self.env.get_obs(env_indices=th.tensor(ordered_slots, dtype=th.long))
+            obs_list, _ = self.env.get_obs(env_indices=th.tensor(env_indices, dtype=th.long))
         task_name = self.cfg.task.name
-        # One batched policy for all slots: reset its per-env state once.
+        # One batched policy for the complete batch: reset its per-environment state once.
         self.policy.reset()
-        for i, slot in enumerate(ordered_slots):
-            self.obs[slot] = self._preprocess_obs(obs_list[i], env_idx=slot)
-            for metric in self.metrics[slot]:
-                metric.reset(self.env)
+        for obs_idx, env_idx in enumerate(env_indices):
+            instance_eval_state = self.instance_eval_states[env_idx]
+            instance_eval_state.obs = self._preprocess_obs(obs_list[obs_idx], instance_eval_state)
+            for metric in instance_eval_state.metrics:
+                metric.reset()
             if write_video:
-                video_name = os.path.join(video_path, f"{task_name}_{slot_to_instance[slot]}_{rollout_id}.mp4")
+                video_name = os.path.join(video_path, f"{task_name}_{instance_eval_state.instance_id}_{rollout_id}.mp4")
                 self._set_video_writer(
-                    slot, create_video_writer(fpath=video_name, resolution=(448, 672), rate=video_fps)
+                    instance_eval_state,
+                    create_video_writer(fpath=video_name, resolution=(448, 672), rate=video_fps),
                 )
 
-    def _preprocess_obs(self, obs: dict, env_idx: int = 0) -> dict:
-        robot = self.robots[env_idx]
+    def _preprocess_obs(self, obs: dict, instance_eval_state: InstanceEvaluationState) -> dict:
+        robot = instance_eval_state.env_accessor.robot
         obs = flatten_obs_dict(obs)
         base_pose = robot.get_position_orientation()
         cam_rel_poses = []
@@ -536,8 +588,8 @@ class Evaluator:
         obs["task_id"] = th.tensor([TASK_NAMES_TO_INDICES[self.cfg.task.name]], dtype=th.int64)
         return obs
 
-    def _write_video(self, env_idx: int) -> None:
-        obs = self.obs[env_idx]
+    def _write_video(self, instance_eval_state: InstanceEvaluationState) -> None:
+        obs = instance_eval_state.obs
         required_camera_ids = ("left_wrist", "right_wrist", "head")
         if not all(camera_id in self.robot_camera_names for camera_id in required_camera_ids):
             return
@@ -554,26 +606,28 @@ class Evaluator:
         head_rgb = cv2.resize(obs[self.robot_camera_names["head"] + "::rgb"].detach().cpu().numpy(), (448, 448))
         write_video(
             np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0),
-            video_writer=self._video_writers[env_idx],
+            video_writer=instance_eval_state.video_writer,
             batch_size=1,
             mode="rgb",
         )
 
     def reset(self) -> None:
-        """Generic reset of all slots to the currently-loaded (seed) instance + reset policies/metrics."""
+        """Reset all logical environments to their loaded instances and reset policy and metrics."""
         obs_list, _ = self.env.reset()
-        for env_idx in range(self.num_envs):
-            self._reset_light_synchronizer(env_idx)
+        for instance_eval_state in self.instance_eval_states:
+            self._reset_light_synchronizer(instance_eval_state)
         # Refresh obs after light visibility changes so the first obs is in sync (see load_batch).
         if self.should_sync_lights:
             for _ in range(3):
                 og.sim.render()
             obs_list, _ = self.env.get_obs()
         self.policy.reset()
-        for env_idx in range(self.num_envs):
-            self.obs[env_idx] = self._preprocess_obs(obs_list[env_idx], env_idx=env_idx)
-            for metric in self.metrics[env_idx]:
-                metric.reset(self.env)
+        for instance_eval_state in self.instance_eval_states:
+            env_idx = instance_eval_state.env_idx
+            instance_eval_state.obs = self._preprocess_obs(obs_list[env_idx], instance_eval_state)
+            instance_eval_state.active = True
+            for metric in instance_eval_state.metrics:
+                metric.reset()
         self.n_success_trials, self.n_trials = 0, 0
 
     def run(
@@ -586,46 +640,48 @@ class Evaluator:
         video_fps: int = 30,
     ) -> dict:
         """
-        Offline driver for one batch containing exactly ``num_envs`` instances. An early-finishing slot
-        waits idle rather than getting a new instance. Writes one result JSON per instance to
+        Offline driver for one batch containing exactly ``num_envs`` instances. An environment whose
+        instance finishes early waits idle rather than receiving a new instance. Writes one result JSON per instance to
         @metrics_dir if given. Returns {instance id -> result dict} (result is score_utils-compatible:
         q_score/time/agent_distance plus task/instance/success/steps).
         """
         task_name = self.cfg.task.name
 
-        def load_fn(slot_to_instance):
+        def load_fn(env_idx_to_instance):
             self.load_batch(
-                slot_to_instance,
+                env_idx_to_instance,
                 write_video=write_video,
                 video_path=video_path,
                 rollout_id=rollout_id,
                 video_fps=video_fps,
             )
 
-        def step_fn(active_slots):
-            terminated, truncated = self._step_fn(active_slots)
+        def step_fn(active_env_indices):
+            terminated, truncated = self._step_fn(active_env_indices)
             if write_video:
-                for slot in active_slots:
-                    self._write_video(slot)
+                for env_idx in active_env_indices:
+                    self._write_video(self.instance_eval_states[env_idx])
             return terminated, truncated
 
-        def record_fn(slot, instance, step, terminated, truncated):
+        def record_fn(env_idx, instance, step, terminated, truncated):
+            instance_eval_state = self.instance_eval_states[env_idx]
+            instance_eval_state.active = False
             self.n_trials += 1
-            success = bool(self.env.task.success[slot])
+            success = instance_eval_state.env_accessor.success
             if success:
                 self.n_success_trials += 1
             result = {"task": task_name, "instance_id": int(instance), "rollout_id": rollout_id, "steps": step}
             result["success"] = success
-            for metric in self.metrics[slot]:
-                result.update(metric.aggregate(self.env))
+            for metric in instance_eval_state.metrics:
+                result.update(metric.aggregate())
             if metrics_dir is not None:
                 with open(os.path.join(metrics_dir, f"{task_name}_{instance}_{rollout_id}.json"), "w") as f:
                     json.dump(result, f, indent=2, default=float)
             if write_video:
-                self._set_video_writer(slot, None)
+                self._set_video_writer(instance_eval_state, None)
             q_score = result.get("q_score", {}).get("final")
             logger.info(
-                f"Instance {instance} (slot {slot}) finished at step {step}: success={success} q_score={q_score}"
+                f"Instance {instance} (env {env_idx}) finished at step {step}: success={success} q_score={q_score}"
             )
             return result
 
@@ -652,8 +708,8 @@ class Evaluator:
         logger.info("")
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_value, exc_tb)
-        for env_idx in range(self.num_envs):
-            self._set_video_writer(env_idx, None)
+        for instance_eval_state in self.instance_eval_states:
+            self._set_video_writer(instance_eval_state, None)
         self.env.close()
         og.shutdown()
 
@@ -663,4 +719,15 @@ class Evaluator:
         sys.exit(0)
 
 
-__all__ = ["Evaluator", "resolve_instance_ids", "evaluate_instances_batched"]
+# Backward-compatible alias for callers that imported the original class name.
+Evaluator = BatchedEvaluator
+
+
+__all__ = [
+    "BatchedEvaluator",
+    "Evaluator",
+    "InstanceEnvAccessor",
+    "InstanceEvaluationState",
+    "resolve_instance_ids",
+    "evaluate_instances_batched",
+]

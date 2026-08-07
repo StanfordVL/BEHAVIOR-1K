@@ -1,6 +1,6 @@
 """Websocket evaluation runner for the BEHAVIOR-1K challenge.
 
-Drives the OmniGibson ``Evaluator`` against a policy served over a websocket
+Drives the OmniGibson ``BatchedEvaluator`` against a policy served over a websocket
 (e.g. the openpi or GR00T ``scripts/b1k/serve_b1k.py`` server). For each test instance of a
 task it runs a rollout and writes a per-rollout result JSON compatible with
 ``omnigibson/eval/utils/score_utils.py`` (``q_score``, ``time``,
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
-from omnigibson.eval.evaluator import Evaluator, resolve_instance_ids
+from omnigibson.eval.evaluator import BatchedEvaluator, resolve_instance_ids
 from omnigibson.eval.utils.eval_utils import DEFAULT_EVAL_SEED, seed_everything
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
         "--num-envs",
         type=int,
         default=1,
-        help="Number of parallel env slots. Must equal the number of selected instance indices.",
+        help="Number of logical environments in the evaluation batch. Must equal the number of instance indices.",
     )
     parser.add_argument(
         "--replay-action-chunk-size",
@@ -131,7 +131,7 @@ def main() -> None:
     logger.info(f"Resolved {args.mode} instance ids for {args.task_name}: {instance_ids}")
     if len(instance_ids) != args.num_envs:
         raise ValueError(
-            "Evaluation requires exactly one instance per environment slot: "
+            "Evaluation requires exactly one instance per logical environment: "
             f"got {len(instance_ids)} instance indices and --num-envs={args.num_envs}."
         )
 
@@ -175,7 +175,7 @@ def main() -> None:
         os.makedirs(video_dir, exist_ok=True)
 
     results = []
-    with Evaluator(cfg) as evaluator:
+    with BatchedEvaluator(cfg) as evaluator:
         # Each run() pass evaluates the selected instances together in one parallel batch. The outer
         # loop repeats that same batch for additional rollouts.
         for rollout_id in range(args.num_rollouts):

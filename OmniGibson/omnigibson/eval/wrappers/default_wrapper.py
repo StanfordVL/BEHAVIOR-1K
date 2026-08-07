@@ -9,7 +9,8 @@ class DefaultWrapper(EnvironmentWrapper):
     Default eval wrapper: low-resolution (224x224) RGB observations.
 
     Camera resolution and modalities are declared via :meth:`camera_spec` and baked into the robot
-    config at env CREATION by the Evaluator (see ``omnigibson.eval.evaluator.Evaluator.load_env``),
+    config at env CREATION by the BatchedEvaluator
+    (see ``omnigibson.eval.evaluator.BatchedEvaluator.load_env``),
     not changed at runtime. This is required because in multi-env mode robot cameras are batched into
     a single ``TiledVisionSensor`` whose resolution is fixed at creation, so a post-hoc per-sensor
     resize would be silently ignored.
