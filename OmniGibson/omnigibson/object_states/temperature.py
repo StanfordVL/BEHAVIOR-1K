@@ -78,14 +78,18 @@ def _incoming_heat_kernel(
         source_world_position = wp.mul(
             link_pose, wp.vec4(local_offset[0], local_offset[1], local_offset[2], wp.float32(1.0))
         )
-        # get cx, cy, cz: center x, y, z of target's aabb bounding box
-        cx = (aabb_values[s, target_aabb_idx, 0] + aabb_values[s, target_aabb_idx, 3]) * wp.float32(0.5)
-        cy = (aabb_values[s, target_aabb_idx, 1] + aabb_values[s, target_aabb_idx, 4]) * wp.float32(0.5)
-        cz = (aabb_values[s, target_aabb_idx, 2] + aabb_values[s, target_aabb_idx, 5]) * wp.float32(0.5)
-        # get dx, dy, dz: delta of source position and target's center on 3 directions
-        dx = source_world_position[0] - cx
-        dy = source_world_position[1] - cy
-        dz = source_world_position[2] - cz
+        # Distance from the heat element to the CLOSEST POINT of the target's AABB (element
+        # position clamped into the box). This mirrors the pre-vectorization semantics, which
+        # used a PhysX overlap_sphere(threshold) collision query — any surface contact with the
+        # sphere counted. Using the AABB *center* instead silently shrinks every source's reach
+        # by the target's own extent (e.g. a sausage in a pan on a burner grazes the sphere but
+        # its center is beyond the threshold, so it would never cook).
+        qx = wp.clamp(source_world_position[0], aabb_values[s, target_aabb_idx, 0], aabb_values[s, target_aabb_idx, 3])
+        qy = wp.clamp(source_world_position[1], aabb_values[s, target_aabb_idx, 1], aabb_values[s, target_aabb_idx, 4])
+        qz = wp.clamp(source_world_position[2], aabb_values[s, target_aabb_idx, 2], aabb_values[s, target_aabb_idx, 5])
+        dx = source_world_position[0] - qx
+        dy = source_world_position[1] - qy
+        dz = source_world_position[2] - qz
         d2 = dx * dx + dy * dy + dz * dz
         threshold = distance_thresholds[h]
         if d2 > threshold * threshold:
