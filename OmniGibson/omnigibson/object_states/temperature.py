@@ -31,7 +31,7 @@ def _incoming_heat_kernel(
     distance_thresholds: wp.array(dtype=wp.float32),  # (N_hss,)
     hss_self_temp_idx: wp.array(dtype=wp.int32),  # (N_hss,) into Temperature N — to skip self
     hss_self_inside_idx: wp.array(dtype=wp.int32),  # (N_hss,) into Inside N (for requires_inside)
-    link_flat_idx: wp.array(dtype=wp.int32),  # (N_hss,) into POSE_MATRICES — -1 if N/A
+    link_flat_idx: wp.array2d(dtype=wp.int32),  # (S_hss, N_hss) into POSE_MATRICES — -1 if N/A
     link_local_offset: wp.array(dtype=wp.vec3),  # (N_hss,) heat element offset in link local frame
     temp_to_aabb_idx: wp.array(dtype=wp.int32),  # (N_temp,) Temperature N → AABB N
     temp_to_inside_idx: wp.array(dtype=wp.int32),  # (N_temp,) Temperature N → Inside N
@@ -67,9 +67,10 @@ def _incoming_heat_kernel(
             return
         if inside_values[s, target_idx_in_inside, src_idx_in_inside] == wp.uint8(0):
             return
-    # point sources: target's AABB center must be within the distance threshold of the heat element
+    # point sources: target's AABB center must be within the distance threshold of the heat element.
+    # The element link is a different rigid body in every scene, so its pose index is per (s, h).
     else:
-        li = link_flat_idx[h]
+        li = link_flat_idx[s, h]
         if li < wp.int32(0):
             return
         link_pose = pose_matrices[li]
