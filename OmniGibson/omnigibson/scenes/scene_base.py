@@ -571,7 +571,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 obj_info["root_link"]["pos"], obj_info["root_link"]["ori"] = T.pose_transform(
                     *T.mat2pose(self.pose), pos, ori
                 )
-            # TODO: also handle system registry here
+            # NOTE: system registry states need no such conversion -- particle systems dump/load
+            # their particle poses in the SCENE frame (see BaseSystem._dump_state and
+            # PhysxParticleInstancer._dump_state), so load_state below places each scene's particles
+            # at that scene's own world offset.
             self.load_state(init_state, serialized=False)
         self._initial_file = self.save(as_dict=True)
 

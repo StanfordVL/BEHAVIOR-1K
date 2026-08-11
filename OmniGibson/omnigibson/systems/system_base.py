@@ -5,6 +5,7 @@ from functools import cache
 import torch as th
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories, get_dataset_path
 from omnigibson.utils.python_utils import Serializable, get_uuid
@@ -335,10 +336,34 @@ class BaseSystem(Serializable):
         # We have n_particles (1), min / max scale (3*2), each particle pose (7*n)
         return 7 + 7 * self.n_particles
 
+    def _transform_poses(self, mat, positions, orientations):
+        """
+        Batch-transform particle poses by homogeneous transform @mat.
+
+        Args:
+            mat (th.tensor): (4, 4) homogeneous transformation matrix
+            positions (th.tensor): (N, 3) particle positions
+            orientations (th.tensor): (N, 4) particle (x,y,z,w) quaternion orientations
+
+        Returns:
+            2-tuple: transformed (N, 3) positions and (N, 4) orientations
+        """
+        if len(positions) == 0:
+            return positions, orientations
+        rot = mat[:3, :3]
+        new_positions = positions @ rot.T + mat[:3, 3]
+        new_orientations = T.mat2quat(rot.unsqueeze(0) @ T.quat2mat(orientations))
+        return new_positions, new_orientations
+
     def _dump_state(self):
-        positions, orientations = (
-            self.get_particles_local_pose() if self._store_local_poses else self.get_particles_position_orientation()
-        )
+        if self._store_local_poses:
+            positions, orientations = self.get_particles_local_pose()
+        else:
+            # Store poses in the SCENE frame (not world frame), mirroring PhysxParticleInstancer, so
+            # that states authored in one scene (e.g. dataset task instances, authored with the scene
+            # at the world origin) load correctly into cloned scenes at other world offsets.
+            positions, orientations = self.get_particles_position_orientation()
+            positions, orientations = self._transform_poses(self.scene.pose_inv, positions, orientations)
         return dict(
             n_particles=self.n_particles,
             min_scale=self.min_scale,
@@ -359,8 +384,14 @@ class BaseSystem(Serializable):
         self.max_scale = state["max_scale"]
 
         # Load the poses
-        setter = self.set_particles_local_pose if self._store_local_poses else self.set_particles_position_orientation
-        setter(positions=state["positions"], orientations=state["orientations"])
+        if self._store_local_poses:
+            self.set_particles_local_pose(positions=state["positions"], orientations=state["orientations"])
+        else:
+            # Stored poses are scene-relative (see _dump_state) -- convert back into world frame using
+            # THIS system's scene pose, so a state authored in the canonical scene lands in the correct
+            # world position for cloned scenes as well.
+            positions, orientations = self._transform_poses(self.scene.pose, state["positions"], state["orientations"])
+            self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     def serialize(self, state):
         # Array is n_particles, then min_scale and max_scale, then poses for all particles
