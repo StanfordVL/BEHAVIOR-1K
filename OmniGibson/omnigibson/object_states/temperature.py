@@ -67,7 +67,7 @@ def _incoming_heat_kernel(
             return
         if inside_values[s, target_idx_in_inside, src_idx_in_inside] == wp.uint8(0):
             return
-    # point sources: target's AABB center must be within the distance threshold of the heat element.
+    # point sources: the target's AABB must be within the distance threshold of the heat element.
     # The element link is a different rigid body in every scene, so its pose index is per (s, h).
     else:
         li = link_flat_idx[s, h]
@@ -79,11 +79,20 @@ def _incoming_heat_kernel(
             link_pose, wp.vec4(local_offset[0], local_offset[1], local_offset[2], wp.float32(1.0))
         )
         # Distance from the heat element to the CLOSEST POINT of the target's AABB (element
-        # position clamped into the box). This mirrors the pre-vectorization semantics, which
-        # used a PhysX overlap_sphere(threshold) collision query — any surface contact with the
-        # sphere counted. Using the AABB *center* instead silently shrinks every source's reach
-        # by the target's own extent (e.g. a sausage in a pan on a burner grazes the sphere but
-        # its center is beyond the threshold, so it would never cook).
+        # position clamped into the box).
+        #
+        # This is an APPROXIMATION of the pre-vectorization behaviour, which ran a PhysX
+        # overlap_sphere(threshold) scene query against the target's actual COLLISION GEOMETRY
+        # (heat_source_or_sink.py on main). Since a target's AABB always contains its geometry,
+        # distance-to-AABB <= distance-to-geometry, so this test is slightly MORE permissive than
+        # overlap_sphere — most visibly for long, thin or diagonally-oriented targets whose AABB
+        # is much larger than the mesh itself.
+        #
+        # It is nonetheless much closer than what it replaces: testing the AABB *center* shrinks
+        # every source's reach by the target's own extent (e.g. a sausage in a pan on a burner
+        # grazes the sphere, but its center is beyond the threshold, so it would never cook).
+        # An exact port would need per-(source, target) mesh queries inside this kernel, which is
+        # not available to Warp here; see the PR discussion for the trade-off.
         qx = wp.clamp(source_world_position[0], aabb_values[s, target_aabb_idx, 0], aabb_values[s, target_aabb_idx, 3])
         qy = wp.clamp(source_world_position[1], aabb_values[s, target_aabb_idx, 1], aabb_values[s, target_aabb_idx, 4])
         qz = wp.clamp(source_world_position[2], aabb_values[s, target_aabb_idx, 2], aabb_values[s, target_aabb_idx, 5])
