@@ -333,8 +333,8 @@ class BaseSystem(Serializable):
 
     @property
     def state_size(self):
-        # We have n_particles (1), min / max scale (3*2), each particle pose (7*n)
-        return 7 + 7 * self.n_particles
+        # We have n_particles (1), uses_local_poses (1), min / max scale (3*2), each particle pose (7*n)
+        return 8 + 7 * self.n_particles
 
     def _transform_poses(self, mat, positions, orientations):
         """
@@ -366,6 +366,12 @@ class BaseSystem(Serializable):
             positions, orientations = self._transform_poses(self.scene.pose_inv, positions, orientations)
         return dict(
             n_particles=self.n_particles,
+            # Record which frame `positions` / `orientations` are expressed in, so a state can be
+            # validated against the system loading it instead of silently reinterpreted. Without
+            # this the numbers are ambiguous: local poses and scene-frame poses are indistinguishable
+            # in the file, so flipping `_store_local_poses` for a system would make every previously
+            # saved state load objects to the wrong place with no error.
+            uses_local_poses=self._store_local_poses,
             min_scale=self.min_scale,
             max_scale=self.max_scale,
             positions=positions,
@@ -379,6 +385,16 @@ class BaseSystem(Serializable):
             f"particles state! Current number: {self.n_particles}, "
             f"loaded number: {state['n_particles']}"
         )
+        # States saved before `uses_local_poses` was recorded carry no frame information, so fall
+        # back to this system's own setting -- i.e. assume they match, which is how they were always
+        # interpreted. Only a state that explicitly disagrees is an error.
+        uses_local_poses = state.get("uses_local_poses", self._store_local_poses)
+        assert uses_local_poses == self._store_local_poses, (
+            f"Particle pose frame mismatch when loading state for system {self.name}: the state was "
+            f"saved with uses_local_poses={uses_local_poses}, but this system expects "
+            f"{self._store_local_poses}. Loading it would place particles incorrectly."
+        )
+
         # Load scale
         self.min_scale = state["min_scale"]
         self.max_scale = state["max_scale"]
@@ -394,10 +410,13 @@ class BaseSystem(Serializable):
             self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     def serialize(self, state):
-        # Array is n_particles, then min_scale and max_scale, then poses for all particles
+        # Array is n_particles, uses_local_poses, then min_scale and max_scale, then poses for all particles
         return th.cat(
             [
                 th.tensor([state["n_particles"]], dtype=th.float32),
+                # .get() so a state dict loaded from a file written before this field existed can
+                # still be re-serialized; absent means "same frame as this system", see _load_state.
+                th.tensor([float(state.get("uses_local_poses", self._store_local_poses))], dtype=th.float32),
                 state["min_scale"],
                 state["max_scale"],
                 state["positions"].flatten(),
@@ -406,18 +425,20 @@ class BaseSystem(Serializable):
         )
 
     def deserialize(self, state):
-        # First index is number of particles, then min_scale and max_scale, then the individual particle poses
+        # First index is number of particles, then the pose frame flag, then min_scale and max_scale,
+        # then the individual particle poses
         state_dict = dict()
         n_particles = int(state[0])
         len_positions = n_particles * 3
         len_orientations = n_particles * 4
         state_dict["n_particles"] = n_particles
-        state_dict["min_scale"] = state[1:4]
-        state_dict["max_scale"] = state[4:7]
-        state_dict["positions"] = state[7 : 7 + len_positions].reshape(-1, 3)
-        state_dict["orientations"] = state[7 + len_positions : 7 + len_positions + len_orientations].reshape(-1, 4)
+        state_dict["uses_local_poses"] = bool(state[1])
+        state_dict["min_scale"] = state[2:5]
+        state_dict["max_scale"] = state[5:8]
+        state_dict["positions"] = state[8 : 8 + len_positions].reshape(-1, 3)
+        state_dict["orientations"] = state[8 + len_positions : 8 + len_positions + len_orientations].reshape(-1, 4)
 
-        return state_dict, 7 + len_positions + len_orientations
+        return state_dict, 8 + len_positions + len_orientations
 
 
 class VisualParticleSystem(BaseSystem):
