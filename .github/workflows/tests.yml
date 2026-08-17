@@ -80,6 +80,7 @@ jobs:
           - test_multiple_envs_behavior_infra_api
           - test_multiple_envs_behavior_infra_scene
           - test_multiple_envs_behavior_task
+          - test_multiple_envs_heat_narrow_phase
           - test_multiple_envs_heat_states
           - test_multiple_envs_transition_rules
           - test_object_removal
