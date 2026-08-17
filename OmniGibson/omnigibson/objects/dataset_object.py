@@ -263,9 +263,9 @@ class DatasetObject(USDObject):
         # If neither was provided, default to ones(3) (no scaling).
         if self._load_config.get("scale", None) is None:
             self._load_config["scale"] = th.ones(3)
-        assert th.all(
-            th.abs(self._load_config["scale"]) > 1e-4
-        ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
+        assert th.all(th.abs(self._load_config["scale"]) > 1e-4), (
+            f"Scale of {self.name} is too small: {self._load_config['scale']}"
+        )
         # Run super last
         super()._post_load()
 
@@ -392,9 +392,9 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) bounding box
         """
-        assert (
-            "ig:nativeBB" in self.property_names
-        ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        assert "ig:nativeBB" in self.property_names, (
+            f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        )
         return th.tensor(self.get_attribute(attr="ig:nativeBB"))
 
     @property

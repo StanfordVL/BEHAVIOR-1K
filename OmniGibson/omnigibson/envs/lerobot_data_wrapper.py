@@ -235,9 +235,9 @@ class LeRobotDataWrapper(DataWrapper):
 
     def create_dataset(self, output_path: str, env: Environment, overwrite: bool = True) -> None:
         # Sanity checks
-        assert (
-            output_path == self.lerobot_dataset_kwargs["repo_id"]
-        ), f"Expected LeRobot repo_id path ({self.lerobot_dataset_kwargs['repo_id']}) to match output_path ({output_path})!"
+        assert output_path == self.lerobot_dataset_kwargs["repo_id"], (
+            f"Expected LeRobot repo_id path ({self.lerobot_dataset_kwargs['repo_id']}) to match output_path ({output_path})!"
+        )
 
         abs_output_path = f"{self.lerobot_dataset_kwargs['root']}"
 
@@ -312,9 +312,9 @@ class LeRobotDataWrapper(DataWrapper):
 
         for frame_idx, traj_step in enumerate(traj_data):
             if frame_idx == 0:
-                assert (
-                    len(traj_step.keys()) == 1
-                ), f"Expected only one key in 0th traj step, but got: {traj_step.keys()}"
+                assert len(traj_step.keys()) == 1, (
+                    f"Expected only one key in 0th traj step, but got: {traj_step.keys()}"
+                )
                 assert "obs" in traj_step, f"Expected 'obs' key in 0th traj step, but got: {traj_step.keys()}"
                 continue
 
@@ -427,9 +427,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
         """
         log.info(f"Flushing partial trajectory at step {self.current_episode_step_count}...")
         assert self.flush_every_n_steps > 0, "flush_every_n_steps must be greater than 0 to flush partial trajectory"
-        assert (
-            len(self.current_traj_history) > 0
-        ), "Expected non-empty trajectory history when flushing partial trajectory"
+        assert len(self.current_traj_history) > 0, (
+            "Expected non-empty trajectory history when flushing partial trajectory"
+        )
         # Add frames to the LeRobot dataset incrementally
         # Skip the first step (only has obs from reset, no action/reward)
         for frame_idx in range(1, len(self.current_traj_history)):
@@ -452,7 +452,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper, LeRobotDataWrapper):
         # This is needed because obs[t] pairs with action[t+1], and after reset we need
         # the previous observation to pair with the new action
         last_step = self.current_traj_history[-1]
-        assert (
-            "obs" in last_step
-        ), f"Expected 'obs' key in last step of trajectory history to keep for next segment, but got: {last_step.keys()}"
+        assert "obs" in last_step, (
+            f"Expected 'obs' key in last step of trajectory history to keep for next segment, but got: {last_step.keys()}"
+        )
         self.current_traj_history = [{"obs": last_step["obs"]}]
