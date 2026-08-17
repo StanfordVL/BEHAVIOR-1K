@@ -8,6 +8,7 @@ from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.object_states.tensorized_state import TensorizedState, _wp_from_torch
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
 
@@ -35,6 +36,10 @@ def _incoming_heat_kernel(
     link_local_offset: wp.array(dtype=wp.vec3),  # (N_hss,) heat element offset in link local frame
     temp_to_aabb_idx: wp.array(dtype=wp.int32),  # (N_temp,) Temperature N → AABB N
     temp_to_inside_idx: wp.array(dtype=wp.int32),  # (N_temp,) Temperature N → Inside N
+    target_link_offsets: wp.array(dtype=wp.int32),  # (S_temp*N_temp+1,) CSR offsets into the below
+    target_link_indices: wp.array(dtype=wp.int32),  # (K,) flat link idx of each target's collision links
+    link_mesh_ids: wp.array(dtype=wp.uint64),  # RigidBodyViewAPI.LINK_MESH_IDS — 0 if no mesh
+    n_temp: wp.int32,  # targets per scene, to index the CSR table by (s, n)
     pose_matrices: wp.array(dtype=wp.mat44),  # RigidBodyViewAPI.POSE_MATRICES
     aabb_values: wp.array3d(dtype=wp.float32),  # AABB (S, N_aabb, 6)
     inside_values: wp.array3d(dtype=wp.uint8),  # Inside (S, N_inside, N_inside) — uint8 view of bool
@@ -78,21 +83,19 @@ def _incoming_heat_kernel(
         source_world_position = wp.mul(
             link_pose, wp.vec4(local_offset[0], local_offset[1], local_offset[2], wp.float32(1.0))
         )
-        # Distance from the heat element to the CLOSEST POINT of the target's AABB (element
-        # position clamped into the box).
+        # BROAD PHASE: distance from the heat element to the CLOSEST POINT of the target's AABB
+        # (element position clamped into the box).
         #
-        # This is an APPROXIMATION of the pre-vectorization behaviour, which ran a PhysX
-        # overlap_sphere(threshold) scene query against the target's actual COLLISION GEOMETRY
-        # (heat_source_or_sink.py on main). Since a target's AABB always contains its geometry,
-        # distance-to-AABB <= distance-to-geometry, so this test is slightly MORE permissive than
-        # overlap_sphere — most visibly for long, thin or diagonally-oriented targets whose AABB
-        # is much larger than the mesh itself.
+        # Pre-vectorization this test was a PhysX overlap_sphere(threshold) scene query against the
+        # target's actual COLLISION GEOMETRY (heat_source_or_sink.py on main). That is a CPU-side
+        # query with a callback, one call per source, so it cannot run inside this kernel. Instead
+        # we reproduce it in two stages: this cheap AABB test rejects almost everything, and the
+        # narrow phase below measures to the real meshes for whatever survives.
         #
-        # It is nonetheless much closer than what it replaces: testing the AABB *center* shrinks
-        # every source's reach by the target's own extent (e.g. a sausage in a pan on a burner
-        # grazes the sphere, but its center is beyond the threshold, so it would never cook).
-        # An exact port would need per-(source, target) mesh queries inside this kernel, which is
-        # not available to Warp here; see the PR discussion for the trade-off.
+        # An AABB always contains its geometry, so distance-to-AABB <= distance-to-geometry and
+        # this stage never rejects a pair overlap_sphere would have accepted — exactly what a broad
+        # phase must guarantee. It is only *too permissive* on its own, most visibly for long, thin
+        # or diagonally-oriented targets (measured 0.69 m of slack for a bar along a box diagonal).
         qx = wp.clamp(source_world_position[0], aabb_values[s, target_aabb_idx, 0], aabb_values[s, target_aabb_idx, 3])
         qy = wp.clamp(source_world_position[1], aabb_values[s, target_aabb_idx, 1], aabb_values[s, target_aabb_idx, 4])
         qz = wp.clamp(source_world_position[2], aabb_values[s, target_aabb_idx, 2], aabb_values[s, target_aabb_idx, 5])
@@ -103,6 +106,68 @@ def _incoming_heat_kernel(
         threshold = distance_thresholds[h]
         if d2 > threshold * threshold:
             return
+
+        # NARROW PHASE — the AABB test above is only a conservative broad phase (AABB contains the
+        # geometry, so it can pass for targets whose mesh is far away; measured 0.69 m of slack for
+        # a bar lying along a box diagonal). Reproduce main's overlap_sphere by measuring to the
+        # target's actual collision meshes, but only for pairs that survived the broad phase.
+        base = s * n_temp + n
+        lo = target_link_offsets[base]
+        hi = target_link_offsets[base + wp.int32(1)]
+        if hi > lo:  # targets with no collision geometry (e.g. cloth) keep the AABB result
+            # Search radius. Normally the threshold is enough. But if the element is INSIDE the
+            # target's AABB (d2 == 0) it may also be inside the mesh, and the nearest surface can
+            # then be farther away than the threshold — querying only to `threshold` would return
+            # no result and we would miss a containment that overlap_sphere reports as contact.
+            # Widen the radius by the AABB diagonal in exactly that case, so the cost is paid only
+            # for the rare candidate rather than on every pair.
+            max_d = threshold
+            if d2 == wp.float32(0.0):
+                ex = aabb_values[s, target_aabb_idx, 3] - aabb_values[s, target_aabb_idx, 0]
+                ey = aabb_values[s, target_aabb_idx, 4] - aabb_values[s, target_aabb_idx, 1]
+                ez = aabb_values[s, target_aabb_idx, 5] - aabb_values[s, target_aabb_idx, 2]
+                max_d = threshold + wp.sqrt(ex * ex + ey * ey + ez * ez)
+            hit = wp.int32(0)
+            for k in range(lo, hi):
+                body = target_link_indices[k]
+                mesh_id = link_mesh_ids[body]
+                if mesh_id == wp.uint64(0):
+                    continue
+                # Into the link's local frame. collision_mesh_cpu_data bakes world scale into the
+                # points, so POSE_MATRICES is a pure rotation+translation and its inverse is
+                # (R^T, -R^T t) — cheaper and stabler than a general 4x4 inverse, and because the
+                # transform is rigid the distance measured here equals the world-frame distance.
+                lp = pose_matrices[body]
+                rot = wp.mat33(
+                    lp[0, 0],
+                    lp[0, 1],
+                    lp[0, 2],
+                    lp[1, 0],
+                    lp[1, 1],
+                    lp[1, 2],
+                    lp[2, 0],
+                    lp[2, 1],
+                    lp[2, 2],
+                )
+                rel = wp.vec3(
+                    source_world_position[0] - lp[0, 3],
+                    source_world_position[1] - lp[1, 3],
+                    source_world_position[2] - lp[2, 3],
+                )
+                local_p = wp.transpose(rot) * rel
+                # Links farther than max_d return no result, so they cost nothing.
+                res = wp.mesh_query_point(mesh_id, local_p, max_d)
+                if res.result:
+                    cp = wp.mesh_eval_position(mesh_id, res.face, res.u, res.v)
+                    dist = wp.length(local_p - cp)
+                    # A negative sign means the element is INSIDE this mesh. overlap_sphere counts
+                    # containment as contact, so accept it regardless of the distance out to the
+                    # surface — otherwise a large pot enclosing a burner would stop cooking.
+                    if res.sign < wp.float32(0.0) or dist <= threshold:
+                        hit = wp.int32(1)
+                        break
+            if hit == wp.int32(0):
+                return
 
     influence_mask[s, h, n] = wp.uint8(1)
     delta = (source_temperatures[h] - temperature_values[s, n]) * heating_rates[h]
@@ -205,6 +270,15 @@ class Temperature(TensorizedAbsoluteState):
     _temp_to_aabb_idx = None  # wp.array (N_temp,) int32 — Temperature N → AABB N
     _temp_to_inside_idx = None  # wp.array (N_temp,) int32 — Temperature N → Inside N
 
+    # CSR table giving each (scene, target) its collision-geometry links, so the point-source
+    # proximity test can measure to the target's actual mesh rather than to its AABB. For scene s
+    # and Temperature index n the links are
+    #   _target_link_indices[_target_link_offsets[s * N_temp + n] : _target_link_offsets[... + 1]]
+    # indexing RigidBodyViewAPI.POSE_MATRICES / LINK_MESH_IDS. Targets with no collision geometry
+    # (e.g. cloth, which is absent from RigidBodyViewAPI) get an empty range.
+    _target_link_offsets = None  # wp.array (S_temp * N_temp + 1,) int32
+    _target_link_indices = None  # wp.array (K,) int32
+
     # Placeholder wp.array to satisfy the kernel signature when Inside tracks no objects.
     _placeholder_inside = None  # wp.array (1, 1, 1) uint8
 
@@ -282,6 +356,8 @@ class Temperature(TensorizedAbsoluteState):
             cls._hss_self_inside_idx = None
             cls._temp_to_aabb_idx = None
             cls._temp_to_inside_idx = None
+            cls._target_link_offsets = None
+            cls._target_link_indices = None
             cls.INFLUENCE_MASK = None
             cls.INFLUENCE_MASK_CPU = None
             cls.INFLUENCE_MASK_CPU_WP = None
@@ -304,6 +380,30 @@ class Temperature(TensorizedAbsoluteState):
             temp_to_inside[n] = inside_map.get(rel_path, -1)
         cls._temp_to_aabb_idx = create_tensor_from_list(temp_to_aabb, "int32", device="cuda")
         cls._temp_to_inside_idx = create_tensor_from_list(temp_to_inside, "int32", device="cuda")
+
+        # CSR table of each (scene, target)'s collision links, for the exact point-source test.
+        # Walks IDX_OBJS the same way AABB.initialize_view does, and skips links with no collision
+        # geometry via LINK_VERTEX_COUNTS so the kernel never queries a null mesh id.
+        S_temp = len(cls.IDX_OBJS)
+        link_offsets = th.zeros((S_temp * N_temp + 1,), dtype=th.int32)
+        link_indices = []
+        for s_idx, scene_row in enumerate(cls.IDX_OBJS):
+            for n, obj in enumerate(scene_row):
+                if obj is not None and obj.prim_type != PrimType.CLOTH:
+                    for link in obj.links.values():
+                        flat_idx = RigidBodyViewAPI.get_flat_idx(link.prim_path)
+                        if flat_idx is None:
+                            continue
+                        if RigidBodyViewAPI.LINK_VERTEX_COUNTS[flat_idx].item() == 0:
+                            continue  # no collision geometry for this link
+                        link_indices.append(flat_idx)
+                link_offsets[s_idx * N_temp + n + 1] = len(link_indices)
+        cls._target_link_offsets = create_tensor_from_list(link_offsets, "int32", device="cuda")
+        # create_tensor_from_list cannot build a zero-length array; the kernel only reads this when
+        # some (s, n) has a non-empty range, so a 1-element dummy is safe when nothing has geometry.
+        cls._target_link_indices = create_tensor_from_list(
+            th.tensor(link_indices or [0], dtype=th.int32), "int32", device="cuda"
+        )
 
         cls.INFLUENCE_MASK = wp.zeros((S_hss, N_hss, N_temp), dtype=wp.uint8, device="cuda")
         cls.INFLUENCE_MASK_CPU = th.zeros((S_hss, N_hss, N_temp), dtype=th.bool).pin_memory()
@@ -356,6 +456,10 @@ class Temperature(TensorizedAbsoluteState):
                         hss._link_local_offset,
                         cls._temp_to_aabb_idx,
                         cls._temp_to_inside_idx,
+                        cls._target_link_offsets,
+                        cls._target_link_indices,
+                        RigidBodyViewAPI.LINK_MESH_IDS,
+                        wp.int32(N),
                         RigidBodyViewAPI.POSE_MATRICES,
                         AABB.VALUES_WP,
                         inside_values_wp,

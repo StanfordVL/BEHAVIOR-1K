@@ -410,13 +410,19 @@ class BaseSystem(Serializable):
             self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     def serialize(self, state):
-        # Array is n_particles, uses_local_poses, then min_scale and max_scale, then poses for all particles
+        # Array is n_particles, the pose-frame marker, then min_scale and max_scale, then poses.
+        #
+        # The marker is written NEGATIVE (-1 = world/scene frame, -2 = local) purely so that
+        # deserialize can tell this layout from the one that predates the flag. Arrays written
+        # before it hold min_scale in this slot, and scales are always positive, so a negative
+        # value here is unambiguous. Without that, an old array would be read shifted by one and
+        # silently produce garbage rather than failing.
         return th.cat(
             [
                 th.tensor([state["n_particles"]], dtype=th.float32),
                 # .get() so a state dict loaded from a file written before this field existed can
                 # still be re-serialized; absent means "same frame as this system", see _load_state.
-                th.tensor([float(state.get("uses_local_poses", self._store_local_poses))], dtype=th.float32),
+                th.tensor([-1.0 - float(state.get("uses_local_poses", self._store_local_poses))], dtype=th.float32),
                 state["min_scale"],
                 state["max_scale"],
                 state["positions"].flatten(),
@@ -425,20 +431,32 @@ class BaseSystem(Serializable):
         )
 
     def deserialize(self, state):
-        # First index is number of particles, then the pose frame flag, then min_scale and max_scale,
-        # then the individual particle poses
+        # First index is number of particles, then (newer format only) the pose-frame marker, then
+        # min_scale and max_scale, then the individual particle poses.
         state_dict = dict()
         n_particles = int(state[0])
         len_positions = n_particles * 3
         len_orientations = n_particles * 4
         state_dict["n_particles"] = n_particles
-        state_dict["uses_local_poses"] = bool(state[1])
-        state_dict["min_scale"] = state[2:5]
-        state_dict["max_scale"] = state[5:8]
-        state_dict["positions"] = state[8 : 8 + len_positions].reshape(-1, 3)
-        state_dict["orientations"] = state[8 + len_positions : 8 + len_positions + len_orientations].reshape(-1, 4)
 
-        return state_dict, 8 + len_positions + len_orientations
+        # Arrays written before the pose-frame flag existed carry min_scale in slot 1, which is
+        # always positive; only the newer format writes a negative marker there. Keeps previously
+        # dumped states (e.g. recorded HDF5 demos) readable.
+        if state[1] < 0:
+            state_dict["uses_local_poses"] = bool(-state[1] - 1.0)
+            offset = 2
+        else:
+            offset = 1
+
+        state_dict["min_scale"] = state[offset : offset + 3]
+        state_dict["max_scale"] = state[offset + 3 : offset + 6]
+        base = offset + 6
+        state_dict["positions"] = state[base : base + len_positions].reshape(-1, 3)
+        state_dict["orientations"] = state[base + len_positions : base + len_positions + len_orientations].reshape(
+            -1, 4
+        )
+
+        return state_dict, base + len_positions + len_orientations
 
 
 class VisualParticleSystem(BaseSystem):
