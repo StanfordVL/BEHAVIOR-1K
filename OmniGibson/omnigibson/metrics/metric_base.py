@@ -50,9 +50,9 @@ class MetricBase:
             info (dict): info, i.e. dictionary with any useful information
         """
         step_metrics = self._compute_step_metrics(env, action, obs, reward, terminated, truncated, info)
-        assert (
-            env.scene in self.state
-        ), f"Environment {env} is not being tracked, please call 'self.reset(env)' to track!"
+        assert env.scene in self.state, (
+            f"Environment {env} is not being tracked, please call 'self.reset(env)' to track!"
+        )
         state = self.state[env.scene]
         for k, v in step_metrics.items():
             if k not in state:

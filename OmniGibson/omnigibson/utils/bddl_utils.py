@@ -283,22 +283,22 @@ def _populate_input_output_objects_systems(og_recipe, input_synsets, output_syns
         (input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")
     ):
         for synset, count in synsets.items():
-            assert (
-                get_knowledge_base().get_synset(synset).is_leaf
-            ), f"Synset {synset} must be a leaf node in the taxonomy!"
+            assert get_knowledge_base().get_synset(synset).is_leaf, (
+                f"Synset {synset} must be a leaf node in the taxonomy!"
+            )
             if is_substance_synset(synset):
                 og_recipe[system_key].append(get_system_name_by_synset(synset))
             else:
                 obj_categories = [c.name for c in get_knowledge_base().get_synset(synset).categories]
-                assert (
-                    len(obj_categories) == 1
-                ), f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
+                assert len(obj_categories) == 1, (
+                    f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
+                )
                 og_recipe[obj_key][obj_categories[0]] = count
 
     # Assert only one of output_objects or output_systems is not None
-    assert (
-        len(og_recipe["output_objects"]) == 0 or len(og_recipe["output_systems"]) == 0
-    ), "Recipe can only generate output objects or output systems, but not both!"
+    assert len(og_recipe["output_objects"]) == 0 or len(og_recipe["output_systems"]) == 0, (
+        "Recipe can only generate output objects or output systems, but not both!"
+    )
 
 
 def _populate_input_output_states(og_recipe, input_states, output_states):
@@ -317,56 +317,56 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                 first_synset, second_synset = synset_split
 
             # Assert the first synset is an object because the systems don't have any states.
-            assert (
-                get_knowledge_base().get_synset(first_synset).is_leaf
-            ), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
-            assert not is_substance_synset(
-                first_synset
-            ), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
+            assert get_knowledge_base().get_synset(first_synset).is_leaf, (
+                f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
+            )
+            assert not is_substance_synset(first_synset), (
+                f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
+            )
             obj_categories = [c.name for c in get_knowledge_base().get_synset(first_synset).categories]
-            assert (
-                len(obj_categories) == 1
-            ), f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
+            assert len(obj_categories) == 1, (
+                f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
+            )
             first_obj_category = obj_categories[0]
 
             if second_synset is None:
                 for sc in state_conditions:
                     state_class = PREDICATE_TO_STATE[sc.predicate]
-                    assert issubclass(
-                        state_class, AbsoluteObjectState
-                    ), f"Input/output state type {sc.predicate.__name__} must be a unary state!"
+                    assert issubclass(state_class, AbsoluteObjectState), (
+                        f"Input/output state type {sc.predicate.__name__} must be a unary state!"
+                    )
                     og_recipe[states_key][first_obj_category]["unary"].append((state_class, sc.value))
             else:
-                assert (
-                    get_knowledge_base().get_synset(second_synset).is_leaf
-                ), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                assert get_knowledge_base().get_synset(second_synset).is_leaf, (
+                    f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                )
                 if is_substance_synset(second_synset):
                     second_obj_category = get_system_name_by_synset(second_synset)
                     is_substance = True
                 else:
                     obj_categories = [c.name for c in get_knowledge_base().get_synset(second_synset).categories]
-                    assert (
-                        len(obj_categories) == 1
-                    ), f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
+                    assert len(obj_categories) == 1, (
+                        f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
+                    )
                     second_obj_category = obj_categories[0]
                     is_substance = False
 
                 for sc in state_conditions:
                     state_class = PREDICATE_TO_STATE[sc.predicate]
-                    assert issubclass(
-                        state_class, RelativeObjectState
-                    ), f"Input/output state type {sc.predicate.__name__} must be a binary state!"
-                    assert is_substance == (
-                        state_class in get_system_states()
-                    ), f"Input/output state type {sc.predicate.__name__} system state inconsistency found!"
+                    assert issubclass(state_class, RelativeObjectState), (
+                        f"Input/output state type {sc.predicate.__name__} must be a binary state!"
+                    )
+                    assert is_substance == (state_class in get_system_states()), (
+                        f"Input/output state type {sc.predicate.__name__} system state inconsistency found!"
+                    )
                     if is_substance:
                         og_recipe[states_key][first_obj_category]["binary_system"].append(
                             (state_class, second_obj_category, sc.value)
                         )
                     else:
-                        assert (
-                            states_key != "output_states"
-                        ), f"Output state type {sc.predicate.__name__} can only be used in input states!"
+                        assert states_key != "output_states", (
+                            f"Output state type {sc.predicate.__name__} can only be used in input states!"
+                        )
                         og_recipe[states_key][first_obj_category]["binary_object"].append(
                             (state_class, second_obj_category, sc.value)
                         )
@@ -377,9 +377,9 @@ def _populate_filter_categories(og_recipe, filter_name, synsets):
     if synsets is not None:
         og_recipe[f"{filter_name}_categories"] = set()
         for synset in synsets:
-            assert (
-                get_knowledge_base().get_synset(synset).is_leaf
-            ), f"Synset {synset} must be a leaf node in the taxonomy!"
+            assert get_knowledge_base().get_synset(synset).is_leaf, (
+                f"Synset {synset} must be a leaf node in the taxonomy!"
+            )
             assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
             for category in [c.name for c in get_knowledge_base().get_synset(synset).categories]:
                 og_recipe[f"{filter_name}_categories"].add(category)
@@ -452,9 +452,9 @@ def translate_bddl_washer_rule_to_og_washer_rule(washer_rule):
         else:
             solvent_names = []
             for solvent in solvents:
-                assert (
-                    get_knowledge_base().get_synset(solvent).is_leaf
-                ), f"Synset {solvent} must be a leaf node in the taxonomy!"
+                assert get_knowledge_base().get_synset(solvent).is_leaf, (
+                    f"Synset {solvent} must be a leaf node in the taxonomy!"
+                )
                 assert is_substance_synset(solvent), f"Synset {solvent} must be a substance synset!"
                 solvent_name = get_system_name_by_synset(solvent)
                 solvent_names.append(solvent_name)
@@ -1001,9 +1001,9 @@ class BDDLSampler:
                             log.warning(log_msg)
 
                             # Record the result for the child object
-                            assert (
-                                parent_obj_name not in problematic_objs[child_scope_name]
-                            ), f"Multiple kinematic relationships attempted for pair {condition.body}"
+                            assert parent_obj_name not in problematic_objs[child_scope_name], (
+                                f"Multiple kinematic relationships attempted for pair {condition.body}"
+                            )
                             problematic_objs[child_scope_name][parent_obj_name] = success
                             # If any condition fails for this candidate object, skip
                             if not success:

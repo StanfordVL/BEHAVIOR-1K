@@ -217,9 +217,9 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 4) numpy array, where each of the N particles' desired orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        assert (
-            quat.shape[0] == self.n_particles
-        ), f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert quat.shape[0] == self.n_particles, (
+            f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self.n_particles}!"
+        )
         # If the number of particles is nonzero, swap w position, since Quath takes (w,x,y,z)
         quat = quat
         if self.n_particles > 0:
@@ -244,9 +244,9 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' desired velocities are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        assert (
-            vel.shape[0] == self.n_particles
-        ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert vel.shape[0] == self.n_particles, (
+            f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
+        )
         self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(vel.tolist()))
 
     @property
@@ -267,9 +267,9 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' desired scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        assert (
-            scales.shape[0] == self.n_particles
-        ), f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert scales.shape[0] == self.n_particles, (
+            f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
+        )
         self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray(scales.tolist()))
 
     @property
@@ -290,9 +290,9 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N,) numpy array, where each of the N particles' desired prototype_id
                 (i.e.: which prototype is being used for that particle)
         """
-        assert (
-            prototype_ids.shape[0] == self.n_particles
-        ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert prototype_ids.shape[0] == self.n_particles, (
+            f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
+        )
         self.set_attribute(attr="protoIndices", val=prototype_ids.int().cpu().numpy())
 
     @property
@@ -1366,9 +1366,9 @@ class FluidSystem(MicroPhysicalParticleSystem):
         super().initialize(scene)
 
         # Assert that the material is an OmniSurface material.
-        assert isinstance(
-            self._material, OmniSurfaceMaterialPrim
-        ), "FluidSystem material must be an instance of MaterialPrim"
+        assert isinstance(self._material, OmniSurfaceMaterialPrim), (
+            "FluidSystem material must be an instance of MaterialPrim"
+        )
 
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         self._material.bind(self.system_prim_path)
@@ -1502,9 +1502,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
         self._particle_template = particle_template
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "GranularSystem particle template has more than one link"
-        assert (
-            len(particle_template.root_link.visual_meshes) == 1
-        ), "GranularSystem particle template has more than one visual mesh"
+        assert len(particle_template.root_link.visual_meshes) == 1, (
+            "GranularSystem particle template has more than one visual mesh"
+        )
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via self.min/max_scale
         assert th.all(particle_template.scale == 1.0)

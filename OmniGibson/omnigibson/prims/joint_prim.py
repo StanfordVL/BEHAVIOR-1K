@@ -760,9 +760,9 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set position for articulated joints!"
         if drive:
             assert self.driven, "Can only use set_pos with drive=True if this joint is driven!"
-            assert (
-                self._control_type == ControlType.POSITION
-            ), "Trying to set joint position target, but control type is not position!"
+            assert self._control_type == ControlType.POSITION, (
+                "Trying to set joint position target, but control type is not position!"
+            )
 
         # Standardize input
         pos = (
@@ -811,9 +811,9 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set velocity for articulated joints!"
         if drive:
             assert self.driven, "Can only use set_vel with drive=True if this joint is driven!"
-            assert (
-                self._control_type == ControlType.VELOCITY
-            ), f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
+            assert self._control_type == ControlType.VELOCITY, (
+                f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
+            )
 
         # Standardize input
         vel = (
