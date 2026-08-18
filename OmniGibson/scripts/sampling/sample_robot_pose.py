@@ -98,12 +98,12 @@ def sample_robot_poses(env) -> Dict[str, List[Dict]]:
     Returns:
         Dictionary mapping "robot" to list of pose dicts
     """
-    # Find the reference object from initial conditions
+    # Find the reference object from initial conditions (single-env script: scene 0)
     reference_object_name = None
     for cond in env.task.activity_initial_conditions:
         object_list = []
         for bddl_name in cond.get_relevant_objects():
-            obj = env.task.object_scope.get(bddl_name, None)
+            obj = env.task.object_scope[0].get(bddl_name, None)
             if obj is not None:
                 object_list.append(obj.name)
 
@@ -247,10 +247,10 @@ def process_task(task_info: Dict):
         for bddl_name, obj_state in tro_torch_state.items():
             if "agent" in bddl_name or "robot_poses" in bddl_name:
                 continue
-            env.task.object_scope[bddl_name].load_state(obj_state, serialized=False)
+            env.task.object_scope[0][bddl_name].load_state(obj_state, serialized=False)
         for _ in range(25):
             og.sim.step_physics()
-            for bddl_name, entity in env.task.object_scope.items():
+            for bddl_name, entity in env.task.object_scope[0].items():
                 if not is_system_bddl_inst(bddl_name) and entity is not None:
                     entity.keep_still()
 

@@ -72,7 +72,17 @@ jobs:
           # - test_data_collection  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2016
           - test_dump_load_states
           - test_envs
-          - test_multiple_envs
+          - test_multiple_envs_dummy_api
+          - test_multiple_envs_dummy_scene
+          - test_multiple_envs_grasp
+          - test_multiple_envs_point_navigation
+          - test_multiple_envs_point_reaching
+          - test_multiple_envs_behavior_infra_api
+          - test_multiple_envs_behavior_infra_scene
+          - test_multiple_envs_behavior_task
+          - test_multiple_envs_heat_narrow_phase
+          - test_multiple_envs_heat_states
+          - test_multiple_envs_transition_rules
           - test_object_removal
           - test_object_states
           # - test_primitives

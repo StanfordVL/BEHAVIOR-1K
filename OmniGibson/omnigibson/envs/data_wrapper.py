@@ -84,8 +84,9 @@ class DataWrapper(EnvironmentWrapper):
             env, (Environment, EnvironmentWrapper)
         ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class or EnvironmentWrapper!"
 
-        # Only one scene is supported for now
-        assert len(og.sim.scenes) == 1, "Only one scene is currently supported for DataWrapper env!"
+        # DataWrapper is single-env only: create_dataset, step, and trajectory-processing
+        # all assume one env's worth of state/obs/rewards at a time.
+        assert env.num_envs == 1, f"DataWrapper is single-env only; got num_envs={env.num_envs}."
 
         self.traj_count = 0
         self.step_count = 0
@@ -143,8 +144,16 @@ class DataWrapper(EnvironmentWrapper):
         if isinstance(action, dict):
             action = th.cat([act for act in action.values()])
 
-        next_obs, reward, terminated, truncated, info = self.env.step(action, n_render_iterations=n_render_iterations)
+        obs_list, rewards, terminateds, truncateds, infos = self.env.step(
+            action, n_render_iterations=n_render_iterations
+        )
         self.step_count += 1
+
+        next_obs = obs_list[0]
+        reward = rewards[0].item()
+        terminated = terminateds[0].item()
+        truncated = truncateds[0].item()
+        info = infos[0]
 
         self._record_step_trajectory(action, next_obs, reward, terminated, truncated, info)
 
@@ -209,7 +218,8 @@ class DataWrapper(EnvironmentWrapper):
         if len(self.current_traj_history) > 0:
             self.flush_current_traj()
 
-        self.current_obs, info = self.env.reset()
+        obs_list, info = self.env.reset()
+        self.current_obs = obs_list[0]
         # Store initial obs as the first entry in the trajectory
         self.current_traj_history.append({"obs": self._process_obs(self.current_obs, info)})
 
@@ -234,8 +244,9 @@ class DataWrapper(EnvironmentWrapper):
             bool: Whether the current episode should be saved or discarded
         """
         # Only save successful demos and if actually recording,
-        # or there's only one observation in the trajectory (i.e. the initial obs after reset)
-        return (self.env.task.success or not self.only_successes) and not (
+        # or there's only one observation in the trajectory (i.e. the initial obs after reset).
+        # Single-env data wrapper: index task.success (now a (num_envs,) bool tensor) at scene 0.
+        return (bool(self.env.task.success[0]) or not self.only_successes) and not (
             len(self.current_traj_history) == 1 and set(self.current_traj_history[0].keys()) == {"obs"}
         )
 
@@ -504,6 +515,10 @@ class DataPlaybackWrapper(DataWrapper):
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
             kwargs (dict): Arguments to pass to super class
         """
+        # Playback is single-env only: env.scene reads and indexing on obs_list[0] / infos[0]
+        # later assume one env. Fail fast before env.scene.save() (below) runs in multi-env.
+        assert env.num_envs == 1, f"DataPlaybackWrapper is single-env only; got num_envs={env.num_envs}."
+
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
 
@@ -685,7 +700,7 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If not controlling robots, disable for all robots
         if not self.include_robot_control:
-            for robot in self.robots:
+            for robot in self.scene.robots:
                 robot.control_enabled = False
                 # Set all controllers to effort mode with zero gain, this keeps the robot still
                 for controller in robot.controllers.values():
@@ -712,7 +727,8 @@ class DataPlaybackWrapper(DataWrapper):
             first_time_load_n_iteration = 10
             for _ in range(first_time_load_n_iteration):
                 og.sim.render()
-            self.current_obs, init_info = self.env.get_obs()
+            obs_list, init_info = self.env.get_obs()
+            self.current_obs = obs_list[0]
             assert len(self.current_traj_history) == 1 and set(self.current_traj_history[-1].keys()) == {
                 "obs"
             }, "Expected reset() to have inserted an initial obs-only entry into the trajectory history!"
@@ -739,13 +755,15 @@ class DataPlaybackWrapper(DataWrapper):
                         system.set_particles_velocities(
                             lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
                         )
-
             # Take a small step with the action to propagate physics after loading the state
-            self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+            obs_list, _, _, _, infos = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+            self.current_obs = obs_list[0]
+            info = infos[0]
             if post_state_update_callback is not None:
                 post_state_update_callback()
                 og.sim.render()
-                self.current_obs, _ = self.env.get_obs()
+                obs_list, _ = self.env.get_obs()
+                self.current_obs = obs_list[0]
 
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:

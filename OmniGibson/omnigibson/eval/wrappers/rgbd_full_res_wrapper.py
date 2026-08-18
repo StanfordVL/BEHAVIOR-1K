@@ -1,42 +1,25 @@
-from omnigibson.envs import EnvironmentWrapper, Environment
-from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.eval.utils.eval_utils import (
-    HEAD_RESOLUTION,
-    WRIST_RESOLUTION,
-    get_robot_camera_names,
-    set_sensor_modalities,
-)
-
-logger = create_module_logger(module_name=__name__)
+from omnigibson.envs import Environment, EnvironmentWrapper
+from omnigibson.eval.utils.eval_utils import EVAL_CAMERA_ROLES, HEAD_RESOLUTION, WRIST_RESOLUTION
 
 
 class RGBDFullResWrapper(EnvironmentWrapper):
     """
+    Eval wrapper: full-resolution RGB-D observations (head at HEAD_RESOLUTION, wrists at
+    WRIST_RESOLUTION) matching the data-collection cameras, plus a depth modality.
+
+    As with :class:`~omnigibson.eval.wrappers.default_wrapper.DefaultWrapper`, camera resolution and
+    modalities are declared via :meth:`camera_spec` and baked into the robot config at env CREATION
+    (multi-env tiled rendering fixes resolution at creation, so a runtime resize would not apply).
+
     Args:
         env (og.Environment): The environment to wrap.
     """
 
+    @classmethod
+    def camera_spec(cls) -> dict:
+        """Returns {"modalities": [...], "resolution": {camera_role: (H, W)}} for this eval profile."""
+        resolution = {role: (HEAD_RESOLUTION if role == "head" else WRIST_RESOLUTION) for role in EVAL_CAMERA_ROLES}
+        return {"modalities": ["rgb", "depth_linear"], "resolution": resolution}
+
     def __init__(self, env: Environment):
         super().__init__(env=env)
-        # Note that from eval.py we only set rgb modality, here we include depth.
-        # Here, we change the camera resolution to match the one we used in data collection
-        robot = env.robots[0]
-        robot_eval_config = getattr(env, "_eval_robot_config", {})
-        camera_roles_by_sensor_name = {
-            camera_name.split("::")[1]: camera_id
-            for camera_id, camera_name in get_robot_camera_names(robot.name, robot_eval_config).items()
-        }
-        for sensor_name, sensor in robot.sensors.items():
-            if not hasattr(sensor, "image_height") or not hasattr(sensor, "image_width"):
-                continue
-            set_sensor_modalities(sensor, {"rgb", "depth_linear"})
-            camera_id = camera_roles_by_sensor_name.get(sensor_name)
-            if camera_id == "head":
-                sensor.image_height = HEAD_RESOLUTION[0]
-                sensor.image_width = HEAD_RESOLUTION[1]
-            else:
-                sensor.image_height = WRIST_RESOLUTION[0]
-                sensor.image_width = WRIST_RESOLUTION[1]
-        # reload observation space
-        env.load_observation_space()
-        logger.info("Reloaded observation space!")

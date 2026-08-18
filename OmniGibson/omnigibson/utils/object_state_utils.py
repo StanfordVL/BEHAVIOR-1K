@@ -6,7 +6,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import Dict, create_module_macros, macros
-from omnigibson.object_states.aabb import AABB
 from omnigibson.utils import sampling_utils
 from omnigibson.utils.constants import GROUND_CATEGORIES, PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint, create_module_logger
@@ -286,7 +285,7 @@ def sample_kinematics(
                 xy_aligned=True
             )
         else:
-            aabb_lower, aabb_upper = objA.states[AABB].get_value()
+            aabb_lower, aabb_upper = objA.aabb
             parallel_bbox_center = (aabb_lower + aabb_upper) / 2.0
             parallel_bbox_orn = th.tensor([0.0, 0.0, 0.0, 1.0])
             parallel_bbox_extents = aabb_upper - aabb_lower
@@ -351,8 +350,8 @@ def sample_kinematics(
             og.sim.step_physics()
             # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked", and let fall
             # until it settles
-            aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
-            aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
+            aabb_lower_a, aabb_upper_a = objA.aabb
+            aabb_lower_b, aabb_upper_b = objB.aabb
             bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
             desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
             desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
@@ -416,8 +415,8 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
     else:
         obj.root_link.reset()
 
-    obj_aabb_low, obj_aabb_high = obj.states[AABB].get_value()
-    other_aabb_low, other_aabb_high = other.states[AABB].get_value()
+    obj_aabb_low, obj_aabb_high = obj.aabb
+    other_aabb_low, other_aabb_high = other.aabb
 
     # z value is always the same: the top-z of the other object + half the height of the object to be placed + offset
     z_value = other_aabb_high[2] + (obj_aabb_high[2] - obj_aabb_low[2]) / 2.0 + z_offset

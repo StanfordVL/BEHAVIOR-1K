@@ -15,7 +15,12 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, count_joints, find_joint_prims
+from omnigibson.utils.usd_utils import (
+    RigidBodyViewAPI,
+    absolute_prim_path_to_scene_relative,
+    count_joints,
+    find_joint_prims,
+)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -655,6 +660,13 @@ class EntityPrim(XFormPrim):
                 self._articulation_view.set_joint_positions(positions, joint_indices=indices)
             og.sim.sync_physx_to_fabric()
 
+        # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+        # that are now one frame behind. Flag them as stale so the next state read forces a
+        # refresh via the lazy-refresh gate in TensorizedState._get_value.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.caches_dirty = True
+
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
         Set the joint velocities (both actual value and target values) in simulation. Note: only works if the simulator
@@ -1024,9 +1036,9 @@ class EntityPrim(XFormPrim):
             ), "Orientation mismatch between entity prim and root link"
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
             if self.kinematic_only:
-                for link in self._links.values():
-                    if isinstance(link, RigidKinematicPrim):
-                        link.clear_kinematic_only_cache()
+                RigidBodyViewAPI.invalidate_kinematic(
+                    [link for link in self._links.values() if isinstance(link, RigidKinematicPrim)]
+                )
         else:
             # Otherwise, we simply move the object in PhysX and force it to update Fabric, too.
             if self.articulated:
@@ -1060,6 +1072,13 @@ class EntityPrim(XFormPrim):
                     positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
                 )
                 og.sim.sync_physx_to_fabric()
+
+                # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+                # that are now one frame behind. Flag them as stale so the next state read forces a
+                # refresh via the lazy-refresh gate in TensorizedState._get_value.
+                from omnigibson.object_states.tensorized_state import TensorizedState
+
+                TensorizedState.caches_dirty = True
             else:
                 self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
