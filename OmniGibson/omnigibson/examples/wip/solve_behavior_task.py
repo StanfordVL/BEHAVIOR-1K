@@ -39,7 +39,7 @@ def main():
 
     # Load the environment
     env = og.Environment(configs=config)
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
@@ -47,14 +47,14 @@ def main():
     controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=False)
 
     # Grasp can of soda
-    grasp_obj = env.task.object_scope["can__of__soda.n.01_2"]
+    grasp_obj = env.task.object_scope[0]["can__of__soda.n.01_2"]
     print("Executing controller")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
     print("Finished executing grasp")
 
     # Place can in trash can
     print("Executing controller")
-    trash = env.task.object_scope["ashcan.n.01_1"]
+    trash = env.task.object_scope[0]["ashcan.n.01_1"]
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, trash), env)
     print("Finished executing place")
 

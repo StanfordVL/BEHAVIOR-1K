@@ -147,6 +147,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             "It currently only works with Tiago and R1 with their HolonomicBaseJointController/JointControllers set to absolute position mode."
         )
         super().__init__(env, robot)
+        # Resolve which env this primitive controller is bound to, based on the robot's scene.
+        # Used by get_action_space() to pick the right per-env BehaviorTask object_scope.
+        self._env_idx = next(i for i, s in enumerate(env.scenes) if s is robot.scene)
         self.controller_functions = {
             StarterSemanticActionPrimitiveSet.GRASP: self._grasp,
             StarterSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,
@@ -221,7 +224,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             assert isinstance(
                 self.env.task, BehaviorTask
             ), "Activity relevant objects can only be used for BEHAVIOR tasks"
-            self.addressable_objects = sorted(set(self.env.task.object_scope.values()), key=lambda obj: obj.name)
+            self.addressable_objects = sorted(
+                set(self.env.task.object_scope[self._env_idx].values()), key=lambda obj: obj.name
+            )
         else:
             self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
 
@@ -1940,9 +1945,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             current_joint_pos = self._get_joint_position_with_fingers_at_limit("upper")
         else:
             current_joint_pos = self.robot.get_joint_positions()
+
+        # For holonomic robots, base joints are relative to root_link, but candidate
+        # poses are in world frame. Convert (x, y) from world to root_link-relative.
+        root_pos = self.robot.root_link.get_position_orientation()[0] if self.robot.is_holonomic_base else None
+
         for pose in candidate_poses:
             joint_pos = current_joint_pos.clone()
-            joint_pos[self.robot.base_control_idx] = pose
+            if root_pos is not None:
+                joint_pos[self.robot.base_control_idx] = th.tensor(
+                    [pose[0] - root_pos[0], pose[1] - root_pos[1], pose[2]]
+                )
+            else:
+                joint_pos[self.robot.base_control_idx] = pose
             candidate_joint_positions.append(joint_pos)
 
         candidate_joint_positions = th.stack(candidate_joint_positions)
@@ -1981,7 +1996,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Gets 3d pose from 2d pose
 
         Args:
-            pose_2d (Iterable): (x, y, yaw) 2d pose
+            pose_2d (Iterable): (x, y, yaw) 2d pose in the world frame
 
         Returns:
             th.tensor: (x,y,z) Position in the world frame
@@ -1989,7 +2004,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         if self.robot.is_holonomic_base:
             base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
-            pos = th.tensor([pose_2d[0], pose_2d[1], base_joints[2]], dtype=th.float32)
+            # base_joints[2] (z) is relative to root_link; convert to world frame
+            root_pos = self.robot.root_link.get_position_orientation()[0]
+            pos = th.tensor([pose_2d[0], pose_2d[1], root_pos[2] + base_joints[2]], dtype=th.float32)
             euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)
             mat = T.euler_intrinsic2mat(euler_intrinsic_xyz)
             orn = T.mat2quat(mat)

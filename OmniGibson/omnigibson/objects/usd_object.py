@@ -20,8 +20,8 @@ from omnigibson.object_states.factory import (
     get_fire_states,
     get_requirements_for_ability,
     get_state_name,
+    get_states_and_params_for_ability,
     get_states_by_dependency_order,
-    get_states_for_ability,
     get_steam_states,
     get_texture_change_priority,
     get_texture_change_states,
@@ -309,6 +309,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             )
             n_fixed_joints += 1
 
+        # Add articulated_ prefix into prim path so ArticulationView can use a simple pattern match
+        # Only for non-robot articulated objects
+        if (
+            not kinematic_only
+            and (n_joints > 0 or n_fixed_joints > 0)
+            and not self._relative_prim_path.startswith("/controllable")
+        ):
+            self._relative_prim_path = f"/articulated__{self.name}"
+
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
@@ -337,8 +346,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         This is useful for pre-compiling scene USDs, speeding up load times especially for parallel envs.
         """
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
-        prim_path = "/World" + self._relative_prim_path
         usd_path = self._prepare_to_load()
+        prim_path = "/World" + self._relative_prim_path
         prim = stage.GetPrimAtPath(prim_path)
         assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
         prim = stage.DefinePrim(prim_path, "Xform")
@@ -535,10 +544,20 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                         break
                 if compatible:
                     params = self._abilities[ability]
-                    for state_type in get_states_for_ability(ability):
+                    for state_type, state_params in get_states_and_params_for_ability(ability, params):
+                        # Fail loudly instead of silently letting the last ability's params win —
+                        # a single state instance can't serve two abilities (e.g. an object that
+                        # is both a heatSource and flammable is not supported; the BDDL data
+                        # generation sanity checks enforce this at the synset level). Raised
+                        # unconditionally (not an assert) so python -O cannot skip it.
+                        if state_type in states_info:
+                            raise ValueError(
+                                f"Object {self.name}: state {state_type.__name__} is requested by multiple abilities "
+                                f"({states_info[state_type]['ability']} and {ability}); this is not supported."
+                            )
                         states_info[state_type] = {
                             "ability": ability,
-                            "params": state_type.postprocess_ability_params(params, self.scene),
+                            "params": state_type.postprocess_ability_params(state_params, self.scene),
                         }
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
@@ -586,8 +605,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if emitter_type == EmitterType.FIRE:
             fire_at_meta_link = True
             if OnFire in self.states:
-                # Note whether the heat source link is explicitly set
-                link = self.states[OnFire].link
+                # Flammable object: the fire is placed at the companion heat source's link
+                # (the heatsource meta link when annotated, e.g. a candle wick; the root link
+                # otherwise). OnFire itself is a pure threshold detector and carries no link.
+                heat_source = self.states.get(HeatSourceOrSink)
+                link = heat_source.link if heat_source is not None else self.root_link
                 fire_at_meta_link = link != self.root_link
             elif HeatSourceOrSink in self.states:
                 # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links

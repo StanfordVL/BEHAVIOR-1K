@@ -1,6 +1,6 @@
 """Websocket evaluation runner for the BEHAVIOR-1K challenge.
 
-Drives the OmniGibson ``Evaluator`` against a policy served over a websocket
+Drives the OmniGibson ``BatchedEvaluator`` against a policy served over a websocket
 (e.g. the openpi or GR00T ``scripts/b1k/serve_b1k.py`` server). For each test instance of a
 task it runs a rollout and writes a per-rollout result JSON compatible with
 ``omnigibson/eval/utils/score_utils.py`` (``q_score``, ``time``,
@@ -17,14 +17,13 @@ Example:
 """
 
 import argparse
-import json
 import logging
 import os
 from pathlib import Path
 
 from omegaconf import OmegaConf
 
-from omnigibson.eval.evaluator import Evaluator, resolve_instance_ids
+from omnigibson.eval.evaluator import BatchedEvaluator, resolve_instance_ids
 from omnigibson.eval.utils.eval_utils import DEFAULT_EVAL_SEED, seed_everything
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -66,6 +65,21 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--num-rollouts", type=int, default=1, help="Rollouts per instance.")
     parser.add_argument(
+        "--num-envs",
+        type=int,
+        default=1,
+        help="Number of logical environments in the evaluation batch. Must equal the number of instance indices.",
+    )
+    parser.add_argument(
+        "--replay-action-chunk-size",
+        type=int,
+        default=0,
+        help=(
+            "Opt in to exact client-side replay of a complete server-returned action chunk. "
+            "Use the receding-horizon length (for example 16); 0 keeps one websocket request per step."
+        ),
+    )
+    parser.add_argument(
         "--max-steps",
         type=int,
         default=None,
@@ -103,12 +117,23 @@ def main() -> None:
     args = parse_args()
 
     gm.HEADLESS = args.headless
+    # Headless evaluation consumes robot-camera observations through VisionSensor / TiledVisionSensor render
+    # products, not the separate 1280x720 debug viewport. Avoid constructing that unused viewer product: at
+    # N=10 it accounts for two of five RTX tile passes while policy camera shapes and traces remain unchanged.
+    # The environment override restores the old path only for controlled performance A/B runs.
+    if args.headless and os.getenv("OMNIGIBSON_KEEP_VIEWER_CAMERA", "0") != "1":
+        gm.RENDER_VIEWER_CAMERA = False
 
     seed = seed_everything(DEFAULT_EVAL_SEED)
     logger.info(f"Seeded Python, NumPy, and Torch with seed={seed}")
 
     instance_ids = resolve_instance_ids(args.task_name, args.instance_indices, mode=args.mode)
     logger.info(f"Resolved {args.mode} instance ids for {args.task_name}: {instance_ids}")
+    if len(instance_ids) != args.num_envs:
+        raise ValueError(
+            "Evaluation requires exactly one instance per logical environment: "
+            f"got {len(instance_ids)} instance indices and --num-envs={args.num_envs}."
+        )
 
     robot_config = None
     if args.robot_config is not None:
@@ -121,6 +146,7 @@ def main() -> None:
             "_target_": "omnigibson.eval.policies.WebsocketPolicy",
             "host": args.host,
             "port": args.port,
+            "action_chunk_size": args.replay_action_chunk_size,
         }
     else:
         model_cfg = {"_target_": "omnigibson.eval.policies.LocalPolicy", "action_dim": None}
@@ -136,6 +162,7 @@ def main() -> None:
             "write_video": args.write_video,
             "mode": args.mode,
             "seed": seed,
+            "num_envs": args.num_envs,
             "task": {"name": args.task_name},
             "robot": robot_config,
         }
@@ -148,55 +175,19 @@ def main() -> None:
         os.makedirs(video_dir, exist_ok=True)
 
     results = []
-    with Evaluator(cfg) as evaluator:
-        for instance_id in instance_ids:
-            try:
-                evaluator.reset()
-                evaluator.load_task_instance(int(instance_id))
-            except Exception:
-                logger.exception(f"Failed to load task instance {instance_id}.")
-                raise
-            for rollout_id in range(args.num_rollouts):
-                video_path = os.path.join(video_dir, f"{args.task_name}_{instance_id}_{rollout_id}.mp4")
-                try:
-                    evaluator.reset()
-                    if args.write_video:
-                        evaluator.start_recording(video_path, rate=args.video_fps)
-                    terminated = truncated = False
-                    steps = 0
-                    while not (terminated or truncated):
-                        terminated, truncated = evaluator.step()
-                        steps += 1
-
-                    success = bool(evaluator.env.task.success)
-                    metrics = {}
-                    for metric in evaluator.metrics:
-                        metrics.update(metric.aggregate(evaluator.env))
-
-                    result = {
-                        "task": args.task_name,
-                        "instance_id": int(instance_id),
-                        "rollout_id": rollout_id,
-                        "steps": steps,
-                        "success": success,
-                        **metrics,
-                    }
-                    out_path = os.path.join(json_dir, f"{args.task_name}_{instance_id}_{rollout_id}.json")
-                    with open(out_path, "w") as f:
-                        json.dump(result, f, indent=2, default=float)
-                    q_score = metrics.get("q_score", {}).get("final")
-                    video_msg = f" | video -> {video_path}" if args.write_video else ""
-                    logger.info(
-                        f"Result: instance={instance_id} rollout={rollout_id} steps={steps} "
-                        f"success={success} q_score={q_score} -> {out_path}{video_msg}"
-                    )
-                    results.append(result)
-                except Exception:
-                    logger.exception(f"Instance {instance_id} rollout {rollout_id} failed.")
-                    raise
-                finally:
-                    if args.write_video:
-                        evaluator.stop_recording()
+    with BatchedEvaluator(cfg) as evaluator:
+        # Each run() pass evaluates the selected instances together in one parallel batch. The outer
+        # loop repeats that same batch for additional rollouts.
+        for rollout_id in range(args.num_rollouts):
+            rollout_results = evaluator.run(
+                [int(i) for i in instance_ids],
+                write_video=args.write_video,
+                video_path=video_dir,
+                metrics_dir=json_dir,
+                rollout_id=rollout_id,
+                video_fps=args.video_fps,
+            )
+            results.extend(rollout_results.values())
 
     n = len(results)
     n_success = sum(r["success"] for r in results)
