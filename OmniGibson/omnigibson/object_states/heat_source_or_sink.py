@@ -105,7 +105,7 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
     _requires_inside = None  # wp.array (N_hss,) uint8
     _requires_on_fire = None  # wp.array (N_hss,) uint8
     _ignition_temperatures = None  # wp.array (N_hss,) float32 — self-clamp threshold (requires_on_fire only)
-    _link_flat_idx = None  # wp.array (N_hss,) int32 into RigidBodyViewAPI.POSE_MATRICES — -1 if requires_inside
+    _link_flat_idx = None  # wp.array (S_hss, N_hss) int32 into RigidBodyViewAPI.POSE_MATRICES — -1 if requires_inside
     _link_local_offset = None  # wp.array (N_hss,) vec3 — offset of heat element in link frame
 
     # Index maps into the gate states' OBJ_IDXS — rebuilt in pre_update because OnFire's view
@@ -326,7 +326,11 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         requires_inside = th.zeros(N, dtype=th.uint8)
         requires_on_fire = th.zeros(N, dtype=th.uint8)
         ignition_temperatures = th.zeros(N, dtype=th.float32)
-        link_flat_idx = th.full((N,), -1, dtype=th.int32)
+        # Per (scene, source): each scene's clone of a source is a DIFFERENT rigid body with its
+        # own flat index into RigidBodyViewAPI.POSE_MATRICES, so the element link index must be
+        # resolved per scene. (The config arrays above stay (N,) — they are scene-invariant.)
+        S = len(cls.IDX_OBJS)
+        link_flat_idx = th.full((S, N), -1, dtype=th.int32)
         link_local_offset = th.zeros((N, 3), dtype=th.float32)
 
         for _, hss_obj_idx in cls.OBJ_IDXS.items():
@@ -348,17 +352,23 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             if not hss_state_instance.requires_inside:
                 # Store this hss' heat element link so Temperature can compute source positions:
                 # the meta link when annotated (e.g. a candle wick), the root link for fire sources
-                # without one.
-                if hss_state_instance._links:
-                    link = hss_state_instance.link
-                elif hss_state_instance.requires_on_fire:
-                    link = hss_state_instance.obj.root_link
-                else:
-                    link = None
-                if link is not None:
-                    flat = RigidBodyViewAPI.get_flat_idx(link.prim_path)
-                    if flat is not None:
-                        link_flat_idx[hss_obj_idx] = int(flat)
+                # without one. Resolved PER SCENE: each scene's clone has its own link prim (and
+                # therefore its own flat pose index).
+                for s_idx, scene_row in enumerate(cls.IDX_OBJS):
+                    scene_obj = scene_row[hss_obj_idx]
+                    if scene_obj is None:
+                        continue
+                    scene_state = scene_obj.states[cls]
+                    if scene_state._links:
+                        link = scene_state.link
+                    elif scene_state.requires_on_fire:
+                        link = scene_obj.root_link
+                    else:
+                        link = None
+                    if link is not None:
+                        flat = RigidBodyViewAPI.get_flat_idx(link.prim_path)
+                        if flat is not None:
+                            link_flat_idx[s_idx, hss_obj_idx] = int(flat)
 
         create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
         cls._temperatures = create_tensor_from_list(temperatures, "float32", device="cuda")
@@ -369,7 +379,8 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         cls._requires_inside = create_tensor_from_list(requires_inside, "uint8", device="cuda")
         cls._requires_on_fire = create_tensor_from_list(requires_on_fire, "uint8", device="cuda")
         cls._ignition_temperatures = create_tensor_from_list(ignition_temperatures, "float32", device="cuda")
-        cls._link_flat_idx = create_tensor_from_list(link_flat_idx, "int32", device="cuda")
+        # (S, N) int32 — wp.array reinterprets the 2D torch buffer directly.
+        cls._link_flat_idx = wp.array(link_flat_idx, dtype=wp.int32, device="cuda")
         # vec3 has no scalar-only helper — wp.array reinterprets the (N, 3) float32 CPU buffer as (N,) vec3.
         cls._link_local_offset = wp.array(link_local_offset, dtype=wp.vec3, device="cuda")
 
@@ -488,6 +499,13 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
         self.VALUES[s, obj_idx] = bool(new_value)
         self.VALUES_CPU[s, obj_idx] = bool(new_value)
         return True
+
+    # The activation gate is fully derived (recomputed every step from ToggledOn / Open / OnFire),
+    # so loading must be a no-op — matching main, where HeatSourceOrSink is not stateful. The
+    # inherited TensorizedAbsoluteState._load_state would restore a stale gate value that could
+    # make a source active (heating) for the first step after a scene load / reset.
+    def _load_state(self, state):
+        return
 
     def affects_obj(self, obj):
         """

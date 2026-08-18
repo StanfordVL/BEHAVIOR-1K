@@ -185,4 +185,11 @@ class OnFire(TensorizedAbsoluteState):
         self.VALUES_CPU[s, h] = bool(new_value)
         return True
 
-    # Nothing needs to be done to save/load OnFire since it is derived from Temperature.
+    # OnFire is fully derived from Temperature (a pure threshold detector), so loading must be a
+    # no-op — matching main, where OnFire is not stateful at all. Overriding the inherited
+    # TensorizedAbsoluteState._load_state is REQUIRED: the generic implementation routes through
+    # _set_value(stored_value), and _set_value(False) writes Temperature = ignition_temperature - 1
+    # (~249 C) — i.e. restoring a saved `on_fire: False` would HEAT a cold flammable object on
+    # every scene load / reset.
+    def _load_state(self, state):
+        return
