@@ -53,16 +53,18 @@ def seed_everything(seed: int, deterministic_torch: bool = False) -> int:
     return seed
 
 
-def _load_challenge_task_ids() -> dict[str, int]:
+def _load_challenge_task_misc() -> tuple[dict[str, int], dict[str, list[str]]]:
     task_ids = {}
+    task_rooms = {}
     task_misc_path = os.path.join(gm.DATA_PATH, "2026-challenge-task-instances", "metadata", "B100_task_misc.csv")
     with open(task_misc_path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             task_ids[row["Task"]] = int(row["Task ID"])
-    return task_ids
+            task_rooms[row["Task"]] = [room.strip() for room in row["Rooms to inlcude"].splitlines() if room.strip()]
+    return task_ids, task_rooms
 
 
-TASK_NAMES_TO_INDICES = _load_challenge_task_ids()
+TASK_NAMES_TO_INDICES, TASK_NAMES_TO_ROOMS = _load_challenge_task_misc()
 if not TASK_NAMES_TO_INDICES:
     raise RuntimeError(
         "Could not load challenge task metadata. Expected one of: "
