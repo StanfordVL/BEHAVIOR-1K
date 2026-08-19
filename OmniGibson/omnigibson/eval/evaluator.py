@@ -14,28 +14,17 @@ from av.stream import Stream
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-TORCH_NUM_THREADS = None
-TORCH_NUM_INTEROP_THREADS = None
-
-if TORCH_NUM_THREADS is not None:
-    th.set_num_threads(TORCH_NUM_THREADS)
-if TORCH_NUM_INTEROP_THREADS is not None:
-    th.set_num_interop_threads(TORCH_NUM_INTEROP_THREADS)
-
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from gello.utils.og_teleop_cfg import DISABLED_TRANSITION_RULES
-from gello.utils.og_teleop_utils import (
-    augment_rooms,
-    get_task_relevant_room_types,
-    load_available_tasks,
-)
+from gello.utils.og_teleop_utils import load_available_tasks
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.eval.utils.eval_utils import (
     EVAL_TIMEOUT_MULTIPLIER,
     NUM_HIDDEN_TEST_INSTANCES,
     NUM_PUBLIC_TEST_INSTANCES,
     TASK_NAMES_TO_INDICES,
+    TASK_NAMES_TO_ROOMS,
     TEST_INSTANCE_IDS,
     flatten_obs_dict,
     generate_basic_environment_config,
@@ -51,6 +40,14 @@ from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.eval.utils.light_utils import LightToggleSynchronizer, set_light_control_toggles
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
+
+TORCH_NUM_THREADS = None
+TORCH_NUM_INTEROP_THREADS = None
+
+if TORCH_NUM_THREADS is not None:
+    th.set_num_threads(TORCH_NUM_THREADS)
+if TORCH_NUM_INTEROP_THREADS is not None:
+    th.set_num_interop_threads(TORCH_NUM_INTEROP_THREADS)
 
 LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 EVAL_BASE_LINK_MASS = 250.0
@@ -158,9 +155,7 @@ class Evaluator:
         task_cfg = available_tasks[task_name][0]
         cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg)
         if self.cfg.partial_scene_load:
-            relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
-            relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
-            cfg["scene"]["load_room_types"] = relevant_rooms
+            cfg["scene"]["load_room_instances"] = TASK_NAMES_TO_ROOMS[task_name]
 
         robot_cfg = self._build_robot_config(task_name=task_name, task_cfg=task_cfg)
         self.robot_name = robot_cfg["name"]
