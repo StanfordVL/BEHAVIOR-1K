@@ -6,15 +6,23 @@ on:
   push:
     branches:
       - 'main'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: >
+          Tag to publish the manually-built behavior-dev/behavior-gha images under (e.g. the branch
+          name).
+        required: true
+        type: string
 
 jobs:
   docker:
     runs-on: docker-builder  # This is a larger runner with more disk space.
     steps:
-      - 
+      -
         name: Check disk space
         run: df . -h
-      - 
+      -
         name: Free disk space
         run: |
           sudo docker rmi $(docker image ls -aq) >/dev/null 2>&1 || true
@@ -44,7 +52,7 @@ jobs:
           sudo apt-get autoremove -y >/dev/null 2>&1
           sudo apt-get autoclean -y >/dev/null 2>&1
           echo "some packages purged"
-      - 
+      -
         name: Check disk space
         run: |
           df . -h
@@ -60,7 +68,7 @@ jobs:
         with:
           registry: nvcr.io
           username: ${{ secrets.NVCR_USERNAME }}
-          password: ${{ secrets.NVCR_PASSWORD }}   
+          password: ${{ secrets.NVCR_PASSWORD }}
       -
         name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -70,6 +78,7 @@ jobs:
       -
         name: Metadata for prod Image
         id: meta-prod
+        if: github.event_name != 'workflow_dispatch'
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -87,6 +96,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=raw,value=${{ github.event.inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
       -
         name: Metadata for actions Image
         id: meta-actions
@@ -95,11 +105,12 @@ jobs:
           images: |
             stanfordvl/behavior-gha
           tags: |
-            # We only push to the latest tag for the actions image
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=raw,value=${{ github.event.inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
       -
         name: Build and push prod image
         id: build-prod
+        if: github.event_name != 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -123,8 +134,11 @@ jobs:
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
           file: docker/Dockerfile
-          cache-from: type=registry,ref=stanfordvl/behavior:build-cache  # OK to share cache here.
-          cache-to: type=registry,ref=stanfordvl/behavior:build-cache,mode=max
+          # Manual workflow_dispatch builds read from the shared cache for speed but never write to
+          # it, so a broken branch build can never poison the cache used by the real main/release
+          # builds.
+          cache-from: type=registry,ref=stanfordvl/behavior:build-cache
+          cache-to: ${{ github.event_name != 'workflow_dispatch' && 'type=registry,ref=stanfordvl/behavior:build-cache,mode=max' || '' }}
 
       - name: Update actions image Dockerfile with dev image tag
         run: |
@@ -139,5 +153,5 @@ jobs:
           tags: ${{ steps.meta-actions.outputs.tags }}
           labels: ${{ steps.meta-actions.outputs.labels }}
           file: docker/gh-actions/Dockerfile
-          cache-from: type=registry,ref=stanfordvl/behavior:build-cache  # OK to share cache here.
-          cache-to: type=registry,ref=stanfordvl/behavior:build-cache,mode=max
+          cache-from: type=registry,ref=stanfordvl/behavior:build-cache
+          cache-to: ${{ github.event_name != 'workflow_dispatch' && 'type=registry,ref=stanfordvl/behavior:build-cache,mode=max' || '' }}
