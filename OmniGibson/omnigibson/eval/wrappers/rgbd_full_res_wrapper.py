@@ -1,3 +1,4 @@
+import omnigibson as og
 from omnigibson.envs import EnvironmentWrapper, Environment
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.eval.utils.eval_utils import (
@@ -37,6 +38,9 @@ class RGBDFullResWrapper(EnvironmentWrapper):
             else:
                 sensor.image_height = WRIST_RESOLUTION[0]
                 sensor.image_width = WRIST_RESOLUTION[1]
+
+        og.sim.update_handles()
+
         # reload observation space
         env.load_observation_space()
         logger.info("Reloaded observation space!")
