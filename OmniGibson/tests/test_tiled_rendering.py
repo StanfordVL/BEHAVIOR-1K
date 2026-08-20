@@ -1,8 +1,9 @@
 """
 Tests for tiled rendering in multi-env (vectorized) environments.
 
-In multi-env mode (num_envs > 1), all per-env robot cameras are batched into a single tiled render
-product (TiledVisionSensor), and per-env camera observations are slices of the batched buffer.
+In multi-env mode (num_envs > 1) with gm.ENABLE_TILED_RENDERING enabled, all per-env robot cameras are
+batched into a single tiled render product (TiledVisionSensor), and per-env camera observations are slices
+of the batched buffer. Tiled rendering is opt-in, so this suite turns the macro on explicitly.
 """
 
 import pytest
@@ -47,6 +48,10 @@ def _init_macros():
         gm.USE_GPU_DYNAMICS = False
         gm.ENABLE_TRANSITION_RULES = False
         gm.ENABLE_OBJECT_STATES = False
+        # Tiled rendering is opt-in (gm.ENABLE_TILED_RENDERING defaults to False); this suite tests
+        # it, so turn it on explicitly. Must be set here, before the first env load reads it -- gm
+        # locks a macro once read, so assigning it again on a later call would raise.
+        gm.ENABLE_TILED_RENDERING = True
     else:
         og.sim.stop()
 
@@ -106,7 +111,9 @@ def test_tiled_rendering_core():
         cam_name = _camera_sensor_name(env._scenes[0].robots[0])
 
         # --- Tiled sensor is active and covers the camera with the requested modalities ---
-        assert env._tiled_sensor is not None, "Tiled sensor should be created when num_envs > 1"
+        assert (
+            env._tiled_sensor is not None
+        ), "Tiled sensor should be created when num_envs > 1 and gm.ENABLE_TILED_RENDERING is True"
         assert cam_name in env._tiled_sensor.modalities
         assert {"rgb", "depth_linear"} == set(env._tiled_sensor.modalities[cam_name])
         for scene in env._scenes:

@@ -1,107 +1,34 @@
 """
-test_multiple_envs_behavior_infra_scene.py
-==========================================
+test_multiple_envs_behavior_scene.py
+====================================
 Multi-environment infrastructure tests using BehaviorTask with R1Pro.
 
 Covers:
-  Section 3 – Task tensors (PotentialReward, Timeout, PredicateGoal)
-  Section 4 – Scene coordinates
-  Section 5 – Robot getter/setter
+  - Task tensors (BehaviorTask's PotentialReward / Timeout / PredicateGoal wiring)
+  - Scene state dump/load
+  - Robot getter/setter
+
+The env comes from the shared `behavior_env` fixture (conftest.py).
+
+Deliberately NOT covered here: scene placement and frame conversions. Those are Scene/prim logic,
+independent of the task, and are tested once in test_multiple_envs_dummy_scene.py. Only
+dump/load state is kept on the BehaviorTask side, where the scene has far more objects.
 """
 
-import pytest
 import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
-from omnigibson.utils.transform_utils import quat_multiply
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-NUM_ENVS = 2
-ACTIVITY_NAME = "picking_up_trash"
-SCENE_MODEL = "house_double_floor_lower"
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-def _init_macros():
-    """Set simulator macros (only once, before first Environment is created)."""
-    if og.sim is None:
-        gm.RENDER_VIEWER_CAMERA = False
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = False
-        gm.ENABLE_FLATCACHE = False
-        gm.ENABLE_TRANSITION_RULES = False
-    else:
-        og.sim.stop()
-
-
-def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True):
-    """Create an Environment with BehaviorTask and R1Pro."""
-    _init_macros()
-    cfg = {
-        "env": {"num_envs": num_envs},
-        "scene": {
-            "type": "InteractiveTraversableScene",
-            "scene_model": SCENE_MODEL,
-            "load_room_types": ["living_room", "kitchen"],
-        },
-        "robots": [{"model": "r1pro", "obs_modalities": []}],
-        "task": {
-            "type": "BehaviorTask",
-            "activity_name": ACTIVITY_NAME,
-            "activity_definition_id": 0,
-            "activity_instance_id": 0,
-            "online_object_sampling": False,
-            "use_presampled_robot_pose": use_presampled_robot_pose,
-            "termination_config": {"max_steps": 500},
-            "reward_config": {"r_potential": 1.0},
-        },
-    }
-    print(
-        f"  Setting up BehaviorTask env: num_envs={num_envs}, robot=r1pro, "
-        f"activity={ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}"
-    )
-    env = og.Environment(configs=cfg)
-    print("  BehaviorTask environment created successfully")
-    return env
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-@pytest.fixture(scope="module")
-def behavior_env():
-    """Build the BehaviorTask env once per module and tear it down at the end.
-
-    Loading `house_double_floor_lower` x NUM_ENVS with a BehaviorTask is the
-    dominant CI cost; sharing one env across the module's tests is what keeps
-    the suite under the 30-minute timeout.
-    """
-    env = setup_behavior_environment()
-    try:
-        yield env
-    finally:
-        og.clear()
-
-
-@pytest.fixture(autouse=True)
-def _reset_behavior_env(request):
-    """Restore a clean post-reset state before each test that uses behavior_env."""
-    if "behavior_env" in request.fixturenames:
-        request.getfixturevalue("behavior_env").reset()
-    yield
-
+from utils import (
+    BEHAVIOR_NUM_ENVS as NUM_ENVS,
+)
 
 # ===================================================================
-#  Section 3 – Task / reward / termination tensor tests
+#  Task / reward / termination tensors
 # ===================================================================
 
 
@@ -165,7 +92,7 @@ class TestBehaviorTaskTensors:
 
 
 # ===================================================================
-#  Section 4 – Scene coordinate system tests
+#  Scene state dump/load
 # ===================================================================
 
 
@@ -211,42 +138,9 @@ class TestBehaviorSceneCoordinates:
         assert th.allclose(initial_pos_0[1], post_pos_0[1], atol=1e-3)
         assert th.allclose(initial_pos_1[1], post_pos_1[1], atol=1e-3)
 
-    def test_get_local_position(self, behavior_env):
-        """Robot scene-frame position + scene origin equals world position."""
-        env = behavior_env
-
-        robot_local = env.scenes[1].robots[0].get_position_orientation(frame="scene")[0]
-        robot_global = env.scenes[1].robots[0].get_position_orientation()[0]
-        scene_pos = env.scenes[1].get_position_orientation()[0]
-
-        print(f"  local={robot_local}, global={robot_global}, scene_origin={scene_pos}")
-        assert th.allclose(robot_global, scene_pos + robot_local, atol=1e-3)
-
-    def test_position_orientation_relative_to_scene(self, behavior_env):
-        """set/get position in scene frame is consistent."""
-        env = behavior_env
-
-        robot = env.scenes[1].robots[0]
-        new_relative_pos = th.tensor([1.0, 2.0, 0.5])
-        new_relative_ori = th.tensor([0, 0, 0.7071, 0.7071])
-
-        robot.set_position_orientation(position=new_relative_pos, orientation=new_relative_ori, frame="scene")
-        updated_pos, updated_ori = robot.get_position_orientation(frame="scene")
-
-        print(f"  set relative pos={new_relative_pos}, got={updated_pos}")
-        assert th.allclose(updated_pos, new_relative_pos, atol=1e-3)
-        assert th.allclose(updated_ori, new_relative_ori, atol=1e-3)
-
-        scene_pos, scene_ori = env.scenes[1].get_position_orientation()
-        global_pos, global_ori = robot.get_position_orientation()
-        expected_global_pos = scene_pos + updated_pos
-        assert th.allclose(global_pos, expected_global_pos, atol=1e-3)
-        expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
-        assert th.allclose(global_ori, expected_global_ori, atol=1e-3)
-
 
 # ===================================================================
-#  Section 5 – Robot getter/setter tests (R1Pro only)
+#  Robot getter/setter (R1Pro only)
 # ===================================================================
 
 

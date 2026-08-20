@@ -1,4 +1,3 @@
-import pytest
 import torch as th
 
 import omnigibson as og
@@ -7,22 +6,17 @@ from omnigibson import object_states
 from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
 
-from utils import (
-    MULTI_ENV_ROBOTS,
-    setup_multi_environment,
-)
-
 
 # ===================================================================
-#  Section 4 – Scene coordinate system & state tests
+#  Scene coordinate system & state
 # ===================================================================
 
 
 class TestSceneCoordinates:
     """Multi-scene position/orientation and state dump/load tests."""
 
-    def test_multi_scene_dump_load_states(self):
-        env = setup_multi_environment(3)
+    def test_multi_scene_dump_load_states(self, make_multi_env):
+        env = make_multi_env(3)
         robot_0 = env.scenes[0].robots[0]
         robot_1 = env.scenes[1].robots[0]
         robot_2 = env.scenes[2].robots[0]
@@ -86,10 +80,8 @@ class TestSceneCoordinates:
         assert th.allclose(initial_robot_pos_scene_1[1], post_robot_pos_scene_1[1], atol=1e-3)
         assert th.allclose(initial_robot_pos_scene_2[1], post_robot_pos_scene_2[1], atol=1e-3)
 
-        og.clear()
-
-    def test_multi_scene_get_local_position(self):
-        env = setup_multi_environment(3)
+    def test_multi_scene_get_local_position(self, make_multi_env):
+        env = make_multi_env(3)
 
         robot_1_pos_local = env.scenes[1].robots[0].get_position_orientation(frame="scene")[0]
         robot_1_pos_global = env.scenes[1].robots[0].get_position_orientation()[0]
@@ -98,10 +90,9 @@ class TestSceneCoordinates:
 
         print(f"  local={robot_1_pos_local}, global={robot_1_pos_global}, scene_origin={pos_scene}")
         assert th.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
-        og.clear()
 
-    def test_multi_scene_set_local_position(self):
-        env = setup_multi_environment(3)
+    def test_multi_scene_set_local_position(self, make_multi_env):
+        env = make_multi_env(3)
 
         robot = env.scenes[1].robots[0]
         initial_global_pos = robot.get_position_orientation()[0]
@@ -130,25 +121,8 @@ class TestSceneCoordinates:
             global_pos_change, expected_change, atol=1e-3
         ), f"Global position change {global_pos_change} does not match expected change {expected_change}"
 
-        og.clear()
-
-    def test_multi_scene_scene_prim(self):
-        env = setup_multi_environment(1)
-        original_robot_pos = env.scenes[0].robots[0].get_position_orientation()[0]
-        scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
-        original_scene_prim_pos = env.scenes[0]._scene_prim.get_position_orientation()[0]
-        env.scenes[0].set_position_orientation(position=original_scene_prim_pos + scene_prim_displacement)
-        new_scene_prim_pos = env.scenes[0]._scene_prim.get_position_orientation()[0]
-        new_robot_pos = env.scenes[0].robots[0].get_position_orientation()[0]
-        print(f"  scene_prim moved: {original_scene_prim_pos} -> {new_scene_prim_pos}")
-        print(f"  robot moved: {original_robot_pos} -> {new_robot_pos}")
-        assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
-        assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-2)
-
-        og.clear()
-
-    def test_multi_scene_position_orientation_relative_to_scene(self):
-        env = setup_multi_environment(3)
+    def test_multi_scene_position_orientation_relative_to_scene(self, make_multi_env):
+        env = make_multi_env(3)
 
         robot = env.scenes[1].robots[0]
         new_relative_pos = th.tensor([1.0, 2.0, 0.5])
@@ -179,20 +153,33 @@ class TestSceneCoordinates:
             global_ori, expected_global_ori, atol=1e-3
         ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
 
-        og.clear()
+    # Ordered last within this class purely as an optimization: it is the only num_envs=1 test
+    # here, so running it after the num_envs=3 tests avoids rebuilding the shared 3-env env.
+    # It also permanently moves the scene prim, which env.reset() does not restore.
+    def test_multi_scene_scene_prim(self, make_multi_env):
+        env = make_multi_env(1)
+        original_robot_pos = env.scenes[0].robots[0].get_position_orientation()[0]
+        scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
+        original_scene_prim_pos = env.scenes[0]._scene_prim.get_position_orientation()[0]
+        env.scenes[0].set_position_orientation(position=original_scene_prim_pos + scene_prim_displacement)
+        new_scene_prim_pos = env.scenes[0]._scene_prim.get_position_orientation()[0]
+        new_robot_pos = env.scenes[0].robots[0].get_position_orientation()[0]
+        print(f"  scene_prim moved: {original_scene_prim_pos} -> {new_scene_prim_pos}")
+        print(f"  robot moved: {original_robot_pos} -> {new_robot_pos}")
+        assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
+        assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-2)
 
 
 # ===================================================================
-#  Section 5 – Robot-specific getter/setter tests (parametrized)
+#  Robot getter/setter, across robots
 # ===================================================================
 
 
-@pytest.mark.parametrize("robot", MULTI_ENV_ROBOTS)
 class TestRobotGetterSetter:
     """Position/orientation getter and setter correctness across robots."""
 
-    def test_getter(self, robot):
-        env = setup_multi_environment(2, robot=robot)
+    def test_getter(self, make_multi_env, robot_model):
+        env = make_multi_env(2, robot=robot_model)
         robot1 = env.scenes[0].robots[0]
 
         robot1_world_position, robot1_world_orientation = robot1.get_position_orientation()
@@ -217,10 +204,8 @@ class TestRobotGetterSetter:
         assert th.allclose(robot2_world_position, combined_position, atol=1e-3)
         assert th.allclose(robot2_world_orientation, combined_orientation, atol=1e-3)
 
-        og.clear()
-
-    def test_setter(self, robot):
-        env = setup_multi_environment(2, robot=robot)
+    def test_setter(self, make_multi_env, robot_model):
+        env = make_multi_env(2, robot=robot_model)
 
         robot_obj = env.scenes[1].robots[0]
 
@@ -253,11 +238,9 @@ class TestRobotGetterSetter:
         assert not th.allclose(got_world_pos2, new_world_pos, atol=1e-3)
         assert not th.allclose(got_world_ori2, new_world_ori, atol=1e-3)
 
-        og.clear()
-
-    def test_setter_sim_stopped(self, robot):
+    def test_setter_sim_stopped(self, make_multi_env, robot_model):
         """Getter/setter should work even when the simulator is stopped."""
-        env = setup_multi_environment(2, robot=robot)
+        env = make_multi_env(2, robot=robot_model)
         og.sim.stop()
         print("  Sim stopped")
 
@@ -293,16 +276,14 @@ class TestRobotGetterSetter:
         assert not th.allclose(got_world_pos2, new_world_pos, atol=1e-3)
         assert not th.allclose(got_world_ori2, new_world_ori, atol=1e-3)
 
-        og.clear()
-
 
 # ===================================================================
-#  Section 6 – Particle system test
+#  Particle systems
 # ===================================================================
 
 
 class TestParticles:
-    def test_multi_scene_particle_source(self):
+    def test_multi_scene_particle_source(self, make_multi_env):
         sink_cfg = dict(
             type="DatasetObject",
             name="sink",
@@ -325,7 +306,7 @@ class TestParticles:
             position=[0.0, -1.5, 0.0],
         )
 
-        env = setup_multi_environment(3, additional_objects_cfg=[sink_cfg])
+        env = make_multi_env(3, additional_objects_cfg=[sink_cfg])
 
         for i, scene in enumerate(env.scenes):
             sink = scene.object_registry("name", "sink")
@@ -335,5 +316,3 @@ class TestParticles:
         print("  Running 50 sim steps...")
         for _ in range(50):
             og.sim.step()
-
-        og.clear()

@@ -1,6 +1,6 @@
 """
-test_multi_env_behavior_task.py
-===============================
+test_multiple_envs_behavior_task.py
+===================================
 Multi-environment BehaviorTask-specific logic tests with R1Pro.
 
 Covers BDDL object scope, potential reward, task observations, presampled robot
@@ -8,70 +8,20 @@ pose, activity attributes, instructions, and end-to-end goal completion (moving
 objects into the goal state and verifying per-env success / reward / reset).
 
 Uses the ``picking_up_trash`` activity on ``house_double_floor_lower``.
-Infrastructure tests live in ``test_multi_env_behavior_infra.py``.
+Env/scene infrastructure for the same env lives in ``test_multiple_envs_behavior_scene.py``.
 """
 
-import pytest
 import torch as th
 
 import omnigibson as og
-from omnigibson.macros import gm
+
 from omnigibson.object_states import Inside
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-NUM_ENVS = 2
-ACTIVITY_NAME = "picking_up_trash"
-SCENE_MODEL = "house_double_floor_lower"
-# Reward weight used in the task config; the completing env.step should earn ~R_POTENTIAL.
-R_POTENTIAL = 1.0
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-def _init_macros():
-    """Set simulator macros (only once, before first Environment is created)."""
-    if og.sim is None:
-        gm.RENDER_VIEWER_CAMERA = False
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = False
-        gm.ENABLE_FLATCACHE = False
-        gm.ENABLE_TRANSITION_RULES = False
-    else:
-        og.sim.stop()
-
-
-def setup_behavior_environment(num_envs=NUM_ENVS, use_presampled_robot_pose=True):
-    """Create an Environment with BehaviorTask and R1Pro."""
-    _init_macros()
-    cfg = {
-        "env": {"num_envs": num_envs},
-        "scene": {
-            "type": "InteractiveTraversableScene",
-            "scene_model": SCENE_MODEL,
-            "load_room_types": ["living_room", "kitchen"],
-        },
-        "robots": [{"model": "r1pro", "obs_modalities": []}],
-        "task": {
-            "type": "BehaviorTask",
-            "activity_name": ACTIVITY_NAME,
-            "activity_definition_id": 0,
-            "activity_instance_id": 0,
-            "online_object_sampling": False,
-            "use_presampled_robot_pose": use_presampled_robot_pose,
-            "termination_config": {"max_steps": 500},
-            "reward_config": {"r_potential": R_POTENTIAL},
-        },
-    }
-    print(
-        f"  Setting up BehaviorTask env: num_envs={num_envs}, robot=r1pro, "
-        f"activity={ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}"
-    )
-    env = og.Environment(configs=cfg)
-    print("  BehaviorTask environment created successfully")
-    return env
+from utils import (
+    BEHAVIOR_ACTIVITY_NAME as ACTIVITY_NAME,
+    BEHAVIOR_NUM_ENVS as NUM_ENVS,
+    BEHAVIOR_R_POTENTIAL as R_POTENTIAL,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +33,7 @@ def _goal_objects(env, env_idx):
     picking_up_trash's goal is `forall can: inside(can, ashcan)`; these are the
     objects we move to drive the task to success.
     """
-    scope = env.task.object_scope[env_idx]
+    scope = env.task.object_scopes[env_idx]
     ashcans = [scope[k] for k in sorted(scope) if k.startswith("ashcan.n.01")]
     cans = [scope[k] for k in sorted(scope) if k.startswith("can__of__soda.n.01")]
     assert len(ashcans) == 1 and ashcans[0] is not None, f"ashcan not bound in scope[{env_idx}]"
@@ -124,29 +74,6 @@ def _random_actions(env):
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-@pytest.fixture(scope="module")
-def behavior_env():
-    """Build the BehaviorTask env once per module and tear it down at the end.
-
-    Loading `house_double_floor_lower` x NUM_ENVS with a BehaviorTask is the
-    dominant CI cost; sharing one env across the module's tests is what keeps
-    the suite under the 30-minute timeout.
-    """
-    env = setup_behavior_environment()
-    try:
-        yield env
-    finally:
-        og.clear()
-
-
-@pytest.fixture(autouse=True)
-def _reset_behavior_env(request):
-    """Restore a clean post-reset state before each test that uses behavior_env."""
-    if "behavior_env" in request.fixturenames:
-        request.getfixturevalue("behavior_env").reset()
-    yield
 
 
 # ===================================================================
@@ -163,10 +90,10 @@ class TestBehaviorTaskLogic:
         env = behavior_env
 
         for env_idx in range(NUM_ENVS):
-            scope = env.task.object_scope[env_idx]
-            assert scope is not None, f"object_scope[{env_idx}] is None"
+            scope = env.task.object_scopes[env_idx]
+            assert scope is not None, f"object_scopes[{env_idx}] is None"
             assert isinstance(scope, dict)
-            assert "agent.n.01_1" in scope, f"agent not found in object_scope[{env_idx}]"
+            assert "agent.n.01_1" in scope, f"agent not found in object_scopes[{env_idx}]"
             # Agent entity should be *this* scene's robot (raw sim object after #2040 BDDLEntity removal),
             # not some other env's robot — this is what guarantees per-env predicate evaluation is isolated.
             agent_entity = scope["agent.n.01_1"]
@@ -177,7 +104,7 @@ class TestBehaviorTaskLogic:
             print(f"  env {env_idx}: scope has {len(scope)} entries, agent={agent_entity.name}")
 
         # Scopes are independent dict objects
-        assert env.task.object_scope[0] is not env.task.object_scope[1]
+        assert env.task.object_scopes[0] is not env.task.object_scopes[1]
 
     def test_potential_reward_computation(self, behavior_env):
         """get_potential returns a finite float for each env."""
@@ -196,8 +123,8 @@ class TestBehaviorTaskLogic:
         """task.get_obs produces a per-env low-dim observation vector.
 
         (The env.step()->obs "task" key plumbing is already covered by
-        test_step_return_shapes in test_multiple_envs_behavior_infra_api.py; here
-        we exercise the BehaviorTask-specific get_obs content directly.)
+        test_multiple_envs_dummy_api.py::test_step_return_shapes; here we exercise the
+        BehaviorTask-specific get_obs content directly.)
         """
         env = behavior_env
 
@@ -253,9 +180,9 @@ class TestBehaviorTaskLogic:
 
         # Symbolic compiled task is now singular (shared across envs), not a list of NUM_ENVS
         assert not isinstance(env.task.compiled_task, list)
-        # object_scope stays per-env
-        assert isinstance(env.task.object_scope, list)
-        assert len(env.task.object_scope) == NUM_ENVS
+        # object_scopes stays per-env
+        assert isinstance(env.task.object_scopes, list)
+        assert len(env.task.object_scopes) == NUM_ENVS
         # Sampler is a single BDDLSampler bound to env 0
         assert isinstance(env.task.sampler, BDDLSampler)
 
@@ -426,33 +353,51 @@ class TestBehaviorTaskGoalCompletion:
         ), "selective reset of env 0 changed env 1's goal status"
 
 
+class TestBehaviorTaskPartialReset:
+    """Partial reset against a real BehaviorTask scene.
+
+    The dummy_api version of this test only moves a robot in a near-empty scene; this one exercises
+    BehaviorTask's per-env scene/agent reset."""
+
+    def test_selective_reset(self, behavior_env):
+        """Resetting env_indices=[1] only resets scene 1, leaving scene 0 unchanged."""
+        env = behavior_env
+
+        known_pos = th.tensor([1.0, 1.0, 0.5])
+        env.scenes[0].robots[0].set_position_orientation(position=known_pos, frame="scene")
+        og.sim.step()
+
+        pos_before = env.scenes[0].robots[0].get_position_orientation(frame="scene")[0].clone()
+
+        env.reset(env_indices=th.tensor([1]))
+
+        pos_after = env.scenes[0].robots[0].get_position_orientation(frame="scene")[0]
+        print(f"  pos_before={pos_before}, pos_after={pos_after}")
+        # BehaviorTask scenes have many objects, so physics settling causes more drift than minimal scenes
+        assert th.allclose(
+            pos_before, pos_after, atol=0.15
+        ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
+
+
+#  No-presampled-pose variant
 # ===================================================================
-#  No-presample variant (kept separate; needs use_presampled_robot_pose=False)
-# ===================================================================
-#
-# This test must run *after* every test that uses `behavior_env`, because it
-# tears down the shared module-scope env to build one with a different config.
-# Pytest collects in source order, so keeping this class at the bottom of the
-# file is what guarantees the correct ordering.
 
 
 class TestBehaviorTaskNoPresample:
-    """BehaviorTask with use_presampled_robot_pose=False. Cannot share the module-scope env."""
+    """BehaviorTask with use_presampled_robot_pose=False.
 
-    def test_no_presampled_robot_pose(self):
+    Uses its own env (different config from the shared `behavior_env`); `behavior_env_no_presample`
+    handles building and tearing down whichever env is cached, so this can run in any order.
+    """
+
+    def test_no_presampled_robot_pose(self, behavior_env_no_presample):
         """BehaviorTask constructs, resets, and steps without a presampled pose.
 
         (Pose validity/unit-quaternion checks are covered by
         TestBehaviorTaskLogic::test_presampled_robot_pose; this variant only needs
         to prove the use_presampled_robot_pose=False path doesn't crash.)
         """
-        # Tear down the module-scope `behavior_env` (built with use_presampled_robot_pose=True)
-        # before constructing the variant. _init_macros only stops the sim; without an explicit
-        # clear, the new env's object-state machinery references prims from the previous scenes
-        # and crashes during play() with `'NoneType' object has no attribute 'state_updated'`.
-        og.clear()
-        env = setup_behavior_environment(use_presampled_robot_pose=False)
-        env.reset()
+        env = behavior_env_no_presample
         env.step(_zero_actions(env))
 
         for env_idx in range(NUM_ENVS):
@@ -460,5 +405,3 @@ class TestBehaviorTaskNoPresample:
             assert th.isfinite(pos).all(), f"Robot {env_idx} position has non-finite values"
             assert th.isfinite(ori).all(), f"Robot {env_idx} orientation has non-finite values"
             print(f"  env {env_idx}: robot pos={pos}, ori={ori}")
-
-        og.clear()
