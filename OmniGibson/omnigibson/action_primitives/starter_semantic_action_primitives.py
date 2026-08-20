@@ -225,7 +225,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 self.env.task, BehaviorTask
             ), "Activity relevant objects can only be used for BEHAVIOR tasks"
             self.addressable_objects = sorted(
-                set(self.env.task.object_scope[self._env_idx].values()), key=lambda obj: obj.name
+                set(self.env.task.object_scopes[self._env_idx].values()), key=lambda obj: obj.name
             )
         else:
             self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)

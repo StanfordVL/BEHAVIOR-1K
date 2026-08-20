@@ -76,9 +76,9 @@ These are object states that are agnostic to other objects in a given scene.
     <tr>
         <td valign="top" width="60%">
             [**`Adjacency`**](../reference/object_states/adjacency.md)<br><br>  
-            Pairwise relation indicating whether `other` is reachable from `self`'s AABB center via a ray in any of 22 directions: 2 vertical (+Z, −Z) and 20 horizontal (5 equally-spaced coordinate planes × 2 orthogonal axes × +/− signs).<br><br>
+            Pairwise relation indicating whether `other` is reachable from `self`'s AABB center via a ray in any of 12 directions: 2 vertical (+Z, −Z) and 10 horizontal directions evenly spaced 36° apart around the XY plane (`m.HORIZONTAL_DIRECTION_COUNT`).<br><br>
             <ul>
-                <li>`get_value(other)`: returns a 22-element bool tensor; `value[k]` is True iff `other` is hit when ray-casting from `self`'s AABB center along direction `k`. Layout: `k=0` is +Z, `k=1` is −Z, `k=2..11` are the 10 horizontal axes' positive directions, `k=12..21` are the 10 horizontal axes' negative directions.</li>
+                <li>`get_value(other)`: returns a 12-element bool tensor; `value[k]` is True iff `other` is hit when ray-casting from `self`'s AABB center along direction `k`. Layout: `k=0` is +Z, `k=1` is −Z, and `k=2..11` are the 10 horizontal directions, where direction `k` has angle `(k-2) * 36°` in the XY plane (so `k=2` is +X and `k=7` is −X). Each horizontal entry is already a signed direction, so there is no separate negative-direction block.</li>
                 <li>`set_value()`: Not supported.</li>
             </ul>
         </td>

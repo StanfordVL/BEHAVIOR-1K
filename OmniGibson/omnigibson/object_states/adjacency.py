@@ -143,8 +143,10 @@ class Adjacency(TensorizedRelativeState):
 
     S = number of scenes
     N = number of objects with Adjacency state
-    VALUES has shape (S, N, N, 22) bool — VALUES[s, a, b, k] is True iff object b is
-    adjacent to object a in direction k (from a's AABB center).
+    VALUES has shape (S, N, N, K) bool, where K = _ADJ_AXIS_COUNT = 2 + m.HORIZONTAL_DIRECTION_COUNT
+    (12 by default: +Z, -Z, and 10 horizontal directions evenly spaced 36 degrees apart on the XY
+    plane). VALUES[s, a, b, k] is True iff object b is adjacent to object a in direction k
+    (from a's AABB center).
 
     Diagonal and cross-scene cells are always False.
     Cloth is excluded via is_compatible (no collision mesh to ray-cast against).
@@ -244,7 +246,7 @@ class Adjacency(TensorizedRelativeState):
             cls._link_to_obj_idx = None
             cls._link_to_scene_idx = None
 
-        # Allocate the int32 scratch (S, N, N, 22) used as the atomic_max target.
+        # Allocate the int32 scratch (S, N, N, K) used as the atomic_max target.
         if S > 0 and N > 0:
             cls._output = wp.zeros((S, N, N, _ADJ_AXIS_COUNT), dtype=wp.int32, device="cuda")
         else:

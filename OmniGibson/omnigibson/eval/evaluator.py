@@ -161,7 +161,7 @@ class InstanceEnvAccessor:
 
     @property
     def object_scope(self):
-        return self.shared_env.task.object_scope[self.env_idx]
+        return self.shared_env.task.object_scopes[self.env_idx]
 
     @property
     def success(self) -> bool:
@@ -263,9 +263,10 @@ class BatchedEvaluator:
         cfg["robots"] = [robot_cfg]
 
         # Camera resolution + modalities are decided by the chosen eval wrapper and baked into the
-        # robot config HERE, before env creation. This is required (not just cleaner) because in
-        # multi-env mode robot cameras are batched into a single TiledVisionSensor whose resolution is
-        # fixed at creation -- a post-hoc per-sensor resize in the wrapper would be silently ignored.
+        # robot config HERE, before env creation. This is required (not just cleaner) whenever
+        # gm.ENABLE_TILED_RENDERING is set and num_envs > 1: robot cameras are then batched into a single
+        # TiledVisionSensor whose resolution is fixed at creation -- a post-hoc per-sensor resize in the
+        # wrapper would be silently ignored.
         # Resolve the wrapper class (without instantiating it -- that needs the env) to read its spec.
         camera_spec = get_class(env_wrapper["_target_"]).camera_spec()
         cfg["robots"][0]["obs_modalities"] = ["proprio", *camera_spec["modalities"]]

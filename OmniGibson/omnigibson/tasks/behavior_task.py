@@ -114,7 +114,9 @@ class BehaviorTask(BaseTask):
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
-        self.object_scope = None  # Maps str to sim object (BaseObject/BaseSystem) or None
+        # list of per-env dicts, one per env: object_scopes[env_idx] maps BDDL instance name (str) to
+        # sim object (BaseObject/BaseSystem) or None
+        self.object_scopes = None
         self.object_instance_to_category = None  # Maps str to str
         self.future_obj_instances = None  # set of str
 
@@ -167,7 +169,7 @@ class BehaviorTask(BaseTask):
     def _evaluate_predicate(self, env_idx, predicate_name, *entities):
         from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
 
-        return evaluate_bddl_predicate(predicate_name, *[self.object_scope[env_idx][ent] for ent in entities])
+        return evaluate_bddl_predicate(predicate_name, *[self.object_scopes[env_idx][ent] for ent in entities])
 
     def get_goal_option_satisfaction(self, env_idx):
         """
@@ -248,7 +250,7 @@ class BehaviorTask(BaseTask):
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
             for env_idx in range(env.num_envs):
-                for inst, entity in self.object_scope[env_idx].items():
+                for inst, entity in self.object_scopes[env_idx].items():
                     if "agent.n." in inst:
                         continue
                     if not is_system_bddl_inst(inst) and entity is not None:
@@ -293,7 +295,7 @@ class BehaviorTask(BaseTask):
 
         # Force wake objects
         for env_idx in env_indices:
-            for obj in self.object_scope[env_idx].values():
+            for obj in self.object_scopes[env_idx].values():
                 if obj is not None and isinstance(obj, DatasetObject):
                     obj.wake()
 
@@ -356,10 +358,10 @@ class BehaviorTask(BaseTask):
         self._compiled_rooms = None
 
         # Set up base object scope per-env (agent first, then base instances)
-        self.object_scope = [None] * env.num_envs
+        self.object_scopes = [None] * env.num_envs
         for env_idx in range(env.num_envs):
-            self.object_scope[env_idx] = {"agent.n.01_1": None}
-            self.object_scope[env_idx].update({name: None for name in base_scope})
+            self.object_scopes[env_idx] = {"agent.n.01_1": None}
+            self.object_scopes[env_idx].update({name: None for name in base_scope})
 
         # Object instance to category mapping (base only for now)
         self.object_instance_to_category = {
@@ -395,7 +397,7 @@ class BehaviorTask(BaseTask):
         self.activity_natural_language_goal_conditions = compiled.natural_language_goal_conditions
 
     def _finalize_object_scope(self, env_idx):
-        """Rebuild self.object_scope[env_idx] from self.compiled_task.object_scope.
+        """Rebuild self.object_scopes[env_idx] from self.compiled_task.object_scope.
 
         Called per env after compile. Preserves any objects already bound to base-scope
         instances so we don't lose assignments made before wildcard expansion.
@@ -403,7 +405,7 @@ class BehaviorTask(BaseTask):
         Args:
             env_idx (int): Index of the env whose scope should be rebuilt.
         """
-        scope = self.object_scope[env_idx]
+        scope = self.object_scopes[env_idx]
         existing = dict(scope)
         scope.clear()
         scope["agent.n.01_1"] = existing.get("agent.n.01_1")
@@ -427,7 +429,7 @@ class BehaviorTask(BaseTask):
         """
         room_instances = {}
         for obj_inst, room_type in self._base_inroom_assignments.items():
-            entity = self.object_scope[env_idx].get(obj_inst)
+            entity = self.object_scopes[env_idx].get(obj_inst)
             if entity is None:
                 continue
             # Find which room instance this object is in
@@ -470,11 +472,11 @@ class BehaviorTask(BaseTask):
             )
 
         # Per-env scope: rebuild against the compiled task's scope, preserving prior assignments
-        old_scope = dict(self.object_scope[env_idx])
+        old_scope = dict(self.object_scopes[env_idx])
         self._finalize_object_scope(env_idx)
         for inst, entity in old_scope.items():
-            if inst in self.object_scope[env_idx]:
-                self.object_scope[env_idx][inst] = entity
+            if inst in self.object_scopes[env_idx]:
+                self.object_scopes[env_idx][inst] = entity
 
     def get_potential(self, env, env_idx):
         # Bind env_idx into the predicate evaluator so check_goal sees an arity-2 callback
@@ -514,7 +516,7 @@ class BehaviorTask(BaseTask):
             env=env,
             env_idx=0,
             activity_conditions=self._base_conditions,
-            object_scope=self.object_scope[0],
+            object_scope=self.object_scopes[0],
         )
 
         if self.online_object_sampling:
@@ -572,7 +574,7 @@ class BehaviorTask(BaseTask):
             # TODO @wensi-ai: Assign objects to remaining wildcard objects. This is a no-op for 2026+ tasks.
             self._assign_wildcard_instances(env, env_idx)
             # assert that everything in the object scope that's not a future object is not None
-            for inst, entity in self.object_scope[env_idx].items():
+            for inst, entity in self.object_scopes[env_idx].items():
                 if inst not in self.future_obj_instances and entity is None:
                     raise ValueError(
                         f"Object instance '{inst}' (env_idx={env_idx}) was not assigned an entity during cache assignment!"
@@ -590,8 +592,8 @@ class BehaviorTask(BaseTask):
             env: The environment with the active scene.
             env_idx (int): Index of the env / scene to assign for.
         """
-        for inst in self.object_scope[env_idx]:
-            if self.object_scope[env_idx][inst] is not None:
+        for inst in self.object_scopes[env_idx]:
+            if self.object_scopes[env_idx][inst] is not None:
                 continue
             if "agent.n." in inst:
                 continue
@@ -599,8 +601,8 @@ class BehaviorTask(BaseTask):
             categories = set(og_categories_from_bddl_inst(inst))
             for obj in env.scenes[env_idx].objects:
                 # Check category match and that obj isn't already assigned
-                if obj.category in categories and obj not in self.object_scope[env_idx].values():
-                    self.object_scope[env_idx][inst] = obj
+                if obj.category in categories and obj not in self.object_scopes[env_idx].values():
+                    self.object_scopes[env_idx][inst] = obj
                     break
 
     def get_agent(self, env, env_idx=0):
@@ -631,7 +633,7 @@ class BehaviorTask(BaseTask):
         inst_to_name = scene.get_task_metadata(key="inst_to_name")
 
         # Assign object_scope based on a cached scene
-        for obj_inst in self.object_scope[env_idx]:
+        for obj_inst in self.object_scopes[env_idx]:
             if obj_inst in self.future_obj_instances:
                 entity = None
             elif obj_inst not in inst_to_name:
@@ -649,7 +651,7 @@ class BehaviorTask(BaseTask):
                     entity = scene.robots[idx]
                 else:
                     entity = scene.get_system(name) if is_system else scene.object_registry("name", name)
-            self.object_scope[env_idx][obj_inst] = entity
+            self.object_scopes[env_idx][obj_inst] = entity
 
     def update_bddl_scope_metadata(self, env, env_idx):
         """
@@ -669,7 +671,7 @@ class BehaviorTask(BaseTask):
             key="inst_to_name",
             data={
                 inst: _get_name(inst, entity)
-                for inst, entity in self.object_scope[env_idx].items()
+                for inst, entity in self.object_scopes[env_idx].items()
                 if entity is not None
             },
         )
@@ -680,7 +682,7 @@ class BehaviorTask(BaseTask):
         # Collect non-system instances with existence status, drawn from THIS env's scope only.
         obj_entries = [
             (inst, obj, obj is not None)
-            for inst, obj in self.object_scope[env_idx].items()
+            for inst, obj in self.object_scopes[env_idx].items()
             if not is_system_bddl_inst(inst)
         ]
 
@@ -742,16 +744,16 @@ class BehaviorTask(BaseTask):
         """
         # Each object belongs to exactly one scene. Find which env's scene owns this object
         # and update only that env's scope.
-        for env_idx in range(len(self.object_scope)):
+        for env_idx in range(len(self.object_scopes)):
             if obj.scene is not None and obj.scene is not self._env.scenes[env_idx]:
                 continue
-            for inst, entity in self.object_scope[env_idx].items():
+            for inst, entity in self.object_scopes[env_idx].items():
                 if (
                     entity is None
                     and not is_system_bddl_inst(inst)
                     and obj.category in set(og_categories_from_bddl_inst(inst))
                 ):
-                    self.object_scope[env_idx][inst] = obj
+                    self.object_scopes[env_idx][inst] = obj
                     return
 
     def _update_bddl_scope_from_removed_obj(self, obj):
@@ -762,12 +764,12 @@ class BehaviorTask(BaseTask):
         Args:
             obj (USDObject): Newly removed object
         """
-        for env_idx in range(len(self.object_scope)):
+        for env_idx in range(len(self.object_scopes)):
             if obj.scene is not None and obj.scene is not self._env.scenes[env_idx]:
                 continue
-            for inst, entity in self.object_scope[env_idx].items():
+            for inst, entity in self.object_scopes[env_idx].items():
                 if entity is not None and not is_system_bddl_inst(inst) and obj.name == entity.name:
-                    self.object_scope[env_idx][inst] = None
+                    self.object_scopes[env_idx][inst] = None
                     return
 
     def _update_bddl_scope_from_system_init(self, system):
@@ -778,16 +780,16 @@ class BehaviorTask(BaseTask):
         Args:
             system (BaseSystem): Newly initialized system
         """
-        for env_idx in range(len(self.object_scope)):
+        for env_idx in range(len(self.object_scopes)):
             if system.scene is not None and system.scene is not self._env.scenes[env_idx]:
                 continue
-            for inst, entity in self.object_scope[env_idx].items():
+            for inst, entity in self.object_scopes[env_idx].items():
                 if (
                     entity is None
                     and is_system_bddl_inst(inst)
                     and og_categories_from_bddl_inst(inst)[0] == system.name
                 ):
-                    self.object_scope[env_idx][inst] = system
+                    self.object_scopes[env_idx][inst] = system
                     return
 
     def _update_bddl_scope_from_system_clear(self, system):
@@ -798,12 +800,12 @@ class BehaviorTask(BaseTask):
         Args:
             system (BaseSystem): Newly cleared system
         """
-        for env_idx in range(len(self.object_scope)):
+        for env_idx in range(len(self.object_scopes)):
             if system.scene is not None and system.scene is not self._env.scenes[env_idx]:
                 continue
-            for inst, entity in self.object_scope[env_idx].items():
+            for inst, entity in self.object_scopes[env_idx].items():
                 if entity is not None and is_system_bddl_inst(inst) and system.name == entity.name:
-                    self.object_scope[env_idx][inst] = None
+                    self.object_scopes[env_idx][inst] = None
                     return
 
     def show_instruction(self, env_idx=0):
@@ -850,7 +852,7 @@ class BehaviorTask(BaseTask):
                 {gm.DATA_PATH}/2026-challenge-task-instances/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
             task_relevant_only (bool): Whether to only save the task relevant object scope states. If True, will only
-                call dump_state() on all the BDDL instances in self.object_scope, else will save the entire sim state
+                call dump_state() on all the BDDL instances in self.object_scopes, else will save the entire sim state
                 via env.scene.save()
             suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
@@ -879,7 +881,7 @@ class BehaviorTask(BaseTask):
         if task_relevant_only:
             task_relevant_state_dict = {
                 bddl_name: bddl_obj.dump_state(serialized=False)
-                for bddl_name, bddl_obj in env.task.object_scope[env_idx].items()
+                for bddl_name, bddl_obj in env.task.object_scopes[env_idx].items()
                 if bddl_obj is not None and "agent" not in bddl_name
             }
             Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)

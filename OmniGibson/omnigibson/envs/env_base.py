@@ -467,8 +467,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_task()
         self._load_external_sensors()
 
-        # When running multiple envs, batch all per-env robot cameras into a single tiled render product
-        # so that one render pass serves every env. Must be created before play (mirrors camera prims on the stage).
+        # When running multiple envs with gm.ENABLE_TILED_RENDERING, batch all per-env robot cameras into a
+        # single tiled render product so that one render pass serves every env. Must be created before play
+        # (mirrors camera prims on the stage). Otherwise every env renders through its own per-camera render
+        # product, exactly as in the single-env case.
         if self._tiled_sensor is not None:
             # In case of a reload, remove the stale tiled sensor first (no-op if og.clear() already did)
             self._tiled_sensor.remove()
@@ -476,7 +478,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         has_vision_sensors = any(
             isinstance(sensor, VisionSensor) for robot in self._scenes[0].robots for sensor in robot.sensors.values()
         )
-        if self.num_envs > 1 and has_vision_sensors:
+        if gm.ENABLE_TILED_RENDERING and self.num_envs > 1 and has_vision_sensors:
             # Creating the tiled render product and attaching annotators edits the USD stage
             with og.sim.editing_usd():
                 self._tiled_sensor = TiledVisionSensor(envs=self._scenes)
@@ -497,9 +499,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Build sensor registry for get_obs()
         self._build_sensor_registry()
 
-        # Robot camera observations come from the tiled render product in multi-env mode. Pause the
-        # individual render products: hiding their UI viewports is a no-op in headless mode and leaves
-        # those unused products rendering every frame alongside the tiled product.
+        # When tiled rendering is active, robot camera observations come from the tiled render product.
+        # Pause the individual render products: hiding their UI viewports is a no-op in headless mode and
+        # leaves those unused products rendering every frame alongside the tiled product.
         keep_individual_render_products = os.getenv("OMNIGIBSON_KEEP_INDIVIDUAL_RENDER_PRODUCTS", "0") == "1"
         if self._tiled_sensor is not None and not keep_individual_render_products:
             with og.sim.editing_usd():
