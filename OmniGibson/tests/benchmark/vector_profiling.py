@@ -21,6 +21,9 @@ parser.add_argument("-d", "--deep-profiling", action="store_true")
 
 NUM_STEPS = 300
 
+# Activity used for the "behavior" task type; must have a pre-sampled template for the scene below.
+BEHAVIOR_ACTIVITY_NAME = "bringing_water"
+
 
 def apply_macros(args):
     # BehaviorTask relies on object states (and transition rules) to evaluate its
@@ -44,30 +47,58 @@ def make_config(args):
 
     if args.task_type == "behavior":
         # Cached BehaviorTask requires (scene, activity) pair with pre-sampled template JSON.
-        # house_single_floor + bringing_water is one such pair; loading the full scene (no
-        # load_object_categories filter) because the cached template includes task objects.
+        # house_single_floor + bringing_water is one such pair.
+        #
+        # Restrict loading to the rooms the activity actually needs, using the same
+        # B100_task_misc.csv metadata the challenge evaluator reads (see
+        # omnigibson/eval/utils/eval_utils.py). house_single_floor has 21 room instances /
+        # 595 objects; bringing_water needs 7 of them. Loading the full house multiplies by
+        # n_envs and exhausts GPU memory well before n_envs=10, which is exactly the
+        # configuration this benchmark exists to measure -- and it is not how the stack is
+        # used in practice, since eval always loads a room subset.
         cfg["scene"] = {
             "type": "InteractiveTraversableScene",
             "scene_model": "house_single_floor",
         }
+        try:
+            from omnigibson.eval.utils.eval_utils import TASK_NAMES_TO_ROOMS
+
+            rooms = TASK_NAMES_TO_ROOMS.get(BEHAVIOR_ACTIVITY_NAME)
+        except Exception as e:  # metadata CSV absent -> fall back to the full scene
+            print(f"[vector_profiling] Could not read challenge room metadata ({e}); loading full scene.")
+            rooms = None
+        if rooms:
+            cfg["scene"]["load_room_instances"] = rooms
+            print(f"[vector_profiling] Loading {len(rooms)} room instance(s) for {BEHAVIOR_ACTIVITY_NAME}: {rooms}")
+        else:
+            print(f"[vector_profiling] No room metadata for {BEHAVIOR_ACTIVITY_NAME}; loading full scene.")
     else:
         cfg["scene"] = {
             "type": "InteractiveTraversableScene",
             "scene_model": "Rs_int",
             "load_object_categories": ["floors", "breakfast_table"],
         }
-    cfg["robots"] = [
-        {
-            "model": "r1pro",
-            "obs_modalities": ["rgb"] if args.rendering else ["proprio"],
-            "position": [-1.3, 0.5, 0.0],
-            "orientation": [0.0, 0.0, 0.7071, -0.7071],
-        }
-    ]
+    robot_cfg = {
+        "model": "r1pro",
+        "obs_modalities": ["rgb"] if args.rendering else ["proprio"],
+    }
+    if args.task_type != "behavior":
+        # Pose hand-picked for Rs_int (beside the breakfast_table). Only valid for the
+        # Rs_int-based task types.
+        robot_cfg["position"] = [-1.3, 0.5, 0.0]
+        robot_cfg["orientation"] = [0.0, 0.0, 0.7071, -0.7071]
+    # BehaviorTask deliberately gets NO pose here: it places the robot from the scene's
+    # presampled robot_poses metadata (behavior_task.py, use_presampled_robot_pose). Seeding
+    # an Rs_int pose into house_single_floor spawns the robot inside geometry, and because
+    # Environment.load() runs post_play_load -> scene.reset() -> step_physics() *before*
+    # BehaviorTask.reset() ever applies the presampled pose, that first physics step
+    # diverges to NaN. This matches how the challenge evaluator configures its robot
+    # (omnigibson/eval/r1pro.yaml declares no position).
+    cfg["robots"] = [robot_cfg]
     if args.task_type == "behavior":
         cfg["task"] = {
             "type": "BehaviorTask",
-            "activity_name": "bringing_water",
+            "activity_name": BEHAVIOR_ACTIVITY_NAME,
             "activity_definition_id": 0,
             "online_object_sampling": False,
         }
