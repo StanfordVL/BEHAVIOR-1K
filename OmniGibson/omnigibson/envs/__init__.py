@@ -1,3 +1,4 @@
+from omnigibson.envs.action_guard_wrapper import ActionGuardDecision, ActionGuardWrapper, ActionRejectedError
 from omnigibson.envs.data_wrapper import DataWrapper, DataPlaybackWrapper
 from omnigibson.envs.hdf5_data_wrapper import HDF5CollectionWrapper, HDF5PlaybackWrapper
 from omnigibson.envs.lerobot_data_wrapper import LeRobotDataWrapper, LeRobotPlaybackWrapper
@@ -9,6 +10,9 @@ from omnigibson.envs.vec_env_base import VectorEnvironment
 
 __all__ = [
     "create_wrapper",
+    "ActionGuardDecision",
+    "ActionGuardWrapper",
+    "ActionRejectedError",
     "DataWrapper",
     "DataPlaybackWrapper",
     "HDF5CollectionWrapper",
