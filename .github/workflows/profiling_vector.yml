@@ -68,27 +68,27 @@ jobs:
           - name: "10env-norender-behavior-states"
             args: "--n-envs 10 --task-type behavior --object-states"
             label: "10 envs, no render, behavior, states on"
-          - name: "8env-render-simple-nostates"
-            args: "--n-envs 8 --rendering"
-            label: "8 envs, render, simple, states off"
-          - name: "8env-render-simple-states"
-            args: "--n-envs 8 --rendering --object-states"
-            label: "8 envs, render, simple, states on"
-          - name: "8env-render-behavior-states"
-            args: "--n-envs 8 --rendering --task-type behavior --object-states"
-            label: "8 envs, render, behavior, states on"
+          - name: "10env-render-simple-nostates"
+            args: "--n-envs 10 --rendering"
+            label: "10 envs, render, simple, states off"
+          - name: "10env-render-simple-states"
+            args: "--n-envs 10 --rendering --object-states"
+            label: "10 envs, render, simple, states on"
+          - name: "10env-render-behavior-states"
+            args: "--n-envs 10 --rendering --task-type behavior --object-states"
+            label: "10 envs, render, behavior, states on"
           - name: "10env-norender-navigation-nostates"
             args: "--n-envs 10 --task-type navigation"
             label: "10 envs, no render, navigation, states off"
           - name: "10env-norender-navigation-states"
             args: "--n-envs 10 --task-type navigation --object-states"
             label: "10 envs, no render, navigation, states on"
-          - name: "8env-render-navigation-nostates"
-            args: "--n-envs 8 --rendering --task-type navigation"
-            label: "8 envs, render, navigation, states off"
-          - name: "8env-render-navigation-states"
-            args: "--n-envs 8 --rendering --task-type navigation --object-states"
-            label: "8 envs, render, navigation, states on"
+          - name: "10env-render-navigation-nostates"
+            args: "--n-envs 10 --rendering --task-type navigation"
+            label: "10 envs, render, navigation, states off"
+          - name: "10env-render-navigation-states"
+            args: "--n-envs 10 --rendering --task-type navigation --object-states"
+            label: "10 envs, render, navigation, states on"
 
     defaults:
       run:
@@ -188,7 +188,7 @@ jobs:
               "Vram usage": "VRAM (GB)",
           }
           HIGHER_IS_BETTER = {"FPS"}
-          N_ENV_GROUPS = ["1 env", "8 envs", "10 envs"]
+          N_ENV_GROUPS = ["1 env", "10 envs"]
           REFERENCE_GROUP = N_ENV_GROUPS[0]
 
           def fmt(metric, value):
