@@ -189,6 +189,7 @@ jobs:
           }
           HIGHER_IS_BETTER = {"FPS"}
           N_ENV_GROUPS = ["1 env", "10 envs"]
+          REFERENCE_GROUP = N_ENV_GROUPS[0]
 
           def fmt(metric, value):
               if value is None:
@@ -203,6 +204,17 @@ jobs:
               emoji = "⚪" if abs(pct) < 5 else ("🟢" if is_better else "🔴")
               sign = "+" if pct > 0 else ""
               return f" ({sign}{pct:.1f}% {emoji})"
+
+          # Ratio of this scenario against the same scenario at REFERENCE_GROUP env count, so the
+          # multi-env rows show how each metric scales with n_envs (e.g. "x4.2" load, "x9.0" FPS).
+          def scaling(label, metric, value):
+              if value is None or ", " not in label:
+                  return ""
+              ref_label = REFERENCE_GROUP + ", " + label.split(", ", 1)[1]
+              ref_val = pr.get(ref_label, {}).get(metric)
+              if ref_val is None or ref_val == 0:
+                  return ""
+              return f" [x{value / ref_val:.1f}]"
 
           lines = ["## Vector Profiling Report\n"]
           if not has_base:
@@ -229,6 +241,8 @@ jobs:
                       cell = fmt(m, pv)
                       if has_base and pv is not None:
                           cell += delta(m, pv, bv)
+                      if group != REFERENCE_GROUP:
+                          cell += scaling(label, m, pv)
                       row += f" | {cell}"
                   lines.append(row + " |")
 
@@ -239,6 +253,9 @@ jobs:
           lines.append("- ⚪ Change < 5%")
           lines.append("- **FPS**: higher is better. All other metrics: lower is better.")
           lines.append("- FPS = total throughput across all envs (n_envs × per-env FPS)")
+          lines.append(f"- `[xN.N]` = ratio against the same scenario at {REFERENCE_GROUP}. "
+                       "For FPS this is the throughput speed-up (higher is better); "
+                       "for every other metric it is the growth factor (lower is better).")
           lines.append("\n</details>")
 
           report = "\n".join(lines)
