@@ -4,6 +4,23 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 ---
 
+### 08/24/2026 {#08242026}
+
+**Challenge rule clarifications:**
+
+1. Please use the latest `main` branch of the `BEHAVIOR-1K` repository for challenge evaluation. It includes the fixes below, which were merged after the `v3.9.1` tag.
+
+**Bug fixes:**
+
+1. Updated partial-scene evaluation to load the exact room instances specified for each task in `B100_task_misc.csv`. This keeps the evaluation scene consistent with the challenge task metadata.
+2. Fixed observation loading with `RGBDFullResWrapper` by refreshing simulator handles after changing camera resolutions and before rebuilding the observation space.
+
+**New features:**
+
+1. Added support for manually building and publishing branch-specific `behavior-dev` and `behavior-gha` Docker images through the container-build GitHub Actions workflow.
+
+---
+
 ### 07/27/2026 {#07272026}
 
 **Challenge rule clarifications:**
