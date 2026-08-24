@@ -26,7 +26,7 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 **New features:**
 
-1. Introduced a participant registration form for the 2026 BEHAVIOR Challenge.
+1. Introduced a [participant registration form](https://forms.gle/Kf4ABLmDKbuK5Yhj6) for the 2026 BEHAVIOR Challenge.
 
 ---
 
