@@ -52,6 +52,39 @@ def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: 
         obj._recorded_non_kin_state_names = set(recorded_obj_state.get("non_kin", {}))
 
 
+def _recorded_non_kin_state_name_union(recorded_scene_file: dict) -> set[str] | None:
+    """Returns the union of every recorded object's non-kinematic state names.
+
+    Objects added mid-episode by recorded transitions have no per-name entry in the
+    recorded initial scene file, so ``_align_scene_object_states_with_recorded_schema``
+    can never stamp them and they would deserialize with the CURRENT code's state
+    schema instead of the recording's, corrupting the serialized-state walk for every
+    subsequent object in the row. The union over all recorded objects is the
+    recording's non-kin state vocabulary: any state name absent from it (e.g. one that
+    became stateful only after the data was collected) was never serialized by the
+    collection code, so stamping an added object with the union makes ``deserialize``
+    skip exactly the states the recording could not contain, while every state the
+    added object shares with the vocabulary is still consumed.
+
+    Returns None when the recorded scene file carries no per-object registry state, in
+    which case there is nothing to align (matching
+    ``_align_scene_object_states_with_recorded_schema``'s no-op in that case).
+    """
+    state = recorded_scene_file.get("state", {})
+    object_registry_state = (
+        state.get("registry", {}).get("object_registry", {})
+        if "registry" in state
+        else state.get("object_registry", {})
+    )
+    if not object_registry_state:
+        return None
+
+    names: set[str] = set()
+    for recorded_obj_state in object_registry_state.values():
+        names.update(recorded_obj_state.get("non_kin", {}))
+    return names
+
+
 class DataWrapper(EnvironmentWrapper):
     """
     An OmniGibson environment wrapper for writing data to a dataset file.
@@ -780,10 +813,17 @@ class DataPlaybackWrapper(DataWrapper):
                         continue
                     obj = scene.object_registry("name", remove_obj_name)
                     scene.remove_object(obj)
+                recorded_non_kin_names = _recorded_non_kin_state_name_union(self.recorded_scene_file)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
                     if _is_system_particle_template_info(add_obj_info, added_systems):
                         continue
                     obj = create_object_from_init_info(add_obj_info)
+                    # Transition-added objects have no entry in the recorded scene file, so
+                    # _align_scene_object_states_with_recorded_schema cannot stamp them; align
+                    # them with the recording's non-kin state vocabulary instead so that
+                    # deserializing subsequent state rows consumes the recorded layout.
+                    if recorded_non_kin_names is not None:
+                        obj._recorded_non_kin_state_names = set(recorded_non_kin_names)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
                 # Step physics to initialize any new objects
