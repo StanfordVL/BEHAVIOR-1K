@@ -12,12 +12,29 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 **Bug fixes:**
 
-1. Updated partial-scene evaluation to load the exact room instances specified for each task in `B100_task_misc.csv`. This keeps the evaluation scene consistent with the challenge task metadata.
-2. Fixed observation loading with `RGBDFullResWrapper` by refreshing simulator handles after changing camera resolutions and before rebuilding the observation space.
+1. Updated the 2026 challenge demonstration dataset to correct robot velocity observations in `observation.state`:
+    - `base_qvel` now uses the robot base velocity in the local robot frame.
+    - Arm, gripper, and trunk `qvel` fields now use raw simulator joint velocities from the original HDF5 demonstrations.
+    - `meta/stats.json` was recomputed to reflect the corrected velocity values.
+
+    The affected state fields are:
+
+    - `state[0:3]`: `base_qvel`
+    - `state[10:17]`: `arm_left_qvel`
+    - `state[26:28]`: `gripper_left_qvel`
+    - `state[35:42]`: `arm_right_qvel`
+    - `state[51:53]`: `gripper_right_qvel`
+    - `state[57:61]`: `trunk_qvel`
+
+    Actions, videos, annotations, episode metadata, and all non-velocity state dimensions are unchanged.
+2. Updated partial-scene evaluation to load the exact room instances specified for each task in `B100_task_misc.csv`. This keeps the evaluation scene consistent with the challenge task metadata.
+3. Fixed observation loading with `RGBDFullResWrapper` by refreshing simulator handles after changing camera resolutions and before rebuilding the observation space.
+4. Fixed bugs affecting the challenge leaderboard and submission form.
 
 **New features:**
 
-1. Added support for manually building and publishing branch-specific `behavior-dev` and `behavior-gha` Docker images through the container-build GitHub Actions workflow.
+1. Introduced a participant registration form for the 2026 BEHAVIOR Challenge.
+2. Added support for manually building and publishing branch-specific `behavior-dev` and `behavior-gha` Docker images through the container-build GitHub Actions workflow.
 
 ---
 
