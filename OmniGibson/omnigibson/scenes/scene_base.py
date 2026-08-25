@@ -739,7 +739,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Remove from omni stage
             obj.remove()
 
-    def reset(self, hard=True):
+    def reset(self, hard=True, step_physics=True):
         """
         Resets this scene
 
@@ -747,6 +747,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             hard (bool): If set, will force the set of active objects currently in the sim to match
                 the specified objects stored in self._initial_file. Otherwise, will only load the kinematic and semantic
                 state for any objects that are currently in the sim, ignoring any additional / missing objects
+            step_physics (bool): If set, takes a physics step after loading the state, which settles the restored
+                state before it is read back. Note that a physics step is global: it advances *every* scene in the
+                simulator, not just this one. A caller resetting several scenes in a loop must therefore pass False
+                here and take a single og.sim.step_physics() once the loop is done -- otherwise the scene reset
+                first is advanced once per remaining scene while the scene reset last is never advanced at all,
+                making the post-reset state a function of the scene's slot index.
         """
         # Make sure the simulator is playing
         assert og.sim.is_playing(), "Simulator must be playing in order to reset the scene!"
@@ -760,7 +766,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         else:
             self.load_state(self._initial_file["state"], serialized=False)
 
-        og.sim.step_physics()
+        if step_physics:
+            og.sim.step_physics()
 
     def save(self, json_path=None, as_dict=False):
         """
@@ -876,6 +883,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def restore(self, scene_file, update_initial_file=False):
         """
         Restores this scene given @scene_file
+
+        This does NOT move the scene prim to the pose recorded in @scene_file: that
+        pose identifies the frame the file was captured in, and object poses are
+        re-based from it into this scene's current frame. See ``_dump_state``.
 
         Args:
             scene_file (str or dict): Full path of either JSON file or loaded scene file to load, which contains
@@ -1243,6 +1254,23 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._objects_info
 
     def _dump_state(self):
+        """Dumps this scene's state.
+
+        The ``pos``/``ori`` entries record **the scene frame the state was captured
+        in**. They are provenance, not a target pose: ``_load_state`` uses them to
+        re-base object poses out of the capture frame and into this scene's frame,
+        and never moves the scene prim itself.
+
+        This is a deliberate deviation from a literal ``Serializable`` round trip:
+        after ``state = scene.dump_state(); scene.set_position_orientation(...);
+        scene.load_state(state)`` the scene stays where it was moved to, and its
+        objects come back re-based onto that new pose. The scene prim's pose belongs
+        to the loader, which owns multi-scene tiling (see
+        ``_load_scene_prim_with_objects``); letting a state dump move it collapses
+        every scene onto the capture frame's cell at ``num_envs > 1``, where objects
+        from different scenes physically collide, because tiling is the only
+        cross-scene isolation there is. ``Scene.restore`` inherits this behavior.
+        """
         # Default state for the scene is from the registry alone
         pos, ori = self.get_position_orientation()
         return {
@@ -1255,11 +1283,82 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Load scene state, then registry
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
-            self.set_position_orientation(position=state["pos"], orientation=state["ori"])
-            # Now update the rest of the state as normal
-            self._registry.load_state(state=state["registry"], serialized=False)
+            # The recorded ("pos", "ori") entries define the SCENE POSE THE STATE WAS
+            # CAPTURED IN, not a pose this scene should move to. The scene keeps its own
+            # prim pose (multi-scene tiling is owned by the loader, see
+            # _load_scene_prim_with_objects); if the recorded frame differs from this
+            # scene's, every pose-bearing object state is re-based from the recorded
+            # scene frame into this scene's frame before loading — the load_state
+            # counterpart of the per-scene conversion initialize() applies to the
+            # initial scene file.
+            #
+            # The previous behavior (set this scene's prim pose to the recorded pose and
+            # load object poses raw) collapses every scene onto the recording's cell at
+            # num_envs > 1: single-scene recordings store the origin, so all scenes'
+            # objects were physically injected into scene 0's world cell, where they
+            # collide across scenes (no cross-scene collision filtering exists).
+            rec_pos = th.as_tensor(state["pos"], dtype=th.float32).reshape(3)
+            rec_ori = th.as_tensor(state["ori"], dtype=th.float32).reshape(4)
+            cur_pos, cur_ori = self.get_position_orientation()
+            registry_state = state["registry"]
+            if not (th.equal(rec_pos, cur_pos) and th.equal(rec_ori, cur_ori)):
+                # rel = cur ∘ rec⁻¹ maps recorded-frame world poses into this scene's
+                # world frame. When rec == cur (single-env replay, initialize(), or a
+                # same-session save/load) the branch above keeps the load bit-identical
+                # to the raw path.
+                inv_rec_pos, inv_rec_ori = T.invert_pose_transform(rec_pos, rec_ori)
+                rel_pos, rel_ori = T.pose_transform(cur_pos, cur_ori, inv_rec_pos, inv_rec_ori)
+                registry_state = self._rebase_registry_state_poses(registry_state, rel_pos, rel_ori)
+            self._registry.load_state(state=registry_state, serialized=False)
         else:
             self._registry.load_state(state=state, serialized=False)
+
+    @staticmethod
+    def _rebase_registry_state_poses(registry_state, rel_pos, rel_ori):
+        """Returns a copy of @registry_state with object poses transformed by (rel_pos, rel_ori).
+
+        Transforms, for every object_registry entry that carries a "root_link" dict:
+        - "pos"/"ori": rigid pose composition rel ∘ (pos, ori)
+        - "lin_vel"/"ang_vel": free vectors, rotated by rel_ori
+        - "particle_positions"/"particle_velocities" (cloth): points transformed /
+          vectors rotated
+
+        system_registry states are NOT touched: particle systems dump and load their
+        particle poses in the scene frame already (see BaseSystem._dump_state), so they
+        are frame-correct without conversion.
+
+        The input dicts are never mutated (callers such as Scene.restore() reuse loaded
+        state dicts across calls); only the re-based leaves are replaced in copies.
+        """
+        rebased = dict(registry_state)
+        object_registry = registry_state.get("object_registry")
+        if object_registry is None:
+            return rebased
+        new_object_registry = {}
+        for name, obj_state in object_registry.items():
+            root = obj_state.get("root_link") if isinstance(obj_state, dict) else None
+            if not isinstance(root, dict) or "pos" not in root:
+                new_object_registry[name] = obj_state
+                continue
+            new_root = dict(root)
+            new_root["pos"], new_root["ori"] = T.pose_transform(
+                rel_pos,
+                rel_ori,
+                th.as_tensor(root["pos"], dtype=th.float32).reshape(3),
+                th.as_tensor(root["ori"], dtype=th.float32).reshape(4),
+            )
+            for vec_key in ("lin_vel", "ang_vel", "particle_velocities"):
+                if vec_key in root:
+                    vec = th.as_tensor(root[vec_key], dtype=th.float32)
+                    new_root[vec_key] = T.quat_apply(rel_ori, vec).reshape(vec.shape)
+            if "particle_positions" in root:
+                pts = th.as_tensor(root["particle_positions"], dtype=th.float32)
+                new_root["particle_positions"] = (T.quat_apply(rel_ori, pts) + rel_pos).reshape(pts.shape)
+            new_obj_state = dict(obj_state)
+            new_obj_state["root_link"] = new_root
+            new_object_registry[name] = new_obj_state
+        rebased["object_registry"] = new_object_registry
+        return rebased
 
     def serialize(self, state):
         return th.cat([state["pos"], state["ori"], self._registry.serialize(state=state["registry"])])
