@@ -660,14 +660,29 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
     @classmethod
     def post_update(cls):
-        """Sync visual marker colors for changed objects."""
+        """Sync visual marker colors for changed objects.
+
+        Overrides (does not extend) TensorizedState.post_update, so it must repeat that
+        method's guards itself.
+        """
+        if cls.VALUES_CPU is None or cls.VALUES_CPU.numel() == 0:
+            return
         diff = cls.VALUES_CPU != cls.PREV_VALUES
         changed_mask = th.any(diff, dim=tuple(range(2, diff.ndim))) if diff.ndim > 2 else diff
         for s_idx in range(cls.VALUES_CPU.shape[0]):
             for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
                 obj = cls.IDX_OBJS[s_idx][obj_idx]
+                if obj is None:
+                    # Column vacated in this scene (e.g. mid-play object removal) but kept
+                    # alive by another scene sharing the relative prim path — see IDX_OBJS.
+                    continue
                 obj.state_updated()
                 marker = cls.visual_markers[s_idx][obj_idx]
+                # Assets without a togglebutton meta link get no marker (_init_marker leaves
+                # the entry None and skips them); there is no color to sync. Same guard as
+                # _check_overlap's.
+                if marker is None:
+                    continue
                 marker.color = cls.COLOR_ON if bool(cls.VALUES_CPU[s_idx, obj_idx].item()) else cls.COLOR_OFF
 
     def _get_value(self):
