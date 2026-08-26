@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import torch as th
 
+import omnigibson as og
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import Registerable, classproperty
@@ -135,9 +136,14 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         Args:
             env (Environment): environment instance
         """
-        # Reset all scenes to their initial stored configuration
+        # Reset all scenes to their initial stored configuration, then settle them with a single shared physics
+        # step. og.sim.step_physics() advances every scene at once, so stepping inside the loop would advance the
+        # first scene once per remaining scene and the last scene not at all -- and because the caller snapshots
+        # each scene's initial file right after this, that slot-ordered drift would be baked into the state every
+        # subsequent reset() restores to.
         for scene in env.scenes:
-            scene.reset(hard=False)
+            scene.reset(hard=False, step_physics=False)
+        og.sim.step_physics()
 
         # Compute the low dimensional observation dimension. Obs keys and shape are task-defined
         # and identical across envs, so env 0 is canonical.
@@ -187,8 +193,13 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             env (Environment): environment instance
             env_indices (th.Tensor): Indices of environments to reset
         """
+        # Reset every requested scene first, then take one shared physics step. og.sim.step_physics() is global, so
+        # stepping per scene inside the loop would give the first-reset scene one extra step per remaining scene and
+        # the last-reset scene none, making the post-reset state a deterministic function of the scene's slot index
+        # instead of matching single-env semantics.
         for idx in env_indices:
-            env.scenes[idx].reset()
+            env.scenes[idx].reset(step_physics=False)
+        og.sim.step_physics()
 
     def _reset_agent(self, env, env_indices):
         """
