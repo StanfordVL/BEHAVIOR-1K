@@ -27,14 +27,13 @@ Key deviations from the single-env upstream, each intentional:
   before applying that step's transitions, so a goal produced by the final
   step's transition can only be observed on a step the recording does not
   contain -- which is why such a demo used to be scored a fail with nothing in
-  its row explaining why (task-0040 demo 400100: transition at 4852 of 4853
-  steps, popcorn never created, both predicates unsatisfied). Applying it
-  in-loop is what the old skip avoided, because the deterministic hold would
-  then keep re-injecting a final recorded row whose serialized layout predates
-  the added objects. The terminal pass sidesteps both problems: it runs once
-  the loop is over, re-injects the final recorded row (topology still matches),
-  applies the transition, settles, and takes ONE extra batched step to read the
-  post-transition verdict. See _apply_terminal_transitions.
+  its row explaining why. A transition on the final action step needs no
+  special handling: it is applied in-loop like any other, and on an offset-1
+  recording the following iteration injects the trailing state row -- the
+  authoritative post-transition state, serialized against exactly the topology
+  the transition just created. Only an offset-0 recording (no trailing row)
+  whose success appears solely at its last verdict is unscoreable; see
+  unreplayable_recording_step.
 - Finished demos hold: once demo i's steps are exhausted, its final recorded
   state row keeps being re-injected and its final action re-applied until the
   longest demo in the batch finishes (deterministic hold).
@@ -231,11 +230,20 @@ class VectorReplayHarness:
             ``episode_<N>.hdf5`` -- identifier only, documented here),
         task_id (int), task_name (str),
         demo_group (str or None): HDF5 group replayed, e.g. "demo_3",
-        n_steps (int or None): replayed steps in that group -- the minimum
-            dataset length across action/state/state_size/reward/terminated/
-            truncated, matching upstream playback's zip iteration semantics,
-        status (str): "pass" (fresh success at final step), "fail", or
-            "replay_error" (designed malformed-demo row, see module docstring),
+        n_steps (int or None): the demo's RECORDED length -- its action /
+            reward / terminated / truncated row count, which the shape contract
+            requires to be equal (see validate_demo_shape). NOT the number of
+            replay iterations: an offset-1 recording is replayed for one step
+            more, to inject its trailing post-final-action state row,
+        status (str): the comparison's outcome, a function of BOTH sides --
+            "pass" (fresh and recorded both report success), "fail" (no fresh
+            success), "fresh_only_success" (fresh reached the goal on a
+            recording that never claimed it -- a disagreement, quarantined, and
+            never counted as a pass), "unreplayable_recording" (see
+            unreplayable_recording_step), or "replay_error" (designed
+            malformed-demo row, see module docstring). The reporter may further
+            reclassify "fail" as "agrees_not_successful" when the recording
+            never claimed success AND the two agreed at every step,
         fresh_success_final (bool or None): env.task.success[i] at the demo's
             final recorded step,
         first_fresh_success_step (int or None): first step where the fresh
@@ -256,14 +264,15 @@ class VectorReplayHarness:
             CONSTRUCTION (see class docstring's "Slots are not interchangeable"),
             so this is the field that makes slot-correlated failures
             computable after the fact,
-        terminal_transition_step (int or None): the demo's final recorded step,
-            when a transition recorded there was applied by the terminal pass
-            and the verdict below was read from the extra step that followed.
-            None for every ordinary demo. Makes the class computable in the
-            campaign's output instead of looking like an unexplained fail,
+        terminal_transition_step (int or None): the demo's final recorded
+            action step when a transition is recorded there, else None.
+            Descriptive: such a transition needs no special handling, because
+            an offset-1 recording's trailing state row is the authoritative
+            post-transition state and is injected on the following iteration.
+            Kept so the class stays computable in the campaign's output,
         unreplayable_recording_step (int or None): set when the demo matches the
-            recording-boundary rule (see unreplayable_recording_step): its only
-            recorded success is produced by a transition on its final replayed
+            recording-boundary rule (see unreplayable_recording_step): the
+            recording has no trailing post-final-action state row and its only
             step, so no replay can score it. Such a demo is still REPLAYED and
             its partial goal_status kept -- the row's status becomes
             "unreplayable_recording" rather than "fail". A row carrying this field
@@ -545,6 +554,91 @@ class VectorReplayHarness:
         self._merged_scene_file = merged_scene_file
         return env
 
+    @staticmethod
+    def validate_demo_shape(*, path, episode_id, action, reward, terminated, truncated, state, state_size, transitions):
+        """Validates one demo's dataset shapes and returns (n_verdicts, n_state_rows, state_offset).
+
+        Split out of _read_demo so the contract is a pure function of the shapes and can
+        be exercised directly: every rejection below is a way a recording can be
+        truncated or malformed, and each one used to be absorbed silently.
+
+        Raises:
+            ValueError: on any unsupported shape. The caller turns this into a
+                replay_error row rather than replaying a recording it cannot trust.
+        """
+        # ---- Dataset-shape contract ----
+        # Collection stores S0 at reset and S(i+1) after action i, so a recording has
+        # n_verdicts actions and n_verdicts + 1 state rows. Some recordings carry no
+        # trailing row (state == action); those two are the ONLY shapes the 2026 dataset
+        # exhibits (censused over the local cache: 54 files at offset 1, 13 at offset 0,
+        # nothing else). Anything else is a truncated or malformed file.
+        #
+        # The previous behavior -- min() over all six lengths, matching upstream's zip --
+        # silently absorbed truncation AND, on every offset-1 recording, discarded the
+        # trailing state row: the authoritative post-final-action state, the one the
+        # recording's own last verdict was computed on. A demo whose success first appears
+        # there was then unscoreable for a reason that did not exist.
+        lengths = {
+            name: int(tensor.shape[0])
+            for name, tensor in (
+                ("action", action),
+                ("reward", reward),
+                ("terminated", terminated),
+                ("truncated", truncated),
+                ("state", state),
+                ("state_size", state_size),
+            )
+        }
+        verdict_lengths = {name: lengths[name] for name in ("action", "reward", "terminated", "truncated")}
+        state_lengths = {name: lengths[name] for name in ("state", "state_size")}
+        if len(set(verdict_lengths.values())) != 1:
+            raise ValueError(
+                f"Demo group demo_{episode_id} in {path}: the per-action datasets must all have the "
+                f"same length, got {verdict_lengths}. This recording is truncated or malformed; "
+                f"replaying the shortest would silently drop recorded actions and verdicts."
+            )
+        if len(set(state_lengths.values())) != 1:
+            raise ValueError(
+                f"Demo group demo_{episode_id} in {path}: state and state_size must have the same "
+                f"length, got {state_lengths}."
+            )
+        n_verdicts = lengths["action"]
+        n_state_rows = lengths["state"]
+        if n_verdicts == 0:
+            raise ValueError(f"Demo group demo_{episode_id} in {path} has zero recorded steps")
+        state_offset = n_state_rows - n_verdicts
+        if state_offset not in (0, 1):
+            raise ValueError(
+                f"Demo group demo_{episode_id} in {path}: {n_state_rows} state rows for "
+                f"{n_verdicts} recorded actions (offset {state_offset}). The supported formats are "
+                f"offset 1 (a trailing post-final-action state row) and offset 0 (no trailing row); "
+                f"any other shape means the file is truncated."
+            )
+        # Every state row must declare a usable serialized length. A zero, negative,
+        # non-integral or over-wide entry would slice the padded row wrongly and
+        # deserialize garbage -- silently, since deserialize walks whatever it is handed.
+        state_width = int(state.shape[1])
+        sizes = state_size.to(th.int64) if state_size.dtype.is_floating_point else state_size
+        if state_size.dtype.is_floating_point and not bool(th.equal(state_size, sizes.to(state_size.dtype))):
+            raise ValueError(f"Demo group demo_{episode_id} in {path}: state_size holds non-integral values.")
+        bad = [(int(i), int(sizes[i])) for i in range(n_state_rows) if not (0 < int(sizes[i]) <= state_width)]
+        if bad:
+            raise ValueError(
+                f"Demo group demo_{episode_id} in {path}: {len(bad)} state_size entries are not in "
+                f"(0, {state_width}] (row, value) {bad[:10]}{' ...' if len(bad) > 10 else ''}."
+            )
+        # A transition is indexed by the action step it follows, so it is reachable only at
+        # an index the replay actually steps. An unreachable one changes what the demo can
+        # achieve, so it is a malformed recording, not a warning.
+        unreachable_transitions = sorted(step for step in (int(k) for k in transitions) if step > n_verdicts - 1)
+        if unreachable_transitions:
+            raise ValueError(
+                f"Demo group demo_{episode_id} in {path} records transition(s) at step(s) "
+                f"{unreachable_transitions}, beyond its {n_verdicts} recorded actions; they can "
+                f"never be applied, so the demo's verdict cannot be reproduced."
+            )
+        return n_verdicts, n_state_rows, state_offset
+
     def _read_demo(self, path, demo_id):
         """Loads one demo's replay data from HDF5 into torch tensors.
 
@@ -585,43 +679,29 @@ class VectorReplayHarness:
                 f"expected 2-D (n_steps, dim) arrays, got action ndim={action.ndim}, "
                 f"state ndim={state.ndim}"
             )
-        # Upstream playback iterates zip(action, state, state_size, reward, terminated,
-        # truncated), so the SHORTEST dataset governs the step count. Raw demos really do
-        # differ (action sometimes has n-1 rows vs state's n); mirror the zip semantics and
-        # record the iterated length as n_steps.
-        lengths = {
-            "action": int(action.shape[0]),
-            "state": int(state.shape[0]),
-            "state_size": int(state_size.shape[0]),
-            "reward": int(reward.shape[0]),
-            "terminated": int(terminated.shape[0]),
-            "truncated": int(truncated.shape[0]),
-        }
-        n_steps = min(lengths.values())
-        if n_steps == 0:
-            raise ValueError(f"Demo group demo_{episode_id} in {path} has zero recorded steps")
-        if len(set(lengths.values())) > 1:
-            log.info(
-                f"Demo group demo_{episode_id} in {path} has unequal dataset lengths {lengths}; "
-                f"iterating the shortest ({n_steps} steps), matching upstream zip semantics"
-            )
-        # Transitions recorded past the replayed range can never be applied (there is no
-        # such step to apply them at). Say so: a dropped transition changes what the demo
-        # can achieve, so it is reported, never silently ignored.
-        unreachable_transitions = sorted(step for step in (int(k) for k in transitions) if step > n_steps - 1)
-        if unreachable_transitions:
-            log.warning(
-                f"Demo group demo_{episode_id} in {path} records transition(s) at step(s) "
-                f"{unreachable_transitions}, beyond the {n_steps} replayed steps (n_steps is the "
-                f"min over the dataset lengths {lengths}); they cannot be applied and this demo's "
-                f"verdict is evaluated without them"
-            )
+        n_verdicts, n_state_rows, state_offset = self.validate_demo_shape(
+            path=path,
+            episode_id=episode_id,
+            action=action,
+            reward=reward,
+            terminated=terminated,
+            truncated=truncated,
+            state=state,
+            state_size=state_size,
+            transitions=transitions,
+        )
 
         return {
             "demo_id": demo_id,
             "path": path,
             "episode_id": episode_id,
-            "n_steps": n_steps,
+            # Recorded actions / verdicts. Kept named n_steps because it is the demo's
+            # recorded length in every report and row the campaign emits.
+            "n_steps": n_verdicts,
+            # Replay iterations for this demo: one per state row, so the trailing
+            # post-final-action row is injected and evaluated when the recording has one.
+            "n_replay_steps": n_state_rows,
+            "state_offset": state_offset,
             "transitions": transitions,
             "recorded_scene_file": recorded_scene_file,
             "init_metadata": init_metadata,
@@ -635,66 +715,68 @@ class VectorReplayHarness:
 
     @staticmethod
     def terminal_transition_step(demo):
-        """The demo's final replayed step if a transition is recorded there, else None.
+        """The demo's final recorded action step if a transition is recorded there, else None.
 
-        A transition recorded on the final step produces state the recording
-        cannot contain (there is no later row), so its effect on the goal can only
-        be seen by stepping past the recording -- what _apply_terminal_transitions
-        does. Transitions recorded BEYOND the replayed range (possible because
-        n_steps is the min over unequal dataset lengths) are never applied; they
-        are reported by _read_demo at WARNING rather than dropped silently.
+        Descriptive only -- it drives no special handling. A transition on the final
+        action step is applied by the ordinary in-loop path, and on an offset-1
+        recording the following iteration then injects the trailing state row, which
+        is the authoritative post-transition state. Recorded in the result row so the
+        class stays computable in the campaign's output.
+
+        This used to select demos for a separate terminal pass that reconstructed the
+        post-transition state from transition metadata. That pass existed because the
+        trailing state row was being discarded by the loader; with the row preserved,
+        reconstructing anything is both unnecessary and less accurate.
 
         Args:
             demo (dict): loaded demo from _read_demo.
 
         Returns:
-            int or None: the final step index when it carries a transition.
+            int or None: the final recorded action step when it carries a transition.
         """
         final_step = demo["n_steps"] - 1
         return final_step if str(final_step) in demo["transitions"] else None
 
     @staticmethod
     def unreplayable_recording_step(demo):
-        """The final replayed step when this demo's only recorded success is unreachable.
+        """The final verdict index when this demo's only recorded success cannot be reached.
 
-        The recording-boundary bucket, deliberately CONJUNCTIVE:
+        The rule is about the RECORDING'S SHAPE, not about transitions:
 
-        (A) a transition is recorded AT or PAST the final replayed step
-            (``max(transition steps) >= n_steps - 1``), so its products can never
-            appear in a recorded state row -- there is no later row to carry them.
-            Measured on task-0040: 400010's state_size grows +25 floats one step
-            after its transition, 400100's never grows at all, so its popcorn
-            exists in no row and a system-add can only produce an EMPTY system; and
-        (B) the recording's ``terminated`` first turns True only on that final step,
-            so the campaign's "fresh success one step later" convention has no step
-            to observe it on either.
+        (A) ``state_offset == 0`` -- the recording has no trailing post-final-action
+            state row, so the state its own last verdict was computed on, S(N), was
+            never written; and
+        (B) the recording's ``terminated`` first turns True only at that last verdict
+            index, so the success exists solely in the state that is missing.
 
-        (A) alone is NOT sufficient and must not be used alone: a demo may carry a
-        final-step transition and have satisfied its goal earlier, in which case
-        replay scores it normally. (B) alone is the physics-mediated variant of the
-        same boundary. Only both together mean no replay -- ours or upstream's --
-        can score the demo, at any num_envs, in any slot.
+        Both together mean no replay -- ours or upstream's -- can score the demo, at
+        any num_envs, in any slot: the only state that satisfies the goal is absent
+        from the file.
 
-        Distinct from ``terminal_transition_step``, which is an EXACT final-step
-        match and drives whether the terminal pass has a transition to apply; a
-        transition recorded PAST the replayed range is never applied (it is warned
-        about in _read_demo) but still counts for (A).
+        Neither half is sufficient. Offset 0 alone is ordinary (most such demos
+        succeed well before the end, in rows that are present). A final-only success
+        alone is ordinary too when the trailing row exists: offset-1 recordings ARE
+        replayed through S(N), which is why this rule says nothing about transitions.
+        A final-step transition used to appear here, on the premise that its products
+        "can never appear in a recorded state row". That premise was false -- they
+        appear in the trailing row, which the loader was discarding -- and it made six
+        replayable task-40 demos unscoreable. The mechanism is the missing row, and
+        whether the last state change was symbolic or physics-mediated is irrelevant.
 
         Args:
             demo (dict): loaded demo from _read_demo.
 
         Returns:
-            int or None: the final replayed step index when the demo is in the bucket.
+            int or None: the last verdict index when the demo is in the bucket.
         """
-        final_step = demo["n_steps"] - 1
-        steps = [int(key) for key in demo["transitions"]]
-        if not steps or max(steps) < final_step:
+        if demo["state_offset"] != 0:
             return None
+        last_verdict = demo["n_steps"] - 1
         terminated = demo["terminated"]
         first_true = next((i for i in range(demo["n_steps"]) if bool(terminated[i])), None)
-        if first_true is None or first_true < final_step:
+        if first_true is None or first_true < last_verdict:
             return None
-        return final_step
+        return last_verdict
 
     def _disable_robot_control(self):
         """Disables joint control on every scene's robots.
@@ -800,9 +882,9 @@ class VectorReplayHarness:
 
         A SceneSeparationError says the batch's scenes were not isolated, so no
         demo in it has a meaningful verdict -- these rows record that fact (with
-        the gap that tripped, per slot) instead of leaving the output silently
-        short. The caller is expected to write them and then fail the batch's
-        unit of work; they are never a substitute for a verdict.
+        the gap that tripped, per slot) instead of leaving the shard's output
+        silently short. The caller is expected to write them and then fail the
+        batch's unit of work; they are never a substitute for a verdict.
 
         Args:
             demo_h5_paths (list of str): the failing batch's demo files, in the
@@ -1090,92 +1172,6 @@ class VectorReplayHarness:
                 detail=f"Measured over {len(self._sep_sample_names)} sampled objects per scene.",
             )
 
-    def _apply_terminal_transitions(self, demos, slots, t_batch_start):
-        """Applies final-step transitions and re-reads those slots' verdicts, once per batch.
-
-        Runs after the step loop, so nothing here can perturb another demo's
-        recorded numbers: every demo has already reached its final step and had
-        its verdict captured. For each slot in @slots:
-
-        1. re-inject that demo's final recorded state row -- the topology still
-           matches it (the transition has not been applied yet), and injecting
-           makes the starting state exact rather than "whatever the hold left",
-        2. apply the recorded transition, then ONE global ``og.sim.step()`` to
-           initialize added objects (the same settle the in-loop path takes),
-        3. take ONE batched ``env.step`` with every slot's last recorded action.
-           This is the step whose ``terminated``/``success``/``goal_status`` can
-           see the transition's products, and it is the step the recording itself
-           does not contain.
-
-        The other slots take that one extra step from their held state. Their
-        verdicts are already final and their mismatch counters are not touched,
-        so the only effect is one step of unobserved physics in their own cells --
-        the same trade the in-loop post-transition settle step already makes.
-
-        ``first_fresh_success_step`` for a repaired demo is ``n_steps`` -- one past
-        the recording's last index, deliberately: it keeps the campaign's
-        ``first_fresh_success == recorded_first_terminated + 1`` signature true for
-        these demos too.
-
-        Args:
-            demos (list of dict): the batch's loaded demos, slot-aligned.
-            slots (list of int): slots whose final step carries a transition.
-            t_batch_start (float): the batch's monotonic clock origin, for wall_s.
-
-        Returns:
-            dict: {slot: (fresh_terminated, success, goal_status, wall_s)}.
-        """
-        env = self.env
-        scenes = env.scenes
-        for slot in slots:
-            demo = demos[slot]
-            final_step = demo["n_steps"] - 1
-            scenes[slot].load_state(demo["state"][final_step, : int(demo["state_size"][final_step])], serialized=True)
-            cur_transitions = demo["transitions"][str(final_step)]
-            t_apply = time.monotonic()
-            self._apply_transitions(
-                scene=scenes[slot],
-                cur_transitions=cur_transitions,
-                recorded_scene_file=demo["recorded_scene_file"],
-            )
-            log.info(
-                f"Terminal pass: applied demo {demo['demo_id']} (slot {slot}) final-step "
-                f"transition at t={final_step} in {time.monotonic() - t_apply:.3f}s: "
-                f"sys_add={cur_transitions['systems']['add']}, "
-                f"sys_rm={cur_transitions['systems']['remove']}, "
-                f"obj_add={[info['args']['name'] for info in cur_transitions['objects']['add']]}, "
-                f"obj_rm={cur_transitions['objects']['remove']}"
-            )
-        t_settle = time.monotonic()
-        og.sim.step()
-        log.info(f"Terminal pass: global settle step took {time.monotonic() - t_settle:.3f}s")
-
-        action_dim = int(demos[0]["action"].shape[1])
-        action_rows = []
-        for env_idx in range(self.num_envs):
-            if env_idx < len(demos):
-                demo = demos[env_idx]
-                action_rows.append(demo["action"][demo["n_steps"] - 1].to(th.float32))
-            else:
-                action_rows.append(th.zeros(action_dim, dtype=th.float32))
-        _, _, terminateds, _, infos = env.step(th.stack(action_rows, dim=0))
-
-        results = {}
-        for slot in slots:
-            demo = demos[slot]
-            results[slot] = (
-                bool(terminateds[slot]),
-                bool(env.task.success[slot].item()),
-                self._jsonable_goal_status(infos[slot]["done"]["goal_status"]),
-                time.monotonic() - t_batch_start,
-            )
-            log.info(
-                f"Terminal pass: demo {demo['demo_id']} (slot {slot}) post-transition verdict at "
-                f"step {demo['n_steps']} (one past its last recorded step): "
-                f"terminated={results[slot][0]} success={results[slot][1]} goal={results[slot][2]}"
-            )
-        return results
-
     def replay_batch(self, demo_h5_paths, step_callback=None):
         """Replays up to num_envs demos in lockstep and returns per-demo result rows.
 
@@ -1198,11 +1194,13 @@ class VectorReplayHarness:
         step, which is harmless because their state is re-injected on the next
         iteration).
 
-        Terminal pass: a demo whose final recorded step carries a transition gets
-        its verdict re-read after that transition is applied (see
-        _apply_terminal_transitions), which costs the batch one extra step. The
-        in-loop verdict for such a demo is provisional; for every other demo the
-        loop's verdict is final and nothing about its replay changes.
+        Step count: one iteration per STATE ROW, not per recorded action. An
+        offset-1 recording (the common shape: N actions, N+1 states) therefore
+        gets one iteration more than it has actions, whose job is to inject the
+        trailing post-final-action row -- the state the recording's own last
+        verdict was computed on -- and read the verdict there. Its action is the
+        last recorded one, re-applied. An offset-0 recording has no such row and
+        gets exactly N iterations.
 
         Separation invariant: the batch derives its own minimum inter-scene gap
         from the post-injection geometry (``_init_separation_baseline``) and
@@ -1271,7 +1269,9 @@ class VectorReplayHarness:
 
         env = self.env
         scenes = env.scenes
-        max_len = max(demo["n_steps"] for demo in demos)
+        # One iteration per STATE ROW, so an offset-1 recording's trailing
+        # post-final-action row is injected and evaluated like any other.
+        max_len = max(demo["n_replay_steps"] for demo in demos)
         log.info(
             f"Replaying batch of {len(demos)} demo(s) "
             f"({len(rows_by_input_idx)} load error(s)) over {max_len} steps at num_envs={self.num_envs}"
@@ -1291,7 +1291,6 @@ class VectorReplayHarness:
 
         # --- Step loop ---
         action_dim = int(demos[0]["action"].shape[1])
-        terminal_slots = []  # slots whose final step carries a transition (see the terminal pass)
         first_success_step = [None] * len(demos)
         mismatches = [0] * len(demos)
         final_success = [None] * len(demos)
@@ -1303,18 +1302,24 @@ class VectorReplayHarness:
                 log.info(f"Replaying batch step {t}/{max_len}")
 
             # State injection: active demos load state[t]; finished demos re-inject their final
-            # recorded state row (deterministic hold)
+            # recorded state row (deterministic hold). Indexed over state rows, so on the
+            # last iteration of an offset-1 demo this is the trailing authoritative row --
+            # and by then any transition on the final action step has already been applied,
+            # so the topology that row was serialized against exists.
             for slot, demo in enumerate(demos):
-                idx = t if t < demo["n_steps"] else demo["n_steps"] - 1
+                idx = min(t, demo["n_replay_steps"] - 1)
                 scenes[slot].load_state(demo["state"][idx, : int(demo["state_size"][idx])], serialized=True)
 
             # Batched actions: recorded action for active demos, last action for finished demos,
-            # zeros for inert slots (their robots have control disabled, so this is a no-op)
+            # zeros for inert slots (their robots have control disabled, so this is a no-op).
+            # Clamped to the last RECORDED action: an offset-1 demo's extra iteration has a
+            # state row but no action of its own, and re-applying the last action is the
+            # convention the recording's own final verdict was produced under.
             action_rows = []
             for env_idx in range(self.num_envs):
                 if env_idx < len(demos):
                     demo = demos[env_idx]
-                    idx = t if t < demo["n_steps"] else demo["n_steps"] - 1
+                    idx = min(t, demo["n_steps"] - 1)
                     action_rows.append(demo["action"][idx].to(th.float32))
                 else:
                     action_rows.append(th.zeros(action_dim, dtype=th.float32))
@@ -1324,40 +1329,35 @@ class VectorReplayHarness:
 
             any_transition = False
             for slot, demo in enumerate(demos):
-                if t >= demo["n_steps"]:
+                if t >= demo["n_replay_steps"]:
                     continue
                 fresh_terminated = bool(terminateds[slot])
                 if fresh_terminated and first_success_step[slot] is None:
                     first_success_step[slot] = t
-                if fresh_terminated != bool(demo["terminated"][t]):
+                # Per-step agreement is only defined where the recording has a verdict.
+                # An offset-1 demo's extra iteration has a state row but no verdict of its
+                # own -- the recording's last verdict was computed ON that row, and it is
+                # already accounted for by the first_fresh_success == recorded + 1 convention.
+                if t < demo["n_steps"] and fresh_terminated != bool(demo["terminated"][t]):
                     mismatches[slot] += 1
-                if t == demo["n_steps"] - 1:
-                    # Final recorded step: capture fresh success and goal status from this step.
+                if t == demo["n_replay_steps"] - 1:
+                    # Last state row: capture fresh success and goal status from this step.
                     # BehaviorTask._step_termination adds goal_status to the termination infos,
                     # which BaseTask.step nests under the "done" key of each env's info dict.
                     final_success[slot] = bool(env.task.success[slot].item())
                     final_goal_status[slot] = self._jsonable_goal_status(infos[slot]["done"]["goal_status"])
                     wall_s[slot] = time.monotonic() - t_batch_start
                     log.info(
-                        f"Demo {demo['demo_id']} (slot {slot}) finished at step {t}: "
-                        f"fresh_success={final_success[slot]}"
+                        f"Demo {demo['demo_id']} (slot {slot}) finished at step {t} "
+                        f"(state row {t} of {demo['n_replay_steps']}, offset "
+                        f"{demo['state_offset']}): fresh_success={final_success[slot]}"
                     )
-                    if self.terminal_transition_step(demo) is not None:
-                        # This verdict is PROVISIONAL: the goal this demo records is produced by
-                        # the transition on this very step, which upstream applies after the info
-                        # capture. The terminal pass below re-reads it after applying that
-                        # transition; without it the demo is scored a fail it cannot avoid.
-                        terminal_slots.append(slot)
-                        log.info(
-                            f"Demo {demo['demo_id']} (slot {slot}) records a transition on its "
-                            f"final step {t}; its verdict is provisional until the terminal pass"
-                        )
-                # Transitions apply after the step (upstream ordering). One recorded ON the
-                # demo's final step is deferred to the terminal pass instead: applying it here
-                # would break the deterministic hold's re-injection of the final recorded state
-                # row (whose serialized layout predates the added objects), and the verdict it
-                # produces cannot be seen without stepping past the recording.
-                if t < demo["n_steps"] - 1 and str(t) in demo["transitions"]:
+                # Transitions apply after the step, indexed by the action step they follow
+                # (upstream ordering). One on the final action step is applied here like any
+                # other: on an offset-1 recording the next iteration then injects the trailing
+                # state row, which is the authoritative post-transition state and needs this
+                # topology to exist before it can be deserialized.
+                if t < demo["n_steps"] and str(t) in demo["transitions"]:
                     cur_transitions = demo["transitions"][str(t)]
                     t_apply = time.monotonic()
                     self._apply_transitions(
@@ -1391,22 +1391,6 @@ class VectorReplayHarness:
             if step_callback is not None:
                 step_callback(t=t, demos=demos, scenes=scenes, terminateds=terminateds, infos=infos)
 
-        # --- Terminal pass: final-step transitions, and the verdicts that need them ---
-        terminal_steps = {}
-        if terminal_slots:
-            for slot, (fresh, success, goal_status, wall) in self._apply_terminal_transitions(
-                demos=demos, slots=terminal_slots, t_batch_start=t_batch_start
-            ).items():
-                demo = demos[slot]
-                terminal_steps[slot] = demo["n_steps"] - 1
-                final_success[slot] = success
-                final_goal_status[slot] = goal_status
-                wall_s[slot] = wall
-                if fresh and first_success_step[slot] is None:
-                    # One past the recording's last index, keeping the campaign's
-                    # first_fresh_success == recorded_first_terminated + 1 signature.
-                    first_success_step[slot] = demo["n_steps"]
-
         # --- Separation-check cost, measured rather than asserted ---
         if self._sep_check_count:
             batch_wall = time.monotonic() - t_batch_start
@@ -1434,23 +1418,49 @@ class VectorReplayHarness:
             # the per-demo evidence for the diagnosis, and a demo that passes anyway
             # proves the rule wrong instead of hiding behind a skip.
             unreplayable_step = self.unreplayable_recording_step(demo)
-            status = "pass" if final_success[slot] else "fail"
+            recorded_final = bool(demo["terminated"][demo["n_steps"] - 1])
+            # A verdict is a COMPARISON, so the status is a function of both sides.
+            # "pass" means the two agree that the demo succeeded -- nothing else. Deriving
+            # it from the fresh side alone let a fresh-only success (the recording never
+            # claimed success; this replay says it did) be reported as a pass, which is the
+            # exact shape a multi-scene contamination bug produces: a goal predicate
+            # spuriously true at the final step. That is the campaign's most interesting
+            # possible finding, so it gets its own status, is quarantined, and never enters
+            # the pass total.
+            if not final_success[slot]:
+                # No fresh success. Whether this is a real shortfall or agreement with a
+                # recording that never claimed success is decided by the reporter, which
+                # also requires zero per-step mismatches before calling it agreement.
+                status = "fail"
+            elif recorded_final:
+                status = "pass"
+            else:
+                status = "fresh_only_success"
+            if status == "fresh_only_success":
+                log.warning(
+                    f"Demo {demo['demo_id']} (slot {slot}) reached success at step "
+                    f"{first_success_step[slot]} but its recording never reports success "
+                    f"(recorded_terminated_final=False). This is a DISAGREEMENT, not a pass: it is "
+                    f"what a spurious goal predicate looks like. Quarantined for triage. "
+                    f"Goal status: {final_goal_status[slot]}"
+                )
             if unreplayable_step is not None:
                 if final_success[slot]:
                     log.warning(
                         f"Demo {demo['demo_id']} (slot {slot}) matches the unreplayable-recording rule "
-                        f"(transition at/past its final step {unreplayable_step}, recorded terminated "
-                        f"first True only there) yet REACHED SUCCESS at step "
+                        f"(no trailing state row, recorded success only at verdict "
+                        f"{unreplayable_step}) yet REACHED SUCCESS at step "
                         f"{first_success_step[slot]}: the rule mis-classified this demo. Row keeps "
-                        f"status=pass and the mismatch is reported for follow-up."
+                        f"status={status} and the mismatch is reported for follow-up."
                     )
                 else:
                     status = "unreplayable_recording"
                     log.info(
-                        f"Demo {demo['demo_id']} (slot {slot}) labelled unreplayable_recording: its only "
-                        f"recorded success is produced by the transition on its final step "
-                        f"{unreplayable_step}, whose products appear in no recorded state row. Partial "
-                        f"goal status kept: {final_goal_status[slot]}"
+                        f"Demo {demo['demo_id']} (slot {slot}) labelled unreplayable_recording: the "
+                        f"recording has no trailing post-final-action state row (state_offset=0) and "
+                        f"its success appears only at verdict {unreplayable_step}, so the only state "
+                        f"satisfying the goal was never written. Partial goal status kept: "
+                        f"{final_goal_status[slot]}"
                     )
             rows_by_input_idx[demo_input_idx[slot]] = {
                 "demo_id": demo["demo_id"],
@@ -1468,7 +1478,7 @@ class VectorReplayHarness:
                 "num_envs": self.num_envs,
                 "batch": batch_index,
                 "slot": slot,
-                "terminal_transition_step": terminal_steps.get(slot),
+                "terminal_transition_step": self.terminal_transition_step(demo),
                 "unreplayable_recording_step": unreplayable_step,
                 "min_scene_gap_m": (
                     round(self._sep_min_gap_by_slot[slot], 4) if slot in self._sep_min_gap_by_slot else None
