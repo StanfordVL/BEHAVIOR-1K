@@ -1323,9 +1323,20 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         - "particle_positions"/"particle_velocities" (cloth): points transformed /
           vectors rotated
 
-        system_registry states are NOT touched: particle systems dump and load their
-        particle poses in the scene frame already (see BaseSystem._dump_state), so they
-        are frame-correct without conversion.
+        system_registry entries are handled asymmetrically, because their two halves
+        live in different frames:
+        - particle POSITIONS and ORIENTATIONS are already scene-relative (they go
+          through convert_world_pose_to_scene_relative in the systems' _dump_state), so
+          they are frame-correct as-is and must NOT be transformed;
+        - particle VELOCITIES are stored raw in the WORLD frame (micro:
+          "particle_velocities"; macro physical: "lin_velocities"/"ang_velocities"), so
+          they are rotated by rel_ori like any other free vector.
+
+        Only the rotation applies to velocities, never the translation. Under
+        translation-only tiling rel_ori is identity and this is a no-op, which is why
+        the omission was invisible: restoring into a scene rotated relative to the
+        recording left particles moving along the recorded world axis instead of the
+        scene's, so the next physics step drove them the wrong way.
 
         The input dicts are never mutated (callers such as Scene.restore() reuse loaded
         state dicts across calls); only the re-based leaves are replaced in copies.
@@ -1358,7 +1369,47 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             new_obj_state["root_link"] = new_root
             new_object_registry[name] = new_obj_state
         rebased["object_registry"] = new_object_registry
+
+        system_registry = registry_state.get("system_registry")
+        if isinstance(system_registry, dict):
+            new_system_registry = {}
+            for name, sys_state in system_registry.items():
+                if not isinstance(sys_state, dict):
+                    new_system_registry[name] = sys_state
+                    continue
+                new_sys_state = Scene._rebase_system_velocities(sys_state, rel_ori)
+                new_system_registry[name] = new_sys_state
+            rebased["system_registry"] = new_system_registry
         return rebased
+
+    @staticmethod
+    def _rebase_system_velocities(sys_state, rel_ori):
+        """Returns a copy of a system state with its world-frame velocity fields rotated.
+
+        Recurses one level into nested per-instancer dicts (micro systems keep a dict of
+        instancer states), and leaves every other field -- including scene-relative
+        particle positions and orientations -- untouched.
+        """
+        rotated = dict(sys_state)
+        changed = False
+        for key in ("particle_velocities", "lin_velocities", "ang_velocities"):
+            value = sys_state.get(key)
+            if value is None:
+                continue
+            vec = th.as_tensor(value, dtype=th.float32)
+            if vec.numel() == 0:
+                continue
+            rotated[key] = T.quat_apply(rel_ori, vec.reshape(-1, 3)).reshape(vec.shape)
+            changed = True
+        for key, value in sys_state.items():
+            if key in ("particle_velocities", "lin_velocities", "ang_velocities"):
+                continue
+            if isinstance(value, dict):
+                nested = Scene._rebase_system_velocities(value, rel_ori)
+                if nested is not value:
+                    rotated[key] = nested
+                    changed = True
+        return rotated if changed else sys_state
 
     def serialize(self, state):
         return th.cat([state["pos"], state["ori"], self._registry.serialize(state=state["registry"])])
