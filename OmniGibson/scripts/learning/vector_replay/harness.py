@@ -62,6 +62,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.controllers import ControllerView, ControlType
 from omnigibson.envs.data_wrapper import (
+    _add_recorded_non_kin_states_to_scene_file,
     _align_scene_object_states_with_recorded_schema,
     _is_system_particle_template_info,
     _is_system_particle_template_name,
@@ -504,8 +505,19 @@ class VectorReplayHarness:
             for name, info in merged_scene_file["objects_info"]["init_info"].items()
             if not (info["class_name"] == "Robot" or info["class_name"].lower() in REGISTERED_ROBOTS)
         }
+        recorded_scene_files = [recorded_scene_file]
         for path in demo_h5_paths[1:]:
-            self._check_batch_compat(path, self._read_recorded_scene_file(path))
+            other_recorded_scene_file = self._read_recorded_scene_file(path)
+            self._check_batch_compat(path, other_recorded_scene_file)
+            recorded_scene_files.append(other_recorded_scene_file)
+
+        # Build every object with the union of states serialized by this shard's recordings.
+        # Per-demo _prepare_batch alignment below still selects the exact names and order for
+        # the row being injected.
+        _add_recorded_non_kin_states_to_scene_file(
+            scene_file=merged_scene_file,
+            recorded_scene_files=recorded_scene_files,
+        )
         # Overwrite room types to avoid loading room types from the recorded config
         config["scene"]["load_room_types"] = None
         config["scene"]["load_room_instances"] = load_room_instances

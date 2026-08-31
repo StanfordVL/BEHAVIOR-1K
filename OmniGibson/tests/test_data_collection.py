@@ -3,12 +3,14 @@ import json
 import tempfile
 from unittest.mock import MagicMock
 
+import pytest
 import torch as th
 import os
 
 import omnigibson as og
 from omnigibson.envs import HDF5CollectionWrapper, HDF5PlaybackWrapper, LeRobotPlaybackWrapper, LeRobotDataWrapper
 from omnigibson.envs.data_wrapper import (
+    _add_recorded_non_kin_states_to_scene_file,
     _align_scene_object_states_with_recorded_schema,
     _is_system_particle_template_info,
     _is_system_particle_template_name,
@@ -16,6 +18,7 @@ from omnigibson.envs.data_wrapper import (
 from omnigibson.envs.hdf5_data_wrapper import HDF5DataWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
@@ -131,6 +134,78 @@ def test_align_scene_object_states_with_recorded_schema_marks_serialized_states(
 
     assert set(obj.states) == {RecordedState, ExtraState}
     assert obj._recorded_non_kin_state_names == {"RecordedState"}
+    assert obj._recorded_non_kin_state_order == ("RecordedState",)
+
+
+def test_add_recorded_non_kin_states_to_scene_file_unions_demos_in_recorded_order():
+    scene_file = {
+        "objects_info": {
+            "init_info": {
+                "grill": {"class_name": "DatasetObject", "args": {"name": "grill"}},
+                "car": {"class_name": "DatasetObject", "args": {"name": "car"}},
+            }
+        }
+    }
+    recorded_scene_files = [
+        {
+            "state": {
+                "registry": {
+                    "object_registry": {
+                        "grill": {"non_kin": {"ToggledOn": {}, "Temperature": {}}},
+                        "car": {"non_kin": {"Temperature": {}}},
+                    }
+                }
+            }
+        },
+        {
+            "state": {
+                "registry": {
+                    "object_registry": {
+                        "grill": {"non_kin": {"Temperature": {}, "AttachedTo": {}}},
+                    }
+                }
+            }
+        },
+    ]
+
+    _add_recorded_non_kin_states_to_scene_file(scene_file, recorded_scene_files)
+
+    assert scene_file["objects_info"]["init_info"]["grill"]["args"]["recorded_non_kin_state_names"] == [
+        "ToggledOn",
+        "Temperature",
+        "AttachedTo",
+    ]
+    assert scene_file["objects_info"]["init_info"]["car"]["args"]["recorded_non_kin_state_names"] == ["Temperature"]
+
+
+def test_usd_object_deserializes_non_kin_states_in_recorded_order_and_rejects_missing_state():
+    class FirstState:
+        pass
+
+    class SecondState:
+        pass
+
+    class StateInstance:
+        stateful = True
+
+        def deserialize(self, state):
+            return {"value": int(state[0])}, 1
+
+    obj = MagicMock()
+    obj.name = "schema_test_object"
+    # Deliberately reverse the current dependency order. The recorded order is authoritative.
+    obj._states = {SecondState: StateInstance(), FirstState: StateInstance()}
+    obj._recorded_non_kin_state_names = {"FirstState", "SecondState"}
+    obj._recorded_non_kin_state_order = ("FirstState", "SecondState")
+
+    deserialized, idx = USDObject._deserialize_non_kin_states(obj, th.tensor([11.0, 22.0]), 0)
+
+    assert deserialized == {"FirstState": {"value": 11}, "SecondState": {"value": 22}}
+    assert idx == 2
+
+    obj._recorded_non_kin_state_order = ("FirstState", "RemovedState")
+    with pytest.raises(ValueError, match="could not construct"):
+        USDObject._deserialize_non_kin_states(obj, th.tensor([11.0, 22.0]), 0)
 
 
 # ---------------------------------------------------------------------------

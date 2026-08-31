@@ -49,7 +49,51 @@ def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: 
         if obj is None or obj.states is None:
             continue
 
-        obj._recorded_non_kin_state_names = set(recorded_obj_state.get("non_kin", {}))
+        recorded_names = tuple(recorded_obj_state.get("non_kin", {}))
+        obj._recorded_non_kin_state_names = set(recorded_names)
+        obj._recorded_non_kin_state_order = recorded_names
+
+
+def _add_recorded_non_kin_states_to_scene_file(scene_file: dict, recorded_scene_files: list[dict]) -> None:
+    """Adds every recorded object's non-kinematic state vocabulary to its init args.
+
+    Replay can outlive the taxonomy that created a recording.  If an ability is removed,
+    constructing the same object with the current taxonomy can omit a state which is still
+    present in every serialized row.  Filtering current states against the recorded names only
+    handles the opposite direction (new current states); it cannot consume a removed state's
+    payload and the rest of the row is then parsed at the wrong offsets.
+
+    The environment must therefore construct the union of states recorded for each object
+    before object-state initialization and tensor-view creation.  Per-demo alignment later sets
+    the exact recorded order used to deserialize that demo.  Unknown or incompatible state
+    classes fail during object construction / deserialization instead of silently skipping data.
+
+    This mutates @scene_file in place.  @recorded_scene_files may contain multiple demos that
+    will share one environment; their per-object vocabularies are unioned while preserving first
+    appearance order.
+    """
+    init_info = scene_file["objects_info"]["init_info"]
+    names_by_object = {}
+    for recorded_scene_file in recorded_scene_files:
+        state = recorded_scene_file.get("state", {})
+        object_registry_state = (
+            state.get("registry", {}).get("object_registry", {})
+            if "registry" in state
+            else state.get("object_registry", {})
+        )
+        for obj_name, recorded_obj_state in object_registry_state.items():
+            ordered_names = names_by_object.setdefault(obj_name, [])
+            for state_name in recorded_obj_state.get("non_kin", {}):
+                if state_name not in ordered_names:
+                    ordered_names.append(state_name)
+
+    for obj_name, state_names in names_by_object.items():
+        if obj_name not in init_info:
+            raise ValueError(
+                f"Recorded state schema names object {obj_name!r}, but that object has no init_info "
+                "in the replay scene file."
+            )
+        init_info[obj_name].setdefault("args", {})["recorded_non_kin_state_names"] = state_names
 
 
 def _recorded_non_kin_state_name_union(recorded_scene_file: dict) -> set[str] | None:
@@ -432,7 +476,8 @@ class DataPlaybackWrapper(DataWrapper):
         config["env"]["flatten_obs_space"] = True
 
         # Set the scene file either to the one stored in the hdf5 or the hot swap scene file
-        config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+        recorded_scene_file = json.loads(f["data"].attrs["scene_file"])
+        config["scene"]["scene_file"] = recorded_scene_file
         if full_scene_file:
             with open(full_scene_file, "r") as json_file:
                 full_scene_json = json.load(json_file)
@@ -443,7 +488,12 @@ class DataPlaybackWrapper(DataWrapper):
             config["scene"]["load_room_types"] = None
             config["scene"]["load_room_instances"] = load_room_instances
         else:
-            config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+            config["scene"]["scene_file"] = recorded_scene_file
+
+        _add_recorded_non_kin_states_to_scene_file(
+            scene_file=config["scene"]["scene_file"],
+            recorded_scene_files=[recorded_scene_file],
+        )
 
         # Use dummy task if not loading task
         if not include_task:
