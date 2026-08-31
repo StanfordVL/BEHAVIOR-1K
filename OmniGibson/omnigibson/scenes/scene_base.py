@@ -921,27 +921,37 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 f"Got mismatch in scene type: current is type {self.__class__.__name__}, trying to load type {init_info['class_name']}"
             )
 
-        # Synchronize systems -- we need to check for pruning currently-existing systems,
-        # as well as creating any non-existing systems
+        # Work out every topology change before touching either systems or objects. System
+        # clear/init can remove/add particle template objects, so it must participate in the
+        # same stop -> mutate topology -> play lifecycle as ordinary object changes.
         current_systems = set(self.active_systems.keys())
         load_systems = set(scene_info["state"]["registry"]["system_registry"].keys())
         systems_to_remove = current_systems - load_systems
         systems_to_add = load_systems - current_systems
+        load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
+        current_obj_names = set(self.object_registry.get_dict("name").keys())
+        object_topology_changed = current_obj_names != load_obj_names
+
+        restart_sim = bool(systems_to_remove or systems_to_add or object_topology_changed) and og.sim.is_playing()
+
+        if restart_sim:
+            og.sim.stop()
+
+        # Synchronize systems -- we need to check for pruning currently-existing systems,
+        # as well as creating any non-existing systems. This is deliberately after stop():
+        # MacroParticleSystem.clear() removes its particle template object, and doing that
+        # while playing enters Simulator.removing_objects(), which first dumps the entire
+        # simulation through tensor views that a prior transition may already have invalidated.
         for name in systems_to_remove:
             self.clear_system(name)
         for name in systems_to_add:
             self.get_system(name, force_init=True)
 
+        # System init / clear can itself add or remove particle-template objects. Recompute the
+        # object delta afterwards so those objects are not removed twice or recreated manually.
         current_obj_names = set(self.object_registry.get_dict("name").keys())
-        load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
-
         objs_to_remove = current_obj_names - load_obj_names
         objs_to_add = load_obj_names - current_obj_names
-
-        restart_sim = (objs_to_add or objs_to_remove) and og.sim.is_playing()
-
-        if restart_sim:
-            og.sim.stop()
 
         # Delete any extra objects that currently exist in the scene stage
         objects_to_remove = [self.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove]
