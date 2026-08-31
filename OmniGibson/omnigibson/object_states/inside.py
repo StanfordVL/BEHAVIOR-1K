@@ -30,6 +30,17 @@ m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_TRANSLATION = 1e-2  # 1cm
 m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_ROTATION = math.radians(1)  # 1 degree
 
 
+def _orient_face_normals_outward(points, face_centroids, face_normals):
+    """Return convex-mesh face normals oriented away from the mesh interior."""
+    # The mean of the mesh vertices is a convex combination of those vertices, so for a
+    # full-dimensional convex container mesh it lies inside the hull.  An outward normal
+    # therefore has a non-positive dot product with the vector from its face to this point.
+    mesh_interior = points.mean(dim=0)
+    points_toward_interior = mesh_interior.unsqueeze(0) - face_centroids
+    inward = (points_toward_interior * face_normals).sum(dim=-1) > 0
+    return th.where(inward.unsqueeze(-1), -face_normals, face_normals)
+
+
 # Tensorized Inside state.
 #
 # VALUES shape: (S, N, N) bool — VALUES[s, inner, container] is True iff
@@ -337,7 +348,11 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                             continue
 
                         centroids = mesh.mesh_face_centroids  # (F, 3) local-unscaled
-                        normals = mesh.mesh_face_normals  # (F, 3) local-unscaled
+                        normals = _orient_face_normals_outward(
+                            points=mesh.points,
+                            face_centroids=centroids,
+                            face_normals=mesh.mesh_face_normals,
+                        )  # (F, 3) local-unscaled
                         face_count = centroids.shape[0]
                         if face_count == 0:
                             continue
