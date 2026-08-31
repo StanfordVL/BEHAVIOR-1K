@@ -11,6 +11,13 @@ inherit.
 
 Key deviations from the single-env upstream, each intentional:
 
+- Recorded timing: unlike ``DataPlaybackWrapper(include_contacts=True)``,
+  which forces all frequencies to 1000 Hz to minimize physical motion while
+  regenerating observations, verdict replay preserves the recording's action,
+  rendering, and physics frequencies. Some time-dependent states belong to
+  sleeping objects omitted from sparse state rows, so they can only reach the
+  recorded value if each replay step advances the recorded amount of time.
+  Every demo sharing an environment must declare exactly the same frequencies.
 - Per-scene state injection: a single-scene recording's serialized state blob
   is exactly one scene's serialized state (``og.sim.serialize`` is a pure
   concatenation of per-scene states), so each demo's state row is injected via
@@ -52,6 +59,7 @@ which voids every demo in it.
 
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -89,6 +97,7 @@ DEFAULT_SEPARATION_CHECK_EVERY = 250
 # object; the periodic sample keeps the six cell-defining extremes plus an even
 # spread over the sorted names, so its box tracks the full cloud's box closely.
 DEFAULT_SEPARATION_SAMPLE_OBJECTS = 24
+REPLAY_FREQUENCY_KEYS = ("action_frequency", "rendering_frequency", "physics_frequency")
 # Fraction of the batch's own derived clearance that must remain at every check.
 # The clearance is (tile geometry - content extents), i.e. the empty space the
 # loader's tiling leaves between two scenes' object clouds -- 39.6 m on task-0001
@@ -339,12 +348,83 @@ class VectorReplayHarness:
         self._full_scene_object_names = None
         self._merged_object_names = None
         self._merged_init_info_stripped = None
+        self._reference_frequencies = None
 
     @staticmethod
-    def _read_recorded_scene_file(demo_h5_path):
-        """Reads the recorded (partial) scene file dict from a demo HDF5's attrs."""
-        with h5py.File(demo_h5_path, "r") as f:
-            return json.loads(f["data"].attrs["scene_file"])
+    def _recorded_frequencies(path, config):
+        """Returns one recording's validated (action, rendering, physics) frequencies.
+
+        These values define replay semantics, so none may be missing, defaulted,
+        coerced from a string / bool, non-finite, or non-positive.
+        """
+        if not isinstance(config, dict) or not isinstance(config.get("env"), dict):
+            raise ValueError(f"Demo file {path} has no config.env mapping")
+        frequencies = []
+        for key in REPLAY_FREQUENCY_KEYS:
+            if key not in config["env"]:
+                raise ValueError(f"Demo file {path} is missing required config.env.{key}")
+            value = config["env"][key]
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(
+                    f"Demo file {path} has non-numeric config.env.{key}={value!r}; "
+                    "replay frequencies must be finite positive numbers"
+                )
+            value = float(value)
+            if not math.isfinite(value) or value <= 0.0:
+                raise ValueError(
+                    f"Demo file {path} has invalid config.env.{key}={value!r}; "
+                    "replay frequencies must be finite positive numbers"
+                )
+            frequencies.append(value)
+        return tuple(frequencies)
+
+    def _check_recorded_frequencies(self, path, config):
+        """Raises if @config's timing differs from the batch reference recording."""
+        frequencies = self._recorded_frequencies(path, config)
+        if self._reference_frequencies is None:
+            raise RuntimeError("Replay frequency reference was not initialized before compatibility checking")
+        if frequencies != self._reference_frequencies:
+            expected = dict(zip(REPLAY_FREQUENCY_KEYS, self._reference_frequencies))
+            actual = dict(zip(REPLAY_FREQUENCY_KEYS, frequencies))
+            raise ValueError(
+                f"Demo file {path} has replay frequencies {actual}, which differ from batch reference "
+                f"{self._reference_demo_path}: {expected}. Demos with different timing cannot share one environment."
+            )
+        return frequencies
+
+    @classmethod
+    def _configure_replay_env(cls, config, num_envs, expected_frequencies, path):
+        """Applies non-timing replay settings while preserving recorded timing exactly."""
+        before = cls._recorded_frequencies(path, config)
+        if before != expected_frequencies:
+            raise RuntimeError(
+                f"Internal error: replay config frequencies {before} differ from validated frequencies "
+                f"{expected_frequencies} for {path}"
+            )
+        config["env"]["flatten_obs_space"] = True
+        config["env"]["num_envs"] = int(num_envs)
+        after = cls._recorded_frequencies(path, config)
+        if after != expected_frequencies:
+            raise RuntimeError(
+                f"Replay config surgery changed recorded frequencies for {path}: "
+                f"expected {expected_frequencies}, got {after}"
+            )
+
+    def _assert_active_replay_frequencies(self, env):
+        """Asserts that the constructed env and simulator use the validated recording timing."""
+        active = self._recorded_frequencies("constructed replay environment", {"env": env.env_config})
+        if active != self._reference_frequencies:
+            raise RuntimeError(
+                f"Constructed replay environment changed recorded frequencies: expected "
+                f"{self._reference_frequencies}, got {active}"
+            )
+        expected_dts = tuple(1.0 / frequency for frequency in self._reference_frequencies)
+        active_dts = (og.sim.get_sim_step_dt(), og.sim.get_rendering_dt(), og.sim.get_physics_dt())
+        for key, expected, actual in zip(REPLAY_FREQUENCY_KEYS, expected_dts, active_dts):
+            if not math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=1e-12):
+                raise RuntimeError(
+                    f"Simulator {key} dt does not match the recording: expected {expected}, got {actual}"
+                )
 
     @staticmethod
     def _recorded_object_names(recorded_scene_file):
@@ -428,11 +508,11 @@ class VectorReplayHarness:
     def build_batch_env(self, demo_h5_paths, num_envs, full_scene_file, load_room_instances):
         """Builds the multi-env playback Environment shared by all batches.
 
-        Applies the same config surgery ``DataPlaybackWrapper.create_from_hdf5``
-        performs on the ``include_contacts=True`` path, reading the base config
-        from the FIRST demo file's attrs, plus ``num_envs=N``. Checks that
-        every given demo file's recording is compatible with the batch scene
-        built from the first file (the five checks documented on
+        Reads the base config from the FIRST demo file's attrs, preserves its
+        recorded action / rendering / physics frequencies, and adds
+        ``num_envs=N``. Checks that every demo declares exactly the same valid
+        frequencies and that every given demo file's recording is compatible
+        with the batch scene built from the first file (the five checks documented on
         BatchObjectSetMismatchError -- deliberately NOT recorded-object-set
         equality, which real same-task demos violate); raises
         BatchObjectSetMismatchError naming the violations otherwise.
@@ -468,6 +548,8 @@ class VectorReplayHarness:
         with h5py.File(demo_h5_paths[0], "r") as f:
             config = json.loads(f["data"].attrs["config"])
             recorded_scene_file = json.loads(f["data"].attrs["scene_file"])
+        self._reference_demo_path = demo_h5_paths[0]
+        self._reference_frequencies = self._recorded_frequencies(self._reference_demo_path, config)
 
         # Batch-compat reference invariants come from the first demo's recording and the full
         # scene file; the compat check itself runs after the merge below (it needs the merged
@@ -475,22 +557,20 @@ class VectorReplayHarness:
         # so everything reference-side is computed from the recording BEFORE merging.
         with open(full_scene_file, "r") as json_file:
             full_scene_json = json.load(json_file)
-        self._reference_demo_path = demo_h5_paths[0]
         self._reference_object_names = self._recorded_object_names(recorded_scene_file)
         self._full_scene_object_names = set(full_scene_json["objects_info"]["init_info"].keys())
         self._reference_recording_only_names = self._reference_object_names - self._full_scene_object_names
         self._reference_robot_names = self._recorded_robot_names(recorded_scene_file)
         self._reference_system_names = set(recorded_scene_file["state"]["registry"]["system_registry"].keys())
 
-        # --- Config surgery, mirroring create_from_hdf5's include_contacts=True path ---
-        # Minimize physics leakage during playback (we need to take an env step when loading state)
-        config["env"]["action_frequency"] = 1000.0
-        config["env"]["rendering_frequency"] = 1000.0
-        config["env"]["physics_frequency"] = 1000.0
-        # Make sure obs space is flattened (matches upstream playback config)
-        config["env"]["flatten_obs_space"] = True
-        # The one multi-env addition: N scenes (env_base reads env_config["num_envs"])
-        config["env"]["num_envs"] = int(num_envs)
+        # Apply only non-timing playback settings. Unlike observation playback, verdict
+        # replay must advance exactly the amount of time the recording advanced.
+        self._configure_replay_env(
+            config=config,
+            num_envs=num_envs,
+            expected_frequencies=self._reference_frequencies,
+            path=self._reference_demo_path,
+        )
 
         # Merge the full scene file with the recorded (partial) scene file, keeping the robot
         # from the recording
@@ -507,7 +587,10 @@ class VectorReplayHarness:
         }
         recorded_scene_files = [recorded_scene_file]
         for path in demo_h5_paths[1:]:
-            other_recorded_scene_file = self._read_recorded_scene_file(path)
+            with h5py.File(path, "r") as f:
+                other_config = json.loads(f["data"].attrs["config"])
+                other_recorded_scene_file = json.loads(f["data"].attrs["scene_file"])
+            self._check_recorded_frequencies(path, other_config)
             self._check_batch_compat(path, other_recorded_scene_file)
             recorded_scene_files.append(other_recorded_scene_file)
 
@@ -539,6 +622,7 @@ class VectorReplayHarness:
             robot_cfg["exclude_sensor_names"] = None
 
         env = Environment(configs=config)
+        self._assert_active_replay_frequencies(env)
 
         # Automatic reset would re-initialize a slot the moment its demo terminates (and zero
         # task.success before we can read it): the recorded config must not enable it.
@@ -665,6 +749,8 @@ class VectorReplayHarness:
         """
         with h5py.File(path, "r") as f:
             data_grp = f["data"]
+            config = json.loads(data_grp.attrs["config"])
+            self._check_recorded_frequencies(path, config)
             recorded_scene_file = json.loads(data_grp.attrs["scene_file"])
             self._check_batch_compat(path, recorded_scene_file)
 
