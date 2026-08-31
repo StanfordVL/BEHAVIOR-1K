@@ -16,19 +16,25 @@ m = create_module_macros(module_path=__file__)
 m.MAX_DISTANCE_VERTICAL = 5.0
 m.MAX_DISTANCE_HORIZONTAL = 5.0
 
-# Number of horizontal directions, evenly spaced around the XY plane at angles k * 360/N.
-m.HORIZONTAL_DIRECTION_COUNT = 10
+# The legacy scalar implementation cast along eight unique, evenly spaced
+# horizontal axes in both directions. Its coordinate-plane construction also
+# emitted four duplicate rays; duplicates cannot change the OR-reduced
+# Adjacency / NextTo result, so the tensorized implementation keeps only the
+# eight unique axes: 8 * 2 = 16 signed directions, spaced 22.5 degrees apart.
+m.HORIZONTAL_AXIS_COUNT = 8
+
+_HORIZONTAL_DIRECTION_COUNT = 2 * m.HORIZONTAL_AXIS_COUNT
 
 
 # Tensorized Adjacency state
 #
-# VALUE is (S, N, N, 12) bool tensor populated by Warp ray casts against per-link wp.Mesh.
+# VALUE is (S, N, N, 18) bool tensor populated by Warp ray casts against per-link wp.Mesh.
 #
 # Axis layout:
 #   k=0       : +Z   (other above self)
 #   k=1       : -Z   (other below self)
-#   k=2..11   : 10 horizontal directions evenly spaced on the XY plane,
-#               direction k has angle (k-2) * 2π / 10 (so k=2 is +X, k=7 is -X).
+#   k=2..9    : positive directions of the 8 unique legacy horizontal axes
+#   k=10..17  : negative directions of those same axes
 #
 # VALUES[s, a, b, k] = True iff a ray from object a's AABB center in direction k
 # hits any collision-link of object b within max_distances[k]. Self pairs and
@@ -36,8 +42,8 @@ m.HORIZONTAL_DIRECTION_COUNT = 10
 #
 # Cloth is skipped via is_compatible — cloth has no collision_mesh_cpu_data. TODO(andi) verrify this
 
-# Total number of axis directions (2 vertical + 10 horizontal)
-_ADJ_AXIS_COUNT = 2 + m.HORIZONTAL_DIRECTION_COUNT  # = 12
+# Total number of signed ray directions (2 vertical + 16 horizontal)
+_ADJ_AXIS_COUNT = 2 + _HORIZONTAL_DIRECTION_COUNT  # = 18
 
 # Horizontal-direction slice into the K axis: range(_HORIZONTAL_K_START, _HORIZONTAL_K_END).
 _HORIZONTAL_K_START = 2
@@ -116,15 +122,18 @@ def _adjacency_finalize_kernel(
 
 
 def _build_adjacency_axis_tables():
-    """Build the (12, 3) directions table and (12,) max-distance table.
+    """Build the legacy-equivalent (18, 3) directions and distance tables.
 
     Layout matches the kernel's k axis:
-      [+Z, -Z, h_0, h_1, ..., h_(N-1)]
-    where N = m.HORIZONTAL_DIRECTION_COUNT and h_k = (cos(k·2π/N), sin(k·2π/N), 0).
+      [+Z, -Z, axis_0+, ..., axis_7+, axis_0-, ..., axis_7-]
+
+    These are the 16 unique signed directions in the legacy scalar ray set.
+    Omitting its four duplicate rays preserves the OR-reduced predicate result
+    while avoiding redundant ray casts.
     """
-    n_horizontal = m.HORIZONTAL_DIRECTION_COUNT
-    angles = th.arange(n_horizontal, dtype=th.float32) * (2.0 * math.pi / n_horizontal)
-    horizontal_dirs = th.stack([th.cos(angles), th.sin(angles), th.zeros_like(angles)], dim=1)  # (N, 3)
+    axis_angles = th.arange(m.HORIZONTAL_AXIS_COUNT, dtype=th.float32) * (math.pi / m.HORIZONTAL_AXIS_COUNT)
+    axes = th.stack([th.cos(axis_angles), th.sin(axis_angles), th.zeros_like(axis_angles)], dim=1)
+    horizontal_dirs = th.cat([axes, -axes], dim=0)
 
     directions = th.zeros((_ADJ_AXIS_COUNT, 3), dtype=th.float32)
     directions[0] = th.tensor([0.0, 0.0, 1.0])
@@ -143,10 +152,9 @@ class Adjacency(TensorizedRelativeState):
 
     S = number of scenes
     N = number of objects with Adjacency state
-    VALUES has shape (S, N, N, K) bool, where K = _ADJ_AXIS_COUNT = 2 + m.HORIZONTAL_DIRECTION_COUNT
-    (12 by default: +Z, -Z, and 10 horizontal directions evenly spaced 36 degrees apart on the XY
-    plane). VALUES[s, a, b, k] is True iff object b is adjacent to object a in direction k
-    (from a's AABB center).
+    VALUES has shape (S, N, N, 18) bool: +Z, -Z, then the positive and negative
+    directions of the eight unique legacy horizontal axes. VALUES[s, a, b, k] is True iff
+    object b is adjacent to object a in direction k (from a's AABB center).
 
     Diagonal and cross-scene cells are always False.
     Cloth is excluded via is_compatible (no collision mesh to ray-cast against).
@@ -156,9 +164,9 @@ class Adjacency(TensorizedRelativeState):
     _aabb_obj_idxs = None  # wp.array (N_adj,) int32
     _link_to_obj_idx = None  # wp.array (L_total,) int32
     _link_to_scene_idx = None  # wp.array (L_total,) int32
-    _directions = None  # wp.array2d (12, 3) float32
-    _max_distances = None  # wp.array (12,) float32
-    _output = None  # wp.array4d (S, N_adj, N_adj, 12) int32 — atomic_max target
+    _directions = None  # wp.array2d (18, 3) float32
+    _max_distances = None  # wp.array (18,) float32
+    _output = None  # wp.array4d (S, N_adj, N_adj, 18) int32 — atomic_max target
 
     @classproperty
     def value_shape(cls):
