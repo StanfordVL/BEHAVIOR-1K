@@ -347,12 +347,24 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                         if mesh._mesh_type != "Mesh":
                             continue
 
-                        centroids = mesh.mesh_face_centroids  # (F, 3) local-unscaled
+                        # Match GeomPrim.check_local_points_in_volume(), whose Delaunay
+                        # test classifies points against the convex hull of the mesh's
+                        # vertices.  The authored mesh may contain triangulation faces
+                        # that are not hull facets; treating those as halfspaces rejects
+                        # valid interior points.
+                        hull_faces = th.as_tensor(mesh.delaunay_triangulation.convex_hull, dtype=th.long)
+                        hull_vertices = mesh.points[hull_faces]
+                        centroids = hull_vertices.mean(dim=1)  # (F_hull, 3) local-unscaled
+                        edge1 = hull_vertices[:, 1] - hull_vertices[:, 0]
+                        edge2 = hull_vertices[:, 2] - hull_vertices[:, 0]
+                        normals = th.cross(edge1, edge2, dim=1)
+                        normal_lengths = th.linalg.vector_norm(normals, dim=1, keepdim=True)
+                        normals = normals / th.clamp(normal_lengths, min=1e-8)
                         normals = _orient_face_normals_outward(
                             points=mesh.points,
                             face_centroids=centroids,
-                            face_normals=mesh.mesh_face_normals,
-                        )  # (F, 3) local-unscaled
+                            face_normals=normals,
+                        )  # (F_hull, 3) local-unscaled
                         face_count = centroids.shape[0]
                         if face_count == 0:
                             continue
