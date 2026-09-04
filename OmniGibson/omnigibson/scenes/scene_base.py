@@ -1259,20 +1259,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def _dump_state(self):
         """Dumps this scene's state.
 
-        The ``pos``/``ori`` entries record **the scene frame the state was captured
-        in**. They are provenance, not a target pose: ``_load_state`` uses them to
-        re-base object poses out of the capture frame and into this scene's frame,
-        and never moves the scene prim itself.
-
-        This is a deliberate deviation from a literal ``Serializable`` round trip:
-        after ``state = scene.dump_state(); scene.set_position_orientation(...);
-        scene.load_state(state)`` the scene stays where it was moved to, and its
-        objects come back re-based onto that new pose. The scene prim's pose belongs
-        to the loader, which owns multi-scene tiling (see
-        ``_load_scene_prim_with_objects``); letting a state dump move it collapses
-        every scene onto the capture frame's cell at ``num_envs > 1``, where objects
-        from different scenes physically collide, because tiling is the only
-        cross-scene isolation there is. ``Scene.restore`` inherits this behavior.
+        ``pos``/``ori`` record where the scene sat when the state was taken; loading uses them to
+        shift object poses over to wherever the scene sits now, and never moves the scene itself.
+        Moving it would stack every scene on the same spot when running several at once, so their
+        objects would collide.
         """
         # Default state for the scene is from the registry alone
         pos, ori = self.get_position_orientation()
@@ -1286,29 +1276,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Load scene state, then registry
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
-            # The recorded ("pos", "ori") entries define the SCENE POSE THE STATE WAS
-            # CAPTURED IN, not a pose this scene should move to. The scene keeps its own
-            # prim pose (multi-scene tiling is owned by the loader, see
-            # _load_scene_prim_with_objects); if the recorded frame differs from this
-            # scene's, every pose-bearing object state is re-based from the recorded
-            # scene frame into this scene's frame before loading — the load_state
-            # counterpart of the per-scene conversion initialize() applies to the
-            # initial scene file.
-            #
-            # The previous behavior (set this scene's prim pose to the recorded pose and
-            # load object poses raw) collapses every scene onto the recording's cell at
-            # num_envs > 1: single-scene recordings store the origin, so all scenes'
-            # objects were physically injected into scene 0's world cell, where they
-            # collide across scenes (no cross-scene collision filtering exists).
+            # ("pos", "ori") say where the scene sat when the state was taken. Leave this scene
+            # where it is and shift the object poses over instead, so that running several
+            # scenes at once does not pile them all onto the recorded spot and let their
+            # objects collide.
             rec_pos = th.as_tensor(state["pos"], dtype=th.float32).reshape(3)
             rec_ori = th.as_tensor(state["ori"], dtype=th.float32).reshape(4)
             cur_pos, cur_ori = self.get_position_orientation()
             registry_state = state["registry"]
             if not (th.equal(rec_pos, cur_pos) and th.equal(rec_ori, cur_ori)):
-                # rel = cur ∘ rec⁻¹ maps recorded-frame world poses into this scene's
-                # world frame. When rec == cur (single-env replay, initialize(), or a
-                # same-session save/load) the branch above keeps the load bit-identical
-                # to the raw path.
+                # rel = cur ∘ rec⁻¹ moves a recorded pose over to this scene. When the two
+                # match, this branch is skipped and the poses load unchanged.
                 inv_rec_pos, inv_rec_ori = T.invert_pose_transform(rec_pos, rec_ori)
                 rel_pos, rel_ori = T.pose_transform(cur_pos, cur_ori, inv_rec_pos, inv_rec_ori)
                 registry_state = self._rebase_registry_state_poses(registry_state, rel_pos, rel_ori)
@@ -1318,31 +1296,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
     @staticmethod
     def _rebase_registry_state_poses(registry_state, rel_pos, rel_ori):
-        """Returns a copy of @registry_state with object poses transformed by (rel_pos, rel_ori).
+        """Returns a copy of @registry_state with object poses moved over by (rel_pos, rel_ori).
 
-        Transforms, for every object_registry entry that carries a "root_link" dict:
-        - "pos"/"ori": rigid pose composition rel ∘ (pos, ori)
-        - "lin_vel"/"ang_vel": free vectors, rotated by rel_ori
-        - "particle_positions"/"particle_velocities" (cloth): points transformed /
-          vectors rotated
+        Objects have their positions moved and their velocities rotated. Particle systems are
+        different: their positions are already stored relative to the scene, so only their
+        velocities need rotating. Velocities are only ever rotated, never moved.
 
-        system_registry entries are handled asymmetrically, because their two halves
-        live in different frames:
-        - particle POSITIONS and ORIENTATIONS are already scene-relative (they go
-          through convert_world_pose_to_scene_relative in the systems' _dump_state), so
-          they are frame-correct as-is and must NOT be transformed;
-        - particle VELOCITIES are stored raw in the WORLD frame (micro:
-          "particle_velocities"; macro physical: "lin_velocities"/"ang_velocities"), so
-          they are rotated by rel_ori like any other free vector.
-
-        Only the rotation applies to velocities, never the translation. Under
-        translation-only tiling rel_ori is identity and this is a no-op, which is why
-        the omission was invisible: restoring into a scene rotated relative to the
-        recording left particles moving along the recorded world axis instead of the
-        scene's, so the next physics step drove them the wrong way.
-
-        The input dicts are never mutated (callers such as Scene.restore() reuse loaded
-        state dicts across calls); only the re-based leaves are replaced in copies.
+        The input dicts are left untouched, since callers reuse them across calls.
         """
         rebased = dict(registry_state)
         object_registry = registry_state.get("object_registry")

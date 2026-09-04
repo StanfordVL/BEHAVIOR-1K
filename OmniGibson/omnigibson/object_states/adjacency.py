@@ -16,11 +16,8 @@ m = create_module_macros(module_path=__file__)
 m.MAX_DISTANCE_VERTICAL = 5.0
 m.MAX_DISTANCE_HORIZONTAL = 5.0
 
-# The legacy scalar implementation cast along eight unique, evenly spaced
-# horizontal axes in both directions. Its coordinate-plane construction also
-# emitted four duplicate rays; duplicates cannot change the OR-reduced
-# Adjacency / NextTo result, so the tensorized implementation keeps only the
-# eight unique axes: 8 * 2 = 16 signed directions, spaced 22.5 degrees apart.
+# Number of horizontal directions
+# total 8 * 2 = 16 signed directions, spaced 22.5 degrees apart.
 m.HORIZONTAL_AXIS_COUNT = 8
 
 _HORIZONTAL_DIRECTION_COUNT = 2 * m.HORIZONTAL_AXIS_COUNT
@@ -122,7 +119,7 @@ def _adjacency_finalize_kernel(
 
 
 def _build_adjacency_axis_tables():
-    """Build the legacy-equivalent (18, 3) directions and distance tables.
+    """Build the (18, 3) directions and distance tables.
 
     Layout matches the kernel's k axis:
       [+Z, -Z, axis_0+, ..., axis_7+, axis_0-, ..., axis_7-]

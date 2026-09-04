@@ -37,6 +37,11 @@ def _is_system_particle_template_name(obj_name: str, system_names: set[str]) -> 
 
 
 def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: dict) -> None:
+    """Tells each object which non-kinematic states the demo saved for it, and in what order.
+
+    Reading a frame back walks the saved numbers in that order, so it has to follow the recording
+    rather than whatever states the current code gives the object.
+    """
     state = recorded_scene_file.get("state", {})
     object_registry_state = (
         state.get("registry", {}).get("object_registry", {})
@@ -55,22 +60,13 @@ def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: 
 
 
 def _add_recorded_non_kin_states_to_scene_file(scene_file: dict, recorded_scene_files: list[dict]) -> None:
-    """Adds every recorded object's non-kinematic state vocabulary to its init args.
+    """Passes each object the list of non-kinematic states the recording saved for it, as a
+    constructor arg.
 
-    Replay can outlive the taxonomy that created a recording.  If an ability is removed,
-    constructing the same object with the current taxonomy can omit a state which is still
-    present in every serialized row.  Filtering current states against the recorded names only
-    handles the opposite direction (new current states); it cannot consume a removed state's
-    payload and the rest of the row is then parsed at the wrong offsets.
-
-    The environment must therefore construct the union of states recorded for each object
-    before object-state initialization and tensor-view creation.  Per-demo alignment later sets
-    the exact recorded order used to deserialize that demo.  Unknown or incompatible state
-    classes fail during object construction / deserialization instead of silently skipping data.
-
-    This mutates @scene_file in place.  @recorded_scene_files may contain multiple demos that
-    will share one environment; their per-object vocabularies are unioned while preserving first
-    appearance order.
+    Which states an object gets is decided by its synset abilities, which may have changed since the
+    demo was recorded; without this list an object can be built without a state that every saved
+    frame still contains.  Edits @scene_file in place.  If several demos share one environment, each
+    object gets the combined list from all of them, ordered by where each name first appears.
     """
     init_info = scene_file["objects_info"]["init_info"]
     names_by_object = {}
@@ -97,22 +93,15 @@ def _add_recorded_non_kin_states_to_scene_file(scene_file: dict, recorded_scene_
 
 
 def _recorded_non_kin_state_name_union(recorded_scene_file: dict) -> set[str] | None:
-    """Returns the union of every recorded object's non-kinematic state names.
+    """Returns every non-kinematic state name that appears anywhere in one demo, pooled across all
+    its objects.
 
-    Objects added mid-episode by recorded transitions have no per-name entry in the
-    recorded initial scene file, so ``_align_scene_object_states_with_recorded_schema``
-    can never stamp them and they would deserialize with the CURRENT code's state
-    schema instead of the recording's, corrupting the serialized-state walk for every
-    subsequent object in the row. The union over all recorded objects is the
-    recording's non-kin state vocabulary: any state name absent from it (e.g. one that
-    became stateful only after the data was collected) was never serialized by the
-    collection code, so stamping an added object with the union makes ``deserialize``
-    skip exactly the states the recording could not contain, while every state the
-    added object shares with the vocabulary is still consumed.
-
-    Returns None when the recorded scene file carries no per-object registry state, in
-    which case there is nothing to align (matching
-    ``_align_scene_object_states_with_recorded_schema``'s no-op in that case).
+    Each frame is one flat array of numbers, read back one object and one state at a time, so an
+    object that expects a state the recording never saved eats the numbers meant for whatever comes
+    next, and everything after it is off by that much.  Objects created mid-episode (e.g. the halves
+    left by slicing) are not in the recorded scene file, so their own list is unknown; this pooled
+    list is the safe stand-in, because a name missing from it was never saved for anything.
+    Returns None if the recording has no per-object state at all.
     """
     state = recorded_scene_file.get("state", {})
     object_registry_state = (
@@ -868,10 +857,9 @@ class DataPlaybackWrapper(DataWrapper):
                     if _is_system_particle_template_info(add_obj_info, added_systems):
                         continue
                     obj = create_object_from_init_info(add_obj_info)
-                    # Transition-added objects have no entry in the recorded scene file, so
-                    # _align_scene_object_states_with_recorded_schema cannot stamp them; align
-                    # them with the recording's non-kin state vocabulary instead so that
-                    # deserializing subsequent state rows consumes the recorded layout.
+                    # Objects created by a transition are not in the recorded scene file, so they
+                    # have no saved state list of their own. Give them the pooled list instead, so
+                    # reading back later frames stays on the right numbers.
                     if recorded_non_kin_names is not None:
                         obj._recorded_non_kin_state_names = set(recorded_non_kin_names)
                     scene.add_object(obj)
