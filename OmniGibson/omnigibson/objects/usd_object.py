@@ -1170,7 +1170,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             state_items = [
                 (get_state_name(state_type), state_instance)
                 for state_type, state_instance in self._states.items()
-                if recorded_names is None or get_state_name(state_type) in recorded_names
+                if state_instance.stateful and (recorded_names is None or get_state_name(state_type) in recorded_names)
             ]
         else:
             current_states = {
