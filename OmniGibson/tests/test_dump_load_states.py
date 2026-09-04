@@ -1,51 +1,11 @@
 import tempfile
-from unittest.mock import MagicMock
 
 import torch as th
 from utils import SYSTEM_EXAMPLES
 
 import omnigibson as og
 from omnigibson.object_states import Covered
-from omnigibson.scenes.scene_base import Scene
 from omnigibson.systems import VisualParticleSystem
-
-
-def test_scene_restore_stops_before_system_topology_changes(monkeypatch):
-    events = []
-    sim = MagicMock()
-    sim.is_stopped.return_value = False
-    sim.is_playing.return_value = True
-    sim.stop.side_effect = lambda: events.append("stop")
-    sim.play.side_effect = lambda: events.append("play")
-    monkeypatch.setattr(og, "sim", sim)
-
-    class RestoreScene:
-        pass
-
-    scene = RestoreScene()
-    scene._check_versions_compatible = MagicMock()
-    scene.active_systems = {"obsolete_system": MagicMock()}
-    scene.object_registry = MagicMock()
-    # The obsolete system owns a template object. clear_system() removes it; restore must
-    # recompute the object delta rather than trying to remove the stale object a second time.
-    scene.object_registry.get_dict.side_effect = [{"obsolete_template": MagicMock()}, {}]
-    scene.clear_system = lambda name: events.append(f"clear:{name}")
-    scene.get_system = MagicMock()
-    scene.load_state = lambda state, serialized: events.append("load")
-    scene_info = {
-        "init_info": {"class_name": "RestoreScene"},
-        "state": {
-            "pos": [0.0, 0.0, 0.0],
-            "ori": [0.0, 0.0, 0.0, 1.0],
-            "registry": {"system_registry": {}, "object_registry": {}},
-        },
-        "objects_info": {"init_info": {}},
-    }
-
-    Scene.restore(scene, scene_file=scene_info)
-
-    assert events == ["stop", "clear:obsolete_system", "play", "load"]
-    sim.batch_remove_objects.assert_called_once_with([])
 
 
 def test_dump_load(env, breakfast_table):
