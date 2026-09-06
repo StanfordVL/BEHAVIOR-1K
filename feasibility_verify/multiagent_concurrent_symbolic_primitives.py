@@ -52,10 +52,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from coop2.behavior_env.env_setup import assert_multi_robot_sanity, build_multi_robot_config, prepare_robots
 from coop2.behavior_env.placement import (
-    TraversabilityIndex,
     look_at_quaternion,
     place_objects,
     place_robots,
+    sample_free_points,
 )
 from coop2.behavior_env.recording import ViewerRecorder, chain, enable_viewer_rendering
 from coop2.behavior_env.primitive_engine import (
@@ -81,7 +81,7 @@ ROBOT_MODEL = "R1"
 # and is a multi-room house -- L1b's room-level world graph needs real rooms, so
 # the big undivided halls are not substitutes despite being emptier.
 # See feasibility_verify/{measure_teleport_risk,survey_scene_capacity}.py.
-SCENE_MODEL = "house_single_floor"
+SCENE_MODEL = "house_single_floor"  # override with --scene
 LOAD_OBJECT_CATEGORIES = None  # None = load the whole scene; the trav map assumes it
 # Placeholders only. Robots are teleported to scene-derived poses right after
 # load (see coop2.behavior_env.placement) -- build_multi_robot_config needs
@@ -100,9 +100,12 @@ VIEWER_CAMERA_POSITION = th.tensor([1.8294, -3.2502, 1.6885])
 VIEWER_CAMERA_ORIENTATION = th.tensor([0.5770, 0.1719, 0.2280, 0.7652])
 VIEWER_CAMERA_FOCAL_LENGTH = 17.0
 VIEWER_CAMERA_HORIZONTAL_APERTURE = 20.995
+#: Ceiling clearance for the overhead shot. hall_arch_wood is a roofed hall,
+#: so an unbounded overhead camera ends up outside the building.
+OVERHEAD_MAX_HEIGHT = 7.0
 
 
-def configure_viewer_camera(env=None, placement_room=None) -> None:
+def configure_viewer_camera(env=None, placement_room=None, overhead: bool = False) -> None:
     """Frame the camera on the robots and apples.
 
     A fixed pose cannot survive a scene change, and placement is randomised per
@@ -143,23 +146,49 @@ def configure_viewer_camera(env=None, placement_room=None) -> None:
         # camera out through an exterior wall, so the shot was the agents seen
         # through wooden louvres. The room's own traversable cells are indoors
         # by construction, so pick the one nearest the ideal standoff.
-        eye_xy = None
-        if placement_room is not None:
-            index = TraversabilityIndex(env.scene, env.robots[0])
-            cells = index.room_component(placement_room)
-            # Same-room floor connectivity is not visibility: the first attempt
-            # at this picked a cell 7.9 m down a bending corridor and filmed a
-            # blank wall. Keep only cells that can actually see the centroid,
-            # and prefer the closest acceptable standoff over the furthest.
-            visible = [c for c in cells if index.has_line_of_sight(c, (cx, cy))]
-            if visible:
-                eye_xy = min(
-                    visible,
-                    key=lambda c: abs(math.hypot(c[0] - cx, c[1] - cy) - distance),
-                )
-            elif cells:
-                eye_xy = min(cells, key=lambda c: abs(math.hypot(c[0] - cx, c[1] - cy) - distance))
-        if eye_xy is None:
+        if overhead:
+            # Height is capped, not derived from the span. Deriving it put the
+            # camera 45 m up to fit a 23 m spread -- above hall_arch_wood's
+            # arched roof, filming the outside of the building. An enclosed
+            # hall has a ceiling just as a house does.
+            #
+            # The old formula was also wrong on its own terms: it sized height
+            # with the straight-down relation (span/2 / tan(v_fov/2)) and then
+            # placed the camera obliquely. An oblique view covers far more
+            # ground, so it overshot several times over. Fit the span with the
+            # HORIZONTAL fov and a horizontal standoff instead.
+            height = min(OVERHEAD_MAX_HEIGHT, max(4.0, max(spread_x, spread_y) * 0.45))
+            half_fov_h = math.atan((VIEWER_CAMERA_HORIZONTAL_APERTURE / 2) / VIEWER_CAMERA_FOCAL_LENGTH)
+            # Measured from the near EDGE of the group, not its centre: the
+            # nearest robot sits spread_y/2 in front of the centroid, so a
+            # centroid-relative standoff put it at the lens and clipped it off
+            # the bottom of the frame.
+            fit = (max(spread_x, spread_y, 3.0) / 2) / math.tan(half_fov_h) * 1.15
+            back = fit + spread_y / 2
+            eye = th.tensor([cx, cy - back, height], dtype=th.float32)
+            target = th.tensor([cx, cy, 0.3], dtype=th.float32)
+            og.sim.viewer_camera.set_position_orientation(
+                position=eye, orientation=look_at_quaternion(eye, target)
+            )
+            og.sim.viewer_camera.focal_length = VIEWER_CAMERA_FOCAL_LENGTH
+            og.sim.viewer_camera.horizontal_aperture = VIEWER_CAMERA_HORIZONTAL_APERTURE
+            tilt = math.degrees(math.atan2(height - 0.3, back))
+            print(
+                f"[camera] overhead eye={[round(float(v), 2) for v in eye]} h={height:.1f}m "
+                f"back={back:.1f}m tilt={tilt:.0f}deg spread=({spread_x:.1f}, {spread_y:.1f})"
+            )
+            return
+
+        # Stay inside the room: backing off along a free axis walked the camera
+        # out through an exterior wall. Sample standable points in the room and
+        # take the one nearest the ideal standoff -- they are indoors by
+        # construction. (A trav-map line-of-sight test is not enough on its own:
+        # that map marks doorways walkable, so the ray passes through closed
+        # doors.)
+        candidates = sample_free_points(env.scene, env.robots[0], count=120, room=placement_room)
+        if candidates:
+            eye_xy = min(candidates, key=lambda c: abs(math.hypot(c[0] - cx, c[1] - cy) - distance))
+        else:
             eye_xy = (cx - distance, cy) if spread_x <= spread_y else (cx, cy - distance)
 
         eye = th.tensor([eye_xy[0], eye_xy[1], eye_height], dtype=th.float32)
@@ -172,10 +201,9 @@ def configure_viewer_camera(env=None, placement_room=None) -> None:
             f"spread=({spread_x:.1f}, {spread_y:.1f})  standoff={math.hypot(eye_xy[0]-cx, eye_xy[1]-cy):.1f}m"
             f"  (room={placement_room!r})"
         )
-        try:
-            print(f"[camera] rooms available: {sorted(TraversabilityIndex(env.scene, env.robots[0]).cells_by_room())}")
-        except Exception:  # noqa: BLE001
-            pass
+        seg = getattr(env.scene, "_seg_map", None)
+        if seg is not None:
+            print(f"[camera] rooms available: {sorted(seg.room_ins_name_to_ins_id)}")
     og.sim.viewer_camera.focal_length = VIEWER_CAMERA_FOCAL_LENGTH
     og.sim.viewer_camera.horizontal_aperture = VIEWER_CAMERA_HORIZONTAL_APERTURE
 
@@ -322,6 +350,38 @@ def parse_args():
             "Build the L1a world model and print each agent's L1b text observation before and "
             "after the run. This is what the LLM will be shown, so it is the thing to eyeball."
         ),
+    )
+    parser.add_argument(
+        "--scene",
+        type=str,
+        default=SCENE_MODEL,
+        help=(
+            "Scene model. house_single_floor is a multi-room house (rooms matter for L1b); "
+            "hall_arch_wood is one 4560 m2 open hall, useful when a demo needs every agent in "
+            "frame at once."
+        ),
+    )
+    parser.add_argument(
+        "--camera",
+        choices=["eye", "overhead"],
+        default="eye",
+        help=(
+            "eye: 2.2 m eye level, close in -- readable indoors where anything further is behind a "
+            "wall. overhead: a high oblique that frames every robot and object from the first frame, "
+            "which needs an open space to work."
+        ),
+    )
+    parser.add_argument(
+        "--cluster-radius",
+        type=float,
+        default=6.0,
+        help="Keep robots within this distance of an anchor. Raise it to spread them out.",
+    )
+    parser.add_argument(
+        "--object-radius",
+        type=float,
+        default=8.0,
+        help="Keep objects within this distance of the robots' centroid.",
     )
     parser.add_argument(
         "--n-objects",
@@ -573,7 +633,7 @@ def main() -> None:
         config = build_multi_robot_config(
             robot_poses=robot_poses,
             robot_model=ROBOT_MODEL,
-            scene_model=SCENE_MODEL,
+            scene_model=args.scene,
             load_object_categories=LOAD_OBJECT_CATEGORIES,
             objects=build_objects(),
             agent_names=agent_ids,
@@ -589,7 +649,9 @@ def main() -> None:
 
         # Placement BEFORE prepare_robots: the config poses are placeholders,
         # and nothing has stepped yet, so moving here costs nothing.
-        starts, placement_room = place_robots(env, seed=args.seed, room=args.room)
+        starts, placement_room = place_robots(
+            env, seed=args.seed, room=args.room, cluster_radius=args.cluster_radius
+        )
         print(f"[placement] robots -> {[(round(x, 2), round(y, 2)) for x, y in starts]} in {placement_room!r}")
         prepare_robots(env)
         assert_multi_robot_sanity(env, expected_robots=args.n_robots)
@@ -647,13 +709,13 @@ def main() -> None:
         place_objects(
             env,
             [name for name, _ in APPLES],
-            annulus=probe.sampling_range_for(apple),
             seed=args.seed,
             room=placement_room,
+            near_robots=args.object_radius,
         )
 
         if not args.headless or args.video:
-            configure_viewer_camera(env, placement_room)
+            configure_viewer_camera(env, placement_room, overhead=(args.camera == "overhead"))
 
         monitor = ConcurrencyMonitor(engine, trace_every=args.trace_every)
         recorder = (

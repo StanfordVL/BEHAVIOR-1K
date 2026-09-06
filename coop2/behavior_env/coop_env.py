@@ -181,16 +181,12 @@ class CooperativeBehaviorEnv:
         )
 
         if self.extra_objects:
-            probe = next(iter(self.controllers.values()))
-            first = self.env.scene.object_registry("name", self.extra_objects[0]["name"])
-            if first is not None:
-                place_objects(
-                    self.env,
-                    [spec["name"] for spec in self.extra_objects],
-                    annulus=probe.sampling_range_for(first),
-                    seed=self.seed,
-                    room=self.placement_room,
-                )
+            place_objects(
+                self.env,
+                [spec["name"] for spec in self.extra_objects],
+                seed=self.seed,
+                room=self.placement_room,
+            )
 
         self.world = BehaviorWorldState(self.env, use_scene_graph=self.use_scene_graph)
         self.world.start()

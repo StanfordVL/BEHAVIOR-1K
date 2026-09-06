@@ -43,8 +43,10 @@ class ViewerRecorder:
     """Writes a video from the viewer camera as the engine ticks.
 
     Args:
-        path: output file. The extension picks the container (``.mp4`` is the
-            safe default; ``.webm`` also works via the bundled ffmpeg).
+        path: output file. Written through OmniGibson's own
+            ``create_video_writer`` / ``write_video`` (PyAV, libx264, yuv420p),
+            so these videos encode identically to the ones its eval pipeline
+            produces. ``.mp4``.
         every: capture one frame every N ticks. Rendering is the expensive part
             of a symbolic run -- the primitives themselves are nearly free --
             so this is the main speed/smoothness dial. At the default 4, a
@@ -82,11 +84,13 @@ class ViewerRecorder:
             )
         return self._camera
 
-    def _writer_handle(self):
+    def _writer_handle(self, frame):
+        """OmniGibson's own PyAV writer, so codec/pix_fmt match its videos."""
         if self._writer is None:
-            import imageio  # noqa: PLC0415 - keep the import cost off non-recording runs
+            from omnigibson.eval.utils.obs_utils import create_video_writer  # noqa: PLC0415
 
-            self._writer = imageio.get_writer(self.path, fps=self.fps)
+            height, width = int(frame.shape[0]), int(frame.shape[1])
+            self._writer = create_video_writer(fpath=self.path, resolution=(height, width), rate=self.fps)
         return self._writer
 
     def capture(self) -> None:
@@ -95,8 +99,10 @@ class ViewerRecorder:
         # have happened this tick. env.step does not necessarily render when
         # headless, hence the explicit call.
         og.sim.render()
-        frame = self.camera.get_obs()[0]["rgb"][:, :, :3]
-        self._writer_handle().append_data(frame.cpu().numpy())
+        frame = self.camera.get_obs()[0]["rgb"][:, :, :3].cpu().numpy()
+        from omnigibson.eval.utils.obs_utils import write_video  # noqa: PLC0415
+
+        write_video(frame[None], self._writer_handle(frame), mode="rgb")
         self.frames += 1
 
     def __call__(self, env_step: int) -> None:
@@ -107,6 +113,9 @@ class ViewerRecorder:
     def close(self) -> None:
         """Finalise the file. Idempotent."""
         if self._writer is not None:
-            self._writer.close()
+            container, stream = self._writer
+            for packet in stream.encode():
+                container.mux(packet)
+            container.close()
             self._writer = None
             print(f"[video] wrote {self.frames} frames to {self.path}")

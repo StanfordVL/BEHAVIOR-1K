@@ -30,7 +30,7 @@ from coop2.behavior_env.primitive_engine import (
     PrimitiveOutcome,
     ReasonCode,
 )
-from coop2.behavior_env.placement import TraversabilityIndex, place_objects, place_robots
+from coop2.behavior_env.placement import pick_room, place_objects, place_robots, sample_free_points
 from coop2.behavior_env.recording import ViewerRecorder, chain, enable_viewer_rendering
 from coop2.behavior_env.symbolic_contention import (
     DEFAULT_GATED_PRIMITIVES,
@@ -50,7 +50,8 @@ __all__ = [
     "EntityObservation",
     "PredicateFact",
     "SymbolicObservation",
-    "TraversabilityIndex",
+    "pick_room",
+    "sample_free_points",
     "place_objects",
     "place_robots",
     "render_symbolic_view",

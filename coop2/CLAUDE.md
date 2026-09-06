@@ -353,6 +353,46 @@ The verify script has a wall-clock cap and a stall detector (>12 primitives
 issued without `current_action_index` moving) precisely because a timeout
 cannot tell "slow" from "not progressing".
 
+## Reuse audit (2026-09-06)
+
+Systematic pass for hand-rolled code that OmniGibson or BDDL already provides.
+Replaced:
+
+| was | now |
+|---|---|
+| private `robot._ag_obj_in_hand` (3 sites) | `robot.is_grasping(arm, candidate_obj)` |
+| `RECEPTACLE_CATEGORIES`, ~25 category names | `obj.abilities` (`fillable` / `openable`) from the taxonomy |
+| `STRUCTURAL_CATEGORIES` name list | synset ancestry via `ObjectTaxonomy.is_descendant` |
+| `imageio.get_writer` | `eval.utils.obs_utils.create_video_writer` / `write_video` |
+| ids `apple#1` | BDDL instance naming `apple.n.01_1` |
+| scene-graph edge labels | BDDL tokens via `bddl_utils.PREDICATE_TO_STATE` |
+| hand-rolled erosion / connectivity / free-space sampling | `scene.get_random_point(floor, reference_point, robot)` |
+| objects dropped on random floor cells | `obj.states[OnTop].set_value(surface, True)` |
+
+A rendered fact is now `ontop(apple.n.01_1, breakfast_table.n.01_1)` -- the same
+strings an activity definition and its goal predicates use, so M9's
+`check_goal` needs no translation layer.
+
+The state->token mapping matters more than it looks: `Hot` is
+`object_states.Heated` and `Attached` is `AttachedTo`, so a name-equality check
+would work for most predicates and fail silently on exactly those.
+
+**BDDL cannot build the room world graph.** It is purely symbolic: its
+predicate classes are empty (`class OnTop(BinaryPredicate): pass`), truth comes
+from a callback into OmniGibson, `InRoom` is not even in `PREDICATE_TO_STATE`
+so it cannot be evaluated at runtime, and `knowledge_base` is an offline
+catalogue of what a scene's rooms contain *by design*, not what is in them now.
+The live graph has to come from `SceneGraphBuilder` + `seg_map`, which is what
+`world_state.py` does -- that part is not duplicated work.
+
+Genuinely no upstream equivalent, and kept: mutual separation between N robots,
+destination reservation under concurrency, room-scoped free space, the
+concurrent primitive engine, and the symbolic contention layer.
+
+Found while doing this: `is_fixed` was **always False**. `scene.fixed_objects`
+is a `{name: obj}` dict, so `set(...)` of it is a set of names and `obj in` it
+never matches. Nothing depended on it until `is_receptacle` did.
+
 ## Metrics: two different counters
 
 `engine.env_step` counts ticks (what `Timeout(max_steps)` counts).

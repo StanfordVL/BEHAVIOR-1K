@@ -101,7 +101,15 @@ class FakeObject:
 class FakeRobot(FakeObject):
     def __init__(self, name, position):
         super().__init__(name, "robot", position)
+        self.arm_names = ["left"]
         self._ag_obj_in_hand = {"left": None}
+
+    def is_grasping(self, arm="default", candidate_obj=None):
+        """Mirrors ManipulationRobot.is_grasping, which the code now calls
+        instead of reading the private _ag_obj_in_hand."""
+        arm = "left" if arm == "default" else arm
+        held = self._ag_obj_in_hand.get(arm)
+        return held is not None if candidate_obj is None else held is candidate_obj
 
 
 class FakeScene:
@@ -147,8 +155,8 @@ def main() -> int:
     seg = FakeSegMap()
     # A fixed counter annotated as kitchen, and a cup that starts in the kitchen.
     counter = FakeObject("counter_xyz_0", "countertop", [-2.0, 0.0, 0.9], in_rooms=["kitchen_0"])
-    cup = FakeObject("cup_abc_0", "cup", [-1.0, 0.0, 0.9], in_rooms=["kitchen_0"])
-    cup2 = FakeObject("cup_abc_1", "cup", [-1.5, 0.5, 0.9], in_rooms=["kitchen_0"])
+    cup = FakeObject("apple_abc_0", "apple", [-1.0, 0.0, 0.9], in_rooms=["kitchen_0"])
+    cup2 = FakeObject("apple_abc_1", "apple", [-1.5, 0.5, 0.9], in_rooms=["kitchen_0"])
     ghost = FakeObject("marker_0", "marker", [1.0, 0.0, 0.0], visual_only=True)
     alice = FakeRobot("agent_0", [-1.2, 0.0, 0.0])
     bob = FakeRobot("agent_1", [2.0, 0.0, 0.0])
@@ -168,11 +176,14 @@ def main() -> int:
     world.step()
     entities = world.entities()
     ids = {e.name: e.entity_id for e in entities.values()}
-    assert ids["cup_abc_0"] == "cup#1" and ids["cup_abc_1"] == "cup#2", ids
+    # BDDL instance naming: synset + _index, the same strings an activity
+    # definition and its goal predicates use.
+    assert ids["apple_abc_0"] == "apple.n.01_1", ids
+    assert ids["apple_abc_1"] == "apple.n.01_2", ids
     cup.set_position([3.0, 0.0, 0.9])
     world.step()
-    assert world.entities()["cup#1"].name == "cup_abc_0"
-    ok("cup#1 / cup#2 assigned, and cup#1 still means the same object after it moves")
+    assert world.entities()["apple.n.01_1"].name == "apple_abc_0"
+    ok("apple.n.01_1 / _2 assigned from the BDDL taxonomy, stable after the object moves")
 
     print("test 3: visual_only objects are excluded")
     assert not any(e.name == "marker_0" for e in world.entities().values())
@@ -180,25 +191,25 @@ def main() -> int:
 
     print("test 4: fixed furniture keeps in_rooms; movables are point-queried")
     entities = world.entities()
-    assert entities["countertop#1"].rooms == ["kitchen_0"], entities["countertop#1"].rooms
+    assert entities["countertop.n.01_1"].rooms == ["kitchen_0"], entities["countertop.n.01_1"].rooms
     # cup#1 was carried to x=+3, so its stale in_rooms says kitchen but the
     # live query must say living_room. This is the trap: in_rooms is written at
     # scene load and never updated.
     assert cup.in_rooms == ["kitchen_0"], "precondition: the annotation is stale"
-    assert entities["cup#1"].rooms == ["living_room_0"], entities["cup#1"].rooms
+    assert entities["apple.n.01_1"].rooms == ["living_room_0"], entities["apple.n.01_1"].rooms
     ok("stale in_rooms overridden for the moved cup; fixed counter keeps its annotation")
 
     print("test 5: held_by is a cross-robot view")
     alice._ag_obj_in_hand["left"] = cup2
     world.step()
-    assert world.entities()["cup#2"].held_by == "agent_0"
-    ok("cup#2 reports held by agent_0, read from every robot's _ag_obj_in_hand")
+    assert world.entities()["apple.n.01_2"].held_by == "agent_0"
+    ok("apple.n.01_2 reports held by agent_0, via the public is_grasping API")
 
     print("test 6: an agent sees its own room, and remembers rooms it has visited")
     obs = world.observation_for("agent_1")  # bob at x=+2 -> living_room_0
     assert obs.room == "living_room_0", obs.room
     names = {e.name for e in obs.entities.values()}
-    assert "cup_abc_0" in names, "the cup was carried into bob's room"
+    assert "apple_abc_0" in names, "the cup was carried into bob's room"
     assert "counter_xyz_0" not in names, "the kitchen counter is not visible from the living room"
     bob.set_position([-3.0, 0.0, 0.0])
     world.step()
@@ -224,16 +235,44 @@ def main() -> int:
     )
     entities = world.entities()
     facts = world.facts(entities)
-    assert len(facts) == 1 and facts[0].predicate == "OnTop"
-    assert facts[0].args == ("cup#1", "countertop#1"), facts[0].args
-    ok(f"edge rendered as {facts[0]}")
+    assert len(facts) == 1
+    assert facts[0].args == ("apple.n.01_1", "countertop.n.01_1"), facts[0].args
+    # omnigibson.utils.bddl_utils is not importable under the stubs, so the
+    # label falls through unchanged -- that fallback is the behaviour on any
+    # scene where the mapping cannot be built.
+    assert facts[0].predicate == "OnTop", facts[0].predicate
+    ok(f"edge rendered as {facts[0]} (token mapping unavailable -> label kept)")
+
+    print("test 7b: with the mapping available, edges carry BDDL tokens")
+    # Seeded rather than imported: the real table comes from inverting
+    # bddl_utils.PREDICATE_TO_STATE, which needs a live object_states import.
+    # The pairs below are the real ones, including the two that do NOT match by
+    # resemblance and would silently pass a name-equality check.
+    ws.BehaviorWorldState._token_cache = {
+        "OnTop": "ontop", "Inside": "inside", "Heated": "hot",
+        "AttachedTo": "attached", "ToggledOn": "toggled_on",
+    }
+    try:
+        assert world.predicate_token("OnTop") == "ontop"
+        assert world.predicate_token("Heated") == "hot", "Hot is object_states.Heated, not Heated"
+        assert world.predicate_token("AttachedTo") == "attached"
+        assert world.predicate_token("Unmapped") == "Unmapped", "unknown labels pass through"
+        world._graph = FakeGraph(
+            nodes={cup: {"states": {}}, counter: {"states": {}}},
+            edges=[(cup, counter, {"states": [("OnTop", True)]})],
+        )
+        fact = world.facts(world.entities())[0]
+        assert str(fact) == "ontop(apple.n.01_1, countertop.n.01_1)", str(fact)
+    finally:
+        ws.BehaviorWorldState._token_cache = None
+    ok(f"{fact} -- character for character what an activity definition writes")
 
     print("test 8: target_hints is the LLM's list of legal actions")
     obs = world.observation_for("agent_0")
     hints = {(h.primitive, h.target_id) for h in sv.target_hints(obs)}
-    assert ("release", "cup#2") in hints, "agent_0 holds cup#2"
-    assert ("grasp", "cup#2") not in hints, "cannot grasp what you already hold"
-    assert ("place_on_top", "countertop#1") in hints, "holding something -> can place it"
+    assert ("release", "apple.n.01_2") in hints, "agent_0 holds apple.n.01_2"
+    assert ("grasp", "apple.n.01_2") not in hints, "cannot grasp what you already hold"
+    assert ("place_on_top", "countertop.n.01_1") in hints, "holding something -> can place it"
     ok("release/place offered while holding; grasp withheld")
 
     print("test 9: an object held by a teammate is surfaced as blocked, not hidden")
@@ -242,7 +281,7 @@ def main() -> int:
     world.step()
     obs = world.observation_for("agent_0")
     blocked = [h for h in sv.target_hints(obs) if h.primitive == "blocked"]
-    assert blocked and blocked[0].target_id == "countertop#1", blocked
+    assert blocked and blocked[0].target_id == "countertop.n.01_1", blocked
     assert "agent_1" in blocked[0].note
     ok(f"reported as: {blocked[0].note}")
 
@@ -255,15 +294,15 @@ def main() -> int:
     world.step()
     obs = world.observation_for("agent_0")
     near = {(h.primitive, h.target_id) for h in sv.target_hints(obs, interaction_radius=1.5)}
-    assert ("navigate_to", "cup#1") in near, "must stay reachable or the LLM cannot discover the fix"
-    assert ("grasp", "cup#1") not in near
+    assert ("navigate_to", "apple.n.01_1") in near, "must stay reachable or the LLM cannot discover the fix"
+    assert ("grasp", "apple.n.01_1") not in near
     ok("far cup offers navigate_to only")
 
     print("test 11: the rendered view groups by room and lists actions")
     text = sv.render_symbolic_view(obs, interaction_radius=1.5)
     assert "you are agent_0" in text and "kitchen_0" in text
-    assert "You can do:" in text and "cup#1" in text
-    assert "cup_abc_0" not in text.split("You can do:")[0].split("Relations:")[0], "raw names must not leak into the entity list"
+    assert "You can do:" in text and "apple.n.01_1" in text
+    assert "apple_abc_0" not in text.split("You can do:")[0].split("Relations:")[0], "raw names must not leak into the entity list"
     ok("header, per-room grouping, and an action list all present")
 
     print("\nALL TESTS PASSED")

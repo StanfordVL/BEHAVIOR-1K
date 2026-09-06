@@ -21,75 +21,80 @@ from coop2.behavior_env.world_state import EntityObservation, SymbolicObservatio
 
 __all__ = ["ActionHint", "render_symbolic_view", "target_hints"]
 
-#: Categories that exist in the scene graph but are not things an agent acts on.
-#: Measured on house_single_floor, one corridor yields 218 entities and 132 legal
-#: (primitive, target) pairs -- 78 walls, 24 shelves, 20 switches, 16 downlights,
-#: 14 paintings -- which is not a prompt, it is a haystack. Filtering here rather
-#: than in L1a is deliberate: the world model stays complete for task evaluation,
-#: and only the *prompt* is pruned.
-STRUCTURAL_CATEGORIES = frozenset(
-    {
-        "walls",
-        "floors",
-        "ceilings",
-        "downlight",
-        "fixed_window",
-        "window",
-        "painting",
-        "mirror",
-        "rug",
-        "carpet",
-        "roof",
-        "lawn",
-        "driveway",
-        "pot_plant",
-        "curtain",
-    }
+#: Scenery: in the world model, out of the prompt. These are the synsets whose
+#: subtrees the taxonomy has no manipulation abilities for -- structure and
+#: fixtures. Measured on house_single_floor, one corridor yields 218 entities
+#: and 132 legal (primitive, target) pairs (78 walls, 24 shelves, 20 switches,
+#: 16 downlights, 14 paintings), which is not a prompt, it is a haystack.
+#:
+#: Matched by synset ancestry rather than a category-name list, so a category
+#: nobody thought of still resolves correctly. Filtering happens in L1b, **not**
+#: L1a: the world model stays complete for task evaluation and only the prompt
+#: is pruned.
+STRUCTURAL_SYNSETS = (
+    "wall.n.01",
+    "floor.n.01",
+    "ceiling.n.01",
+    "roof.n.01",
+    "window.n.01",
+    "door.n.01",
+    "lamp.n.02",
+    "light_source.n.01",
+    "picture.n.01",
+    "mirror.n.01",
+    "rug.n.01",
 )
 
-#: Only these can be placed onto or into. Without it the hint list offered
-#: ``place_on_top(downlight#22)`` and ``place_inside(door#3)``.
-RECEPTACLE_ABILITIES = frozenset({"fillable", "openable"})
-RECEPTACLE_CATEGORIES = frozenset(
-    {
-        "countertop",
-        "table",
-        "coffee_table",
-        "breakfast_table",
-        "desk",
-        "shelf",
-        "bookcase",
-        "cabinet",
-        "fridge",
-        "sink",
-        "bed",
-        "sofa",
-        "chair",
-        "stool",
-        "tray",
-        "plate",
-        "bowl",
-        "box",
-        "bucket",
-        "wardrobe",
-        "dishwasher",
-        "oven",
-        "microwave",
-        "washer",
-        "clothes_dryer",
-    }
-)
+#: Abilities the taxonomy annotates that make an object a valid place target.
+#: Replaces a hand-written list of ~25 category names, which silently missed
+#: anything not on it -- the annotations are the dataset's own answer.
+RECEPTACLE_ABILITIES = ("fillable", "openable")
+
+
+def _taxonomy():
+    from bddl.object_taxonomy import ObjectTaxonomy  # noqa: PLC0415
+
+    global _TAXONOMY
+    if _TAXONOMY is None:
+        _TAXONOMY = ObjectTaxonomy()
+    return _TAXONOMY
+
+
+_TAXONOMY = None
+
+
+def _synset_of(entity):
+    """Synset from the entity id, which is BDDL-shaped: ``apple.n.01_1``."""
+    base = entity.entity_id.rsplit("_", 1)[0]
+    return base if ".n." in base else None
 
 
 def is_structural(entity) -> bool:
-    """Scenery: present in the world model, absent from the prompt."""
-    return entity.category in STRUCTURAL_CATEGORIES
+    """Scenery -- present in the world model, absent from the prompt."""
+    synset = _synset_of(entity)
+    if synset is None:
+        return False
+    if synset in STRUCTURAL_SYNSETS:
+        return True
+    try:
+        taxonomy = _taxonomy()
+        return any(taxonomy.is_descendant(synset, ancestor) for ancestor in STRUCTURAL_SYNSETS)
+    except Exception:  # noqa: BLE001 - synsets outside the taxonomy
+        return False
 
 
 def is_receptacle(entity) -> bool:
-    return entity.category in RECEPTACLE_CATEGORIES or bool(
-        set(entity.abilities) & RECEPTACLE_ABILITIES
-    )
+    """Can something be placed on or in this?
+
+    Reads the taxonomy's own ability annotations, carried on the loaded object
+    as ``obj.abilities`` and copied into the observation.
+    """
+    if set(entity.abilities) & set(RECEPTACLE_ABILITIES):
+        return True
+    # A fixed, non-structural object with a surface is a plausible support even
+    # without a fillable/openable annotation -- tables and countertops have
+    # neither.
+    return entity.is_fixed and not is_structural(entity)
 
 
 #: Unary states that gate a primitive, and the primitive pair they gate.

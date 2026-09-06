@@ -159,15 +159,19 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
     def holder_of(self, obj) -> Optional[Any]:
         """The robot currently holding ``obj``, or None.
 
-        Scans every arm of every robot's ``_ag_obj_in_hand``. This is the
-        cross-robot view that ``_get_obj_in_hand`` deliberately does not give:
-        that one is indexed by ``self.robot`` and ``self.arm`` only.
+        Asks every robot's public ``is_grasping(arm, candidate_obj)``. This is
+        the cross-robot view ``_get_obj_in_hand`` does not give: that one is
+        indexed by ``self.robot`` and ``self.arm`` only. Going through the
+        public API also picks up the ``grasping_mode == "physical"`` branch that
+        reading ``_ag_obj_in_hand`` directly would skip.
         """
         for robot in self._peer_robots():
-            in_hand = getattr(robot, "_ag_obj_in_hand", None) or {}
-            for held in in_hand.values():
-                if held is obj:
-                    return robot
+            for arm in getattr(robot, "arm_names", []):
+                try:
+                    if robot.is_grasping(arm=arm, candidate_obj=obj):
+                        return robot
+                except Exception:  # noqa: BLE001 - non-manipulation robots
+                    break
         return None
 
     def _base_xy(self) -> Tuple[float, float]:

@@ -228,6 +228,13 @@ class FakeRobot:
         self._ag_obj_in_hand = {"left": None}
         scene.robots.append(self)
 
+    def is_grasping(self, arm="default", candidate_obj=None):
+        """Mirrors ManipulationRobot.is_grasping, which the code now calls
+        instead of reading the private _ag_obj_in_hand."""
+        arm = "left" if arm == "default" else arm
+        held = self._ag_obj_in_hand.get(arm)
+        return held is not None if candidate_obj is None else held is candidate_obj
+
     def get_position_orientation(self):
         return self.position, None
 

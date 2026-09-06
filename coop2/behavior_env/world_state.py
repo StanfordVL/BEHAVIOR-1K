@@ -126,6 +126,9 @@ class BehaviorWorldState:
             ``Touching``/``NextTo``, which are the most expensive of all.
     """
 
+    _taxonomy_cache = None
+    _token_cache = None
+
     def __init__(self, env, use_scene_graph: bool = True, exclude_states=None):
         self.env = env
         self.scene = env.scene
@@ -168,14 +171,46 @@ class BehaviorWorldState:
 
     # -- ids ---------------------------------------------------------------
 
+    @staticmethod
+    def _taxonomy():
+        """The BDDL object taxonomy, loaded once (it parses a JSON hierarchy)."""
+        if BehaviorWorldState._taxonomy_cache is None:
+            from bddl.object_taxonomy import ObjectTaxonomy  # noqa: PLC0415
+
+            BehaviorWorldState._taxonomy_cache = ObjectTaxonomy()
+        return BehaviorWorldState._taxonomy_cache
+
+    def synset_of(self, obj) -> Optional[str]:
+        """WordNet synset for @obj's category, e.g. ``apple.n.01``."""
+        category = getattr(obj, "category", None)
+        if not category:
+            return None
+        try:
+            return self._taxonomy().get_synset_from_category(category)
+        except Exception:  # noqa: BLE001 - categories outside the taxonomy
+            return None
+
     def entity_id_for(self, obj) -> str:
-        """Stable ``category#n`` id for @obj."""
+        """Stable BDDL-style id for @obj: ``apple.n.01_1``.
+
+        This is BDDL's own instance naming -- an activity definition writes
+        ``chlorine__bottle.n.01_1 - chlorine__bottle.n.01`` and its goal
+        predicates refer to exactly those strings. Using anything else (an
+        earlier version of this used ``apple#1``) means the ids the LLM is
+        shown do not match the ids the task's goal is written in, so L1d would
+        need a translation layer and every prompt would speak a private
+        dialect. Matching now is much cheaper than matching after M9.
+
+        Falls back to the raw category for objects outside the taxonomy --
+        robots, and anything added ad hoc -- which keeps ids readable rather
+        than raising on a scene the taxonomy does not fully cover.
+        """
         name = obj.name
         if name in self._ids:
             return self._ids[name]
-        category = getattr(obj, "category", None) or type(obj).__name__.lower()
-        self._counts[category] = self._counts.get(category, 0) + 1
-        self._ids[name] = f"{category}#{self._counts[category]}"
+        base = self.synset_of(obj) or getattr(obj, "category", None) or type(obj).__name__.lower()
+        self._counts[base] = self._counts.get(base, 0) + 1
+        self._ids[name] = f"{base}_{self._counts[base]}"
         return self._ids[name]
 
     # -- rooms -------------------------------------------------------------
@@ -200,7 +235,7 @@ class BehaviorWorldState:
         can move is point-queried, because ``in_rooms`` is never updated when an
         object is carried somewhere else.
         """
-        fixed = obj in set(getattr(self.scene, "fixed_objects", {}) or {})
+        fixed = obj in self._fixed_objects()
         in_rooms = list(getattr(obj, "in_rooms", None) or [])
         if fixed and in_rooms:
             return in_rooms
@@ -212,16 +247,38 @@ class BehaviorWorldState:
     def room_of_robot(self, robot) -> Optional[str]:
         return self.room_at(robot.get_position_orientation()[0])
 
+    def _fixed_objects(self) -> Set[Any]:
+        """The scene's immovable objects, as objects.
+
+        ``scene.fixed_objects`` is a **name -> object** dict, so ``set(...)`` of
+        it is a set of *names* and ``obj in`` it is always False. That silently
+        made every entity report ``is_fixed=False``, which only surfaced once
+        the receptacle test started depending on it.
+        """
+        fixed = getattr(self.scene, "fixed_objects", None) or {}
+        values = fixed.values() if hasattr(fixed, "values") else fixed
+        return set(values)
+
     # -- holders -----------------------------------------------------------
 
     def held_objects(self) -> Dict[str, str]:
-        """``{object name: robot name}`` across every robot and arm."""
+        """``{object name: robot name}`` across every robot and arm.
+
+        Uses the public ``robot.is_grasping(arm, candidate_obj)`` rather than
+        reading ``_ag_obj_in_hand`` directly: that private dict skips the
+        ``grasping_mode == "physical"`` branch the public method handles, and is
+        not part of the robot's contract.
+        """
         held: Dict[str, str] = {}
+        candidates = [obj for obj in self.scene.objects if obj not in self.robots]
         for robot in self.robots:
-            in_hand = getattr(robot, "_ag_obj_in_hand", None) or {}
-            for obj in in_hand.values():
-                if obj is not None:
-                    held[obj.name] = robot.name
+            for arm in getattr(robot, "arm_names", []):
+                for obj in candidates:
+                    try:
+                        if robot.is_grasping(arm=arm, candidate_obj=obj):
+                            held[obj.name] = robot.name
+                    except Exception:  # noqa: BLE001 - non-manipulation robots
+                        break
         return held
 
     # -- stepping ----------------------------------------------------------
@@ -249,7 +306,7 @@ class BehaviorWorldState:
     def entities(self) -> Dict[str, EntityObservation]:
         """Every entity in the scene, keyed by stable id."""
         held = self.held_objects()
-        fixed = set(getattr(self.scene, "fixed_objects", {}) or {})
+        fixed = self._fixed_objects()
         out: Dict[str, EntityObservation] = {}
 
         for robot in self.robots:
@@ -285,8 +342,44 @@ class BehaviorWorldState:
             )
         return out
 
+    @staticmethod
+    def _state_to_bddl_token() -> Dict[str, str]:
+        """``{OmniGibson state class name: BDDL token}``, e.g. ``OnTop -> ontop``.
+
+        Inverted from ``bddl_utils.PREDICATE_TO_STATE``, which is the official
+        BDDL-predicate <-> object-state mapping. The scene graph labels its
+        edges with the *state* class name; a goal condition is written with the
+        BDDL *token*. Those two happen to look alike for most predicates
+        (``OnTop`` / ``ontop``) and differ for others (``Hot`` is
+        ``object_states.Heated``, ``Attached`` is ``AttachedTo``), so relying on
+        the resemblance would work until exactly the cases that matter.
+
+        With this and the BDDL instance ids, a rendered fact reads
+        ``ontop(apple.n.01_1, breakfast_table.n.01_1)`` -- character for
+        character what an activity definition writes, which is what M9's
+        ``check_goal`` will be comparing against.
+        """
+        if BehaviorWorldState._token_cache is None:
+            from bddl.predicates import TOKEN_TO_PREDICATE  # noqa: PLC0415
+            from omnigibson.utils.bddl_utils import PREDICATE_TO_STATE  # noqa: PLC0415
+
+            predicate_to_token = {cls: token for token, cls in TOKEN_TO_PREDICATE.items()}
+            BehaviorWorldState._token_cache = {
+                state.__name__: predicate_to_token[predicate]
+                for predicate, state in PREDICATE_TO_STATE.items()
+                if predicate in predicate_to_token
+            }
+        return BehaviorWorldState._token_cache
+
+    def predicate_token(self, state_name: str) -> str:
+        """BDDL token for a scene-graph edge label, or the label unchanged."""
+        try:
+            return self._state_to_bddl_token().get(str(state_name), str(state_name))
+        except Exception:  # noqa: BLE001 - bddl/omnigibson unavailable (stubbed tests)
+            return str(state_name)
+
     def facts(self, entities: Dict[str, EntityObservation]) -> List[PredicateFact]:
-        """Relations from the scene graph, translated into entity ids."""
+        """Relations from the scene graph, in BDDL tokens over BDDL ids."""
         if self._graph is None:
             return []
         by_name = {entity.name: entity.entity_id for entity in entities.values()}
@@ -299,9 +392,15 @@ class BehaviorWorldState:
             # merge_parallel_edges=True gives {"states": [(name, value), ...]};
             # otherwise each edge carries a single {"value": bool}.
             for name, value in data.get("states", []) or []:
-                facts.append(PredicateFact(str(name), (source_id, target_id), bool(value)))
+                facts.append(PredicateFact(self.predicate_token(name), (source_id, target_id), bool(value)))
             if "value" in data and not data.get("states"):
-                facts.append(PredicateFact(str(data.get("name", "related")), (source_id, target_id), bool(data["value"])))
+                facts.append(
+                    PredicateFact(
+                        self.predicate_token(data.get("name", "related")),
+                        (source_id, target_id),
+                        bool(data["value"]),
+                    )
+                )
         facts.sort(key=lambda f: (f.predicate, f.args))
         return facts
 
