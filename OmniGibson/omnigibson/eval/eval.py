@@ -148,14 +148,20 @@ def main() -> None:
         os.makedirs(video_dir, exist_ok=True)
 
     results = []
+    failed_instances = []
     with Evaluator(cfg) as evaluator:
         for instance_id in instance_ids:
             try:
                 evaluator.reset()
                 evaluator.load_task_instance(int(instance_id))
             except Exception:
-                logger.exception(f"Failed to load task instance {instance_id}.")
-                raise
+                # One instance failing to load must not abort the remaining instances of this task:
+                # record it and move on. The failure is reported in eval_summary.json below because the
+                # process exit status cannot carry it (Evaluator.__exit__ -> og.shutdown() -> app.close()
+                # terminates the process with status 0 before any sys.exit() after the block would run).
+                logger.exception(f"Failed to load task instance {instance_id}; skipping it.")
+                failed_instances.append(int(instance_id))
+                continue
             for rollout_id in range(args.num_rollouts):
                 video_path = os.path.join(video_dir, f"{args.task_name}_{instance_id}_{rollout_id}.mp4")
                 try:
@@ -192,16 +198,34 @@ def main() -> None:
                     )
                     results.append(result)
                 except Exception:
-                    logger.exception(f"Instance {instance_id} rollout {rollout_id} failed.")
-                    raise
+                    logger.exception(f"Instance {instance_id} rollout {rollout_id} failed; skipping it.")
+                    failed_instances.append(int(instance_id))
+                    break
                 finally:
                     if args.write_video:
                         evaluator.stop_recording()
 
-    n = len(results)
-    n_success = sum(r["success"] for r in results)
-    mean_q = (sum(r.get("q_score", {}).get("final", 0.0) for r in results) / n) if n else 0.0
-    logger.info(f"Eval summary: {n_success}/{n} success | mean q_score={mean_q:.3f} | task={args.task_name}")
+        n = len(results)
+        n_success = sum(r["success"] for r in results)
+        mean_q = (sum(r.get("q_score", {}).get("final", 0.0) for r in results) / n) if n else 0.0
+        logger.info(f"Eval summary: {n_success}/{n} success | mean q_score={mean_q:.3f} | task={args.task_name}")
+        if failed_instances:
+            logger.error(f"{len(failed_instances)} instance(s) failed and were skipped: {sorted(set(failed_instances))}")
+        # Written while the simulator is still up: the process exit status is always 0 (see above).
+        with open(os.path.join(os.path.expanduser(args.output_dir), "eval_summary.json"), "w") as f:
+            json.dump(
+                {
+                    "task": args.task_name,
+                    "mode": args.mode,
+                    "requested_instance_ids": [int(i) for i in instance_ids],
+                    "completed_instance_ids": sorted({int(r["instance_id"]) for r in results}),
+                    "failed_instance_ids": sorted(set(failed_instances)),
+                    "n_success": int(n_success),
+                    "mean_q_score": mean_q,
+                },
+                f,
+                indent=2,
+            )
 
 
 if __name__ == "__main__":

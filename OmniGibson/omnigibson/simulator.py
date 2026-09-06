@@ -978,6 +978,13 @@ def _launch_simulator(*args, **kwargs):
             """
             playing = self.is_playing()
             if playing:
+                # A transition rule may have deleted prims during the last physics step of an episode
+                # (omni.physx.tensors: "prim ... was deleted while being used by a shape in a tensor view.
+                # The physics.tensors simulationView was invalidated."). If the episode ended on that very
+                # step -- e.g. cooking / slicing satisfied the goal -- nothing refreshed the handles before
+                # the next reset, and dump_state() below reads None joint states from the dead views
+                # (`AttributeError: 'NoneType' object has no attribute 'view'`). Rebuild the handles first.
+                self.update_handles()
                 state = self.dump_state()
 
                 # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
