@@ -1,0 +1,311 @@
+"""
+Run LLM agents with the Broadcast Chain topology.
+
+Uses the Broadcast Chain factory from comm_topology.llm_broadcast_chain.
+with broadcast messaging where each agent sends to all following agents.
+
+Decision Flow:
+    Agent i:
+        1. Wait for messages from agents 0..i-1 (if i > 0)
+        2. Generate plan using LLM
+        3. Broadcast message to agents i+1..n-1
+"""
+
+import sys
+import os
+import json
+import threading
+import time
+from datetime import datetime
+from typing import Dict
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from coop2.behavior_env.coop_env import CooperativeEnv
+from coop2.behavior_env.cooperative_tasks import plot_metrics_timeline
+from coop2.cognitive import (
+    PlanningEnvWrapper, 
+    LLMClient,
+    visualize_all_agents_progress,
+    print_plan_summary,
+    visualize_comprehensive_timeline,
+    build_repair_intervention_report,
+    compute_all_metrics,
+    print_metrics_summary,
+    save_metrics,
+    save_metrics_csv,
+)
+from coop2.cognitive.viz import RealtimeVisualizationWrapper
+from coop2.comm_topology import create_llm_broadcast_chain_topology
+try:
+    from llm_usage import print_llm_usage_summary
+except ImportError:
+    from experiment.llm_usage import print_llm_usage_summary
+
+
+def run_broadcast_chain_experiment(
+    n_agents=3,
+    max_steps=200,
+    verbose=True,
+    show_viz=False,
+    llm_verbose=True,
+    coop2_precheck_enabled=False,
+    llm_model=None,
+    time_limit_seconds=120,
+    seed=42,
+    record_video=True,
+    output_root=None,
+):
+    """
+    Run the Broadcast Chain condition.
+    
+    Args:
+        n_agents: Number of agents
+        max_steps: Maximum environment steps
+        verbose: Whether to print verbose output
+        show_viz: Whether to show live visualization
+        llm_verbose: If True, print LLM API inputs and outputs
+        coop2_precheck_enabled: If True, enable COOP2 pre-execution repair
+        llm_model: Optional model/deployment override
+        time_limit_seconds: Wall-clock budget for the score task. Disable with 0 or None.
+        seed: Environment random seed.
+        record_video: If True, record and save an episode GIF.
+        output_root: Optional directory where this run directory should be created.
+    """
+    print("="*80)
+    print("BROADCAST CHAIN WITH LLM AGENTS")
+    print("="*80)
+    
+    # Create output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    repair_label = "repair_on" if coop2_precheck_enabled else "repair_off"
+    results_root = output_root or os.path.join(os.path.dirname(__file__), 'results')
+    output_dir = os.path.join(
+        results_root,
+        f'broadcast_chain_agents{n_agents}_{repair_label}_seed{seed}_{timestamp}',
+    )
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"\nResults will be saved to: {output_dir}\n")
+    
+    # Initialize LLM client
+    print("Initializing LLM client...")
+    llm_client = LLMClient.from_env(model=llm_model, verbose=llm_verbose)
+    print(f"  Model: {llm_client.model}")
+    if llm_verbose:
+        print("  LLM verbose mode: ON (showing API inputs/outputs)")
+    
+    # Create environment
+    agent_names = [f"agent_{i}" for i in range(n_agents)]
+    base_env = CooperativeEnv(
+        area=(64, 64),
+        view=(9, 9),
+        size=(84, 84),
+        reward=True,
+        length=max_steps,
+        n_players=n_agents,
+        seed=seed,
+        coop_config_path="paper",
+    )
+    if hasattr(base_env, "set_team_score_time_limit"):
+        base_env.set_team_score_time_limit(time_limit_seconds)
+    
+    # Create Broadcast Chain LLM agents.
+    print(f"\nCreating Broadcast Chain with {n_agents} agents...")
+    print(f"  Speaking order: {' -> '.join(agent_names)}")
+    print(f"  Each agent broadcasts to all following agents")
+    if coop2_precheck_enabled:
+        print("  COOP2 repair: enabled")
+    if time_limit_seconds:
+        print(f"  Team-score deadline: {max_steps} env steps or {time_limit_seconds} seconds, whichever comes first")
+    
+    agents = create_llm_broadcast_chain_topology(
+        n_agents=n_agents,
+        llm_client=llm_client,
+        temperature=0.7,
+        verbose=verbose,
+    )
+    
+    # Wrap with planning environment
+    plan_env = PlanningEnvWrapper(
+        base_env,
+        agent_names=agent_names,
+        agents=agents,
+        log_file=os.path.join(output_dir, "plan_logs.json"),
+        interrupt_on_message=True,
+        coop2_precheck_enabled=coop2_precheck_enabled,
+    )
+    
+    # Wrap with visualization
+    env = RealtimeVisualizationWrapper(plan_env, record_video=record_video, show=show_viz)
+    
+    # Run the experiment
+    print("\n" + "="*80)
+    print("STARTING EXPERIMENT")
+    print("="*80)
+    
+    obs_dict, info = env.reset()
+    done = False
+    timed_out = False
+    deadline = None
+    if time_limit_seconds and time_limit_seconds > 0:
+        deadline = time.monotonic() + float(time_limit_seconds)
+    
+    running_threads: Dict[str, threading.Thread] = {}
+    
+    try:
+        while env.current_step < max_steps and not done:
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                break
+
+            while not all(env.agents[aid].ready for aid in agent_names):
+                if deadline is not None and time.monotonic() >= deadline:
+                    timed_out = True
+                    break
+
+                for aid in agent_names:
+                    agent = env.agents[aid]
+                    if aid not in running_threads or not running_threads[aid].is_alive():
+                        running_threads[aid] = threading.Thread(target=agent.create_agent_thread)
+                        running_threads[aid].start()
+                env.wait_for_state_change(timeout=0.05)
+
+            if timed_out:
+                break
+            
+            for t in running_threads.values():
+                t.join()
+            running_threads.clear()
+
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                break
+            
+            obs_dict, rewards, terminated, truncated, info = env.step()
+            
+            if env.current_step % 10 == 0:
+                print(f"\n--- Step {env.current_step}/{max_steps} ---")
+                for agent_id, agent in agents.items():
+                    role = f"SPEAKER-{agent.speaker_order}"
+                    print(f"  {agent_id} ({role}): {agent.api_calls} API calls, {agent.total_tokens_used} tokens")
+            
+            done = any(terminated.values()) or any(truncated.values())
+    
+    except KeyboardInterrupt:
+        print("\n\nExperiment interrupted by user")
+    
+    last_step = env.current_step
+    
+    print(f"\n{'='*80}")
+    print(f"Episode complete at step {last_step}")
+    if timed_out:
+        print(f"Stopped because wall-clock limit reached ({time_limit_seconds} seconds)")
+    print(f"{'='*80}")
+    
+    env.terminate_unfinished_plans()
+    env.save_logs(output_dir)
+
+    if coop2_precheck_enabled:
+        report_path = build_repair_intervention_report(output_dir)
+        if report_path:
+            print(f"COOP2 repair process figure: {report_path}")
+
+    stats = env.get_plan_statistics()
+    print(f"\nPlan Statistics:")
+    print(f"  Total Plans: {stats['total_plans']}")
+    if stats['total_plans'] > 0:
+        print(f"  Successful: {stats['successful']}")
+        print(f"  Failed: {stats['failed']}")
+        print(f"  Success Rate: {stats['success_rate']*100:.1f}%")
+        print(f"  Average Duration: {stats['average_duration']:.1f} steps")
+    
+    usage_summary = print_llm_usage_summary(
+        agents,
+        role_getter=lambda _agent_id, agent: f"speaker-{agent.speaker_order}",
+        extra_getter=lambda _agent_id, agent: {"speaker_order": agent.speaker_order},
+    )
+    total_api_calls = usage_summary["total_api_calls"]
+    total_tokens = usage_summary["total_tokens"]
+    
+    print_plan_summary(env.logger.plan_history)
+    
+    agent_timeline_path = os.path.join(output_dir, 'agent_timeline.png')
+    visualize_all_agents_progress(env.logger.plan_history, output_path=agent_timeline_path)
+    
+    comprehensive_timeline_path = os.path.join(output_dir, 'comprehensive_timeline.png')
+    visualize_comprehensive_timeline(
+        env.agents, env.logger.plan_history, last_step,
+        env.message_broker.get_message_log(),
+        output_path=comprehensive_timeline_path
+    )
+    
+    task_history = env._env.symbolic_env.env.task_tracker.get_history()
+    metrics_history = [step_summary.metrics for step_summary in task_history if step_summary.metrics]
+    if metrics_history:
+        metrics_path = os.path.join(output_dir, 'metrics_timeline.png')
+        plot_metrics_timeline(metrics_history, output_path=metrics_path, show=False)
+    
+    if record_video:
+        gif_path = os.path.join(output_dir, 'episode.gif')
+        env.save_video(gif_path, fps=12)
+    env.close()
+    
+    llm_stats_path = os.path.join(output_dir, 'llm_usage.json')
+    llm_stats = {
+        'model': llm_client.model,
+        'topology': 'broadcast_chain',
+        'max_steps': max_steps,
+        'time_limit_seconds': time_limit_seconds,
+        'timed_out': timed_out,
+        'seed': seed,
+        'record_video': record_video,
+        **usage_summary,
+    }
+    with open(llm_stats_path, 'w') as f:
+        json.dump(llm_stats, f, indent=2)
+
+    # Compute and save COOP² metrics after llm_usage.json exists.
+    print("\nComputing COOP² metrics...")
+    metrics = compute_all_metrics(output_dir)
+    print_metrics_summary(metrics)
+    save_metrics(metrics, os.path.join(output_dir, 'coop2_metrics.json'))
+    save_metrics_csv(metrics, os.path.join(output_dir, 'coop2_metrics.csv'))
+    
+    print(f"\n{'='*80}")
+    print(f"Results saved to: {output_dir}")
+    print(f"{'='*80}")
+    
+    return agents, env
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Run Broadcast Chain LLM experiment")
+    parser.add_argument("--agents", type=int, default=3, help="Number of agents")
+    parser.add_argument("--steps", type=int, default=200, help="Maximum steps")
+    parser.add_argument("--time-limit-seconds", type=float, default=120, help="Wall-clock time budget; use 0 to disable")
+    parser.add_argument("--quiet", action="store_true", help="Reduce output verbosity")
+    parser.add_argument("--show", action="store_true", help="Show live visualization")
+    parser.add_argument("--coop2-repair", action="store_true", help="Enable COOP2 pre-execution repair")
+    parser.add_argument("--model", type=str, default=None, help="LLM model/deployment override")
+    parser.add_argument("--llm-quiet", action="store_true", help="Hide raw LLM API prompts and responses")
+    parser.add_argument("--seed", type=int, default=42, help="Environment random seed")
+    parser.add_argument("--no-video", action="store_true", help="Skip episode GIF recording/saving")
+    parser.add_argument("--output-root", type=str, default=None, help="Directory where the run result folder is created")
+    
+    args = parser.parse_args()
+    
+    run_broadcast_chain_experiment(
+        n_agents=args.agents,
+        max_steps=args.steps,
+        verbose=not args.quiet,
+        show_viz=args.show,
+        llm_verbose=not args.llm_quiet,
+        coop2_precheck_enabled=args.coop2_repair,
+        llm_model=args.model,
+        time_limit_seconds=args.time_limit_seconds,
+        seed=args.seed,
+        record_video=not args.no_video,
+        output_root=args.output_root,
+    )
