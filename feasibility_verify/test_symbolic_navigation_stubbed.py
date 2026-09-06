@@ -333,7 +333,71 @@ def main() -> int:
         assert gap >= separation - 1e-6, (gap, separation)
     ok(f"no sample within {separation:.2f} m of agent_1 (2 x robot radius)")
 
-    print("test 12: separation is just-touching, not a planning margin")
+    print("test 12: concurrent samplers must not all pick the same spot")
+    # The TOCTOU race this registry exists for: every agent samples while every
+    # other robot is still at its start pose metres away, so a
+    # current-position-only check passes for all of them and they teleport into
+    # each other. Measured at 0.64 m apart against a 1.24 m requirement, which
+    # let one robot's assisted grasp latch onto another robot.
+    race_scene = FakeScene(FakeSegMap())
+    movers = [FakeRobot(race_scene, name=f"agent_{i}", position=(5.0 * i, 5.0 * i, 0.0)) for i in range(3)]
+    registry = module.DestinationRegistry()
+    controllers = [
+        Navigable(None, robot, require_same_room=False, require_traversable=False, destinations=registry)
+        for robot in movers
+    ]
+    contested = FakeObject("apple_0", [0.0, 0.0, 0.4])
+    poses = []
+    for controller in controllers:
+        pose = controller._sample_pose_near_object(contested)  # nobody has moved yet
+        assert pose is not None
+        poses.append((float(pose[0]), float(pose[1])))
+    separation = controllers[0].robot_separation
+    for i in range(len(poses)):
+        for j in range(i + 1, len(poses)):
+            gap = math.hypot(poses[i][0] - poses[j][0], poses[i][1] - poses[j][1])
+            assert gap >= separation - 1e-6, f"agents {i},{j} would overlap at {gap:.2f} m"
+    assert len(registry) == 3
+    ok(f"3 concurrent samples around one object, all >= {separation:.2f} m apart")
+
+    print("test 13: without the registry the race reproduces")
+    # Guards the guard: if this stops finding overlaps, test 12 has stopped
+    # testing anything. Measured over many trials rather than one, because a
+    # single random draw of three poses around an object sometimes happens to
+    # be well separated -- a one-shot version of this assertion is flaky and
+    # would eventually be "fixed" by deleting it.
+    def closest_pair(use_registry):
+        scene = FakeScene(FakeSegMap())
+        robots = [FakeRobot(scene, name=f"r{i}", position=(5.0 * i, 5.0 * i, 0.0)) for i in range(3)]
+        shared = module.DestinationRegistry() if use_registry else None
+        picked = []
+        for robot in robots:
+            controller = Navigable(
+                None, robot, require_same_room=False, require_traversable=False, destinations=shared
+            )
+            pose = controller._sample_pose_near_object(contested)
+            if pose is None:
+                return None
+            picked.append((float(pose[0]), float(pose[1])))
+        return min(
+            math.hypot(picked[i][0] - picked[j][0], picked[i][1] - picked[j][1])
+            for i in range(3)
+            for j in range(i + 1, 3)
+        )
+
+    trials = 200
+    unguarded = [closest_pair(False) for _ in range(trials)]
+    guarded = [closest_pair(True) for _ in range(trials)]
+    overlaps_without = sum(1 for d in unguarded if d is not None and d < separation)
+    overlaps_with = sum(1 for d in guarded if d is not None and d < separation)
+    assert overlaps_without > trials * 0.1, f"only {overlaps_without}/{trials} overlapped; race not reproduced"
+    assert overlaps_with == 0, f"{overlaps_with}/{trials} overlapped despite reservations"
+    ok(
+        f"no registry: {overlaps_without}/{trials} trials overlap; "
+        f"with registry: {overlaps_with}/{trials}"
+    )
+
+    print("test 14: separation is just-touching, not a planning margin")
     # Symbolic navigation teleports, so there is no path to keep clear -- only
     # bodies to keep from overlapping. Anything larger needlessly shrinks the
     # usable floor, which matters at N=9.

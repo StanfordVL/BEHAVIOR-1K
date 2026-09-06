@@ -46,7 +46,45 @@ from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
     SymbolicSemanticActionPrimitives,
 )
 
-__all__ = ["NavigableSymbolicActionPrimitives"]
+__all__ = ["DestinationRegistry", "NavigableSymbolicActionPrimitives"]
+
+
+class DestinationRegistry:
+    """Where each agent has *decided* to teleport, before it gets there.
+
+    Checking separation against other robots' current positions is not enough
+    under concurrency, and the failure is a textbook time-of-check/time-of-use
+    race. All N agents are assigned NAVIGATE_TO on the same tick; each samples
+    its destination on its generator's first ``next()``, while every other robot
+    is still standing at its start pose metres away. Every check passes. Then
+    all of them teleport next to the same object and interpenetrate -- measured
+    at 0.64 m apart against a 1.24 m requirement, which was enough for one
+    robot's assisted grasp to latch onto **another robot** (``holding=agent_0``).
+
+    So agents reserve the pose they are about to occupy, and everyone else's
+    sampler avoids reservations as well as bodies.
+
+    Reservations are overwritten, never explicitly released: a reservation means
+    "this agent intends to be here", which stays true until it decides to go
+    somewhere else, and once the robot has actually arrived the reservation and
+    its body coincide. That makes a dropped or aborted primitive self-correcting
+    instead of leaking a permanently blocked spot.
+    """
+
+    def __init__(self):
+        self._by_agent: dict = {}
+
+    def reserve(self, agent_id: str, xy) -> None:
+        self._by_agent[agent_id] = (float(xy[0]), float(xy[1]))
+
+    def release(self, agent_id: str) -> None:
+        self._by_agent.pop(agent_id, None)
+
+    def others(self, agent_id: str):
+        return [xy for name, xy in self._by_agent.items() if name != agent_id]
+
+    def __len__(self) -> int:
+        return len(self._by_agent)
 
 
 class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
@@ -91,6 +129,10 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
             clear, only bodies to keep from overlapping.
         require_traversable: reject poses where the eroded trav map says the
             robot does not fit. Silently inert on a scene with no trav map.
+        destinations: shared :class:`DestinationRegistry`. Without one,
+            separation is checked only against where robots currently stand,
+            which under concurrency is where they were *before* they all
+            teleported to the same place.
         sampling_attempts: how many candidates to try before giving up.
         require_same_room: reject candidates outside the target's room. Set
             False for scenes without a segmentation map (a plain ``Scene``
@@ -109,6 +151,7 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
         robot_radius: Optional[float] = None,
         robot_separation: Optional[float] = None,
         require_traversable: bool = True,
+        destinations: Optional["DestinationRegistry"] = None,
         sampling_attempts: int = 200,
         require_same_room: bool = True,
         distance_range: Optional[Tuple[float, float]] = None,
@@ -120,6 +163,9 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
         self._nav_robot_radius = robot_radius
         self._nav_robot_separation = robot_separation
         self._nav_require_traversable = bool(require_traversable)
+        # Shared across every controller in the scene, or separation is only
+        # ever checked against stale positions. None = no reservations.
+        self._nav_destinations = destinations
         self._nav_sampling_attempts = sampling_attempts
         self._nav_require_same_room = require_same_room
         self._nav_distance_range = distance_range
@@ -196,17 +242,25 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
         return bool(eroded[row][col] == 255)
 
     def _clear_of_other_robots(self, xy) -> bool:
-        """Is @xy at least ``robot_separation`` from every other robot?"""
+        """Is @xy clear of every other robot's body **and** its destination?"""
         separation = self.robot_separation
         scene = getattr(self.robot, "scene", None)
         robots = getattr(scene, "robots", None)
         if robots is None:
             robots = getattr(self.env, "robots", None) or []
+        occupied = []
         for other in robots:
             if other is self.robot:
                 continue
             other_xy = other.get_position_orientation()[0][:2]
-            if math.hypot(float(xy[0]) - float(other_xy[0]), float(xy[1]) - float(other_xy[1])) < separation:
+            occupied.append((float(other_xy[0]), float(other_xy[1])))
+        if self._nav_destinations is not None:
+            # The bodies are where everyone *was*; the reservations are where
+            # everyone is *going*. Under concurrency only the second set is
+            # current, because nobody has teleported yet when the samplers run.
+            occupied.extend(self._nav_destinations.others(self.robot.name))
+        for other_x, other_y in occupied:
+            if math.hypot(float(xy[0]) - other_x, float(xy[1]) - other_y) < separation:
                 return False
         return True
 
@@ -301,6 +355,8 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
                 continue
             if not self._clear_of_other_robots(candidate[:2]):
                 continue
+            if self._nav_destinations is not None:
+                self._nav_destinations.reserve(self.robot.name, candidate[:2])
             return candidate
 
         # No candidate satisfied all of the filters. Returning None makes
@@ -321,9 +377,20 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
         """
         pose = self._sample_pose_near_object(obj, eef_pose=eef_pose)
         if pose is None:
+            lo, hi = self.sampling_range_for(obj)
+            # This text goes into the prompt verbatim, so it has to say what an
+            # agent can act on. "Could not find a valid base pose" describes the
+            # sampler's internals; what the agent needs to know is that the
+            # space around the target is taken -- by furniture, by walls, or by
+            # teammates who reserved it first -- and that waiting or retargeting
+            # is the move, not retrying.
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
-                "Could not find a valid base pose near the object in the same room",
-                {"object": obj.name},
+                f"Cannot reach {obj.name}: there is no free floor space around it to stand on "
+                f"(need a spot {lo:.1f}-{hi:.1f} m away, clear of walls, furniture and other agents). "
+                "Another agent may already be standing there. Try a different target, or wait for "
+                "them to move.",
+                {"object": obj.name, "sampling_range": [round(lo, 2), round(hi, 2)],
+                 "reason_code": "NO_SPACE_AROUND_TARGET"},
             )
         yield from self._navigate_to_pose(pose)

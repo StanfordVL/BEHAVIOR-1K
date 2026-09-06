@@ -168,6 +168,37 @@ class TraversabilityIndex:
         # half by furniture is not twice as useful as one half of it.
         return max(pool, key=lambda k: len(self.room_component(k)))
 
+    def has_line_of_sight(self, a, b, samples_per_metre: float = 8.0) -> bool:
+        """Is the straight line from @a to @b clear of walls, in the xy plane?
+
+        Walks the segment on the **uneroded** floor map: erosion encodes "a
+        robot body fits here", which is far stricter than "light passes here".
+        Furniture is baked into the map, so this is still conservative -- a
+        camera looking over a low sofa is rejected -- but conservative here just
+        means picking a different cell.
+
+        Needed because same-room floor connectivity does not imply visibility:
+        a corridor bends, and a cell 8 m along it can have a wall in between.
+        """
+        trav_map = self.trav_map
+        floor_map = getattr(trav_map, "floor_map", None)
+        if not floor_map:
+            return True
+        raw = floor_map[0]
+        distance = math.hypot(float(b[0]) - float(a[0]), float(b[1]) - float(a[1]))
+        steps = max(2, int(distance * samples_per_metre))
+        for i in range(steps + 1):
+            t = i / steps
+            x = float(a[0]) + t * (float(b[0]) - float(a[0]))
+            y = float(a[1]) + t * (float(b[1]) - float(a[1]))
+            row, col = trav_map.world_to_map(th.tensor([x, y]))
+            row, col = int(row), int(col)
+            if not (0 <= row < raw.shape[0] and 0 <= col < raw.shape[1]):
+                return False
+            if raw[row][col] != 255:
+                return False
+        return True
+
     def sample_separated(
         self,
         count: int,

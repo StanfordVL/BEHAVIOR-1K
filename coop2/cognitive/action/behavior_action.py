@@ -220,10 +220,10 @@ class BehaviorActionExecutor:
         if outcome.get("status") == "failed":
             reason = outcome.get("reason") or outcome.get("failure_reason") or "Action failed"
             result = self._complete(SymbolicActionStatus.FAILED, reason, outcome)
-            # terminate_plan mirrors COOP2's flag: a target the sampler cannot
-            # reach will not become reachable by trying the next action of the
-            # same plan, but a contested object might be released, so
-            # OBJECT_CLAIMED and TOO_FAR deliberately do not terminate.
+            # terminate_plan mirrors COOP2's flag. Contention codes terminate
+            # too: the plan was written against a world that has since
+            # contradicted it, and reasoning is the only stage where the agent
+            # can negotiate for the contested object or retarget.
             result["terminate_plan"] = bool(
                 outcome.get("terminate_plan")
                 or outcome.get("reason_code") in ReasonCode.TERMINATES_PLAN
@@ -246,6 +246,37 @@ class BehaviorActionExecutor:
             "outcome": outcome,
             "terminate_plan": False,
         }
+
+    # -- surface the upstream wrappers call -------------------------------
+    # SymbolicEnvWrapper and PlanningEnvWrapper reach into the executor for
+    # these. They are part of the contract just as much as execute() is, and
+    # missing one shows up as an AttributeError deep inside a reset.
+
+    def update_env_step(self, env_step: int) -> None:
+        self.current_env_step = int(env_step)
+
+    def reset_current_action(self) -> None:
+        self.current_symbolic_action = None
+        self._last_outcome = None
+
+    def clear_history(self) -> None:
+        self.action_history.clear()
+
+    def get_action_records(self) -> List[Dict[str, Any]]:
+        return [record.to_dict() for record in self.action_history]
+
+    def get_action_value(self, primitive_action: str) -> str:
+        """Crafter mapped primitive names to integer env actions; here the
+        primitive name *is* the value, because the facade takes symbolic
+        actions rather than an action index."""
+        return primitive_action
+
+    #: Crafter side-channels for share/place/collect requests. The wrapper
+    #: polls these every step; ours never populates them because the facade
+    #: takes the symbolic action itself.
+    pending_share = None
+    pending_place = None
+    pending_collect = None
 
     def complete_current_action(
         self,

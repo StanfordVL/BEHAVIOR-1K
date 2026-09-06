@@ -20,8 +20,9 @@ key                          consumer
 One ``step()`` is one ``engine.tick()``, i.e. one ``env.step``. That is the
 right granularity for the engine but the wrong one for the world model: a
 primitive spans 10^2-10^3 ticks, and rebuilding the scene graph on each would
-dominate the run. So the model is refreshed only when a primitive actually
-terminated, or every ``observation_every`` ticks. Metrics follow the same split
+dominate the run. The model is therefore refreshed **only when a primitive
+terminates** -- which is precisely when an agent returns to the reasoning stage
+and has a reason to look at the world. Nobody reads it in between. Metrics follow the same split
 the engine already draws: ``env_step`` counts ticks, ``decision_count`` counts
 primitives, and it is ``decision_count`` that is COOP2's denominator.
 """
@@ -45,8 +46,12 @@ class CooperativeBehaviorEnv:
         room: room instance to place everyone in. ``None`` picks the largest
             indoor one.
         objects: extra objects to add, as env-config dicts.
-        observation_every: refresh the world model at least this often (ticks),
-            in addition to whenever a primitive terminates.
+        observation_every: optional tick-interval refresh, **off by default**.
+            The world model is rebuilt when a primitive terminates -- i.e. when
+            an agent returns to the reasoning stage and actually needs to look
+            at the world. Rebuilding on a timer instead would recompute the
+            scene graph hundreds of times inside a single primitive for nobody
+            to read. Set it non-zero only to debug drift.
     """
 
     def __init__(
@@ -59,7 +64,7 @@ class CooperativeBehaviorEnv:
         room: Optional[str] = None,
         objects: Optional[Sequence[Dict[str, Any]]] = None,
         headless: bool = True,
-        observation_every: int = 200,
+        observation_every: int = 0,
         use_scene_graph: bool = True,
         coop_config_path: Optional[str] = None,
         **kwargs: Any,
@@ -130,6 +135,7 @@ class CooperativeBehaviorEnv:
         from coop2.behavior_env.symbolic_contention import (  # noqa: PLC0415
             ContentiousSymbolicActionPrimitives,
         )
+        from coop2.behavior_env.symbolic_navigation import DestinationRegistry  # noqa: PLC0415
         from coop2.behavior_env.world_state import BehaviorWorldState  # noqa: PLC0415
         from coop2.cognitive.action.behavior_action import BehaviorActionExecutor  # noqa: PLC0415
 
@@ -155,8 +161,14 @@ class CooperativeBehaviorEnv:
         prepare_robots(self.env)
         assert_multi_robot_sanity(self.env, expected_robots=self.n_agents)
 
+        # One registry for the whole scene: agents reserve the pose they are
+        # about to teleport to, so concurrent samplers cannot all pick spots
+        # around the same object and interpenetrate on arrival.
+        self.destinations = DestinationRegistry()
         self.controllers = {
-            agent_id: ContentiousSymbolicActionPrimitives(self.env, robot)
+            agent_id: ContentiousSymbolicActionPrimitives(
+                self.env, robot, destinations=self.destinations
+            )
             for agent_id, robot in zip(self.agent_names, self.env.robots)
         }
         self.engine = MultiAgentPrimitiveEngine(
@@ -281,7 +293,11 @@ class CooperativeBehaviorEnv:
             self._pending_outcomes[agent_id] = payload
             self.executors[agent_id].submit_outcome(payload)
 
-        refresh = bool(outcomes) or (self.engine.env_step % self.observation_every == 0)
+        # An outcome is exactly the moment an agent goes back to reasoning, so
+        # that is the only moment the world model has a reader.
+        refresh = bool(outcomes) or (
+            self.observation_every > 0 and self.engine.env_step % self.observation_every == 0
+        )
         if refresh:
             self.world.step()
             info = self._build_info()

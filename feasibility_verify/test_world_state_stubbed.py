@@ -207,11 +207,15 @@ def main() -> int:
     assert "counter_xyz_0" in {e.name for e in obs.entities.values()}
     bob.set_position([2.0, 0.0, 0.0])
     world.step()
+    # Default is the CURRENT room only. An observation that accumulates every
+    # room ever visited grows without bound and stops describing where the
+    # agent is; the current room is also the scope COOP2's spatial constraint
+    # is defined on.
     obs = world.observation_for("agent_1")
-    assert "counter_xyz_0" in {e.name for e in obs.entities.values()}, "kitchen was seen once, so it is remembered"
-    obs_forget = world.observation_for("agent_1", include_seen_rooms=False)
-    assert "counter_xyz_0" not in {e.name for e in obs_forget.entities.values()}
-    ok("current room always; visited rooms retained unless include_seen_rooms=False")
+    assert "counter_xyz_0" not in {e.name for e in obs.entities.values()}, "left the kitchen -> not shown"
+    obs_remember = world.observation_for("agent_1", include_seen_rooms=True)
+    assert "counter_xyz_0" in {e.name for e in obs_remember.entities.values()}, "memory still available opt-in"
+    ok("current room by default; visited rooms only with include_seen_rooms=True")
 
     print("test 7: relations are translated into entity ids")
     world._graph = FakeGraph(

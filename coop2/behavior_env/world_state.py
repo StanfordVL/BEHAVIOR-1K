@@ -309,14 +309,20 @@ class BehaviorWorldState:
         self,
         agent_id: str,
         max_steps: Optional[int] = None,
-        include_seen_rooms: bool = True,
+        include_seen_rooms: bool = False,
         goal_status: Optional[Dict[str, Any]] = None,
         last_action_id: Optional[str] = None,
         last_error: Optional[str] = None,
     ) -> SymbolicObservation:
         """The room-level view for one agent.
 
-        Privileged within its rooms: no occlusion, no FOV. That matches
+        **The agent's room only, by default.** Remembered rooms are available
+        via ``include_seen_rooms=True`` but are off: an observation that
+        accumulates every room ever visited grows without bound over an episode
+        and stops being a description of where the agent *is*. The current room
+        is also exactly the scope COOP2's spatial constraint is defined on.
+
+        Privileged within that room: no occlusion, no FOV. That matches
         crafter's ``symbolic_view``, which is equally privileged inside its
         window, so the comparison across environments stays honest -- but it
         does need saying out loud in the paper.

@@ -31,6 +31,7 @@ own plan: it isolates base motion from manipulation.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 import time
@@ -50,7 +51,12 @@ from omnigibson.macros import gm
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from coop2.behavior_env.env_setup import assert_multi_robot_sanity, build_multi_robot_config, prepare_robots
-from coop2.behavior_env.placement import look_at_quaternion, place_objects, place_robots
+from coop2.behavior_env.placement import (
+    TraversabilityIndex,
+    look_at_quaternion,
+    place_objects,
+    place_robots,
+)
 from coop2.behavior_env.recording import ViewerRecorder, chain, enable_viewer_rendering
 from coop2.behavior_env.primitive_engine import (
     MotionMode,
@@ -58,7 +64,10 @@ from coop2.behavior_env.primitive_engine import (
     PrimitiveOutcome,
 )
 from coop2.behavior_env.symbolic_contention import ContentiousSymbolicActionPrimitives
-from coop2.behavior_env.symbolic_navigation import NavigableSymbolicActionPrimitives
+from coop2.behavior_env.symbolic_navigation import (
+    DestinationRegistry,
+    NavigableSymbolicActionPrimitives,
+)
 from coop2.behavior_env.symbolic_view import render_symbolic_view, target_hints
 from coop2.behavior_env.world_state import BehaviorWorldState
 
@@ -93,7 +102,7 @@ VIEWER_CAMERA_FOCAL_LENGTH = 17.0
 VIEWER_CAMERA_HORIZONTAL_APERTURE = 20.995
 
 
-def configure_viewer_camera(env=None) -> None:
+def configure_viewer_camera(env=None, placement_room=None) -> None:
     """Frame the camera on the robots and apples.
 
     A fixed pose cannot survive a scene change, and placement is randomised per
@@ -113,14 +122,60 @@ def configure_viewer_camera(env=None) -> None:
         xs = [float(p[0]) for p in points]
         ys = [float(p[1]) for p in points]
         cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
-        spread = max(max(xs) - min(xs), max(ys) - min(ys), 2.0)
-        # Back off along -y and lift, so the whole spread fits the 63 deg FOV.
-        distance = spread * 1.3 + 2.0
-        eye = th.tensor([cx, cy - distance, 0.6 * distance], dtype=th.float32)
-        target = th.tensor([cx, cy, 0.4], dtype=th.float32)
+        spread_x, spread_y = max(xs) - min(xs), max(ys) - min(ys)
+
+        # Distance needed to fit the wider axis in the 63 deg horizontal FOV,
+        # with margin. Backing off further only shrinks the agents.
+        half_fov = math.atan((VIEWER_CAMERA_HORIZONTAL_APERTURE / 2) / VIEWER_CAMERA_FOCAL_LENGTH)
+        # Capped hard at 4.5 m. Fitting the whole spread wanted ~8 m, but at
+        # that range something is almost always in the way indoors, and a
+        # line-of-sight test on the trav map cannot catch it: that map marks
+        # doorways walkable, so the ray passes straight through closed doors.
+        # A close shot that shows two agents beats a wide one that shows a wall.
+        needed = (max(spread_x, spread_y, 1.5) / 2) / math.tan(half_fov) * 1.25
+        distance = min(max(needed, 3.0), 4.5)
+
+        # Stay at human eye level. Tying height to distance put the camera 6 m
+        # up in a 20 m corridor -- above the ceiling, filming the roof.
+        eye_height = 2.2  # above the robots, below a ~2.5 m ceiling
+
+        # And stay INSIDE the room. Backing off along a free axis walked the
+        # camera out through an exterior wall, so the shot was the agents seen
+        # through wooden louvres. The room's own traversable cells are indoors
+        # by construction, so pick the one nearest the ideal standoff.
+        eye_xy = None
+        if placement_room is not None:
+            index = TraversabilityIndex(env.scene, env.robots[0])
+            cells = index.room_component(placement_room)
+            # Same-room floor connectivity is not visibility: the first attempt
+            # at this picked a cell 7.9 m down a bending corridor and filmed a
+            # blank wall. Keep only cells that can actually see the centroid,
+            # and prefer the closest acceptable standoff over the furthest.
+            visible = [c for c in cells if index.has_line_of_sight(c, (cx, cy))]
+            if visible:
+                eye_xy = min(
+                    visible,
+                    key=lambda c: abs(math.hypot(c[0] - cx, c[1] - cy) - distance),
+                )
+            elif cells:
+                eye_xy = min(cells, key=lambda c: abs(math.hypot(c[0] - cx, c[1] - cy) - distance))
+        if eye_xy is None:
+            eye_xy = (cx - distance, cy) if spread_x <= spread_y else (cx, cy - distance)
+
+        eye = th.tensor([eye_xy[0], eye_xy[1], eye_height], dtype=th.float32)
+        target = th.tensor([cx, cy, 0.7], dtype=th.float32)  # robot torso, not the floor
         og.sim.viewer_camera.set_position_orientation(
             position=eye, orientation=look_at_quaternion(eye, target)
         )
+        print(
+            f"[camera] eye={[round(float(v), 2) for v in eye]} -> centroid=({cx:.2f}, {cy:.2f})  "
+            f"spread=({spread_x:.1f}, {spread_y:.1f})  standoff={math.hypot(eye_xy[0]-cx, eye_xy[1]-cy):.1f}m"
+            f"  (room={placement_room!r})"
+        )
+        try:
+            print(f"[camera] rooms available: {sorted(TraversabilityIndex(env.scene, env.robots[0]).cells_by_room())}")
+        except Exception:  # noqa: BLE001
+            pass
     og.sim.viewer_camera.focal_length = VIEWER_CAMERA_FOCAL_LENGTH
     og.sim.viewer_camera.horizontal_aperture = VIEWER_CAMERA_HORIZONTAL_APERTURE
 
@@ -266,6 +321,16 @@ def parse_args():
         help=(
             "Build the L1a world model and print each agent's L1b text observation before and "
             "after the run. This is what the LLM will be shown, so it is the thing to eyeball."
+        ),
+    )
+    parser.add_argument(
+        "--n-objects",
+        type=int,
+        default=2,
+        help=(
+            "How many apples to spawn. Targets are handed out round-robin, so with fewer objects "
+            "than robots some agents collide by construction -- set this >= --n-robots for a clean "
+            "no-contention control, and below it (or use --contend) to force competition."
         ),
     )
     parser.add_argument(
@@ -499,6 +564,9 @@ def main() -> None:
         enable_viewer_rendering()
 
     try:
+        globals()["APPLES"] = [
+            (f"apple_{i}", [0.5 * i, 0.0, 0.05]) for i in range(max(1, args.n_objects))
+        ]
         robot_poses = [([1.5 * i, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]) for i in range(args.n_robots)]
         agent_ids = [f"agent_{i}" for i in range(args.n_robots)]
         globals()["AGENT_IDS"] = agent_ids
@@ -538,10 +606,13 @@ def main() -> None:
         # without them the symbolic set is distance- and holder-blind, so
         # there is no resource competition to cooperate about (and a second
         # grasp of a held object silently double-joints it).
+        # ONE registry shared by every controller. A per-controller registry
+        # would only ever see its own reservation and change nothing.
+        destinations = DestinationRegistry()
         if args.no_contention:
             controllers = {
-                agent_id: NavigableSymbolicActionPrimitives(env, robot)
-                for agent_id, robot in zip(AGENT_IDS, env.robots)
+                agent_id: NavigableSymbolicActionPrimitives(env, robot, destinations=destinations)
+                for agent_id, robot in zip(agent_ids, env.robots)
             }
         else:
             controllers = {
@@ -550,8 +621,9 @@ def main() -> None:
                     robot,
                     interaction_radius=args.interaction_radius,
                     travel_ticks_per_meter=args.travel_ticks_per_meter,
+                    destinations=destinations,
                 )
-                for agent_id, robot in zip(AGENT_IDS, env.robots)
+                for agent_id, robot in zip(agent_ids, env.robots)
             }
         engine = MultiAgentPrimitiveEngine(
             env,
@@ -581,7 +653,7 @@ def main() -> None:
         )
 
         if not args.headless or args.video:
-            configure_viewer_camera(env)
+            configure_viewer_camera(env, placement_room)
 
         monitor = ConcurrencyMonitor(engine, trace_every=args.trace_every)
         recorder = (

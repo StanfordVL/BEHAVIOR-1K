@@ -198,11 +198,16 @@ def main() -> int:
     )
     assert result["status"] == "failed"
     assert "held by agent_1" in result["failure_reason"]
-    assert result["terminate_plan"] is False, "a contested object may be released; keep the plan alive"
-    ok("OBJECT_CLAIMED -> failed, reason preserved, plan NOT terminated")
+    # Contention terminates the plan and returns the agent to reasoning. Both
+    # codes are individually recoverable, but the plan that produced them was
+    # written against a world that has since contradicted it -- and reasoning is
+    # the only stage where the agent can negotiate or retarget.
+    assert result["terminate_plan"] is True, "contention must send the agent back to reasoning"
+    ok("OBJECT_CLAIMED -> failed, reason preserved, plan terminated")
 
-    print("test 7: unreachable targets do terminate the plan")
-    for code in ("PLANNING", "SAMPLING", "TIMEOUT", "INVALID_TARGET", "CRASHED"):
+    print("test 7: every terminating code sends the agent back to reasoning")
+    for code in ("PLANNING", "SAMPLING", "TIMEOUT", "INVALID_TARGET", "CRASHED",
+                 "OBJECT_CLAIMED", "TOO_FAR"):
         engine = FakeEngine()
         executor = Executor("agent_0", engine=engine, world_state=world)
         executor.execute("navigate_to", target="apple#1")
@@ -211,9 +216,13 @@ def main() -> int:
             action_outcome={"status": "failed", "reason_code": code, "reason": code}
         )
         assert result["terminate_plan"] is True, code
-    for code in ("OBJECT_CLAIMED", "TOO_FAR", "PRE_CONDITION", "POST_CONDITION", "EXECUTION"):
+    for code in ("OBJECT_CLAIMED", "TOO_FAR"):
+        assert code in reason_codes.TERMINATES_PLAN, code
+    # These stay non-terminating: they are failures of one action under a plan
+    # the world has not contradicted, so the next action is still meaningful.
+    for code in ("PRE_CONDITION", "POST_CONDITION", "EXECUTION"):
         assert code not in reason_codes.TERMINATES_PLAN, code
-    ok("PLANNING/SAMPLING/TIMEOUT/INVALID_TARGET/CRASHED terminate; the recoverable ones do not")
+    ok("7 codes terminate incl. both contention codes; PRE/POST_CONDITION and EXECUTION do not")
 
     print("test 8: assign() rejecting up front surfaces as a failure, not a hang")
     engine = FakeEngine(reject={"status": "failed", "reason_code": "INVALID_TARGET", "reason": "no such object"})

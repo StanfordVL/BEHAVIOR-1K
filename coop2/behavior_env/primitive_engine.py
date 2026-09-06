@@ -143,9 +143,9 @@ class ReasonCode:
 
     # Raised by coop2.behavior_env.symbolic_contention, which tags them onto
     # metadata["reason_code"] because ActionPrimitiveError.Reason has only five
-    # members and both of these would collapse into PRE_CONDITION. Neither
-    # terminates the plan: TOO_FAR is fixed by navigating, OBJECT_CLAIMED by
-    # picking another target -- both are the cooperation signal itself.
+    # members and both of these would collapse into PRE_CONDITION. Both
+    # terminate the plan and return the agent to reasoning -- see
+    # TERMINATES_PLAN below.
     OBJECT_CLAIMED = "OBJECT_CLAIMED"  # target is held by another agent
     TOO_FAR = "TOO_FAR"  # outside the interaction radius; navigate first
 
@@ -162,7 +162,19 @@ class ReasonCode:
     #: for ``navigate_no_path`` and navigate timeouts. A target the planner
     #: cannot reach or sample a pose for will not become reachable by trying
     #: the next action of the same plan.
-    TERMINATES_PLAN = frozenset({PLANNING, SAMPLING, TIMEOUT, INVALID_TARGET, CRASHED})
+    #:
+    #: OBJECT_CLAIMED and TOO_FAR are in here too, which is not obvious: both
+    #: are individually recoverable (a teammate may release the object; walking
+    #: closer fixes the distance). But the plan that produced them was written
+    #: against a world that has since contradicted it, so continuing to its next
+    #: action executes a stale intention. Sending the agent back to reasoning is
+    #: also the *only* place cooperation can happen -- that is where it can
+    #: negotiate for the contested object or choose a different target. Letting
+    #: the plan grind on would turn contention into silent wasted motion instead
+    #: of a decision the topology layer is measured on.
+    TERMINATES_PLAN = frozenset(
+        {PLANNING, SAMPLING, TIMEOUT, INVALID_TARGET, CRASHED, OBJECT_CLAIMED, TOO_FAR}
+    )
 
     @classmethod
     def from_primitive_error(cls, error: BaseException) -> str:

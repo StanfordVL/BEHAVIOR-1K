@@ -396,9 +396,11 @@ def main() -> int:
     plain = FakeActionPrimitiveError(FakeActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "hand full")
     assert ReasonCode.from_primitive_error(claimed) == ReasonCode.OBJECT_CLAIMED
     assert ReasonCode.from_primitive_error(plain) == ReasonCode.PRE_CONDITION
-    assert ReasonCode.OBJECT_CLAIMED not in ReasonCode.TERMINATES_PLAN
-    assert ReasonCode.TOO_FAR not in ReasonCode.TERMINATES_PLAN
-    ok("metadata['reason_code'] wins over the enum; neither terminates the plan")
+    # Both terminate: the agent goes back to reasoning, where it can negotiate
+    # for the contested object or pick a different target.
+    assert ReasonCode.OBJECT_CLAIMED in ReasonCode.TERMINATES_PLAN
+    assert ReasonCode.TOO_FAR in ReasonCode.TERMINATES_PLAN
+    ok("metadata['reason_code'] wins over the enum; both terminate the plan")
 
     print("\nALL TESTS PASSED")
     return 0

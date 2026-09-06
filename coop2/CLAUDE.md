@@ -282,6 +282,77 @@ when reusing cached info. The status column could not catch this; only the
 independent facts could -- `held_objects` and the scene graph's `OnTop`. Keep
 verifying against physical state, not against the status field.
 
+## Observation scope and refresh (decided 2026-09-06)
+
+* `observation_for()` shows the agent's **current room only**;
+  `include_seen_rooms=True` is opt-in. An observation that accumulates every
+  room ever visited grows without bound over an episode and stops describing
+  where the agent is, and the current room is the scope COOP2's spatial
+  constraint is defined on anyway.
+* The world model is rebuilt **only when a primitive terminates** — i.e. when an
+  agent returns to the reasoning stage and actually has a reason to look. There
+  is no timer refresh (`observation_every` defaults to 0): a primitive spans
+  10^2–10^3 ticks, so a periodic rebuild would recompute the scene graph
+  hundreds of times inside one primitive for nobody to read.
+
+## Concurrent destination race (fixed 2026-09-06)
+
+Separation was checked against other robots' **current** positions, which under
+concurrency is a time-of-check/time-of-use bug. All N agents get NAVIGATE_TO on
+the same tick; each samples its destination on its generator's first `next()`,
+while every other robot still stands at its start pose metres away. Every check
+passes, then all of them teleport beside the same object.
+
+Measured on a 3-agent contend run: agent_0 and agent_1 ended **0.64 m** apart
+against a 1.24 m requirement, and agent_1's assisted grasp latched onto
+**agent_0** — `holding=agent_0`. The same `holding=<robot>` corruption the
+separation filter was supposed to have removed.
+
+Fix: `symbolic_navigation.DestinationRegistry`, **one per scene**, shared by
+every controller. An agent reserves the pose it is about to occupy; every other
+sampler avoids reservations as well as bodies. Reservations are overwritten,
+never released — "this agent intends to be here" holds until it decides
+otherwise, and once it arrives the reservation and its body coincide, so an
+aborted primitive self-corrects instead of leaking a blocked spot.
+
+After: closest pair 1.93 m, no `holding=<robot>`, and `OBJECT_CLAIMED` is back
+as the contention signal instead of physics-induced `POST_CONDITION`.
+
+The regression test is statistical on purpose: without the registry ~100/200
+trials overlap, with it 0/200. A single-draw version of that assertion is flaky
+(three random poses around one object are sometimes well separated) and would
+eventually get deleted rather than fixed.
+
+## L3 verified end-to-end, 2026-09-06
+
+`feasibility_verify/verify_l3_plan_loop.py` drives the real
+`PlanningEnvWrapper` (its ready barrier, plan lifecycle and logging) with a
+scripted agent in place of the LLM:
+
+```
+Plan #1 navigate_to -> grasp -> release   all OK, SUCCEEDED at step 693
+Plan #2 grasp(ghost#99)                   failed -> "terminating plan" -> reasoning
+Plan #3 navigate_to                       OK -> complete -> reasoning
+decision_count 4, env_step 888, barrier closed for exactly 3 ticks
+```
+
+Confirms the intended model: an arbitrary-length plan runs to completion
+without the driver advancing it, only completion or failure returns the agent
+to reasoning, and physics is frozen while it reasons.
+
+⚠️ **Two executor sets is the trap here.** The facade builds
+`CooperativeBehaviorEnv.executors` and calls `execute()` on them, while L3 reads
+plan progress from `get_action_records()` on the *wrapper's*
+`agent_actions`. When those were separate objects the wrapper's history stayed
+empty, `action_status` came back None, and L3 re-issued action 1 forever. From
+outside it is indistinguishable from a slow primitive -- it burned a 30-minute
+timeout before being caught. `BehaviorSymbolicEnvWrapper._adopt_facade_executors`
+now shares one executor per agent.
+
+The verify script has a wall-clock cap and a stall detector (>12 primitives
+issued without `current_action_index` moving) precisely because a timeout
+cannot tell "slow" from "not progressing".
+
 ## Metrics: two different counters
 
 `engine.env_step` counts ticks (what `Timeout(max_steps)` counts).
@@ -313,8 +384,16 @@ the default derives the radius from `distance_range`.
 
 Both new codes are raised as `PRE_CONDITION_ERROR` with
 `metadata["reason_code"]` set; `ReasonCode.from_primitive_error` prefers that
-over the five-member enum. Neither is in `TERMINATES_PLAN` — TOO_FAR is fixed
-by navigating, OBJECT_CLAIMED by choosing another target.
+over the five-member enum.
+
+**Both are in `TERMINATES_PLAN`** (decided 2026-09-06). They are individually
+recoverable — a teammate may release the object, walking closer fixes the
+distance — but the plan that produced them was written against a world that has
+since contradicted it, so its next action is a stale intention. Terminating
+returns the agent to the **reasoning stage**, which is the only place it can
+negotiate for the contested object or retarget. Grinding the plan on instead
+would turn contention into silent wasted motion rather than a decision the
+topology layer is measured on.
 
 ## Deliberately not implemented
 
