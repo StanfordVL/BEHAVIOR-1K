@@ -163,14 +163,24 @@ def main() -> int:
     scene = FakeScene([counter, cup, cup2, ghost, alice, bob], fixed=[counter], seg_map=seg)
     env = FakeEnv(scene, [alice, bob])
 
-    print("test 1: the scene graph builder is configured for multi-agent")
-    world = ws.BehaviorWorldState(env)
+    print("test 1: the scene graph builder is off by default, correct when asked for")
+    # Upstream's builder scans every ordered pair in the scene against every
+    # relative boolean state: 1.59M get_value calls and 14.9 s per refresh on
+    # a 654-object scene, against 44 ms for a physics tick. Relations are
+    # computed scoped to the shown entities instead, so the builder is opt-in.
+    FakeSceneGraphBuilder.last_kwargs = None
+    default_world = ws.BehaviorWorldState(env)
+    default_world.start()
+    assert FakeSceneGraphBuilder.last_kwargs is None, "builder must not be built by default"
+    assert default_world._graph is None
+
+    world = ws.BehaviorWorldState(env, use_scene_graph=True)
     world.start()
     kwargs = FakeSceneGraphBuilder.last_kwargs
     assert kwargs["full_obs"] is True, kwargs
     assert kwargs["robot_names"] == ["agent_0", "agent_1"], kwargs
     assert kwargs["egocentric"] is False
-    ok("full_obs=True and every robot name passed (else teammates vanish / FOVs intersect)")
+    ok("builder opt-in; when on, full_obs=True and every robot name is passed")
 
     print("test 2: type-local ids are readable and stable")
     world.step()
@@ -304,6 +314,57 @@ def main() -> int:
     assert "You can do:" in text and "apple.n.01_1" in text
     assert "apple_abc_0" not in text.split("You can do:")[0].split("Relations:")[0], "raw names must not leak into the entity list"
     ok("header, per-room grouping, and an action list all present")
+
+    print("test 12: interaction_radius may be resolved per entity")
+    # The gate (interaction_radius_for) is per-object: a table's radius exceeds
+    # an apple's. Passing one scalar taken from a probe object -- in practice
+    # the smallest one -- labelled every larger object "too far" while the gate
+    # would have allowed it, contradicting what the system prompt promises.
+    obs = world.observation_for("agent_0")
+    distances = {}
+    me = obs.entities[sv._agent_entity_id(obs)]
+    for eid, e in obs.entities.items():
+        if not e.is_robot:
+            distances[eid] = ((e.position[0] - me.position[0]) ** 2
+                              + (e.position[1] - me.position[1]) ** 2) ** 0.5
+    far_id = max(distances, key=distances.get)
+    far_d = distances[far_id]
+
+    tight = {(h.primitive, h.target_id) for h in sv.target_hints(obs, interaction_radius=far_d / 2)}
+    assert ("navigate_to", far_id) in tight
+    assert not any(p == "grasp" and t == far_id for p, t in tight), "scalar radius must exclude it"
+
+    # Same observation, but this entity alone gets a radius large enough.
+    def per_entity(entity, _far=far_id, _d=far_d):
+        return _d * 2 if entity.entity_id == _far else _d / 2
+
+    loose = {(h.primitive, h.target_id) for h in sv.target_hints(obs, interaction_radius=per_entity)}
+    assert ("navigate_to", far_id) in loose
+    assert any(t == far_id and p != "navigate_to" for p, t in loose), \
+        "a per-entity radius must bring the far object's other verbs back"
+    ok("callable radius is applied per entity, scalar still works")
+
+    print("test 13: a light switch is not a surface")
+    # "fixed and not structural" accepted electric switches, downlights and
+    # sliding doors as places to put things. Placement then asked OmniGibson to
+    # sample an apple onto a light switch, and one refusal takes 113 seconds.
+    class Ent:
+        def __init__(self, entity_id, abilities=(), is_fixed=True):
+            self.entity_id, self.abilities, self.is_fixed = entity_id, list(abilities), is_fixed
+
+    supports = ["shelf.n.01_1", "breakfast_table.n.01_1", "countertop.n.01_1", "bookcase.n.01_1"]
+    not_supports = ["switch.n.01_1", "room_light.n.01_1", "door.n.01_1", "painting.n.01_1"]
+    for entity_id in supports:
+        assert sv.is_support_surface(Ent(entity_id)), entity_id
+        assert sv.is_receptacle(Ent(entity_id)), entity_id
+    for entity_id in not_supports:
+        assert not sv.is_support_surface(Ent(entity_id)), entity_id
+        assert not sv.is_receptacle(Ent(entity_id)), entity_id
+    # A fridge is not a support by ancestry but is still a receptacle.
+    fridge = Ent("electric_refrigerator.n.01_1", abilities=["fillable", "openable"])
+    assert not sv.is_support_surface(fridge)
+    assert sv.is_receptacle(fridge)
+    ok("supports by taxonomy ancestry; switches/lights/doors rejected; fridge still a receptacle")
 
     print("\nALL TESTS PASSED")
     return 0

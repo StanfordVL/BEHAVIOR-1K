@@ -29,14 +29,23 @@ distance is the main cost you control. You cannot see -- you are given a
 symbolic description of the room you are standing in, and only that room.
 
 Rules that decide whether an action succeeds:
-- You must be within reach of an object to grasp, place, open or toggle it.
-  If you are not, navigate_to it first. Acting from across the room fails.
+- To grasp, place, open or toggle an object you must be closer to it than that
+  object's own distance threshold; beyond it the action fails with TOO_FAR.
+  Under "You can do:" a distance in metres is shown ONLY for objects that are
+  currently out of range -- no distance means you are already close enough to
+  act on it now.
+- An out-of-range object offers navigate_to and NOTHING else. That is the only
+  action you may issue on it: the manipulation verbs are absent from its line
+  precisely because they would fail. navigate_to it first, and you are then
+  guaranteed to be within its threshold and its other verbs appear.
 - One object at a time: grasp needs an empty gripper, place needs a full one.
 - Objects are exclusive. If a teammate is holding something, your grasp fails
   with "held by <agent>". Going after a target a teammate already has costs you
   the whole trip for nothing.
-- Refer to objects only by the ids listed under Current Reachable Targets.
-  They look like apple.n.01_1. Never invent or guess one.
+- Refer to objects only by the ids listed under "You can do:", which are the
+  objects in the room you are standing in. They look like apple.n.01_1. Never
+  invent or guess one. An entry marked "blocked" is in that room but currently
+  unavailable -- the bracketed note says why.
 
 When an action fails, your plan is abandoned and you are asked to think again.
 Read the failure reason before replanning -- it tells you whether to wait,

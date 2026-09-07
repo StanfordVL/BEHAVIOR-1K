@@ -34,7 +34,10 @@ nothing has stepped yet, so the placeholders never matter.
 
 from __future__ import annotations
 
+import json
 import math
+import os
+import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
@@ -251,6 +254,126 @@ def place_robots(
     return chosen, chosen_room
 
 
+#: Resolved object layouts, keyed by (scene, room, seed, objects). Checked in
+#: so a run reproduces exactly and starts without re-sampling; delete an entry
+#: (or pass use_cache=False) to force a fresh layout.
+_DEFAULT_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "placement_cache.json")
+
+
+def _cache_key(scene_model, room, seed, names) -> str:
+    return "|".join([
+        str(scene_model or "?"),
+        str(room or "?"),
+        str(seed if seed is not None else "?"),
+        ",".join(sorted(names)),
+    ])
+
+
+def _load_cache(path: str) -> Dict[str, Any]:
+    try:
+        with open(path) as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return {}
+
+
+def _store_cache(path: str, key: str, scene, names) -> None:
+    """Record where the objects actually ended up, after settling."""
+    poses = {}
+    for name in names:
+        obj = scene.object_registry("name", name)
+        if obj is None:
+            return
+        position, orientation = obj.get_position_orientation()
+        poses[name] = {
+            "position": [float(v) for v in position],
+            "orientation": [float(v) for v in orientation],
+        }
+    data = _load_cache(path)
+    data[key] = poses
+    try:
+        with open(path, "w") as handle:
+            json.dump(data, handle, indent=2, sort_keys=True)
+        print(f"[placement] cached layout under {key!r}")
+    except OSError:
+        pass
+
+
+def _apply_cached(scene, names, cached) -> List[Tuple[float, float]]:
+    """Replay a cached layout instead of sampling one."""
+    placed: List[Tuple[float, float]] = []
+    for name in names:
+        obj = scene.object_registry("name", name)
+        entry = cached.get(name)
+        if obj is None or entry is None:
+            raise KeyError(f"Cached layout does not cover {name!r}.")
+        obj.set_position_orientation(
+            position=th.tensor(entry["position"], dtype=th.float32),
+            orientation=th.tensor(entry["orientation"], dtype=th.float32),
+        )
+        placed.append((float(entry["position"][0]), float(entry["position"][1])))
+        print(f"[placement] {name} -> ({placed[-1][0]:.2f}, {placed[-1][1]:.2f}) from cache")
+    return placed
+
+
+class _SurfaceCandidate:
+    """The three fields L1b's predicates read, taken off a scene object.
+
+    Placement and the agent must agree on what counts as a surface: if they
+    disagree, either the agent is offered a place_on_top it cannot perform, or
+    an object is placed somewhere the agent is never told about.
+    """
+
+    __slots__ = ("entity_id", "abilities", "is_fixed")
+
+    def __init__(self, obj, fixed_names):
+        synset = _synset_for(obj)
+        self.entity_id = f"{synset}_1" if synset else (getattr(obj, "name", "") or "")
+        self.abilities = sorted(getattr(obj, "abilities", None) or [])
+        self.is_fixed = getattr(obj, "name", None) in fixed_names
+
+
+def _synset_for(obj):
+    """WordNet synset for @obj's category, or None outside the taxonomy."""
+    category = getattr(obj, "category", None)
+    if not category:
+        return None
+    try:
+        from bddl.object_taxonomy import ObjectTaxonomy  # noqa: PLC0415
+
+        global _TAXONOMY
+        if _TAXONOMY is None:
+            _TAXONOMY = ObjectTaxonomy()
+        return _TAXONOMY.get_synset_from_category(category)
+    except Exception:  # noqa: BLE001 - category outside the taxonomy
+        return None
+
+
+_TAXONOMY = None
+
+
+def _is_support_surface(obj, scene) -> bool:
+    """Would the agent be allowed to place something onto @obj?
+
+    Reuses L1b's own support test -- the same one that decides whether the
+    agent is offered place_on_top -- rather than "has an OnTop state", which
+    nearly every kinematic object has. That version treated light switches,
+    sliding doors and downlights as surfaces, and a single refused
+    ``OnTop.set_value`` on one of them cost 113 seconds.
+    """
+    from coop2.behavior_env.symbolic_view import is_support_surface  # noqa: PLC0415
+
+    fixed = getattr(scene, "fixed_objects", None) or {}
+    fixed_names = set(fixed.keys()) if isinstance(fixed, dict) else {
+        getattr(o, "name", o) for o in fixed
+    }
+    candidate = _SurfaceCandidate(obj, fixed_names)
+    try:
+        return is_support_surface(candidate)
+    except Exception:  # noqa: BLE001 - taxonomy unavailable
+        return False
+
+
 def place_objects(
     env,
     names: Sequence[str],
@@ -260,6 +383,10 @@ def place_objects(
     near_robots: Optional[float] = 8.0,
     surfaces: Optional[Sequence[Any]] = None,
     z: float = 0.05,
+    max_surface_tries: int = 3,
+    scene_model: Optional[str] = None,
+    cache_path: Optional[str] = None,
+    use_cache: bool = True,
 ) -> List[Tuple[float, float]]:
     """Put each named object somewhere reachable, preferring a real surface.
 
@@ -267,21 +394,40 @@ def place_objects(
     kinematic sampler, so the object ends up physically resting on a table or
     counter the way a household object actually would. Only if no surface in the
     room accepts it does this fall back to a standable floor point.
+
+    ``set_value`` is a *stochastic physical* sampler: it raycasts and steps
+    physics internally, costing anywhere from milliseconds to several seconds
+    per call, and it can simply refuse. Trying every surface in the room was
+    therefore unbounded in practice -- corridor_0 holds a dozen shelves, and
+    one unlucky reset spent over fifteen minutes in this loop without placing
+    a single apple, while a lucky one finished in five seconds. So: try the
+    nearest few surfaces only (@max_surface_tries), then take the floor. The
+    floor path is a cheap trav-map sample and always terminates.
     """
     robots = list(env.robots)
     scene = env.scene
     if seed is not None:
         th.manual_seed(int(seed) + 9973)  # decorrelate from robot placement
 
+    # A resolved layout is worth keeping. Sampling is stochastic and a single
+    # refused OnTop.set_value costs OmniGibson ~112 s, so the same (scene,
+    # room, seed, objects) can take anywhere from 0 to several minutes to place
+    # identically. Replaying the cached poses makes startup constant-time and
+    # makes two runs of the same seed literally identical, which is what the
+    # experiment wants. Where objects *should* go is a task-design question;
+    # this only remembers an answer once one has been found.
+    cache_path = cache_path or _DEFAULT_CACHE
+    key = _cache_key(scene_model, room, seed, names)
+    if use_cache:
+        cached = _load_cache(cache_path).get(key)
+        if cached and len(cached) == len(names):
+            return _apply_cached(scene, names, cached)
+
     from omnigibson import object_states  # noqa: PLC0415
 
     if surfaces is None:
         candidates = scene.object_registry("in_rooms", room, default_val=[]) if room else []
-        surfaces = [
-            obj
-            for obj in candidates
-            if object_states.OnTop in getattr(obj, "states", {}) or "table" in (obj.category or "")
-        ]
+        surfaces = [obj for obj in candidates if _is_support_surface(obj, scene)]
 
     centre = None
     if near_robots is not None and robots:
@@ -295,18 +441,31 @@ def place_objects(
         if obj is None:
             raise KeyError(f"No object named {name!r} in the scene.")
 
-        on_surface = False
+        # Nearest first: the closest surface is both the likeliest to accept a
+        # sample and the most useful place for the object to be.
+        in_range = []
         for surface in surfaces:
-            if centre is not None:
-                sx, sy = surface.get_position_orientation()[0][:2]
-                if math.hypot(float(sx) - centre[0], float(sy) - centre[1]) > near_robots:
-                    continue
+            sx, sy = surface.get_position_orientation()[0][:2]
+            if centre is None:
+                in_range.append((0.0, surface))
+                continue
+            distance = math.hypot(float(sx) - centre[0], float(sy) - centre[1])
+            if distance <= near_robots:
+                in_range.append((distance, surface))
+        in_range.sort(key=lambda pair: pair[0])
+
+        on_surface = False
+        for _, surface in in_range[:max_surface_tries]:
+            started = time.time()
             try:
                 if obj.states[object_states.OnTop].set_value(surface, True):
                     on_surface = True
                     break
             except Exception:  # noqa: BLE001 - surface refuses the sample
-                continue
+                pass
+            elapsed = time.time() - started
+            if elapsed > 5.0:
+                print(f"[placement] {surface.name} refused {name} after {elapsed:.0f}s")
 
         if not on_surface:
             spot = None
@@ -333,4 +492,7 @@ def place_objects(
         placed.append((float(position[0]), float(position[1])))
         where = "on a surface" if on_surface else "on the floor"
         print(f"[placement] {name} -> ({placed[-1][0]:.2f}, {placed[-1][1]:.2f}) {where}")
+
+    if use_cache:
+        _store_cache(cache_path, key, scene, names)
     return placed

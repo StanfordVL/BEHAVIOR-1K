@@ -15,7 +15,7 @@ what is inside") are expressible here at all.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Union
 
 from coop2.behavior_env.world_state import EntityObservation, SymbolicObservation, room_type_of
 
@@ -50,6 +50,15 @@ STRUCTURAL_SYNSETS = (
 #: anything not on it -- the annotations are the dataset's own answer.
 RECEPTACLE_ABILITIES = ("fillable", "openable")
 
+#: Taxonomy ancestors that make an object something you can put things *on*.
+#: Between them these cover shelves (support.n.10), tables/cabinets/chairs
+#: (furniture.n.01) and countertops (surface.n.01), while excluding switches,
+#: downlights, doors, paintings and televisions -- all of which are fixed,
+#: non-structural objects that the previous "fixed and not structural" rule
+#: accepted. That rule cost real time: placement tried to sample an apple onto
+#: an electric switch, and a single refusal takes OmniGibson 113 seconds.
+SUPPORT_SYNSETS = ("support.n.10", "furniture.n.01", "surface.n.01")
+
 
 def _taxonomy():
     from bddl.object_taxonomy import ObjectTaxonomy  # noqa: PLC0415
@@ -83,18 +92,35 @@ def is_structural(entity) -> bool:
         return False
 
 
+def is_support_surface(entity) -> bool:
+    """Is this the kind of thing you can put an object on top of?
+
+    Taxonomy ancestry rather than "has an OnTop state", which nearly every
+    kinematic object has, or "is fixed", which light switches also are.
+    """
+    synset = _synset_of(entity)
+    if synset is None:
+        return False
+    if synset in SUPPORT_SYNSETS:
+        return True
+    try:
+        taxonomy = _taxonomy()
+        return any(taxonomy.is_descendant(synset, ancestor) for ancestor in SUPPORT_SYNSETS)
+    except Exception:  # noqa: BLE001 - synsets outside the taxonomy
+        return False
+
+
 def is_receptacle(entity) -> bool:
     """Can something be placed on or in this?
 
-    Reads the taxonomy's own ability annotations, carried on the loaded object
-    as ``obj.abilities`` and copied into the observation.
+    Two independent grounds, both from the taxonomy: a support surface (shelf,
+    table, countertop) takes things on top, and a fillable/openable object
+    (fridge, cabinet) takes things inside. A fridge is not a support by
+    ancestry but is still a receptacle, so both are checked.
     """
     if set(entity.abilities) & set(RECEPTACLE_ABILITIES):
         return True
-    # A fixed, non-structural object with a surface is a plausible support even
-    # without a fillable/openable annotation -- tables and countertops have
-    # neither.
-    return entity.is_fixed and not is_structural(entity)
+    return is_support_surface(entity)
 
 
 #: Unary states that gate a primitive, and the primitive pair they gate.
@@ -136,7 +162,7 @@ def _holding(observation: SymbolicObservation) -> Optional[EntityObservation]:
 
 def target_hints(
     observation: SymbolicObservation,
-    interaction_radius: Optional[float] = None,
+    interaction_radius: Optional[Union[float, Callable[[EntityObservation], Optional[float]]]] = None,
     include_structural: bool = False,
 ) -> List[ActionHint]:
     """Every primitive the agent could legally issue right now.
@@ -145,6 +171,11 @@ def target_hints(
     out-of-range target still yields NAVIGATE_TO, and the note says why the
     manipulation primitives are absent. Silently dropping the target instead
     would leave the LLM unable to discover that navigating fixes it.
+
+    @interaction_radius may be a single distance or a callable resolving one
+    per entity. The gate it mirrors (``interaction_radius_for``) is per-object
+    -- a table's radius exceeds an apple's -- so a single scalar taken from one
+    probe object mislabels every object of a different size. Pass the callable.
     """
     me = observation.entities.get(_agent_entity_id(observation))
     held = _holding(observation)
@@ -159,7 +190,8 @@ def target_hints(
         distance = None
         if me is not None:
             distance = ((entity.position[0] - me.position[0]) ** 2 + (entity.position[1] - me.position[1]) ** 2) ** 0.5
-        in_range = interaction_radius is None or distance is None or distance <= interaction_radius
+        radius = interaction_radius(entity) if callable(interaction_radius) else interaction_radius
+        in_range = radius is None or distance is None or distance <= radius
         far_note = "" if in_range else f"too far ({distance:.1f} m) -- navigate_to first"
 
         hints.append(
@@ -205,7 +237,7 @@ def _agent_entity_id(observation: SymbolicObservation) -> Optional[str]:
 
 def render_symbolic_view(
     observation: SymbolicObservation,
-    interaction_radius: Optional[float] = None,
+    interaction_radius: Optional[Union[float, Callable[[EntityObservation], Optional[float]]]] = None,
     max_facts: int = 25,
     include_structural: bool = False,
 ) -> str:

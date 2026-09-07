@@ -253,6 +253,81 @@ def main() -> int:
     assert "Valid actions" in result["failure_reason"], result["failure_reason"]
     ok("unknown verb -> failed with the legal vocabulary in the message")
 
+    print("test: production PlanningEnvWrapper builds the BEHAVIOR wrapper")
+    # This was wrong for the whole of M7 and no test caught it, because the
+    # only place the swap happened was a monkeypatch inside the GPU harness.
+    # Crafter's base class turns symbolic actions into integer action ids; the
+    # facade drops them (0 is falsy) and every plan sits in "executing" until
+    # the episode ends -- no exception, no failed action, just a wasted run.
+    from coop2.cognitive.plan import plan_env_wrapper
+    from coop2.cognitive.action.behavior_env_wrapper import BehaviorSymbolicEnvWrapper
+
+    assert plan_env_wrapper.SymbolicEnvWrapper is BehaviorSymbolicEnvWrapper, (
+        f"PlanningEnvWrapper would build {plan_env_wrapper.SymbolicEnvWrapper.__name__}"
+    )
+    ok("PlanningEnvWrapper is wired to BehaviorSymbolicEnvWrapper")
+
+    print("test 13: succeed_when_all_hold ends the episode, nothing else does")
+    # DummyTask evaluates no goal, so `terminated` was hardcoded False for
+    # every agent: a robot could hold the goal object and the episode would
+    # still run until it ran out of steps. This is the stand-in check until M9
+    # reconnects BDDL's compiled_task.check_goal.
+    from coop2.behavior_env.coop_env import CooperativeBehaviorEnv
+
+    class GoalObj:
+        def __init__(self, name, category):
+            self.name, self.category = name, category
+
+    class GoalRegistry:
+        def __init__(self, objs):
+            self._objs = {o.name: o for o in objs}
+        def __call__(self, _key, name):
+            return self._objs.get(name)
+
+    class GoalScene:
+        def __init__(self, objs):
+            self.object_registry = GoalRegistry(objs)
+
+    class GoalEnv:
+        """self.env is the OmniGibson env; the registry hangs off env.scene."""
+        def __init__(self, objs):
+            self.scene = GoalScene(objs)
+
+    class GoalWorld:
+        """Only what _goal_reached touches: robots, held_objects, synset_of."""
+        def __init__(self, robots, held):
+            self.robots = robots
+            self._held = held
+        def held_objects(self):
+            return dict(self._held)
+        def synset_of(self, obj):
+            return {"apple": "apple.n.01", "cup": "cup.n.01"}.get(obj.category)
+
+    r0, r1 = GoalObj("agent_0", "robot"), GoalObj("agent_1", "robot")
+    a0, a1 = GoalObj("apple_0", "apple"), GoalObj("apple_1", "apple")
+    cup = GoalObj("cup_0", "cup")
+
+    def make(held, target="apple.n.01"):
+        env = object.__new__(CooperativeBehaviorEnv)
+        env.succeed_when_all_hold = target
+        env.goal_reached_at = None
+        env.world = GoalWorld([r0, r1], held)
+        env.env = GoalEnv([r0, r1, a0, a1, cup])
+        env.engine = type("E", (), {"env_step": 7})()
+        return env
+
+    assert make({})._goal_reached() is False, "nobody holding -> not done"
+    assert make({"apple_0": "agent_0"})._goal_reached() is False, "one of two -> not done"
+    assert make({"apple_0": "agent_0", "cup_0": "agent_1"})._goal_reached() is False, \
+        "a cup is not an apple"
+    done = make({"apple_0": "agent_0", "apple_1": "agent_1"})
+    assert done._goal_reached() is True, "both holding an apple -> done"
+    assert done.goal_reached_at == 7, "the step it happened on is recorded"
+
+    off = make({"apple_0": "agent_0", "apple_1": "agent_1"}, target=None)
+    assert off._goal_reached() is False, "unset knob must keep the old behaviour"
+    ok("terminates only when every agent holds the named synset")
+
     print("\nALL TESTS PASSED")
     return 0
 

@@ -57,6 +57,18 @@ class FakeWorld:
     def predicate_token(self, name):
         return {"Open": "open", "ToggledOn": "toggled_on"}.get(str(name), str(name))
 
+    def relation_holds(self, token, source_id, target_id):
+        """One binary relation, evaluated on demand.
+
+        Production evaluates the predicate it was asked about rather than
+        enumerating every true relation in the scene; the stub mirrors that
+        contract so the test exercises the path production takes.
+        """
+        for fact in self._facts:
+            if (fact.predicate, *fact.args) == (token, source_id, target_id):
+                return bool(fact.value)
+        return False
+
 
 def _load():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

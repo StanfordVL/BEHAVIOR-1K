@@ -1,0 +1,6 @@
+# Experiment output: one directory per run, written by coop2/experiment/run_*.py.
+# The data is reproducible from the code plus the seed, and a single run's
+# coop2_process_log.json is ~3 MB, so none of it belongs in git.
+*
+!.gitignore
+!README.md

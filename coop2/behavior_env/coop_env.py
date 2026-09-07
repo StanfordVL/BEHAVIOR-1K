@@ -65,9 +65,10 @@ class CooperativeBehaviorEnv:
         objects: Optional[Sequence[Dict[str, Any]]] = None,
         headless: bool = True,
         observation_every: int = 0,
-        use_scene_graph: bool = True,
+        use_scene_graph: bool = False,
         coop_config_path: Optional[str] = None,
         task_specs=None,
+        succeed_when_all_hold: Optional[str] = None,
         **kwargs: Any,
     ):
         # crafter kwargs (area/view/size/n_players/reward) arrive from the
@@ -90,6 +91,12 @@ class CooperativeBehaviorEnv:
         self.use_scene_graph = use_scene_graph
         self.coop_config_path = coop_config_path
         self.task_specs = task_specs
+        # Stand-in goal check until M9 reconnects BDDL's compiled_task.check_goal.
+        # DummyTask evaluates nothing, so without this `terminated` is always
+        # False and an episode can only ever end by running out of steps --
+        # a robot can hold the goal object and nothing notices.
+        self.succeed_when_all_hold = succeed_when_all_hold
+        self.goal_reached_at: Optional[int] = None
         self.task_tracker = None
         self._closed = False
         import os as _os
@@ -197,6 +204,7 @@ class CooperativeBehaviorEnv:
                 [spec["name"] for spec in self.extra_objects],
                 seed=self.seed,
                 room=self.placement_room,
+                scene_model=self.scene_model,
             )
 
         self.world = BehaviorWorldState(self.env, use_scene_graph=self.use_scene_graph)
@@ -299,17 +307,27 @@ class CooperativeBehaviorEnv:
 
         info: Dict[str, Any] = {}
         for agent_id in self.agent_names:
-            observation = self.world.observation_for(agent_id, max_steps=self.length)
+            observation = self.world.observation_for(
+                agent_id, max_steps=self.length, env_step=self.engine.env_step
+            )
+            # Resolve the radius per entity, not once from a probe object. The
+            # gate is per-object (a table's radius exceeds an apple's), so a
+            # single probe radius -- in practice the smallest object's --
+            # labelled large objects "too far" while the gate would have let
+            # them through, contradicting what the prompt promises the agent.
             radius = None
             controller = self.controllers.get(agent_id)
-            if controller is not None and observation.entities:
-                probe = next(
-                    (e for e in observation.entities.values() if not e.is_robot and not e.is_fixed), None
-                )
-                if probe is not None:
-                    obj = self.env.scene.object_registry("name", probe.name)
-                    if obj is not None:
-                        radius = controller.interaction_radius_for(obj)
+            if controller is not None:
+                cache: Dict[str, Optional[float]] = {}
+
+                def radius(entity, _controller=controller, _cache=cache):
+                    if entity.name not in _cache:
+                        obj = self.env.scene.object_registry("name", entity.name)
+                        _cache[entity.name] = (
+                            _controller.interaction_radius_for(obj) if obj is not None else None
+                        )
+                    return _cache[entity.name]
+
             hints = target_hints(observation, interaction_radius=radius)
             info[agent_id] = {
                 "symbolic_world_state": observation,
@@ -388,13 +406,44 @@ class CooperativeBehaviorEnv:
             }
 
         truncated_all = self.engine.env_step >= self.length
+        terminated_all = self._goal_reached()
         return (
             self._empty_obs(),
             {agent_id: 0.0 for agent_id in self.agent_names},
-            {agent_id: False for agent_id in self.agent_names},
+            {agent_id: terminated_all for agent_id in self.agent_names},
             {agent_id: truncated_all for agent_id in self.agent_names},
             info,
         )
+
+    def _goal_reached(self) -> bool:
+        """True once every agent holds an object of ``succeed_when_all_hold``.
+
+        The synset is matched, not the category, so "apple.n.01" is what the
+        agent sees in its own observation and what a BDDL goal would name.
+        Grasping is exclusive, so "every agent holds an apple" already implies
+        they hold *different* apples -- there is no separate distinctness check.
+        """
+        if not self.succeed_when_all_hold or self.world is None:
+            return False
+        if self.goal_reached_at is not None:
+            return True
+
+        held = self.world.held_objects()  # {object name: robot name}
+        holders = set()
+        for obj_name, robot_name in held.items():
+            obj = self.env.scene.object_registry("name", obj_name)
+            if obj is not None and self.world.synset_of(obj) == self.succeed_when_all_hold:
+                holders.add(robot_name)
+
+        robot_names = {robot.name for robot in self.world.robots}
+        if robot_names and robot_names <= holders:
+            self.goal_reached_at = self.engine.env_step
+            print(
+                f"[goal] every agent holds a {self.succeed_when_all_hold} "
+                f"at env_step {self.goal_reached_at}"
+            )
+            return True
+        return False
 
     def wait_for_state_change(self, timeout: float = 0.05) -> None:
         """No-op: this env is synchronous. crafter's runner polls a thread."""

@@ -95,6 +95,7 @@ def run_centralized_experiment(
     scene_model=None,
     room=None,
     objects=None,
+    succeed_when_all_hold=None,
 ):
     """
     Run experiment with centralized LLM agents.
@@ -119,7 +120,11 @@ def run_centralized_experiment(
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     repair_label = "repair_on" if coop2_precheck_enabled else "repair_off"
-    results_root = output_root or os.path.join(os.path.dirname(__file__), 'results')
+    # coop2/runs/ -- one folder per run, next to the code rather than in
+    # /tmp, so a reboot does not take the experiment data with it.
+    results_root = output_root or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'runs'
+    )
     output_dir = os.path.join(
         results_root,
         f'centralized_agents{n_agents}_{repair_label}_seed{seed}_{timestamp}',
@@ -154,6 +159,8 @@ def run_centralized_experiment(
         env_kwargs["room"] = room
     if objects is not None:
         env_kwargs["objects"] = objects
+    if succeed_when_all_hold is not None:
+        env_kwargs["succeed_when_all_hold"] = succeed_when_all_hold
     base_env = CooperativeEnv(**env_kwargs)
     if hasattr(base_env, "set_team_score_time_limit"):
         base_env.set_team_score_time_limit(time_limit_seconds)
@@ -360,8 +367,28 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42, help="Environment random seed")
     parser.add_argument("--no-video", action="store_true", help="Skip episode GIF recording/saving")
     parser.add_argument("--output-root", type=str, default=None, help="Directory where the run result folder is created")
-    
+    parser.add_argument("--n-objects", type=int, default=0,
+                        help="Apples to place in the team's room. 0 places none, which leaves the "
+                             "scene without the goal's objects: every plan then fails at grounding "
+                             "with INVALID_TARGET and no primitive is ever assigned.")
+    parser.add_argument("--scene", type=str, default=None, help="Scene model override")
+    parser.add_argument("--room", type=str, default=None, help="Room to place the team and objects in")
+    parser.add_argument("--succeed-when-all-hold", type=str, default=None, metavar="SYNSET",
+                        help="End the episode once every agent holds an object of this synset "
+                             "(e.g. apple.n.01). Stand-in until BDDL goal checking returns; "
+                             "without it `terminated` is always False and the episode can only "
+                             "end by running out of steps.")
+
     args = parser.parse_args()
+
+    objects = None
+    if args.n_objects > 0:
+        objects = [
+            {"type": "DatasetObject", "name": f"apple_{i}", "category": "apple",
+             "model": "agveuv", "position": [0.4 * i, 0.0, 0.05],
+             "orientation": [0.0, 0.0, 0.0, 1.0]}
+            for i in range(args.n_objects)
+        ]
     
     run_centralized_experiment(
         n_agents=args.agents,
@@ -375,4 +402,8 @@ if __name__ == "__main__":
         seed=args.seed,
         record_video=not args.no_video,
         output_root=args.output_root,
+        scene_model=args.scene,
+        room=args.room,
+        objects=objects,
+        succeed_when_all_hold=args.succeed_when_all_hold,
     )

@@ -482,15 +482,14 @@ class CoopTaskTracker:
 
     # -- goal evaluation ---------------------------------------------------
 
-    def _fact_set(self) -> set:
-        """Every currently-true relation, as ``(token, arg1, arg2)`` tuples."""
-        facts = set()
-        for fact in self.world.facts(self.world.entities()):
-            if fact.value:
-                facts.add((fact.predicate, *fact.args))
-        return facts
+    def _holds(self, predicate: Optional[Tuple[str, ...]]) -> bool:
+        """Is @predicate true right now?
 
-    def _holds(self, predicate: Optional[Tuple[str, ...]], facts: set) -> bool:
+        Binary predicates are evaluated one at a time through the world model.
+        This used to build the set of *every* true relation in the scene and
+        test membership, which is quadratic in the entity count: 9.4 s per
+        macro-step on house_single_floor, to answer at most a few questions.
+        """
         if predicate is None:
             return True
         if len(predicate) == 2:  # unary: (token, entity)
@@ -505,7 +504,9 @@ class CoopTaskTracker:
                 if self.world.predicate_token(name) == token:
                     return bool(value)
             return False
-        return tuple(predicate) in facts
+        if len(predicate) != 3:
+            return False
+        return self.world.relation_holds(*predicate)
 
     # -- stepping ----------------------------------------------------------
 
@@ -520,7 +521,6 @@ class CoopTaskTracker:
                 world state, only in what was decided.
         """
         acting = acting or {}
-        facts = self._fact_set()
         entities = self.world.entities()
         robots = {name: entities[eid] for eid, name in ((e.entity_id, e.name) for e in entities.values())
                   if entities[eid].is_robot}
@@ -542,13 +542,13 @@ class CoopTaskTracker:
             task.spatial_count = len(nearby)
             task.acting_agents = sorted(a for a, t in acting.items() if t == task.task_id)
             task.temporal_count = len(task.acting_agents)
-            task.dependency_met = self._holds(task.precondition, facts)
+            task.dependency_met = self._holds(task.precondition)
             task.participating_agents = sorted(set(task.agents_nearby) | set(task.acting_agents))
             task.participation_count = len(task.participating_agents)
             task.participation_ratio = (
                 task.participation_count / task.required_agents if task.required_agents else 0.0
             )
-            task.satisfied = self._holds(task.goal, facts)
+            task.satisfied = self._holds(task.goal)
             task.status = TaskStatus.COMPLETED if task.satisfied else TaskStatus.PENDING
 
         metrics = self._diff(env_step)

@@ -19,18 +19,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from feasibility_verify.stub_llm import StubLLMClient  # noqa: E402
 
-# TWO substitutions are needed, and forgetting either one fails silently.
-#
-# PlanningEnvWrapper constructs SymbolicEnvWrapper by name; the crafter one
-# converts each symbolic action into a crafter *integer* action id, which this
-# facade cannot execute. Patch the name in the consumer's namespace -- the
-# module did `from ..action.action_env_wrapper import SymbolicEnvWrapper`, so
-# rebinding the source module has no effect.
+# Only the LLM is substituted. The wrapper used to be monkeypatched here too,
+# which hid a real defect: production PlanningEnvWrapper was still building
+# crafter's SymbolicEnvWrapper, so a live run issued integer action ids the
+# facade silently skipped and every plan sat in "executing" until the episode
+# ran out of steps. The wiring is fixed in plan_env_wrapper now; assert it
+# rather than patch it, so this harness cannot mask the same class of bug again.
 import coop2.cognitive.action.behavior_env_wrapper as _l2w  # noqa: E402
 import coop2.cognitive.agent.llm_client as _llm  # noqa: E402
 import coop2.cognitive.plan.plan_env_wrapper as _plan_env_wrapper  # noqa: E402
 
-_plan_env_wrapper.SymbolicEnvWrapper = _l2w.BehaviorSymbolicEnvWrapper
+assert _plan_env_wrapper.SymbolicEnvWrapper is _l2w.BehaviorSymbolicEnvWrapper, (
+    "PlanningEnvWrapper must build BehaviorSymbolicEnvWrapper; crafter's base "
+    "class turns symbolic actions into integer ids the facade drops silently."
+)
 _llm.LLMClient = StubLLMClient
 import coop2.experiment.run_individual as run_individual  # noqa: E402
 

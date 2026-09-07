@@ -113,12 +113,32 @@ class SymbolicObservation:
         return grouped
 
 
+#: Binary relations surfaced to the agent. Kept explicit because the cost of a
+#: relation scan is (entities^2 x states): OmniGibson's SceneGraphBuilder scans
+#: *every* ordered pair in the scene against *every* relative boolean state,
+#: which on house_single_floor's 654 objects is 1.59M get_value calls and was
+#: measured at 14.9 s per refresh -- 73% of a 150-step episode, against 44 ms
+#: for an actual physics tick. Only the room's entities are ever shown to an
+#: agent, so only they need relations.
+RELATION_STATES = ("OnTop", "Inside", "Under")
+
+#: Unary states surfaced to the agent. These are the ones symbolic_view's
+#: _STATE_GATES turns into open/close and toggle_on/toggle_off hints.
+UNARY_STATES = ("Open", "ToggledOn")
+
+
 class BehaviorWorldState:
     """Shared world model. Build once per env; ``step()`` once per macro-step.
 
     Args:
         env: the OmniGibson environment.
-        use_scene_graph: build relation facts via ``SceneGraphBuilder``. The
+        use_scene_graph: also maintain OmniGibson's ``SceneGraphBuilder``.
+            **Off by default**: its all-pairs relation scan costs 14.9 s per
+            refresh on a 654-object scene (see RELATION_STATES), and the only
+            things read from the graph -- unary states and relations -- are
+            computed directly, scoped to the entities actually being shown.
+            Turn it on to cross-check the scoped results against upstream's.
+            Original note: build relation facts via ``SceneGraphBuilder``. The
             binary kinematic predicates underneath are adjacency ray casts, so
             this is the expensive part; off, only entities and unary states are
             produced.
@@ -129,7 +149,7 @@ class BehaviorWorldState:
     _taxonomy_cache = None
     _token_cache = None
 
-    def __init__(self, env, use_scene_graph: bool = True, exclude_states=None):
+    def __init__(self, env, use_scene_graph: bool = False, exclude_states=None):
         self.env = env
         self.scene = env.scene
         self.robots = list(env.robots)
@@ -138,6 +158,8 @@ class BehaviorWorldState:
         self._exclude_states = exclude_states
         self._builder = None
         self._graph = None
+        self._facts_cache_key = None
+        self._facts_cache: List[PredicateFact] = []
         self.step_index = 0
 
         # Stable type-local ids, assigned on first sight and never reused: the
@@ -298,6 +320,9 @@ class BehaviorWorldState:
         """Refresh the world model. One call per macro-step, not per tick."""
         self.step_index += 1
         if self._builder is not None:
+            # Both of these are O(scene): step() scans every ordered pair for
+            # relations and get_scene_graph() copies the whole graph. Only run
+            # when the caller explicitly asked for the upstream graph.
             self._builder.step(self.scene)
             self._graph = self._builder.get_scene_graph()
         for robot in self.robots:
@@ -307,12 +332,43 @@ class BehaviorWorldState:
 
     # -- observation -------------------------------------------------------
 
+    @staticmethod
+    def _state_entry(obj, state_name: str):
+        """``obj.states`` entry for @state_name, or None.
+
+        Real ``states`` dicts are keyed by the state *class*; the stubbed
+        tests key them by name. Accept both rather than forcing either.
+        """
+        states = getattr(obj, "states", None)
+        if not states:
+            return None
+        for key, value in states.items():
+            if getattr(key, "__name__", None) == state_name or key == state_name:
+                return value
+        return None
+
     def _unary_states(self, obj) -> Dict[str, bool]:
-        """Boolean unary states, read from the graph node when available."""
+        """Boolean unary states for @obj.
+
+        Read from the graph node when a graph is being maintained, otherwise
+        straight off the object -- same values, without the all-pairs scan
+        that maintaining the graph pays for.
+        """
         if self._graph is not None and obj in self._graph.nodes:
             states = self._graph.nodes[obj].get("states", {})
             return {str(k): bool(v) for k, v in states.items()}
-        return {}
+
+        out: Dict[str, bool] = {}
+        for state_name in UNARY_STATES:
+            entry = self._state_entry(obj, state_name)
+            if entry is None:
+                continue
+            try:
+                value = entry.get_value() if hasattr(entry, "get_value") else entry
+            except Exception:  # noqa: BLE001 - a state that cannot be evaluated now
+                continue
+            out[state_name] = bool(value)
+        return out
 
     def entities(self) -> Dict[str, EntityObservation]:
         """Every entity in the scene, keyed by stable id."""
@@ -390,9 +446,98 @@ class BehaviorWorldState:
             return str(state_name)
 
     def facts(self, entities: Dict[str, EntityObservation]) -> List[PredicateFact]:
-        """Relations from the scene graph, in BDDL tokens over BDDL ids."""
+        """Relations among @entities, in BDDL tokens over BDDL ids.
+
+        Scoped to the entities passed in -- which is the agent's own room --
+        unless a SceneGraphBuilder is being maintained, in which case its edges
+        are used instead. The scan is quadratic in the entity count, so the
+        difference between "this room" and "the scene" is 47^2 against 654^2.
+        """
         if self._graph is None:
-            return []
+            return self._facts_scoped(entities)
+        return self._facts_from_graph(entities)
+
+    def _facts_scoped(self, entities: Dict[str, EntityObservation]) -> List[PredicateFact]:
+        """Relations computed directly, only among @entities.
+
+        Uses the same ``obj.states[X].get_value(other)`` calls the graph
+        builder makes; what is replaced is only its scan policy, which is
+        every ordered pair in the scene against every relative boolean state.
+        Results are memoised per world refresh, since both agents in a room
+        ask for the same set.
+        """
+        key = (self.step_index, frozenset(entity.name for entity in entities.values()))
+        if self._facts_cache_key == key:
+            return list(self._facts_cache)
+
+        by_name = self._objects_by_name()
+        pairs = []
+        for entity in entities.values():
+            obj = by_name.get(entity.name)
+            if obj is not None:
+                pairs.append((entity.entity_id, obj))
+
+        facts: List[PredicateFact] = []
+        for source_id, source in pairs:
+            for state_name in RELATION_STATES:
+                entry = self._state_entry(source, state_name)
+                if entry is None or not hasattr(entry, "get_value"):
+                    continue
+                token = self.predicate_token(state_name)
+                for target_id, target in pairs:
+                    if target is source:
+                        continue
+                    try:
+                        if entry.get_value(target):
+                            facts.append(PredicateFact(token, (source_id, target_id), True))
+                    except Exception:  # noqa: BLE001 - state undefined for this pair
+                        continue
+
+        facts.sort(key=lambda f: (f.predicate, f.args))
+        self._facts_cache_key = key
+        self._facts_cache = facts
+        return list(facts)
+
+    def _objects_by_name(self) -> Dict[str, Any]:
+        """``{name: object}`` over the scene and its robots.
+
+        Built from ``scene.objects`` rather than ``object_registry`` so this
+        works when driven without a full scene (the stubbed tests).
+        """
+        by_name = {getattr(obj, "name", None): obj for obj in self.scene.objects}
+        for robot in self.robots:
+            by_name[getattr(robot, "name", None)] = robot
+        by_name.pop(None, None)
+        return by_name
+
+    def relation_holds(self, token: str, source_id: str, target_id: str) -> bool:
+        """Is this one binary relation true right now?
+
+        Answers the predicate that was asked for. The alternative -- enumerate
+        every true relation in the scene, then test membership -- is quadratic
+        in the entity count and was measured at 9.4 s per call on
+        house_single_floor, to settle a handful of task goals.
+        """
+        by_name = self._objects_by_name()
+        names = {entity_id: name for name, entity_id in self._ids.items()}
+        source = by_name.get(names.get(source_id))
+        target = by_name.get(names.get(target_id))
+        if source is None or target is None or source is target:
+            return False
+        for state_name in RELATION_STATES:
+            if self.predicate_token(state_name) != token:
+                continue
+            entry = self._state_entry(source, state_name)
+            if entry is None or not hasattr(entry, "get_value"):
+                return False
+            try:
+                return bool(entry.get_value(target))
+            except Exception:  # noqa: BLE001 - undefined for this pair
+                return False
+        return False
+
+    def _facts_from_graph(self, entities: Dict[str, EntityObservation]) -> List[PredicateFact]:
+        """Relations read off a maintained SceneGraphBuilder's edges."""
         by_name = {entity.name: entity.entity_id for entity in entities.values()}
         facts: List[PredicateFact] = []
         for source, target, data in self._graph.edges(data=True):
@@ -419,6 +564,7 @@ class BehaviorWorldState:
         self,
         agent_id: str,
         max_steps: Optional[int] = None,
+        env_step: Optional[int] = None,
         include_seen_rooms: bool = False,
         goal_status: Optional[Dict[str, Any]] = None,
         last_action_id: Optional[str] = None,
@@ -462,7 +608,11 @@ class BehaviorWorldState:
 
         return SymbolicObservation(
             agent_id=agent_id,
-            step=self.step_index,
+            # env_step, not step_index: max_steps is a budget in env steps, so
+            # reporting the macro-step count here made the prompt read
+            # "Step 5/1500" when 490 of the 1500 were already spent -- two
+            # different units printed as one fraction.
+            step=self.step_index if env_step is None else env_step,
             max_steps=max_steps,
             room=current_room,
             entities=entities,

@@ -9,3 +9,4 @@ outputs/
 
 __pycache__/
 .codex
+.env

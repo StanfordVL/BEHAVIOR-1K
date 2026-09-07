@@ -15,7 +15,12 @@ from coop2._repair_shim import (
     Coop2TraceLogger,
     PettingZooParallelAdapter,
 )
-from ..action.action_env_wrapper import SymbolicEnvWrapper
+# The BEHAVIOR subclass, not crafter's base class. The base converts each
+# symbolic action into a crafter *integer* action id, which this facade cannot
+# execute: it hands over {"agent_0": 0}, the facade's `if not action` skips it
+# because 0 is falsy, and the plan then sits in "executing" forever with no
+# primitive ever assigned. Nothing raises; the episode just runs out of steps.
+from ..action.behavior_env_wrapper import BehaviorSymbolicEnvWrapper as SymbolicEnvWrapper
 from .plan import SymbolicPlan, SymbolicPlanExecutor, SymbolicPlanLogger
 from .coop2_process_logger import Coop2ProcessLogger
 from .coop2_repair_dispatcher import Coop2RepairDispatcher
@@ -101,6 +106,12 @@ class PlanningEnvWrapper:
         # Track current observations for plan generation
         self._current_obs: Dict[str, Any] = {}
         self._current_step: int = 0
+
+        # The agent view is rebuilt only at a decision boundary; see
+        # _agent_view_signature. Between boundaries nothing about the plan has
+        # changed, so re-serialising it every tick is pure overhead.
+        self._cached_agent_views: List[Dict[str, Any]] = []
+        self._last_agent_view_signature: Optional[tuple] = None
 
         # Compact per-step process trace for COOP2 case-study plots/metrics.
         self.coop2_process_logger = Coop2ProcessLogger(
@@ -350,6 +361,31 @@ class PlanningEnvWrapper:
             info,
         )
 
+    def _agent_view_signature(self, actions: Dict[str, Any]) -> tuple:
+        """What must change before the agent view is worth rebuilding.
+
+        A new plan_id means the agent went back to reasoning and returned with
+        a fresh plan; a changed status covers interruption and failure; a
+        changed action index means the plan advanced. Everything else is a tick
+        in which the plan is simply still running.
+        """
+        signature = []
+        for agent_id in self.agent_names:
+            agent = self.agents.get(agent_id)
+            plan = getattr(agent, "plan", None) if agent is not None else None
+            action = actions.get(agent_id) or {}
+            signature.append((
+                agent_id,
+                getattr(plan, "plan_id", None),
+                getattr(plan, "current_action_index", None),
+                str(getattr(plan, "status", None)),
+                getattr(getattr(agent, "state", None), "value", None),
+                bool(getattr(agent, "ready", False)),
+                action.get("action_type") if isinstance(action, dict) else None,
+                action.get("target") if isinstance(action, dict) else None,
+            ))
+        return tuple(signature)
+
     def step(self):
         """
         Execute one environment step for all agents.
@@ -407,7 +443,15 @@ class PlanningEnvWrapper:
                 action_results=self._prev_action_results[agent_id]
             )
             actions[agent_id] = action
-        process_agent_views = self.coop2_process_logger.build_agent_views(actions)
+        # Rebuild only when an agent is back in reasoning, a plan was
+        # interrupted, or the action index advanced. record_step mutates the
+        # dicts it is handed (it writes action_outcome into them), so hand it
+        # shallow copies rather than the cached originals.
+        signature = self._agent_view_signature(actions)
+        if signature != self._last_agent_view_signature:
+            self._cached_agent_views = self.coop2_process_logger.build_agent_views(actions)
+            self._last_agent_view_signature = signature
+        process_agent_views = [dict(view) for view in self._cached_agent_views]
 
         # Execute all actions in the environment (one step)
         obs_dict, rewards, terminated, truncated, info = self.symbolic_env.step(actions)
