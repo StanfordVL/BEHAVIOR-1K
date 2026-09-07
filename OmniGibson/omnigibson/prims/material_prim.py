@@ -110,9 +110,9 @@ class MaterialPrim(BasePrim):
         relative_prim_path = absolute_prim_path_to_scene_relative(scene, prim_path)
         new_material = material_class(relative_prim_path=relative_prim_path, name=name, **kwargs)
         new_material.load(scene)
-        assert (
-            new_material.prim_path == prim_path
-        ), f"Material prim path {new_material.prim_path} does not match {prim_path}"
+        assert new_material.prim_path == prim_path, (
+            f"Material prim path {new_material.prim_path} does not match {prim_path}"
+        )
         MaterialPrim.MATERIALS[prim_path] = new_material
         return new_material
 

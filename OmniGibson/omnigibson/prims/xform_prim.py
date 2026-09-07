@@ -67,9 +67,9 @@ class XFormPrim(BasePrim):
         # Pre-created OG objects' prims always have these things set up ahead of time.
         # Note that if this is an instanceable prim, we also don't need write these properties
         # TODO: This still breaks things downstream so we assert here to make sure we have backwards-compatibility with the expected prim types
-        assert (
-            not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy()
-        ), "Support for instanceable prims has not been implemented yet!"
+        assert not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy(), (
+            "Support for instanceable prims has not been implemented yet!"
+        )
         if not self._xform_props_pre_loaded and not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy():
             self._set_xform_properties()
 
@@ -215,17 +215,17 @@ class XFormPrim(BasePrim):
 
             # Check that the local transform consists only of a position, scale and rotation
             product = local_transform[:3, :3] @ local_transform[:3, :3].T
-            assert th.allclose(
-                product, th.diag(th.diag(product)), atol=1e-3
-            ), f"{self._prim.GetPath()} local transform is not orthogonal."
+            assert th.allclose(product, th.diag(th.diag(product)), atol=1e-3), (
+                f"{self._prim.GetPath()} local transform is not orthogonal."
+            )
 
             # Return the local pose
             position, orientation = T.mat2pose(local_transform)
 
         # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        assert math.isclose(th.norm(orientation).item(), 1, abs_tol=1e-3), (
+            f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        )
 
         # Actually set the local pose now.
         properties = self.prim.GetPropertyNames()

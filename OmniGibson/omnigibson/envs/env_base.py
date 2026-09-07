@@ -82,19 +82,19 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # If the sim is launched, check that the parameters match
         if og.sim is not None:
-            assert (
-                og.sim.initial_physics_dt == physics_dt
-            ), f"Physics frequency mismatch! Expected {physics_dt}, got {og.sim.initial_physics_dt}"
-            assert (
-                og.sim.initial_rendering_dt == rendering_dt
-            ), f"Rendering frequency mismatch! Expected {rendering_dt}, got {og.sim.initial_rendering_dt}"
+            assert og.sim.initial_physics_dt == physics_dt, (
+                f"Physics frequency mismatch! Expected {physics_dt}, got {og.sim.initial_physics_dt}"
+            )
+            assert og.sim.initial_rendering_dt == rendering_dt, (
+                f"Rendering frequency mismatch! Expected {rendering_dt}, got {og.sim.initial_rendering_dt}"
+            )
             assert og.sim.device == self.device, f"Device mismatch! Expected {self.device}, got {og.sim.device}"
-            assert (
-                og.sim.viewer_width == viewer_width
-            ), f"Viewer width mismatch! Expected {viewer_width}, got {og.sim.viewer_width}"
-            assert (
-                og.sim.viewer_height == viewer_height
-            ), f"Viewer height mismatch! Expected {viewer_height}, got {og.sim.viewer_height}"
+            assert og.sim.viewer_width == viewer_width, (
+                f"Viewer width mismatch! Expected {viewer_width}, got {og.sim.viewer_width}"
+            )
+            assert og.sim.viewer_height == viewer_height, (
+                f"Viewer height mismatch! Expected {viewer_height}, got {og.sim.viewer_height}"
+            )
         # Otherwise, launch a simulator instance
         else:
             og.launch(
@@ -256,9 +256,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if "name" not in robot_config:
                     robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
                 if "model" in robot_config:
-                    assert (
-                        "type" not in robot_config
-                    ), "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
+                    assert "type" not in robot_config, (
+                        "CANNOT SPECIFY BOTH TYPE AND MODEL. Robot config key 'type' is deprecated; use 'model' instead."
+                    )
                 elif "type" in robot_config:
                     log.warning(
                         "Robot config key 'type' is deprecated; use 'model' instead. "
@@ -391,12 +391,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
             lows = []
             highs = []
             for space in action_space.values():
-                assert isinstance(
-                    space, gym.spaces.Box
-                ), "Can only flatten action space where all individual spaces are gym.space.Box instances!"
-                assert (
-                    len(space.shape) == 1
-                ), "Can only flatten action space where all individual spaces are 1D instances!"
+                assert isinstance(space, gym.spaces.Box), (
+                    "Can only flatten action space where all individual spaces are gym.space.Box instances!"
+                )
+                assert len(space.shape) == 1, (
+                    "Can only flatten action space where all individual spaces are 1D instances!"
+                )
                 lows.append(space.low)
                 highs.append(space.high)
             action_space = gym.spaces.Box(

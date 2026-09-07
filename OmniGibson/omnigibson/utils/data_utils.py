@@ -31,9 +31,9 @@ def merge_scene_files(scene_a, scene_b, keep_robot_from="b"):
 
     # Sanity check to make sure the two scene files are compatible
     if "init_info" in scene_a and "init_info" in scene_b:
-        assert (
-            scene_a["init_info"]["args"]["scene_model"] == scene_b["init_info"]["args"]["scene_model"]
-        ), "Scene models must match for merging"
+        assert scene_a["init_info"]["args"]["scene_model"] == scene_b["init_info"]["args"]["scene_model"], (
+            "Scene models must match for merging"
+        )
 
     # Initialize merged scene file
     result = {

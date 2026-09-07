@@ -415,9 +415,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             for shape_attr, default_val in shape_defaults.items():
                 if shape_attr in property_names:
                     val = self.projection_mesh.get_attribute(shape_attr)
-                    assert (
-                        val == default_val
-                    ), f"Projection mesh should have shape-based attribute {shape_attr} == {default_val}! Got: {val}"
+                    assert val == default_val, (
+                        f"Projection mesh should have shape-based attribute {shape_attr} == {default_val}! Got: {val}"
+                    )
 
             # Set the scale based on projection mesh params
             self.projection_mesh.scale = self._projection_mesh_params["extents"]
@@ -425,9 +425,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Make sure the object updates its meshes, and assert that there's only a single visual mesh
             # TODO: This is a bad idea. It creates orphaned prims when the mesh lists get overwritten. Why do we need this?
             self.link.update_meshes()
-            assert (
-                len(self.link.visual_meshes) == 1
-            ), f"Expected only a single projection mesh for {self.link}, got: {len(self.link.visual_meshes)}"
+            assert len(self.link.visual_meshes) == 1, (
+                f"Expected only a single projection mesh for {self.link}, got: {len(self.link.visual_meshes)}"
+            )
 
             # Make sure the mesh is translated so that its tip lies at the meta link origin, and rotated so the vector
             # from tip to tail faces the positive x axis
@@ -558,15 +558,16 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         if condition_type == ParticleModifyCondition.FUNCTION:
             cond = value
         elif condition_type == ParticleModifyCondition.SATURATED:
-            cond = lambda obj: self.obj.scene.is_system_active(value) and obj.states[Saturated].get_value(
-                self.obj.scene.get_system(value)
+            cond = lambda obj: (
+                self.obj.scene.is_system_active(value)
+                and obj.states[Saturated].get_value(self.obj.scene.get_system(value))
             )
         elif condition_type == ParticleModifyCondition.TOGGLEDON:
             cond = lambda obj: obj.states[ToggledOn].get_value() == value
         elif condition_type == ParticleModifyCondition.GRAVITY:
             # Particles spawn in negative z-axis direction, so check positive dot product of link frame with global
-            cond = (
-                lambda obj: (
+            cond = lambda obj: (
+                (
                     th.dot(
                         T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1])
                         @ th.tensor([0, 0, 1], dtype=th.float32),
@@ -1144,13 +1145,13 @@ class ParticleApplier(ParticleModifier):
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
             local_pos, local_quat = self.projection_mesh.get_position_orientation(frame="parent")
-            assert th.all(
-                th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
-            ), "Projection mesh tip should align with metalink position!"
+            assert th.all(th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))), (
+                "Projection mesh tip should align with metalink position!"
+            )
             local_euler = T.quat2euler(local_quat)
-            assert th.all(
-                th.isclose(local_euler, th.zeros_like(local_euler))
-            ), "Projection mesh orientation should align with metalink orientation!"
+            assert th.all(th.isclose(local_euler, th.zeros_like(local_euler))), (
+                "Projection mesh orientation should align with metalink orientation!"
+            )
 
         # Store which method to use for sampling particle locations
         if self._sample_with_raycast:
@@ -1162,12 +1163,12 @@ class ParticleApplier(ParticleModifier):
                 raise ValueError(f"Unsupported ParticleModifyMethod: {self.method}!")
         else:
             # Make sure we're only using a physical particle system and the projection method
-            assert isinstance(
-                system, PhysicalParticleSystem
-            ), "If not sampling with raycast, ParticleApplier only supports PhysicalParticleSystems!"
-            assert (
-                self.method == ParticleModifyMethod.PROJECTION
-            ), "If not sampling with raycast, ParticleApplier only supports ParticleModifyMethod.PROJECTION method!"
+            assert isinstance(system, PhysicalParticleSystem), (
+                "If not sampling with raycast, ParticleApplier only supports PhysicalParticleSystems!"
+            )
+            assert self.method == ParticleModifyMethod.PROJECTION, (
+                "If not sampling with raycast, ParticleApplier only supports ParticleModifyMethod.PROJECTION method!"
+            )
             # Compute particle spawning information once
             self._compute_particle_spawn_information(system=system)
 
@@ -1204,9 +1205,9 @@ class ParticleApplier(ParticleModifier):
         h = extent[2]
         low, high = self.obj.aabb
         n_particles_per_axis = ((high - low) / sampling_distance).int()
-        assert th.all(
-            n_particles_per_axis
-        ), f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."
+        assert th.all(n_particles_per_axis), (
+            f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."
+        )
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [
             th.arange(l + system.particle_radius, h - system.particle_radius + 1e-10, system.particle_radius * 2)
@@ -1397,12 +1398,12 @@ class ParticleApplier(ParticleModifier):
         Args:
             system (BaseSystem): System to apply particles from
         """
-        assert (
-            self.method == ParticleModifyMethod.PROJECTION
-        ), "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
-        assert self.obj.scene.is_physical_particle_system(
-            system_name=system.name
-        ), "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
+        assert self.method == ParticleModifyMethod.PROJECTION, (
+            "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
+        )
+        assert self.obj.scene.is_physical_particle_system(system_name=system.name), (
+            "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
+        )
 
         # Transform pre-cached particle positions into the world frame
         pos, quat = self.link.get_position_orientation()

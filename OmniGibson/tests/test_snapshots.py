@@ -110,7 +110,7 @@ def _check(name, array):
 
     if not path.exists():
         pytest.fail(
-            f"Missing golden snapshot '{name}': {path}. " "Set SNAPSHOT_UPDATE=1 to generate it and commit the result."
+            f"Missing golden snapshot '{name}': {path}. Set SNAPSHOT_UPDATE=1 to generate it and commit the result."
         )
 
     reference = np.load(path)
