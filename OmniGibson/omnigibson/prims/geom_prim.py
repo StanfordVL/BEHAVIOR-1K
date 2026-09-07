@@ -132,41 +132,34 @@ class GeomPrim(XFormPrim):
             self.set_attribute("primvars:displayOpacity", [opacity])
 
     @cached_property
-    def points(self):
-        """
-        Returns:
-            th.tensor: Local poses of all points
-        """
-        # If the geom is a mesh we can directly return its points.
+    def points_and_faces(self):
         mesh = self.prim
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
-            # If the geom is a mesh we can directly return its points.
-            return vtarray_to_torch(mesh.GetAttribute("points").Get(), dtype=th.float32)
+            points = vtarray_to_torch(mesh.GetAttribute("points").Get(), dtype=th.float32)
+            face_vertex_counts = vtarray_to_torch(mesh.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
+            face_indices = vtarray_to_torch(mesh.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
+
+            faces = []
+            i = 0
+            for count in face_vertex_counts:
+                for j in range(count - 2):
+                    faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
+                i += count
+            faces = th.tensor(faces, dtype=th.int)
         else:
-            # Return the vertices of the trimesh
-            return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices, dtype=th.float32)
+            tm = mesh_prim_shape_to_trimesh_mesh(mesh)
+            points = th.tensor(tm.vertices, dtype=th.float32)
+            faces = th.tensor(tm.faces, dtype=th.int)
+        return points, faces
 
-    @cached_property
+    @property
+    def points(self):
+        return self.points_and_faces[0]
+
+    @property
     def faces(self):
-        mesh = self.prim
-        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
-        if mesh_type != "Mesh":
-            log.warning(f"Geom {self.prim_path} is not a mesh, returning None for faces.")
-            return None
-
-        face_vertex_counts = vtarray_to_torch(mesh.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
-        face_indices = vtarray_to_torch(mesh.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
-
-        faces = []
-        i = 0
-        for count in face_vertex_counts:
-            for j in range(count - 2):
-                faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
-            i += count
-        faces = th.tensor(faces, dtype=th.int)
-
-        return faces
+        return self.points_and_faces[1]
 
     @cached_property
     def delaunay_triangulation(self):
@@ -255,13 +248,12 @@ class GeomPrim(XFormPrim):
         return points_transformed
 
     @property
-    def aabb(self):
-        world_pose_w_scale = self.scaled_transform
+    def points_in_world_frame(self):
+        return self.transform_local_points_to_world(self.points)
 
-        # transform self.points into world frame
-        points = self.points
-        points_homogeneous = th.cat((points, th.ones((points.shape[0], 1))), dim=1)
-        points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:, :3]
+    @property
+    def aabb(self):
+        points_transformed = self.points_in_world_frame
 
         aabb_lo = th.min(points_transformed, dim=0).values
         aabb_hi = th.max(points_transformed, dim=0).values

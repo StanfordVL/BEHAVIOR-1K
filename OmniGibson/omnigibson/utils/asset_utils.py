@@ -251,16 +251,19 @@ def get_all_object_category_models_with_abilities(category, abilities):
             to support the requested list of @abilities
     """
     # Avoid circular imports
-    from omnigibson.object_states.factory import get_requirements_for_ability, get_states_for_ability
+    from omnigibson.object_states.factory import get_requirements_for_ability, get_states_and_params_for_ability
     from omnigibson.objects.dataset_object import DatasetObject
 
     # Get all valid models
     all_models = get_all_object_category_models(category=category)
 
-    # Generate all object states required per object given the requested set of abilities
+    # Generate all object states required per object given the requested set of abilities. We must
+    # apply the same per-(ability, state) param transform that object hydration uses (via the shared
+    # get_states_and_params_for_ability helper), otherwise a state's asset compatibility is checked
+    # with the wrong kwargs -- e.g. flammable's HeatSourceOrSink would be validated with
+    # requires_on_fire=False and wrongly demand a heatsource meta link.
     abilities_info = {
-        ability: [(state_type, params) for state_type in get_states_for_ability(ability)]
-        for ability, params in abilities.items()
+        ability: get_states_and_params_for_ability(ability, params) for ability, params in abilities.items()
     }
 
     # Get mapping for class init kwargs

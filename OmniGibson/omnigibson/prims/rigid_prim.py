@@ -497,6 +497,42 @@ class RigidPrim(XFormPrim):
             return None
         return self.transform_local_points_to_world(local_points)
 
+    @cached_property
+    def collision_mesh_cpu_data(self):
+        """
+        Returns:
+            (pts_cpu, faces_cpu) tuple of CPU torch tensors, or None if the link has no collision
+            geometry. Used by RigidBodyViewAPI.initialize_view() to batch H2D copies and
+            wp.Mesh construction across all links.
+
+            - pts_cpu: (N, 3) float32 — vertices of all collision geoms of this link, expressed
+              in the link's local frame, with the link's world scale baked in.
+            - faces_cpu: (M*3,) int32 — flat triangle vertex indices into pts_cpu (link-local;
+              offsets across geoms within the link are already applied).
+
+        The world scale is baked into the stored points so that downstream kernels can
+        transform back to world frame using just the link's pose-matrix (rotation + translation,
+        no scale) — matching what RigidBodyViewAPI.POSE_MATRICES provides.
+        """
+        world_to_scaled_link = T.pose_inv(T.pose2mat(self.get_position_orientation()))
+        pts_concat, idx_concat, point_offset = [], [], 0
+        for geom in self._collision_meshes.values():
+            pts = geom.points_in_world_frame
+            if pts is None or pts.shape[0] == 0:
+                continue
+            points_wrt_link = T.transform_points(pts, world_to_scaled_link)
+            faces = geom.faces
+            pts_concat.append(points_wrt_link)
+            idx_concat.append((faces + point_offset).flatten())
+            point_offset += points_wrt_link.shape[0]
+
+        if not pts_concat:
+            return None
+
+        pts_cpu = th.cat(pts_concat, dim=0).to(th.float32)
+        faces_cpu = th.cat(idx_concat, dim=0).to(th.int32)
+        return pts_cpu, faces_cpu
+
     @property
     def aabb(self):
         position, _ = self.get_position_orientation()

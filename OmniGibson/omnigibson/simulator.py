@@ -15,18 +15,21 @@ from pathlib import Path
 from omnigibson.utils.profiling_utils import Profiler
 
 import torch as th
+import warp as wp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
+from omnigibson.object_states.tensorized_state import TensorizedState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
+from omnigibson.sensors.tiled_sensor import TiledVisionSensor
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.asset_utils import ensure_omnigibson_robot_assets_version, get_dataset_path
@@ -45,13 +48,15 @@ from omnigibson.utils.ui_utils import (
 )
 from omnigibson.utils.vision_utils import add_semantic_label
 from omnigibson.utils.usd_utils import (
+    ArticulatedObjectViewAPI,
     CollisionAPI,
     ControllableObjectViewAPI,
+    RigidBodyViewAPI,
     RigidContactAPI,
+    clear as clear_usd_utils,
+    triangularize_mesh,
 )
-from omnigibson.utils.usd_utils import clear as clear_usd_utils
 from omnigibson.controllers import ControllerView
-from omnigibson.utils.usd_utils import triangularize_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -86,6 +91,25 @@ def with_profiler(name):
         return wrapper
 
     return decorator
+
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
+m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
+
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
+m.SCENE_MARGIN = 10.0
+m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
+
+m.KIT_FILES = {
+    (5, 1, 0): "omnigibson_5_1_0.kit",
+}
 
 
 # Helper functions for starting omnigibson
@@ -257,6 +281,13 @@ def _launch_app():
         global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
         global_data_dir.mkdir(parents=True, exist_ok=True)
         sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
+
+        # Persist warp's JIT-compiled kernel cache under gm.APPDATA_PATH so it survives
+        # across runs (warp's default ~/.cache/warp is per-user/ephemeral on some
+        # self-hosted CI runners, which means every run pays the full NVRTC JIT cost).
+        global_warp_cache_dir = Path(gm.APPDATA_PATH) / "global" / "warp_cache"
+        global_warp_cache_dir.mkdir(parents=True, exist_ok=True)
+        wp.config.kernel_cache_dir = str(global_warp_cache_dir)
 
         with launch_context(None):
             app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
@@ -484,6 +515,10 @@ def _launch_simulator(*args, **kwargs):
             self._objects_to_initialize = []
             self._objects_require_joint_break_callback = False
             self._deferred_joint_breaks = []
+            # Set when update_handles() is called mid-step (currently_stepping): the tensorized
+            # object-state views read world poses from Fabric in their initialize_view(), which is
+            # forbidden during a physics step, so the rebuild is deferred to _on_post_physics_step.
+            self._deferred_tensorized_view_init = False
 
             # Maps callback name to callback
             self._callbacks_on_play = dict()
@@ -505,7 +540,7 @@ def _launch_simulator(*args, **kwargs):
             self.object_state_types_requiring_update = [
                 state
                 for state in self.object_state_types
-                if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, TensorizedState))
             ]
             self.object_state_types_on_joint_break = {
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
@@ -526,8 +561,11 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
 
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
+                if issubclass(state, TensorizedState):
                     state.global_initialize()
+
+            # Captured wp.Graph wrapping every TensorizedState's global_update().
+            self._state_graph = None
 
             # Now start rebuilding everything
             # Disable collision between root links of fixed base objects
@@ -870,41 +908,44 @@ def _launch_simulator(*args, **kwargs):
             self._camera_mover.print_info()
             return self._camera_mover
 
-        def import_scene(self, scene):
+        def import_scene(self, scenes):
             """
-            Import a scene into the simulator. A scene could be a synthetic one or a realistic Gibson Environment.
+            Import one or more scenes into the simulator. A scene could be a synthetic one or a realistic Gibson
+            Environment.
 
             Args:
-                scene (Scene): a scene object to load
+                scenes (Scene or list of Scenes): scene(s) to load
             """
             assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
-            assert isinstance(scene, Scene), "import_scene can only be called with Scene"
+            if isinstance(scenes, Scene):
+                scenes = [scenes]
+            assert all(
+                isinstance(scene, Scene) for scene in scenes
+            ), "import_scene can only be called with Scene instances"
+            assert len(scenes) > 0, "import_scene requires at least one scene"
 
             # Check that the scene is not already imported
-            if scene.loaded:
-                raise ValueError("Scene is already loaded!")
+            for scene in scenes:
+                if scene.loaded:
+                    raise ValueError("Scene is already loaded!")
+                self._last_scene_edge = scene.load(
+                    idx=len(self.scenes),
+                    last_scene_edge=self._last_scene_edge,
+                    initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
+                    scene_margin=m.SCENE_MARGIN,
+                )
+                # Load the scene.
+                self._scenes.append(scene)
 
-            self._last_scene_edge = scene.load(
-                idx=len(self.scenes),
-                last_scene_edge=self._last_scene_edge,
-                initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
-                scene_margin=m.SCENE_MARGIN,
-            )
-
-            # Load the scene.
-            self._scenes.append(scene)
-
-            # Make sure simulator is not running, then start it so that we can initialize the scene
-            assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
             self.play()
-
-            # Initialize the scene
-            scene.initialize()
-
-            # Need to one more step for particle systems to work
+            for scene in scenes:
+                scene.initialize()
+            # One step is needed for particle systems to work.
             self.step()
             self.stop()
-            log.info(f"Imported scene {scene.idx}.")
+
+            for scene in scenes:
+                log.info(f"Imported scene {scene.idx}.")
 
         # TODO: Remove this context manager and call _post_import_object directly since the objects
         # are already known when this is called.
@@ -1059,9 +1100,11 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[USDObject]): list of objects to remove
             """
-            with self.removing_objects(objs=objs):
-                for obj in objs:
-                    obj.scene.remove_object(obj, _batched_call=True)
+            objs = list(objs)
+            if len(objs) > 0:
+                with self.removing_objects(objs=objs):
+                    for obj in objs:
+                        obj.scene.remove_object(obj, _batched_call=True)
 
         def remove_prim(self, prim):
             """
@@ -1196,7 +1239,124 @@ def _launch_simulator(*args, **kwargs):
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
+            RigidBodyViewAPI.initialize_view()
+            ArticulatedObjectViewAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+
+            if gm.ENABLE_OBJECT_STATES:
+                if self.currently_stepping:
+                    # update_handles() is reached mid-step when a joint is created during a physics
+                    # callback (e.g. assisted grasping or on-contact attachment). Tensorized state
+                    # views bake static geometry from Fabric world poses in initialize_view(), which
+                    # is forbidden while currently_stepping=True. These views are only consumed by the
+                    # post-physics state update, so defer the rebuild until currently_stepping clears
+                    # (mirrors the deferred joint-break handling in _on_post_physics_step). The physics
+                    # views above are refreshed immediately so the new joint is registered.
+                    self._deferred_tensorized_view_init = True
+                else:
+                    for state_type in og.sim.object_state_types_requiring_update:
+                        if issubclass(state_type, TensorizedState):
+                            state_type.initialize_view()
+
+        def _refresh_state_caches(self, dt=0.0):
+            """
+            Run a full update for tensorized object state and view API.
+
+            This function will be called in the following cases:
+            - in usual step, in ``_non_physics_step`` (passes the sim-step dt)
+            - in ``step_physics`` (passes dt=0)
+            - anywhere that poses/joints are set between sim steps (sample_kinematics,
+            Inside._set_value, set_position_orientation / JointPrim.set_pos) and
+            any TensorizedAbsoluteState need to get_value (default dt=0)
+
+            ``dt`` is the seconds elapsed for this logical step; it is forwarded to each
+            tensorized state's ``pre_update`` so time-dependent states advance by exactly the
+            sim-step dt on a real step and by 0 on physics-only / out-of-step refreshes.
+
+            Always clears ``TensorizedState.caches_dirty`` on completion.
+            """
+            if len(self.scenes) == 0 or not self.is_playing():
+                TensorizedState.caches_dirty = False
+                return
+
+            RigidBodyViewAPI.read_from_physx()
+            ArticulatedObjectViewAPI.read_from_physx()
+            wp.synchronize_stream(wp.get_stream())
+
+            self._capture_warp_graph(dt)
+
+            RigidContactAPI._PENDING_STEPS = 0
+
+        def _capture_warp_graph(self, dt=0.0):
+            """
+            Manage the per-step warp graph end-to-end (gating, pre/post bookkeeping, capture,
+            and launch all live here so ``_refresh_state_caches`` stays thin).
+
+            Steps:
+              1. Compute the list of tensorized states, gated on ``gm.ENABLE_OBJECT_STATES``.
+                 If the list is empty (object states disabled or none registered), run the
+                 view-API ``update()``s directly and return — there is no pre/global/post
+                 pipeline to drive.
+              2. Otherwise, run ``pre_update(dt)`` for each state, then either (re-)capture or
+                 replay the per-step graph (view-API H2D + tensorized state global_updates).
+                 ``wp.ScopedCapture`` only RECORDS ops — the captured graph must be launched
+                 explicitly via ``wp.capture_launch`` for its kernels to run this frame.
+              3. After ``wp.synchronize()``, run ``post_update`` for each state for change
+                 detection.
+
+            Always clears ``TensorizedState.caches_dirty`` on completion.
+            """
+            tensorized_states = (
+                [state for state in self.object_state_types_requiring_update if issubclass(state, TensorizedState)]
+                if gm.ENABLE_OBJECT_STATES
+                else []
+            )
+
+            if not tensorized_states:
+                # No tensorized-state pipeline → still refresh GPU view-API mirrors so
+                # downstream consumers (rendering, ad-hoc queries) see fresh poses / contacts.
+                RigidBodyViewAPI.update()
+                RigidContactAPI.update()
+                wp.synchronize_stream(wp.get_stream())
+                TensorizedState.caches_dirty = False
+                return
+
+            # Nested _get_value during this refresh should read the cache directly rather
+            # than recursively triggering another refresh.
+            TensorizedState._refresh_in_progress = True
+            try:
+                TensorizedState.caches_dirty = True
+
+                for state_type in tensorized_states:
+                    state_type.pre_update(dt)
+
+                if TensorizedState.graph_dirty:
+                    if all(s.VALUES is None or s.VALUES.numel() == 0 for s in tensorized_states):
+                        # Nothing to capture; leave _state_graph as None.
+                        self._state_graph = None
+                    else:
+                        # ScopedCapture creates + owns its capture stream. Inside the with-block,
+                        # wp.get_stream() returns that stream and any wp.launch / wp.copy defaults
+                        # to it. Tensorized-state kernels read POSE_MATRICES / joint positions
+                        # written by the view-API kernels above — stream ordering on the capture
+                        # stream guarantees they see fresh values.
+                        with wp.ScopedCapture(device="cuda") as capture:
+                            RigidBodyViewAPI.update()
+                            RigidContactAPI.update()
+                            for state_type in tensorized_states:
+                                state_type.global_update()
+                        self._state_graph = capture.graph
+                    TensorizedState.graph_dirty = False
+                if self._state_graph is not None:
+                    wp.capture_launch(self._state_graph)
+
+                wp.synchronize_stream(wp.get_stream())
+
+                for state_type in tensorized_states:
+                    state_type.post_update()
+            finally:
+                TensorizedState._refresh_in_progress = False
+                TensorizedState.caches_dirty = False
 
         @with_profiler(name="_non_physics_step_profiler")
         def _non_physics_step(self):
@@ -1209,9 +1369,6 @@ def _launch_simulator(*args, **kwargs):
 
             # If we're playing we, also run additional logic
             if self.is_playing():
-                # Update persistent rigid contact caches from the latest step
-                RigidContactAPI.update_contact_cache()
-
                 # Check to see if any objects should be initialized (only done IF we're playing)
                 n_objects_to_initialize = len(self._objects_to_initialize)
                 if n_objects_to_initialize > 0 and self.is_playing():
@@ -1244,12 +1401,15 @@ def _launch_simulator(*args, **kwargs):
                     for system in scene.active_systems.values():
                         system.update()
 
+                # Update view API data and tensorized states. One _non_physics_step runs per
+                # og.sim.step(), which spans get_sim_step_dt() seconds — advance time-dependent
+                # states by exactly that.
+                self._refresh_state_caches(dt=self.get_sim_step_dt())
+
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
-                    # Step the object states in global topological order (if the scene exists)
+                    # UpdateStateMixin per-object updates (reads VALUES_CPU after sync)
                     for state_type in self.object_state_types_requiring_update:
-                        if issubclass(state_type, GlobalUpdateStateMixin):
-                            state_type.global_update()
                         if issubclass(state_type, UpdateStateMixin):
                             for scene in self.scenes:
                                 for obj in scene.get_objects_with_state(state_type):
@@ -1303,19 +1463,10 @@ def _launch_simulator(*args, **kwargs):
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
                     # sim was stopped. We need to reset them to default_kp and default_kd defined defined in Robot.
-                    # We also need to take an additional sim step to make sure simulator is functioning properly.
-                    # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
-                    # operations immediately after playing; e.g.: syncing USD poses when fabric is enabled
                     for scene in self.scenes:
                         for robot in scene.robots:
                             if robot.initialized:
                                 robot.update_controller_mode()
-                                # TODO: Typically, robots should be initialized on the first play() call
-                                # Problem: In multi-environment setups, import_scene() for subsequent environments
-                                # calls play()+stop(), which prematurely triggers initialization before all environments
-                                # are loaded. This is a temporary workaround.
-                                robot.reset()
-                                robot.keep_still()
 
                         # Also refresh any transition rules that became stale while sim was stopped
                         if gm.ENABLE_TRANSITION_RULES:
@@ -1413,7 +1564,8 @@ def _launch_simulator(*args, **kwargs):
 
             # Accumulate contact data from this physics step and then flush to cache.
             # We normally do this in _non_physics_step, but step_physics bypasses that so we do it here.
-            RigidContactAPI.update_contact_cache()
+            # dt=0: a bare physics step must not advance time-dependent states (matches legacy behavior).
+            self._refresh_state_caches(dt=0.0)
 
         @with_profiler(name="_pre_physics_step_profiler")
         def _on_pre_physics_step(self):
@@ -1451,8 +1603,30 @@ def _launch_simulator(*args, **kwargs):
                     # Run the post physics update for backend view
                     ControllableObjectViewAPI.post_physics_step()
 
-                # Pull the contact sensor data
-                RigidContactAPI.add_contacts_from_physics_step()
+                # Pull the contact sensor data — must run while currently_stepping is True,
+                # since RigidContactAPI.read_from_physx asserts on it. Unlike the pose/DOF
+                # view APIs (snapshot-only, drained once per render-step in
+                # _refresh_state_caches), contacts accumulate per sub-step into pending
+                # buffers that update() later walks, so they must be drained here.
+                RigidContactAPI.read_from_physx()
+                wp.synchronize_stream(wp.get_stream())
+
+                # Record that we are done with the step context. Joint-break callbacks below
+                # are post-step user code: they may call update_handles() / read Fabric, which
+                # is forbidden while currently_stepping=True.
+                self.currently_stepping = False
+
+                # Run any tensorized-state view rebuild that was deferred from a mid-step
+                # update_handles() (e.g. a joint created during grasping). Now that
+                # currently_stepping is False, the Fabric world-pose reads in initialize_view()
+                # are allowed. Do this before joint-break callbacks so they observe fresh views.
+                if self._deferred_tensorized_view_init:
+                    self._deferred_tensorized_view_init = False
+                    if gm.ENABLE_OBJECT_STATES:
+                        for state_type in og.sim.object_state_types_requiring_update:
+                            if issubclass(state_type, TensorizedState):
+                                state_type.initialize_view()
+                    TensorizedState.caches_dirty = True
 
                 if self._deferred_joint_breaks:
                     # Copy the current deferred joint breaks and clear the shared list
@@ -1462,9 +1636,6 @@ def _launch_simulator(*args, **kwargs):
                     self._deferred_joint_breaks.clear()
                     for obj, state_type, joint_path in deferred_breaks:
                         obj.states[state_type].on_joint_break(joint_path)
-
-                # Record that we are done with the step context.
-                self.currently_stepping = False
             except Exception as e:
                 self.currently_in_isaac_step = False
                 self.currently_stepping = False
@@ -1846,6 +2017,7 @@ def _launch_simulator(*args, **kwargs):
             # Handle loading scenes differently depending on whether we're loading from scratch or not
             if load_from_scratch:
                 states = []
+                recreated_scenes = []
                 self.stop()
                 for i, scene_file in enumerate(scene_files):
                     # Directly create and load the scene object
@@ -1869,9 +2041,10 @@ def _launch_simulator(*args, **kwargs):
                     # Also make sure we have any additional modifications necessary from the specific scene
                     og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
-                    # Recreate and import the saved scene
-                    recreated_scene = create_object_from_init_info(init_info)
-                    self.import_scene(scene=recreated_scene)
+                    # Recreate the saved scene
+                    recreated_scenes.append(create_object_from_init_info(init_info))
+
+                self.import_scene(recreated_scenes)
                 self.play()
                 for i, state in enumerate(states):
                     self.scenes[i].load_state(state, serialized=False)
@@ -1929,10 +2102,14 @@ def _launch_simulator(*args, **kwargs):
             # Stop the physics
             self.stop()
 
-            # # Clean subscribed callbacks
-            # self._pre_physics_step_callback.unsubscribe()
-            # self._post_physics_step_callback.unsubscribe()
-            # self._simulation_event_callback.unsubscribe()
+            # Clean subscribed callbacks
+            self._pre_physics_step_callback.unsubscribe()
+            self._post_physics_step_callback.unsubscribe()
+            self._simulation_event_callback.unsubscribe()
+
+            # Clear all tiled vision sensors first -- their render products reference per-scene cameras,
+            # so they must be destroyed before the scenes (and the cameras) are removed
+            TiledVisionSensor.clear()
 
             # Clear all scenes
             for scene in self.scenes:
@@ -1956,7 +2133,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
+                if issubclass(state, TensorizedState):
                     state.global_initialize()
 
             # Clear all materials

@@ -20,7 +20,7 @@ class DummyTask(BaseTask):
         # Do nothing
         return dict()
 
-    def _get_obs(self, env):
+    def _get_obs(self, env, env_idx):
         # No task-specific obs of any kind
         return dict(), dict()
 

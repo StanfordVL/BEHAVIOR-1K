@@ -34,7 +34,13 @@ class LocalPolicy:
             return self.policy.act(obs).detach().cpu()
         else:
             assert self.action_dim is not None
-            return th.zeros(self.action_dim, dtype=th.float32)
+            batch_size = None
+            if obs:
+                first_obs = next(iter(obs.values()))
+                if isinstance(first_obs, th.Tensor) and first_obs.ndim > 0:
+                    batch_size = first_obs.shape[0]
+            shape = (self.action_dim,) if batch_size is None else (batch_size, self.action_dim)
+            return th.zeros(shape, dtype=th.float32)
 
     def reset(self) -> None:
         if self.policy is not None:
@@ -43,7 +49,10 @@ class LocalPolicy:
 
 class WebsocketPolicy:
     """
-    Websocket policy for controlling the robot over a websocket connection.
+    Websocket policy for controlling the robot over a websocket connection. ``action_chunk_size`` opts
+    into the action-chunk protocol documented in ``docs/challenge/evaluation.md``; it is disabled by
+    default because replaying a chunk is correct only for servers that return actions intended for
+    open-loop execution from one observation.
     """
 
     def __init__(
@@ -52,17 +61,29 @@ class WebsocketPolicy:
         host: Optional[str] = None,
         port: Optional[int] = None,
         allow_reconnect: bool = False,
+        action_chunk_size: int = 0,
         **kwargs,
     ) -> None:
         logging.info(f"Creating websocket client policy with host: {host}, port: {port}")
         self.last_action = None
         self.policy = None
         self._allow_reconnect = allow_reconnect
+        self._action_chunk_size = action_chunk_size
         if host is not None or port is not None:
-            self.policy = WebsocketClientPolicy(host=host, port=port, allow_reconnect=allow_reconnect)
+            self.policy = WebsocketClientPolicy(
+                host=host,
+                port=port,
+                allow_reconnect=allow_reconnect,
+                action_chunk_size=action_chunk_size,
+            )
 
     def update_host(self, host: str, port: int) -> None:
-        self.policy = WebsocketClientPolicy(host=host, port=port, allow_reconnect=self._allow_reconnect)
+        self.policy = WebsocketClientPolicy(
+            host=host,
+            port=port,
+            allow_reconnect=self._allow_reconnect,
+            action_chunk_size=self._action_chunk_size,
+        )
 
     def forward(self, obs: dict, *args, **kwargs) -> th.Tensor:
         if "need_new_action" in obs and not obs["need_new_action"] and self.last_action is not None:

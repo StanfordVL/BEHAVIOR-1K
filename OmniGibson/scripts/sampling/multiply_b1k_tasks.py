@@ -150,7 +150,8 @@ def main():
             for _ in range(10):
                 og.sim.step()
 
-            for obj in env.task.object_scope.values():
+            # object_scopes is indexed per env; this sampling script always runs a single env
+            for obj in env.task.object_scopes[0].values():
                 if isinstance(obj, DatasetObject):
                     obj.keep_still()
 

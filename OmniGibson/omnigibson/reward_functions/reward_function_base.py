@@ -1,6 +1,8 @@
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
+import torch as th
+
 from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_REWARD_FUNCTIONS = dict()
@@ -14,6 +16,7 @@ class BaseRewardFunction(Registerable, metaclass=ABCMeta):
 
     def __init__(self):
         # Store internal vars that will be filled in at runtime
+        self._num_envs = None
         self._reward = None
         self._info = None
 
@@ -29,8 +32,8 @@ class BaseRewardFunction(Registerable, metaclass=ABCMeta):
 
         Returns:
             2-tuple:
-                - bool: computed reward
-                - dict: any reward-related information for this specific reward
+                - th.Tensor: (num_envs,) computed reward per env
+                - list[dict]: reward-related information per env
         """
         raise NotImplementedError()
 
@@ -45,8 +48,8 @@ class BaseRewardFunction(Registerable, metaclass=ABCMeta):
 
         Returns:
             2-tuple:
-                - bool: computed reward
-                - dict: any reward-related information for this specific reward
+                - th.Tensor: (num_envs,) computed reward per env
+                - list[dict]: any reward-related information for this specific reward per env
         """
         # Step internally and store output
         self._reward, self._info = self._step(task=task, env=env, action=action)
@@ -54,23 +57,28 @@ class BaseRewardFunction(Registerable, metaclass=ABCMeta):
         # Return reward and a copy of the info
         return self._reward, deepcopy(self._info)
 
-    def reset(self, task, env):
+    def reset(self, task, env, env_indices):
         """
         Reward function-specific reset
 
         Args:
             task (BaseTask): Task instance
             env (Environment): Environment instance
+            env_indices (th.Tensor): Indices of environments to reset
         """
-        # Reset internal vars
-        self._reward = None
-        self._info = None
+        if self._num_envs is None:
+            self._num_envs = env.num_envs
+            self._reward = th.zeros(self._num_envs, dtype=th.float32)
+            self._info = [dict() for _ in range(self._num_envs)]
+        self._reward[env_indices] = 0.0
+        for idx in env_indices:
+            self._info[idx] = dict()
 
     @property
     def reward(self):
         """
         Returns:
-            float: Current reward for this reward function
+            th.Tensor: (num_envs,) current reward for this reward function
         """
         assert self._reward is not None, "At least one step() must occur before reward can be calculated!"
         return self._reward
@@ -79,7 +87,7 @@ class BaseRewardFunction(Registerable, metaclass=ABCMeta):
     def info(self):
         """
         Returns:
-            dict: Current info for this reward function
+            list[dict]: Current info for this reward function per env
         """
         assert self._info is not None, "At least one step() must occur before info can be calculated!"
         return self._info

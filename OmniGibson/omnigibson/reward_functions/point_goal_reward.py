@@ -1,3 +1,5 @@
+import torch as th
+
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
 
@@ -20,7 +22,8 @@ class PointGoalReward(BaseRewardFunction):
         super().__init__()
 
     def _step(self, task, env, action):
-        # Reward received the pointgoal success condition is met
-        reward = self._r_pointgoal if self._pointgoal.success else 0.0
-
-        return reward, {}
+        # Reward received when the pointgoal success condition is met
+        # self._pointgoal.success is (num_envs,) bool tensor
+        rewards = th.where(self._pointgoal.success, self._r_pointgoal, 0.0)
+        infos = [dict() for _ in range(env.num_envs)]
+        return rewards, infos

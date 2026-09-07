@@ -4,8 +4,24 @@ class MetricBase:
     each environment episode
     """
 
-    def __init__(self):
+    def __init__(self, env_idx=0, env_accessor=None):
+        # Batched evaluation binds a metric to an accessor, which owns the mapping into the shared
+        # environment. env_idx remains as a compatibility path for MetricsWrapper and external users.
+        self.env_idx = env_idx
+        self.env_accessor = env_accessor
         self.state = dict()
+
+    def _resolve_env(self, env):
+        if env is not None:
+            return env
+        if self.env_accessor is None:
+            raise ValueError("Metric is not bound to an environment accessor; pass env explicitly.")
+        return self.env_accessor
+
+    def _scene(self, env=None):
+        """Return the scene tracked by this metric for bound and legacy callers."""
+        env = self._resolve_env(env)
+        return env.scene if env is self.env_accessor else env.scenes[self.env_idx]
 
     @classmethod
     def is_compatible(cls, env):
@@ -36,12 +52,11 @@ class MetricBase:
         """
         raise NotImplementedError
 
-    def step(self, env, action, obs, reward, terminated, truncated, info):
+    def step(self, env=None, action=None, obs=None, reward=None, terminated=None, truncated=None, info=None):
         """
         Steps this metric, updating any internal values being tracked.
 
         Args:
-            env (EnvironmentWrapper): Environment being tracked
             action (th.Tensor): action deployed resulting in @obs
             obs (dict): state, i.e. observation
             reward (float): reward, i.e. reward at this current timestep
@@ -49,11 +64,11 @@ class MetricBase:
             truncated (bool): truncated, i.e. whether this episode ended due to a time limit etc.
             info (dict): info, i.e. dictionary with any useful information
         """
+        env = self._resolve_env(env)
         step_metrics = self._compute_step_metrics(env, action, obs, reward, terminated, truncated, info)
-        assert (
-            env.scene in self.state
-        ), f"Environment {env} is not being tracked, please call 'self.reset(env)' to track!"
-        state = self.state[env.scene]
+        scene = self._scene(env)
+        assert scene in self.state, f"Environment {scene} is not being tracked, please call 'self.reset()' to track!"
+        state = self.state[scene]
         for k, v in step_metrics.items():
             if k not in state:
                 state[k] = []
@@ -64,7 +79,6 @@ class MetricBase:
         Compute any step-wise metrics at the current environment step that just occurred
 
         Args:
-            env (EnvironmentWrapper): Environment being tracked
             action (th.Tensor): action deployed resulting in @obs
             obs (dict): state, i.e. observation
             reward (float): reward, i.e. reward at this current timestep
@@ -82,7 +96,6 @@ class MetricBase:
         Computes the aggregated metrics over the current trajectory episode in @env
 
         Args:
-            env (EnvironmentWrapper): Environment being tracked
             episode_info (dict): Internal information that was tracked using @_compute_episode metrics. This
                 information is is the same key-mapped dict as @_compute_step_metrics mapped to the
                 list of values aggregated over the current trajectory episode
@@ -92,30 +105,26 @@ class MetricBase:
         """
         raise NotImplementedError
 
-    def aggregate(self, env):
+    def aggregate(self, env=None):
         """
-        Aggregates information over the current trajectory being tracked in @env
-
-        Args:
-            env (EnvironmentWrapper): Environment being tracked
+        Aggregates information over the current trajectory tracked by this metric.
 
         Returns:
             dict: Any relevant aggregated metric information
         """
-        if env.scene in self.state:
-            if self.state[env.scene] == dict():
+        env = self._resolve_env(env)
+        scene = self._scene(env)
+        if scene in self.state:
+            if self.state[scene] == dict():
                 return dict()
             else:
-                return self._compute_episode_metrics(env=env, episode_info=self.state[env.scene])
+                return self._compute_episode_metrics(env=env, episode_info=self.state[scene])
         else:
             print("Environment not yet tracked, skipping metric aggregation!")
             return dict()
 
-    def reset(self, env):
+    def reset(self, env=None):
         """
-        Resets this metric with respect to @env
-
-        Args:
-            env (EnvironmentWrapper): Environment being tracked
+        Resets this metric for its bound logical environment.
         """
-        self.state[env.scene] = dict()
+        self.state[self._scene(env)] = dict()

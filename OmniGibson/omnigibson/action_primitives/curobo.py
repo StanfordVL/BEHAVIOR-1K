@@ -97,9 +97,6 @@ class CuRoboMotionGenerator:
                 Increasing this value will make the motion planner more conservative in its planning with respect
                 to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
-        # Only support one scene for now -- verify that this is the case
-        assert len(og.sim.scenes) == 1
-
         # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
         self.debug = debug

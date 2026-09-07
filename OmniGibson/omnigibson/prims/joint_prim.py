@@ -794,6 +794,13 @@ class JointPrim(BasePrim):
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
             og.sim.sync_physx_to_fabric()
 
+        # OpenState (and any future joint-derived state) reads from a cached
+        # ArticulatedObjectViewAPI._JOINT_POSITIONS that we've just bypassed; mark all
+        # tensorized caches dirty so the next read forces a refresh.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.caches_dirty = True
+
     def set_vel(self, vel, normalized=False, drive=False):
         """
         Set the velocity of this joint in metric space

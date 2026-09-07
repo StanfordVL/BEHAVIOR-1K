@@ -27,30 +27,3 @@ class UpdateStateMixin(BaseObjectState):
         classes = super()._do_not_register_classes
         classes.add("UpdateStateMixin")
         return classes
-
-
-class GlobalUpdateStateMixin(BaseObjectState):
-    """
-    A state-mixin that allows for per-sim-step global updates via the global_update() call
-    """
-
-    @classmethod
-    def global_initialize(cls):
-        """
-        Executes a global initialization sequence for this state. Default is no-op
-        """
-        pass
-
-    @classmethod
-    def global_update(cls):
-        """
-        Executes a global update for this object state. Default is no-op
-        """
-        pass
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("GlobalUpdateStateMixin")
-        return classes

@@ -158,6 +158,13 @@ gm.GUI_VIEWPORT_ONLY = False
 # Whether to use the viewer camera or not
 gm.RENDER_VIEWER_CAMERA = True
 
+# Whether to batch all per-env robot cameras into a single tiled render product when num_envs > 1.
+# Tiled rendering issues one render pass for every env instead of one per camera, which is much faster
+# at high env counts, but it fixes camera resolution at creation time and returns raw (unremapped)
+# segmentation IDs without the per-modality info dicts. When False, every env renders through its own
+# per-camera render product, regardless of num_envs.
+gm.ENABLE_TILED_RENDERING = os.getenv("OMNIGIBSON_ENABLE_TILED_RENDERING", "False").lower() in ("true", "1", "t")
+
 # Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
 # This includes extra information for things such as object sampling, and also any debug
 # logging messages

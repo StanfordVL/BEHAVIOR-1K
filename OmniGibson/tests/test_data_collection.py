@@ -297,7 +297,8 @@ def test_lerobot_obs_mapping_depth():
 
 def test_should_save_current_episode():
     mock_env = MagicMock()
-    mock_env.task.success = False
+    # task.success is a (num_envs,) bool tensor post-#2001 vector-env refactor.
+    mock_env.task.success = th.tensor([False])
 
     wrapper = _MinimalHDF5Wrapper(hdf5_file=MagicMock())
     wrapper.env = mock_env
@@ -324,7 +325,7 @@ def test_should_save_current_episode():
         {"obs": {"proprio": th.zeros(2)}},
         {"action": th.zeros(2), "reward": 0.0, "terminated": True, "truncated": False},
     ]
-    mock_env.task.success = True
+    mock_env.task.success = th.tensor([True])
     assert wrapper.should_save_current_episode
 
 
@@ -335,7 +336,7 @@ def test_flush_current_traj_counter():
     with h5py.File(path, "w") as f:
         wrapper = _MinimalHDF5Wrapper(hdf5_file=f)
         mock_env = MagicMock()
-        mock_env.task.success = False
+        mock_env.task.success = th.tensor([False])
         wrapper.env = mock_env
         wrapper.only_successes = False
         f.create_group("data")
@@ -441,7 +442,7 @@ def test_collection_basic():
     for _ in range(2):
         env.reset()
         for _ in range(3):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
     env.save_data()
 
@@ -469,30 +470,30 @@ def test_collection_with_transitions():
 
     env.reset()
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
 
     obj = DatasetObject(name="banana", category="banana")
     env.scene.add_object(obj)
     obj.set_position(th.ones(3, dtype=th.float32) * 10.0)
 
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
 
     env.scene.remove_object(obj)
 
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
 
     water = env.scene.get_system("water")
     water.generate_particles(positions=th.rand(5, 3, dtype=th.float32) * 10.0)
 
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
 
     env.scene.clear_system("water")
 
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
 
     env.save_data()
 
@@ -519,27 +520,27 @@ def test_collection_checkpoint_rollback():
 
     env.reset()
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
 
     env.update_checkpoint()
-    robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
+    robot_eef_state = {arm: env.scene.robots[0].get_eef_position(arm=arm) for arm in env.scene.robots[0].arm_names}
 
-    env.step(env.robots[0].action_space.sample())
+    env.step(env.scene.robots[0].action_space.sample())
 
     water = env.scene.get_system("water")
     water.generate_particles(positions=th.rand(10, 3, dtype=th.float32) * 10.0)
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
 
     env.rollback_to_checkpoint()
 
     assert "water" not in env.scene.active_systems
 
     for arm, pos in robot_eef_state.items():
-        assert th.all(th.isclose(pos, env.robots[0].get_eef_position(arm=arm))).item()
+        assert th.all(th.isclose(pos, env.scene.robots[0].get_eef_position(arm=arm))).item()
 
     for _ in range(2):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scene.robots[0].action_space.sample())
     env.save_data()
 
     with h5py.File(collect_hdf5_path, "r") as f:
@@ -573,7 +574,7 @@ def test_hdf5_playback_and_dataset():
     for _ in range(2):
         env.reset()
         for _ in range(3):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
     env.save_data()
 
@@ -692,7 +693,7 @@ def test_lerobot_playback_and_dataset():
     for _ in range(2):
         env.reset()
         for _ in range(3):
-            env.step(env.robots[0].action_space.sample())
+            env.step(env.scene.robots[0].action_space.sample())
 
     env.save_data()
 
