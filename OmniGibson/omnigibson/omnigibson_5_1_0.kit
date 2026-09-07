@@ -22,6 +22,15 @@ vulkan = true # Explicitly enable Vulkan (on by default on Linux, off by default
 window.iconPath = "${app}/OmniGibson_logo.png"
 enableDeveloperWarnings = false    # disable developer warnings to reduce log noise
 
+[settings.rtx]
+# Isaac Sim's own extensions all launch with --/rtx/descriptorSets=360000 (71 occurrences across
+# 66 extensions); OmniGibson runs a trimmed custom .kit experience and so inherits Kit's much
+# smaller built-in default of 10000. That budget runs out once enough render products exist --
+# e.g. 8 envs x r1pro's 3 cameras -- surfacing as "Unable to allocate descriptor sets" /
+# "Failed to allocate ParameterBlock resources" during scene setup. Measured cost of raising it
+# on an RTX 5090: 0.06-0.16 GB of VRAM.
+descriptorSets = 360000
+
 [settings.crashreporter]
 enabled = false           # disable Kit crash reporter
 gatherUserStory = false
