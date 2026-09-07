@@ -67,6 +67,7 @@ class CooperativeBehaviorEnv:
         observation_every: int = 0,
         use_scene_graph: bool = True,
         coop_config_path: Optional[str] = None,
+        task_specs=None,
         **kwargs: Any,
     ):
         # crafter kwargs (area/view/size/n_players/reward) arrive from the
@@ -88,6 +89,12 @@ class CooperativeBehaviorEnv:
         self.observation_every = int(observation_every)
         self.use_scene_graph = use_scene_graph
         self.coop_config_path = coop_config_path
+        self.task_specs = task_specs
+        self.task_tracker = None
+        self._closed = False
+        import os as _os
+        self.engine_verbose = bool(kwargs.get('engine_verbose') or _os.environ.get('COOP2_ENGINE_VERBOSE'))
+        self.outcomes_seen = 0
 
         self.agent_names: List[str] = [f"agent_{i}" for i in range(self.n_agents)]
         self.possible_agents: List[str] = list(self.agent_names)
@@ -136,6 +143,10 @@ class CooperativeBehaviorEnv:
             ContentiousSymbolicActionPrimitives,
         )
         from coop2.behavior_env.symbolic_navigation import DestinationRegistry  # noqa: PLC0415
+        from coop2.behavior_env.cooperative_tasks import (  # noqa: PLC0415
+            BehaviorTaskState,
+            CoopTaskTracker,
+        )
         from coop2.behavior_env.world_state import BehaviorWorldState  # noqa: PLC0415
         from coop2.cognitive.action.behavior_action import BehaviorActionExecutor  # noqa: PLC0415
 
@@ -177,7 +188,7 @@ class CooperativeBehaviorEnv:
             attempts=1,
             enable_head_tracking=False,
             controllers=self.controllers,
-            verbose=False,
+            verbose=self.engine_verbose,
         )
 
         if self.extra_objects:
@@ -194,7 +205,41 @@ class CooperativeBehaviorEnv:
             agent_id: BehaviorActionExecutor(agent_id, engine=self.engine, world_state=self.world)
             for agent_id in self.agent_names
         }
+
+        # L1d. Exposed as `task_tracker` because plan_log_saver.save_task_log
+        # and run_individual reach it by that name on the base env; without it
+        # the episode runs to completion and then dies writing its logs.
+        self.world.step()
+        tasks = self.task_specs if self.task_specs is not None else self._default_tasks()
+        self.task_tracker = CoopTaskTracker(self.world, tasks)
+        self.capability_history = self.task_tracker.capability_history
         self._loaded = True
+
+    def _default_tasks(self):
+        """One "hold this" task per added object.
+
+        A deliberately trivial default so a runner started without a task set
+        still produces populated constraint metrics rather than empty ones --
+        an empty task list makes every COOP2 constraint read zero, which is
+        indistinguishable from a cooperation failure.
+        """
+        from coop2.behavior_env.cooperative_tasks import BehaviorTaskState  # noqa: PLC0415
+
+        tasks = []
+        for spec in self.extra_objects:
+            obj = self.env.scene.object_registry("name", spec["name"])
+            if obj is None:
+                continue
+            entity_id = self.world.entity_id_for(obj)
+            tasks.append(
+                BehaviorTaskState(
+                    task_id=f"hold_{entity_id}",
+                    target_id=entity_id,
+                    goal=("holding", entity_id),
+                    required_agents=1,
+                )
+            )
+        return tasks
 
     def reset(self, seed: Optional[int] = None, get_obs: bool = True) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if seed is not None:
@@ -207,10 +252,37 @@ class CooperativeBehaviorEnv:
         return self._empty_obs(), info
 
     def close(self) -> None:
-        import omnigibson as og  # noqa: PLC0415
+        """Release the env -- but do **not** shut Isaac down here.
 
-        if og.sim is not None:
-            og.shutdown()
+        ``og.shutdown()`` ends in ``app.close()``, which terminates the process
+        without unwinding Python. crafter's ``close()`` merely tore down an
+        object, so the copied runners call it in the middle of their teardown
+        and then keep going: ``run_individual`` closes at line 252 and computes
+        and writes ``coop2_metrics.json`` at 270-272. Shutting down inside
+        ``close()`` meant those twenty lines never ran and the episode produced
+        no metrics -- silently, since nothing unwinds far enough to raise.
+
+        So the real shutdown is deferred to interpreter exit. og.sim is a
+        process singleton and there is one env per process, so nothing is
+        waiting to reuse the GPU in the meantime.
+        """
+        self._closed = True
+        self._register_shutdown()
+
+    @staticmethod
+    def _register_shutdown() -> None:
+        if getattr(CooperativeBehaviorEnv, "_shutdown_registered", False):
+            return
+        import atexit  # noqa: PLC0415
+
+        def _shutdown() -> None:
+            import omnigibson as og  # noqa: PLC0415
+
+            if og.sim is not None:
+                og.shutdown()
+
+        atexit.register(_shutdown)
+        CooperativeBehaviorEnv._shutdown_registered = True
 
     def render(self) -> None:
         return None
@@ -291,6 +363,13 @@ class CooperativeBehaviorEnv:
 
         # An outcome is exactly the moment an agent goes back to reasoning, so
         # that is the only moment the world model has a reader.
+        self.outcomes_seen += len(outcomes)
+        if outcomes and self.task_tracker is not None:
+            # A terminated primitive is the macro-step boundary: the constraints
+            # are defined over decisions, not ticks.
+            acting = {agent_id: None for agent_id in outcomes}
+            self.task_tracker.step(self.engine.env_step, acting=acting)
+
         refresh = bool(outcomes) or (
             self.observation_every > 0 and self.engine.env_step % self.observation_every == 0
         )

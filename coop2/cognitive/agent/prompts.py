@@ -21,11 +21,26 @@ from ..coop2_messages import (
 # Environment Description
 # ============================================================================
 
-ENV_DESCRIPTION = """You are playing a cooperative 2D crafting game.
+ENV_DESCRIPTION = """You are one of several robots working together in a house.
 
-Maximize team score from wood, stone, coal, iron, and diamond before the step/time budget ends. Food and drink do not score; collect cow/food only for survival.
+You act through high-level primitives, not joint commands. Each one takes many
+simulation steps: driving across a room costs roughly 60 ticks per metre, so
+distance is the main cost you control. You cannot see -- you are given a
+symbolic description of the room you are standing in, and only that room.
 
-Crafting dependencies: table uses wood; wood_pickaxe unlocks stone/coal; stone_pickaxe unlocks iron; furnace plus coal supports later tool crafting; iron_pickaxe unlocks diamond. Placed tables/furnaces appear as local IDs such as table 1 or furnace 1 for navigation."""
+Rules that decide whether an action succeeds:
+- You must be within reach of an object to grasp, place, open or toggle it.
+  If you are not, navigate_to it first. Acting from across the room fails.
+- One object at a time: grasp needs an empty gripper, place needs a full one.
+- Objects are exclusive. If a teammate is holding something, your grasp fails
+  with "held by <agent>". Going after a target a teammate already has costs you
+  the whole trip for nothing.
+- Refer to objects only by the ids listed under Current Reachable Targets.
+  They look like apple.n.01_1. Never invent or guess one.
+
+When an action fails, your plan is abandoned and you are asked to think again.
+Read the failure reason before replanning -- it tells you whether to wait,
+approach, or pick a different target."""
 
 
 def get_env_description() -> str:
@@ -140,51 +155,39 @@ def format_agent_states_simple(
 # ============================================================================
 
 def format_agent_status(
-    health: Optional[int] = None,
-    food: Optional[int] = None,
-    drink: Optional[int] = None,
-    energy: Optional[int] = None,
-    tools: Optional[Dict[str, Any]] = None,
-    inventory: Optional[Dict[str, int]] = None,
+    holding: Optional[str] = None,
+    room: Optional[str] = None,
+    last_error: Optional[str] = None,
+    teammates: Optional[Dict[str, Any]] = None,
+    **legacy: Any,
 ) -> str:
-    """
-    Format the agent's current status.
-    
+    """Format the agent's current status.
+
+    crafter reported health/food/drink/energy and an inventory. None of that
+    exists here: a robot has no vitals, and it carries at most one object. What
+    replaces it is what actually gates the next action -- what is in the
+    gripper, which room the agent is in, and why the last action failed.
+
+    ``**legacy`` swallows the old keyword names so a caller that still passes
+    ``health=`` gets a status block rather than a TypeError.
+
     Args:
-        health: Current health (0-9)
-        food: Current food level (0-9)
-        drink: Current drink level (0-9)
-        energy: Current energy level (0-9)
-        tools: Dict of equipped tools
-        inventory: Dict of resource counts
-    
-    Returns:
-        Formatted string describing agent status
+        holding: entity id in the gripper, or None.
+        room: room instance the agent is standing in.
+        last_error: failure reason from the previous action.
+        teammates: ``{agent_id: what they hold}`` -- the cross-agent view that
+            makes contention visible before it costs a trip.
     """
     lines = []
     lines.append("YOUR STATUS:")
-    
-    # Health/vitals
-    vitals = []
-    if health is not None:
-        vitals.append(f"health={health}/9")
-    if food is not None:
-        vitals.append(f"food={food}/9")
-    if drink is not None:
-        vitals.append(f"drink={drink}/9")
-    if energy is not None:
-        vitals.append(f"energy={energy}/9")
-    
-    if vitals:
-        lines.append(f"  Vitals: {', '.join(vitals)}")
-    
-    # Tools
-    if tools:
-        tool_list = [f"{k}={v}" for k, v in tools.items() if v]
-        if tool_list:
-            lines.append(f"  Tools: {', '.join(tool_list)}")
-        else:
-            lines.append("  Tools: none")
+    lines.append(f"  Holding: {holding}" if holding else "  Holding: nothing")
+    lines.append(f"  Room: {room}" if room else "  Room: unknown")
+    if teammates:
+        for agent_id, held in sorted(teammates.items()):
+            lines.append(f"  {agent_id} is holding: {held or 'nothing'}")
+    if last_error:
+        lines.append(f"  Last action failed: {last_error}")
+    inventory = legacy.get("inventory")
     
     # Inventory/Resources
     if inventory:

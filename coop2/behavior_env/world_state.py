@@ -264,21 +264,32 @@ class BehaviorWorldState:
     def held_objects(self) -> Dict[str, str]:
         """``{object name: robot name}`` across every robot and arm.
 
-        Uses the public ``robot.is_grasping(arm, candidate_obj)`` rather than
-        reading ``_ag_obj_in_hand`` directly: that private dict skips the
-        ``grasping_mode == "physical"`` branch the public method handles, and is
-        not part of the robot's contract.
+        The private ``_ag_obj_in_hand`` is read for the *identity* of what is
+        held -- it is the only place that information exists, since
+        ``is_grasping`` answers yes/no about a candidate you must already name.
+        The answer is then confirmed through the public
+        ``is_grasping(arm, candidate_obj)``, which is what applies the
+        ``grasping_mode == "physical"`` rules.
+
+        Written this way for cost, not taste. Asking ``is_grasping`` about every
+        object in the scene is O(robots x arms x objects); house_single_floor has
+        654 of them, and this runs inside ``entities()``, which runs per agent on
+        every observation refresh. That version made a 4000-tick episode fail to
+        finish a single 500-tick NAVIGATE_TO inside its wall-clock budget, and
+        the only visible symptom was empty constraint metrics.
         """
         held: Dict[str, str] = {}
-        candidates = [obj for obj in self.scene.objects if obj not in self.robots]
         for robot in self.robots:
-            for arm in getattr(robot, "arm_names", []):
-                for obj in candidates:
-                    try:
-                        if robot.is_grasping(arm=arm, candidate_obj=obj):
-                            held[obj.name] = robot.name
-                    except Exception:  # noqa: BLE001 - non-manipulation robots
-                        break
+            in_hand = getattr(robot, "_ag_obj_in_hand", None) or {}
+            for arm, candidate in in_hand.items():
+                if candidate is None:
+                    continue
+                try:
+                    confirmed = robot.is_grasping(arm=arm, candidate_obj=candidate)
+                except Exception:  # noqa: BLE001 - non-manipulation robots
+                    confirmed = True
+                if confirmed:
+                    held[candidate.name] = robot.name
         return held
 
     # -- stepping ----------------------------------------------------------

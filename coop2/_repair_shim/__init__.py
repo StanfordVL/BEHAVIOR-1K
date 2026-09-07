@@ -109,6 +109,29 @@ class Coop2TraceLogger:
     def to_list(self) -> List[Any]:
         return list(self.events)
 
+    @property
+    def records(self) -> List[Any]:
+        return list(self.events)
+
+    def save(self, output_path: str) -> None:
+        """Write the (always empty) trace.
+
+        ``plan_log_saver.save_all`` calls this at the end of every episode, so
+        a missing method aborts log saving *after* the episode has already run
+        -- which is how it was found. Writing an empty list rather than
+        skipping keeps ``compute_metrics`` reading a valid file, and makes
+        "repair produced no events" explicit instead of indistinguishable from
+        "the file was never written".
+        """
+        import json  # noqa: PLC0415
+        import os  # noqa: PLC0415
+
+        directory = os.path.dirname(os.path.abspath(output_path))
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(output_path, "w") as handle:
+            json.dump({"events": [], "shim": True}, handle, indent=2)
+
 
 class Coop2RepairController:
     """A repair gate that is permanently off.

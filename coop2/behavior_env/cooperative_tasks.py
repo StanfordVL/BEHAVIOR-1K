@@ -158,7 +158,10 @@ class StepMetrics:
 class StepTaskSummary:
     """Summary of all task states for a single env step."""
     env_step: int
-    tasks: Dict[int, TaskState] = field(default_factory=dict)  # resource_id -> TaskState
+    # Copied verbatim; the annotation named crafter's TaskState, which this
+    # module does not define. Widened rather than renamed: to_dict() and the
+    # runner read the field by name.
+    tasks: Dict[Any, Any] = field(default_factory=dict)
     successful_collections: List[int] = field(default_factory=list)  # resource_ids collected
     failed_attempts: List[int] = field(default_factory=list)  # resource_ids with failed attempts
     metrics: Optional[StepMetrics] = None  # Aggregated metrics for this step
@@ -192,18 +195,27 @@ def save_task_states_log(task_states_history: List[Dict[str, Any]], output_path:
     """
     Save task states history to JSON file.
     
+    Snapshots come from ``CoopTaskTracker.get_task_states_history()``, whose
+    keys are 'env_step', 'tasks' (already-serialised task dicts) and 'metrics'.
+    The crafter original read 'step'/'task_states' and dropped 'metrics'
+    altogether -- compute_metrics reads constraint changes out of 'metrics', so
+    that version wrote a file scoring zero constraints for every run.
+
     Args:
-        task_states_history: List of dicts with 'step' and 'task_states' (Dict[int, TaskState])
+        task_states_history: List of dicts with 'env_step', 'tasks', 'metrics'
         output_path: Path to save JSON file
     """
     task_states_serializable = []
     for snapshot in task_states_history:
+        tasks = snapshot.get('tasks', [])
+        if isinstance(tasks, dict):
+            tasks = list(tasks.values())
         task_states_serializable.append({
-            'step': int(snapshot['step']),
+            'step': int(snapshot.get('env_step', snapshot.get('step', 0))),
             'task_states': {
-                str(resource_id): convert_to_serializable(task.to_dict()) 
-                for resource_id, task in snapshot['task_states'].items()
-            }
+                str(task['task_id']): convert_to_serializable(task) for task in tasks
+            },
+            'metrics': convert_to_serializable(snapshot.get('metrics')),
         })
     
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -236,6 +248,7 @@ def plot_metrics_timeline(metrics_list: List['StepMetrics'], output_path: Option
         show: Whether to display the plot
     """
     import matplotlib.pyplot as plt  # noqa: PLC0415 - only this function plots
+    import matplotlib.patches as mpatches  # noqa: PLC0415 - legend handles below
     if not metrics_list:
         print("No metrics to plot")
         return
@@ -461,6 +474,7 @@ class CoopTaskTracker:
         self.world = world
         self.tasks: Dict[str, BehaviorTaskState] = {task.task_id: task for task in tasks}
         self.metrics_history: List[StepMetrics] = []
+        self.task_history: List[StepTaskSummary] = []
         self.task_states_history: List[Dict[str, Any]] = []
         self.capability_history: List[CapabilityChange] = []
         self._previous: Dict[str, BehaviorTaskState] = {}
@@ -539,6 +553,23 @@ class CoopTaskTracker:
 
         metrics = self._diff(env_step)
         self.metrics_history.append(metrics)
+        self.task_history.append(
+            StepTaskSummary(
+                env_step=env_step,
+                # Snapshot as *copies*, not dicts and not references. The
+                # saver both diffs these by attribute (curr.spatial_count) and
+                # calls .to_dict() on them, so dicts break it; and the live
+                # task objects are rewritten every step, so references would
+                # make every historical snapshot show the latest values.
+                tasks={
+                    task_id: BehaviorTaskState(**{**task.__dict__})
+                    for task_id, task in self.tasks.items()
+                },
+                successful_collections=[t.task_id for t in self.tasks.values() if t.satisfied],
+                failed_attempts=[],
+                metrics=metrics,
+            )
+        )
         self.task_states_history.append(
             {
                 "env_step": env_step,
@@ -617,6 +648,15 @@ class CoopTaskTracker:
         return metrics
 
     # -- what plan_log_saver reads ----------------------------------------
+
+    def get_history(self) -> List[StepTaskSummary]:
+        """Per-step summaries, as L6's runner expects.
+
+        ``run_individual`` does
+        ``[s.metrics for s in task_tracker.get_history() if s.metrics]``, so the
+        summaries must carry a populated ``metrics`` -- the name is the contract.
+        """
+        return list(self.task_history)
 
     def get_task_states_history(self) -> List[Dict[str, Any]]:
         return list(self.task_states_history)

@@ -92,6 +92,9 @@ def run_centralized_experiment(
     seed=42,
     record_video=True,
     output_root=None,
+    scene_model=None,
+    room=None,
+    objects=None,
 ):
     """
     Run experiment with centralized LLM agents.
@@ -133,7 +136,7 @@ def run_centralized_experiment(
     
     # Create environment
     agent_names = [f"agent_{i}" for i in range(n_agents)]
-    base_env = CooperativeEnv(
+    env_kwargs = dict(
         area=(64, 64),
         view=(9, 9),
         size=(84, 84),
@@ -143,6 +146,15 @@ def run_centralized_experiment(
         seed=seed,
         coop_config_path="paper",
     )
+    # BEHAVIOR-only knobs; see run_individual for why omitting `objects`
+    # silently produces a scene without the goal's objects in it.
+    if scene_model is not None:
+        env_kwargs["scene_model"] = scene_model
+    if room is not None:
+        env_kwargs["room"] = room
+    if objects is not None:
+        env_kwargs["objects"] = objects
+    base_env = CooperativeEnv(**env_kwargs)
     if hasattr(base_env, "set_team_score_time_limit"):
         base_env.set_team_score_time_limit(time_limit_seconds)
     

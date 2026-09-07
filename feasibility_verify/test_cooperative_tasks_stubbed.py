@@ -157,6 +157,50 @@ def main() -> int:
     assert m.convert_to_serializable(record) is not None
     ok("task_states records carry env_step/tasks/metrics and survive serialisation")
 
+    print("test 9: get_history() snapshots satisfy plan_log_saver's contract")
+    # plan_log_saver diffs these by attribute AND calls .to_dict() on them,
+    # so dict-shaped values crash it at save time -- after the episode has
+    # already run. It also snapshots per step, so the values must be copies:
+    # storing the live task objects makes every step show the final state.
+    summaries = tracker2.get_history()
+    assert len(summaries) == 2
+    for summary in summaries:
+        for task in summary.tasks.values():
+            for attr in ("spatial_count", "temporal_count", "dependency_met", "status"):
+                assert hasattr(task, attr), f"saver reads .{attr} by attribute"
+            assert isinstance(task.to_dict(), dict)
+        assert isinstance(summary.to_dict(), dict)
+    assert summaries[0].tasks["t2"].dependency_met is False, "step 1 snapshot must not show step 2's value"
+    assert summaries[1].tasks["t2"].dependency_met is True
+    ok("per-step snapshots are attribute-readable copies, not dicts or live references")
+
+    print("test 10: the post-episode output functions actually execute")
+    # These three are carried over verbatim and only ever ran at the very end
+    # of a GPU episode, so a missing lazy import in one of them (mpatches) cost
+    # a full 10-minute run to surface. Execute them here instead.
+    import json
+    import tempfile
+
+    import matplotlib
+    matplotlib.use("Agg")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        plot_path = os.path.join(tmp, "metrics_timeline.png")
+        m.plot_metrics_timeline(tracker2.metrics_history, output_path=plot_path, show=False)
+        assert os.path.getsize(plot_path) > 0, "plot_metrics_timeline wrote nothing"
+
+        states_path = os.path.join(tmp, "task_states.json")
+        m.save_task_states_log(tracker2.get_task_states_history(), states_path)
+        written = json.load(open(states_path))
+        # compute_metrics.compute_constraint_metrics reads exactly these keys.
+        assert written and set(written[0]) >= {"step", "task_states", "metrics"}
+        assert written[-1]["metrics"]["constraint_changes"]["dependency"]["improved_tasks"] == ["t2"]
+
+        cap_path = os.path.join(tmp, "capability_log.json")
+        m.save_capability_log(tracker2.capability_history, cap_path)
+        assert os.path.getsize(cap_path) > 0
+    ok("plot_metrics_timeline / save_task_states_log / save_capability_log all run")
+
     print("\nALL TESTS PASSED")
     return 0
 

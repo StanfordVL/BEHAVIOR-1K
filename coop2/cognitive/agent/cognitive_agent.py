@@ -20,14 +20,6 @@ from .llm_client import (
     InterruptDecision,
     LLMAction,
     TaskSpecification,
-    MoveAction,
-    CollectAction,
-    PlaceAction,
-    CraftAction,
-    SleepAction,
-    NoopAction,
-    NavigateAction,
-    ShareAction,
 )
 
 
@@ -283,25 +275,17 @@ def build_interrupt_prompt(
 # ============================================================================
 
 def extract_action_parameters(llm_action: LLMAction) -> Dict[str, Any]:
-    """Extract parameters from typed action class to dict for SymbolicAction."""
-    if isinstance(llm_action, MoveAction):
-        return {"direction": llm_action.direction.value, "num_steps": llm_action.num_steps}
-    elif isinstance(llm_action, CollectAction):
-        return {"target": llm_action.target.value, "steps": llm_action.steps}
-    elif isinstance(llm_action, PlaceAction):
-        return {"object_type": llm_action.item.value}
-    elif isinstance(llm_action, CraftAction):
-        return {"object_type": llm_action.item.value}
-    elif isinstance(llm_action, SleepAction):
-        return {}
-    elif isinstance(llm_action, NoopAction):
-        return {}
-    elif isinstance(llm_action, NavigateAction):
-        return {"object_type": llm_action.object_type, "item_id": llm_action.item_id, "timeout": llm_action.timeout}
-    elif isinstance(llm_action, ShareAction):
-        return {"recipient_agent_id": llm_action.recipient_agent_id, "resource_type": llm_action.resource_type, "quantity": llm_action.quantity}
-    else:
-        return {}
+    """Typed action model -> SymbolicAction args.
+
+    Every BEHAVIOR action is either ``{target}`` or ``{}``, so this is a dump of
+    the model minus its discriminator rather than a per-class branch. The
+    crafter version had eight isinstance arms because its actions had eight
+    different shapes (direction+steps, item, resource+quantity...); an
+    isinstance ladder here would need editing every time a verb is added, and
+    would silently return ``{}`` for one that was forgotten.
+    """
+    args = llm_action.model_dump(exclude={"action_type"}, exclude_none=True)
+    return {key: value for key, value in args.items() if value != ""}
 
 
 def parse_plan_response(
@@ -393,74 +377,67 @@ def apply_repair_plan_recommendation(
 
 
 def _collect_task_args(task_spec: TaskSpecification) -> Dict[str, Any]:
-    task_name = str(task_spec.task.value or "").lower()
-    if not task_name.startswith("collect_"):
-        return {}
-    target = task_name.removeprefix("collect_")
-    return {
-        "target": target,
-        "resource_type": task_spec.object_type,
-        "task_id": task_spec.object_id,
-        "target_id": task_spec.object_id,
-        "item_id": task_spec.object_id,
-    }
+    """Ids to stamp onto the actions that serve @task_spec.
+
+    crafter parsed these out of the task *name* (``collect_wood`` ->
+    ``target="wood"``). A task specification here already names its entity
+    directly, so there is nothing to parse: the target is the id, and the
+    reference is the second predicate argument when there is one.
+    """
+    args: Dict[str, Any] = {"target": task_spec.object_type}
+    if getattr(task_spec, "reference", None):
+        args["reference"] = task_spec.reference
+    return args
 
 
 def _attach_task_target_to_collect_actions(
     task_spec: TaskSpecification,
     actions: List[SymbolicAction],
 ) -> None:
-    """Carry task ids from collect task specifications into collect actions."""
+    """Fill in a target on any action that omitted one.
+
+    Kept under its original name because the process logger and the plan
+    wrapper call it; "collect" no longer exists as a verb, so it now fills the
+    gap for whichever action the plan aimed at the task.
+    """
     task_args = _collect_task_args(task_spec)
-    if not task_args:
-        return
-    target = str(task_args["target"]).lower()
     for action in actions:
-        if action.action_type != "collect":
+        if action.action_type in ("wait", "share", "release"):
             continue
-        action_target = str(action.args.get("target") or "").lower()
-        if action_target and action_target != target:
-            continue
-        for key, value in task_args.items():
-            action.args.setdefault(key, value)
+        action.args.setdefault("target", task_args["target"])
 
 
 def _ensure_task_terminal_action(task_spec: TaskSpecification, actions: List[SymbolicAction]) -> None:
-    """Ensure task-labeled plans include an action that can achieve the task."""
-    task_name = str(task_spec.task.value or "").lower()
+    """Make sure the plan actually contains an action that can achieve the task.
 
-    if task_name.startswith("collect_"):
-        task_args = _collect_task_args(task_spec)
-        target = task_args.get("target", task_name.removeprefix("collect_"))
-        has_matching_collect = any(
-            action.action_type == "collect"
-            and str(action.args.get("target", "")).lower() == target
-            for action in actions
-        )
-        if not has_matching_collect:
-            actions.append(SymbolicAction("collect", task_args or {"target": target}))
+    An LLM that states a goal and then lists only navigation is a common
+    failure; crafter guarded it by appending a matching ``collect``. The
+    BEHAVIOR equivalent is per predicate: ``ontop``/``inside`` need a place,
+    ``open``/``closed``/``toggled_on`` need the matching toggle, ``holding``
+    needs a grasp.
+    """
+    token = str(getattr(task_spec.task, "value", task_spec.task) or "").lower()
+    target = task_spec.object_type
+    reference = getattr(task_spec, "reference", None)
+
+    terminal_for = {
+        "ontop": ("place_on_top", reference or target),
+        "inside": ("place_inside", reference or target),
+        "open": ("open", target),
+        "closed": ("close", target),
+        "toggled_on": ("toggle_on", target),
+        "holding": ("grasp", target),
+    }
+    wanted = terminal_for.get(token)
+    if wanted is None:
         return
-
-    if task_name.startswith("make_"):
-        item = task_name.removeprefix("make_")
-        has_matching_craft = any(
-            action.action_type == "craft"
-            and str(action.args.get("object_type", "")).lower() == item
-            for action in actions
-        )
-        if not has_matching_craft:
-            actions.append(SymbolicAction("craft", {"object_type": item}))
-        return
-
-    if task_name.startswith("place_"):
-        item = task_name.removeprefix("place_")
-        has_matching_place = any(
-            action.action_type == "place"
-            and str(action.args.get("object_type", "")).lower() == item
-            for action in actions
-        )
-        if not has_matching_place:
-            actions.append(SymbolicAction("place", {"object_type": item}))
+    action_type, action_target = wanted
+    already = any(
+        action.action_type == action_type and action.args.get("target") == action_target
+        for action in actions
+    )
+    if not already:
+        actions.append(SymbolicAction(action_type=action_type, args={"target": action_target}))
 
 
 def parse_interrupt_response(

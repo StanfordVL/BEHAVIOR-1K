@@ -28,67 +28,148 @@ load_dotenv(_ENVIRONMENT_ROOT.parent / ".env", override=False)
 # Enums for constrained values
 # ============================================================================
 
-class Direction(str, Enum):
-    """Movement directions."""
-    UP = "up"
-    DOWN = "down"
-    LEFT = "left"
-    RIGHT = "right"
+# ============================================================================
+# Structured output vocabulary -- BEHAVIOR-1K
+# ============================================================================
+# This is one third of M5's "three-piece" change (PORTING_PLAN 5): the Pydantic
+# schema, the L2 controllers and action_outcome.effects have to agree. Structured
+# output *constrains* the model, so whatever is not expressible here is not
+# emittable at all -- and anything expressible but unknown to L2 becomes a
+# wasted decision. The verbs below are exactly
+# coop2.cognitive.action.behavior_action.BEHAVIOR_ACTION_TO_PRIMITIVE plus the
+# two communication actions.
+#
+# Targets are free-form strings, deliberately not enums: the legal set is
+# scene-dependent and is handed to the model each turn as `target_hints`. An
+# enum would freeze one scene's objects into the schema. They are BDDL instance
+# ids (`apple.n.01_1`), which is also how the goal predicates are written.
+
+_TARGET = "Entity id exactly as shown in Current Reachable Targets, e.g. 'apple.n.01_1'. Never invent one."
 
 
-class Resource(str, Enum):
-    """Collectible resources."""
-    WOOD = "wood"
-    STONE = "stone"
-    COAL = "coal"
-    IRON = "iron"
-    DIAMOND = "diamond"
-    FOOD = "food"
+class NavigateToAction(BaseModel):
+    """Drive the base to a standable pose near the target."""
+
+    action_type: Literal["navigate_to"] = "navigate_to"
+    target: str = Field(description=_TARGET)
 
 
-class PlaceableItem(str, Enum):
-    """Items that can be placed."""
-    TABLE = "table"
-    FURNACE = "furnace"
+class GraspAction(BaseModel):
+    """Pick the target up. Requires being within reach and both hands empty."""
+
+    action_type: Literal["grasp"] = "grasp"
+    target: str = Field(description=_TARGET)
 
 
-class CraftableItem(str, Enum):
-    """Items that can be crafted."""
-    WOOD_PICKAXE = "wood_pickaxe"
-    STONE_PICKAXE = "stone_pickaxe"
-    IRON_PICKAXE = "iron_pickaxe"
+class PlaceOnTopAction(BaseModel):
+    """Put what you are holding on top of the target."""
+
+    action_type: Literal["place_on_top"] = "place_on_top"
+    target: str = Field(description=_TARGET)
+
+
+class PlaceInsideAction(BaseModel):
+    """Put what you are holding inside the target."""
+
+    action_type: Literal["place_inside"] = "place_inside"
+    target: str = Field(description=_TARGET)
+
+
+class ReleaseAction(BaseModel):
+    """Drop what you are holding where you stand."""
+
+    action_type: Literal["release"] = "release"
+
+
+class OpenAction(BaseModel):
+    action_type: Literal["open"] = "open"
+    target: str = Field(description=_TARGET)
+
+
+class CloseAction(BaseModel):
+    action_type: Literal["close"] = "close"
+    target: str = Field(description=_TARGET)
+
+
+class ToggleOnAction(BaseModel):
+    action_type: Literal["toggle_on"] = "toggle_on"
+    target: str = Field(description=_TARGET)
+
+
+class ToggleOffAction(BaseModel):
+    action_type: Literal["toggle_off"] = "toggle_off"
+    target: str = Field(description=_TARGET)
+
+
+class WaitAction(BaseModel):
+    """Do nothing this turn. Costs a decision but no motion."""
+
+    action_type: Literal["wait"] = "wait"
+
+
+class ShareAction(BaseModel):
+    """Tell a teammate something. No physical effect."""
+
+    action_type: Literal["share"] = "share"
+    recipient_agent_id: str = Field(description="Agent id to tell, e.g. 'agent_1'")
+    message: str = Field(description="What to tell them")
+
+
+# Union type for all actions
+LLMAction = Union[
+    NavigateToAction,
+    GraspAction,
+    PlaceOnTopAction,
+    PlaceInsideAction,
+    ReleaseAction,
+    OpenAction,
+    CloseAction,
+    ToggleOnAction,
+    ToggleOffAction,
+    WaitAction,
+    ShareAction,
+]
 
 
 class Task(str, Enum):
-    """Available tasks/achievements in the environment."""
-    # Collection tasks
-    COLLECT_WOOD = "collect_wood"
-    COLLECT_STONE = "collect_stone"
-    COLLECT_COAL = "collect_coal"
-    COLLECT_IRON = "collect_iron"
-    COLLECT_DIAMOND = "collect_diamond"
-    COLLECT_FOOD = "collect_food"
-    
-    # Crafting tasks
-    MAKE_WOOD_PICKAXE = "make_wood_pickaxe"
-    MAKE_STONE_PICKAXE = "make_stone_pickaxe"
-    MAKE_IRON_PICKAXE = "make_iron_pickaxe"
-    
-    # Placement tasks
-    PLACE_TABLE = "place_table"
-    PLACE_FURNACE = "place_furnace"
-    PLACE_STONE = "place_stone"
+    """Goal predicates a plan can aim at.
+
+    Replaces crafter's achievement list (collect_wood, make_stone_pickaxe...).
+    These are BDDL predicate tokens, so a task specification is the same shape
+    as the goal condition L1d evaluates and M9's check_goal will compare.
+    """
+
+    ONTOP = "ontop"
+    INSIDE = "inside"
+    OPEN = "open"
+    CLOSED = "closed"
+    TOGGLED_ON = "toggled_on"
+    HOLDING = "holding"
 
 
 class TaskSpecification(BaseModel):
-    """Task specification with object type and target ID."""
-    task: Task = Field(description="The task type to accomplish")
-    object_type: str = Field(description="Type of target object (e.g., 'tree', 'stone', 'cow', 'table')")
-    object_id: int = Field(description="ID of the specific object instance to target")
-    
+    """What the plan is trying to make true.
+
+    ``object_type`` / ``object_id`` are kept as field names because
+    ``cognitive_agent._collect_task_args`` and the process logger read them by
+    name, and the point of the port is to leave those files untouched. Here
+    ``object_type`` carries the BDDL entity id and ``object_id`` is unused
+    (always 1) -- an id like ``apple.n.01_1`` already encodes the instance
+    index, so a separate integer would be a second, conflicting source of truth.
+    """
+
+    task: Task = Field(description="Predicate to make true")
+    object_type: str = Field(description=_TARGET)
+    object_id: int = Field(default=1, description="Unused; the entity id already carries the index")
+    reference: Optional[str] = Field(
+        default=None,
+        description="Second argument for binary predicates, e.g. the surface for 'ontop'. Same id format.",
+    )
+
     def __str__(self) -> str:
-        """String representation of the task specification."""
-        return f"{self.task.value}({self.object_type}#{self.object_id})"
+        if self.reference:
+            return f"{self.task.value}({self.object_type}, {self.reference})"
+        return f"{self.task.value}({self.object_type})"
 
 
 class InterruptDecision(str, Enum):
@@ -99,67 +180,8 @@ class InterruptDecision(str, Enum):
 
 # ============================================================================
 # Pydantic models for structured LLM output - Action Classes
-# ============================================================================
-
-class MoveAction(BaseModel):
-    """Move in a direction."""
-    action_type: Literal["move"] = "move"
-    direction: Direction = Field(description="Direction to move")
-    num_steps: int = Field(ge=1, le=5, description="Number of steps (1-5)")
-
-
-class CollectAction(BaseModel):
-    """Collect a resource at current location."""
-    action_type: Literal["collect"] = "collect"
-    target: Resource = Field(description="Resource to collect")
-    steps: int = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="Maximum primitive steps to keep attempting collection; stops early on success",
-    )
-
-
-class PlaceAction(BaseModel):
-    """Place an item in the world."""
-    action_type: Literal["place"] = "place"
-    item: PlaceableItem = Field(description="Item to place")
-
-
-class CraftAction(BaseModel):
-    """Craft an item."""
-    action_type: Literal["craft"] = "craft"
-    item: CraftableItem = Field(description="Item to craft")
-
-
-class SleepAction(BaseModel):
-    """Sleep to restore energy."""
-    action_type: Literal["sleep"] = "sleep"
-
-
-class NoopAction(BaseModel):
-    """Do nothing this step."""
-    action_type: Literal["noop"] = "noop"
-
-
-class NavigateAction(BaseModel):
-    """Navigate to a specific object in the world using pathfinding."""
-    action_type: Literal["navigate"] = "navigate"
-    object_type: str = Field(description="Type of object to navigate to (e.g., 'tree', 'stone', 'coal', 'iron', 'diamond', 'water', 'table', 'furnace')")
-    item_id: int = Field(description="ID of the specific object instance to navigate to. For visible utilities, use the local ID shown as table 1, table 2, furnace 1, etc.")
-    timeout: int = Field(default=30, ge=1, le=100, description="Maximum steps to attempt navigation (default 30)")
-
-
-class ShareAction(BaseModel):
-    """Share resources with another agent."""
-    action_type: Literal["share"] = "share"
-    recipient_agent_id: str = Field(description="Agent ID to share with (e.g., 'agent_0', 'agent_1')")
-    resource_type: str = Field(description="Type of resource to share (e.g., 'wood', 'stone', 'coal', 'iron')")
-    quantity: int = Field(default=1, ge=1, description="Amount to share (default 1)")
-
 
 # Union type for all actions
-LLMAction = Union[MoveAction, CollectAction, PlaceAction, CraftAction, SleepAction, NoopAction, NavigateAction, ShareAction]
 
 
 # ============================================================================

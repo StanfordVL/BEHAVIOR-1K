@@ -56,7 +56,11 @@ BEHAVIOR_ACTION_TO_PRIMITIVE = {
 #: Actions with no physical effect. They must still be first-class: COOP2's
 #: plans coordinate through them, and an agent with nothing useful to do has to
 #: be able to say so rather than being forced into a pointless primitive.
-COMMUNICATION_ACTIONS = ("wait", "share")
+#:
+#: ``noop`` is not in the LLM's vocabulary -- it is what L3's plan executor
+#: returns on its no-plan path (``{"action_type": "noop"}``). Treating it as an
+#: unknown verb turned every barrier-closed step into a reported failure.
+COMMUNICATION_ACTIONS = ("wait", "share", "noop")
 
 #: The LLM-facing vocabulary. Mirrors ``cognitive/constants.py:ACTION_SCHEMA``
 #: in shape so the prompt builder needs no special-casing, but every target is a
