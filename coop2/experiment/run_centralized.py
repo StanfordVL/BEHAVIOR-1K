@@ -45,7 +45,7 @@ from coop2.comm_topology import LLMLeaderAgent, LLMFollowerAgent, create_llm_cen
 try:
     from llm_usage import print_llm_usage_summary
 except ImportError:
-    from experiment.llm_usage import print_llm_usage_summary
+    from coop2.experiment.llm_usage import print_llm_usage_summary
 
 
 # ============================================================================

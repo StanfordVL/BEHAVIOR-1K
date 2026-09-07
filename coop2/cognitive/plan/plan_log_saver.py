@@ -38,7 +38,7 @@ class PlanningLogSaver:
 
     def save_task_log(self, output_path: str) -> None:
         """Save task states history to JSON (only changed tasks to reduce file size)."""
-        from macrafter.cooperative_tasks import convert_to_serializable
+        from coop2.behavior_env.cooperative_tasks import convert_to_serializable
 
         base_env = self.wrapper.symbolic_env.env
         if not hasattr(base_env, "task_tracker"):
@@ -92,7 +92,7 @@ class PlanningLogSaver:
 
     def save_capability_log(self, output_path: str) -> None:
         """Save capability change history to JSON (if CooperativeEnv is used)."""
-        from macrafter.cooperative_tasks import save_capability_log
+        from coop2.behavior_env.cooperative_tasks import save_capability_log
 
         base_env = self.wrapper.symbolic_env.env
         if hasattr(base_env, "task_tracker"):

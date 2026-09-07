@@ -162,7 +162,7 @@ class PlanningEnvWrapper:
         base_env = getattr(self.symbolic_env, "env", self.symbolic_env)
         if hasattr(base_env, "task_tracker"):
             try:
-                from coop2_repair import MacrafterCoopAdapter
+                from coop2._repair_shim import MacrafterCoopAdapter
                 return MacrafterCoopAdapter(self.symbolic_env)
             except ImportError:
                 pass

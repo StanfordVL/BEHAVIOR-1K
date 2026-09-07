@@ -13,11 +13,16 @@ module                      layer
 ``world_state``             L1a entity registry, type-local IDs, room membership
 ``symbolic_view``           L1b scene -> text, target_hints
 ``placement``               --  scene-derived robot/object placement
-``cooperative_tasks``(todo) L1d TaskState spatial/temporal/dependency/participation
+``cooperative_tasks``       L1d TaskState spatial/temporal/dependency/participation
 ``coop_env`` (todo)         L1  CooperativeBehaviorEnv, the PettingZoo-shaped facade
 ==========================  ====================================================
 """
 
+from coop2.behavior_env.cooperative_tasks import (
+    BehaviorTaskState,
+    CoopTaskTracker,
+    StepMetrics,
+)
 from coop2.behavior_env.env_setup import (
     assert_multi_robot_sanity,
     build_multi_robot_config,
@@ -46,6 +51,9 @@ from coop2.behavior_env.world_state import (
 )
 
 __all__ = [
+    "BehaviorTaskState",
+    "CoopTaskTracker",
+    "StepMetrics",
     "BehaviorWorldState",
     "EntityObservation",
     "PredicateFact",

@@ -40,7 +40,7 @@ from coop2.comm_topology import create_llm_broadcast_chain_topology
 try:
     from llm_usage import print_llm_usage_summary
 except ImportError:
-    from experiment.llm_usage import print_llm_usage_summary
+    from coop2.experiment.llm_usage import print_llm_usage_summary
 
 
 def run_broadcast_chain_experiment(
