@@ -210,7 +210,9 @@ def main() -> None:
         mean_q = (sum(r.get("q_score", {}).get("final", 0.0) for r in results) / n) if n else 0.0
         logger.info(f"Eval summary: {n_success}/{n} success | mean q_score={mean_q:.3f} | task={args.task_name}")
         if failed_instances:
-            logger.error(f"{len(failed_instances)} instance(s) failed and were skipped: {sorted(set(failed_instances))}")
+            logger.error(
+                f"{len(failed_instances)} instance(s) failed and were skipped: {sorted(set(failed_instances))}"
+            )
         # Written while the simulator is still up: the process exit status is always 0 (see above).
         with open(os.path.join(os.path.expanduser(args.output_dir), "eval_summary.json"), "w") as f:
             json.dump(
