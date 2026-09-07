@@ -587,9 +587,9 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         # and will therefore not be tracked properly in subsequent states during playback. So we assert that the current
         # idx is NOT the current checkpoint idx
         if len(self.checkpoint_step_idxs) > 0:
-            assert (
-                self.checkpoint_step_idxs[-1] - 1 != self.env.episode_steps
-            ), "A checkpoint was just updated. Any subsequent transitions at this immediate timestep will not be replayed properly!"
+            assert self.checkpoint_step_idxs[-1] - 1 != self.env.episode_steps, (
+                "A checkpoint was just updated. Any subsequent transitions at this immediate timestep will not be replayed properly!"
+            )
 
         if self.env.episode_steps not in self.current_transitions:
             self.current_transitions[self.env.episode_steps] = {
@@ -686,9 +686,9 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
             )
         log.info(f"Flushing partial trajectory at step {self.current_episode_step_count}...")
         assert self.flush_every_n_steps > 0, "flush_every_n_steps must be greater than 0 to flush partial trajectory"
-        assert (
-            len(self.current_traj_history) > 0
-        ), "Expected non-empty trajectory history when flushing partial trajectory"
+        assert len(self.current_traj_history) > 0, (
+            "Expected non-empty trajectory history when flushing partial trajectory"
+        )
         data_length_to_flush = len(self.current_traj_history)
         # At step 0, we only have observation data, so observation data will only have one more offset than others
         if self.current_episode_step_count == 0:

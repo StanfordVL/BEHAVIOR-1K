@@ -186,7 +186,7 @@ def _build_frame_pcd(
             K = intrinsics[intrinsic_name]
         else:
             raise KeyError(
-                f"No intrinsics found for camera {camera_name!r}. " f"Available keys: {sorted(intrinsics.keys())}"
+                f"No intrinsics found for camera {camera_name!r}. Available keys: {sorted(intrinsics.keys())}"
             )
         color_pcds.append(_build_camera_pcd(item, dataset, camera_name, K, max_depth=max_depth))
 

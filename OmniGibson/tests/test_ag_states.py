@@ -225,9 +225,9 @@ def test_ag_serialized_block_right_arm_only(env, assisted_robot, apple):
             0.0,  # joint_type: FixedJoint
         ]
     )
-    assert th.allclose(
-        ag_block, expected, atol=1e-6
-    ), f"AG block mismatch.\n  actual:   {ag_block.tolist()}\n  expected: {expected.tolist()}"
+    assert th.allclose(ag_block, expected, atol=1e-6), (
+        f"AG block mismatch.\n  actual:   {ag_block.tolist()}\n  expected: {expected.tolist()}"
+    )
 
 
 def test_ag_serialized_block_both_arms_layout(env, assisted_robot, apple, bowl):
