@@ -89,6 +89,21 @@ BEHAVIOR_ACTION_SCHEMA = {
 }
 
 
+def _normalise_instance_id(entity_id: Optional[str]) -> Optional[str]:
+    """``apple.n.01_01`` -> ``apple.n.01_1``; None if there is no numeric suffix.
+
+    Only the trailing instance index is touched. The synset itself contains
+    digits (``apple.n.01``) that must not be rewritten, which is why this
+    splits on the last underscore rather than stripping zeros anywhere.
+    """
+    if not entity_id or "_" not in entity_id:
+        return None
+    base, _, suffix = entity_id.rpartition("_")
+    if not base or not suffix.isdigit():
+        return None
+    return f"{base}_{int(suffix)}"
+
+
 class BehaviorActionExecutor:
     """Grounds one agent's symbolic actions into engine primitives.
 
@@ -114,15 +129,33 @@ class BehaviorActionExecutor:
     # -- grounding ---------------------------------------------------------
 
     def resolve_target(self, target: Optional[str]) -> Optional[str]:
-        """``'apple#1'`` -> ``'apple_agveuv_0'``.
+        """``'apple.n.01_1'`` -> ``'apple_agveuv_0'``.
 
         Passes through anything already a scene name, so a caller that knows
         the real name (tests, scripted demos) does not have to invent an id.
+
+        Falls back to a zero-padding-insensitive match. Models write BDDL
+        instance suffixes the way numbers are usually padded -- three separate
+        runs produced ``apple.n.01_01`` and ``coffee_table.n.01_01`` for
+        ``_1`` -- and one such typo costs the whole plan: in the recorded BDDL
+        run agent_0 grasped its apple, then died on
+        ``navigate_to(coffee_table.n.01_01)`` and spent the remaining 1400
+        steps recovering. ``_01`` and ``_1`` name the same instance and cannot
+        name different ones, so rejecting it buys nothing. Prompt wording was
+        tried first and did not hold.
         """
         if target is None or self.world_state is None:
             return target
-        for name, entity_id in self.world_state._ids.items():
+        ids = self.world_state._ids
+        for name, entity_id in ids.items():
             if entity_id == target:
+                return name
+
+        normalised = _normalise_instance_id(target)
+        if normalised is None:
+            return target
+        for name, entity_id in ids.items():
+            if _normalise_instance_id(entity_id) == normalised:
                 return name
         return target
 

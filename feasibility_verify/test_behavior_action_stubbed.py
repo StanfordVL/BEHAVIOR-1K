@@ -277,115 +277,86 @@ def main() -> int:
     )
     ok("PlanningEnvWrapper is wired to BehaviorSymbolicEnvWrapper")
 
-    print("test 13: succeed_when_all_hold ends the episode, nothing else does")
-    # DummyTask evaluates no goal, so `terminated` was hardcoded False for
-    # every agent: a robot could hold the goal object and the episode would
-    # still run until it ran out of steps. This is the stand-in check until M9
-    # reconnects BDDL's compiled_task.check_goal.
+    print("test 13: only a BDDL activity can end an episode early")
+    # `terminated` used to be hardcoded False for every agent, and a stand-in
+    # check ("every agent holds an apple") was added while BDDL was not wired
+    # up. That stand-in is gone: with BDDL deciding, a second authority can
+    # only disagree, and a run without an activity should be visibly unbounded
+    # rather than quietly ending on a proxy.
     from coop2.behavior_env.coop_env import CooperativeBehaviorEnv
 
-    class GoalObj:
-        def __init__(self, name, category):
-            self.name, self.category = name, category
+    class Compiled:
+        def __init__(self, met):
+            self.met = met
+            self.calls = 0
+        def check_goal(self, _evaluate):
+            self.calls += 1
+            return self.met, {"satisfied": [0] if self.met else [], "unsatisfied": []}
 
-    class GoalRegistry:
-        def __init__(self, objs):
-            self._objs = {o.name: o for o in objs}
-        def __call__(self, _key, name):
-            return self._objs.get(name)
+    class Task:
+        def __init__(self, met):
+            self.compiled_task = Compiled(met)
+        def _evaluate_predicate(self, *_):
+            return True
 
-    class GoalScene:
-        def __init__(self, objs):
-            self.object_registry = GoalRegistry(objs)
-
-    class GoalEnv:
-        """self.env is the OmniGibson env; the registry hangs off env.scene."""
-        def __init__(self, objs):
-            self.scene = GoalScene(objs)
-
-    class GoalWorld:
-        """Only what _goal_reached touches: robots, held_objects, synset_of."""
-        def __init__(self, robots, held):
-            self.robots = robots
-            self._held = held
-        def held_objects(self):
-            return dict(self._held)
-        def synset_of(self, obj):
-            return {"apple": "apple.n.01", "cup": "cup.n.01"}.get(obj.category)
-
-    r0, r1 = GoalObj("agent_0", "robot"), GoalObj("agent_1", "robot")
-    a0, a1 = GoalObj("apple_0", "apple"), GoalObj("apple_1", "apple")
-    cup = GoalObj("cup_0", "cup")
-
-    def make(held, target="apple.n.01"):
+    def make(activity, met):
         env = object.__new__(CooperativeBehaviorEnv)
-        env.succeed_when_all_hold = target
-        env.bddl_activity = None      # no activity -> the stand-in decides
-        env.bddl_instance_id = 0
+        env.bddl_activity = activity
         env.goal_reached_at = None
-        env.world = GoalWorld([r0, r1], held)
-        env.env = GoalEnv([r0, r1, a0, a1, cup])
-        env.engine = type("E", (), {"env_step": 7})()
+        env.env = type("E", (), {"task": Task(met)})()
+        env.engine = type("Eng", (), {"env_step": 11})()
         return env
 
-    assert make({})._goal_reached() is False, "nobody holding -> not done"
-    assert make({"apple_0": "agent_0"})._goal_reached() is False, "one of two -> not done"
-    assert make({"apple_0": "agent_0", "cup_0": "agent_1"})._goal_reached() is False, \
-        "a cup is not an apple"
-    done = make({"apple_0": "agent_0", "apple_1": "agent_1"})
-    assert done._goal_reached() is True, "both holding an apple -> done"
-    assert done.goal_reached_at == 7, "the step it happened on is recorded"
+    # No activity: nothing can end the episode, whatever the world looks like.
+    no_activity = make(None, met=True)
+    assert no_activity._goal_reached() is False, "without an activity nothing terminates"
+    assert no_activity.goal_reached_at is None
 
-    off = make({"apple_0": "agent_0", "apple_1": "agent_1"}, target=None)
-    assert off._goal_reached() is False, "unset knob must keep the old behaviour"
-    ok("terminates only when every agent holds the named synset")
+    unmet = make("coop_two_apples_pomaria", met=False)
+    assert unmet._goal_reached() is False
+    assert unmet.goal_reached_at is None
+    assert unmet.env.task.compiled_task.calls == 1, "check_goal must actually be consulted"
 
-    print("test: replan aborts the abandoned primitive, resume never does")
-    # A NAVIGATE_TO runs for hundreds of ticks. Replacing a plan used to clear
-    # only L2's record, leaving the engine running the old primitive: the new
-    # plan's first action could not be issued while has_active stayed true, and
-    # the abandoned primitive's outcome arrived with nothing to attach to.
-    # Resuming must take neither step, or every message would refund the travel
-    # the agent had already paid for.
-    from coop2.cognitive.plan.plan_env_wrapper import PlanningEnvWrapper
+    met = make("coop_two_apples_pomaria", met=True)
+    assert met._goal_reached() is True
+    assert met.goal_reached_at == 11, "the step it happened on is recorded"
+    # Sticky, and without re-consulting the task.
+    before = met.env.task.compiled_task.calls
+    assert met._goal_reached() is True
+    assert met.env.task.compiled_task.calls == before
+    ok("check_goal is the only authority; no activity means no early termination")
 
-    class SpyEngine:
-        def __init__(self):
-            self.aborted = []
-            self._active = {"agent_0"}
-        def has_active(self, agent_id):
-            return agent_id in self._active
-        def abort(self, agent_id, retract=False):
-            self.aborted.append((agent_id, retract))
-            self._active.discard(agent_id)
-            return None
+    print("test: a zero-padded instance suffix still resolves")
+    # Models pad the BDDL instance index: three runs produced apple.n.01_01 and
+    # coffee_table.n.01_01 for _1. One such typo cost a whole plan -- agent_0
+    # grasped its apple, died on navigate_to(coffee_table.n.01_01), and spent
+    # the remaining 1400 steps recovering. _01 and _1 cannot name different
+    # instances, so rejecting it buys nothing.
+    from coop2.cognitive.action.behavior_action import _normalise_instance_id
 
-    class SpyHandler:
-        def __init__(self):
-            self.reset_calls = 0
-        def reset_current_action(self):
-            self.reset_calls += 1
+    assert _normalise_instance_id("apple.n.01_01") == "apple.n.01_1"
+    assert _normalise_instance_id("apple.n.01_1") == "apple.n.01_1"
+    assert _normalise_instance_id("apple.n.01_012") == "apple.n.01_12"
+    # The synset's own digits must survive: only the trailing index is touched.
+    assert _normalise_instance_id("apple.n.01_01").startswith("apple.n.01_")
+    assert _normalise_instance_id("no_digits_here") is None
+    assert _normalise_instance_id("nounderscore") is None
+    assert _normalise_instance_id(None) is None
 
-    engine = SpyEngine()
-    handler = SpyHandler()
-    wrapper = object.__new__(PlanningEnvWrapper)
-    wrapper.symbolic_env = type("W", (), {"env": type("E", (), {"engine": engine})(),
-                                          "agent_actions": {"agent_0": handler}})()
-    wrapper._prev_action_results = {"agent_0": "stale"}
-
-    wrapper._reset_symbolic_action_state("agent_0")
-    assert engine.aborted == [("agent_0", False)], engine.aborted
-    assert handler.reset_calls == 1
-    assert wrapper._prev_action_results["agent_0"] is None
-    assert not engine.has_active("agent_0"), "the new plan must be issuable next tick"
-
-    # Nothing running: abort must not be called at all.
-    engine2 = SpyEngine(); engine2._active.clear()
-    wrapper.symbolic_env = type("W", (), {"env": type("E", (), {"engine": engine2})(),
-                                          "agent_actions": {"agent_0": SpyHandler()}})()
-    wrapper._reset_symbolic_action_state("agent_0")
-    assert engine2.aborted == [], "nothing in flight -> nothing to abort"
-    ok("replan aborts the in-flight primitive; nothing else touches it")
+    # The shared fixture above still uses the pre-BDDL "apple#1" ids; production
+    # ids are BDDL instance names, which is where the padding happens.
+    bddl_world = FakeWorldState({
+        "apple_omzprq_0": "apple.n.01_1",
+        "coffee_table_gpkbiw_0": "coffee_table.n.01_1",
+    })
+    executor = Executor("agent_0", engine=FakeEngine(), world_state=bddl_world)
+    assert executor.resolve_target("apple.n.01_1") == "apple_omzprq_0"
+    assert executor.resolve_target("apple.n.01_01") == "apple_omzprq_0", "padded must resolve too"
+    assert executor.resolve_target("coffee_table.n.01_01") == "coffee_table_gpkbiw_0", \
+        "the id that actually cost a plan in the recorded run"
+    assert executor.resolve_target("apple.n.01_9") == "apple.n.01_9", \
+        "an id that matches nothing must pass through unchanged"
+    ok("apple.n.01_01 resolves to the same object as apple.n.01_1")
 
     print("\nALL TESTS PASSED")
     return 0

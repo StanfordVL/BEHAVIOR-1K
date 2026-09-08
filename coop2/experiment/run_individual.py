@@ -58,7 +58,6 @@ def run_individual_experiment(
     scene_model=None,
     room=None,
     objects=None,
-    succeed_when_all_hold=None,
     bddl_activity=None,
     bddl_instance_id=0,
 ):
@@ -127,12 +126,11 @@ def run_individual_experiment(
         env_kwargs["room"] = room
     if objects is not None:
         env_kwargs["objects"] = objects
-    if succeed_when_all_hold is not None:
-        env_kwargs["succeed_when_all_hold"] = succeed_when_all_hold
+    if record_video:
+        env_kwargs["video_path"] = os.path.join(output_dir, "episode.mp4")
     if bddl_activity is not None:
-        # BDDL decides `terminated` from here on; succeed_when_all_hold is the
-        # stand-in for runs without an activity and is short-circuited in the
-        # facade so the two can never both be deciding.
+        # The activity's goal expression is the only thing that can end an
+        # episode early; there is no proxy check any more.
         env_kwargs["bddl_activity"] = bddl_activity
         env_kwargs["bddl_instance_id"] = bddl_instance_id
     base_env = CooperativeEnv(**env_kwargs)
@@ -279,9 +277,9 @@ def run_individual_experiment(
         metrics_path = os.path.join(output_dir, 'metrics_timeline.png')
         plot_metrics_timeline(metrics_history, output_path=metrics_path, show=False)
     
-    if record_video:
-        gif_path = os.path.join(output_dir, 'episode.gif')
-        env.save_video(gif_path, fps=12)
+    # No save_video call here: nothing implements it. The facade records as it
+    # ticks (video_path below) and finalises the file in close(), because the
+    # encoder has to be flushed and og.shutdown() never unwinds.
     env.close()
     
     llm_stats_path = os.path.join(output_dir, 'llm_usage.json')
@@ -336,16 +334,11 @@ if __name__ == "__main__":
     parser.add_argument("--room", type=str, default=None, help="Room to place the team and objects in")
     parser.add_argument("--bddl-activity", type=str, default=None, metavar="NAME",
                         help="BDDL activity to load from its cached instance, e.g. "
-                             "coop_two_apples_pomaria. Its goal expression then decides "
-                             "when the episode terminates, superseding "
-                             "--succeed-when-all-hold.")
+                             "coop_two_apples_pomaria. Its goal expression is what decides "
+                             "when the episode terminates; without it nothing does, and the "
+                             "run ends only on the step or wall-clock limit.")
     parser.add_argument("--bddl-instance-id", type=int, default=0,
                         help="activity_instance_id of the cached template to load")
-    parser.add_argument("--succeed-when-all-hold", type=str, default=None, metavar="SYNSET",
-                        help="End the episode once every agent holds an object of this synset "
-                             "(e.g. apple.n.01). Stand-in until BDDL goal checking returns; "
-                             "without it `terminated` is always False and the episode can only "
-                             "end by running out of steps.")
 
     args = parser.parse_args()
 
@@ -374,7 +367,6 @@ if __name__ == "__main__":
         scene_model=args.scene,
         room=args.room,
         objects=objects,
-        succeed_when_all_hold=args.succeed_when_all_hold,
         bddl_activity=args.bddl_activity,
         bddl_instance_id=args.bddl_instance_id,
     )

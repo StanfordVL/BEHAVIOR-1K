@@ -3,8 +3,9 @@
 Until now ``terminated`` was hardcoded False for every agent and the task was
 ``DummyTask``, which evaluates nothing: an episode could only ever end by
 running out of steps, and a robot could hold the goal object with nothing
-noticing. ``--succeed-when-all-hold`` was a stand-in for that; this replaces it
-with the activity's real goal.
+noticing. A stand-in check ("every agent holds an apple") stood in for it
+while BDDL was not wired up; that is gone, and the activity's own goal
+expression is now the only thing that can end an episode early.
 
 What this proves, in order:
 

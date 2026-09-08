@@ -68,9 +68,9 @@ class CooperativeBehaviorEnv:
         use_scene_graph: bool = False,
         coop_config_path: Optional[str] = None,
         task_specs=None,
-        succeed_when_all_hold: Optional[str] = None,
         bddl_activity: Optional[str] = None,
         bddl_instance_id: int = 0,
+        video_path: Optional[str] = None,
         **kwargs: Any,
     ):
         # crafter kwargs (area/view/size/n_players/reward) arrive from the
@@ -100,11 +100,13 @@ class CooperativeBehaviorEnv:
         self.bddl_activity = bddl_activity
         self.bddl_instance_id = int(bddl_instance_id)
 
-        # Stand-in goal check for runs with no BDDL activity.
-        # DummyTask evaluates nothing, so without this `terminated` is always
-        # False and an episode can only ever end by running out of steps --
-        # a robot can hold the goal object and nothing notices.
-        self.succeed_when_all_hold = succeed_when_all_hold
+        # Where to write the episode video, or None. The viewer camera has to
+        # be enabled *before* the Environment is built (gm.RENDER_VIEWER_CAMERA
+        # is read when the camera is created), which is why this is a
+        # constructor argument and not a method you call later.
+        self.video_path = video_path
+        self.recorder = None
+
         self.goal_reached_at: Optional[int] = None
         self.task_tracker = None
         self._closed = False
@@ -170,7 +172,13 @@ class CooperativeBehaviorEnv:
         gm.ENABLE_TRANSITION_RULES = False
         if self.headless:
             gm.HEADLESS = True
-            gm.RENDER_VIEWER_CAMERA = False
+            # Headless and "no viewer camera" are separate: rendering offscreen
+            # is exactly how a video gets recorded without a window.
+            gm.RENDER_VIEWER_CAMERA = bool(self.video_path)
+        if self.video_path:
+            from coop2.behavior_env.recording import enable_viewer_rendering  # noqa: PLC0415
+
+            enable_viewer_rendering()
 
         config = build_multi_robot_config(
             robot_poses=[([1.5 * i, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]) for i in range(self.n_agents)],
@@ -208,6 +216,7 @@ class CooperativeBehaviorEnv:
             controllers=self.controllers,
             verbose=self.engine_verbose,
         )
+        self._start_recording()
 
         if self.extra_objects:
             place_objects(
@@ -233,6 +242,54 @@ class CooperativeBehaviorEnv:
         self.task_tracker = CoopTaskTracker(self.world, tasks)
         self.capability_history = self.task_tracker.capability_history
         self._loaded = True
+
+    def _start_recording(self) -> None:
+        """Frame the task and hook the recorders onto the engine's tick.
+
+        Writes one file per view: an overview of the room, plus a chase view
+        per robot. The overview alone was not enough to see what happened --
+        two R1s in a living room are small in a shot wide enough to hold the
+        whole task -- and a per-robot view shows which object each one is
+        actually reaching for.
+        """
+        if not self.video_path:
+            return
+        import os as _os  # noqa: PLC0415
+
+        from coop2.behavior_env.recording import (  # noqa: PLC0415
+            MultiViewRecorder,
+            chain,
+            chase_pose,
+        )
+
+        base, extension = _os.path.splitext(self.video_path)
+        extension = extension or ".mp4"
+
+        # One camera per robot, no room-wide shot. A single overview cannot be
+        # framed indoors here: 63 deg cannot hold 4.4 m of task from inside a
+        # 4.9 m room, a wide enough lens turns the robots into specks, and the
+        # seg map's living_room_0 spans an open-plan boundary so "a traversable
+        # cell at the right distance" kept landing behind a wall. A camera over
+        # a robot has none of those problems.
+        views = {
+            robot.name: (lambda robot=robot: chase_pose(robot))
+            for robot in self.env.robots
+        }
+
+        from coop2.behavior_env.recording import WIDE_FOCAL_LENGTH  # noqa: PLC0415
+
+        self.recorder = MultiViewRecorder(
+            views=views,
+            path_for=lambda name: f"{base}_{name}{extension}",
+            every=4,
+            fps=30,
+            # Every view is a wide one: the ceiling caps the camera about a
+            # metre above the robot's head, and 63 deg from there frames little
+            # more than the head.
+            focal_lengths={name: WIDE_FOCAL_LENGTH for name in views},
+        )
+        self.engine.on_tick = chain(self.engine.on_tick, self.recorder)
+        print(f"[video] recording {len(views)} views: {', '.join(views)}")
 
     def _enforce_controller_config(self, config: Dict[str, Any]) -> None:
         """Apply our controller config to whatever robots the scene ended up with.
@@ -371,6 +428,13 @@ class CooperativeBehaviorEnv:
         process singleton and there is one env per process, so nothing is
         waiting to reuse the GPU in the meantime.
         """
+        # The video file is only valid once the encoder is flushed, and the
+        # real shutdown below never unwinds, so finalise it here.
+        if self.recorder is not None:
+            # ViewerRecorder.close() reports the frame count itself.
+            self.recorder.close()
+            self.recorder = None
+
         self._closed = True
         self._register_shutdown()
 
@@ -515,17 +579,18 @@ class CooperativeBehaviorEnv:
     def _goal_reached(self) -> bool:
         """Has the episode's goal been met?
 
-        BDDL first when an activity is loaded: ``compiled_task.check_goal`` is
-        the activity's own goal expression evaluated against the simulator, and
-        it is the only authority once it exists. ``succeed_when_all_hold`` was
-        the stand-in for runs that have no activity; the two must never both be
-        deciding, so BDDL short-circuits it.
+        ``compiled_task.check_goal`` is the only authority: the BDDL activity's
+        own goal expression, evaluated against the simulator. A stand-in check
+        ("every agent holds an apple") stood here while BDDL was not wired up.
+        It is gone: two things deciding `terminated` cannot disagree usefully,
+        and a run with no activity should be visibly unbounded rather than
+        quietly ending on a proxy for the goal.
         """
         if self.goal_reached_at is not None:
             return True
         if self.bddl_activity:
             return self._bddl_goal_reached()
-        return self._all_hold_goal_reached()
+        return False
 
     def _bddl_goal_reached(self) -> bool:
         """``compiled_task.check_goal`` against the live scene.
@@ -548,34 +613,6 @@ class CooperativeBehaviorEnv:
             self.goal_reached_at = self.engine.env_step
             print(f"[goal] BDDL goal satisfied at env_step {self.goal_reached_at}: {breakdown}")
         return bool(met)
-
-    def _all_hold_goal_reached(self) -> bool:
-        """True once every agent holds an object of ``succeed_when_all_hold``.
-
-        The synset is matched, not the category, so "apple.n.01" is what the
-        agent sees in its own observation and what a BDDL goal would name.
-        Grasping is exclusive, so "every agent holds an apple" already implies
-        they hold *different* apples -- there is no separate distinctness check.
-        """
-        if not self.succeed_when_all_hold or self.world is None:
-            return False
-
-        held = self.world.held_objects()  # {object name: robot name}
-        holders = set()
-        for obj_name, robot_name in held.items():
-            obj = self.env.scene.object_registry("name", obj_name)
-            if obj is not None and self.world.synset_of(obj) == self.succeed_when_all_hold:
-                holders.add(robot_name)
-
-        robot_names = {robot.name for robot in self.world.robots}
-        if robot_names and robot_names <= holders:
-            self.goal_reached_at = self.engine.env_step
-            print(
-                f"[goal] every agent holds a {self.succeed_when_all_hold} "
-                f"at env_step {self.goal_reached_at}"
-            )
-            return True
-        return False
 
     def wait_for_state_change(self, timeout: float = 0.05) -> None:
         """No-op: this env is synchronous. crafter's runner polls a thread."""
