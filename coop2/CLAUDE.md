@@ -31,32 +31,88 @@ This file is only the operational summary.
 | BDDL task + cached instance | `bddl3/.../coop_two_apples_pomaria/`, `feasibility_verify/{sample,verify}_coop_task_instance.py` | **done, GPU-verified** 2026-09-07 |
 | M9 wiring (BehaviorTask + `check_goal` termination) | `coop2/behavior_env/coop_env.py` | **done**, commits `e4d28a98`…`5fda3d28` |
 
-## Where we are (2026-09-08)
+## Where we are (2026-09-08, evening)
 
-**M1–M6 passed. M7 steps 1–2 passed** (offline runner with `StubLLMClient`, zero
-tracebacks, 10 output files). **M9 is wired**: `coop_env` loads OmniGibson's
-`BehaviorTask` from the cached instance when `bddl_activity` is set, and
-`compiled_task.check_goal` is the *only* authority over `terminated` — the stand-in
-"every agent holds an apple" check is gone. Acceptance criteria are in PORTING_PLAN.md §7.
+**All three topologies solve the BDDL activity.** `individual`,
+`broadcast_chain` and `centralized` each reached `coop_two_apples_pomaria`'s goal
+at seed 0 with 2 agents and `--steps 4000`: `check_goal` fired at env_step 1303,
+1303 and 1278 respectively, `{'satisfied': [0], 'unsatisfied': []}`. Runs take
+about two minutes each. Reproduce with the command in "Commands" below.
 
-**Credentials now exist** (`.env`, Azure OpenAI, deployment `gpt-5.6-luna` — the
-`.env` is gitignored and does not travel between machines, so recreate it). Real-LLM
-runs work end to end on all three topologies. `beta.chat.completions.parse` still
-exists in the installed `openai` 3.0.0, so the 1.x-era call site needs no change.
+| topology | goal @ step | plans | succeeded | primitives | primitive ticks | messages | LLM calls | tokens |
+|---|---|---|---|---|---|---|---|---|
+| individual | 1303 | 4 | 1 | 6 | 2278 | 0 | 4 | 13731 |
+| broadcast_chain | 1303 | 4 | 1 | 6 | 2278 | 3 | 6 | 22328 |
+| centralized | 1278 | 4 | 1 | 6 | 1924 | 6 | 7 | 19669 |
+
+`centralized` finishes the manipulation in 1924 primitive ticks against 2278 for
+the other two, and pays 6 messages and the highest API latency for it -- which is
+the trade COOP2 exists to measure. One seed proves nothing about the ordering;
+that is what M7 step 3's remaining seeds are for.
+
+**M1-M6 passed. M7 steps 1-2 passed.** M9 is wired: `coop_env` loads
+OmniGibson's `BehaviorTask` from the cached instance when `bddl_activity` is set,
+and `compiled_task.check_goal` is the *only* authority over `terminated`.
+Acceptance criteria are in PORTING_PLAN.md section 7.
 
 What is left:
 
-1. **Nobody has solved the activity yet.** Best run so far: one apple delivered to
-   `coffee_table.n.01_1` by real-LLM `individual` at 2500 steps. The second never
-   arrives. See "Why the task is not solved yet" below — the last known blocker
-   (objects flying out of the scene) was fixed on 2026-09-08 but **not yet re-run**.
-2. **M7 step 3** — three topologies × ≥3 seeds, for the metrics table. Runnable now.
-3. **M8** — decentralized topology.
+1. **M7 step 3** -- more seeds per topology for the metrics table. Note
+   `build_results_table.py` cannot read these runs: it skips any folder without
+   `team_score.json`, which the runners do not write while `team_score.enabled`
+   is False. Same defect class as the rest of that file (see "The recurring
+   defect class" in the memory notes) -- post-episode code that only runs after
+   a full GPU episode.
+2. **M8** -- decentralized topology.
 
-**Scene note:** the earlier target was `house_single_floor` (Rs_int measured unusable,
-96.2 % of sampled base poses reject). The BDDL task is on `Pomaria_1_int`/`living_room_0`
-because that is where the two-armchair + coffee-table layout exists; revisit if N=9 needs
-more floor area than that room has.
+**Scene note:** the earlier target was `house_single_floor` (Rs_int measured
+unusable, 96.2 % of sampled base poses reject). The BDDL task is on
+`Pomaria_1_int`/`living_room_0` because that is where the two-armchair +
+coffee-table layout exists; revisit if N=9 needs more floor area than that room
+has.
+
+## The bug that made the activity look unsolvable (2026-09-08)
+
+`OnTop` is `Touching` and `Touching` is a contact-report query, and **a sleeping
+PhysX actor emits no contact reports**. Every OmniGibson object is constructed
+with `DEFAULT_SLEEP_THRESHOLD = 5e-05` (`entity_prim.py`). An apple placed on the
+coffee table falls the sampler's 2 cm z-offset, comes to rest, and is slept --
+after which it is still sitting on the table and `OnTop` reads False forever.
+
+Our own placement path is what makes it arrive so fast: `_place_with_predicate`
+does release -> `set_position_orientation` -> `keep_still()` -> settle, and
+`keep_still()` zeroes both velocities. `keep_still()` was added by the *previous*
+fix, to stop the object being flung out of the house; it cured the fling and
+brought the sleep forward. Both were real.
+
+Two readers were being lied to, which is why the fix is central
+(`coop_env._keep_task_objects_awake`, applied at build and after every reset) and
+not at either call site:
+
+- `_place_with_predicate` raised EXECUTION_ERROR "it did not come to rest there"
+  for a third to a half of all placements -- which reads as a physics failure and
+  is not one;
+- `check_goal` cannot see a delivered apple that has gone to sleep, so **no run
+  could have reported success no matter how well the agents played**. That is why
+  "one of two apples delivered" was the ceiling for days.
+
+Measured, not argued -- `feasibility_verify/measure_placement_rest.py`:
+
+| | before | after |
+|---|---|---|
+| placements that come to rest, empty table | 10/20 | 20/20 |
+| placements that come to rest, one apple already there | 11/20 | 20/20 |
+| single-step `OnTop` reads of a settled apple | 0/20 | 20/20 |
+
+The discriminating evidence: success and failure are geometrically identical --
+same sampled and final z (0.415 -> 0.390), same `VerticalAdjacency` below/above
+lists, and the radius-from-centre medians order *oppositely* in the two
+conditions, i.e. noise. The neighbouring apple makes no difference (63 % vs
+67 %), which killed the first hypothesis. The failing pose reports no contact
+with **anything**, at velocity exactly `[0,0,0]`; `is_asleep` is the only thing
+that differs, and `wake()` plus one step flips `OnTop` to True with the object
+not having moved. Three geometric hypotheses were proposed and all three were
+measured wrong before this one was measured right.
 
 ## Open defects
 
@@ -91,7 +147,7 @@ Use the `behavior` conda env (see the repo root `AGENTS.md`), and
 for f in feasibility_verify/test_*.py; do python "$f"; done
 
 # The real thing: an LLM-driven episode against the BDDL activity.
-python -m coop2.experiment.run_individual --agents 2 --steps 2500 --seed 0 \
+python -m coop2.experiment.run_individual --agents 2 --steps 4000 --seed 0 \
   --scene Pomaria_1_int --room living_room_0 \
   --bddl-activity coop_two_apples_pomaria \
   --goal "Put both apples on coffee_table.n.01_1." \
@@ -550,19 +606,21 @@ filename from `{scene}_task_{activity}_{def_id}_{inst_id}_template`.
 - `env.reset()` restores the initial file, so poses set after loading need either
   re-applying each reset or a `scene.update_initial_file()` (`prepare_robots` does this).
 
-## Why the task is not solved yet (2026-09-08)
+## The seven blockers, in the order they were found (2026-09-08)
 
-Six things blocked it, in the order they were found. All are fixed; the last two
-have **not been validated by a run yet** -- that is the next thing to do.
+All fixed, and all seven had to go before any topology could finish the activity.
+The seventh -- the sleeping apple, section above -- is the one that made the other
+six look insufficient, because it hid success even when the agents played well.
 
 | # | symptom | cause | fixed |
 |---|---|---|---|
 | 1 | every plan died at grounding, `decisions` stayed 0 | the runners inherited crafter's `CooperativeEnv(...)` call and placed no objects | `77d175296` |
 | 2 | ~3.4 s per env_step | two all-pairs scans per macro-step: `SceneGraphBuilder.step()` (14.9 s) and `CoopTaskTracker._fact_set()` (9.4 s) | `77d175296` |
 | 3 | agent placed apples on the wrong coffee table, `check_goal` never fired | `entity_id_for` numbered instances in scene order, independently of `task.object_scope`; `living_room_0` has two coffee tables | `5fda3d283` |
-| 4 | a single `PLACE_ON_TOP` cost >1000 ticks, so 2500 steps bought ~2 primitives per agent | `tune_primitive_macros()` existed, was measured (1100-1728 -> 118-379 ticks) and **was never called**; `MAX_STEPS_FOR_SETTLING` stayed at upstream's 500, and `_release` + `_settle_robot` each burn it in full | uncommitted at time of writing |
+| 4 | a single `PLACE_ON_TOP` cost >1000 ticks, so 2500 steps bought ~2 primitives per agent | `tune_primitive_macros()` existed, was measured (1100-1728 -> 118-379 ticks) and **was never called**; `MAX_STEPS_FOR_SETTLING` stayed at upstream's 500, and `_release` + `_settle_robot` each burn it in full | `efe4c0159` |
 | 5 | `wait` was an instant no-op, so an agent yielding the floor **stopped the world** (the plan loop does not step the env while any agent reasons) | `wait` was in `COMMUNICATION_ACTIONS` | `5fda3d283` |
-| 6 | 51 x `NO_SPACE_AROUND_TARGET`, all `{room: 200, trav: 0, robots: 0}`, target logged at 12 m -> 27 m -> 36 m -> 38 m from the room | upstream's `_place_with_predicate` does release -> `set_position_orientation` -> settle, and **`set_position_orientation` does not zero velocity**: the object arrives carrying the fall it accumulated while being released, and the settle integrates it out of the house | uncommitted at time of writing |
+| 6 | 51 x `NO_SPACE_AROUND_TARGET`, all `{room: 200, trav: 0, robots: 0}`, target logged at 12 m -> 27 m -> 36 m -> 38 m from the room | upstream's `_place_with_predicate` does release -> `set_position_orientation` -> settle, and **`set_position_orientation` does not zero velocity**: the object arrives carrying the fall it accumulated while being released, and the settle integrates it out of the house | `efe4c0159` |
+| 7 | `place_on_top` failed "it did not come to rest there" on a third to a half of placements, and `check_goal` never fired even after an apple was correctly delivered | `OnTop` is `Touching`, `Touching` is a contact-report query, and a slept PhysX actor reports no contacts; the default sleep threshold is 5e-05 and `keep_still()` zeroes the velocity on the way in | `e205c0e0b` |
 
 Method note, because it cost most of the day: for #6 I proposed three geometric
 explanations (the annulus round the table is full; the target is being carried by a
