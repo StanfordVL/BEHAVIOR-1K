@@ -181,11 +181,19 @@ class CooperativeBehaviorEnv:
 
         gm.USE_GPU_DYNAMICS = False
         gm.ENABLE_TRANSITION_RULES = False
+        # This flag, not OMNIGIBSON_HEADLESS, is what decides. gm.HEADLESS is
+        # seeded from that env var, but setting it here either way means the
+        # caller's intent wins in both directions: `--gui` opens a window even
+        # with OMNIGIBSON_HEADLESS=1 still exported in the shell, and the
+        # default stays headless on a machine that happens to have a DISPLAY.
+        gm.HEADLESS = bool(self.headless)
         if self.headless:
-            gm.HEADLESS = True
             # Headless and "no viewer camera" are separate: rendering offscreen
             # is exactly how a video gets recorded without a window.
             gm.RENDER_VIEWER_CAMERA = bool(self.video_path)
+        else:
+            # A window with nothing drawn in it is the worse failure mode.
+            gm.RENDER_VIEWER_CAMERA = True
         if self.video_path:
             from coop2.behavior_env.recording import enable_viewer_rendering  # noqa: PLC0415
 

@@ -155,6 +155,18 @@ python -m coop2.experiment.run_individual --agents 2 --steps 4000 --seed 0 \
 # run_centralized / run_broadcast_chain take the same flags.
 # Output lands in coop2/runs/<topology>_agents<N>_..._<timestamp>/.
 
+# Watch it in a window. --gui is the ONLY way: --show is a no-op (the
+# visualisation wrapper is a stub by design) and OMNIGIBSON_HEADLESS is not
+# enough on its own, because CooperativeBehaviorEnv defaults headless=True and
+# _build assigns gm.HEADLESS itself. Needs a DISPLAY. Verified: an
+# "OmniGibson 3.9.2" X window at 1468x966, with carb.windowing.plugins and
+# omni.kit.mainwindow started -- neither loads headless.
+python -m coop2.experiment.run_individual --gui --agents 2 --steps 60 --seed 0 \
+  --scene Pomaria_1_int --room living_room_0 \
+  --bddl-activity coop_two_apples_pomaria --model gpt-5.6-luna --llm-quiet
+# Headless runs still record: per-robot episode_agent_<i>.mp4 land in the run
+# folder, because RENDER_VIEWER_CAMERA and HEADLESS are separate switches.
+
 # Same stack with no credentials: substitutes StubLLMClient for the model, so a
 # later failure with a real one is unambiguously the model and not the plumbing.
 python feasibility_verify/verify_runner_offline.py

@@ -60,6 +60,7 @@ def run_individual_experiment(
     objects=None,
     bddl_activity=None,
     bddl_instance_id=0,
+    headless=True,
 ):
     """
     Run experiment with individual LLM agents (no communication).
@@ -136,6 +137,9 @@ def run_individual_experiment(
         env_kwargs["objects"] = objects
     if record_video:
         env_kwargs["video_path"] = os.path.join(output_dir, "episode.mp4")
+    # Explicit, because CooperativeBehaviorEnv._build sets gm.HEADLESS itself
+    # when this is True -- so OMNIGIBSON_HEADLESS alone cannot open a window.
+    env_kwargs["headless"] = headless
     if bddl_activity is not None:
         # The activity's goal expression is the only thing that can end an
         # episode early; there is no proxy check any more.
@@ -343,6 +347,11 @@ if __name__ == "__main__":
                              "run ends only on the step or wall-clock limit.")
     parser.add_argument("--bddl-instance-id", type=int, default=0,
                         help="activity_instance_id of the cached template to load")
+    parser.add_argument("--gui", action="store_true",
+                        help="Open the Isaac Sim viewport. Needs a DISPLAY, and note that "
+                             "--show is a no-op: the visualisation wrapper is a stub, and "
+                             "OMNIGIBSON_HEADLESS is overridden by the env's own headless "
+                             "default, so this flag is the only way to get a window.")
 
     args = parser.parse_args()
     
@@ -363,4 +372,5 @@ if __name__ == "__main__":
         room=args.room,
         bddl_activity=args.bddl_activity,
         bddl_instance_id=args.bddl_instance_id,
+        headless=not args.gui,
     )
