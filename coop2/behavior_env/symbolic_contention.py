@@ -339,11 +339,57 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
         self._require_near(obj, "grasp", GATE_GRASP)
         yield from super()._grasp(obj)
 
-    def _place_with_predicate(self, obj, predicate, *args, **kwargs):
-        # obj is the *reference* here (the table), not the thing in hand.
+    def _place_with_predicate(self, obj, predicate, near_poses=None, near_poses_threshold=None):
+        """Upstream's placement, with the object's velocity zeroed on arrival.
+
+        obj is the *reference* here (the table), not the thing in hand.
+
+        Reimplemented rather than delegated because of one line. Upstream does
+        release -> set_position_orientation -> settle, and
+        ``set_position_orientation`` moves a body without touching its
+        velocity. The object has just spent the release's settle (50 + 200
+        ticks) falling out of the gripper, so it arrives at the sampled pose
+        carrying that fall, and the settle afterwards integrates it: one
+        recorded episode had a task apple leave the house entirely, logged at
+        12 m, then 27 m, then 36 m, then 38 m from the living room. Every
+        subsequent navigate_to it then failed with NO_SPACE_AROUND_TARGET
+        (200/200 candidates rejected by the same-room filter), which reads as a
+        crowding problem and is really a missing object.
+
+        ``keep_still()`` is upstream's own helper for exactly this.
+        """
         self._require_unclaimed(obj, "place onto")
         self._require_near(obj, "place onto", GATE_PLACE)
-        yield from super()._place_with_predicate(obj, predicate, *args, **kwargs)
+
+        from omnigibson.action_primitives.action_primitive_set_base import (  # noqa: PLC0415
+            ActionPrimitiveError as _Error,
+        )
+
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise _Error(
+                _Error.Reason.PRE_CONDITION_ERROR,
+                "You need to be grasping an object first to place it somewhere.",
+            )
+
+        obj_pose = self._sample_pose_with_object_and_predicate(
+            predicate, obj_in_hand, obj,
+            near_poses=near_poses, near_poses_threshold=near_poses_threshold,
+        )
+        yield from self._release()
+
+        obj_in_hand.set_position_orientation(*obj_pose)
+        # The one line upstream is missing.
+        obj_in_hand.keep_still()
+        yield from self._settle_robot()
+
+        if not obj_in_hand.states[predicate].get_value(obj):
+            raise _Error(
+                _Error.Reason.EXECUTION_ERROR,
+                f"Failed to place {obj_in_hand.name} onto {obj.name}: it did not come to rest "
+                "there. It has been released, so grasp it again before retrying.",
+                {"dropped object": obj_in_hand.name, "target object": obj.name},
+            )
 
     def _open_or_close(self, obj, should_open):
         verb = "open" if should_open else "close"

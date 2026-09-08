@@ -247,7 +247,43 @@ class BehaviorActionExecutor:
 
     def submit_outcome(self, outcome: Dict[str, Any]) -> None:
         """Hand the engine's terminal outcome for this agent to the executor."""
-        self._last_outcome = outcome
+        self._last_outcome = self._rename_to_entity_ids(outcome)
+
+    def _rename_to_entity_ids(self, outcome: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Rewrite scene names in an outcome into the ids the agent knows.
+
+        A primitive can only raise with the scene name -- that is all the
+        controller has -- so failures arrived saying things like "Cannot reach
+        apple_48". The agent has never seen that string: it is shown ids like
+        apple.n.01_2 and told never to invent a name, so it cannot tell which
+        of its targets failed or even that the name refers to something in its
+        own plan. Longest name first, or apple_4 would match inside apple_48.
+        """
+        if not outcome or self.world_state is None:
+            return outcome
+        ids = getattr(self.world_state, "_ids", None)
+        if not ids:
+            return outcome
+
+        renamed = dict(outcome)
+        for name in sorted(ids, key=len, reverse=True):
+            entity_id = ids[name]
+            if entity_id == name:
+                continue
+            for field in ("failure_reason", "reason"):
+                text = renamed.get(field)
+                if isinstance(text, str) and name in text:
+                    renamed[field] = text.replace(name, entity_id)
+            metadata = renamed.get("metadata")
+            if isinstance(metadata, dict):
+                metadata = dict(metadata)
+                for key, value in metadata.items():
+                    if isinstance(value, str) and name in value:
+                        metadata[key] = value.replace(name, entity_id)
+                renamed["metadata"] = metadata
+            if isinstance(renamed.get("target"), str) and renamed["target"] == name:
+                renamed["target"] = entity_id
+        return renamed
 
     def check_termination_condition(
         self,

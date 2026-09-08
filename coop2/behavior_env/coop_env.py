@@ -154,6 +154,7 @@ class CooperativeBehaviorEnv:
             assert_multi_robot_sanity,
             build_multi_robot_config,
             prepare_robots,
+            tune_primitive_macros,
         )
         from coop2.behavior_env.placement import place_objects, place_robots  # noqa: PLC0415
         from coop2.behavior_env.primitive_engine import MultiAgentPrimitiveEngine  # noqa: PLC0415
@@ -167,6 +168,16 @@ class CooperativeBehaviorEnv:
         )
         from coop2.behavior_env.world_state import BehaviorWorldState  # noqa: PLC0415
         from coop2.cognitive.action.behavior_action import BehaviorActionExecutor  # noqa: PLC0415
+
+        # Before any controller exists: MacroDict locks a macro once it has
+        # been read. This was written, measured (primitives that cost
+        # 1100-1728 ticks dropped to 118-379) and then never called -- so
+        # MAX_STEPS_FOR_SETTLING stayed at upstream's 500, _release and
+        # _settle_robot each burned it in full, and a single PLACE_ON_TOP cost
+        # over 1000 ticks. A 2500-step episode bought about two primitives per
+        # agent, which is why every run so far ran out of steps rather than
+        # finishing the task.
+        tune_primitive_macros()
 
         gm.USE_GPU_DYNAMICS = False
         gm.ENABLE_TRANSITION_RULES = False

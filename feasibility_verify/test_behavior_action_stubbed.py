@@ -379,6 +379,33 @@ def main() -> int:
         "an id that matches nothing must pass through unchanged"
     ok("apple.n.01_01 resolves to the same object as apple.n.01_1")
 
+    print("test: failure text names objects by the id the agent was shown")
+    # A primitive can only raise with the scene name -- that is all the
+    # controller has -- so a real failure read "Cannot reach apple_48". The
+    # agent has never seen that string: it is shown apple.n.01_2 and told never
+    # to invent a name, so it could not tell which of its targets had failed.
+    world2 = FakeWorldState({
+        "apple_48": "apple.n.01_2",
+        "apple_4": "apple.n.01_9",          # a prefix of the above, on purpose
+        "coffee_table_gpkbiw_0": "coffee_table.n.01_1",
+    })
+    executor = Executor("agent_0", engine=FakeEngine(), world_state=world2)
+    executor.submit_outcome({
+        "status": "failed",
+        "failure_reason": "Cannot reach apple_48: no free floor space around it.",
+        "target": "apple_48",
+        "metadata": {"object": "apple_48", "target object": "coffee_table_gpkbiw_0"},
+    })
+    got = executor._last_outcome
+    assert "apple.n.01_2" in got["failure_reason"], got["failure_reason"]
+    assert "apple_48" not in got["failure_reason"], got["failure_reason"]
+    assert got["target"] == "apple.n.01_2", got["target"]
+    assert got["metadata"]["object"] == "apple.n.01_2"
+    assert got["metadata"]["target object"] == "coffee_table.n.01_1"
+    # Longest-first matters: apple_4 must not be substituted inside apple_48.
+    assert "apple.n.01_9" not in got["failure_reason"], got["failure_reason"]
+    ok("scene names in failure text and metadata become entity ids")
+
     print("\nALL TESTS PASSED")
     return 0
 

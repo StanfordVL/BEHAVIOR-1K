@@ -124,6 +124,19 @@ class FakeSymbolicPrimitives:
         self.log.append(("grasp", obj.name))
         yield from self._settle_robot()
 
+    def _get_obj_in_hand(self):
+        return self.robot._ag_obj_in_hand.get(self.arm)
+
+    def _sample_pose_with_object_and_predicate(self, predicate, obj_in_hand, obj, **kwargs):
+        # Upstream returns a (position, orientation) pair on the reference.
+        self.log.append(("sample_place", obj.name))
+        return (FakeVector(list(obj.position)), [0.0, 0.0, 0.0, 1.0])
+
+    def _release(self):
+        self.robot._ag_obj_in_hand[self.arm] = None
+        self.log.append(("release",))
+        yield from self._settle_robot()
+
     def _place_with_predicate(self, obj, predicate, *args, **kwargs):
         self.robot._ag_obj_in_hand[self.arm] = None
         self.log.append(("place", obj.name))
@@ -245,6 +258,21 @@ class FakeRobot:
         return "hold"
 
 
+class _AlwaysTrueStates(dict):
+    """``obj.states[predicate].get_value(reference)`` -> True for anything."""
+
+    class _True:
+        @staticmethod
+        def get_value(_reference=None):
+            return True
+
+    def __getitem__(self, _predicate):
+        return self._True()
+
+    def __contains__(self, _predicate):
+        return True
+
+
 class FakeObject:
     def __init__(self, name, position, in_rooms=None, aabb_extent=(0.05, 0.05, 0.05)):
         self.name = name
@@ -253,9 +281,24 @@ class FakeObject:
         self.aabb_extent = FakeVector(aabb_extent)
         self.open = False
         self.toggled = False
+        #: How many times keep_still() was called. Placement must zero the
+        #: object's velocity between the teleport and the settle, or the fall
+        #: it accumulated while being released is integrated afterwards.
+        self.stilled = 0
+        #: Predicate -> object whose get_value() the post-condition check
+        #: calls. Defaults to "the placement worked", so a test only overrides
+        #: it when the failure path is what is under test.
+        self.states = _AlwaysTrueStates()
 
     def get_position_orientation(self):
         return self.position, None
+
+    def set_position_orientation(self, position=None, orientation=None):
+        if position is not None:
+            self.position = FakeVector(list(position))
+
+    def keep_still(self):
+        self.stilled += 1
 
 
 def expect_error(generator, code):
@@ -344,7 +387,10 @@ def main() -> int:
 
     print("test 5: the holder can still act on what it holds")
     assert ctrl_a.holder_of(cup) is alice
-    assert list(ctrl_a._place_with_predicate(FakeObject("table_0", [0.6, 0.0, 0.4]), "OnTop")) == ["settle"] * 3
+    # Two settle phases, not one: placement releases (which settles) and then
+    # settles again after moving the object. The stub's old one-phase version
+    # was simpler than upstream, and this reimplementation matches upstream.
+    assert list(ctrl_a._place_with_predicate(FakeObject("table_0", [0.6, 0.0, 0.4]), "OnTop")) == ["settle"] * 6
     assert alice._ag_obj_in_hand["left"] is None
     assert ctrl_b.holder_of(cup) is None, "released -> claim cleared"
     ok("holder_of() is a live cross-robot view, and self-claims do not block")
@@ -444,6 +490,23 @@ def main() -> int:
     assert len(list(ctrl_a.wait(ticks=10_000))) == module.MAX_WAIT_TICKS
     assert len(list(ctrl_a.wait(ticks=0))) == 1, "a wait of zero would be the old bug again"
     ok(f"wait yields {module.DEFAULT_WAIT_TICKS} ticks by default, capped at {module.MAX_WAIT_TICKS}")
+
+    print("test: placement zeroes the object's velocity before settling")
+    # Upstream does release -> set_position_orientation -> settle, and
+    # set_position_orientation does not touch velocity. The object arrives
+    # carrying the fall it accumulated while being released, and the settle
+    # integrates it: one episode logged a task apple at 12 m, then 27, then
+    # 36, then 38 m from the living room, after which every navigate_to it
+    # failed with NO_SPACE_AROUND_TARGET (200/200 rejected by the same-room
+    # filter) -- a missing object reading as a crowding problem.
+    _, alice, bob, ctrl_a, ctrl_b = fresh()
+    cup = FakeObject("cup_2", [0.5, 0.0, 0.5])
+    table = FakeObject("table_1", [0.6, 0.0, 0.4])
+
+    assert list(ctrl_a._grasp(cup)) == ["settle"] * 3
+    list(ctrl_a._place_with_predicate(table, "OnTop"))
+    assert cup.stilled == 1, f"keep_still called {cup.stilled} times, expected 1"
+    ok("keep_still() runs between the teleport and the settle")
 
     print("\nALL TESTS PASSED")
     return 0

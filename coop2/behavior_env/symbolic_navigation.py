@@ -333,6 +333,13 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
         distance_lo, distance_hi = self.sampling_range_for(obj)
         attempts = self._nav_sampling_attempts if sampling_attempts is None else sampling_attempts
 
+        # Which filter rejected how many. NO_SPACE_AROUND_TARGET only says
+        # "none of the candidates passed", and three separate hypotheses about
+        # which filter was responsible were all wrong when measured offline --
+        # the annulus accepts 28-48% of candidates in every state that could be
+        # reproduced by hand. Reporting the breakdown at the moment of failure
+        # is cheaper than guessing which state the episode was in.
+        rejected = {"room": 0, "trav": 0, "robots": 0}
         for _ in range(attempts):
             distance = th.rand(1).item() * (distance_hi - distance_lo) + distance_lo
             yaw = th.rand(1).item() * 2.0 * math.pi - math.pi
@@ -350,15 +357,19 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
             # None for anything off the map).
             if self._nav_require_same_room and self._seg_map() is not None:
                 if self._room_of(candidate[:2]) not in target_rooms:
+                    rejected["room"] += 1
                     continue
             if not self._is_traversable(candidate[:2]):
+                rejected["trav"] += 1
                 continue
             if not self._clear_of_other_robots(candidate[:2]):
+                rejected["robots"] += 1
                 continue
             if self._nav_destinations is not None:
                 self._nav_destinations.reserve(self.robot.name, candidate[:2])
             return candidate
 
+        self._nav_last_rejections = dict(rejected)
         # No candidate satisfied all of the filters. Returning None makes
         # _navigate_to_obj raise PLANNING_ERROR -- the honest signal that this
         # target has no standable pose around it. Measured on Rs_int that is
@@ -391,6 +402,8 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
                 "Another agent may already be standing there. Try a different target, or wait for "
                 "them to move.",
                 {"object": obj.name, "sampling_range": [round(lo, 2), round(hi, 2)],
+                 "rejected_by": getattr(self, "_nav_last_rejections", None),
+                 "target_xy": [round(float(v), 2) for v in obj.get_position_orientation()[0][:2]],
                  "reason_code": "NO_SPACE_AROUND_TARGET"},
             )
         yield from self._navigate_to_pose(pose)

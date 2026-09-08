@@ -212,6 +212,18 @@ class BehaviorWorldState:
         except Exception:  # noqa: BLE001 - categories outside the taxonomy
             return None
 
+    def entity_id_of_name(self, name: str) -> Optional[str]:
+        """``apple_48`` -> ``apple.n.01_2``, or None if unknown.
+
+        The reverse of entity_id_for, for error text. A primitive raises with
+        the *scene* name, because that is all the controller has, and the agent
+        has never seen it -- it is told to use only the ids from "You can do:"
+        and never to invent one. An outcome that says "Cannot reach apple_48"
+        is therefore unusable: the agent cannot tell which of its targets
+        failed, or even that the name refers to something it knows.
+        """
+        return self._ids.get(name)
+
     def adopt_task_scope(self, task) -> int:
         """Take entity ids straight from a BehaviorTask's object_scope.
 

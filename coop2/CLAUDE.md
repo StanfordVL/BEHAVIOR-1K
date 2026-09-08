@@ -14,27 +14,49 @@ This file is only the operational summary.
 
 | layer | package | status |
 |---|---|---|
-| L6 experiment (runners, grid, metrics) | `coop2/experiment/` | **copied, imports clean** (M3) |
-| L5 comm_topology (individual/chain/centralized) | `coop2/comm_topology/` | **copied verbatim** (M3) |
-| L4 cognitive/agent (FSM, memory, broker, prompts, LLM) | `coop2/cognitive/agent/` | **copied**, 3 edits pending (M5) |
-| L3 cognitive/plan (plan lifecycle, PlanningEnvWrapper) | `coop2/cognitive/plan/` | **copied**, `_plan_goal_failure_reason` pending |
+| L6 experiment (runners, grid, metrics) | `coop2/experiment/` | **GPU-verified with a stub LLM** (M7 steps 1–2) |
+| L5 comm_topology (individual/chain/centralized) | `coop2/comm_topology/` | **copied verbatim, exercised by M7** (individual) |
+| L4 cognitive/agent (FSM, memory, broker, prompts, LLM) | `coop2/cognitive/agent/` | **BDDL vocabulary aligned, FSM GPU-verified** (M7) |
+| L3 cognitive/plan (plan lifecycle, PlanningEnvWrapper) | `coop2/cognitive/plan/` | **GPU-verified driving the facade** (2026-09-06) |
 | L2 cognitive/action (symbolic action → primitive) | `coop2/cognitive/action/behavior_action.py` | **rewritten, GPU-verified** (M5) |
-| L1a world model | `coop2/behavior_env/world_state.py` | **done**, CPU-tested (M4) |
-| L1b text observation + target_hints | `coop2/behavior_env/symbolic_view.py` | **done**, CPU-tested (M4) |
-| L1 placement (scene-derived poses) | `coop2/behavior_env/placement.py` | **done**, GPU-verified |
+| L1a world model | `coop2/behavior_env/world_state.py` | **done, CPU-tested + GPU-verified** (M4) |
+| L1b text observation + target_hints | `coop2/behavior_env/symbolic_view.py` | **done, CPU-tested + GPU-verified** (M4) |
+| L1c primitive execution engine | `coop2/behavior_env/primitive_engine.py` | **done, GPU-verified** 2026-09-05 |
+| L1d task tracker | `coop2/behavior_env/cooperative_tasks.py` | **done, M6 PASSED** 2026-09-07 |
+| L1 symbolic nav fix + contention | `coop2/behavior_env/symbolic_{navigation,contention}.py` | **done, GPU-verified** 2026-09-05 |
+| L1 placement (scene-derived poses) | `coop2/behavior_env/placement.py` | **done, GPU-verified** |
 | L1 facade | `coop2/behavior_env/coop_env.py` | **done, GPU-verified** (M5) |
-| L1d task tracker | `coop2/behavior_env/cooperative_tasks.py` | **import stub only** (M6) |
+| L0 N-robot env config + startup ritual | `coop2/behavior_env/env_setup.py` | **done, GPU-verified** 2026-09-05 |
 | — repair shim, viz stub | `coop2/_repair_shim/`, `coop2/cognitive/viz/` | **done** (no-op by design) |
-| L1c primitive execution engine | `coop2/behavior_env/primitive_engine.py` | **done, unverified on GPU** |
-| L1 symbolic nav fix + contention | `coop2/behavior_env/symbolic_{navigation,contention}.py` | **done, unverified on GPU** |
-| L1 env facade, world model, text obs, task tracker | `coop2/behavior_env/` | only L0+L1c exist |
-| L0 N-robot env config + startup ritual | `coop2/behavior_env/env_setup.py` | **done, unverified on GPU** |
+| BDDL task + cached instance | `bddl3/.../coop_two_apples_pomaria/`, `feasibility_verify/{sample,verify}_coop_task_instance.py` | **done, GPU-verified** 2026-09-07 |
+| M9 wiring (BehaviorTask + `check_goal` termination) | `coop2/behavior_env/coop_env.py` | **done**, commits `e4d28a98`…`5fda3d28` |
 
-**M1 / M2 / M2.5 passed on GPU 2026-09-05** (RTX 5070 Ti, symbolic mode): env
-loads in 20.4 s, two symbolic controllers build in 0.1 s with cuRobo skipped
-entirely, `--mode concurrent` gives overlap_ratio 0.99 against 0.00 for
-`--mode exclusive`, and the radius gate / travel cost / `OBJECT_CLAIMED` all
-fire. **M3/M4/M5 passed** (M5 on 2026-09-06): `import coop2.experiment.run_individual` and every other copied module imports clean. Next is **M4** (L1a/L1b world model + text observation). Acceptance criteria are in PORTING_PLAN.md §7.
+## Where we are (2026-09-07)
+
+**M1–M6 passed. M7 steps 1–2 passed** (offline runner with `StubLLMClient`, zero
+tracebacks, 10 output files). **M9 is wired**: `coop_env` loads OmniGibson's
+`BehaviorTask` from the cached instance when `bddl_activity` is set, and
+`compiled_task.check_goal` is the *only* authority over `terminated` — the stand-in
+"every agent holds an apple" check is gone. Acceptance criteria are in PORTING_PLAN.md §7.
+
+**Credentials now exist** (`.env`, Azure OpenAI, deployment `gpt-5.6-luna` — the
+`.env` is gitignored and does not travel between machines, so recreate it). Real-LLM
+runs work end to end on all three topologies. `beta.chat.completions.parse` still
+exists in the installed `openai` 3.0.0, so the 1.x-era call site needs no change.
+
+What is left:
+
+1. **Nobody has solved the activity yet.** Best run so far: one apple delivered to
+   `coffee_table.n.01_1` by real-LLM `individual` at 2500 steps. The second never
+   arrives. See "Why the task is not solved yet" below — the last known blocker
+   (objects flying out of the scene) was fixed on 2026-09-08 but **not yet re-run**.
+2. **M7 step 3** — three topologies × ≥3 seeds, for the metrics table. Runnable now.
+3. **M8** — decentralized topology.
+
+**Scene note:** the earlier target was `house_single_floor` (Rs_int measured unusable,
+96.2 % of sampled base poses reject). The BDDL task is on `Pomaria_1_int`/`living_room_0`
+because that is where the two-armchair + coffee-table layout exists; revisit if N=9 needs
+more floor area than that room has.
 
 ## Known defects (found during M1–M2.5, not yet fixed)
 
@@ -434,6 +456,130 @@ returns the agent to the **reasoning stage**, which is the only place it can
 negotiate for the contested object or retarget. Grinding the plan on instead
 would turn contention into silent wasted motion rather than a decision the
 topology layer is measured on.
+
+## M9: BDDL reconnected — first custom task (2026-09-07)
+
+A real BDDL activity now exists and is cached as a task instance, and `coop_env`
+already loads it (`bddl_activity=...` -> `BehaviorTask` with
+`online_object_sampling=False`) with `compiled_task.check_goal` deciding `terminated`.
+This section is the authoring record: how the activity was written and how to
+regenerate the instance.
+
+**The task**: `bddl3/bddl/activity_definitions/coop_two_apples_pomaria/problem0.bddl`
+— `Pomaria_1_int` / `living_room_0`, one apple on each of the two armchairs, goal is
+`(forall (?apple.n.01 - apple.n.01) (ontop ?apple.n.01 ?coffee_table.n.01_1))`.
+
+```bash
+# produce the instance (~45 s, writes the template json). NOT in git -- re-run after a machine change.
+OMNIGIBSON_HEADLESS=1 python -u feasibility_verify/sample_coop_task_instance.py
+# acceptance test: loads the cached template, forces the goal, checks check_goal flips
+OMNIGIBSON_HEADLESS=1 python -u feasibility_verify/verify_coop_task_instance.py
+```
+
+Template lands at
+`$OMNIGIBSON_DATASET/2026-challenge-task-instances/scenes/Pomaria_1_int/json/Pomaria_1_int_task_coop_two_apples_pomaria_0_0_template.json`.
+`BehaviorTask` finds it on its own — with `online_object_sampling: false` and no
+`scene_file`/`scene_instance`, `verify_scene_and_task_config` rebuilds that exact
+filename from `{scene}_task_{activity}_{def_id}_{inst_id}_template`.
+
+### Authoring facts (all verified, not read off docstrings)
+
+- **A new activity directory is auto-discovered.** `get_all_activities()` is `os.listdir`
+  on `activity_definitions/`; `activity_manifest.txt` and
+  `activity_to_preselected_scenes.json` are read by no code at all.
+  `kb.add_task(name, definition=<string>)` registers one at runtime with no files, but then
+  `room_requirements` stays empty and `task.matching_scene(scene)` falsely returns "pass" —
+  only the file route gets a real pre-flight check. Use `matching_scene` before burning a
+  GPU run; it names the missing furniture per room instance.
+- **`sampling_whitelist` is `{synset: {category: {model: None-or-bbox}}}`** — a dict, not
+  the "list of valid models" the `BehaviorTask` docstring claims (`bddl_utils.py:894` calls
+  `.keys()` on it). It is the only way to pin one of several same-synset scene objects:
+  `living_room_0` has two coffee tables and BDDL only knows the synset.
+- **Declare exactly one agent.** Omitting it entirely crashes `BDDLSampler.__init__` at
+  `bddl_utils.py:486` with `KeyError: 'agent.n.01_1'`, because `update_activity` puts that
+  key in `object_scope` unconditionally while `_object_instance_to_synset` comes from
+  `parsed_objects`. Declaring a *second* agent also crashes (the sampler binds only
+  `agent.n.01_1`, leaving `None` for the rest, and `_filter_object_scope` then dereferences
+  `None.prim_type`); it works only with a patch to `bddl_utils.py:553`, which was written,
+  verified, and then **reverted on purpose** — OmniGibson is unmodified. Robots past
+  `robots[0]` are simply invisible to BDDL, which costs nothing while no goal mentions an
+  agent. The *cached* path never needed the patch: `behavior_task.py:548` already maps
+  `agent.n.01_N -> env.robots[N-1]`.
+- **`inroom` cannot be evaluated** (`PREDICATE_TO_STATE` has no `InRoom`), so
+  `compiled_task.check_initial_conditions()` raises `KeyError` on any task using it. Check
+  the kinematic facts directly instead. Same trap for `broken` and `grasped`; `grasped` is
+  one dict line away from working (`object_states.IsGrasping` already exists).
+- **Sampling is unseeded and apples roll.** Different apple models get drawn per instance
+  and one rolled off the armchair during the 300-step settle. Both apples are pinned to
+  model `omzprq` via the whitelist, and the script exits non-zero rather than save a layout
+  whose own initial conditions are already violated. Always cache a template; never sample
+  per run. `--instance_id N` produces alternative layouts.
+
+### What the template does and does not carry
+
+- Robot **world poses are in there**, but as `joint_pos` of the holonomic base joints, not
+  `root_link.pos` — the root stays at the spawn/park anchor (`agent_0` reads
+  `[300, 300, 300]`). Real pose = anchor + first three joint values.
+- Robot **controller configs are NOT in there.** `init_info.args` holds only
+  `name / model / obs_modalities / default_reset_mode / scale`; the saved
+  `controller_groups` is goal *state*, and its `arm_left` goal is `target_pos` +
+  `target_ori_mat`, i.e. the R1 **default task-space controller**, not the
+  `JointController` stack `r1_primitives.yaml` requires.
+- ⇒ **Load it with `include_robots: False`** and supply coop2's own robot list. The template
+  then contributes only the object layout (apples, armchairs, coffee table), which is all we
+  want from it; `build_multi_robot_config` already sets that flag.
+- `env.reset()` restores the initial file, so poses set after loading need either
+  re-applying each reset or a `scene.update_initial_file()` (`prepare_robots` does this).
+
+## Why the task is not solved yet (2026-09-08)
+
+Six things blocked it, in the order they were found. All are fixed; the last two
+have **not been validated by a run yet** -- that is the next thing to do.
+
+| # | symptom | cause | fixed |
+|---|---|---|---|
+| 1 | every plan died at grounding, `decisions` stayed 0 | the runners inherited crafter's `CooperativeEnv(...)` call and placed no objects | `77d175296` |
+| 2 | ~3.4 s per env_step | two all-pairs scans per macro-step: `SceneGraphBuilder.step()` (14.9 s) and `CoopTaskTracker._fact_set()` (9.4 s) | `77d175296` |
+| 3 | agent placed apples on the wrong coffee table, `check_goal` never fired | `entity_id_for` numbered instances in scene order, independently of `task.object_scope`; `living_room_0` has two coffee tables | `5fda3d283` |
+| 4 | a single `PLACE_ON_TOP` cost >1000 ticks, so 2500 steps bought ~2 primitives per agent | `tune_primitive_macros()` existed, was measured (1100-1728 -> 118-379 ticks) and **was never called**; `MAX_STEPS_FOR_SETTLING` stayed at upstream's 500, and `_release` + `_settle_robot` each burn it in full | uncommitted at time of writing |
+| 5 | `wait` was an instant no-op, so an agent yielding the floor **stopped the world** (the plan loop does not step the env while any agent reasons) | `wait` was in `COMMUNICATION_ACTIONS` | `5fda3d283` |
+| 6 | 51 x `NO_SPACE_AROUND_TARGET`, all `{room: 200, trav: 0, robots: 0}`, target logged at 12 m -> 27 m -> 36 m -> 38 m from the room | upstream's `_place_with_predicate` does release -> `set_position_orientation` -> settle, and **`set_position_orientation` does not zero velocity**: the object arrives carrying the fall it accumulated while being released, and the settle integrates it out of the house | uncommitted at time of writing |
+
+Method note, because it cost most of the day: for #6 I proposed three geometric
+explanations (the annulus round the table is full; the target is being carried by a
+teammate; `DestinationRegistry` reservations accumulate) and **measured all three to
+be wrong** -- `feasibility_verify/measure_target_capacity.py` shows 28-48 % of
+candidate poses accepted in every reproducible state, so 200 consecutive rejections
+were impossible. What settled it was making the failure report its own attribution
+(`rejected_by` per filter, plus `target_xy`) rather than reproducing states by hand.
+Same shape as #2, where four rounds of guessing lost to one cProfile run.
+
+## Diagnostics that exist now, use them first
+
+- `feasibility_verify/preview_cameras.py` -- one frame per camera view, then stops.
+  Framing cannot be checked by reading pose numbers; four wrong poses got through
+  that way. Also renders control shots straight at each robot, which separates "the
+  framing is wrong" from "nothing renders".
+- `feasibility_verify/measure_target_capacity.py` -- per-filter rejection histogram
+  around any target, with and without a teammate parked next to it.
+- `COOP2_ENGINE_VERBOSE=1` -- per-primitive progress lines (`agent_0:PLACE_ON_TOP@1063`).
+  This is what exposed #4: tick counts rising linearly with env_step and never ending.
+- `[nav]` lines -- sampled pose, distance and travel ticks charged, one per navigate.
+- `NO_SPACE_AROUND_TARGET` metadata carries `rejected_by` and `target_xy`.
+
+## Open, not yet diagnosed
+
+- **Models mangle instance suffixes.** `apple.n.01_01` for `_1` appeared in three
+  separate runs; `resolve_target` now normalises zero padding. But putting the id in
+  the goal text produced `coffee_table.n.01_01_1` -- a *doubled* suffix, which the
+  normaliser does not handle. Prompt wording was tried first and did not hold.
+- **`TOO_FAR` after a successful `navigate_to` to the same object** (16 in one run).
+  The prompt promises navigation puts you in range. The object was being carried by a
+  teammate, so it moved; and the code returned `TOO_FAR` rather than `OBJECT_CLAIMED`,
+  which means `holder_of` saw it as unheld -- consistent with the window inside
+  `_place_with_predicate` where the object has been released but not yet placed.
+- **`progress 0/4`** reads as "nothing started" when it means "action 1 is still
+  running". Cosmetic, but it misled a diagnosis once.
 
 ## Deliberately not implemented
 
