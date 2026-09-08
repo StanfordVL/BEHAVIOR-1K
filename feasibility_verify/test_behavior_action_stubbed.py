@@ -363,6 +363,16 @@ def main() -> int:
     assert _normalise_instance_id("no_digits_here") is None
     assert _normalise_instance_id("nounderscore") is None
     assert _normalise_instance_id(None) is None
+    # A doubled suffix: naming coffee_table.n.01_1 in the goal text (living_room_0
+    # holds two coffee tables, so "the coffee table" is ambiguous) made a model
+    # re-pad the index it was handed and then append its own.
+    assert _normalise_instance_id("coffee_table.n.01_01_1") == "coffee_table.n.01_1"
+    assert _normalise_instance_id("coffee_table.n.01_1_1") == "coffee_table.n.01_1"
+    # But two suffixes that disagree name two different instances, and guessing
+    # which one the model meant is worse than an unknown target.
+    assert _normalise_instance_id("apple.n.01_2_1") is None
+    # A scene name, whose non-numeric middle segment must not be eaten.
+    assert _normalise_instance_id("apple_omzprq_0") == "apple_omzprq_0"
 
     # The shared fixture above still uses the pre-BDDL "apple#1" ids; production
     # ids are BDDL instance names, which is where the padding happens.
@@ -377,6 +387,8 @@ def main() -> int:
         "the id that actually cost a plan in the recorded run"
     assert executor.resolve_target("apple.n.01_9") == "apple.n.01_9", \
         "an id that matches nothing must pass through unchanged"
+    assert executor.resolve_target("coffee_table.n.01_01_1") == "coffee_table_gpkbiw_0", \
+        "the doubled suffix the goal text provoked"
     ok("apple.n.01_01 resolves to the same object as apple.n.01_1")
 
     print("test: failure text names objects by the id the agent was shown")

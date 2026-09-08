@@ -24,6 +24,7 @@ unaware that an LLM exists.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 from coop2.behavior_env.primitive_engine import ReasonCode
@@ -95,19 +96,32 @@ BEHAVIOR_ACTION_SCHEMA = {
 }
 
 
+_INSTANCE_SUFFIXES = re.compile(r"^(?P<base>.*?)(?P<suffixes>(?:_\d+)+)$")
+
+
 def _normalise_instance_id(entity_id: Optional[str]) -> Optional[str]:
     """``apple.n.01_01`` -> ``apple.n.01_1``; None if there is no numeric suffix.
 
     Only the trailing instance index is touched. The synset itself contains
     digits (``apple.n.01``) that must not be rewritten, which is why this
-    splits on the last underscore rather than stripping zeros anywhere.
+    matches ``_<digits>`` groups at the end rather than stripping zeros anywhere.
+
+    *Several* trailing groups collapse to one, because putting an id in the goal
+    text made a model echo it as ``coffee_table.n.01_01_1`` -- it re-padded the
+    index it was given and then appended its own. Collapsing is only safe when
+    every group names the same instance, so a genuine disagreement
+    (``apple.n.01_2_1``) is left alone and fails loudly as an unknown target
+    rather than being silently resolved to a guess.
     """
-    if not entity_id or "_" not in entity_id:
+    if not entity_id:
         return None
-    base, _, suffix = entity_id.rpartition("_")
-    if not base or not suffix.isdigit():
+    match = _INSTANCE_SUFFIXES.match(entity_id)
+    if match is None or not match.group("base"):
         return None
-    return f"{base}_{int(suffix)}"
+    indices = {int(group) for group in match.group("suffixes").split("_") if group}
+    if len(indices) > 1:
+        return None
+    return f"{match.group('base')}_{indices.pop()}"
 
 
 class BehaviorActionExecutor:

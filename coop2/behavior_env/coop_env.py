@@ -246,6 +246,7 @@ class CooperativeBehaviorEnv:
         if getattr(task, "object_scope", None):
             adopted = self.world.adopt_task_scope(task)
             print(f"[setup] adopted {adopted} entity ids from the BDDL object scope")
+        self._keep_task_objects_awake()
         self.executors = {
             agent_id: BehaviorActionExecutor(agent_id, engine=self.engine, world_state=self.world)
             for agent_id in self.agent_names
@@ -417,6 +418,9 @@ class CooperativeBehaviorEnv:
         if not self._loaded:
             self._build()
         self._pending_outcomes = {}
+        # Re-applied here because a scene reset restores the initial file, and a
+        # task object that is allowed to sleep is invisible to OnTop.
+        self._keep_task_objects_awake()
         self.world.step()
         # Baseline at env_step 0. The tracker only samples when a primitive
         # terminates, so its first snapshot lands hundreds of ticks in, by
@@ -592,6 +596,51 @@ class CooperativeBehaviorEnv:
             {agent_id: truncated_all for agent_id in self.agent_names},
             info,
         )
+
+    def _keep_task_objects_awake(self) -> None:
+        """Stop PhysX putting the task's objects to sleep.
+
+        ``OnTop`` is ``Touching`` and ``Touching`` is a contact-report query, and
+        **a sleeping actor emits no contact reports**. An apple placed on the
+        coffee table falls the sampler's 2 cm z-offset, comes to rest, and PhysX
+        sleeps it at the default threshold of 5e-05 -- after which the apple is
+        still sitting on the table and ``OnTop`` reads False, permanently. It is
+        not a placement or geometry failure: measured with
+        ``feasibility_verify/measure_placement_rest.py``, the apple is motionless
+        at the same z whether the predicate says yes or no, ``is_asleep`` is the
+        only thing that differs, and ``wake()`` plus one step flips ``OnTop`` to
+        True without the object moving at all.
+
+        Two readers were being lied to, which is why this is fixed here rather
+        than at either call site: ``_place_with_predicate`` reported
+        EXECUTION_ERROR "it did not come to rest there" for a third to a half of
+        all placements, and -- the expensive one -- ``check_goal`` cannot see a
+        delivered apple that has gone to sleep, so the activity reads unsolved
+        even once both apples are on the table.
+
+        Waking one side of a resting pair wakes the island, so the movable
+        objects are enough; robots are excluded because they are driven every
+        tick anyway.
+        """
+        task = getattr(self.env, "task", None)
+        scope = getattr(task, "object_scope", None) or {}
+        robots = {robot.name for robot in self.env.robots}
+        kept = []
+        for entity in scope.values():
+            obj = getattr(entity, "wrapped_obj", entity)
+            if obj is None or getattr(obj, "name", None) in robots:
+                continue
+            if getattr(obj, "kinematic_only", True):
+                continue
+            try:
+                obj.sleep_threshold = 0.0
+                obj.wake()
+            except Exception as error:  # noqa: BLE001 - never block a run on this
+                print(f"[setup] could not keep {getattr(obj, 'name', obj)} awake: {error}")
+                continue
+            kept.append(obj.name)
+        if kept:
+            print(f"[setup] {len(kept)} task objects will never sleep: {sorted(kept)}")
 
     def _goal_reached(self) -> bool:
         """Has the episode's goal been met?
