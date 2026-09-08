@@ -31,7 +31,7 @@ This file is only the operational summary.
 | BDDL task + cached instance | `bddl3/.../coop_two_apples_pomaria/`, `feasibility_verify/{sample,verify}_coop_task_instance.py` | **done, GPU-verified** 2026-09-07 |
 | M9 wiring (BehaviorTask + `check_goal` termination) | `coop2/behavior_env/coop_env.py` | **done**, commits `e4d28a98`…`5fda3d28` |
 
-## Where we are (2026-09-07)
+## Where we are (2026-09-08)
 
 **M1–M6 passed. M7 steps 1–2 passed** (offline runner with `StubLLMClient`, zero
 tracebacks, 10 output files). **M9 is wired**: `coop_env` loads OmniGibson's
@@ -58,51 +58,26 @@ What is left:
 because that is where the two-armchair + coffee-table layout exists; revisit if N=9 needs
 more floor area than that room has.
 
-## Known defects (found during M1–M2.5, not yet fixed)
+## Open defects
 
-0. **Measured 2026-09-05: upstream's collision check is affordable but not
-   sufficient.** One `CuRoboMotionGenerator(robot, use_default_embodiment_only=True,
-   batch_size=2)` per R1 costs **7.7 s / 4.0 s and ~2.2 GB each** (6.23 GB of
-   15.4 GB for two), and one `check_collisions` batch costs **96 ms with
-   `update_obstacles`, 5 ms without**. It **does** reject poses on top of the
-   other robot (0/4 collision-free), fixing the `holding=agent_1` corruption.
-   It does **not** reject standing on a 5 cm apple: 8/8 collision-free at every
-   distance from 0.05 m to 0.45 m, because the robot base genuinely clears it.
-   So a target-clearance floor is still needed on top. NB `batch_size=16` OOMs
-   a 16 GB card during `mg.warmup()` (13.25 GiB allocated) -- keep the default 2.
+Fixed ones are not listed here -- the fix and its reasoning live in the commit
+and in the code comment at the site. What is still true:
 
-1. ~~**`distance_range` lower bound is 0.0**~~ **FIXED 2026-09-05.** The sampler
-   now derives its range per object as
-   `[clearance(obj), clearance(obj) + reach]` where
-   `clearance = obj_half_diagonal_xy + robot_radius + margin`, and filters every
-   candidate on traversability (eroded trav map) and separation from other
-   robots (default `2 * robot_radius`, just-touching -- symbolic navigation
-   teleports, so there is no path to keep clear). `interaction_radius` is
-   likewise per object now, derived from the same range, because a fixed radius
-   cannot serve both an apple (0.72 m) and a table (3.38 m). Original text:
-   **`distance_range` lower bound is 0.0**, inherited from upstream
-   `BASE_POSE_SAMPLING_LOWER_BOUND`. Safe upstream only because cuRobo
-   validates the sampled pose; our cuRobo-free sampler does not, so the robot
-   can teleport *onto* its target. Observed: agent_0 landed 0.105 m from
-   apple_0 and the subsequent grasp failed `POST_CONDITION`; with contention
-   off, both robots landed on each other and agent_0's **physical** assisted
-   grasp latched onto robot agent_1 (`holding=agent_1`). Raise the lower bound
-   and reject candidates near another robot.
-2. ~~**apple_0 at (-1.694, -3.578) has `room=None`**~~ **FIXED 2026-09-05**:
-   moved to (-0.5, -1.25), which is in `living_room_0`, inside the viewer camera
-   frustum, has the best standable-pose fraction of any visible in-room point in
-   this scene (23%), and is near-equidistant from both robots (1.99 vs 1.95 m)
-   so `--contend` is a real race. Original text: **apple_0 has `room=None`** so
-   `_target_rooms` returns `[None]` and the same-room filter degenerates to
-   `None in [None]`, accepting any candidate. Will break L1b's room-level
-   observation.
-3. **`_settle_robot` makes tick counts nondeterministic**: it loops to
-   `MAX_STEPS_FOR_SETTLING=500` until velocity < 0.01, so a robot teleported
-   into geometry never settles. The same seeded NAVIGATE_TO cost 359 / 421 /
-   858 ticks across three runs.
-4. A rejected precondition still costs **50 ticks**, not 0: `apply_ref` runs
-   its "settle before returning" block after catching the error and before
-   raising the group.
+1. **A rejected precondition costs 50 ticks, not 0.** ``apply_ref`` runs its
+   "settle before returning" block after catching the error and before raising
+   the group, so ``TOO_FAR`` and friends are not free. Visible in the plan log
+   as ``ticks=50`` on a failed action.
+2. **cuRobo, if it is ever reintroduced, rejects poses on the other robot but
+   not poses on a small object.** Measured 2026-09-05: 8/8 candidate poses
+   collision-free from 0.05 m to 0.45 m from a 5 cm apple, because the base
+   genuinely clears it -- a target-clearance floor is needed on top of any
+   collision check. One generator per R1 costs ~2.2 GB and 4-8 s, and
+   ``batch_size=16`` OOMs a 16 GB card in ``mg.warmup()``; the default is 2.
+   cuRobo is currently **not used at all** (user decision): pose validity comes
+   from the trav map plus geometry.
+
+See also "Open, not yet diagnosed" near the end of this file for behaviour that
+is understood but not yet explained.
 
 ## Commands
 
@@ -110,17 +85,38 @@ Use the `behavior` conda env (see the repo root `AGENTS.md`), and
 `OMNIGIBSON_HEADLESS=1` when there is no display.
 
 ```bash
-# GPU demos (need Isaac + an RTX GPU)
-python feasibility_verify/multiagent_concurrent_primitives.py --plan navigate
-python feasibility_verify/multiagent_concurrent_primitives.py --mode exclusive
-python feasibility_verify/multiagent_concurrent_symbolic_primitives.py --plan navigate_to
+# CPU-only regression checks -- no Isaac, no GPU, a few seconds each. RUN THESE
+# FIRST after touching anything in coop2/. They are main() scripts, not pytest
+# cases: `pytest` collects nothing from them.
+for f in feasibility_verify/test_*.py; do python "$f"; done
 
-# CPU-only regression tests -- no Isaac, no GPU. RUN THESE FIRST after
-# touching anything in coop2/behavior_env/.
-python feasibility_verify/test_primitive_engine_stubbed.py
-python feasibility_verify/test_symbolic_navigation_stubbed.py
-python feasibility_verify/test_symbolic_contention_stubbed.py
-python feasibility_verify/test_world_state_stubbed.py
+# The real thing: an LLM-driven episode against the BDDL activity.
+python -m coop2.experiment.run_individual --agents 2 --steps 2500 --seed 0 \
+  --scene Pomaria_1_int --room living_room_0 \
+  --bddl-activity coop_two_apples_pomaria \
+  --goal "Put both apples on coffee_table.n.01_1." \
+  --model gpt-5.6-luna --llm-quiet
+# run_centralized / run_broadcast_chain take the same flags.
+# Output lands in coop2/runs/<topology>_agents<N>_..._<timestamp>/.
+
+# Same stack with no credentials: substitutes StubLLMClient for the model, so a
+# later failure with a real one is unambiguously the model and not the plumbing.
+python feasibility_verify/verify_runner_offline.py
+
+# BDDL: sample an activity instance (~45 s, exits non-zero without saving if the
+# layout is unstable), then check it, then check that check_goal ends an episode.
+python feasibility_verify/sample_coop_task_instance.py
+python -u feasibility_verify/verify_coop_task_instance.py
+python -u feasibility_verify/verify_bddl_terminates_episode.py
+
+# Diagnostics. Reach for these before forming a hypothesis.
+python -u feasibility_verify/preview_cameras.py --out /tmp/cams
+python -u feasibility_verify/measure_target_capacity.py
+COOP2_ENGINE_VERBOSE=1 python -m coop2.experiment.run_individual ...   # per-primitive ticks
+
+# Older GPU demos, pre-BDDL: contention and concurrency in isolation.
+python feasibility_verify/multiagent_concurrent_symbolic_primitives.py --plan navigate_to
+python feasibility_verify/multiagent_concurrent_primitives.py --mode exclusive
 ```
 
 ## The engine (L1c) in one paragraph
@@ -152,8 +148,21 @@ primitive boundary, which COOP² does **not** do — never build the runner on i
 
 ## Hard constraints (each of these fails silently or crashes)
 
-- `scene.include_robots: false`. `Environment._load_robots` is guarded by
-  `if len(self.scene.robots) == 0`, so otherwise your `robots:` list is ignored.
+- `scene.include_robots: false`, **and that is not sufficient with a BDDL
+  activity.** `Environment._load_robots` is guarded by
+  `if len(self.scene.robots) == 0`, so your `robots:` list is ignored whenever
+  the scene has already imported robots -- which it has, because
+  `BehaviorTask.verify_scene_and_task_config` points `scene_instance` at the
+  cached template and the template contains the robots it was sampled with.
+  The robots then come up with R1's defaults (IK arms, delta trunk) while
+  `robot._controller_config` still reports yours, and nothing raises until
+  `q_to_action` asserts on the first tick. `coop_env._enforce_controller_config`
+  compares the live `ControllerView` registry against the config we built and
+  calls `reload_controllers` when they disagree.
+- `task.use_presampled_robot_pose: false`. The class default is **True** despite
+  its docstring saying False, and a template sampled without presampled poses
+  has no `robot_poses` metadata, so `BehaviorTask.reset` dereferences None.
+  This facade places robots itself anyway.
 - Every robot needs an explicit `name` — it is the action/obs dict key.
 - Use `model: r1`, not the deprecated `type: R1`. Prefer **R1 over R1Pro**:
   cuRobo drops the DEFAULT embodiment at cuda capability (12,0) (RTX-50) while
@@ -163,7 +172,10 @@ primitive boundary, which COOP² does **not** do — never build the runner on i
 - `apply_ref(attempts=1)`. The default 5× retry is **not idempotent** and burns
   thousands of ticks per attempt.
 - Call `tune_primitive_macros()` **before** constructing any controller: reading
-  a macro locks it against writes.
+  a macro locks it against writes. `coop_env._build` does this now -- it did not
+  for most of the port, which left `MAX_STEPS_FOR_SETTLING` at upstream's 500
+  and made a single PLACE_ON_TOP cost over 1000 ticks (`_release` and
+  `_settle_robot` each burn the budget in full).
 - Construct controllers only after the robots are at their reset pose —
   `_arm_targets` / `_reset_eef_pose` are frozen in `__init__`.
 - Idle action is `robot.q_to_action(robot.get_joint_positions())`, **not**
@@ -265,8 +277,8 @@ Two fixes got it there, and their effect was much larger than expected:
 | wall clock | 214 s | 21 s |
 | overlap ratio | 0.37 | 0.75 |
 
-1. **Prompt filtering** (`symbolic_view.STRUCTURAL_CATEGORIES` /
-   `RECEPTACLE_CATEGORIES`). One corridor produced 78 walls, 24 shelves, 20
+1. **Prompt filtering** (`symbolic_view.STRUCTURAL_SYNSETS` /
+   `RECEPTACLE_ABILITIES`, since renamed from the original category lists). One corridor produced 78 walls, 24 shelves, 20
    switches, 16 downlights and 14 paintings, plus nonsense hints like
    `place_on_top(downlight#22)` and `place_inside(door#3)`. Filtering lives in
    L1b, **not** L1a: the world model stays complete for task evaluation and only
@@ -275,10 +287,17 @@ Two fixes got it there, and their effect was much larger than expected:
    `place_robots` already clustered the robots, but objects were still sampled
    from the whole room -- a 20 m corridor put the contested apple 11 m away.
 
-**The `_settle_robot` blow-up was a symptom, not a separate defect.** Primitives
-that cost 1100-1728 ticks now cost 118-379. `MAX_STEPS_FOR_SETTLING=500` is only
-reached when a robot never comes to rest, and that was caused by the long-range
-placement, not by the settle logic. No macro tuning was needed.
+**Corrected 2026-09-08.** This section originally concluded: "the
+`_settle_robot` blow-up was a symptom, not a separate defect ... no macro tuning
+was needed", on the grounds that primitives went from 1100-1728 ticks to 118-379
+once objects were clustered near the team. That conclusion is why
+`tune_primitive_macros()` was written and then **never called**, and the defect
+survived until 2026-09-08: with `MAX_STEPS_FOR_SETTLING` at upstream's 500, a
+single PLACE_ON_TOP was measured at 1063 ticks and still rising
+(`COOP2_ENGINE_VERBOSE=1` shows the count climbing linearly with env_step),
+because `_release` and `_settle_robot` each burn the full budget and an R1's
+holonomic base does not reach `velocity < 0.01`. Clustering objects helped, but
+it did not remove the need for the macro -- both were required.
 
 ## M5 acceptance, GPU-verified 2026-09-06
 
