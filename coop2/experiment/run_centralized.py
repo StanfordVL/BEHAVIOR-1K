@@ -154,7 +154,8 @@ def run_centralized_experiment(
         coop_config_path="paper",
     )
     # BEHAVIOR-only knobs; see run_individual for why omitting `objects`
-    # silently produces a scene without the goal's objects in it.
+    # silently produces a scene without the goal's objects in it, and why it
+    # has no CLI flag now that a BDDL activity brings its own.
     if scene_model is not None:
         env_kwargs["scene_model"] = scene_model
     if room is not None:
@@ -382,10 +383,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42, help="Environment random seed")
     parser.add_argument("--no-video", action="store_true", help="Skip episode GIF recording/saving")
     parser.add_argument("--output-root", type=str, default=None, help="Directory where the run result folder is created")
-    parser.add_argument("--n-objects", type=int, default=0,
-                        help="Apples to place in the team's room. 0 places none, which leaves the "
-                             "scene without the goal's objects: every plan then fails at grounding "
-                             "with INVALID_TARGET and no primitive is ever assigned.")
     parser.add_argument("--scene", type=str, default=None, help="Scene model override")
     parser.add_argument("--room", type=str, default=None, help="Room to place the team and objects in")
     parser.add_argument("--goal", type=str, default="", help="Global goal instruction for agent prompts")
@@ -398,15 +395,6 @@ if __name__ == "__main__":
                         help="activity_instance_id of the cached template to load")
 
     args = parser.parse_args()
-
-    objects = None
-    if args.n_objects > 0:
-        objects = [
-            {"type": "DatasetObject", "name": f"apple_{i}", "category": "apple",
-             "model": "agveuv", "position": [0.4 * i, 0.0, 0.05],
-             "orientation": [0.0, 0.0, 0.0, 1.0]}
-            for i in range(args.n_objects)
-        ]
     
     run_centralized_experiment(
         n_agents=args.agents,
@@ -422,7 +410,6 @@ if __name__ == "__main__":
         output_root=args.output_root,
         scene_model=args.scene,
         room=args.room,
-        objects=objects,
         goal_instruction=args.goal,
         bddl_activity=args.bddl_activity,
         bddl_instance_id=args.bddl_instance_id,

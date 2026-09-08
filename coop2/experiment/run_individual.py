@@ -116,10 +116,18 @@ def run_individual_experiment(
         seed=seed,
         coop_config_path="paper",
     )
-    # BEHAVIOR-only knobs. The crafter runner had no scene and no object
-    # placement, so leaving these unset yields a scene with none of the goal's
+    # BEHAVIOR-only knobs. The crafter runner had no scene and no objects at
+    # all, so leaving these unset yields a scene with none of the goal's
     # objects in it: every plan then fails at grounding with INVALID_TARGET
     # before the engine ever assigns a primitive.
+    #
+    # `objects` has no CLI flag. It used to (--n-objects, which scattered N
+    # apples in the team's room) and that only made sense before BDDL: an
+    # activity's cached template already contains the objects its goal refers
+    # to, placed to satisfy its own initial conditions, so adding more from
+    # the command line produced four apples for a two-apple task and nothing
+    # in the code stopped it. Programmatic callers that genuinely have no
+    # activity -- the offline runner harness -- still pass a list here.
     if scene_model is not None:
         env_kwargs["scene_model"] = scene_model
     if room is not None:
@@ -326,10 +334,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42, help="Environment random seed")
     parser.add_argument("--no-video", action="store_true", help="Skip episode GIF recording/saving")
     parser.add_argument("--output-root", type=str, default=None, help="Directory where the run result folder is created")
-    parser.add_argument("--n-objects", type=int, default=0,
-                        help="Apples to place in the team's room. 0 places none, which leaves the "
-                             "scene without the goal's objects: every plan then fails at grounding "
-                             "with INVALID_TARGET and no primitive is ever assigned.")
     parser.add_argument("--scene", type=str, default=None, help="Scene model override")
     parser.add_argument("--room", type=str, default=None, help="Room to place the team and objects in")
     parser.add_argument("--bddl-activity", type=str, default=None, metavar="NAME",
@@ -341,15 +345,6 @@ if __name__ == "__main__":
                         help="activity_instance_id of the cached template to load")
 
     args = parser.parse_args()
-
-    objects = None
-    if args.n_objects > 0:
-        objects = [
-            {"type": "DatasetObject", "name": f"apple_{i}", "category": "apple",
-             "model": "agveuv", "position": [0.4 * i, 0.0, 0.05],
-             "orientation": [0.0, 0.0, 0.0, 1.0]}
-            for i in range(args.n_objects)
-        ]
     
     run_individual_experiment(
         n_agents=args.agents,
@@ -366,7 +361,6 @@ if __name__ == "__main__":
         output_root=args.output_root,
         scene_model=args.scene,
         room=args.room,
-        objects=objects,
         bddl_activity=args.bddl_activity,
         bddl_instance_id=args.bddl_instance_id,
     )
