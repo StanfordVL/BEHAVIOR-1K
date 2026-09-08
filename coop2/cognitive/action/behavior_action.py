@@ -51,6 +51,12 @@ BEHAVIOR_ACTION_TO_PRIMITIVE = {
     "close": "CLOSE",
     "toggle_on": "TOGGLE_ON",
     "toggle_off": "TOGGLE_OFF",
+    # Not an upstream primitive; the engine dispatches WAIT to our controller's
+    # own generator. It is here rather than in COMMUNICATION_ACTIONS because an
+    # instant wait cannot yield the floor: the plan loop freezes physics while
+    # any agent is reasoning, so a wait that costs no ticks stops the world
+    # instead of letting a teammate finish.
+    "wait": "WAIT",
 }
 
 #: Actions with no physical effect. They must still be first-class: COOP2's
@@ -69,7 +75,7 @@ BEHAVIOR_ACTION_TO_PRIMITIVE = {
 #: success, and the topology with the highest Y_plan was the one that never
 #: approached an object. Agent-to-agent text belongs on the MessageBroker,
 #: which the topologies already drive; it is not a plan action.
-COMMUNICATION_ACTIONS = ("wait", "noop")
+COMMUNICATION_ACTIONS = ("noop",)
 
 #: The LLM-facing vocabulary. Mirrors ``cognitive/constants.py:ACTION_SCHEMA``
 #: in shape so the prompt builder needs no special-casing, but every target is a
@@ -85,7 +91,7 @@ BEHAVIOR_ACTION_SCHEMA = {
     "close": [{"type": "entity_id", "field": "target"}],
     "toggle_on": [{"type": "entity_id", "field": "target"}],
     "toggle_off": [{"type": "entity_id", "field": "target"}],
-    "wait": [],
+    "wait": [{"type": "int", "field": "ticks"}],
 }
 
 
@@ -160,6 +166,10 @@ class BehaviorActionExecutor:
         return target
 
     def _primitive_enum(self, primitive_name: str):
+        if primitive_name == "WAIT":
+            from coop2.behavior_env.primitive_engine import WAIT  # noqa: PLC0415
+
+            return WAIT
         from omnigibson.action_primitives.symbolic_semantic_action_primitives import (  # noqa: PLC0415
             SymbolicSemanticActionPrimitiveSet,
         )
@@ -211,7 +221,13 @@ class BehaviorActionExecutor:
             return primitive_name
 
         target = self.resolve_target(kwargs.get("target"))
-        immediate = self.engine.assign(self.agent_id, self._primitive_enum(primitive_name), target)
+        primitive_kwargs = {"ticks": kwargs["ticks"]} if "ticks" in kwargs else None
+        immediate = self.engine.assign(
+            self.agent_id,
+            self._primitive_enum(primitive_name),
+            target,
+            primitive_kwargs=primitive_kwargs,
+        )
         if immediate is not None:
             # assign() rejects unknown targets before anything moves, and
             # reports them as a terminal outcome rather than raising.

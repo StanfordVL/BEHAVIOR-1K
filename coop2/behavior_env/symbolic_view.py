@@ -198,6 +198,15 @@ def target_hints(
             ActionHint("navigate_to", entity.entity_id, entity.name, "" if in_range else f"{distance:.1f} m away")
         )
         if not in_range:
+            # Say it, rather than leaving it to be inferred from the absence of
+            # the other verbs. A line that reads "navigate_to [5.7 m away]" and
+            # one that reads "grasp, navigate_to" differ only by what is
+            # missing, and an agent that misreads that spends a whole plan
+            # discovering it: one recorded run had an agent plan
+            # grasp-then-place on an object it was five metres from.
+            hints.append(
+                ActionHint("unreachable", entity.entity_id, entity.name, far_note)
+            )
             continue
 
         if entity.held_by is None and held is None and not entity.is_fixed:
@@ -294,7 +303,12 @@ def render_symbolic_view(
         for hint in hints:
             by_target.setdefault(hint.target_id, []).append(hint)
         for target_id, target_hint_list in sorted(by_target.items()):
-            verbs = ", ".join(sorted({h.primitive for h in target_hint_list}))
+            primitives = {h.primitive for h in target_hint_list}
+            # Status words first, then the verbs. Sorting alphabetically put
+            # "unreachable" after "navigate_to" and "blocked" before it, so the
+            # two lines that mean opposite things looked alike at a glance.
+            status = [word for word in ("unreachable", "blocked") if word in primitives]
+            verbs = ", ".join(status + sorted(primitives - set(status)))
             note = next((h.note for h in target_hint_list if h.note), "")
             lines.append(f"  {target_id}: {verbs}" + (f"   [{note}]" if note else ""))
 

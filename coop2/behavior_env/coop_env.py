@@ -229,6 +229,12 @@ class CooperativeBehaviorEnv:
 
         self.world = BehaviorWorldState(self.env, use_scene_graph=self.use_scene_graph)
         self.world.start()
+        # Before anything asks for an id: the activity's own bindings win, so
+        # the ids in the prompt are the ids its goal expression is written in.
+        task = getattr(self.env, "task", None)
+        if getattr(task, "object_scope", None):
+            adopted = self.world.adopt_task_scope(task)
+            print(f"[setup] adopted {adopted} entity ids from the BDDL object scope")
         self.executors = {
             agent_id: BehaviorActionExecutor(agent_id, engine=self.engine, world_state=self.world)
             for agent_id in self.agent_names

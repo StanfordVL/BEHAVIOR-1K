@@ -426,6 +426,25 @@ def main() -> int:
     expect_error(ctrl_b._grasp(mine), "OBJECT_CLAIMED")
     ok("re-grasping your own object raises ALREADY_HELD; a teammate still gets OBJECT_CLAIMED")
 
+    print("test: wait holds for real ticks, defaulted and capped")
+    # A wait that costs nothing cannot yield the floor. The plan loop returns
+    # without stepping the env whenever an agent is not ready, so an instant
+    # wait puts the agent back into reasoning, which stops the world -- the
+    # teammate it was waiting for advances by nothing, and the wait costs an
+    # LLM call for it.
+    _, alice, bob, ctrl_a, ctrl_b = fresh()
+
+    default_ticks = list(ctrl_a.wait())
+    assert len(default_ticks) == module.DEFAULT_WAIT_TICKS, len(default_ticks)
+    assert all(t == "hold" or t is not None for t in default_ticks[:3]), default_ticks[:3]
+
+    assert len(list(ctrl_a.wait(ticks=50))) == 50
+    # Capped: an agent that yields for the rest of the episode cannot react to
+    # the thing it was waiting for.
+    assert len(list(ctrl_a.wait(ticks=10_000))) == module.MAX_WAIT_TICKS
+    assert len(list(ctrl_a.wait(ticks=0))) == 1, "a wait of zero would be the old bug again"
+    ok(f"wait yields {module.DEFAULT_WAIT_TICKS} ticks by default, capped at {module.MAX_WAIT_TICKS}")
+
     print("\nALL TESTS PASSED")
     return 0
 

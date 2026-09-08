@@ -366,6 +366,69 @@ def main() -> int:
     assert sv.is_receptacle(fridge)
     ok("supports by taxonomy ancestry; switches/lights/doors rejected; fridge still a receptacle")
 
+    print("test 14: out-of-range objects are marked unreachable, not just verb-less")
+    # An out-of-range line used to differ from an in-range one only by what was
+    # missing: "navigate_to [5.7 m away]" against "grasp, navigate_to". One
+    # recorded run had an agent plan grasp-then-place on an object five metres
+    # away, so the state is now named.
+    obs = world.observation_for("agent_0")
+    me = obs.entities[sv._agent_entity_id(obs)]
+    distances = {
+        eid: ((e.position[0] - me.position[0]) ** 2 + (e.position[1] - me.position[1]) ** 2) ** 0.5
+        for eid, e in obs.entities.items() if not e.is_robot
+    }
+    far_id = max(distances, key=distances.get)
+
+    tight = sv.target_hints(obs, interaction_radius=distances[far_id] / 2)
+    far_hints = [h for h in tight if h.target_id == far_id]
+    primitives = {h.primitive for h in far_hints}
+    assert "unreachable" in primitives, primitives
+    assert "navigate_to" in primitives
+    assert primitives == {"unreachable", "navigate_to"}, "no manipulation verbs on an unreachable target"
+    unreachable_note = next(h.note for h in far_hints if h.primitive == "unreachable")
+    assert "too far" in unreachable_note and "navigate_to first" in unreachable_note, unreachable_note
+    # The rendered line keeps the shorter distance note; both say the same thing.
+    shown = next(h.note for h in far_hints if h.note)
+    assert "m away" in shown, shown
+
+    # And the rendered line leads with the status word, not with a verb.
+    text = sv.render_symbolic_view(obs, interaction_radius=distances[far_id] / 2)
+    line = next(l for l in text.splitlines() if l.strip().startswith(far_id + ":"))
+    assert line.split(":", 1)[1].strip().startswith("unreachable"), line
+
+    # A reachable object must not be marked.
+    loose = sv.target_hints(obs, interaction_radius=distances[far_id] * 2)
+    assert not any(h.primitive == "unreachable" for h in loose), "in-range must not be marked"
+    ok(f"{far_id} reads 'unreachable, navigate_to'; in-range targets are unmarked")
+
+    print("test 15: BDDL object_scope bindings win over enumeration order")
+    # entity_id_for numbers instances in scene order, so coffee_table.n.01_1
+    # was whichever table the scene listed first while the activity's goal
+    # meant the one its sampler bound -- a different table in the same room.
+    # The agent placed both apples on the id it was shown and check_goal kept
+    # saying unmet: an unwinnable task that reads as an agent failure.
+    first = FakeObject("table_gcollb_0", "coffee_table", [0.0, 0.0, 0.4])
+    second = FakeObject("table_gpkbiw_0", "coffee_table", [2.0, 0.0, 0.4])
+    scene2 = FakeScene([first, second, alice], fixed=[first, second], seg_map=seg)
+    env2 = FakeEnv(scene2, [alice])
+    scoped = ws.BehaviorWorldState(env2)
+    scoped.start()
+
+    # Enumeration order alone would give the first table _1.
+    plain = ws.BehaviorWorldState(env2)
+    plain.start()
+    assert plain.entity_id_for(first).endswith("_1"), plain.entity_id_for(first)
+
+    class Task:
+        object_scope = {"coffee_table.n.01_1": second}
+
+    assert scoped.adopt_task_scope(Task()) == 1
+    assert scoped.entity_id_for(second) == "coffee_table.n.01_1", scoped.entity_id_for(second)
+    # And the unbound table must not be handed the id the task already used.
+    other = scoped.entity_id_for(first)
+    assert other != "coffee_table.n.01_1", other
+    ok(f"the bound table keeps coffee_table.n.01_1; the other becomes {other}")
+
     print("\nALL TESTS PASSED")
     return 0
 

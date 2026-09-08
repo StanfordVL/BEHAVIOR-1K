@@ -86,6 +86,7 @@ __all__ = [
     "ReasonCode",
     "PrimitiveOutcome",
     "MultiAgentPrimitiveEngine",
+    "WAIT",
 ]
 
 
@@ -115,6 +116,23 @@ class MotionMode:
     EXCLUSIVE = "exclusive"
 
     ALL = (CONCURRENT, EXCLUSIVE)
+
+
+class _WaitPrimitive:
+    """Stands in for an enum member upstream does not have.
+
+    ``SymbolicSemanticActionPrimitiveSet`` has no WAIT, and adding one would
+    not help: ``apply_ref`` dispatches on its own members. This only needs to
+    carry a ``.name``, which is all assign() reads before handing off.
+    """
+
+    name = "WAIT"
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "WAIT"
+
+
+WAIT = _WaitPrimitive()
 
 
 class ReasonCode:
@@ -531,6 +549,7 @@ class MultiAgentPrimitiveEngine:
         agent_id: str,
         primitive: StarterSemanticActionPrimitiveSet,
         target: Any = None,
+        primitive_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Optional[PrimitiveOutcome]:
         """Give one agent one primitive to start. Advances no simulation.
 
@@ -576,9 +595,17 @@ class MultiAgentPrimitiveEngine:
                 ),
             )
 
-        generator = self.controllers[agent_id].apply_ref(
-            primitive, *([] if obj is None else [obj]), attempts=self.attempts
-        )
+        if primitive_name == WAIT.name:
+            # Not in upstream's primitive set, so apply_ref cannot dispatch it;
+            # our controller implements it directly. Everything downstream --
+            # ticking, abort, outcomes, decision_count -- is unchanged, which
+            # is the point: a wait has to occupy the engine like any other
+            # primitive or the world does not advance during it.
+            generator = self.controllers[agent_id].wait(**(primitive_kwargs or {}))
+        else:
+            generator = self.controllers[agent_id].apply_ref(
+                primitive, *([] if obj is None else [obj]), attempts=self.attempts
+            )
         self._active[agent_id] = _ActiveRun(
             agent_id=agent_id,
             primitive=primitive_name,

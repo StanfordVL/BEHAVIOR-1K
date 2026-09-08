@@ -34,10 +34,13 @@ Rules that decide whether an action succeeds:
   Under "You can do:" a distance in metres is shown ONLY for objects that are
   currently out of range -- no distance means you are already close enough to
   act on it now.
-- An out-of-range object offers navigate_to and NOTHING else. That is the only
-  action you may issue on it: the manipulation verbs are absent from its line
-  precisely because they would fail. navigate_to it first, and you are then
-  guaranteed to be within its threshold and its other verbs appear.
+- An out-of-range object is marked "unreachable" and offers navigate_to and
+  NOTHING else. You cannot grasp, place, open or toggle an unreachable object,
+  however close it looks in the room listing: you must navigate_to it first.
+- If there is nothing useful to do right now -- a teammate is already handling
+  the only target you could work on, or you are waiting on something to
+  finish -- issue wait rather than acting anyway. wait holds your position for
+  the number of ticks you give it, during which the others make progress.
 - One object at a time: grasp needs an empty gripper, place needs a full one.
 - Objects are exclusive. If a teammate is holding something, your grasp fails
   with "held by <agent>". Going after a target a teammate already has costs you

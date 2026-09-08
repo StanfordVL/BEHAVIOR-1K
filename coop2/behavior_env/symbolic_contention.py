@@ -79,6 +79,14 @@ DEFAULT_RADIUS_MARGIN = 0.35
 #: this number sets how expensive distance is relative to a decision.
 DEFAULT_TRAVEL_TICKS_PER_METER = 60.0
 
+#: Ticks a ``wait`` holds for when the agent does not say. Long enough that a
+#: teammate's NAVIGATE_TO (300-500 ticks here) makes real progress during it.
+DEFAULT_WAIT_TICKS = 200
+
+#: Cap on a single wait. An agent that yields the floor for the rest of the
+#: episode cannot react to the thing it was waiting for.
+MAX_WAIT_TICKS = 600
+
 
 class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
     """Symbolic primitives with proximity, travel cost, and cross-robot claims.
@@ -265,6 +273,27 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
         indistinguishable from settling as far as the controller is concerned.
         """
         return self._postprocess_action(self.robot.q_to_action(self.robot.get_joint_positions()))
+
+    def wait(self, ticks: Optional[int] = None):
+        """Hold position for @ticks, then finish. A real primitive on purpose.
+
+        ``wait`` used to be a "communication action": no primitive, completed
+        the instant it was issued. That made it worse than useless. The plan
+        loop freezes physics whenever any agent is not ready -- it returns
+        without stepping the env -- so an instant wait put the agent straight
+        back into reasoning, which stopped the world, which meant the teammate
+        it was waiting for advanced by exactly nothing while the wait burned an
+        LLM call. Yielding the floor is only meaningful if time passes, and time
+        only passes while some agent holds an active primitive.
+
+        Args:
+            ticks: how long to hold. Defaults to DEFAULT_WAIT_TICKS, clamped to
+                MAX_WAIT_TICKS.
+        """
+        held = DEFAULT_WAIT_TICKS if ticks is None else int(ticks)
+        held = max(1, min(held, MAX_WAIT_TICKS))
+        for _ in range(held):
+            yield self._hold_action()
 
     def travel_ticks(self, distance: float) -> int:
         """Hold-position ticks charged for travelling ``distance`` metres."""

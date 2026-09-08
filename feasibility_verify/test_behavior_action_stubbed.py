@@ -53,8 +53,9 @@ class FakeEngine:
         self.active = set()
         self.reject = reject
 
-    def assign(self, agent_id, primitive, target=None):
+    def assign(self, agent_id, primitive, target=None, primitive_kwargs=None):
         self.assigned.append((agent_id, primitive.name, target))
+        self.primitive_kwargs = primitive_kwargs
         if self.reject is not None:
             return FakeOutcome(self.reject)
         self.active.add(agent_id)
@@ -151,8 +152,15 @@ def main() -> int:
     assert set(module.BEHAVIOR_ACTION_TO_PRIMITIVE) == {
         "navigate_to", "grasp", "place_on_top", "place_inside", "release",
         "open", "close", "toggle_on", "toggle_off",
+        # wait is a primitive too, dispatched to our own controller rather than
+        # upstream's set. It has to occupy the engine: the plan loop freezes
+        # physics while any agent reasons, so a wait costing no ticks stops the
+        # world instead of letting a teammate finish.
+        "wait",
     }
-    ok("9 primitives + wait/share, and every schema entry is reachable")
+    assert module.COMMUNICATION_ACTIONS == ("noop",), module.COMMUNICATION_ACTIONS
+    assert module.BEHAVIOR_ACTION_SCHEMA["wait"] == [{"type": "int", "field": "ticks"}]
+    ok("10 primitives incl. wait; noop is the only action with no primitive")
 
     print("test 2: execute() assigns and returns without advancing anything")
     engine = FakeEngine()
@@ -232,12 +240,25 @@ def main() -> int:
     assert result["status"] == "failed" and result["terminate_plan"] is True, result
     ok("unknown target fails immediately with terminate_plan")
 
-    print("test 9: wait needs no primitive; share is not an action at all")
+    print("test 9: wait is a real primitive; share is not an action at all")
+    # wait used to complete instantly without touching the engine. The plan
+    # loop freezes physics while any agent is not ready, so that put the agent
+    # straight back into reasoning, stopped the world, and let the teammate it
+    # was waiting for advance by nothing -- while burning an LLM call.
     engine = FakeEngine()
     executor = Executor("agent_0", engine=engine, world_state=world)
-    assert executor.execute("wait") == "wait"
-    assert engine.assigned == [], "communication must not touch the engine"
-    assert executor.check_termination_condition()["status"] == "success"
+    assert executor.execute("wait", ticks=250) == "WAIT"
+    assert engine.assigned == [("agent_0", "WAIT", None)], engine.assigned
+    assert engine.primitive_kwargs == {"ticks": 250}, engine.primitive_kwargs
+    # In flight, exactly like any other primitive -- not instantly successful.
+    assert executor.check_termination_condition() == {"status": "pending"}
+
+    # No ticks given: the controller applies its own default, so nothing is
+    # passed down and the engine still gets a real primitive.
+    engine = FakeEngine()
+    executor = Executor("agent_0", engine=engine, world_state=world)
+    assert executor.execute("wait") == "WAIT"
+    assert engine.primitive_kwargs is None
 
     # share was a text message that completed instantly and never failed, so a
     # plan made of shares scored as a success while touching nothing: one

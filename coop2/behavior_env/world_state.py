@@ -212,6 +212,38 @@ class BehaviorWorldState:
         except Exception:  # noqa: BLE001 - categories outside the taxonomy
             return None
 
+    def adopt_task_scope(self, task) -> int:
+        """Take entity ids straight from a BehaviorTask's object_scope.
+
+        Without this the two namings only *look* alike. ``entity_id_for``
+        numbers instances in scene-enumeration order, so
+        ``coffee_table.n.01_1`` was whichever coffee table the scene listed
+        first, while the activity's goal refers to the one its sampler bound --
+        a different table in the same room. The agent then placed both apples
+        on "coffee_table.n.01_1" as it had been shown it, and check_goal kept
+        reporting the goal unmet because it was looking at the other one. An
+        unwinnable task that looks like an agent failure.
+
+        Returns the number of ids adopted.
+        """
+        scope = getattr(task, "object_scope", None) or {}
+        adopted = 0
+        for instance_name, entity in scope.items():
+            if entity is None:
+                continue
+            name = getattr(entity, "name", None)
+            if not name:
+                continue
+            self._ids[name] = instance_name
+            # Keep the fallback counter past anything the scope already used,
+            # so an object outside the scope cannot be handed an id the task
+            # has already bound to something else.
+            base, _, suffix = instance_name.rpartition("_")
+            if base and suffix.isdigit():
+                self._counts[base] = max(self._counts.get(base, 0), int(suffix))
+            adopted += 1
+        return adopted
+
     def entity_id_for(self, obj) -> str:
         """Stable BDDL-style id for @obj: ``apple.n.01_1``.
 

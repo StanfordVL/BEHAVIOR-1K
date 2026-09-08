@@ -102,9 +102,21 @@ class ToggleOffAction(BaseModel):
 
 
 class WaitAction(BaseModel):
-    """Do nothing this turn. Costs a decision but no motion."""
+    """Hold position, letting time pass so a teammate can finish.
+
+    Costs real ticks, not zero: the world only advances while some agent has a
+    primitive running, so a free wait would stop it rather than yield it.
+    """
 
     action_type: Literal["wait"] = "wait"
+    ticks: int = Field(
+        default=200,
+        ge=1,
+        le=600,
+        description="How long to hold, in simulation ticks. A teammate's "
+                    "navigation takes roughly 300-500, so 200 is a short "
+                    "pause and 600 is most of a long trip.",
+    )
 
 
 # Union type for all actions
