@@ -60,7 +60,16 @@ BEHAVIOR_ACTION_TO_PRIMITIVE = {
 #: ``noop`` is not in the LLM's vocabulary -- it is what L3's plan executor
 #: returns on its no-plan path (``{"action_type": "noop"}``). Treating it as an
 #: unknown verb turned every barrier-closed step into a reported failure.
-COMMUNICATION_ACTIONS = ("wait", "share", "noop")
+#: There is deliberately no "share" here. COOP2's share is a *physical*
+#: resource transfer (recipient, resource_type, quantity) that the env executes
+#: and that can fail; OmniGibson's symbolic primitive set has no handover, so
+#: the port turned it into a text message that completed instantly and never
+#: failed. The LLM then discovered it could "act" by talking: one broadcast run
+#: issued 395 shares against 30 navigate_to, every share-only plan was scored a
+#: success, and the topology with the highest Y_plan was the one that never
+#: approached an object. Agent-to-agent text belongs on the MessageBroker,
+#: which the topologies already drive; it is not a plan action.
+COMMUNICATION_ACTIONS = ("wait", "noop")
 
 #: The LLM-facing vocabulary. Mirrors ``cognitive/constants.py:ACTION_SCHEMA``
 #: in shape so the prompt builder needs no special-casing, but every target is a
@@ -77,10 +86,6 @@ BEHAVIOR_ACTION_SCHEMA = {
     "toggle_on": [{"type": "entity_id", "field": "target"}],
     "toggle_off": [{"type": "entity_id", "field": "target"}],
     "wait": [],
-    "share": [
-        {"type": "agent", "field": "target_agent", "allow_self": False},
-        {"type": "text", "field": "message"},
-    ],
 }
 
 
@@ -277,7 +282,8 @@ class BehaviorActionExecutor:
 
     #: Crafter side-channels for share/place/collect requests. The wrapper
     #: polls these every step; ours never populates them because the facade
-    #: takes the symbolic action itself.
+    #: takes the symbolic action itself. pending_share in particular stays None
+    #: forever -- there is no share action in this vocabulary.
     pending_share = None
     pending_place = None
     pending_collect = None

@@ -457,6 +457,12 @@ class BehaviorTaskState:
         }
 
 
+#: Tokens meaning "some agent has this in a gripper". BDDL has no unary
+#: `holding` predicate -- it writes inhandofrobot(obj, agent) -- but the
+#: cooperative tasks ported from crafter are stated over the object alone.
+_HELD_TOKENS = frozenset({"holding", "held", "inhandofrobot"})
+
+
 class CoopTaskTracker:
     """Evaluates the tasks each macro-step and produces :class:`StepMetrics`.
 
@@ -498,8 +504,16 @@ class CoopTaskTracker:
             entity_obs = observation_entities.get(entity)
             if entity_obs is None:
                 return False
-            # Unary predicates live on the entity's own state dict, where the
-            # scene graph put them under the OmniGibson state class name.
+            # "holding" is not an object state -- it is the grasp relation,
+            # carried on the observation as held_by. Without this the default
+            # ("holding", "apple.n.01_1") task could never be satisfied: an
+            # agent held the apple for a thousand steps while every snapshot
+            # recorded satisfied=False, so success was invisible to the metrics
+            # and the episode had no reason to stop.
+            if token in _HELD_TOKENS:
+                return getattr(entity_obs, "held_by", None) is not None
+            # Other unary predicates live on the entity's own state dict, under
+            # the OmniGibson state class name.
             for name, value in entity_obs.states.items():
                 if self.world.predicate_token(name) == token:
                     return bool(value)

@@ -222,6 +222,26 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
             {"target object": obj.name, "distance": round(distance, 3), "radius": round(radius, 3)},
         )
 
+    def _require_not_held_by_self(self, obj) -> None:
+        """Refuse to grasp what is already in this robot's own gripper.
+
+        Upstream re-grasps happily: the primitive settles for fifty ticks and
+        reports success without changing anything. An agent that had achieved
+        its goal therefore kept proposing ``holding(apple)`` and kept being
+        told it had succeeded -- nineteen times in one episode -- because the
+        environment never contradicted it. A no-op that scores as a success
+        both wastes the agent's decisions and inflates Y_plan, so it fails, and
+        the failure sends the agent back to reasoning where it can see that it
+        is already holding the thing and pick something else to do.
+        """
+        if self.holder_of(obj) is self.robot:
+            raise self._error(
+                "ALREADY_HELD",
+                f"You are already holding {obj.name}; grasping it again does nothing. "
+                "If this was your goal, it is met -- choose a different task.",
+                {"target object": obj.name},
+            )
+
     def _require_unclaimed(self, obj, verb: str) -> None:
         if not self.enforce_claims:
             return
@@ -268,7 +288,15 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
         """
         start_x, start_y = self._base_xy()
         distance = math.hypot(float(pose_2d[0]) - start_x, float(pose_2d[1]) - start_y)
-        for _ in range(self.travel_ticks(distance)):
+        ticks = self.travel_ticks(distance)
+        # One line per navigate -- there are tens per episode, not thousands.
+        # Without it a 1435-tick NAVIGATE_TO to a target 3.7 m away is only
+        # visible after the run, as a number with no way to attribute it
+        # between travel padding and the settle loop.
+        print(f"[nav] {getattr(self.robot, 'name', '?')} -> "
+              f"({float(pose_2d[0]):.2f}, {float(pose_2d[1]):.2f}) "
+              f"{distance:.1f} m, {ticks} travel ticks")
+        for _ in range(ticks):
             yield self._hold_action()
         yield from super()._navigate_to_pose(pose_2d)
 
@@ -277,6 +305,7 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
     # scene. A rejected primitive therefore costs 0 ticks and moves nothing.
 
     def _grasp(self, obj):
+        self._require_not_held_by_self(obj)
         self._require_unclaimed(obj, "grasp")
         self._require_near(obj, "grasp", GATE_GRASP)
         yield from super()._grasp(obj)

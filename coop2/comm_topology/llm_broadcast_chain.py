@@ -18,7 +18,7 @@ Decision Flow:
 import time
 from typing import Dict, List, Optional
 
-from coop2.cognitive.agent import LLMClient
+from coop2.cognitive.agent import LLMClient, InterruptDecision
 from coop2.cognitive.agent.base_llm_agent import BaseLLMAgent
 from coop2.cognitive.agent.prompts import build_system_prompt
 from coop2.cognitive.plan import SymbolicPlan
@@ -166,6 +166,14 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
     def handle_interrupt(self):
         """Replan on interrupt."""
         if self._handle_coop2_repair_interrupt(self._generate_plan_with_role):
+            return
+        # Ask before discarding. Replanning unconditionally was upstream's
+        # behaviour and works in a grid world where an action is one step; here
+        # a NAVIGATE_TO runs for hundreds of ticks, so a message that arrives
+        # mid-trip used to throw away all the travel already paid for. On
+        # RESUME nothing is touched: the primitive keeps running with its
+        # accrued delay, and the plan continues from where it was.
+        if self.decide_interrupt() is InterruptDecision.RESUME:
             return
         self._execute_flow()
     

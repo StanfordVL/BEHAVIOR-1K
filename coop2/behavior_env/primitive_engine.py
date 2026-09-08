@@ -148,6 +148,7 @@ class ReasonCode:
     # TERMINATES_PLAN below.
     OBJECT_CLAIMED = "OBJECT_CLAIMED"  # target is held by another agent
     TOO_FAR = "TOO_FAR"  # outside the interaction radius; navigate first
+    ALREADY_HELD = "ALREADY_HELD"  # you are already holding this object
 
     _FROM_PRIMITIVE_REASON = {
         "PRE_CONDITION_ERROR": PRE_CONDITION,
@@ -173,7 +174,8 @@ class ReasonCode:
     #: the plan grind on would turn contention into silent wasted motion instead
     #: of a decision the topology layer is measured on.
     TERMINATES_PLAN = frozenset(
-        {PLANNING, SAMPLING, TIMEOUT, INVALID_TARGET, CRASHED, OBJECT_CLAIMED, TOO_FAR}
+        {PLANNING, SAMPLING, TIMEOUT, INVALID_TARGET, CRASHED, OBJECT_CLAIMED, TOO_FAR,
+         ALREADY_HELD}
     )
 
     @classmethod

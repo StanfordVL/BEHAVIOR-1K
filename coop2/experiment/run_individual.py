@@ -59,6 +59,8 @@ def run_individual_experiment(
     room=None,
     objects=None,
     succeed_when_all_hold=None,
+    bddl_activity=None,
+    bddl_instance_id=0,
 ):
     """
     Run experiment with individual LLM agents (no communication).
@@ -127,6 +129,12 @@ def run_individual_experiment(
         env_kwargs["objects"] = objects
     if succeed_when_all_hold is not None:
         env_kwargs["succeed_when_all_hold"] = succeed_when_all_hold
+    if bddl_activity is not None:
+        # BDDL decides `terminated` from here on; succeed_when_all_hold is the
+        # stand-in for runs without an activity and is short-circuited in the
+        # facade so the two can never both be deciding.
+        env_kwargs["bddl_activity"] = bddl_activity
+        env_kwargs["bddl_instance_id"] = bddl_instance_id
     base_env = CooperativeEnv(**env_kwargs)
     # Diagnostic hook: keep a handle so a harness can inspect counters after
     # the run without threading a return value through.
@@ -326,6 +334,13 @@ if __name__ == "__main__":
                              "with INVALID_TARGET and no primitive is ever assigned.")
     parser.add_argument("--scene", type=str, default=None, help="Scene model override")
     parser.add_argument("--room", type=str, default=None, help="Room to place the team and objects in")
+    parser.add_argument("--bddl-activity", type=str, default=None, metavar="NAME",
+                        help="BDDL activity to load from its cached instance, e.g. "
+                             "coop_two_apples_pomaria. Its goal expression then decides "
+                             "when the episode terminates, superseding "
+                             "--succeed-when-all-hold.")
+    parser.add_argument("--bddl-instance-id", type=int, default=0,
+                        help="activity_instance_id of the cached template to load")
     parser.add_argument("--succeed-when-all-hold", type=str, default=None, metavar="SYNSET",
                         help="End the episode once every agent holds an object of this synset "
                              "(e.g. apple.n.01). Stand-in until BDDL goal checking returns; "
@@ -360,4 +375,6 @@ if __name__ == "__main__":
         room=args.room,
         objects=objects,
         succeed_when_all_hold=args.succeed_when_all_hold,
+        bddl_activity=args.bddl_activity,
+        bddl_instance_id=args.bddl_instance_id,
     )

@@ -409,6 +409,23 @@ def main() -> int:
     assert ReasonCode.TOO_FAR in ReasonCode.TERMINATES_PLAN
     ok("metadata['reason_code'] wins over the enum; both terminate the plan")
 
+    print("test: grasping what you already hold fails instead of no-oping")
+    # Upstream re-grasps happily -- fifty settle ticks, reports success, changes
+    # nothing. An agent that had achieved its goal kept proposing the same
+    # grasp and kept being told it worked, nineteen times in one episode, so a
+    # no-op scored as a success both wasted its decisions and inflated Y_plan.
+    _, alice, bob, ctrl_a, ctrl_b = fresh()
+    mine = FakeObject("cup_1", [0.5, 0.0, 0.5])
+    assert list(ctrl_a._grasp(mine)) == ["settle"] * 3
+    assert alice._ag_obj_in_hand["left"] is mine
+
+    error = expect_error(ctrl_a._grasp(mine), "ALREADY_HELD")
+    assert "already holding" in error.message.lower(), error.message
+    assert alice._ag_obj_in_hand["left"] is mine, "the failure must not drop it"
+    # A teammate reaching for it still gets the contention code, not this one.
+    expect_error(ctrl_b._grasp(mine), "OBJECT_CLAIMED")
+    ok("re-grasping your own object raises ALREADY_HELD; a teammate still gets OBJECT_CLAIMED")
+
     print("\nALL TESTS PASSED")
     return 0
 

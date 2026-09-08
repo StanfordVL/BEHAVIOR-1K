@@ -107,14 +107,6 @@ class WaitAction(BaseModel):
     action_type: Literal["wait"] = "wait"
 
 
-class ShareAction(BaseModel):
-    """Tell a teammate something. No physical effect."""
-
-    action_type: Literal["share"] = "share"
-    recipient_agent_id: str = Field(description="Agent id to tell, e.g. 'agent_1'")
-    message: str = Field(description="What to tell them")
-
-
 # Union type for all actions
 LLMAction = Union[
     NavigateToAction,
@@ -127,7 +119,6 @@ LLMAction = Union[
     ToggleOnAction,
     ToggleOffAction,
     WaitAction,
-    ShareAction,
 ]
 
 

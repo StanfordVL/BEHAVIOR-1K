@@ -1,0 +1,30 @@
+(define (problem coop_two_apples_pomaria-0)
+    (:domain behavior-1k)
+
+    (:objects
+        apple.n.01_1 apple.n.01_2 - apple.n.01
+        armchair.n.01_1 armchair.n.01_2 - armchair.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop apple.n.01_1 armchair.n.01_1)
+        (ontop apple.n.01_2 armchair.n.01_2)
+        (inroom armchair.n.01_1 living_room)
+        (inroom armchair.n.01_2 living_room)
+        (inroom coffee_table.n.01_1 living_room)
+        (inroom floor.n.01_1 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (forall
+                (?apple.n.01 - apple.n.01)
+                (ontop ?apple.n.01 ?coffee_table.n.01_1)
+            )
+        )
+    )
+)

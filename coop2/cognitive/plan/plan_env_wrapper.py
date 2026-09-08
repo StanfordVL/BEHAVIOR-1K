@@ -338,7 +338,25 @@ class PlanningEnvWrapper:
             )
 
     def _reset_symbolic_action_state(self, agent_id: str):
-        """Clear pending symbolic action state when an agent replaces a plan."""
+        """Drop the action a replaced plan left in flight.
+
+        Clearing L2's record is not enough: the engine is still running the
+        primitive, so ``has_active`` stays true and the *new* plan's first
+        action cannot be issued until the abandoned one finishes -- hundreds of
+        ticks for a NAVIGATE_TO. The old primitive's outcome then arrives with
+        no symbolic action to attach to and is discarded. Abort it here, which
+        is what COOP2's X -> I transition means, and the new plan starts on the
+        next tick.
+
+        This runs only when a plan is actually *replaced*. An agent that
+        interrupts and resumes never reaches this path, so its primitive keeps
+        running with the ticks it has already spent.
+        """
+        base_env = getattr(self.symbolic_env, "env", None)
+        engine = getattr(base_env, "engine", None)
+        if engine is not None and engine.has_active(agent_id):
+            engine.abort(agent_id, retract=False)
+
         action_handler = self.symbolic_env.agent_actions.get(agent_id)
         if action_handler is not None and hasattr(action_handler, "reset_current_action"):
             action_handler.reset_current_action()

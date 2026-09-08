@@ -213,6 +213,58 @@ def main() -> int:
         assert os.path.getsize(cap_path) > 0
     ok("plot_metrics_timeline / save_task_states_log / save_capability_log all run")
 
+    print("test 11: ('holding', obj) reads held_by, not the object's state dict")
+    # The default task set is ("holding", "apple.n.01_1"). Routing it through
+    # the state dict -- which carries only Open/ToggledOn -- made it return
+    # False forever: an agent held the apple for a thousand steps while every
+    # snapshot said satisfied=False, so the run had no visible success at all.
+    held_apple = FakeEntity("apple.n.01_1", "apple_0", (0.0, 0.0, 0.9))
+    free_apple = FakeEntity("apple.n.01_2", "apple_1", (0.5, 0.0, 0.9))
+    robot = FakeEntity("agent_0", "agent_0", (0.2, 0.0, 0.0), is_robot=True)
+    held_apple.held_by = "agent_0"
+
+    world3 = FakeWorld([held_apple, free_apple, robot], [])
+    task = m.BehaviorTaskState(
+        task_id="t_held", target_id="apple.n.01_1", goal=("holding", "apple.n.01_1")
+    )
+    other = m.BehaviorTaskState(
+        task_id="t_free", target_id="apple.n.01_2", goal=("holding", "apple.n.01_2")
+    )
+    tracker3 = m.CoopTaskTracker(world3, [task, other])
+    tracker3.step(env_step=1)
+    assert task.satisfied is True, "an apple in a gripper satisfies holding()"
+    assert other.satisfied is False, "an apple on the floor does not"
+
+    held_apple.held_by = None
+    tracker3.step(env_step=2)
+    assert task.satisfied is False, "releasing it must un-satisfy the task"
+    ok("holding() follows held_by in both directions")
+
+    print("test 12: the first snapshot has no predecessor, so it needs a baseline")
+    # _diff skips a task whose previous state is unknown, and the tracker only
+    # samples when a primitive terminates -- hundreds of ticks in, with the
+    # agents already standing at their targets. Without a snapshot at step 0
+    # the nobody-near -> someone-near transition is never counted, and C+ reads
+    # 0 for an episode in which both agents reached an object.
+    far = FakeEntity("apple.n.01_9", "apple_9", (50.0, 50.0, 0.9))
+    walker = FakeEntity("agent_0", "agent_0", (0.0, 0.0, 0.0), is_robot=True)
+    world4 = FakeWorld([far, walker], [])
+    task4 = m.BehaviorTaskState(
+        task_id="t_far", target_id="apple.n.01_9", goal=("holding", "apple.n.01_9")
+    )
+    tracker4 = m.CoopTaskTracker(world4, [task4])
+
+    baseline = tracker4.step(env_step=0)          # nobody near
+    assert baseline.spatial_improved == 0, "a baseline cannot improve on nothing"
+    assert task4.spatial_count == 0
+
+    walker.position = (50.0, 50.5, 0.0)           # walked up to it
+    after = tracker4.step(env_step=400)
+    assert task4.spatial_count == 1
+    assert after.spatial_improved == 1, "approaching must count as an improvement"
+    assert "t_far" in after.spatial_improved_tasks
+    ok("a step-0 baseline makes the first approach visible to C+")
+
     print("\nALL TESTS PASSED")
     return 0
 

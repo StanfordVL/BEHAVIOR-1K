@@ -30,7 +30,6 @@ from .llm_client import (
     ToggleOnAction,
     ToggleOffAction,
     WaitAction,
-    ShareAction,
     LLMAction,
     load_env_file,
 )
@@ -80,7 +79,6 @@ __all__ = [
     'ToggleOnAction',
     'ToggleOffAction',
     'WaitAction',
-    'ShareAction',
     'LLMAction',
     'load_env_file',
     # Prompts

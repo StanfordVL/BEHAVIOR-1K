@@ -80,6 +80,11 @@ class BaseLLMAgent(Agent):
         self.guard_filter_events = 0
         
         # Environment info (set externally)
+        #: Global objective, prepended to the cooperative config for every
+        #: topology. Lives here rather than in one topology because the leader,
+        #: the followers and the chain all need it: without it those agents
+        #: plan against the room with no stated task at all.
+        self.goal_instruction: str = ""
         self.coop_config: Optional[str] = None
         self.symbolic_view: Optional[str] = None
         self.target_hints: Optional[str] = None
@@ -182,6 +187,13 @@ class BaseLLMAgent(Agent):
             repair_messages,
         )
 
+    def _with_goal(self, coop_config: Optional[str]) -> Optional[str]:
+        """Prepend the global objective to @coop_config, if one is set."""
+        if not self.goal_instruction:
+            return coop_config
+        goal_text = f"GLOBAL OBJECTIVE: {self.goal_instruction}"
+        return f"{goal_text}\n\n{coop_config}" if coop_config else goal_text
+
     def _build_plan_prompt_messages(
         self,
         system_prompt: str,
@@ -192,6 +204,7 @@ class BaseLLMAgent(Agent):
     ) -> List[Dict[str, str]]:
         """Build the standard topology plan prompt with optional role-local context."""
         coop_config = self.coop_config if coop_config_override is None else coop_config_override
+        coop_config = self._with_goal(coop_config)
         obs_prompt = build_observation_prompt(
             env_step=self.env_step,
             agent_id=self.agent_id,
@@ -304,7 +317,7 @@ class BaseLLMAgent(Agent):
             agent_id=self.agent_id,
             messages=repair_messages,
             memory=self.memory.get_events(),
-            coop_config=self.coop_config,
+            coop_config=self._with_goal(self.coop_config),
             symbolic_view=self.symbolic_view,
             target_hints=self.target_hints,
         )
@@ -416,6 +429,68 @@ class BaseLLMAgent(Agent):
             return f"{role_prompt}\n\n{repair_rules}"
         return "You are a cooperative planning agent.\n\n" + repair_rules
     
+    def decide_interrupt(self, messages: Optional[List[Dict]] = None) -> "InterruptDecision":
+        """RESUME or REPLAN for the messages that caused this interrupt.
+
+        Split out of handle_interrupt so a topology can keep its own
+        communication flow on the REPLAN branch -- the leader has to re-request
+        from its followers, which the base class knows nothing about -- while
+        still consulting the model rather than replanning unconditionally.
+
+        RESUME must leave the in-flight primitive alone. A NAVIGATE_TO that is
+        400 ticks into a 500-tick trip has already spent that travel time; if
+        an interrupt discarded and reissued it, every message would refund the
+        distance the agent had already covered, and distance is the resource
+        this environment makes scarce.
+
+        Returns RESUME when there is nothing to decide (no messages) or when
+        the model cannot be reached, because resuming is the option that
+        destroys no work.
+        """
+        if messages is None:
+            messages = self.get_messages(clear_buffer=True)
+        if not messages:
+            return InterruptDecision.RESUME
+        if self.plan is None:
+            return InterruptDecision.REPLAN
+
+        if self.verbose:
+            print(f"\n[{self.agent_id}] Received {len(messages)} message(s), deciding resume/replan:")
+            for msg in messages:
+                print(f"  From {msg['sender']}: {msg['content']}")
+
+        try:
+            interrupt_messages = build_interrupt_prompt(
+                observation=self.observation,
+                env_step=self.env_step,
+                agent_id=self.agent_id,
+                current_plan=self.plan,
+                received_messages=messages,
+                memory=self.memory.get_events(),
+                coop_config=self._with_goal(self.coop_config),
+                symbolic_view=self.symbolic_view,
+                target_hints=self.target_hints,
+            )
+            if self._should_print_llm_io():
+                self._print_llm_messages("Interrupt Decision", interrupt_messages)
+            response, usage = self.llm_client.generate_interrupt_decision(
+                messages=interrupt_messages, temperature=self.temperature
+            )
+            self._record_llm_usage(usage)
+            decision, _ = parse_interrupt_response(
+                llm_response=response,
+                agent_id=self.agent_id,
+                env_step=self.env_step,
+                plan_id=self.plan_count + 1,
+            )
+            if self.verbose:
+                print(f"  [{self.agent_id}] LLM decided: {decision.value.upper()}")
+            return decision
+        except Exception as error:  # noqa: BLE001 - a dead model must not end the episode
+            self._record_llm_error(error)
+            print(f"  [{self.agent_id}] interrupt decision failed ({error}); resuming")
+            return InterruptDecision.RESUME
+
     def handle_interrupt(self):
         """
         Handle interrupt by asking LLM to decide whether to resume or replan.

@@ -96,6 +96,9 @@ def run_centralized_experiment(
     room=None,
     objects=None,
     succeed_when_all_hold=None,
+    goal_instruction="",
+    bddl_activity=None,
+    bddl_instance_id=0,
 ):
     """
     Run experiment with centralized LLM agents.
@@ -161,6 +164,12 @@ def run_centralized_experiment(
         env_kwargs["objects"] = objects
     if succeed_when_all_hold is not None:
         env_kwargs["succeed_when_all_hold"] = succeed_when_all_hold
+    if bddl_activity is not None:
+        # BDDL decides `terminated` from here on; succeed_when_all_hold is the
+        # stand-in for runs without an activity and is short-circuited in the
+        # facade so the two can never both be deciding.
+        env_kwargs["bddl_activity"] = bddl_activity
+        env_kwargs["bddl_instance_id"] = bddl_instance_id
     base_env = CooperativeEnv(**env_kwargs)
     if hasattr(base_env, "set_team_score_time_limit"):
         base_env.set_team_score_time_limit(time_limit_seconds)
@@ -180,6 +189,14 @@ def run_centralized_experiment(
         temperature=0.7,
         verbose=verbose,
     )
+
+    # Every agent plans against the same objective. BaseLLMAgent prepends it to
+    # the cooperative config for both the plan and message prompts, so setting
+    # the attribute is all any topology has to do.
+    if goal_instruction:
+        print(f"  Goal: {goal_instruction}")
+        for _agent in agents.values():
+            _agent.goal_instruction = goal_instruction
     
     # Wrap with planning environment
     plan_env = PlanningEnvWrapper(
@@ -373,6 +390,14 @@ if __name__ == "__main__":
                              "with INVALID_TARGET and no primitive is ever assigned.")
     parser.add_argument("--scene", type=str, default=None, help="Scene model override")
     parser.add_argument("--room", type=str, default=None, help="Room to place the team and objects in")
+    parser.add_argument("--goal", type=str, default="", help="Global goal instruction for agent prompts")
+    parser.add_argument("--bddl-activity", type=str, default=None, metavar="NAME",
+                        help="BDDL activity to load from its cached instance, e.g. "
+                             "coop_two_apples_pomaria. Its goal expression then decides "
+                             "when the episode terminates, superseding "
+                             "--succeed-when-all-hold.")
+    parser.add_argument("--bddl-instance-id", type=int, default=0,
+                        help="activity_instance_id of the cached template to load")
     parser.add_argument("--succeed-when-all-hold", type=str, default=None, metavar="SYNSET",
                         help="End the episode once every agent holds an object of this synset "
                              "(e.g. apple.n.01). Stand-in until BDDL goal checking returns; "
@@ -406,4 +431,7 @@ if __name__ == "__main__":
         room=args.room,
         objects=objects,
         succeed_when_all_hold=args.succeed_when_all_hold,
+        goal_instruction=args.goal,
+        bddl_activity=args.bddl_activity,
+        bddl_instance_id=args.bddl_instance_id,
     )

@@ -232,15 +232,25 @@ def main() -> int:
     assert result["status"] == "failed" and result["terminate_plan"] is True, result
     ok("unknown target fails immediately with terminate_plan")
 
-    print("test 9: wait/share need no primitive and complete at once")
+    print("test 9: wait needs no primitive; share is not an action at all")
     engine = FakeEngine()
     executor = Executor("agent_0", engine=engine, world_state=world)
     assert executor.execute("wait") == "wait"
     assert engine.assigned == [], "communication must not touch the engine"
     assert executor.check_termination_condition()["status"] == "success"
-    executor.execute("share", target_agent="agent_1", message="I have the apple")
-    assert executor.check_termination_condition()["status"] == "success"
-    ok("wait and share complete without issuing a primitive")
+
+    # share was a text message that completed instantly and never failed, so a
+    # plan made of shares scored as a success while touching nothing: one
+    # broadcast run issued 395 of them against 30 navigate_to. Agent-to-agent
+    # text goes through the MessageBroker, which the topologies drive; it is
+    # not a plan action, and asking for it must fail like any unknown verb.
+    engine = FakeEngine()
+    executor = Executor("agent_0", engine=engine, world_state=world)
+    assert executor.execute("share", target_agent="agent_1", message="hi") == "invalid"
+    assert engine.assigned == []
+    result = executor.check_termination_condition()
+    assert result["status"] == "failed", result
+    ok("wait completes without a primitive; share is rejected as an unknown verb")
 
     print("test 10: an unknown action fails loudly instead of silently no-oping")
     # crafter's executor returned "noop" for anything unknown, which turns an
@@ -310,6 +320,8 @@ def main() -> int:
     def make(held, target="apple.n.01"):
         env = object.__new__(CooperativeBehaviorEnv)
         env.succeed_when_all_hold = target
+        env.bddl_activity = None      # no activity -> the stand-in decides
+        env.bddl_instance_id = 0
         env.goal_reached_at = None
         env.world = GoalWorld([r0, r1], held)
         env.env = GoalEnv([r0, r1, a0, a1, cup])
@@ -327,6 +339,53 @@ def main() -> int:
     off = make({"apple_0": "agent_0", "apple_1": "agent_1"}, target=None)
     assert off._goal_reached() is False, "unset knob must keep the old behaviour"
     ok("terminates only when every agent holds the named synset")
+
+    print("test: replan aborts the abandoned primitive, resume never does")
+    # A NAVIGATE_TO runs for hundreds of ticks. Replacing a plan used to clear
+    # only L2's record, leaving the engine running the old primitive: the new
+    # plan's first action could not be issued while has_active stayed true, and
+    # the abandoned primitive's outcome arrived with nothing to attach to.
+    # Resuming must take neither step, or every message would refund the travel
+    # the agent had already paid for.
+    from coop2.cognitive.plan.plan_env_wrapper import PlanningEnvWrapper
+
+    class SpyEngine:
+        def __init__(self):
+            self.aborted = []
+            self._active = {"agent_0"}
+        def has_active(self, agent_id):
+            return agent_id in self._active
+        def abort(self, agent_id, retract=False):
+            self.aborted.append((agent_id, retract))
+            self._active.discard(agent_id)
+            return None
+
+    class SpyHandler:
+        def __init__(self):
+            self.reset_calls = 0
+        def reset_current_action(self):
+            self.reset_calls += 1
+
+    engine = SpyEngine()
+    handler = SpyHandler()
+    wrapper = object.__new__(PlanningEnvWrapper)
+    wrapper.symbolic_env = type("W", (), {"env": type("E", (), {"engine": engine})(),
+                                          "agent_actions": {"agent_0": handler}})()
+    wrapper._prev_action_results = {"agent_0": "stale"}
+
+    wrapper._reset_symbolic_action_state("agent_0")
+    assert engine.aborted == [("agent_0", False)], engine.aborted
+    assert handler.reset_calls == 1
+    assert wrapper._prev_action_results["agent_0"] is None
+    assert not engine.has_active("agent_0"), "the new plan must be issuable next tick"
+
+    # Nothing running: abort must not be called at all.
+    engine2 = SpyEngine(); engine2._active.clear()
+    wrapper.symbolic_env = type("W", (), {"env": type("E", (), {"engine": engine2})(),
+                                          "agent_actions": {"agent_0": SpyHandler()}})()
+    wrapper._reset_symbolic_action_state("agent_0")
+    assert engine2.aborted == [], "nothing in flight -> nothing to abort"
+    ok("replan aborts the in-flight primitive; nothing else touches it")
 
     print("\nALL TESTS PASSED")
     return 0

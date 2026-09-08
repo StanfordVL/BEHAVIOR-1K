@@ -51,6 +51,9 @@ class LLMIndividualAgent(BaseLLMAgent):
         self.wait_for = []
         self.send_to = []
         self._system_prompt = None
+        # Set on the base agent, which prepends it for every prompt path; the
+        # leader, followers and chain need the same thing, so it cannot live
+        # only here.
         self.goal_instruction = goal_instruction
         self.team_agent_ids: List[str] = [agent_id]
     
@@ -64,15 +67,10 @@ class LLMIndividualAgent(BaseLLMAgent):
     def _generate_plan_with_role(self, messages: Optional[List[Dict]] = None) -> SymbolicPlan:
         """Generate plan via LLM."""
         repair_messages = messages
-        coop_config = self.coop_config
-        if self.goal_instruction:
-            goal_text = f"GLOBAL OBJECTIVE: {self.goal_instruction}"
-            coop_config = f"{goal_text}\n\n{coop_config}" if coop_config else goal_text
         prompt_messages = self._build_plan_prompt_messages(
             system_prompt=self._get_system_prompt(),
             agent_names=self.team_agent_ids,
             messages=repair_messages,
-            coop_config_override=coop_config,
         )
         return self._generate_plan_from_messages(
             prompt_messages=prompt_messages,

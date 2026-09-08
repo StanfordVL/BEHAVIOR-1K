@@ -69,6 +69,8 @@ class CooperativeBehaviorEnv:
         coop_config_path: Optional[str] = None,
         task_specs=None,
         succeed_when_all_hold: Optional[str] = None,
+        bddl_activity: Optional[str] = None,
+        bddl_instance_id: int = 0,
         **kwargs: Any,
     ):
         # crafter kwargs (area/view/size/n_players/reward) arrive from the
@@ -91,7 +93,14 @@ class CooperativeBehaviorEnv:
         self.use_scene_graph = use_scene_graph
         self.coop_config_path = coop_config_path
         self.task_specs = task_specs
-        # Stand-in goal check until M9 reconnects BDDL's compiled_task.check_goal.
+        # BDDL activity name, e.g. "coop_two_apples_pomaria". When set, the env
+        # loads OmniGibson's BehaviorTask from the cached instance and
+        # `terminated` follows compiled_task.check_goal -- the activity's own
+        # goal expression, evaluated against the simulator.
+        self.bddl_activity = bddl_activity
+        self.bddl_instance_id = int(bddl_instance_id)
+
+        # Stand-in goal check for runs with no BDDL activity.
         # DummyTask evaluates nothing, so without this `terminated` is always
         # False and an episode can only ever end by running out of steps --
         # a robot can hold the goal object and nothing notices.
@@ -170,8 +179,10 @@ class CooperativeBehaviorEnv:
             load_object_categories=None,
             objects=self.extra_objects,
             agent_names=self.agent_names,
+            task=self._task_config(),
         )
         self.env = og.Environment(configs=config)
+        self._enforce_controller_config(config)
 
         # Placement before prepare_robots: config poses are placeholders and
         # nothing has stepped yet, so moving here is free.
@@ -223,6 +234,83 @@ class CooperativeBehaviorEnv:
         self.capability_history = self.task_tracker.capability_history
         self._loaded = True
 
+    def _enforce_controller_config(self, config: Dict[str, Any]) -> None:
+        """Apply our controller config to whatever robots the scene ended up with.
+
+        ``Environment._load_robots`` skips the entire robots_config when the
+        scene already imported robots -- "Only actually load robots if no robot
+        has been imported from the scene loading directly yet". A BDDL activity
+        sets scene_instance to the cached template, that template contains the
+        robots it was sampled with, and so our config is dropped on the floor:
+        the robots come up with R1's defaults (IK arms, delta trunk) while
+        ``robot._controller_config`` still reports ours. Nothing raises until
+        ``q_to_action`` asserts the trunk is a non-delta JointController, which
+        happens on the first tick, long after the misconfiguration.
+
+        The symbolic primitives require position-mode JointControllers, so
+        assert them here rather than hoping the template was sampled with the
+        same robot config.
+        """
+        wanted = {
+            robot_config["name"]: robot_config.get("controller_config")
+            for robot_config in config.get("robots", [])
+            if robot_config.get("controller_config")
+        }
+        for robot in self.env.robots:
+            controller_config = wanted.get(robot.name)
+            if controller_config is None:
+                continue
+            registered = getattr(robot, "controllers", {}) or {}
+            names = sorted(registered)
+            if names and all(
+                name in controller_config for name in names
+            ) and self._controllers_match(robot, controller_config):
+                continue
+            print(f"[setup] reloading {robot.name}'s controllers to the primitives config")
+            robot.reload_controllers(controller_config)
+
+    @staticmethod
+    def _controllers_match(robot, controller_config: Dict[str, Any]) -> bool:
+        """Do @robot's live controllers already match @controller_config?"""
+        from omnigibson.controllers.controller_view import ControllerView  # noqa: PLC0415
+
+        for name, entry in (getattr(robot, "controllers", {}) or {}).items():
+            group_key = entry[0] if isinstance(entry, tuple) else entry
+            live = ControllerView._controller_groups.get(group_key)
+            expected = (controller_config.get(name) or {}).get("name")
+            if expected and type(live).__name__ != expected:
+                return False
+            wants_delta = (controller_config.get(name) or {}).get("use_delta_commands")
+            if wants_delta is not None and getattr(live, "use_delta_commands", None) != wants_delta:
+                return False
+        return True
+
+    def _task_config(self) -> Optional[Dict[str, Any]]:
+        """BehaviorTask when a BDDL activity is named, else DummyTask.
+
+        ``online_object_sampling=False`` is the point: the instance was sampled
+        once and frozen, so every run loads the same layout. Sampling here
+        instead would take ~45 s and lay the objects out differently each time,
+        and the whole reason for the cached template is that the contested
+        distances stay comparable across runs.
+        """
+        if not self.bddl_activity:
+            return None
+        return {
+            "type": "BehaviorTask",
+            "activity_name": self.bddl_activity,
+            "activity_definition_id": 0,
+            "activity_instance_id": self.bddl_instance_id,
+            "online_object_sampling": False,
+            # Must be False, for two independent reasons. The template was
+            # sampled without presampled robot poses, so scene metadata has no
+            # "robot_poses" key and BehaviorTask.reset dereferences None (the
+            # class default is True, despite its docstring saying False). And
+            # this facade places robots itself, room-scoped and mutually
+            # separated, which a presampled pose would overwrite.
+            "use_presampled_robot_pose": False,
+        }
+
     def _default_tasks(self):
         """One "hold this" task per added object.
 
@@ -256,6 +344,15 @@ class CooperativeBehaviorEnv:
             self._build()
         self._pending_outcomes = {}
         self.world.step()
+        # Baseline at env_step 0. The tracker only samples when a primitive
+        # terminates, so its first snapshot lands hundreds of ticks in, by
+        # which time the agents have already walked to their targets -- and
+        # _diff records nothing for a snapshot with no predecessor. The most
+        # important spatial improvement of the episode, nobody-near to
+        # someone-near, was therefore never counted, and C+ read 0 for runs in
+        # which both agents did reach an object.
+        if self.task_tracker is not None and not self.task_tracker.get_history():
+            self.task_tracker.step(0)
         info = self._build_info()
         return self._empty_obs(), info
 
@@ -416,6 +513,43 @@ class CooperativeBehaviorEnv:
         )
 
     def _goal_reached(self) -> bool:
+        """Has the episode's goal been met?
+
+        BDDL first when an activity is loaded: ``compiled_task.check_goal`` is
+        the activity's own goal expression evaluated against the simulator, and
+        it is the only authority once it exists. ``succeed_when_all_hold`` was
+        the stand-in for runs that have no activity; the two must never both be
+        deciding, so BDDL short-circuits it.
+        """
+        if self.goal_reached_at is not None:
+            return True
+        if self.bddl_activity:
+            return self._bddl_goal_reached()
+        return self._all_hold_goal_reached()
+
+    def _bddl_goal_reached(self) -> bool:
+        """``compiled_task.check_goal`` against the live scene.
+
+        Note what is *not* called: ``check_initial_conditions``. A BDDL init
+        block may contain ``inroom``, which has no entry in
+        ``PREDICATE_TO_STATE`` and raises KeyError; the goal expression is a
+        different set of predicates and is safe to evaluate every macro-step.
+        """
+        task = getattr(self.env, "task", None)
+        compiled = getattr(task, "compiled_task", None)
+        if compiled is None:
+            return False
+        try:
+            met, breakdown = compiled.check_goal(task._evaluate_predicate)
+        except Exception as error:  # noqa: BLE001 - a broken predicate must not end the run
+            print(f"[goal] check_goal raised {type(error).__name__}: {error}")
+            return False
+        if met:
+            self.goal_reached_at = self.engine.env_step
+            print(f"[goal] BDDL goal satisfied at env_step {self.goal_reached_at}: {breakdown}")
+        return bool(met)
+
+    def _all_hold_goal_reached(self) -> bool:
         """True once every agent holds an object of ``succeed_when_all_hold``.
 
         The synset is matched, not the category, so "apple.n.01" is what the
@@ -425,8 +559,6 @@ class CooperativeBehaviorEnv:
         """
         if not self.succeed_when_all_hold or self.world is None:
             return False
-        if self.goal_reached_at is not None:
-            return True
 
         held = self.world.held_objects()  # {object name: robot name}
         holders = set()
