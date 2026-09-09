@@ -390,19 +390,24 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
 
         obj is the *reference* here (the table), not the thing in hand.
 
-        Reimplemented rather than delegated because of one line. Upstream does
-        release -> set_position_orientation -> settle, and
-        ``set_position_orientation`` moves a body without touching its
-        velocity. The object has just spent the release's settle (50 + 200
-        ticks) falling out of the gripper, so it arrives at the sampled pose
-        carrying that fall, and the settle afterwards integrates it: one
-        recorded episode had a task apple leave the house entirely, logged at
-        12 m, then 27 m, then 36 m, then 38 m from the living room. Every
-        subsequent navigate_to it then failed with NO_SPACE_AROUND_TARGET
-        (200/200 candidates rejected by the same-room filter), which reads as a
-        crowding problem and is really a missing object.
+        Reimplemented rather than delegated, for two changes to the order.
 
-        ``keep_still()`` is upstream's own helper for exactly this.
+        Upstream does ``_release()`` -> ``set_position_orientation`` -> settle,
+        and ``_release()`` ends in a settle of its own. So the object spends
+        MAX_STEPS_FOR_SETTLING ticks falling out of the gripper before it is
+        moved: on screen it drops to the floor and only then jumps onto the
+        table. Here the release is split -- detach, teleport, settle once -- so
+        the object goes straight to where it was placed, and a whole settle
+        comes off the cost of every placement.
+
+        And ``set_position_orientation`` moves a body without touching its
+        velocity, so the object used to arrive carrying that fall and the settle
+        integrated it: one recorded episode had a task apple leave the house
+        entirely, logged at 12 m, then 27 m, then 36 m, then 38 m from the living
+        room, after which every navigate_to it failed with
+        NO_SPACE_AROUND_TARGET (200/200 candidates rejected by the same-room
+        filter) -- which reads as a crowding problem and is really a missing
+        object. ``keep_still()`` is upstream's own helper for exactly this.
         """
         self._require_unclaimed(obj, "place onto")
         self._require_near(obj, "place onto", GATE_PLACE)
@@ -422,10 +427,20 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
             predicate, obj_in_hand, obj,
             near_poses=near_poses, near_poses_threshold=near_poses_threshold,
         )
-        yield from self._release()
+
+        # Detach, then move, then settle -- once. Upstream calls ``_release()``,
+        # which is ``release_grasp_immediately`` followed by its own
+        # ``_settle_robot()``, and only teleports afterwards. Those settle steps
+        # are the object in free fall from gripper height: it visibly drops to
+        # the floor and *then* jumps onto the table. Splitting the release lets
+        # the object go straight there, and drops a whole settle
+        # (MAX_STEPS_FOR_SETTLING) from every placement.
+        for arm in self.robot.arm_names:
+            self.robot.release_grasp_immediately(arm=arm)
 
         obj_in_hand.set_position_orientation(*obj_pose)
-        # The one line upstream is missing.
+        # Teleporting does not zero velocity, and the object carries whatever it
+        # picked up in the gripper; the settle below would otherwise integrate it.
         obj_in_hand.keep_still()
         yield from self._settle_robot()
 

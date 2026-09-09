@@ -243,6 +243,17 @@ class FakeRobot:
         self._ag_obj_in_hand = {"left": None}
         scene.robots.append(self)
 
+    def release_grasp_immediately(self, arm="default"):
+        """Mirrors ManipulationRobot.release_grasp_immediately.
+
+        The production placement calls this directly instead of `_release()`,
+        so that the object is detached and teleported without the settle in
+        between -- otherwise it free-falls to the floor first and only then
+        jumps onto the table.
+        """
+        arm = "left" if arm == "default" else arm
+        self._ag_obj_in_hand[arm] = None
+
     def is_grasping(self, arm="default", candidate_obj=None):
         """Mirrors ManipulationRobot.is_grasping, which the code now calls
         instead of reading the private _ag_obj_in_hand.
@@ -401,10 +412,15 @@ def main() -> int:
 
     print("test 5: the holder can still act on what it holds")
     assert ctrl_a.holder_of(cup) is alice
-    # Two settle phases, not one: placement releases (which settles) and then
-    # settles again after moving the object. The stub's old one-phase version
-    # was simpler than upstream, and this reimplementation matches upstream.
-    assert list(ctrl_a._place_with_predicate(FakeObject("table_0", [0.6, 0.0, 0.4]), "OnTop")) == ["settle"] * 6
+    # ONE settle phase, and that is the point. Upstream releases (which settles,
+    # with the object free-falling out of the gripper) and only then teleports,
+    # so the object visibly drops to the floor before jumping onto the table.
+    # This placement detaches without settling, moves the object, and settles
+    # once -- so the object goes straight there and a whole settle comes off the
+    # cost. If this count grows back to two phases, the fall is back.
+    settles = list(ctrl_a._place_with_predicate(FakeObject("table_0", [0.6, 0.0, 0.4]), "OnTop"))
+    assert settles == ["settle"] * 3, settles
+    assert alice._ag_obj_in_hand["left"] is None, "the object must be detached, not still held"
     assert alice._ag_obj_in_hand["left"] is None
     assert ctrl_b.holder_of(cup) is None, "released -> claim cleared"
     ok("holder_of() is a live cross-robot view, and self-claims do not block")

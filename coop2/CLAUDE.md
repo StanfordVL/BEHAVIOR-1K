@@ -203,6 +203,44 @@ fixing 1 and 2 is what surfaced it. Both call sites (`holder_of` and
 `is_definitely_grasping`. The stubs used to return a plain bool, which is why no
 CPU test could catch it; they now return the tri-state and one does.
 
+## Placement no longer drops the object first (2026-09-09)
+
+Upstream's `_place_with_predicate` calls `_release()` -- which is
+`release_grasp_immediately` **followed by its own settle** -- and only teleports
+afterwards. Those settle ticks are the object in free fall from gripper height, so
+on screen the apple dropped to the floor and *then* jumped onto the table. The
+release is now split: detach, teleport, `keep_still()`, settle once. Measured with
+a per-tick height trace: the apple goes 1.223 m (gripper) -> 0.409 (sampled pose,
+table top is 0.358) -> 0.390, with **0 ticks below 0.15 m**. A placement also went
+from ~150 ticks to 101, because a whole settle phase is gone.
+
+## The place/grasp distance gate, measured (2026-09-09)
+
+There is a gate -- `_require_near(obj, verb, GATE_PLACE)` -- but it is looser than
+it looks. `interaction_radius_for` is the navigation annulus's upper bound plus
+0.35, and that is deliberate: the gate must accept anything `navigate_to` can
+produce, or an agent loops navigate -> TOO_FAR forever. The consequence is that
+the slack is `reach (1.5) + radius_margin (0.35) + clearance_margin (0.05)` =
+**1.90 m of clear floor between the robot's edge and the object's edge**,
+identical for every object, because object size only enters through the
+half-diagonal that sets the non-overlap clearance:
+
+| object | footprint | clearance | nav annulus | gate radius | edge gap |
+|---|---|---|---|---|---|
+| apple | 0.08 x 0.08 | 0.72 | [0.72, 2.22] | 2.57 | 1.90 m |
+| coffee_table | 0.74 x 1.45 | 1.48 | [1.48, 2.98] | 3.33 | 1.90 m |
+| armchair | 0.78 x 0.68 | 1.18 | [1.18, 2.68] | 3.03 | 1.90 m |
+
+R1's arm reaches well under a metre, so placement from 1.9 m of clear floor is not
+physically plausible. Tightening is one parameter -- `reach` -- and both the
+annulus and the gate move together, so they cannot disagree. It is also close to
+free: the outer ring of the wide annulus mostly falls outside the room or on
+non-traversable floor, so shrinking it *raises* pose acceptance (coffee table
+48.8 % at reach 1.5, 60.0 % at 0.6). Measured by
+`feasibility_verify/` sweeps at reach 1.5/1.0/0.8/0.6/0.4; only 0.4 starts costing
+apple poses. Not changed yet -- it moves travel cost and contention, which are
+experiment variables.
+
 ## Open defects
 
 Fixed ones are not listed here -- the fix and its reasoning live in the commit
