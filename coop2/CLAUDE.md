@@ -211,6 +211,15 @@ python -m coop2.experiment.run_individual --gui --agents 2 --steps 60 --seed 0 \
 # Headless runs still record: per-robot episode_agent_<i>.mp4 land in the run
 # folder, because RENDER_VIEWER_CAMERA and HEADLESS are separate switches.
 
+# Inspect the scene by hand once the episode is over. --keep-viewer implies
+# --gui, and runs *after* every log, plot and metric file has been written, so
+# Ctrl+C out of it costs nothing. It keeps stepping the sim and prints each
+# BDDL task object's position and speed every 2 s -- which is how to watch for
+# the drifting coffee table without trying to catch it by eye.
+python -m coop2.experiment.run_individual --keep-viewer --agents 2 --steps 4000 \
+  --seed 3 --time-limit-seconds 0 --scene Pomaria_1_int --room living_room_0 \
+  --bddl-activity coop_two_apples_pomaria --model gpt-5.6-luna --llm-quiet
+
 # Same stack with no credentials: substitutes StubLLMClient for the model, so a
 # later failure with a real one is unambiguously the model and not the plumbing.
 python feasibility_verify/verify_runner_offline.py

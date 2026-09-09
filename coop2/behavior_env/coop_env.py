@@ -467,6 +467,69 @@ class CooperativeBehaviorEnv:
         self._closed = True
         self._register_shutdown()
 
+    def keep_viewer_open(self, report_every: float = 2.0) -> None:
+        """Step the sim forever so the window stays live for inspection.
+
+        Call **after** the runner has written its logs: ``close()`` deliberately
+        does not shut Isaac down (the real shutdown is an atexit hook), so the
+        scene is still there and still steppable once the episode is over.
+
+        Prints the task objects' world positions as it goes, because the
+        failure this exists to inspect -- a receptacle drifting out of the room
+        at constant velocity -- is much easier to read as numbers than to catch
+        by eye in a viewport. Ctrl+C to leave.
+        """
+        import time  # noqa: PLC0415
+
+        import omnigibson as og  # noqa: PLC0415
+        import torch as th  # noqa: PLC0415
+
+        if self.headless:
+            print(
+                "[keep-viewer] headless: there is no window to keep open. "
+                "Re-run with --gui (a DISPLAY is required)."
+            )
+            return
+
+        task = getattr(self.env, "task", None)
+        scope = getattr(task, "object_scope", None) or {}
+        robots = {robot.name for robot in self.env.robots}
+        watched = {}
+        for instance, entity in scope.items():
+            obj = getattr(entity, "wrapped_obj", entity)
+            if obj is None or getattr(obj, "name", None) in robots:
+                continue
+            watched[instance] = obj
+
+        print(
+            "\n[keep-viewer] the episode is over and the scene is still live. "
+            "Click the viewport, then RMB-drag or W/A/S/D to fly the camera. "
+            "Ctrl+C to exit."
+        )
+        last_report = 0.0
+        try:
+            while True:
+                if not og.sim.is_playing():
+                    og.sim.play()
+                og.sim.step()
+                now = time.monotonic()
+                if watched and now - last_report >= report_every:
+                    last_report = now
+                    parts = []
+                    for instance, obj in watched.items():
+                        try:
+                            position, _ = obj.get_position_orientation()
+                            velocity = obj.get_linear_velocity()
+                        except Exception:  # noqa: BLE001 - never stop the loop
+                            continue
+                        xyz = [round(float(v), 2) for v in position.tolist()]
+                        speed = float(th.linalg.norm(velocity))
+                        parts.append(f"{instance}={xyz} |v|={speed:.3f}")
+                    if parts:
+                        print("[keep-viewer] " + "  ".join(parts))
+        except KeyboardInterrupt:
+            print("\n[keep-viewer] exiting")
+
     @staticmethod
     def _register_shutdown() -> None:
         if getattr(CooperativeBehaviorEnv, "_shutdown_registered", False):

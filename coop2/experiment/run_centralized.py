@@ -98,6 +98,7 @@ def run_centralized_experiment(
     bddl_activity=None,
     bddl_instance_id=0,
     headless=True,
+    keep_viewer=False,
 ):
     """
     Run experiment with centralized LLM agents.
@@ -362,7 +363,13 @@ def run_centralized_experiment(
     print(f"  - episode.gif: Episode replay video")
     print(f"  - llm_usage.json: LLM token usage statistics")
     print(f"{'='*80}")
-    
+
+
+    # Last, so that everything above is already on disk: this blocks until the
+    # user interrupts it, and Ctrl+C during it must not cost them the run.
+    if keep_viewer:
+        base_env.keep_viewer_open()
+
     return agents, env
 
 
@@ -396,6 +403,9 @@ if __name__ == "__main__":
                              "--show is a no-op: the visualisation wrapper is a stub, and "
                              "OMNIGIBSON_HEADLESS is overridden by the env's own headless "
                              "default, so this flag is the only way to get a window.")
+    parser.add_argument("--keep-viewer", action="store_true",
+                        help="After the episode, keep the window open and keep printing "
+                             "task-object positions until Ctrl+C. Implies --gui.")
 
     args = parser.parse_args()
     
@@ -416,5 +426,6 @@ if __name__ == "__main__":
         goal_instruction=args.goal,
         bddl_activity=args.bddl_activity,
         bddl_instance_id=args.bddl_instance_id,
-        headless=not args.gui,
+        headless=not (args.gui or args.keep_viewer),
+        keep_viewer=args.keep_viewer,
     )
