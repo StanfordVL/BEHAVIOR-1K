@@ -218,8 +218,18 @@ class CooperativeBehaviorEnv:
 
             enable_viewer_rendering()
 
+        # Spawned off-scene on purpose. These are placeholders -- place_robots
+        # moves every robot into the task room straight after -- but the robots
+        # are *created* here and the Environment's own construction and reset
+        # render several frames before placement runs. At the old [1.5 * i, 0,
+        # 0.05] that put them inside the house (0, 0 is kitchen_0 in
+        # Pomaria_1_int, whose floor spans x [-13.7, 1.1]), so an episode opened
+        # with both agents flashing in the kitchen. Parking them outside the
+        # floor plan costs nothing: they have no floor to stand on for those few
+        # frames, and place_robots zeroes velocity when it teleports them in.
+        park = lambda index: [-50.0 - 2.0 * index, -50.0, 0.05]  # noqa: E731
         config = build_multi_robot_config(
-            robot_poses=[([1.5 * i, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]) for i in range(self.n_agents)],
+            robot_poses=[(park(i), [0.0, 0.0, 0.0, 1.0]) for i in range(self.n_agents)],
             robot_model=self.robot_model,
             scene_model=self.scene_model,
             load_object_categories=None,

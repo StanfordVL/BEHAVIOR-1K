@@ -129,14 +129,14 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
             ``reach + 0.35 + clearance_margin`` of clear floor between the
             robot's edge and the object's, the same for every object.
 
-            Was 1.5, which allowed placing with **1.9 m** of clear floor in
-            between -- twice R1's arm, and visibly wrong in the viewport. 0.8
-            gives 1.2 m. Measured before changing: shrinking the annulus does not
-            cost standing poses, it gains them, because the outer ring of a wide
-            annulus mostly falls outside the room or on non-traversable floor
-            (coffee table acceptance 48.8 % at 1.5, 55.3 % at 0.8; apples 37.7 %
-            and 25.2 % -> 42.7 % and 33.7 %). Below about 0.6 the apples start
-            losing poses again.
+            Was 1.5 (1.9 m of clear floor -- twice R1's arm), then 0.8 (1.2 m).
+            **Now 0.6**, which with the manipulation guard gives a 0.70 m gap.
+            Measured before changing: shrinking the annulus does not cost standing
+            poses, it gains them, because the outer ring of a wide annulus mostly
+            falls outside the room or on non-traversable floor (coffee table
+            acceptance 48.8 % at 1.5, 60.0 % at 0.6; apples 37.7 %/25.2 % ->
+            38.2 %/35.2 %). Below 0.6 the apples do start losing poses, which is
+            why this is the floor.
         clearance_margin: slack added to (target half-diagonal + robot radius).
         robot_radius: circumscribed radius. ``None`` derives it from
             ``reset_joint_pos_aabb_extent``, which is what the trav map's own
@@ -164,7 +164,7 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
         self,
         env,
         robot,
-        reach: float = 0.8,
+        reach: float = 0.6,
         clearance_margin: float = 0.05,
         robot_radius: Optional[float] = None,
         robot_separation: Optional[float] = None,

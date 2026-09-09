@@ -71,7 +71,15 @@ DEFAULT_GATED_PRIMITIVES = frozenset({GATE_GRASP, GATE_PLACE, GATE_OPEN_CLOSE, G
 #: radius. Without it a pose sampled exactly at the far edge of the annulus
 #: would be borderline TOO_FAR, and the agent would loop
 #: navigate -> TOO_FAR -> navigate on a float comparison.
-DEFAULT_RADIUS_MARGIN = 0.35
+#:
+#: This is a **guard, not a policy**: it covers the float comparison and the
+#: millimetres a base drifts during the settle after a teleport, nothing more.
+#: It was 0.35, which quietly added a third of a metre to how far away every
+#: agent could manipulate; the distance an agent is allowed to reach across is
+#: ``reach`` alone, so that one number governs it (user, 2026-09-09). Every
+#: non-navigation verb -- grasp, place, open/close, toggle -- goes through
+#: ``interaction_radius_for`` and therefore shares it.
+DEFAULT_RADIUS_MARGIN = 0.05
 
 #: Ticks of travel per metre. One env step is 1/``action_frequency`` seconds
 #: (30 Hz by default), so 60 ticks/m is 2 s/m, i.e. a 0.5 m/s base -- roughly
@@ -169,14 +177,25 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
         self.enforce_claims = bool(enforce_claims)
 
     def interaction_radius_for(self, obj) -> float:
-        """How close the base must be to act on @obj.
+        """How close the base must be to act on @obj. One rule for every verb.
 
-        Derived from the navigation sampler's range for this very object, so
-        the two can never disagree: anything NAVIGATE_TO can produce is in
-        range. A single global constant cannot hold for both an apple and a
-        table -- the table's clearance alone exceeds what would be a sane
-        radius for the apple, and an agent that navigated successfully would
-        still be told TOO_FAR, forever.
+        Every non-navigation primitive -- grasp, place, open/close, toggle --
+        gates on this, so "how far can an agent reach" is a single number:
+        ``reach``, plus a small guard (:data:`DEFAULT_RADIUS_MARGIN`) for the
+        float comparison and settle drift.
+
+        What is uniform is the **clear floor between the robot's edge and the
+        object's**, not the centre-to-centre distance, and it cannot be the
+        latter: the coffee table's own clearance is 1.48 m, so a uniform
+        centre-distance small enough to be meaningful for an apple would make
+        the table unreachable at any pose. So the radius is
+        ``clearance(obj) + reach + guard`` and the *gap* is what stays constant
+        across objects.
+
+        Derived from the navigation sampler's range for this very object, so the
+        two can never disagree: anything NAVIGATE_TO can produce is in range. An
+        agent that navigated successfully must never then be told TOO_FAR, or it
+        loops navigate -> TOO_FAR -> navigate forever.
         """
         if self._interaction_radius is not None:
             return self._interaction_radius

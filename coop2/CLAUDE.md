@@ -239,12 +239,39 @@ non-traversable floor, so shrinking it *raises* pose acceptance (coffee table
 48.8 % at reach 1.5, 60.0 % at 0.6). Measured at reach 1.5/1.0/0.8/0.6/0.4; only
 0.4 starts costing apple poses.
 
-**`reach` is now 0.8** (user decision 2026-09-09), i.e. a 1.20 m edge gap, gate
-radius 1.87 m for an apple and 2.63 m for the coffee table. Cost of the change,
-measured on the same seed: the goal still solves, at env_step 1485 against 1325,
-because agents now have to walk closer; `TOO_FAR` went 11 -> 15 (10 of the 15 on
-grasp, none on place) and `NO_SPACE_AROUND_TARGET` stayed at 0. Any recorded
-metric from before this change has different travel costs and is not comparable.
+**`reach` is now 0.6 and `DEFAULT_RADIUS_MARGIN` is 0.05** (user, 2026-09-09).
+The margin used to be 0.35, which quietly added a third of a metre to every
+manipulation gate; it is now only what it claims to be -- a guard for the float
+comparison and the millimetres a base drifts during a settle -- so **`reach` alone
+is the distance an agent may reach across**, and every non-navigation verb
+(grasp, place, open/close, toggle) gates on it through `interaction_radius_for`.
+
+Resulting gap is a uniform **0.70 m** of clear floor: gate radius 1.37 m for an
+apple, 1.83 m for an armchair, 2.13 m for the coffee table. The *gap* is what is
+uniform, not the centre distance, and it cannot be the latter -- the coffee
+table's own clearance is 1.48 m, so a centre distance tight enough to mean
+anything for an apple would make the table unreachable from any pose.
+
+Measured on the same seed, tightening 0.8 -> 0.6 **helped**: goal at env_step 1230
+against 1485, and `TOO_FAR` 15 -> 11, with `NO_SPACE_AROUND_TARGET` still 0. A
+narrower annulus puts the sampled standing pose closer to the target, so the
+travel charge (60 ticks/m) shrinks. Any metric recorded before this has different
+travel costs and is not comparable.
+
+## Why an agent flashed in the kitchen at startup (2026-09-09)
+
+Robots are *created* at the placeholder poses in `build_multi_robot_config`, and
+`og.Environment`'s construction and reset render several frames before
+`place_robots` moves them into the task room. Those placeholders were
+`[1.5 * i, 0, 0.05]`, and (0, 0) is inside the house -- `kitchen_0` in
+Pomaria_1_int, whose floor spans x [-13.7, 1.1] -- so every episode opened with
+both agents visible in the kitchen for a moment. It only became visible when the
+template's robots stopped being the ones simulated (they came up already in the
+living room). Placeholders are now parked at (-50 - 2i, -50), outside the floor
+plan: nothing renders inside the house before placement, and having no floor for
+those few frames is harmless because `place_robots` zeroes velocity on arrival.
+
+
 
 ## Primitive latency, measured (2026-09-09, reach 0.8)
 
