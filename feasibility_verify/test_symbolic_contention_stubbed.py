@@ -26,6 +26,8 @@ import random
 import sys
 import types
 
+GRASPING_TRUE, GRASPING_UNKNOWN, GRASPING_FALSE = 1, 0, -1
+
 
 # ---------------------------------------------------------------------------
 # Stubs: a minimal torch, then the OmniGibson surface the modules import
@@ -243,10 +245,22 @@ class FakeRobot:
 
     def is_grasping(self, arm="default", candidate_obj=None):
         """Mirrors ManipulationRobot.is_grasping, which the code now calls
-        instead of reading the private _ag_obj_in_hand."""
+        instead of reading the private _ag_obj_in_hand.
+
+        Returns the real tri-state (TRUE=1, UNKNOWN=0, FALSE=-1), not a bool.
+        Returning a bool is what let a truthiness bug through for weeks: the
+        gripper answers FALSE=-1 -- which is *truthy* -- when it is closed on
+        something other than the object being asked about, so every holder check
+        said yes."""
         arm = "left" if arm == "default" else arm
         held = self._ag_obj_in_hand.get(arm)
-        return held is not None if candidate_obj is None else held is candidate_obj
+        if candidate_obj is None:
+            return GRASPING_TRUE if held is not None else GRASPING_FALSE
+        if held is candidate_obj:
+            return GRASPING_TRUE
+        # Closed on something else: exactly the case that returns FALSE, not
+        # UNKNOWN, and exactly the case that used to be read as "yes".
+        return GRASPING_FALSE if held is not None else GRASPING_UNKNOWN
 
     def get_position_orientation(self):
         return self.position, None
@@ -507,6 +521,25 @@ def main() -> int:
     list(ctrl_a._place_with_predicate(table, "OnTop"))
     assert cup.stilled == 1, f"keep_still called {cup.stilled} times, expected 1"
     ok("keep_still() runs between the teleport and the settle")
+
+    print("test: a gripper closed on something else does not claim every object")
+    # IsGraspingState is an IntEnum -- TRUE=1, UNKNOWN=0, FALSE=-1 -- so
+    # `if robot.is_grasping(...)` accepts a definite NO. And FALSE is exactly
+    # what a robot holding apple A returns when asked about apple B: the
+    # controller reports TRUE for "gripper closed", then downgrades to FALSE
+    # when the fingers turn out not to touch the object asked about. The holder
+    # check therefore named a holder for every object in the scene -- the second
+    # apple went permanently OBJECT_CLAIMED as soon as the first was picked up,
+    # while place_on_top failed PRE_CONDITION with an empty hand.
+    from coop2.behavior_env.symbolic_contention import is_definitely_grasping
+    assert is_definitely_grasping(GRASPING_TRUE) is True
+    assert is_definitely_grasping(GRASPING_FALSE) is False, "FALSE is -1, which is truthy"
+    assert is_definitely_grasping(GRASPING_UNKNOWN) is False
+    assert is_definitely_grasping(True) is True, "a bool-returning stub must still work"
+    assert is_definitely_grasping(None) is False
+    assert is_definitely_grasping("yes") is False, "an unreadable answer must not create a claim"
+    ok("only IsGraspingState.TRUE counts as holding")
+
 
     print("\nALL TESTS PASSED")
     return 0

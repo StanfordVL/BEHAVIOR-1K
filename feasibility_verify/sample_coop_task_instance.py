@@ -52,6 +52,56 @@ macros.utils.object_state_utils.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS = 5
 macros.utils.object_state_utils.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 5
 
 
+
+def strip_robots_from_template(path):
+    """Delete the robot entries from a cached task template, in place.
+
+    ``save_task`` dumps the whole scene, robots included, and the template *is*
+    the scene file every episode loads -- so the robots the sampler happened to
+    have are the ones that come up in every later run, no matter what the env
+    config says. ``include_robots: False`` cannot prevent it: that flag gates the
+    robots in the scene USD, not entries restored from the task's own json.
+
+    The state it was baking in was junk. Measured on the 2026-09-09 template:
+    ``agent_1`` was stored with its base z joint at **-0.681**, i.e. 0.68 m below
+    the floor, so physics was ejecting it before placement even ran (it left
+    ``place_robots`` at 2.72 m/s) and it toppled to 18.5 deg of base tilt during
+    the first settle -- a robot on its side, with a position-mode base controller
+    then fighting joint targets it cannot reach. ``agent_0`` was stored with a root
+    anchor of (300, 300, 300) and every non-base joint at zero, i.e. not the
+    tucked reset pose its own init_info asks for.
+
+    Stripping them is what makes coop2's robots config take effect --
+    ``Environment._load_robots`` is guarded by ``if len(self.scene.robots) == 0``
+    -- so the robots come up fresh, with the controller stack r1_primitives.yaml
+    requires and the reset pose they declare, and ``place_robots`` is the only
+    thing that decides where they stand. The object layout is untouched, which is
+    why this can be applied to an existing template without re-sampling.
+
+    Returns the names removed.
+    """
+    import json
+
+    with open(path) as handle:
+        data = json.load(handle)
+
+    init_info = data.get("objects_info", {}).get("init_info", {})
+    names = [
+        name for name, entry in init_info.items()
+        if "robot" in (entry.get("class_module", "") + entry.get("class_name", "")).lower()
+    ]
+    registry = data.get("state", {}).get("registry", {}).get("object_registry", {})
+    for name in names:
+        init_info.pop(name, None)
+        registry.pop(name, None)
+
+    # metadata.task.inst_to_name is deliberately left alone: BDDL still declares
+    # agent.n.01_1, and behavior_task maps agent.n.01_N to env.robots[N-1] on the
+    # cached path, so the mapping resolves to our own robot of the same name.
+    with open(path, "w") as handle:
+        json.dump(data, handle)
+    return names
+
 def build_config(instance_id):
     return {
         "env": {"action_frequency": 30, "physics_frequency": 120, "external_sensors": None},
@@ -192,7 +242,10 @@ def main():
         save_dir = args.save_dir or os.path.join(
             gm.DATA_PATH, "2026-challenge-task-instances", "scenes", SCENE_MODEL, "json"
         )
-        print(f"\nwrote {os.path.join(save_dir, fname + '.json')}")
+        written = os.path.join(save_dir, fname + ".json")
+        removed = strip_robots_from_template(written)
+        print(f"\nwrote {written}")
+        print(f"stripped {len(removed)} robot entries from the template: {removed}")
 
     og.shutdown()
 

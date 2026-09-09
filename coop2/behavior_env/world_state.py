@@ -46,6 +46,24 @@ def room_type_of(room_instance: Optional[str]) -> Optional[str]:
     return room_instance.rsplit("_", 1)[0]
 
 
+GRASPING_TRUE = 1
+
+
+def is_definitely_grasping(state) -> bool:
+    """``True`` only for ``IsGraspingState.TRUE`` (an IntEnum with FALSE = -1).
+
+    Duplicated from ``symbolic_contention`` deliberately: the CPU suites load
+    each module standalone under a stubbed ``omnigibson``, so a shared import
+    would be unimportable there. See that copy for what the truthiness bug cost.
+    """
+    if state is None or isinstance(state, str):
+        return False
+    try:
+        return int(state) == GRASPING_TRUE
+    except (TypeError, ValueError):
+        return False
+
+
 @dataclass
 class EntityObservation:
     """One object or robot, as the cognitive layer sees it."""
@@ -351,7 +369,14 @@ class BehaviorWorldState:
                 if candidate is None:
                     continue
                 try:
-                    confirmed = robot.is_grasping(arm=arm, candidate_obj=candidate)
+                    # == TRUE, not truthiness: IsGraspingState is an IntEnum with
+                    # FALSE = -1 and UNKNOWN = 0, so `if state:` accepts a
+                    # definite no and rejects "don't know" -- which defeats the
+                    # confirmation this call exists to perform. See
+                    # symbolic_contention.holder_of for what that cost.
+                    confirmed = is_definitely_grasping(
+                        robot.is_grasping(arm=arm, candidate_obj=candidate)
+                    )
                 except Exception:  # noqa: BLE001 - non-manipulation robots
                     confirmed = True
                 if confirmed:

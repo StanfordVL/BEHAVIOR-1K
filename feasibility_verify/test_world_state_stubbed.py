@@ -15,6 +15,8 @@ import os
 import sys
 import types
 
+GRASPING_TRUE, GRASPING_UNKNOWN, GRASPING_FALSE = 1, 0, -1
+
 
 class FakeVector(list):
     def __getitem__(self, index):
@@ -106,10 +108,22 @@ class FakeRobot(FakeObject):
 
     def is_grasping(self, arm="default", candidate_obj=None):
         """Mirrors ManipulationRobot.is_grasping, which the code now calls
-        instead of reading the private _ag_obj_in_hand."""
+        instead of reading the private _ag_obj_in_hand.
+
+        Returns the real tri-state (TRUE=1, UNKNOWN=0, FALSE=-1), not a bool.
+        Returning a bool is what let a truthiness bug through for weeks: the
+        gripper answers FALSE=-1 -- which is *truthy* -- when it is closed on
+        something other than the object being asked about, so every holder check
+        said yes."""
         arm = "left" if arm == "default" else arm
         held = self._ag_obj_in_hand.get(arm)
-        return held is not None if candidate_obj is None else held is candidate_obj
+        if candidate_obj is None:
+            return GRASPING_TRUE if held is not None else GRASPING_FALSE
+        if held is candidate_obj:
+            return GRASPING_TRUE
+        # Closed on something else: exactly the case that returns FALSE, not
+        # UNKNOWN, and exactly the case that used to be read as "yes".
+        return GRASPING_FALSE if held is not None else GRASPING_UNKNOWN
 
 
 class FakeScene:

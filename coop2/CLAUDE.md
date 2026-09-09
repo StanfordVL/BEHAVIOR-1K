@@ -158,6 +158,51 @@ placement impulse, and `_keep_task_objects_awake` keeps the table from ever
 sleeping it off. Evidence kept in
 `coop2/runs/individual_agents2_repair_off_seed3_20260909_025858_415866/`.
 
+## Two bugs the viewport exposed (2026-09-09)
+
+A robot vanishing on its first teleport and another toppling mid-episode turned
+out to be three separate defects, found by measuring the startup stages apart
+(`COOP2_PLACEMENT_VERBOSE=1`, and
+`feasibility_verify/measure_base_joint_limits.py`).
+
+**1. The template's robots were the ones being simulated.** `include_robots:
+False` gates the robots in the scene *USD*; it cannot stop entries restored from
+the task's own cached json, and the template *is* the scene file. Proof was in the
+root anchors: (300, 300, 300) and (-52, -50, 0) are the sampler's, not coop2's
+`[1.5 * i, 0, 0.05]`. The state being baked in was junk -- `agent_1` stored with
+its base z joint at **-0.681**, i.e. 0.68 m below the floor, and `agent_0` with a
+root anchor 300 m out and every non-base joint at zero rather than the tucked
+reset pose its own init_info declares. This is also what
+`_enforce_controller_config` was patching after the fact. Fixed by stripping robot
+entries from the template (`strip_robots_from_template` in the sampler, applied to
+the existing template in place so the object layout is untouched). Now the roots
+read (0, 0, 0.05) and (1.5, 0, 0.05), and both robots come up level at 0.51 deg
+instead of 0.51 and **18.52**.
+
+**2. Teleporting a robot did not zero its velocity.** Same defect as the object
+placement that used to fling apples out of the house. Because `agent_1` began
+underfloor, physics was already ejecting it and it left `place_robots` at
+**2.72 m/s**; the orientation it is given is level, but momentum that survives the
+teleport tumbles it during the next settle. `place_robots` now calls
+`keep_still()`. Worth knowing this fixed the velocity but *not* the tilt -- the
+tilt was defect 1, and measuring after each fix is what separated them.
+
+**3. `if robot.is_grasping(...)` accepted a definite NO.** `IsGraspingState` is an
+IntEnum: `TRUE = 1`, `UNKNOWN = 0`, **`FALSE = -1`**. So a truthiness test is true
+for FALSE and false for UNKNOWN. And FALSE is precisely what a robot holding apple
+A returns when asked about apple B: the gripper controller reports TRUE for
+"closed on something", then downgrades to FALSE when the fingers turn out not to
+touch the object asked about (`robots/robot.py`). So `holder_of` named a holder for
+every object in the scene, and **the second apple went permanently
+OBJECT_CLAIMED the instant the first was picked up**, with `place_on_top` failing
+PRE_CONDITION on an empty hand -- the ALREADY_HELD / OBJECT_CLAIMED /
+PRE_CONDITION triad in the plan log. Latent for weeks: with the template's
+mis-configured robots `is_grasping` raised and the `except: break` hid it, so
+fixing 1 and 2 is what surfaced it. Both call sites (`holder_of` and
+`world_state`'s held-object confirmation) now go through
+`is_definitely_grasping`. The stubs used to return a plain bool, which is why no
+CPU test could catch it; they now return the tri-state and one does.
+
 ## Open defects
 
 Fixed ones are not listed here -- the fix and its reasoning live in the commit

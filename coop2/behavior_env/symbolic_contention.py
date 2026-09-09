@@ -88,6 +88,38 @@ DEFAULT_WAIT_TICKS = 200
 MAX_WAIT_TICKS = 600
 
 
+
+#: Mirrors ``omnigibson.controllers.IsGraspingState``: TRUE = 1, UNKNOWN = 0,
+#: FALSE = -1. Spelled out as an int rather than imported because the CPU test
+#: suites load this module under a stubbed ``omnigibson``, and a check that
+#: cannot run in the stubs is a check no test can cover.
+GRASPING_TRUE = 1
+
+
+def is_definitely_grasping(state) -> bool:
+    """``True`` only for ``IsGraspingState.TRUE``.
+
+    ``Robot.is_grasping`` returns an IntEnum with ``FALSE = -1``, so a bare
+    ``if state:`` is true for a definite **no** and false for "don't know". And
+    FALSE is not a rare answer: the gripper controller reports TRUE whenever it
+    is closed on something, then downgrades to FALSE if the fingers are not in
+    contact with the object you asked about (``robots/robot.py``). A robot
+    holding one apple therefore answered "yes, I hold it" about every other
+    object in the scene, and the second apple went permanently OBJECT_CLAIMED
+    the instant the first was picked up -- while ``place_on_top`` failed
+    PRE_CONDITION, because nothing was really in the hand.
+
+    Accepts the enum, a plain int, or a bool (``True`` is ``1``). Anything
+    unreadable counts as *not* grasping: this gates a claim that blocks another
+    agent, so an answer we cannot interpret must not create one.
+    """
+    if state is None or isinstance(state, str):
+        return False
+    try:
+        return int(state) == GRASPING_TRUE
+    except (TypeError, ValueError):
+        return False
+
 class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
     """Symbolic primitives with proximity, travel cost, and cross-robot claims.
 
@@ -172,11 +204,25 @@ class ContentiousSymbolicActionPrimitives(NavigableSymbolicActionPrimitives):
         indexed by ``self.robot`` and ``self.arm`` only. Going through the
         public API also picks up the ``grasping_mode == "physical"`` branch that
         reading ``_ag_obj_in_hand`` directly would skip.
+
+        **Compare against TRUE explicitly.** ``is_grasping`` returns an
+        ``IsGraspingState``, an IntEnum whose members are ``TRUE = 1``,
+        ``UNKNOWN = 0`` and ``FALSE = -1`` -- so a bare truthiness test is true
+        for a definite *no* and false for "don't know". And FALSE is exactly what
+        comes back in the case that matters: the controller reports TRUE whenever
+        the gripper is closed on something, then downgrades to FALSE if the
+        fingers are not in contact with ``candidate_obj``
+        (``robots/robot.py``). So a robot holding apple 1 answered "yes, I hold
+        apple 2" for every other object in the scene, and the second apple became
+        permanently OBJECT_CLAIMED the instant the first was picked up -- with
+        ``place_on_top`` then failing PRE_CONDITION because nothing was really in
+        the hand. Latent until the robots came up with a working controller
+        stack; before that ``is_grasping`` raised and the ``break`` hid it.
         """
         for robot in self._peer_robots():
             for arm in getattr(robot, "arm_names", []):
                 try:
-                    if robot.is_grasping(arm=arm, candidate_obj=obj):
+                    if is_definitely_grasping(robot.is_grasping(arm=arm, candidate_obj=obj)):
                         return robot
                 except Exception:  # noqa: BLE001 - non-manipulation robots
                     break

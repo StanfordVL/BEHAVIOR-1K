@@ -48,6 +48,7 @@ __all__ = [
     "pick_room",
     "place_objects",
     "place_robots",
+    "report_robot_poses",
     "sample_free_points",
 ]
 
@@ -250,9 +251,54 @@ def place_robots(
             position=th.tensor([placed[0], placed[1], z], dtype=th.float32),
             orientation=th.tensor([0.0, 0.0, 0.0, 1.0], dtype=th.float32),
         )
+        # Teleporting does not zero velocity, and a robot can arrive here already
+        # moving: the cached template stores agent_1 0.68 m *below* the floor, so
+        # physics is busy ejecting it, and it was measured leaving this call at
+        # 2.72 m/s. The orientation above is level, but momentum that survives the
+        # teleport tumbles it during the very next settle -- 18.5 deg of base tilt,
+        # a robot on its side, and then a position-mode base controller fighting
+        # joint targets it cannot reach. Same defect as the object placement that
+        # used to fling apples out of the house; same fix, upstream's own helper.
+        robot.keep_still()
     print(f"[placement] room {chosen_room!r}: {[(round(x, 2), round(y, 2)) for x, y in chosen]}")
     return chosen, chosen_room
 
+
+
+def report_robot_poses(env, label: str) -> None:
+    """Print each robot's pose, tilt and support -- one line per robot.
+
+    A diagnostic, gated by ``COOP2_PLACEMENT_VERBOSE`` at the call sites. The
+    failure it exists for is a robot that is level and grounded at one stage of
+    startup and tilted or airborne at the next: reading the stages apart is the
+    only way to tell which one did it, and a single post-build snapshot cannot.
+    """
+    import math
+
+    print(f"[poses] {label}")
+    for robot in env.robots:
+        position = robot.get_position_orientation()[0]
+        positions = robot.get_joint_positions()
+        tilts = []
+        for component in ("rx", "ry"):
+            joint = robot.joints.get(f"base_footprint_{component}_joint")
+            if joint is not None:
+                tilts.append(abs(math.degrees(float(positions[int(joint.dof_indices[0])]))))
+        tilt = max(tilts) if tilts else 0.0
+        try:
+            speed = float(th.linalg.norm(robot.get_linear_velocity()))
+        except Exception:  # noqa: BLE001
+            speed = float("nan")
+        flags = []
+        if tilt > 2.0:
+            flags.append("NOT LEVEL")
+        if float(position[2]) > 0.02:
+            flags.append("AIRBORNE")
+        if speed > 0.01:
+            flags.append("MOVING")
+        print(f"[poses]   {robot.name}: xy=({float(position[0]):+.3f}, {float(position[1]):+.3f}) "
+              f"z={float(position[2]):+.4f} tilt={tilt:5.2f} deg |v|={speed:.4f}"
+              + ("   <-- " + ", ".join(flags) if flags else ""))
 
 #: Resolved object layouts, keyed by (scene, room, seed, objects). Checked in
 #: so a run reproduces exactly and starts without re-sampling; delete an entry

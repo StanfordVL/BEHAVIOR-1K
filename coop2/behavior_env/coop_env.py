@@ -171,7 +171,11 @@ class CooperativeBehaviorEnv:
             prepare_robots,
             tune_primitive_macros,
         )
-        from coop2.behavior_env.placement import place_objects, place_robots  # noqa: PLC0415
+        from coop2.behavior_env.placement import (  # noqa: PLC0415
+            place_objects,
+            place_robots,
+            report_robot_poses,
+        )
         from coop2.behavior_env.primitive_engine import MultiAgentPrimitiveEngine  # noqa: PLC0415
         from coop2.behavior_env.symbolic_contention import (  # noqa: PLC0415
             ContentiousSymbolicActionPrimitives,
@@ -228,8 +232,15 @@ class CooperativeBehaviorEnv:
 
         # Placement before prepare_robots: config poses are placeholders and
         # nothing has stepped yet, so moving here is free.
+        import os as _os  # noqa: PLC0415
+
+        verbose_poses = bool(_os.environ.get("COOP2_PLACEMENT_VERBOSE"))
         _, self.placement_room = place_robots(self.env, seed=self.seed, room=self.room)
+        if verbose_poses:
+            report_robot_poses(self.env, "after place_robots")
         prepare_robots(self.env)
+        if verbose_poses:
+            report_robot_poses(self.env, "after prepare_robots")
         assert_multi_robot_sanity(self.env, expected_robots=self.n_agents)
 
         # One registry for the whole scene: agents reserve the pose they are
@@ -542,6 +553,26 @@ class CooperativeBehaviorEnv:
         self._closed = True
         self._register_shutdown()
 
+    @staticmethod
+    def _base_tilt_degrees(robot) -> float:
+        """Roll/pitch of a holonomic base, in degrees; 0.0 if it has none.
+
+        Read off the virtual base joints rather than the root quaternion: for a
+        holonomic base the root prim does not move, so the orientation that
+        matters lives in base_footprint_rx/ry (robots/robot.py).
+        """
+        import math  # noqa: PLC0415
+
+        if not getattr(robot, "is_holonomic_base", False):
+            return 0.0
+        positions = robot.get_joint_positions()
+        tilts = []
+        for component in ("rx", "ry"):
+            joint = robot.joints.get(f"base_footprint_{component}_joint")
+            if joint is not None:
+                tilts.append(abs(math.degrees(float(positions[int(joint.dof_indices[0])]))))
+        return max(tilts) if tilts else 0.0
+
     def keep_viewer_open(self, report_every: float = 2.0) -> None:
         """Step the sim forever so the window stays live for inspection.
 
@@ -549,10 +580,11 @@ class CooperativeBehaviorEnv:
         does not shut Isaac down (the real shutdown is an atexit hook), so the
         scene is still there and still steppable once the episode is over.
 
-        Prints the task objects' world positions as it goes, because the
-        failure this exists to inspect -- a receptacle drifting out of the room
-        at constant velocity -- is much easier to read as numbers than to catch
-        by eye in a viewport. Ctrl+C to leave.
+        Prints both robots' and the task objects' world positions as it goes,
+        because the failures this exists to inspect -- a receptacle drifting out
+        of the room at constant velocity, a robot lying on its side -- are much
+        easier to read as numbers than to catch by eye in a viewport. Each robot
+        line carries its base tilt for that reason. Ctrl+C to leave.
         """
         import time  # noqa: PLC0415
 
@@ -588,9 +620,26 @@ class CooperativeBehaviorEnv:
                     og.sim.play()
                 og.sim.step()
                 now = time.monotonic()
-                if watched and now - last_report >= report_every:
+                if now - last_report >= report_every:
                     last_report = now
                     parts = []
+                    # The robots first: where each one ended up is the first thing
+                    # you want when inspecting a finished episode, and the tilt is
+                    # here because a toppled robot is the failure that reads as
+                    # "it started convulsing" -- a base tilt of tens of degrees
+                    # says the robot is on its side, which no xyz makes obvious.
+                    for robot in self.env.robots:
+                        try:
+                            position, _ = robot.get_position_orientation()
+                            speed = float(th.linalg.norm(robot.get_linear_velocity()))
+                            tilt = self._base_tilt_degrees(robot)
+                        except Exception:  # noqa: BLE001 - never stop the loop
+                            continue
+                        xyz = [round(float(v), 2) for v in position.tolist()]
+                        note = "  <-- TOPPLED" if tilt > 20.0 else ""
+                        parts.append(
+                            f"{robot.name}={xyz} |v|={speed:.3f} tilt={tilt:.1f}deg{note}"
+                        )
                     for instance, obj in watched.items():
                         try:
                             position, _ = obj.get_position_orientation()
