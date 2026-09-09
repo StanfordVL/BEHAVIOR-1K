@@ -246,6 +246,37 @@ because agents now have to walk closer; `TOO_FAR` went 11 -> 15 (10 of the 15 on
 grasp, none on place) and `NO_SPACE_AROUND_TARGET` stayed at 0. Any recorded
 metric from before this change has different travel costs and is not comparable.
 
+## Primitive latency, measured (2026-09-09, reach 0.8)
+
+`feasibility_verify/measure_primitive_latency.py`. One tick is one `env.step`,
+i.e. 1/30 s at the default action frequency.
+
+| primitive | ticks | seconds | what sets it |
+|---|---|---|---|
+| `grasp` | **101** (n=4, no spread) | 3.4 | one `_settle_robot` |
+| `place_on_top` | **101** (n=4, no spread) | 3.4 | one `_settle_robot` |
+| `navigate_to` | **~100 + 60 per metre** | 5.9-11.0 measured | travel charge + settle |
+| `wait(n)` | **n + 1** | n/30 | exactly what it is asked for |
+| any rejected precondition | **51** | 1.7 | `apply_ref` settles after catching |
+
+So ~100 ticks is the floor of every physical primitive, and `navigate_to` is the
+only one whose cost varies -- `DEFAULT_TRAVEL_TICKS_PER_METER` (60) is charged on
+the distance to the **sampled standing pose**, not to the object's centre. Verified
+against the `[nav]` lines: 3.8 m -> 227 ticks, 2.1 m -> 129, 0.9 m -> 53. Do not fit
+ticks against centre distance; the pose is anywhere in the annulus and the fit
+invents a slope (it suggested 31 ticks/m).
+
+**Budgeting an episode**: one apple is navigate + grasp + navigate + place, so
+roughly `4 x 100 + 60 x (d1 + d2)` -- about 500-700 ticks for in-room distances,
+and both apples in parallel put the goal around env_step 1300-1500, which is what
+runs actually report. A failed action adds 51 ticks and, because it terminates the
+plan, one more LLM round trip.
+
+Note these are much cheaper than the pre-2026-09-08 figures (grasp 500,
+place_on_top 750, navigate ~490-550) quoted elsewhere in this file: those were
+inflated by upstream retrying a placement whose predicate check was lying (the
+sleeping-apple bug) and by the release settle that placement no longer performs.
+
 ## Open defects
 
 Fixed ones are not listed here -- the fix and its reasoning live in the commit
