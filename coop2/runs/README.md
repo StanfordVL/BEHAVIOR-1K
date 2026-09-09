@@ -13,6 +13,16 @@ Each contains:
 | `task_states.json` | per-step task snapshots; `compute_metrics` reads constraint changes from here |
 | `plan_logs.json` | one record per plan, with its actions and outcomes |
 | `agent_states.json`, `llm_usage.json`, `message_log.json` | FSM history, token/API accounting, inter-agent messages |
-| `metrics_timeline.png`, `agent_timeline.png`, `comprehensive_timeline.png` | the plots |
+| `agent_timeline.png` | per-agent FSM state (R/W/X/I) against wall clock, drawn from `agent_states.json` |
+
+`metrics_timeline.png` is no longer produced -- it plotted the COOP2 task
+tracker's C+/C- series, which is out of scope for this project.
 
 Contents are gitignored: reproducible from the code and the seed.
+
+Delete accumulated runs with `clean_runs.py` (dry run by default):
+
+```bash
+python coop2/runs/clean_runs.py                  # show what would go
+python coop2/runs/clean_runs.py --keep 3 --yes   # delete all but the 3 newest
+```

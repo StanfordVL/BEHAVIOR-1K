@@ -27,11 +27,9 @@ from typing import Dict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from coop2.behavior_env.coop_env import CooperativeEnv
-from coop2.behavior_env.cooperative_tasks import plot_metrics_timeline
 from coop2.cognitive import (
     PlanningEnvWrapper, 
     LLMClient,
-    visualize_all_agents_progress,
     print_plan_summary,
     visualize_comprehensive_timeline,
     build_repair_intervention_report,
@@ -41,6 +39,7 @@ from coop2.cognitive import (
     save_metrics_csv,
 )
 from coop2.cognitive.viz import RealtimeVisualizationWrapper
+from coop2.experiment.agent_timeline import plot_from_run_dir
 from coop2.comm_topology import LLMLeaderAgent, LLMFollowerAgent, create_llm_centralized_topology
 try:
     from llm_usage import print_llm_usage_summary
@@ -314,8 +313,10 @@ def run_centralized_experiment(
     print_plan_summary(env.logger.plan_history)
     
     # Create visualizations
-    agent_timeline_path = os.path.join(output_dir, 'agent_timeline.png')
-    visualize_all_agents_progress(env.logger.plan_history, output_path=agent_timeline_path)
+    # save_logs() above wrote agent_states.json; the timeline is drawn from that
+    # file rather than from plan_history, so it shows the FSM (R/W/X/I) and not
+    # just plan boundaries.
+    plot_from_run_dir(output_dir)
     
     comprehensive_timeline_path = os.path.join(output_dir, 'comprehensive_timeline.png')
     visualize_comprehensive_timeline(
@@ -325,12 +326,6 @@ def run_centralized_experiment(
     )
     
     # Plot task metrics
-    task_history = env._env.symbolic_env.env.task_tracker.get_history()
-    metrics_history = [step_summary.metrics for step_summary in task_history if step_summary.metrics]
-    if metrics_history:
-        metrics_path = os.path.join(output_dir, 'metrics_timeline.png')
-        plot_metrics_timeline(metrics_history, output_path=metrics_path, show=False)
-    
     # No save_video call here: nothing implements it. The facade records as it
     # ticks (video_path below) and finalises the file in close(), because the
     # encoder has to be flushed and og.shutdown() never unwinds.
@@ -362,9 +357,8 @@ def run_centralized_experiment(
     print(f"Results saved to: {output_dir}")
     print(f"  - plan_logs.json: Plan execution logs")
     print(f"  - agent_states.json: Agent state timelines")
-    print(f"  - agent_timeline.png: Agent plan timeline visualization")
+    print(f"  - agent_timeline.png: Per-agent FSM state over wall clock")
     print(f"  - comprehensive_timeline.png: Full timeline with messages")
-    print(f"  - metrics_timeline.png: Task metrics over time")
     print(f"  - episode.gif: Episode replay video")
     print(f"  - llm_usage.json: LLM token usage statistics")
     print(f"{'='*80}")

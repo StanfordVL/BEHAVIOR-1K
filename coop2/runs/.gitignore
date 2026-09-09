@@ -4,3 +4,4 @@
 *
 !.gitignore
 !README.md
+!clean_runs.py
