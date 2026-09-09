@@ -258,6 +258,26 @@ narrower annulus puts the sampled standing pose closer to the target, so the
 travel charge (60 ticks/m) shrinks. Any metric recorded before this has different
 travel costs and is not comparable.
 
+## Agent start poses are sampled, but seed-determined (2026-09-09)
+
+`place_robots` calls `th.manual_seed(seed)` and then samples, so a run's robot
+poses are a pure function of (scene, room, seed, robot geometry) -- not random
+run to run, and not a fixed configured pose either. Verified by re-running
+`place_robots` on one loaded scene: seed 0 -> (-7.55, 0.05)/(-10.15, 0.85),
+seed 1 -> (-11.35, 1.85)/(-11.75, -1.95), seed 2 -> different again, and
+returning to seeds 0 and 1 reproduced both exactly. `seed=None` differs every
+call. Today's logs are the same result from the other direction: every seed-0 run
+printed one of exactly two placements, and the switch between them is the commit
+that stopped simulating the template's robots -- because `robot_radius` changed,
+which changes both the trav-map erosion and the separation requirement.
+
+Consequences for the metrics sweep: **the seed varies the agents' start poses and
+nothing else about the scene.** The object layout is frozen in the cached
+template, so across seeds only the start poses (hence travel distances and who is
+nearer which apple) and the LLM's own sampling differ. Placement constraints are
+also worth stating: one room, mutual separation >= 2 x robot_radius (1.236 m),
+within `cluster_radius` 6 m of the first robot, and on traversable eroded floor.
+
 ## Why an agent flashed in the kitchen at startup (2026-09-09)
 
 Robots are *created* at the placeholder poses in `build_multi_robot_config`, and
