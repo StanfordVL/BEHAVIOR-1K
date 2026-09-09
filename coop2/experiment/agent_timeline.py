@@ -28,25 +28,45 @@ STATE_COLOURS = {
 }
 
 
-def _spans(transitions: List[Any], end_time: float) -> List[Tuple[float, float, str, int]]:
-    """``[(start, end, state, env_step), ...]`` from a list of transitions.
+def _spans(
+    transitions: List[Any], end_time: float, end_step: Optional[int] = None,
+) -> List[Tuple[float, float, str, int, int]]:
+    """``[(start, end, state, env_step_in, env_step_out), ...]``.
 
     agent_states.json records the moment a state was *entered*, so a span runs
-    to the next entry, and the last one to the end of the episode.
+    to the next entry, and the last one to the end of the episode. Both ends of
+    the env_step range are carried because only the range is informative: an
+    entry step alone reads as "this span cost 0 steps" on the first span of the
+    run, which starts at env_step 0 and can run for thousands of ticks.
     """
     spans = []
     for index, entry in enumerate(transitions):
         timestamp, env_step, state = float(entry[0]), int(entry[1]), str(entry[2])
-        stop = float(transitions[index + 1][0]) if index + 1 < len(transitions) else end_time
+        following = transitions[index + 1] if index + 1 < len(transitions) else None
+        stop = float(following[0]) if following is not None else end_time
+        stop_step = int(following[1]) if following is not None else (
+            end_step if end_step is not None else env_step
+        )
         if stop > timestamp:
-            spans.append((timestamp, stop, state, env_step))
+            spans.append((timestamp, stop, state, env_step, stop_step))
     return spans
+
+
+def _step_label(first: int, last: int) -> str:
+    """``"280"`` when the world did not move, ``"0-280"`` when it did.
+
+    A degenerate range is the point, not a defect: R, W and I all freeze the
+    env, so a single number *is* the reading, and seeing the same number on
+    three consecutive bars is how the barrier shows up in the figure.
+    """
+    return str(first) if last <= first else f"{first}-{last}"
 
 
 def plot_agent_state_timeline(
     agent_states: Dict[str, List[Any]],
     output_path: str,
     title: Optional[str] = None,
+    end_step: Optional[int] = None,
 ) -> Optional[str]:
     """Write a Gantt-style figure of agent states. Returns the path, or None.
 
@@ -55,6 +75,9 @@ def plot_agent_state_timeline(
             contents of agent_states.json.
         output_path: where to write the PNG.
         title: figure title; defaults to the run directory's name.
+        end_step: env_step the episode ended on, for the last span of each
+            agent. Without it that span's range is left degenerate rather than
+            guessed at.
     """
     if not agent_states:
         return None
@@ -79,7 +102,9 @@ def plot_agent_state_timeline(
     figure, axes = plt.subplots(figsize=(14, 1.4 + 0.9 * len(agents)))
     seen_states = []
     for lane, agent_id in enumerate(agents):
-        for start, stop, state, env_step in _spans(agent_states[agent_id], end_time):
+        for start, stop, state, first_step, last_step in _spans(
+            agent_states[agent_id], end_time, end_step
+        ):
             axes.barh(
                 lane, stop - start, left=start, height=0.55,
                 color=STATE_COLOURS.get(state, "#cccccc"),
@@ -87,11 +112,12 @@ def plot_agent_state_timeline(
             )
             if state not in seen_states:
                 seen_states.append(state)
-            # env_step inside the span, where it fits: it is how a reader ties
-            # this figure back to plan_logs.json.
-            if stop - start > end_time * 0.04:
+            # The env_step range inside the span, where it fits: it is how a
+            # reader ties this figure back to plan_logs.json, and the width of
+            # the range is how much simulation the span actually bought.
+            if stop - start > end_time * 0.05:
                 axes.text(
-                    (start + stop) / 2, lane, f"{env_step}",
+                    (start + stop) / 2, lane, _step_label(first_step, last_step),
                     ha="center", va="center", fontsize=7, color="white",
                 )
 
@@ -100,7 +126,7 @@ def plot_agent_state_timeline(
     axes.set_ylim(-0.6, len(agents) - 0.4)
     axes.invert_yaxis()
     axes.set_xlim(0, end_time)
-    axes.set_xlabel("wall clock (s) -- labels inside the bars are env_step")
+    axes.set_xlabel("wall clock (s) -- labels inside the bars are the env_step range")
     axes.set_title(title or os.path.basename(os.path.dirname(os.path.abspath(output_path))))
     axes.grid(axis="x", alpha=0.3, linestyle=":")
 
@@ -120,6 +146,32 @@ def plot_agent_state_timeline(
     return output_path
 
 
+def _episode_end_step(run_dir: str) -> Optional[int]:
+    """Last env_step of the episode, from plan_logs.json.
+
+    agent_states.json only holds transitions, so the final span of every agent
+    has no recorded end. Plans are closed out with the episode (they are marked
+    interrupted at the step it ended on), so the largest ``end_step`` there is
+    that step.
+    """
+    path = os.path.join(run_dir, "plan_logs.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as handle:
+            payload = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if isinstance(payload, list):
+        plans = payload
+    else:
+        # The saver writes {"plan_history": [...], "current_plans": {...}}.
+        plans = payload.get("plan_history") or payload.get("plans") or []
+    steps = [p.get("end_step") for p in plans if isinstance(p, dict)]
+    steps = [int(s) for s in steps if isinstance(s, (int, float))]
+    return max(steps) if steps else None
+
+
 def plot_from_run_dir(run_dir: str, filename: str = "agent_timeline.png") -> Optional[str]:
     """Draw the timeline for an existing run directory."""
     states_path = os.path.join(run_dir, "agent_states.json")
@@ -128,7 +180,10 @@ def plot_from_run_dir(run_dir: str, filename: str = "agent_timeline.png") -> Opt
     with open(states_path) as handle:
         agent_states = json.load(handle)
     return plot_agent_state_timeline(
-        agent_states, os.path.join(run_dir, filename), title=os.path.basename(run_dir)
+        agent_states,
+        os.path.join(run_dir, filename),
+        title=os.path.basename(run_dir),
+        end_step=_episode_end_step(run_dir),
     )
 
 
