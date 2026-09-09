@@ -105,6 +105,21 @@ class CooperativeBehaviorEnv:
         # is read when the camera is created), which is why this is a
         # constructor argument and not a method you call later.
         self.video_path = video_path
+        # Recording and a live viewport cannot share the camera. A scene gets one
+        # viewer camera, so MultiViewRecorder captures its N views by moving that
+        # camera to each robot, rendering, and putting it back -- several times a
+        # second. Offscreen that is invisible; with a window open it *is* the
+        # window, so the viewport snaps between the robots and back on every
+        # capture pass. Reconciled here rather than at the capture site so that
+        # every later read agrees: gm.RENDER_VIEWER_CAMERA, enable_viewer_rendering
+        # and _start_recording all branch on video_path.
+        if video_path and not headless:
+            print(
+                "[setup] GUI mode: episode recording is off. The recorder captures "
+                "its per-robot views by moving the one shared viewer camera, which "
+                "makes a live viewport jump between robots. Drop --gui to record."
+            )
+            self.video_path = None
         self.recorder = None
 
         self.goal_reached_at: Optional[int] = None
@@ -255,6 +270,8 @@ class CooperativeBehaviorEnv:
             adopted = self.world.adopt_task_scope(task)
             print(f"[setup] adopted {adopted} entity ids from the BDDL object scope")
         self._keep_task_objects_awake()
+        # After the scope is known, so the shot can contain the task's objects.
+        self._frame_viewport()
         self.executors = {
             agent_id: BehaviorActionExecutor(agent_id, engine=self.engine, world_state=self.world)
             for agent_id in self.agent_names
@@ -268,6 +285,64 @@ class CooperativeBehaviorEnv:
         self.task_tracker = CoopTaskTracker(self.world, tasks)
         self.capability_history = self.task_tracker.capability_history
         self._loaded = True
+
+    def _frame_viewport(self) -> None:
+        """Point the viewer camera at the task **once**, then never touch it.
+
+        Only for GUI runs. Without this the window opens wherever OmniGibson
+        left the camera, which indoors is usually the inside of a wall; with the
+        recorder disabled in GUI mode there is nothing else that would aim it.
+
+        Set once on purpose. The recorder's per-tick camera moves are what makes
+        a live viewport flicker, so anything that re-aims during the episode
+        reintroduces exactly the bug this avoids. A human can orbit from here,
+        which is also why the framing being imperfect is acceptable in a way it
+        was not for video: `overview_pose` was rejected for recording because
+        63 deg cannot hold 4.4 m of task from inside a 4.9 m room.
+        """
+        if self.headless:
+            return
+        import omnigibson as og  # noqa: PLC0415
+        from omnigibson.utils.constants import STRUCTURE_CATEGORIES  # noqa: PLC0415
+
+        from coop2.behavior_env.placement import sample_free_points  # noqa: PLC0415
+        from coop2.behavior_env.recording import (  # noqa: PLC0415
+            WIDE_FOCAL_LENGTH,
+            overview_pose,
+        )
+
+        robot_names = {robot.name for robot in self.env.robots}
+        points = [robot.get_position_orientation()[0] for robot in self.env.robots]
+        # The task's own objects, so the shot contains the apples and the table
+        # rather than just the robots. Structure is excluded because a floor's
+        # origin is nowhere near the room and would drag the centre off.
+        task = getattr(self.env, "task", None)
+        for entity in (getattr(task, "object_scope", None) or {}).values():
+            obj = getattr(entity, "wrapped_obj", entity)
+            if obj is None or getattr(obj, "name", None) in robot_names:
+                continue
+            if getattr(obj, "category", None) in STRUCTURE_CATEGORIES:
+                continue
+            points.append(obj.get_position_orientation()[0])
+        if not points:
+            return
+
+        try:
+            cells = sample_free_points(
+                self.env.scene, self.env.robots[0], count=200, room=self.placement_room
+            )
+            position, orientation = overview_pose(points, room_cells=cells)
+            camera = og.sim.viewer_camera
+            camera.focal_length = WIDE_FOCAL_LENGTH
+            camera.set_position_orientation(position=position, orientation=orientation)
+        except Exception as error:  # noqa: BLE001 - a bad shot must not end the run
+            print(f"[setup] could not frame the viewport: {type(error).__name__}: {error}")
+            return
+        print(
+            f"[setup] viewport framed on {len(points)} task points from "
+            f"({float(position[0]):.2f}, {float(position[1]):.2f}, {float(position[2]):.2f}); "
+            "it does not follow the robots -- orbit it yourself"
+        )
 
     def _start_recording(self) -> None:
         """Frame the task and hook the recorders onto the engine's tick.

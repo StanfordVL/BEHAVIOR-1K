@@ -208,6 +208,13 @@ python -m coop2.experiment.run_individual --agents 2 --steps 4000 --seed 0 \
 python -m coop2.experiment.run_individual --gui --agents 2 --steps 60 --seed 0 \
   --scene Pomaria_1_int --room living_room_0 \
   --bddl-activity coop_two_apples_pomaria --model gpt-5.6-luna --llm-quiet
+# --gui turns recording OFF, and that is not a limitation to work around: a
+# scene has ONE viewer camera, MultiViewRecorder captures its N views by moving
+# that camera to each robot and back several times a second, and with a window
+# open that camera *is* the window -- so recording and a live viewport cannot
+# coexist without a second camera. In GUI mode the viewport is instead aimed at
+# the task once, at build time, and then never touched: anything that re-aims
+# during the episode is the flicker. Orbit it yourself.
 # Headless runs still record: per-robot episode_agent_<i>.mp4 land in the run
 # folder, because RENDER_VIEWER_CAMERA and HEADLESS are separate switches.
 
