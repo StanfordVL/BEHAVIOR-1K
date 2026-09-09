@@ -114,6 +114,50 @@ that differs, and `wake()` plus one step flips `OnTop` to True with the object
 not having moved. Three geometric hypotheses were proposed and all three were
 measured wrong before this one was measured right.
 
+## Seed 3, one run per topology (2026-09-09)
+
+| topology | end_step | goal | plans | ok / fail / cut | Y_plan | msgs | API | tokens |
+|---|---|---|---|---|---|---|---|---|
+| broadcast_chain | 1956 | **solved** | 3 | 1 / 0 / 2 | 1.00 | 1 | 3 | 10 819 |
+| centralized | 2094 | **solved** | 3 | 1 / 0 / 2 | 1.00 | 2 | 4 | 11 360 |
+| individual | 3174 | not solved | 5 | 1 / 2 / 2 | 0.33 | 0 | 5 | 17 847 |
+
+Four seeds now: individual 2/4, centralized 4/4, broadcast_chain 4/4. Still not
+enough to separate topology from seed noise, but individual is the only one that
+has ever failed, and both of its failures are physics, not coordination --
+`place_on_top[EXECUTION]` at seeds 1 and 3.
+
+### `--steps` is not the budget: `--time-limit-seconds` defaults to 120
+
+`run_*.py` takes a wall-clock deadline (`run_individual.py:326`) that defaults to
+**120 s** and stops the episode independently of `--steps`. At ~26 env_step/s
+that caps a run near 3100 steps, so `--steps 4000` has never once been reachable
+and every run "to 4000" was really a run to 120 s. Individual seed 3 stopped at
+3174 for exactly this reason.
+
+Re-run with `--time-limit-seconds 0` to check: it still did not solve, so this
+particular result stands. But the deadline is invisible in the run folder --
+nothing records which limit fired -- and it silently makes `--steps` a
+lower-bound-only knob. Pass `--time-limit-seconds 0` when the step count is
+meant to be the experiment variable.
+
+### The coffee table can fly away (seen once, not yet diagnosed)
+
+In the 4000-step individual re-run, `coffee_table_gpkbiw_0` left the living room
+under constant velocity: the `NO_SPACE_AROUND_TARGET` attribution logs it at
+(-10.5, -10.1), then (-14.5, -17.9), (-17.6, -24.1) ... (-46.4, -80.8), roughly
+equal steps in a fixed direction -- coasting, not accelerating, i.e. it carries a
+velocity nothing damps. 97 rejections, all `{'room': 200, 'trav': 0, 'robots': 0}`:
+every candidate pose was rejected for being outside the room, because the target
+had left it. 18 of that run's 21 plans died this way (Y_plan 0.05).
+
+Same shape as blocker #6 but on the *receptacle*, which is supposed to be
+furniture. Not present in any of the three 120 s seed-3 runs, so it is an event
+during the episode rather than a step-count threshold; the obvious suspect is a
+placement impulse, and `_keep_task_objects_awake` keeps the table from ever
+sleeping it off. Evidence kept in
+`coop2/runs/individual_agents2_repair_off_seed3_20260909_025858_415866/`.
+
 ## Open defects
 
 Fixed ones are not listed here -- the fix and its reasoning live in the commit
