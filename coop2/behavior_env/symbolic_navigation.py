@@ -119,6 +119,24 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
             so it widens automatically for a table and stays tight for an apple.
             A fixed range cannot do this: for a large object a 1.5 m upper bound
             is inside the object.
+
+            This also sets the **manipulation gate**, because
+            ``interaction_radius_for`` is this annulus's upper bound plus a
+            margin -- deliberately, so that a pose ``navigate_to`` produced can
+            never be rejected as ``TOO_FAR``, which would loop forever. So
+            ``reach`` is the one number that decides how far away an agent may
+            grasp or place: the slack works out to
+            ``reach + 0.35 + clearance_margin`` of clear floor between the
+            robot's edge and the object's, the same for every object.
+
+            Was 1.5, which allowed placing with **1.9 m** of clear floor in
+            between -- twice R1's arm, and visibly wrong in the viewport. 0.8
+            gives 1.2 m. Measured before changing: shrinking the annulus does not
+            cost standing poses, it gains them, because the outer ring of a wide
+            annulus mostly falls outside the room or on non-traversable floor
+            (coffee table acceptance 48.8 % at 1.5, 55.3 % at 0.8; apples 37.7 %
+            and 25.2 % -> 42.7 % and 33.7 %). Below about 0.6 the apples start
+            losing poses again.
         clearance_margin: slack added to (target half-diagonal + robot radius).
         robot_radius: circumscribed radius. ``None`` derives it from
             ``reset_joint_pos_aabb_extent``, which is what the trav map's own
@@ -146,7 +164,7 @@ class NavigableSymbolicActionPrimitives(SymbolicSemanticActionPrimitives):
         self,
         env,
         robot,
-        reach: float = 1.5,
+        reach: float = 0.8,
         clearance_margin: float = 0.05,
         robot_radius: Optional[float] = None,
         robot_separation: Optional[float] = None,

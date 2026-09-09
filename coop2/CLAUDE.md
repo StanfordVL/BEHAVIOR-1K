@@ -236,10 +236,15 @@ physically plausible. Tightening is one parameter -- `reach` -- and both the
 annulus and the gate move together, so they cannot disagree. It is also close to
 free: the outer ring of the wide annulus mostly falls outside the room or on
 non-traversable floor, so shrinking it *raises* pose acceptance (coffee table
-48.8 % at reach 1.5, 60.0 % at 0.6). Measured by
-`feasibility_verify/` sweeps at reach 1.5/1.0/0.8/0.6/0.4; only 0.4 starts costing
-apple poses. Not changed yet -- it moves travel cost and contention, which are
-experiment variables.
+48.8 % at reach 1.5, 60.0 % at 0.6). Measured at reach 1.5/1.0/0.8/0.6/0.4; only
+0.4 starts costing apple poses.
+
+**`reach` is now 0.8** (user decision 2026-09-09), i.e. a 1.20 m edge gap, gate
+radius 1.87 m for an apple and 2.63 m for the coffee table. Cost of the change,
+measured on the same seed: the goal still solves, at env_step 1485 against 1325,
+because agents now have to walk closer; `TOO_FAR` went 11 -> 15 (10 of the 15 on
+grasp, none on place) and `NO_SPACE_AROUND_TARGET` stayed at 0. Any recorded
+metric from before this change has different travel costs and is not comparable.
 
 ## Open defects
 
