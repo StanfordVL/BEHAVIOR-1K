@@ -324,6 +324,41 @@ place_on_top 750, navigate ~490-550) quoted elsewhere in this file: those were
 inflated by upstream retrying a placement whose predicate check was lying (the
 sleeping-apple bug) and by the release settle that placement no longer performs.
 
+## Second activity: coop_nine_apples_hall (2026-09-09)
+
+`bddl3/bddl/activity_definitions/coop_nine_apples_hall/problem0.bddl` -- nine
+`straight_chair`s and one `coffee_table-cjjayg` in `hall_glass_ceiling`'s
+`empty_room_0`, an apple on each chair, goal = all nine on the table. Sampled the
+documented way (`feasibility_verify/sample_nine_apples_hall.py`:
+`online_object_sampling: True` -> `Environment(...)` -> `save_task()`), with the
+model pinned via `sampling_whitelist` and the robot entries stripped afterwards so
+`--agents` still controls the robot count.
+
+Verified: BEHAVIOR's own `verify_definition` passes, all nine apples sit on their
+own chairs after a 300-step settle, the goal is False at t=0, and the cached
+instance loads with **nine** robots (9 apples + 9 chairs in scope, table is
+`coffee_table-cjjayg`).
+
+Notes worth keeping:
+
+* `hall_glass_ceiling` has rooms `empty_room_0`, `corridor_0`, `bathroom_0`, and
+  contains **no chairs and no tables** -- so every chair and the table are
+  *imported* objects. That is why the init block uses
+  `(ontop straight_chair.n.01_N floor.n.01_1)` and not `inroom`: `inroom` binds
+  to furniture the scene already has. The `ontop ... floor.n.01_1` idiom is the
+  standard one, used by 1008 shipped activities.
+* `tests/bddl_tests.py batch_verify` **cannot run in this checkout** -- it
+  hardcodes `parse_domain("omnigibson")` and only `domain_behavior-1k.bddl` and
+  `domain_behavior-100.bddl` exist, so it dies before reaching any activity. Run
+  `verify_definition` directly with `parse_domain("behavior-1k")` instead.
+* **The distances are the problem, not the sampling.** `ontop floor` lets the
+  sampler use the whole room and this hall is ~50 x 57 m. The cached draw puts
+  chairs 4.7-43.0 m from the table (nine round trips = 550 m ~ 33 000 travel
+  ticks at 60 ticks/m), and `place_robots` starts the team ~47-53 m away because
+  it clusters around wherever the first pose lands. Budget accordingly -- of the
+  order of 60 000 steps, against 4 000 for the two-apple Pomaria task -- or
+  re-sample for a tighter draw, or centre the furniture deliberately.
+
 ## Open defects
 
 Fixed ones are not listed here -- the fix and its reasoning live in the commit

@@ -1,0 +1,44 @@
+(define (problem coop_nine_apples_hall-0)
+    (:domain behavior-1k)
+
+    (:objects
+        apple.n.01_1 apple.n.01_2 apple.n.01_3 apple.n.01_4 apple.n.01_5 apple.n.01_6 apple.n.01_7 apple.n.01_8 apple.n.01_9 - apple.n.01
+        straight_chair.n.01_1 straight_chair.n.01_2 straight_chair.n.01_3 straight_chair.n.01_4 straight_chair.n.01_5 straight_chair.n.01_6 straight_chair.n.01_7 straight_chair.n.01_8 straight_chair.n.01_9 - straight_chair.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop straight_chair.n.01_1 floor.n.01_1)
+        (ontop straight_chair.n.01_2 floor.n.01_1)
+        (ontop straight_chair.n.01_3 floor.n.01_1)
+        (ontop straight_chair.n.01_4 floor.n.01_1)
+        (ontop straight_chair.n.01_5 floor.n.01_1)
+        (ontop straight_chair.n.01_6 floor.n.01_1)
+        (ontop straight_chair.n.01_7 floor.n.01_1)
+        (ontop straight_chair.n.01_8 floor.n.01_1)
+        (ontop straight_chair.n.01_9 floor.n.01_1)
+        (ontop coffee_table.n.01_1 floor.n.01_1)
+        (ontop apple.n.01_1 straight_chair.n.01_1)
+        (ontop apple.n.01_2 straight_chair.n.01_2)
+        (ontop apple.n.01_3 straight_chair.n.01_3)
+        (ontop apple.n.01_4 straight_chair.n.01_4)
+        (ontop apple.n.01_5 straight_chair.n.01_5)
+        (ontop apple.n.01_6 straight_chair.n.01_6)
+        (ontop apple.n.01_7 straight_chair.n.01_7)
+        (ontop apple.n.01_8 straight_chair.n.01_8)
+        (ontop apple.n.01_9 straight_chair.n.01_9)
+        (inroom floor.n.01_1 empty_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (forall
+                (?apple.n.01 - apple.n.01)
+                (ontop ?apple.n.01 ?coffee_table.n.01_1)
+            )
+        )
+    )
+)
