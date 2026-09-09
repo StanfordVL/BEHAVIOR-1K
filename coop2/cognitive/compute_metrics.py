@@ -489,10 +489,25 @@ def compute_task_success_metrics(logs: Dict[str, Any]) -> Dict[str, Any]:
     if not plan_history:
         return {}
 
-    # Plan-based success: count successful plans
+    # Plan-based success. The denominator is plans that *reached a verdict of
+    # their own* -- succeeded or failed -- not every plan ever created.
+    #
+    # A plan still running when the episode stops never had the chance to do
+    # either, and counting it as a non-success measures where the run was cut,
+    # not how the agents did. That is not a corner case here: an episode ends
+    # the moment check_goal fires, so the plan that *satisfies the goal* is
+    # usually still inside its final primitive's settle and is recorded
+    # INTERRUPTED. The first solved run scored Y_plan = 1/3 with zero failures,
+    # because two of its three plans were cut short and one of those two had
+    # just won the task.
+    #
+    # Both counts are still reported, so an agent that stalls forever shows up
+    # as plans_cut_short rather than vanishing from the metric.
     successful_plans = sum(1 for p in plan_history if p.get('status') == 'success')
-    total_plans = len(plan_history)
-    plan_success_rate = successful_plans / total_plans if total_plans > 0 else 0
+    failed_plans = sum(1 for p in plan_history if p.get('status') == 'failed')
+    plans_cut_short = len(plan_history) - successful_plans - failed_plans
+    decided_plans = successful_plans + failed_plans
+    plan_success_rate = successful_plans / decided_plans if decided_plans > 0 else 0
 
     # Resource-based success: count resources collected
     resources_collected = defaultdict(int)
@@ -503,9 +518,11 @@ def compute_task_success_metrics(logs: Dict[str, Any]) -> Dict[str, Any]:
             resources_collected[item] += max(1, amount)
 
     return {
-        'Y_plan': plan_success_rate,  # Plan success rate
+        'Y_plan': plan_success_rate,  # successes / (successes + failures)
         'successful_plans': successful_plans,
-        'total_plans': total_plans,
+        'failed_plans': failed_plans,
+        'plans_cut_short': plans_cut_short,  # still running when the episode ended
+        'total_plans': len(plan_history),
         'resources_collected': dict(resources_collected)
     }
 

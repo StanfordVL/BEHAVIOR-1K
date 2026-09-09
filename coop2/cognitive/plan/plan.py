@@ -107,11 +107,25 @@ class SymbolicPlan:
         return self.complete_failed(step, reason)
     
     def complete_interrupted(self, step: int):
-        """Mark plan as interrupted (e.g., by episode end)."""
+        """Mark plan as interrupted (e.g., by episode end).
+
+        The action in flight is marked too. Leaving it at "executing" forever
+        made the log unreadable at exactly the moment that matters most: in the
+        run where the BDDL goal fired, the placement that *satisfied* it was
+        still inside its settle when the episode stopped, so the trace showed
+        ``place_on_top[executing]`` and gave no way to tell a cut-short action
+        from a stuck one.
+        """
         if self.status in [SymbolicPlanStatus.EXECUTING, SymbolicPlanStatus.PENDING]:
             self.status = SymbolicPlanStatus.INTERRUPTED
             self.end_step = step
             self.failure_reason = "Episode ended"
+
+            current = self.get_current_action()
+            if current is not None and current.status in (None, "executing", "pending"):
+                current.status = "interrupted"
+                current.end_step = step
+                current.failure_reason = "Episode ended"
             return True
         return False
     

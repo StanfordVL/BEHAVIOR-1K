@@ -418,6 +418,34 @@ def main() -> int:
     assert "apple.n.01_9" not in got["failure_reason"], got["failure_reason"]
     ok("scene names in failure text and metadata become entity ids")
 
+    print("test 13: Y_plan counts plans that reached a verdict, not plans created")
+    # An episode ends the instant check_goal fires, so the plan that satisfies
+    # the goal is normally still inside its last primitive's settle and gets
+    # recorded INTERRUPTED. Counting that against the agents measures where the
+    # run was cut. The first solved run scored 1/3 with zero failures, and one
+    # of the two "non-successes" had just won the task.
+    from coop2.cognitive.compute_metrics import compute_task_success_metrics
+
+    def score(statuses):
+        return compute_task_success_metrics(
+            {"plans": {"plan_history": [{"status": st} for st in statuses]}}
+        )
+
+    solved = score(["success", "interrupted", "interrupted"])
+    assert solved["Y_plan"] == 1.0, solved
+    assert solved["successful_plans"] == 1 and solved["failed_plans"] == 0
+    assert solved["plans_cut_short"] == 2, solved
+    assert solved["total_plans"] == 3, "the raw count is still reported"
+
+    mixed = score(["success", "failed", "success", "interrupted"])
+    assert mixed["Y_plan"] == 2 / 3, mixed["Y_plan"]
+
+    # A run where nothing ever finished must not read as perfect.
+    stalled = score(["interrupted", "interrupted"])
+    assert stalled["Y_plan"] == 0, stalled
+    assert stalled["plans_cut_short"] == 2, "a stalling agent stays visible"
+    ok("cut-short plans leave the denominator but stay in the report")
+
     print("\nALL TESTS PASSED")
     return 0
 
