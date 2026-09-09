@@ -8,6 +8,9 @@ import omnigibson.lazy as lazy
 
 from .rigid_prim import RigidPrim
 
+# Index tensor used to select the single rigid body wrapped by per-prim PhysX tensor views.
+_RIGID_INDICES = th.tensor([0], dtype=th.int32)
+
 
 class RigidDynamicPrim(RigidPrim):
     """
@@ -47,32 +50,23 @@ class RigidDynamicPrim(RigidPrim):
         self.set_attribute("physics:kinematicEnabled", False)
         self.set_attribute("physics:rigidBodyEnabled", True)
 
-        # Create the rigid prim view
-        # Import now to avoid too-eager load of Omni classes due to inheritance
-        from omnigibson.utils.deprecated_utils import RigidPrimView
-
-        # set reset_xform_properties to False for load time
-        with og.sim.editing_usd():
-            self._rigid_prim_view = RigidPrimView(self.prim_path, reset_xform_properties=False)
+        # The PhysX rigid body tensor view (omni.physics.tensors) is only valid while simulation
+        # is playing, so we defer its creation until update_handles() is called.
 
         # Run super method to handle common functionality
         super()._post_load()
 
     def update_handles(self):
         """
-        Updates all internal handles for this prim, in case they change since initialization
+        Updates all internal handles for this prim, in case they change since initialization.
+
+        When simulation is playing we rebuild the PhysX rigid body tensor view from the current
+        physics sim view. Otherwise the view is left as None, and all tensor-based accessors will
+        fail their is_playing() asserts.
         """
-        # Validate that the view is valid if physics is running
-        if og.sim.is_playing() and self.initialized:
-            assert (
-                self._rigid_prim_view.is_physics_handle_valid() and self._rigid_prim_view._physics_view.check()
-            ), "Rigid prim view must be valid if physics is running!"
-
-        assert not (
-            og.sim.is_playing() and not self._rigid_prim_view.is_valid
-        ), "Rigid prim view must be valid if physics is running!"
-
-        self._rigid_prim_view.initialize(og.sim.physics_sim_view)
+        if og.sim.is_playing():
+            self._rigid_prim_view = og.sim.physics_sim_view.create_rigid_body_view([self.prim_path])
+            assert self._rigid_prim_view is not None, f"Could not create PhysX rigid body view at {self.prim_path}"
 
     def set_linear_velocity(self, velocity):
         """
@@ -81,8 +75,10 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
-        with og.sim.editing_usd():
-            self._rigid_prim_view.set_linear_velocities(velocity[None, :])
+        assert og.sim.is_playing(), "Simulator must be playing to set linear velocity!"
+        vel = self._rigid_prim_view.get_velocities()
+        vel[0, 0:3] = velocity
+        self._rigid_prim_view.set_velocities(vel, _RIGID_INDICES)
 
     def get_linear_velocity(self, clone=True):
         """
@@ -92,7 +88,11 @@ class RigidDynamicPrim(RigidPrim):
         Returns:
             th.tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_linear_velocities(clone=clone)[0]
+        assert og.sim.is_playing(), "Simulator must be playing to get linear velocity!"
+        vel = self._rigid_prim_view.get_velocities()
+        if clone:
+            vel = vel.clone()
+        return vel[0, 0:3]
 
     def set_angular_velocity(self, velocity):
         """
@@ -101,8 +101,10 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
-        with og.sim.editing_usd():
-            self._rigid_prim_view.set_angular_velocities(velocity[None, :])
+        assert og.sim.is_playing(), "Simulator must be playing to set angular velocity!"
+        vel = self._rigid_prim_view.get_velocities()
+        vel[0, 3:6] = velocity
+        self._rigid_prim_view.set_velocities(vel, _RIGID_INDICES)
 
     def get_angular_velocity(self, clone=True):
         """
@@ -112,7 +114,11 @@ class RigidDynamicPrim(RigidPrim):
         Returns:
             th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_angular_velocities(clone=clone)[0]
+        assert og.sim.is_playing(), "Simulator must be playing to get angular velocity!"
+        vel = self._rigid_prim_view.get_velocities()
+        if clone:
+            vel = vel.clone()
+        return vel[0, 3:6]
 
     def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
@@ -151,10 +157,11 @@ class RigidDynamicPrim(RigidPrim):
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
             position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
-        assert (
-            self._rigid_prim_view.is_physics_handle_valid()
-        ), "Unexpected: rigid prim view is not valid while simulation is playing."
-        self._rigid_prim_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
+        # Write the pose directly into the PhysX tensor buffer. Orientation is (x,y,z,w) internally.
+        pose = self._rigid_prim_view.get_transforms()
+        pose[0, 0:3] = position
+        pose[0, 3:7] = orientation
+        self._rigid_prim_view.set_transforms(pose, _RIGID_INDICES)
         og.sim.sync_physx_to_fabric()
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
@@ -173,10 +180,17 @@ class RigidDynamicPrim(RigidPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
-        # Get the pose from the rigid prim view and convert to our format
-        positions, orientations = self._rigid_prim_view.get_world_poses(clone=clone)
-        position = positions[0]
-        orientation = orientations[0][[1, 2, 3, 0]]  # Convert from (w,x,y,z) to (x,y,z,w)
+        # If the simulation is not playing, the PhysX tensor view does not exist. Fall back
+        # to the USD-backed XFormPrim implementation so callers during load time still work.
+        if not og.sim.is_playing():
+            return super().get_position_orientation(frame=frame, clone=clone)
+
+        # Read the pose directly from the PhysX tensor buffer. Orientation is (x,y,z,w) natively.
+        pose = self._rigid_prim_view.get_transforms()
+        if clone:
+            pose = pose.clone()
+        position = pose[0, 0:3]
+        orientation = pose[0, 3:7]
 
         # Assert that the orientation is a unit quaternion
         assert math.isclose(
@@ -196,9 +210,8 @@ class RigidDynamicPrim(RigidPrim):
         Returns:
             th.Tensor: (x,y,z) position of link CoM in the link frame
         """
-        positions, orientations = self._rigid_prim_view.get_coms(clone=True)
-        position = positions[0][0]
-        return position
+        com = self.get_attribute("physics:centerOfMass")
+        return th.tensor([com[0], com[1], com[2]], dtype=th.float32)
 
     @center_of_mass.setter
     def center_of_mass(self, com):
@@ -206,8 +219,7 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             com (th.Tensor): (x,y,z) position of link CoM in the link frame
         """
-        with og.sim.editing_usd():
-            self._rigid_prim_view.set_coms(positions=com.reshape(1, 1, 3))
+        self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(float(com[0]), float(com[1]), float(com[2])))
 
     @property
     def mass(self):
@@ -215,10 +227,10 @@ class RigidDynamicPrim(RigidPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
-        mass = self._rigid_prim_view.get_masses()[0]
+        mass = self.get_attribute("physics:mass")
 
-        # Fallback to analytical computation of volume * density
-        if mass == 0:
+        # Fallback to analytical computation of volume * density if the USD mass is unset or zero
+        if mass is None or mass == 0:
             return self.volume * self.density
 
         return mass
@@ -229,8 +241,7 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        with og.sim.editing_usd():
-            self._rigid_prim_view.set_masses(th.tensor([mass]))
+        self.set_attribute("physics:mass", float(mass))
 
     @property
     def density(self):
@@ -238,15 +249,15 @@ class RigidDynamicPrim(RigidPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        mass = self._rigid_prim_view.get_masses()[0]
+        mass = self.get_attribute("physics:mass")
         # We first check if the mass is specified, since mass overrides density. If so, density = mass / volume.
         # Otherwise, we try to directly grab the raw usd density value, and if that value does not exist,
         # we return 1000 since that is the canonical density assigned by omniverse
-        if mass != 0.0:
+        if mass is not None and mass != 0.0:
             density = mass / self.volume
         else:
-            density = self._rigid_prim_view.get_densities()[0]
-            if density == 0.0:
+            density = self.get_attribute("physics:density")
+            if density is None or density == 0.0:
                 density = 1000.0
 
         return density
@@ -257,8 +268,7 @@ class RigidDynamicPrim(RigidPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        with og.sim.editing_usd():
-            self._rigid_prim_view.set_densities(th.tensor([density]))
+        self.set_attribute("physics:density", float(density))
 
     @property
     def is_asleep(self):
@@ -272,15 +282,13 @@ class RigidDynamicPrim(RigidPrim):
         """
         Enables gravity for this rigid body
         """
-        with og.sim.editing_usd():
-            self._rigid_prim_view.enable_gravities()
+        self.set_attribute("physxRigidBody:disableGravity", False)
 
     def disable_gravity(self):
         """
         Disables gravity for this rigid body
         """
-        with og.sim.editing_usd():
-            self._rigid_prim_view.disable_gravities()
+        self.set_attribute("physxRigidBody:disableGravity", True)
 
     def wake(self):
         """
