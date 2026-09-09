@@ -130,7 +130,11 @@ class Agent(ABC):
     # W -> I: set_unready(reason='message_received') - message during wait
     # X -> I: set_unready(reason='message_received') - message during execution
     # X -> R: set_unready(reason='plan_terminated') - plan finished, need new plan
-    # I -> W: resume_execution() OR generate new plan then set_ready() - agent becomes ready
+    # I -> W: set_ready() - unconditionally, whatever handle_interrupt decided.
+    #         Resuming and replanning are the same transition; they differ only
+    #         in whether handle_interrupt replaced self.plan, which set_ready
+    #         detects (plan is not _committed_plan) to decide whether the plan
+    #         counter moves.
     # ========================================================================
     
     def set_ready(self, timestamp: float = None, env_step: int = None):
@@ -208,26 +212,6 @@ class Agent(ABC):
         
         else:
             raise ValueError(f"Unknown reason for set_unready: {reason}")
-    
-    def resume_execution(self, timestamp: float = None, env_step: int = None):
-        """
-        Resume plan execution after interrupt (without replanning).
-        
-        Transition: I -> W (agent becomes ready with existing plan)
-        Does NOT increment plan counter.
-        
-        Args:
-            timestamp: Wall clock time
-            env_step: Environment step number
-        """
-        if self._state != AgentState.I:
-            print(f"WARNING [{self.agent_id}]: resume_execution from state {self._state.value}, expected I")
-        
-        if self.plan is None:
-            print(f"WARNING [{self.agent_id}]: resume_execution called but no plan exists")
-        
-        self.ready = True
-        self._set_state(AgentState.W, timestamp, env_step)
     
     @abstractmethod
     def observe(self, observation: Any, env_step: int):
