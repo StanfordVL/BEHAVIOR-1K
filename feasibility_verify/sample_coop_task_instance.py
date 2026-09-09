@@ -57,8 +57,17 @@ def build_config(instance_id):
         "env": {"action_frequency": 30, "physics_frequency": 120, "external_sensors": None},
         "scene": {
             "type": "InteractiveTraversableScene",
+            # No load_room_types filter, deliberately. It used to say
+            # ["living_room"], which loaded a house with exactly one floor in it:
+            # upstream exempts building structure from the room filter, but
+            # `is_building_structure` is `STRUCTURE_CATEGORIES - GROUND_CATEGORIES`
+            # and `floors` is a GROUND category (interactive_traversable_scene.py),
+            # so walls and ceilings bypassed the filter and floors did not. The
+            # template froze that -- 22 walls, 7 ceilings, 1 floor -- and since
+            # save_task writes whatever was loaded and the template *is* the scene
+            # file every run loads, every episode ran in a house whose other rooms
+            # had no ground. Visible the moment anyone opened the viewport.
             "scene_model": SCENE_MODEL,
-            "load_room_types": ["living_room"],
             "seg_map_resolution": 0.1,
         },
         "robots": [
@@ -137,6 +146,18 @@ def main():
     # NB: do not call check_initial_conditions() here -- the init block contains `inroom`,
     # which has no entry in PREDICATE_TO_STATE and would raise KeyError. Check the two
     # kinematic facts we actually care about directly instead.
+    # The BDDL says `inroom ... living_room`, which is a room *type*. With the
+    # whole scene loaded that can bind the furniture to a different living_room
+    # instance than ROOM_INSTANCE, where the robots are placed -- leaving the team
+    # in an empty room and the apples elsewhere. Fail loudly rather than caching it.
+    for name in ("armchair.n.01_1", "armchair.n.01_2", "coffee_table.n.01_1"):
+        rooms = list(getattr(env.task.object_scope[name], "in_rooms", None) or [])
+        print(f"{name} in_rooms: {rooms}")
+        assert ROOM_INSTANCE in rooms, (
+            f"{name} was bound in {rooms}, not {ROOM_INSTANCE} where place_robots puts "
+            "the team; re-run to draw again, or pin the instance in the whitelist"
+        )
+
     stable = True
     for i in (1, 2):
         apple, chair = env.task.object_scope[f"apple.n.01_{i}"], env.task.object_scope[f"armchair.n.01_{i}"]

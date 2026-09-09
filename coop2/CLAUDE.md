@@ -655,6 +655,39 @@ filename from `{scene}_task_{activity}_{def_id}_{inst_id}_template`.
   whose own initial conditions are already violated. Always cache a template; never sample
   per run. `--instance_id N` produces alternative layouts.
 
+### The template is the scene, so what it omits is missing from every run
+
+`save_task(task_relevant_only=False)` writes whatever was **loaded**, and the
+template *is* the scene file each episode loads. So any load filter used while
+sampling is baked into every later run.
+
+The sampling script used to pass `load_room_types: ["living_room"]`, and that
+produced a house with exactly one floor. Upstream exempts building structure from
+the room filter, but the exemption is
+`STRUCTURE_CATEGORIES - GROUND_CATEGORIES` and `floors` is a GROUND category
+(`interactive_traversable_scene.py`) -- so walls and ceilings bypassed the filter
+and floors did not. Every episode since has run in a house whose other six rooms
+had no ground: 50 objects, 22 walls, 7 ceilings, **1 floor**. Nothing failed, which
+is why it survived; it was visible the moment anyone opened `--gui`.
+
+Filter removed and the template re-sampled: 124 objects and **7 floors**, one per
+room (bathroom_0, corridor_0, kitchen_0, living_room_0, pantry_room_0,
+storage_room_0, utility_room_0). Scene load goes 38 s -> 78 s. A run still solves
+the activity (`individual`, seed 0, goal at env_step 2154).
+
+**The layout changed with it.** Sampling is unseeded, so the re-draw moved the
+apples (`apple_48`/`apple_49` are now `apple_122`/`apple_123`); the armchairs and
+`coffee_table_gpkbiw_0` are the same instances. The 1303/1303/1278 three-topology
+numbers above were measured on the one-floor template and are **not** comparable
+to anything sampled after it -- treat them as a pre-change baseline and re-run the
+sweep for the real table.
+
+The script now also asserts that `armchair.n.01_{1,2}` and `coffee_table.n.01_1`
+bind inside `ROOM_INSTANCE`. `inroom ... living_room` matches a room *type*, and
+with the whole scene loaded the sampler could otherwise bind the furniture to a
+different living_room instance than the one `place_robots` uses, leaving the team
+in an empty room.
+
 ### What the template does and does not carry
 
 - Robot **world poses are in there**, but as `joint_pos` of the holonomic base joints, not
