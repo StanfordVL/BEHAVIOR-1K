@@ -3,6 +3,13 @@
 Replaces metrics_timeline.png, which plotted constraint counters this project
 does not use.
 
+Inter-agent messages are overlaid as arrows from the sender's lane to each
+recipient's, at the moment they were sent. Content is deliberately not drawn --
+the question this figure answers is *when* an agent talked and *to whom*, which
+is what ties a frozen world (the I and R spans) to the thing that froze it. The
+message clock and the state clock are both seconds since the run started, so
+they share the x axis directly.
+
 The x axis is wall clock, not env_step, and that is the point of the figure.
 The plan loop does not step the environment while any agent is not ready, so an
 agent in R or I freezes the whole world: those spans occupy real seconds while
@@ -26,6 +33,11 @@ STATE_COLOURS = {
     "waiting": "#8d99ae",      # W -- ready, waiting for the others
     "executing": "#2a9d8f",    # X -- primitive advancing
 }
+
+#: Messages are drawn in one colour on purpose: the arrow already carries the
+#: direction, and colouring by metadata["type"] would compete with the state
+#: colours for the reader's attention.
+MESSAGE_COLOUR = "#22223b"
 
 
 def _spans(
@@ -62,11 +74,58 @@ def _step_label(first: int, last: int) -> str:
     return str(first) if last <= first else f"{first}-{last}"
 
 
+
+def _draw_messages(axes, messages, lane_of, end_time) -> int:
+    """Overlay sender -> recipient arrows. Returns how many were drawn.
+
+    One arrow per (message, recipient), so a leader's broadcast to eight
+    followers is eight arrowheads leaving one point -- which is the shape of the
+    cost, and reads correctly at a glance. Slightly curved so that several
+    messages exchanged at almost the same instant do not collapse into a single
+    vertical stroke.
+    """
+    drawn = 0
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        try:
+            when = float(message.get("timestamp"))
+        except (TypeError, ValueError):
+            continue
+        sender = message.get("sender")
+        if sender not in lane_of or not 0.0 <= when <= end_time:
+            continue
+        recipients = [
+            r for r in (message.get("recipients") or [])
+            if r in lane_of and r != sender
+        ]
+        if not recipients:
+            continue
+        axes.plot(
+            [when], [lane_of[sender]], marker="o", markersize=3.5,
+            color=MESSAGE_COLOUR, zorder=5,
+        )
+        for recipient in recipients:
+            axes.annotate(
+                "",
+                xy=(when, lane_of[recipient]), xytext=(when, lane_of[sender]),
+                arrowprops={
+                    "arrowstyle": "-|>", "color": MESSAGE_COLOUR,
+                    "linewidth": 1.0, "shrinkA": 1.5, "shrinkB": 1.5,
+                    "connectionstyle": "arc3,rad=0.12",
+                },
+                zorder=5, annotation_clip=False,
+            )
+            drawn += 1
+    return drawn
+
+
 def plot_agent_state_timeline(
     agent_states: Dict[str, List[Any]],
     output_path: str,
     title: Optional[str] = None,
     end_step: Optional[int] = None,
+    messages: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[str]:
     """Write a Gantt-style figure of agent states. Returns the path, or None.
 
@@ -78,6 +137,8 @@ def plot_agent_state_timeline(
         end_step: env_step the episode ended on, for the last span of each
             agent. Without it that span's range is left degenerate rather than
             guessed at.
+        messages: message_log.json's contents, or None. Only ``timestamp``,
+            ``sender`` and ``recipients`` are read; the content is not drawn.
     """
     if not agent_states:
         return None
@@ -121,20 +182,34 @@ def plot_agent_state_timeline(
                     ha="center", va="center", fontsize=7, color="white",
                 )
 
+    lane_of = {agent_id: lane for lane, agent_id in enumerate(agents)}
+    message_count = _draw_messages(axes, messages or [], lane_of, end_time)
+
     axes.set_yticks(range(len(agents)))
     axes.set_yticklabels(agents)
     axes.set_ylim(-0.6, len(agents) - 0.4)
     axes.invert_yaxis()
-    axes.set_xlim(0, end_time)
+    # A sliver of left margin: a leader's opening broadcast is sent at t~0, and
+    # against xlim=(0, ...) its marker and arrowhead sit on the spine.
+    axes.set_xlim(-end_time * 0.012, end_time)
     axes.set_xlabel("wall clock (s) -- labels inside the bars are the env_step range")
     axes.set_title(title or os.path.basename(os.path.dirname(os.path.abspath(output_path))))
     axes.grid(axis="x", alpha=0.3, linestyle=":")
 
     order = [s for s in ("reasoning", "interrupted", "waiting", "executing") if s in seen_states]
+    handles = [mpatches.Patch(color=STATE_COLOURS[s], label=s) for s in order]
+    if message_count:
+        # A proxy artist, because an annotate() arrow is not a legend handle.
+        from matplotlib.lines import Line2D  # noqa: PLC0415
+
+        handles.append(Line2D(
+            [0], [0], color=MESSAGE_COLOUR, marker="o", markersize=4, linewidth=1.0,
+            label=f"message, sender -> recipient (n={message_count})",
+        ))
     axes.legend(
-        handles=[mpatches.Patch(color=STATE_COLOURS[s], label=s) for s in order],
+        handles=handles,
         loc="upper center", bbox_to_anchor=(0.5, -0.28),
-        ncol=len(order) or 1, frameon=False,
+        ncol=len(handles) or 1, frameon=False,
     )
 
     figure.tight_layout()
@@ -172,6 +247,24 @@ def _episode_end_step(run_dir: str) -> Optional[int]:
     return max(steps) if steps else None
 
 
+def _messages(run_dir: str) -> List[Dict[str, Any]]:
+    """message_log.json, or an empty list.
+
+    Absent or empty for the `individual` topology, which is not a failure: that
+    topology has no communication channel at all, so the figure simply carries
+    no arrows.
+    """
+    path = os.path.join(run_dir, "message_log.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path) as handle:
+            payload = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    return payload if isinstance(payload, list) else []
+
+
 def plot_from_run_dir(run_dir: str, filename: str = "agent_timeline.png") -> Optional[str]:
     """Draw the timeline for an existing run directory."""
     states_path = os.path.join(run_dir, "agent_states.json")
@@ -184,6 +277,7 @@ def plot_from_run_dir(run_dir: str, filename: str = "agent_timeline.png") -> Opt
         os.path.join(run_dir, filename),
         title=os.path.basename(run_dir),
         end_step=_episode_end_step(run_dir),
+        messages=_messages(run_dir),
     )
 
 
