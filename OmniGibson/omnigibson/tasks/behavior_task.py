@@ -55,6 +55,9 @@ class BehaviorTask(BaseTask):
             mapping category name (e.g.: "breakfast_table") to a list of invalid models that should not be sampled from
             that category. During sampling, if a given synset is found in this blacklist, all specified
             models will not be used as options
+        use_unique_models_per_synset (bool): If True, ensures that each instance of the same synset is assigned a distinct
+            object model (sampling without replacement). Sampling fails if there are fewer valid models than instances
+            for a given synset. Only applies when online_object_sampling is True.
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
             should be specific to the task class. Default is None, which corresponds to a default config being usd.
@@ -77,6 +80,7 @@ class BehaviorTask(BaseTask):
         randomize_presampled_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
+        use_unique_models_per_synset=False,
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
@@ -113,6 +117,7 @@ class BehaviorTask(BaseTask):
         self.randomize_presampled_pose = randomize_presampled_pose
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
+        self.use_unique_models_per_synset = use_unique_models_per_synset  # bool
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
         self.object_scope = None  # Maps str to sim object (BaseObject/BaseSystem) or None
         self.object_instance_to_category = None  # Maps str to str
@@ -377,19 +382,20 @@ class BehaviorTask(BaseTask):
                         break
         return room_instances
 
-    def _compile_with_rooms(self, env):
+    def _compile_with_rooms(self, env, room_instances):
         """Compile the wildcard task using the specific room instances from assigned objects.
 
         After object scope has been assigned (via cache or sampling), this
-        determines which room instances are being used, counts objects in those
-        rooms, and compiles the task with proper wildcard expansion.
+        counts objects in the matched rooms and compiles the task with proper
+        wildcard expansion.
 
         Args:
             env: The environment with the active scene.
+            room_instances: Dict mapping room_type -> room_instance_name. Must
+                be computed from the base inroom anchors BEFORE wildcard-synset
+                bases are unbound, or rooms anchored only by a wildcard synset
+                will drop out of the scene layout.
         """
-        # Determine which room instances the assigned objects are in
-        room_instances = self._determine_room_instances(env)
-
         # Build scene layout from those specific rooms
         scene_layout = self._build_scene_layout_from_rooms(env.scene, room_instances)
 
@@ -416,11 +422,21 @@ class BehaviorTask(BaseTask):
         """
         Initializes the desired activity in the current environment @env
 
-        The flow is:
-        1. Select objects for the base (non-wildcard) scope via sampling or cache.
-        2. Determine which room instances those objects are in.
-        3. Compile the task with the correct scene layout (expanding any wildcards).
-        4. Assign any wildcard-expanded instances.
+        Online flow:
+        1. ``assign_objects`` builds inroom candidates and imports sampleable objects.
+        2. Compile a wildcard-stripped base task and run ``sample_states`` — this
+           performs bipartite matching, binding each base inroom obj_inst to a
+           specific scene object in a specific room instance.
+        3. Clear the bindings of every wildcard-synset base instance so the
+           subsequent expansion treats all instances uniformly.
+        4. Recompile with the real scene layout (now derivable from the matched
+           rooms) — ``expand_wildcards`` produces ``synset_1 .. synset_N``.
+        5. Assign each wildcard instance to a free scene object in the matched room.
+
+        Offline (cache) flow:
+        1. Read ``inst_to_name`` from cached scene metadata.
+        2. Compile using the cached instance names.
+        3. Assign every object from the cache in a single pass.
 
         Args:
             env (Environment): Current active environment instance
@@ -442,71 +458,89 @@ class BehaviorTask(BaseTask):
             accept_scene, feedback = self.sampler.assign_objects(
                 sampling_whitelist=self.sampling_whitelist,
                 sampling_blacklist=self.sampling_blacklist,
+                use_unique_models_per_synset=self.use_unique_models_per_synset,
             )
             if not accept_scene:
                 return accept_scene, feedback
 
-            # Compile with the correct rooms now that objects are assigned
-            self._compile_with_rooms(env)
+            # Compile a wildcard-stripped base task.
+            self.compiled_task = self._task_def.compile_base()
+            self._finalize_compiled_task()
 
             # Phase 2: sample states using compiled conditions
             accept_scene, feedback = self.sampler.sample_states(self.compiled_task)
             if not accept_scene:
                 return accept_scene, feedback
 
-            # Assign any wildcard-expanded instances to remaining scene objects
-            self._assign_wildcard_instances(env)
+            # Snapshot rooms before unbinding — otherwise rooms anchored only
+            # by a wildcard-synset base instance drop from the scene layout.
+            if self._task_def.has_wildcards:
+                room_instances = self._determine_room_instances(env)
+                self._unbind_wildcard_synset_bases()
+                self._compile_with_rooms(env, room_instances)
+                self._assign_wildcard_instances(env, room_instances)
         else:
-            # Derive future instances from parsed conditions for cache assignment
-            self.future_obj_instances = {
-                cond[1] for cond in self._base_conditions.parsed_initial_conditions if cond[0] == "future"
-            }
-
-            # Assign base scope objects from cache (non-strict: skip instances
-            # not in cache, e.g. wildcard instances that don't exist yet)
-            self.assign_object_scope_with_cache(env)
-
-            # Compile with correct rooms now that we know where objects are
-            self._compile_with_rooms(env)
-
-            # Re-assign all objects from cache (scope now includes wildcard instances)
+            inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
+            self.compiled_task = self._task_def.compile_from_inst_to_name(inst_to_name)
+            self._finalize_compiled_task()
             self.future_obj_instances = {
                 init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
             }
-            # Use non-strict so that wildcard-expanded instances absent from cache are handled by
-            # _assign_wildcard_instances below rather than raising an assertion error.
-            # TODO @wensi-ai: Check object scope again to see if any wildcard objects are recorded. 2026+ tasks do this, 2025 ones don't.
             self.assign_object_scope_with_cache(env)
-            # TODO @wensi-ai: Assign objects to remaining wildcard objects. This is a no-op for 2026+ tasks.
-            self._assign_wildcard_instances(env)
-            # assert that everything in the object scope that's not a future object is not None
             for inst, entity in self.object_scope.items():
                 if inst not in self.future_obj_instances and entity is None:
                     raise ValueError(f"Object instance '{inst}' was not assigned an entity during cache assignment!")
 
         return True, None
 
-    def _assign_wildcard_instances(self, env):
-        """Assign wildcard-expanded instances to scene objects in the selected rooms.
+    def _unbind_wildcard_synset_bases(self):
+        """Release the anchor instances (e.g. ``bookcase.n.01_1``) of wildcard synsets so wildcard expansion can re-pool them with ``synset_1..._N``."""
+        wildcard_synsets = self._task_def.wildcard_synsets
+        if not wildcard_synsets:
+            return
+        for inst in list(self.object_scope.keys()):
+            synset = self.object_instance_to_category.get(inst)
+            if synset in wildcard_synsets:
+                self.object_scope[inst] = None
 
-        After wildcard compilation, new instances exist in the scope that need
-        to be matched to objects in the scene that weren't part of the base scope.
+    def _assign_wildcard_instances(self, env, room_instances):
+        """Assign each unbound wildcard instance to a scene object in its matched room, in numeric-suffix order."""
 
-        Args:
-            env: The environment with the active scene.
-        """
-        for inst in self.object_scope:
-            if self.object_scope[inst] is not None:
-                continue
-            if "agent.n." in inst:
-                continue
-            # Try to find a matching object in the scene
+        def numeric_suffix(name):
+            try:
+                return int(name.rsplit("_", 1)[1])
+            except (IndexError, ValueError):
+                return -1
+
+        # Collect unbound slots in suffix order and track already-claimed scene objects
+        unbound = sorted(
+            (inst for inst, entity in self.object_scope.items() if entity is None and "agent.n." not in inst),
+            key=numeric_suffix,
+        )
+        used = {obj for obj in self.object_scope.values() if obj is not None}
+
+        # Resolve each inroom-constrained instance to its matched room instance
+        inroom_assignments = {
+            cond[1]: cond[2] for cond in self.compiled_task.conditions.parsed_initial_conditions if cond[0] == "inroom"
+        }
+
+        # Bind each slot to a free, category-matching object in its matched room
+        for inst in unbound:
+            room_type = inroom_assignments.get(inst)
+            room_inst = room_instances.get(room_type) if room_type is not None else None
+            candidates = (
+                env.scene.object_registry("in_rooms", room_inst, default_val=[])
+                if room_inst is not None
+                else env.scene.objects
+            )
             categories = set(og_categories_from_bddl_inst(inst))
-            for obj in env.scene.objects:
-                # Check category match and that obj isn't already assigned
-                if obj.category in categories and obj not in self.object_scope.values():
-                    self.object_scope[inst] = obj
-                    break
+            matching = sorted(
+                (obj for obj in candidates if obj.category in categories and obj not in used),
+                key=lambda o: numeric_suffix(o.name),
+            )
+            if matching:
+                self.object_scope[inst] = matching[0]
+                used.add(matching[0])
 
     def get_agent(self, env):
         """
