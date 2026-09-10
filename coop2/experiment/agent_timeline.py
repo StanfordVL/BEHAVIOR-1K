@@ -84,7 +84,7 @@ def _draw_messages(axes, messages, lane_of, end_time) -> int:
     messages exchanged at almost the same instant do not collapse into a single
     vertical stroke.
     """
-    drawn = 0
+    drawn = {}
     for message in messages:
         if not isinstance(message, dict):
             continue
@@ -101,6 +101,12 @@ def _draw_messages(axes, messages, lane_of, end_time) -> int:
         ]
         if not recipients:
             continue
+        # A message that stops a teammate mid-primitive and one that waits in
+        # their buffer cost completely different amounts -- the first is an LLM
+        # round trip, the second is free -- so they must not be the same stroke.
+        # `interrupts_execution` is the field the broker itself reads.
+        interrupting = bool((message.get("metadata") or {}).get("interrupts_execution", True))
+        style = "-" if interrupting else (0, (2, 2))
         axes.plot(
             [when], [lane_of[sender]], marker="o", markersize=3.5,
             color=MESSAGE_COLOUR, zorder=5,
@@ -113,10 +119,11 @@ def _draw_messages(axes, messages, lane_of, end_time) -> int:
                     "arrowstyle": "-|>", "color": MESSAGE_COLOUR,
                     "linewidth": 1.0, "shrinkA": 1.5, "shrinkB": 1.5,
                     "connectionstyle": "arc3,rad=0.12",
+                    "linestyle": style, "alpha": 1.0 if interrupting else 0.55,
                 },
                 zorder=5, annotation_clip=False,
             )
-            drawn += 1
+            drawn[interrupting] = drawn.get(interrupting, 0) + 1
     return drawn
 
 
@@ -183,7 +190,8 @@ def plot_agent_state_timeline(
                 )
 
     lane_of = {agent_id: lane for lane, agent_id in enumerate(agents)}
-    message_count = _draw_messages(axes, messages or [], lane_of, end_time)
+    drawn_messages = _draw_messages(axes, messages or [], lane_of, end_time)
+    message_count = sum(drawn_messages.values())
 
     axes.set_yticks(range(len(agents)))
     axes.set_yticklabels(agents)
@@ -199,13 +207,19 @@ def plot_agent_state_timeline(
     order = [s for s in ("reasoning", "interrupted", "waiting", "executing") if s in seen_states]
     handles = [mpatches.Patch(color=STATE_COLOURS[s], label=s) for s in order]
     if message_count:
-        # A proxy artist, because an annotate() arrow is not a legend handle.
+        # Proxy artists, because an annotate() arrow is not a legend handle.
         from matplotlib.lines import Line2D  # noqa: PLC0415
 
-        handles.append(Line2D(
-            [0], [0], color=MESSAGE_COLOUR, marker="o", markersize=4, linewidth=1.0,
-            label=f"message, sender -> recipient (n={message_count})",
-        ))
+        for interrupting, label in ((True, "message, interrupts"), (False, "message, buffered")):
+            count = drawn_messages.get(interrupting, 0)
+            if not count:
+                continue
+            handles.append(Line2D(
+                [0], [0], color=MESSAGE_COLOUR, marker="o", markersize=4, linewidth=1.0,
+                linestyle="-" if interrupting else (0, (2, 2)),
+                alpha=1.0 if interrupting else 0.55,
+                label=f"{label} (n={count})",
+            ))
     axes.legend(
         handles=handles,
         loc="upper center", bbox_to_anchor=(0.5, -0.28),
