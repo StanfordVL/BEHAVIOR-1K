@@ -39,7 +39,9 @@ from coop2.cognitive.plan import SymbolicPlan
 #:
 #: N-1 relays, one per agent, in order, and a relay never starts a second wave.
 #: Everyone below still *receives* the original broadcast and still puts it in
-#: broadcast_history; what the gate removes is the duplicated re-fan-out.
+#: broadcast_history; what the gate removes is the duplicated re-fan-out -- and
+#: the duplicated *thinking*, which is the expensive half: an agent whose turn
+#: has not come does not consult the model at all.
 #:
 #: A relay interrupts, and has to: an agent mid-primitive that merely buffers
 #: the message never runs handle_interrupt, so the wave would die at the first
@@ -122,15 +124,23 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
             "then support, adapt, or choose a different plan from their own observation."
         )
     
-    def _is_my_turn_to_relay(self, messages: List[Dict]) -> bool:
-        """Does this batch contain the message from my immediate predecessor?
+    def _predecessor_spoke(self, messages: List[Dict]) -> bool:
+        """Has my immediate predecessor spoken in this batch -- is it my turn?
 
-        The wave is passed on by exactly one agent at each step -- the one the
-        speaker spoke to first. Everyone else below heard it too, and says
-        nothing, which is what keeps a wave a wave.
+        This gates **thinking as well as speaking**, and the thinking half is
+        the one that costs. `_execute_flow` already waits for the predecessor
+        before planning, so the opening round is ordered; the interrupt path had
+        no such wait, so mid-episode agent_3 would reconsider the moment
+        agent_1 spoke and then reconsider again when agent_2 did -- two LLM
+        round trips for one wave, from a proposal that was not addressed to it
+        in the first place. Measured on the 6-agent run: 53 % of deliveries land
+        on an agent that is not the next speaker.
+
+        Not its turn does not mean not its business: the message is still
+        recorded, and it is read when the agent's turn does come.
         """
         if not self.wait_for:
-            return False  # the first speaker has no predecessor to relay for
+            return False  # the first speaker has no predecessor to wait for
         predecessor = self.wait_for[0]
         return any(msg.get("sender") == predecessor for msg in messages)
 
@@ -180,17 +190,12 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
             verbose_prefix="BROADCAST CHAIN calling LLM for plan...",
         )
     
-    def _execute_flow(self, broadcast: bool = True) -> SymbolicPlan:
+    def _execute_flow(self) -> SymbolicPlan:
         """
         Execute the Broadcast Chain decision flow:
         1. Wait for message from previous agent (if not first)
         2. Generate a current plan using earlier proposals
         3. Broadcast that current plan to following agents
-
-        Args:
-            broadcast: emit step 3. False when replanning inside a wave this
-                agent is not the relay for -- it still replans, it just does not
-                add a second message to a wave that already has one.
         """
         # Step 1: Wait for previous agent (only if they're not ready)
         if self.wait_for and self._any_waiting_agent_not_ready(self._all_agents):
@@ -209,12 +214,11 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         self.plan = self._generate_plan_with_role()
 
         # Step 4: Broadcast to all following agents
-        if broadcast:
-            self._broadcast(
-                self._generate_message(self._format_current_plan_contribution()),
-                kind='proposal',
-                interrupts=True,
-            )
+        self._broadcast(
+            self._generate_message(self._format_current_plan_contribution()),
+            kind='proposal',
+            interrupts=True,
+        )
 
         return self.plan
     
@@ -240,31 +244,31 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         for msg in messages:
             self.broadcast_history.append(f"[{msg['sender']}]: {msg['content']}")
 
-        # Ask before discarding. Replanning unconditionally was upstream's
-        # behaviour and works in a grid world where an action is one step; here
-        # a NAVIGATE_TO runs for hundreds of ticks, so a message that arrives
-        # mid-trip used to throw away all the travel already paid for. On
-        # RESUME nothing is touched: the primitive keeps running with its
-        # accrued delay, and the plan continues from where it was.
-        # Pass the wave on if it is this agent's turn, and only then. Both
-        # branches speak: a receiver that stays the course is telling the agents
-        # below it the one thing they cannot otherwise learn -- that this target
-        # is committed and will not be reconsidered -- which is exactly what a
-        # later speaker needs in order to pick a different apple. Before, only
-        # REPLAN spoke, so 81 % of messages died where they landed.
-        relay = self._is_my_turn_to_relay(messages)
-        if self.decide_interrupt(messages=messages) is InterruptDecision.RESUME:
-            if relay:
-                self._broadcast(
-                    self._format_resume_contribution(messages),
-                    kind='resume_ack',
-                    interrupts=RELAY_INTERRUPTS_EXECUTION,
-                )
+        # Not my turn: the wave has not reached me. Recorded above, read when
+        # my predecessor does speak -- and until then not one LLM call, because
+        # reconsidering on a proposal aimed at the agent above me is the
+        # duplicated thinking, not just duplicated traffic.
+        if not self._predecessor_spoke(messages):
             return
-        # Replan regardless; broadcast only as the wave's relay, so a replan
-        # triggered by a message from further up does not inject a second
-        # message into a wave that already has one.
-        self._execute_flow(broadcast=relay)
+
+        # My turn. Ask before discarding: replanning unconditionally was
+        # upstream's behaviour and works in a grid world where an action is one
+        # step, but here a NAVIGATE_TO runs for hundreds of ticks, so a message
+        # arriving mid-trip used to throw away all the travel already paid for.
+        # On RESUME nothing is touched -- the primitive keeps running with its
+        # accrued delay and the plan continues from where it was -- but the
+        # agent still speaks, because a receiver that stays the course is
+        # telling the agents below it the one thing they cannot otherwise
+        # learn: this target is committed and will not be reconsidered. Before,
+        # only REPLAN spoke, so 81 % of messages died where they landed.
+        if self.decide_interrupt(messages=messages) is InterruptDecision.RESUME:
+            self._broadcast(
+                self._format_resume_contribution(messages),
+                kind='resume_ack',
+                interrupts=RELAY_INTERRUPTS_EXECUTION,
+            )
+            return
+        self._execute_flow()
     
     def reset(self):
         """Reset agent state."""

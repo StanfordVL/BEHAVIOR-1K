@@ -69,18 +69,24 @@ def make_agent(speaker_order: int, n_agents: int, decision: InterruptDecision):
     agent.message_broker = FakeBroker()
     agent.plan = SimplePlan("ontop(apple.n.01_3, coffee_table.n.01_1)")
 
-    # decide_interrupt is one LLM round trip; pin its answer instead of faking
-    # a model. _execute_flow is the REPLAN branch and would call the model too.
-    agent.decide_interrupt = lambda messages=None: decision
+    # decide_interrupt is one LLM round trip; pin its answer instead of faking a
+    # model, and count the calls -- the point of the turn gate is that a
+    # bystander makes none. _execute_flow is the REPLAN branch, also a call.
+    agent.decisions = 0
+
+    def fake_decide_interrupt(messages=None):
+        agent.decisions += 1
+        return decision
+
+    agent.decide_interrupt = fake_decide_interrupt
     agent.replanned = False
 
-    def fake_execute_flow(broadcast=True):
-        # Stands in for the LLM call in step 3, keeping step 4's gate.
+    def fake_execute_flow():
+        # Stands in for the LLM call in step 3, plus step 4's broadcast.
         agent.replanned = True
-        if broadcast:
-            agent._broadcast(
-                agent._format_current_plan_contribution(), kind="proposal", interrupts=True
-            )
+        agent._broadcast(
+            agent._format_current_plan_contribution(), kind="proposal", interrupts=True
+        )
         return agent.plan
 
     agent._execute_flow = fake_execute_flow
@@ -134,6 +140,8 @@ def main() -> int:
         assert relay.sent[0]["metadata"]["chain_message"] == kind
         assert (relay.replanned is (decision is InterruptDecision.REPLAN))
 
+        assert relay.decisions == 1, "the relay consults the model exactly once"
+
         bystander = make_agent(speaker_order=3, n_agents=9, decision=decision)
         deliver(bystander, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_9, ...)")])
         bystander.handle_interrupt()
@@ -141,9 +149,17 @@ def main() -> int:
             f"{kind}: agent_3 relayed for agent_0, whose successor is agent_1 -- "
             "that is the compounding this gate exists to stop"
         )
-        # It still reconsiders; it just does not add a second message to the wave.
-        assert (bystander.replanned is (decision is InterruptDecision.REPLAN))
-    ok("relay is gated on the predecessor; a bystander still replans, silently")
+        # And it does not think either. _execute_flow already waits for the
+        # predecessor before planning, so the opening round is ordered; without
+        # the same gate here, agent_3 reconsidered when agent_1 spoke and then
+        # again when agent_2 did -- two round trips for one wave.
+        assert bystander.decisions == 0, (
+            f"{kind}: a bystander consulted the model for a proposal aimed at the agent above it"
+        )
+        assert not bystander.replanned
+        # Silent, but not deaf.
+        assert any("apple.n.01_9" in entry for entry in bystander.broadcast_history)
+    ok("out of turn: no message, no model call -- but the proposal is still recorded")
 
     print("\ntest: one wave = one message per agent, in order")
     # agent_0 opens; every later agent receives it, and thereafter each agent
