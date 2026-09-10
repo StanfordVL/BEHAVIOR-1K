@@ -20,6 +20,10 @@ Four claims:
      that triggered it.
   4. A relay interrupts, because an agent mid-primitive that merely buffers the
      message never runs handle_interrupt and the wave would die there.
+  5. An agent woken out of turn **holds in I** until the wave reaches it,
+     instead of bouncing back to W and being woken again by every remaining
+     hop -- and releases without thinking if its predecessor commits without
+     ever speaking to it, so the hold cannot deadlock the barrier.
 
 Run:
     python feasibility_verify/test_broadcast_chain_stubbed.py
@@ -210,6 +214,45 @@ def main() -> int:
         )
         assert subject.message_buffer == [], f"{label}: the buffer must be drained once"
     ok("the triggering proposal is in broadcast_history on RESUME and on REPLAN")
+
+    print("\ntest: woken out of turn, the agent holds in I until the wave arrives")
+    import threading, time as _time
+
+    holder = make_agent(speaker_order=3, n_agents=6, decision=InterruptDecision.RESUME)
+    predecessor = make_agent(speaker_order=2, n_agents=6, decision=InterruptDecision.RESUME)
+    predecessor.ready = False          # still to speak
+    holder._all_agents = {"agent_2": predecessor}
+    deliver(holder, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_6, ...)")])
+
+    thread = threading.Thread(target=holder.handle_interrupt, daemon=True)
+    thread.start()
+    thread.join(timeout=0.4)
+    assert thread.is_alive(), "the agent released instead of holding for its predecessor"
+    assert holder.sent == [] and holder.decisions == 0, "it must not act while holding"
+
+    # The wave arrives.
+    holder.message_buffer = [inbound("agent_2", "[agent_2] Proposed plan: ontop(apple.n.01_3, ...)")]
+    holder.buffer_senders = {"agent_2": True}
+    thread.join(timeout=5.0)
+    assert not thread.is_alive(), "the agent never woke when its predecessor spoke"
+    assert holder.decisions == 1 and len(holder.sent) == 1
+    assert any("apple.n.01_6" in e for e in holder.broadcast_history), (
+        "the proposal it held through must still be in front of it when it plans"
+    )
+    assert any("apple.n.01_3" in e for e in holder.broadcast_history)
+    ok("one continuous hold, then one decision that has read both messages")
+
+    print("\ntest: the hold releases if the predecessor commits without speaking")
+    quiet_pred = make_agent(speaker_order=2, n_agents=6, decision=InterruptDecision.RESUME)
+    quiet_pred.ready = True            # committed; nothing is coming
+    stranded = make_agent(speaker_order=3, n_agents=6, decision=InterruptDecision.RESUME)
+    stranded._all_agents = {"agent_2": quiet_pred}
+    deliver(stranded, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_9, ...)")])
+    started = _time.monotonic()
+    stranded.handle_interrupt()
+    assert _time.monotonic() - started < 1.0, "a committed predecessor must not be waited on"
+    assert stranded.sent == [] and stranded.decisions == 0
+    ok("no wave coming, no deadlock -- and still no model call")
 
     print("\ntest: an empty buffer is not an interrupt")
     quiet = make_agent(speaker_order=4, n_agents=9, decision=InterruptDecision.REPLAN)

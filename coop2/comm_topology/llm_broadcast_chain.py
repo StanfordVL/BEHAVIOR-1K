@@ -48,6 +48,17 @@ from coop2.cognitive.plan import SymbolicPlan
 #: busy agent instead of reaching the end of the chain.
 RELAY_INTERRUPTS_EXECUTION = True
 
+#: Seconds an agent will hold in I waiting for the wave to reach it before
+#: giving up and releasing.
+#:
+#: The hold's real guard is `_any_waiting_agent_not_ready`: an agent waits only
+#: while its predecessor is still uncommitted, which is the same condition
+#: `_execute_flow` step 1 uses for the opening round. This cap is the belt for
+#: that pair of braces -- the world is frozen while any agent is in I, so a hold
+#: that never ends does not slow the run down, it stops it. A wave hop costs one
+#: model round trip, measured at 3.9 s, so a nine-agent wave is ~35 s.
+TURN_WAIT_TIMEOUT = 120.0
+
 
 def get_broadcast_chain_role(speaker_order: int, n_agents: int) -> str:
     """Describe an agent's position in the Broadcast Chain."""
@@ -124,6 +135,46 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
             "then support, adapt, or choose a different plan from their own observation."
         )
     
+    def _drain_into_history(self) -> List[Dict]:
+        """Take everything buffered and record it, whether or not it is my turn.
+
+        Out of turn is not out of the loop: a relay plans having read everything
+        said above it, which is the property the chain exists for.
+        """
+        messages = self.get_messages(clear_buffer=True)
+        for msg in messages:
+            self.broadcast_history.append(f"[{msg['sender']}]: {msg['content']}")
+        return messages
+
+    def _await_my_turn(self, pending: List[Dict]) -> List[Dict]:
+        """Stay in I until my predecessor speaks, or until it commits without me.
+
+        Being woken by a proposal aimed at the agent above me *is* an interrupt
+        -- I have been told something and cannot act on it yet -- so the agent
+        holds here rather than bouncing back to W and being woken again by the
+        next hop. Before this, agent_5 in a six-agent wave logged five separate
+        waiting spans at one env_step, one per agent above it; now that is one
+        interrupted span, which is what actually happened.
+
+        Blocking here is what keeps the state at I: `create_agent_thread` calls
+        `set_ready()` only once `handle_interrupt` returns.
+        """
+        deadline = time.monotonic() + TURN_WAIT_TIMEOUT
+        while not self._predecessor_spoke(pending):
+            # Predecessor has committed: whatever it was going to say, it has
+            # said. Nothing is coming, so do not hold the world for it.
+            if not self._any_waiting_agent_not_ready(self._all_agents):
+                break
+            if time.monotonic() >= deadline:
+                print(
+                    f"  [{self.agent_id}] waited {TURN_WAIT_TIMEOUT:.0f}s for "
+                    f"{self.wait_for} and the wave never arrived; releasing"
+                )
+                break
+            time.sleep(0.05)
+            pending.extend(self._drain_into_history())
+        return pending
+
     def _predecessor_spoke(self, messages: List[Dict]) -> bool:
         """Has my immediate predecessor spoken in this batch -- is it my turn?
 
@@ -205,8 +256,7 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
                 time.sleep(0.05)
         
         # Step 2: Collect messages from earlier speakers.
-        for msg in self.get_messages(clear_buffer=True):
-            self.broadcast_history.append(f"[{msg['sender']}]: {msg['content']}")
+        self._drain_into_history()
         
         # Step 3: Generate plan via LLM before broadcasting so downstream
         # speakers see the current proposal, not a stale previous plan.
@@ -233,21 +283,18 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         # so a replan was generated without the proposal that triggered it ever
         # reaching broadcast_history. In a topology whose whole point is that
         # later speakers see earlier proposals, that is the wrong way round.
-        messages = self.get_messages(clear_buffer=True)
+        messages = self._drain_into_history()
         if not messages:
             return
 
         if self._handle_coop2_repair_interrupt(self._generate_plan_with_role, messages=messages):
             return
 
-        # Record before deciding, so both branches plan and speak with it.
-        for msg in messages:
-            self.broadcast_history.append(f"[{msg['sender']}]: {msg['content']}")
-
-        # Not my turn: the wave has not reached me. Recorded above, read when
-        # my predecessor does speak -- and until then not one LLM call, because
-        # reconsidering on a proposal aimed at the agent above me is the
-        # duplicated thinking, not just duplicated traffic.
+        # Hold in I until the wave reaches me, rather than returning to W and
+        # being woken again by every remaining hop. Still not one LLM call
+        # while waiting: reconsidering on a proposal aimed at the agent above me
+        # is duplicated thinking, not just duplicated traffic.
+        messages = self._await_my_turn(messages)
         if not self._predecessor_spoke(messages):
             return
 
