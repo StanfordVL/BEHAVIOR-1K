@@ -40,6 +40,40 @@ STATE_COLOURS = {
 MESSAGE_COLOUR = "#22223b"
 
 
+def _coalesce(spans, min_width: float):
+    """Absorb sub-pixel spans into their neighbour, then merge like with like.
+
+    A chain wave wakes agent_i once per upstream relay, and with the turn gate
+    those wake-ups return immediately: measured at 34 ms of `interrupted`
+    across 42 of them in an 877 s episode. Drawn as bars they are 1e-5 of the
+    axis, but each still paints its white 0.5 pt edge, so agent_5's lane came
+    out shredded by events that together cost a thirtieth of a second. Widening
+    them to a visible pixel would overstate them by five orders of magnitude,
+    so they are folded into the span around them instead -- the messages are
+    still on the figure as arrows, which is where a wave is legible anyway.
+
+    Returns ``(spans, absorbed_count)``.
+    """
+    kept, absorbed = [], 0
+    for start, stop, state, first_step, last_step in spans:
+        if stop - start < min_width and kept:
+            # Hand the time back to the span it interrupted.
+            prev = kept[-1]
+            kept[-1] = (prev[0], stop, prev[2], prev[3], last_step)
+            absorbed += 1
+            continue
+        kept.append((start, stop, state, first_step, last_step))
+
+    merged = []
+    for span in kept:
+        if merged and merged[-1][2] == span[2] and abs(merged[-1][1] - span[0]) < 1e-9:
+            prev = merged[-1]
+            merged[-1] = (prev[0], span[1], prev[2], prev[3], span[4])
+            continue
+        merged.append(span)
+    return merged, absorbed
+
+
 def _spans(
     transitions: List[Any], end_time: float, end_step: Optional[int] = None,
 ) -> List[Tuple[float, float, str, int, int]]:
@@ -169,10 +203,16 @@ def plot_agent_state_timeline(
 
     figure, axes = plt.subplots(figsize=(14, 1.4 + 0.9 * len(agents)))
     seen_states = []
+    # Half a pixel at the figure's own width: below this a bar is nothing but
+    # its own edge stroke.
+    min_width = end_time / (14 * 140 * 2)
+    absorbed_total = 0
     for lane, agent_id in enumerate(agents):
-        for start, stop, state, first_step, last_step in _spans(
-            agent_states[agent_id], end_time, end_step
-        ):
+        spans, absorbed = _coalesce(
+            _spans(agent_states[agent_id], end_time, end_step), min_width
+        )
+        absorbed_total += absorbed
+        for start, stop, state, first_step, last_step in spans:
             axes.barh(
                 lane, stop - start, left=start, height=0.55,
                 color=STATE_COLOURS.get(state, "#cccccc"),
@@ -200,7 +240,10 @@ def plot_agent_state_timeline(
     # A sliver of left margin: a leader's opening broadcast is sent at t~0, and
     # against xlim=(0, ...) its marker and arrowhead sit on the spine.
     axes.set_xlim(-end_time * 0.012, end_time)
-    axes.set_xlabel("wall clock (s) -- labels inside the bars are the env_step range")
+    xlabel = "wall clock (s) -- labels inside the bars are the env_step range"
+    if absorbed_total:
+        xlabel += f"  |  {absorbed_total} sub-pixel spans folded into their neighbour"
+    axes.set_xlabel(xlabel)
     axes.set_title(title or os.path.basename(os.path.dirname(os.path.abspath(output_path))))
     axes.grid(axis="x", alpha=0.3, linestyle=":")
 
