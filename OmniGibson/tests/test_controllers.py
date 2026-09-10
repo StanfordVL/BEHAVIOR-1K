@@ -1,9 +1,13 @@
 import numpy as np
+import pytest
 import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.controllers import ControllerView
+from omnigibson.controllers import ControllerView, ControlType, IsGraspingState
+from omnigibson.controllers.multi_finger_gripper_controller import MultiFingerGripperController
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 # -------------------- Helper Functions --------------------
@@ -66,6 +70,71 @@ def _distance(a, b):
 
 
 # -------------------- Test Cases --------------------
+@pytest.mark.parametrize(
+    "previous_state, closing, filtered_velocity, expected_state",
+    [
+        (IsGraspingState.TRUE, True, 0.1, IsGraspingState.TRUE),
+        (IsGraspingState.TRUE, False, 0.0, IsGraspingState.FALSE),
+        (IsGraspingState.FALSE, True, 0.1, IsGraspingState.FALSE),
+        (IsGraspingState.FALSE, True, 0.0, IsGraspingState.TRUE),
+    ],
+)
+def test_binary_gripper_grasp_state_ignores_transient_velocity(
+    monkeypatch, previous_state, closing, filtered_velocity, expected_state
+):
+    class GripperVelocityFilter:
+        @staticmethod
+        def estimate_batch(_joint_vel):
+            return th.full((1, 2), filtered_velocity)
+
+    monkeypatch.setattr(ControllableObjectViewAPI, "get_member_view_indices", lambda *_args: th.tensor([0]))
+    monkeypatch.setattr(cb, "abs", th.abs)
+    monkeypatch.setattr(cb, "all", th.all)
+    monkeypatch.setattr(cb, "mean", th.mean)
+    monkeypatch.setattr(
+        ControllableObjectViewAPI,
+        "get_all_joint_velocities",
+        lambda *_args, **_kwargs: th.full((1, 2), 0.1),
+    )
+
+    controller = object.__new__(MultiFingerGripperController)
+    controller._articulation_root_paths = ["/World/robot"]
+    controller._dof_idx = th.tensor([0, 1])
+    controller._control_limits = {ControlType.POSITION: (th.tensor([0.0, 0.0]), th.tensor([0.04, 0.04]))}
+    controller._limit_tolerance = 0.001
+    controller._motor_type = "position"
+    controller._mode = "binary"
+    controller._is_grasping = [previous_state]
+    controller._vel_filter = GripperVelocityFilter()
+
+    joint_pos = th.tensor([[0.02, 0.02]])
+    control = th.tensor([[0.0, 0.0]]) if closing else th.tensor([[0.04, 0.04]])
+    controller._update_grasping_state(joint_pos, control, closing_mask=th.tensor([closing]))
+
+    assert controller.is_grasping() == expected_state
+
+
+@pytest.mark.parametrize(
+    "inverted, grasping_state, expected_command",
+    [
+        (False, IsGraspingState.TRUE, -1.0),
+        (False, IsGraspingState.FALSE, 1.0),
+        (True, IsGraspingState.TRUE, 1.0),
+        (True, IsGraspingState.FALSE, -1.0),
+    ],
+)
+def test_binary_gripper_no_op_follows_grasp_state(monkeypatch, inverted, grasping_state, expected_command):
+    monkeypatch.setattr(cb, "array", lambda values: th.tensor(values, dtype=th.float32))
+
+    controller = object.__new__(MultiFingerGripperController)
+    controller._articulation_root_paths = ["/World/robot"]
+    controller._mode = "binary"
+    controller._inverted = inverted
+    controller._is_grasping = [grasping_state]
+
+    assert th.equal(controller._compute_no_op_command(controller_idx=0), th.tensor([expected_command]))
+
+
 def test_arm_control():
     # Create env
     cfg = {
