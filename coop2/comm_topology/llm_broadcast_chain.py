@@ -24,39 +24,20 @@ from coop2.cognitive.agent.prompts import build_system_prompt
 from coop2.cognitive.plan import SymbolicPlan
 
 
-#: One pass down the chain is a **wave**, and the invariant is that each agent
-#: emits at most one message per wave, in chain order.
+#: Does a relay interrupt an agent that is mid-primitive?
 #:
-#: That invariant is the whole reason the relay is affordable, and it is easy
-#: to lose. "Speak whenever a message arrives" loses it immediately: agent_1
-#: broadcasts to 2..6, all five of them speak, and agent_3 speaks twice -- once
-#: for agent_1's message and again for agent_2's -- so one wave compounds into
-#: many. Gating the relay on the *immediate predecessor* gives exactly the
-#: intended shape instead, because only one agent is ever the successor of the
-#: agent that just spoke:
-#:
-#:     agent_1 speaks -> agent_2 relays -> agent_3 relays -> ... -> agent_5 relays
-#:
-#: N-1 relays, one per agent, in order, and a relay never starts a second wave.
-#: Everyone below still *receives* the original broadcast and still puts it in
-#: broadcast_history; what the gate removes is the duplicated re-fan-out -- and
-#: the duplicated *thinking*, which is the expensive half: an agent whose turn
-#: has not come does not consult the model at all.
-#:
-#: A relay interrupts, and has to: an agent mid-primitive that merely buffers
-#: the message never runs handle_interrupt, so the wave would die at the first
-#: busy agent instead of reaching the end of the chain.
+#: Yes, and it has to: an agent that merely buffers the message never runs
+#: handle_interrupt, so the wave would die at the first busy agent instead of
+#: reaching the end of the chain.
 RELAY_INTERRUPTS_EXECUTION = True
 
-#: Seconds an agent will hold in I waiting for the wave to reach it before
-#: giving up and releasing.
+#: Seconds an agent will wait for its predecessor before giving up.
 #:
-#: The hold's real guard is `_any_waiting_agent_not_ready`: an agent waits only
-#: while its predecessor is still uncommitted, which is the same condition
-#: `_execute_flow` step 1 uses for the opening round. This cap is the belt for
-#: that pair of braces -- the world is frozen while any agent is in I, so a hold
-#: that never ends does not slow the run down, it stops it. A wave hop costs one
-#: model round trip, measured at 3.9 s, so a nine-agent wave is ~35 s.
+#: Upstream's loop has no cap -- its only exit is `_any_waiting_agent_not_ready`
+#: going False. That is the right guard and it is kept, but here the world is
+#: frozen while any agent is not ready, so a wait that never ends does not slow
+#: the run down, it stops it. A wave hop costs one model round trip, measured at
+#: 3.9 s, so a nine-agent wave is ~35 s.
 TURN_WAIT_TIMEOUT = 120.0
 
 
@@ -136,33 +117,32 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         )
     
     def _drain_into_history(self) -> List[Dict]:
-        """Take everything buffered and record it, whether or not it is my turn.
-
-        Out of turn is not out of the loop: a relay plans having read everything
-        said above it, which is the property the chain exists for.
-        """
+        """Take everything buffered and record it for the next plan prompt."""
         messages = self.get_messages(clear_buffer=True)
         for msg in messages:
             self.broadcast_history.append(f"[{msg['sender']}]: {msg['content']}")
         return messages
 
-    def _await_my_turn(self, pending: List[Dict]) -> List[Dict]:
-        """Stay in I until my predecessor speaks, or until it commits without me.
+    def _wait_for_previous_speaker(self) -> None:
+        """Block until my predecessor has spoken, or until it commits without me.
 
-        Being woken by a proposal aimed at the agent above me *is* an interrupt
-        -- I have been told something and cannot act on it yet -- so the agent
-        holds here rather than bouncing back to W and being woken again by the
-        next hop. Before this, agent_5 in a six-agent wave logged five separate
-        waiting spans at one env_step, one per agent above it; now that is one
-        interrupted span, which is what actually happened.
+        This is upstream's `_execute_flow` step 1, lifted out so the interrupt
+        path can share it. It is the whole ordering mechanism of the chain and
+        it gives three properties at once, which is why upstream needs nothing
+        else: an agent does not think out of turn (no model call happens here),
+        it does not speak out of turn (it has not reached step 4), and it stays
+        in **I** while it waits, because `create_agent_thread` calls
+        `set_ready()` only once the handler returns. One wave is therefore one
+        message per agent, in chain order.
 
-        Blocking here is what keeps the state at I: `create_agent_thread` calls
-        `set_ready()` only once `handle_interrupt` returns.
+        The exit condition is the predecessor becoming *ready*: whatever it was
+        going to say, it has said, so nothing is coming and the world must not
+        be held for it.
         """
+        if not (self.wait_for and self._any_waiting_agent_not_ready(self._all_agents)):
+            return
         deadline = time.monotonic() + TURN_WAIT_TIMEOUT
-        while not self._predecessor_spoke(pending):
-            # Predecessor has committed: whatever it was going to say, it has
-            # said. Nothing is coming, so do not hold the world for it.
+        while not self.wait_for_messages_from(self.wait_for):
             if not self._any_waiting_agent_not_ready(self._all_agents):
                 break
             if time.monotonic() >= deadline:
@@ -172,28 +152,6 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
                 )
                 break
             time.sleep(0.05)
-            pending.extend(self._drain_into_history())
-        return pending
-
-    def _predecessor_spoke(self, messages: List[Dict]) -> bool:
-        """Has my immediate predecessor spoken in this batch -- is it my turn?
-
-        This gates **thinking as well as speaking**, and the thinking half is
-        the one that costs. `_execute_flow` already waits for the predecessor
-        before planning, so the opening round is ordered; the interrupt path had
-        no such wait, so mid-episode agent_3 would reconsider the moment
-        agent_1 spoke and then reconsider again when agent_2 did -- two LLM
-        round trips for one wave, from a proposal that was not addressed to it
-        in the first place. Measured on the 6-agent run: 53 % of deliveries land
-        on an agent that is not the next speaker.
-
-        Not its turn does not mean not its business: the message is still
-        recorded, and it is read when the agent's turn does come.
-        """
-        if not self.wait_for:
-            return False  # the first speaker has no predecessor to wait for
-        predecessor = self.wait_for[0]
-        return any(msg.get("sender") == predecessor for msg in messages)
 
     def _format_resume_contribution(self, messages: List[Dict]) -> str:
         """What a receiver says downstream when it keeps the plan it had."""
@@ -249,12 +207,8 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         3. Broadcast that current plan to following agents
         """
         # Step 1: Wait for previous agent (only if they're not ready)
-        if self.wait_for and self._any_waiting_agent_not_ready(self._all_agents):
-            while not self.wait_for_messages_from(self.wait_for):
-                if not self._any_waiting_agent_not_ready(self._all_agents):
-                    break
-                time.sleep(0.05)
-        
+        self._wait_for_previous_speaker()
+
         # Step 2: Collect messages from earlier speakers.
         self._drain_into_history()
         
@@ -277,38 +231,38 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         self._execute_flow()
     
     def handle_interrupt(self):
-        """Decide resume/replan, then pass the news down the chain either way."""
-        # Read the buffer ONCE. decide_interrupt() clears it when it reads it
-        # itself, and _execute_flow's own get_messages() then came back empty --
-        # so a replan was generated without the proposal that triggered it ever
-        # reaching broadcast_history. In a topology whose whole point is that
-        # later speakers see earlier proposals, that is the wrong way round.
-        messages = self._drain_into_history()
+        """Wait for the wave, then decide resume/replan, then pass it on.
+
+        Upstream is one line here -- `self._execute_flow()` -- and that is the
+        whole ordering discipline: step 1 waits for the predecessor, so an agent
+        woken by a proposal aimed at someone above it neither thinks nor speaks
+        until its turn comes. Our only departure is that we ask the model
+        whether to resume before discarding a plan (upstream always replans,
+        which is fine in a grid world where an action is one step and wrong here
+        where a NAVIGATE_TO runs for hundreds of ticks). That decision has to
+        happen after the wait, not before: deciding while the predecessor is
+        still speaking is deciding on information that is about to change.
+        """
+        if self._handle_coop2_repair_interrupt(self._generate_plan_with_role):
+            return
+
+        self._wait_for_previous_speaker()
+
+        # Peek, do not drain: `wait_for_messages_from` reads `buffer_senders`,
+        # which `get_messages(clear_buffer=True)` wipes, so an early drain here
+        # would leave _execute_flow's own step 1 unable to tell that the
+        # predecessor had spoken.
+        messages = self.get_messages(clear_buffer=False)
         if not messages:
             return
 
-        if self._handle_coop2_repair_interrupt(self._generate_plan_with_role, messages=messages):
-            return
-
-        # Hold in I until the wave reaches me, rather than returning to W and
-        # being woken again by every remaining hop. Still not one LLM call
-        # while waiting: reconsidering on a proposal aimed at the agent above me
-        # is duplicated thinking, not just duplicated traffic.
-        messages = self._await_my_turn(messages)
-        if not self._predecessor_spoke(messages):
-            return
-
-        # My turn. Ask before discarding: replanning unconditionally was
-        # upstream's behaviour and works in a grid world where an action is one
-        # step, but here a NAVIGATE_TO runs for hundreds of ticks, so a message
-        # arriving mid-trip used to throw away all the travel already paid for.
-        # On RESUME nothing is touched -- the primitive keeps running with its
-        # accrued delay and the plan continues from where it was -- but the
-        # agent still speaks, because a receiver that stays the course is
-        # telling the agents below it the one thing they cannot otherwise
-        # learn: this target is committed and will not be reconsidered. Before,
-        # only REPLAN spoke, so 81 % of messages died where they landed.
         if self.decide_interrupt(messages=messages) is InterruptDecision.RESUME:
+            # Speak anyway. A receiver that keeps its plan is telling the agents
+            # below it the one thing they cannot otherwise learn -- that this
+            # target is committed and will not be reconsidered -- which is what
+            # a later speaker needs in order to pick a different apple. With
+            # only REPLAN speaking, 81 % of messages died where they landed.
+            self._drain_into_history()
             self._broadcast(
                 self._format_resume_contribution(messages),
                 kind='resume_ack',
@@ -316,7 +270,7 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
             )
             return
         self._execute_flow()
-    
+
     def reset(self):
         """Reset agent state."""
         super().reset()

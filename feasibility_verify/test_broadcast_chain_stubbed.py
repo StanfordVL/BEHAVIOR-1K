@@ -1,29 +1,27 @@
 """CPU-only regression test for the broadcast-chain topology's interrupt path.
 
-No Isaac, no GPU, no LLM: the agent's LLM client and message broker are both
-stubbed, so what is pinned here is the protocol -- who speaks, to whom, and
-what the receiver knows when it plans.
+No Isaac, no GPU, no LLM: the agent's model client and message broker are both
+stubbed, so what is pinned here is the protocol -- who speaks, to whom, and what
+the speaker knows when it plans.
 
-Four claims:
+Nearly all of it is downstream of one mechanism: upstream's ``_execute_flow``
+step 1, the wait for the previous speaker. Upstream's ``handle_interrupt`` is
+literally ``self._execute_flow()``, so that wait has always governed the
+interrupt path too; this port had lost it there, and the ordering with it.
 
-  1. **One agent relays per step of a wave, in chain order.** A receiver speaks
-     only when the batch contains its immediate predecessor's message. Relaying
-     on any received message compounds: agent_1 broadcasts to 2..6, all five
-     speak, and agent_3 speaks twice -- once for agent_1 and again for agent_2.
-  2. A relay happens on **both** branches. RESUME used to return silently, so a
-     message died at whichever agent received it and the chain's information
-     stopped propagating one hop in.
-  3. The messages that caused the interrupt reach ``broadcast_history`` on both
-     branches -- and at every agent, relay or not. They did not on REPLAN:
-     ``decide_interrupt`` cleared the buffer and ``_execute_flow``'s own read
-     then came back empty, so the replan was generated without the proposal
-     that triggered it.
-  4. A relay interrupts, because an agent mid-primitive that merely buffers the
+  1. **The wait is the ordering discipline.** An agent woken by a proposal aimed
+     at someone above it neither thinks nor speaks: it blocks, which keeps it in
+     I, until its predecessor speaks. One wave is one message per agent in chain
+     order -- not one per message received, which compounds (agent_0 broadcasts
+     to 1..5, all five speak, agent_2 speaks again for agent_1's message...).
+  2. It releases when the predecessor commits without ever speaking to it, so a
+     wait cannot deadlock a barrier that freezes the world while it holds.
+  3. A relay happens on **both** branches. RESUME used to return silently, so a
+     message died at whichever agent received it.
+  4. Everything heard while waiting reaches ``broadcast_history``, so an agent
+     plans having read every proposal it sat through.
+  5. A relay interrupts, because an agent mid-primitive that merely buffers the
      message never runs handle_interrupt and the wave would die there.
-  5. An agent woken out of turn **holds in I** until the wave reaches it,
-     instead of bouncing back to W and being woken again by every remaining
-     hop -- and releases without thinking if its predecessor commits without
-     ever speaking to it, so the hold cannot deadlock the barrier.
 
 Run:
     python feasibility_verify/test_broadcast_chain_stubbed.py
@@ -33,6 +31,8 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -48,19 +48,22 @@ def ok(message: str) -> None:
     print(f"  ok: {message}")
 
 
-class FakeBroker:
-    """Records sends; never delivers. Delivery is messages.py's job, not ours."""
-
-    def __init__(self) -> None:
-        self.sent = []
-
-
 class FakeLLMClient:
     model = "stub"
 
 
+class SimplePlan:
+    def __init__(self, specification: str) -> None:
+        self.specification = specification
+        self.actions = ["navigate_to(apple.n.01_3)", "grasp(apple.n.01_3)"]
+
+
 def make_agent(speaker_order: int, n_agents: int, decision: InterruptDecision):
-    """One chain agent with the LLM and the broker replaced."""
+    """One chain agent with the model and the broker replaced.
+
+    ``decisions`` counts model consultations: the point of the wait is that an
+    agent out of turn makes none, which no assertion on messages alone can see.
+    """
     agent = LLMBroadcastChainAgent(
         agent_id=f"agent_{speaker_order}",
         llm_client=FakeLLMClient(),
@@ -70,30 +73,26 @@ def make_agent(speaker_order: int, n_agents: int, decision: InterruptDecision):
         n_agents=n_agents,
         verbose=False,
     )
-    agent.message_broker = FakeBroker()
+    # _broadcast refuses to send with no broker, so one has to be present even
+    # though send_message below is what actually records the call.
+    agent.message_broker = object()
     agent.plan = SimplePlan("ontop(apple.n.01_3, coffee_table.n.01_1)")
-
-    # decide_interrupt is one LLM round trip; pin its answer instead of faking a
-    # model, and count the calls -- the point of the turn gate is that a
-    # bystander makes none. _execute_flow is the REPLAN branch, also a call.
     agent.decisions = 0
+    agent.replanned = False
 
     def fake_decide_interrupt(messages=None):
         agent.decisions += 1
         return decision
 
-    agent.decide_interrupt = fake_decide_interrupt
-    agent.replanned = False
-
     def fake_execute_flow():
-        # Stands in for the LLM call in step 3, plus step 4's broadcast.
+        # Stands in for step 3's model call, keeping step 1's wait and step 4.
+        agent._wait_for_previous_speaker()
+        agent._drain_into_history()
         agent.replanned = True
         agent._broadcast(
             agent._format_current_plan_contribution(), kind="proposal", interrupts=True
         )
         return agent.plan
-
-    agent._execute_flow = fake_execute_flow
 
     sent = []
 
@@ -102,15 +101,11 @@ def make_agent(speaker_order: int, n_agents: int, decision: InterruptDecision):
                      "metadata": dict(metadata or {})})
         return sent[-1]
 
+    agent.decide_interrupt = fake_decide_interrupt
+    agent._execute_flow = fake_execute_flow
     agent.send_message = fake_send_message
     agent.sent = sent
     return agent
-
-
-class SimplePlan:
-    def __init__(self, specification: str) -> None:
-        self.specification = specification
-        self.actions = ["navigate_to(apple.n.01_3)", "grasp(apple.n.01_3)"]
 
 
 def inbound(sender: str, content: str) -> dict:
@@ -124,7 +119,7 @@ def deliver(agent, messages) -> None:
 
 
 def main() -> int:
-    print("test: the chain speaks downstream only, and agent N-1 speaks to nobody")
+    print("test: the chain speaks downstream only, and the last speaker to nobody")
     topology = create_llm_broadcast_chain_topology(9, FakeLLMClient(), verbose=False)
     assert topology["agent_0"].send_to == [f"agent_{j}" for j in range(1, 9)]
     assert topology["agent_3"].send_to == [f"agent_{j}" for j in range(4, 9)]
@@ -133,75 +128,95 @@ def main() -> int:
     assert topology["agent_5"].wait_for == ["agent_4"]
     ok("send_to is strictly downstream, wait_for is the immediate predecessor")
 
-    print("\ntest: only the immediate successor relays, on either branch")
+    print("\ntest: woken out of turn, the agent holds in I -- no message, no model call")
     for decision, kind in ((InterruptDecision.RESUME, "resume_ack"),
                            (InterruptDecision.REPLAN, "proposal")):
-        relay = make_agent(speaker_order=3, n_agents=9, decision=decision)
-        deliver(relay, [inbound("agent_2", "[agent_2] Proposed plan: ontop(apple.n.01_1, ...)")])
-        relay.handle_interrupt()
-        assert len(relay.sent) == 1, f"{kind}: expected exactly one relay, got {len(relay.sent)}"
-        assert relay.sent[0]["recipients"] == [f"agent_{j}" for j in range(4, 9)]
-        assert relay.sent[0]["metadata"]["chain_message"] == kind
-        assert (relay.replanned is (decision is InterruptDecision.REPLAN))
+        holder = make_agent(speaker_order=3, n_agents=6, decision=decision)
+        predecessor = make_agent(speaker_order=2, n_agents=6, decision=decision)
+        predecessor.ready = False                      # still to speak
+        holder._all_agents = {"agent_2": predecessor}
+        deliver(holder, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_6, ...)")])
 
-        assert relay.decisions == 1, "the relay consults the model exactly once"
+        thread = threading.Thread(target=holder.handle_interrupt, daemon=True)
+        thread.start()
+        thread.join(timeout=0.4)
+        assert thread.is_alive(), f"{kind}: released instead of holding for its predecessor"
+        assert holder.sent == [] and holder.decisions == 0, (
+            f"{kind}: acted on a proposal aimed at the agent above it"
+        )
 
-        bystander = make_agent(speaker_order=3, n_agents=9, decision=decision)
-        deliver(bystander, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_9, ...)")])
-        bystander.handle_interrupt()
-        assert bystander.sent == [], (
-            f"{kind}: agent_3 relayed for agent_0, whose successor is agent_1 -- "
-            "that is the compounding this gate exists to stop"
+        deliver(holder, [inbound("agent_2", "[agent_2] Proposed plan: ontop(apple.n.01_3, ...)")])
+        thread.join(timeout=5.0)
+        assert not thread.is_alive(), f"{kind}: never woke when its predecessor spoke"
+        assert holder.decisions == 1, f"{kind}: exactly one consultation, on its turn"
+        assert len(holder.sent) == 1, f"{kind}: exactly one relay"
+        assert holder.sent[0]["recipients"] == [f"agent_{j}" for j in range(4, 6)]
+        assert holder.sent[0]["metadata"]["chain_message"] == kind
+        assert any("apple.n.01_3" in e for e in holder.broadcast_history), (
+            f"{kind}: the message that freed it must be in front of it when it plans"
         )
-        # And it does not think either. _execute_flow already waits for the
-        # predecessor before planning, so the opening round is ordered; without
-        # the same gate here, agent_3 reconsidered when agent_1 spoke and then
-        # again when agent_2 did -- two round trips for one wave.
-        assert bystander.decisions == 0, (
-            f"{kind}: a bystander consulted the model for a proposal aimed at the agent above it"
-        )
-        assert not bystander.replanned
-        # Silent, but not deaf.
-        assert any("apple.n.01_9" in entry for entry in bystander.broadcast_history)
-    ok("out of turn: no message, no model call -- but the proposal is still recorded")
+    ok("one hold, then one decision and one relay when the turn comes")
+
+    print("\ntest: the wait releases if the predecessor commits without speaking")
+    # Upstream proceeds here rather than swallowing the interrupt: nobody above
+    # is going to speak, so the agent acts on what it already has.
+    committed = make_agent(speaker_order=2, n_agents=6, decision=InterruptDecision.RESUME)
+    committed.ready = True
+    stranded = make_agent(speaker_order=3, n_agents=6, decision=InterruptDecision.RESUME)
+    stranded._all_agents = {"agent_2": committed}
+    deliver(stranded, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_9, ...)")])
+    started = time.monotonic()
+    stranded.handle_interrupt()
+    assert time.monotonic() - started < 1.0, "a committed predecessor must not be waited on"
+    assert stranded.decisions == 1 and len(stranded.sent) == 1
+    ok("no wave coming, no deadlock, and the interrupt is not swallowed")
 
     print("\ntest: one wave = one message per agent, in order")
-    # agent_0 opens; every later agent receives it, and thereafter each agent
-    # receives whatever its predecessors sent. Replay that faithfully.
+    # An agent already in I is not re-entered -- `interrupt()` is a no-op from I
+    # and `create_agent_thread` runs one handler -- so every agent below the
+    # speaker handles the wave exactly once, blocking inside until its turn.
+    # The replay therefore appends to buffers as relays happen and calls each
+    # handler once, in chain order.
     n = 6
     team = {i: make_agent(i, n, InterruptDecision.RESUME) for i in range(n)}
     for agent in team.values():
         deliver(agent, [])
+        agent.ready = False                            # all woken together
+        agent._all_agents = {a: team[int(a.split("_")[1])] for a in agent.wait_for}
+    team[0].ready = True                               # agent_0 has spoken
+
+    def push(agent, message):
+        agent.message_buffer.append(message)
+        agent.buffer_senders[message["sender"]] = True
+
+    opening = {"sender": "agent_0", "recipients": [f"agent_{j}" for j in range(1, n)],
+               "content": "[agent_0] Proposed plan: ontop(apple.n.01_1, ...)", "timestamp": 0.0}
+    for name in opening["recipients"]:
+        push(team[int(name.split("_")[1])], opening)
+
     spoke = []
-    pending = [{"sender": "agent_0", "recipients": [f"agent_{j}" for j in range(1, n)],
-                "content": "[agent_0] Proposed plan: ontop(apple.n.01_1, ...)", "timestamp": 0.0}]
-    while pending:
-        message = pending.pop(0)
-        for name in message["recipients"]:
-            receiver = team[int(name.split("_")[1])]
-            deliver(receiver, [message])
-            receiver.handle_interrupt()
-            while receiver.sent:
-                out = receiver.sent.pop(0)
-                spoke.append(name)
-                pending.append({"sender": name, "recipients": out["recipients"],
-                                "content": out["content"], "timestamp": 0.0})
-    # 1..n-2: the last agent is the wave's relay too, but its send_to is empty,
-    # so the wave ends there rather than at a rule.
+    for i in range(1, n):
+        receiver = team[i]
+        receiver.handle_interrupt()
+        for out in receiver.sent:
+            spoke.append(f"agent_{i}")
+            relay = {"sender": f"agent_{i}", "recipients": out["recipients"],
+                     "content": out["content"], "timestamp": 0.0}
+            for name in out["recipients"]:
+                push(team[int(name.split("_")[1])], relay)
+        receiver.ready = True                          # spoken; its successor may go
+
+    # 1..n-2 relay; agent_5 is the wave's relay too but its send_to is empty, so
+    # the wave ends there rather than at a rule.
     assert spoke == [f"agent_{i}" for i in range(1, n - 1)], (
         f"a wave should be relayed once by each agent in order, got {spoke}"
     )
     assert len(spoke) == len(set(spoke)), f"an agent spoke twice in one wave: {spoke}"
-    ok("agent_0 speaks, then 1, 2, 3, 4 in order -- each exactly once, and 5 has nobody")
-
-    print("\ntest: a relay interrupts, or the wave dies at the first busy agent")
-    assert chain_module.RELAY_INTERRUPTS_EXECUTION is True
-    relay = make_agent(speaker_order=3, n_agents=9, decision=InterruptDecision.RESUME)
-    deliver(relay, [inbound("agent_2", "[agent_2] Proposed plan: ontop(apple.n.01_5, ...)")])
-    relay.handle_interrupt()
-    assert relay.sent[0]["metadata"]["interrupts_execution"] is True
-    assert relay.plan.specification in relay.sent[0]["content"], "say which plan is being kept"
-    ok("the relay stops the next agent, so it actually runs handle_interrupt")
+    # Each relay planned having read everything said above it, not just the
+    # message that freed it.
+    assert any("agent_0" in e for e in team[4].broadcast_history)
+    assert any("agent_3" in e for e in team[4].broadcast_history)
+    ok("agent_0 speaks, then 1, 2, 3, 4 in order -- each exactly once")
 
     print("\ntest: both branches plan and speak having read the triggering message")
     for decision, label in ((InterruptDecision.RESUME, "RESUME"),
@@ -215,53 +230,14 @@ def main() -> int:
         assert subject.message_buffer == [], f"{label}: the buffer must be drained once"
     ok("the triggering proposal is in broadcast_history on RESUME and on REPLAN")
 
-    print("\ntest: woken out of turn, the agent holds in I until the wave arrives")
-    import threading, time as _time
-
-    holder = make_agent(speaker_order=3, n_agents=6, decision=InterruptDecision.RESUME)
-    predecessor = make_agent(speaker_order=2, n_agents=6, decision=InterruptDecision.RESUME)
-    predecessor.ready = False          # still to speak
-    holder._all_agents = {"agent_2": predecessor}
-    deliver(holder, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_6, ...)")])
-
-    thread = threading.Thread(target=holder.handle_interrupt, daemon=True)
-    thread.start()
-    thread.join(timeout=0.4)
-    assert thread.is_alive(), "the agent released instead of holding for its predecessor"
-    assert holder.sent == [] and holder.decisions == 0, "it must not act while holding"
-
-    # The wave arrives.
-    holder.message_buffer = [inbound("agent_2", "[agent_2] Proposed plan: ontop(apple.n.01_3, ...)")]
-    holder.buffer_senders = {"agent_2": True}
-    thread.join(timeout=5.0)
-    assert not thread.is_alive(), "the agent never woke when its predecessor spoke"
-    assert holder.decisions == 1 and len(holder.sent) == 1
-    assert any("apple.n.01_6" in e for e in holder.broadcast_history), (
-        "the proposal it held through must still be in front of it when it plans"
-    )
-    assert any("apple.n.01_3" in e for e in holder.broadcast_history)
-    ok("one continuous hold, then one decision that has read both messages")
-
-    print("\ntest: the hold releases if the predecessor commits without speaking")
-    quiet_pred = make_agent(speaker_order=2, n_agents=6, decision=InterruptDecision.RESUME)
-    quiet_pred.ready = True            # committed; nothing is coming
-    stranded = make_agent(speaker_order=3, n_agents=6, decision=InterruptDecision.RESUME)
-    stranded._all_agents = {"agent_2": quiet_pred}
-    deliver(stranded, [inbound("agent_0", "[agent_0] Proposed plan: ontop(apple.n.01_9, ...)")])
-    started = _time.monotonic()
-    stranded.handle_interrupt()
-    assert _time.monotonic() - started < 1.0, "a committed predecessor must not be waited on"
-    assert stranded.sent == [] and stranded.decisions == 0
-    ok("no wave coming, no deadlock -- and still no model call")
-
     print("\ntest: an empty buffer is not an interrupt")
     quiet = make_agent(speaker_order=4, n_agents=9, decision=InterruptDecision.REPLAN)
     deliver(quiet, [])
     quiet.handle_interrupt()
-    assert quiet.sent == [] and not quiet.replanned
+    assert quiet.sent == [] and not quiet.replanned and quiet.decisions == 0
     ok("no messages, no plan churn and no broadcast")
 
-    print("\ntest: the last speaker has nobody to acknowledge to")
+    print("\ntest: the last speaker has nobody to relay to")
     last = make_agent(speaker_order=8, n_agents=9, decision=InterruptDecision.RESUME)
     deliver(last, [inbound("agent_7", "[agent_7] Proposed plan: ontop(apple.n.01_2, ...)")])
     last.handle_interrupt()
@@ -271,10 +247,10 @@ def main() -> int:
 
     print("\ntest: the real broker stops an executing agent for a relay")
     # Everything above stubs send_message, so it pins what the topology *asks*
-    # for. This one goes through the real MessageBroker, which is what decides
+    # for. This goes through the real MessageBroker, which is what decides
     # whether an agent mid-primitive is actually stopped -- if the metadata key
-    # were wrong, every test above would still pass and the chain would either
-    # stall or diverge.
+    # were wrong every test above would still pass and the wave would die at
+    # the first busy agent.
     from coop2.cognitive.agent.agent import AgentState
     from coop2.cognitive.messages import MessageBroker
 
@@ -283,7 +259,6 @@ def main() -> int:
     for agent in (sender, middle):
         deliver(agent, [])
     broker = MessageBroker({"agent_0": sender, "agent_1": middle})
-
     for kind in ("resume_ack", "proposal"):
         middle._set_state(AgentState.X, timestamp=0.0, env_step=0)
         broker.send_message(
