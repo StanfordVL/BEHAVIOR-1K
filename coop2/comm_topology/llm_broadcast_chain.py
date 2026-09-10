@@ -24,6 +24,25 @@ from coop2.cognitive.agent.prompts import build_system_prompt
 from coop2.cognitive.plan import SymbolicPlan
 
 
+#: Does the acknowledgement a receiver sends downstream interrupt an agent that
+#: is mid-primitive, the way a fresh proposal does?
+#:
+#: **No, deliberately.** A proposal broadcast interrupts because the sender's
+#: intention changed and downstream agents should reconsider now. An
+#: acknowledgement carries no new intention, and making it interrupt makes the
+#: chain diverge: every message a receiver gets would produce a message to
+#: everyone below it, so with r reasoning broadcasts per agent the traffic
+#: doubles at each position -- for 9 agents and r=8 that is ~4000 interrupts
+#: against the 305 measured today, each one an LLM round trip.
+#:
+#: With this False the acknowledgement still reaches every downstream agent and
+#: still lands in their `broadcast_history`; the broker just buffers it for an
+#: agent in X instead of stopping it (`messages.py`: an agent in W is
+#: interrupted by any message regardless). Flip it to True to measure the
+#: interrupting variant -- budget for it first.
+ACK_INTERRUPTS_EXECUTION = False
+
+
 def get_broadcast_chain_role(speaker_order: int, n_agents: int) -> str:
     """Describe an agent's position in the Broadcast Chain."""
     if speaker_order == 0:
@@ -99,6 +118,32 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
             "then support, adapt, or choose a different plan from their own observation."
         )
     
+    def _format_resume_contribution(self, messages: List[Dict]) -> str:
+        """What a receiver says downstream when it keeps the plan it had."""
+        senders = ", ".join(sorted({msg["sender"] for msg in messages})) or "a teammate"
+        spec = self.plan.specification if self.plan is not None else "no plan"
+        return (
+            f"[{self.agent_id}] Heard {senders} and am continuing with my current "
+            f"plan: {spec}. Treat it as committed, not as a fresh proposal."
+        )
+
+    def _broadcast(self, content: str, kind: str, interrupts: bool) -> None:
+        """Send `content` to every agent after this one in the chain."""
+        if not self.send_to or self.message_broker is None:
+            return
+        self.send_message(
+            recipients=self.send_to,
+            content=content,
+            metadata={
+                'type': 'broadcast_chain',
+                'chain_message': kind,
+                'speaker_order': self.speaker_order,
+                'interrupts_execution': interrupts,
+            },
+        )
+        if self.verbose:
+            print(f"  [{self.agent_id}] Broadcast ({kind}) to {self.send_to}: {content[:50]}...")
+
     def _generate_plan_with_role(self, messages: Optional[List[Dict]] = None) -> SymbolicPlan:
         """Generate a plan with the earlier Broadcast Chain messages."""
         repair_messages = messages
@@ -143,19 +188,11 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         self.plan = self._generate_plan_with_role()
 
         # Step 4: Broadcast to all following agents
-        if self.send_to and self.message_broker is not None:
-            content = self._generate_message(self._format_current_plan_contribution())
-            self.send_message(
-                recipients=self.send_to,
-                content=content,
-                metadata={
-                    'type': 'broadcast_chain',
-                    'speaker_order': self.speaker_order,
-                    'interrupts_execution': True,
-                },
-            )
-            if self.verbose:
-                print(f"  [{self.agent_id}] Broadcast to {self.send_to}: {content[:50]}...")
+        self._broadcast(
+            self._generate_message(self._format_current_plan_contribution()),
+            kind='proposal',
+            interrupts=True,
+        )
 
         return self.plan
     
@@ -164,16 +201,41 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         self._execute_flow()
     
     def handle_interrupt(self):
-        """Replan on interrupt."""
-        if self._handle_coop2_repair_interrupt(self._generate_plan_with_role):
+        """Decide resume/replan, then pass the news down the chain either way."""
+        # Read the buffer ONCE. decide_interrupt() clears it when it reads it
+        # itself, and _execute_flow's own get_messages() then came back empty --
+        # so a replan was generated without the proposal that triggered it ever
+        # reaching broadcast_history. In a topology whose whole point is that
+        # later speakers see earlier proposals, that is the wrong way round.
+        messages = self.get_messages(clear_buffer=True)
+        if not messages:
             return
+
+        if self._handle_coop2_repair_interrupt(self._generate_plan_with_role, messages=messages):
+            return
+
+        # Record before deciding, so both branches plan and speak with it.
+        for msg in messages:
+            self.broadcast_history.append(f"[{msg['sender']}]: {msg['content']}")
+
         # Ask before discarding. Replanning unconditionally was upstream's
         # behaviour and works in a grid world where an action is one step; here
         # a NAVIGATE_TO runs for hundreds of ticks, so a message that arrives
         # mid-trip used to throw away all the travel already paid for. On
         # RESUME nothing is touched: the primitive keeps running with its
         # accrued delay, and the plan continues from where it was.
-        if self.decide_interrupt() is InterruptDecision.RESUME:
+        if self.decide_interrupt(messages=messages) is InterruptDecision.RESUME:
+            # Speak anyway. A receiver that stays the course is telling the
+            # agents below it something they cannot otherwise learn -- that this
+            # target is now committed and is not going to be reconsidered --
+            # which is exactly the claim a later speaker needs in order to pick
+            # a different apple. Silence on RESUME meant 81 % of all messages
+            # died at whichever agent received them.
+            self._broadcast(
+                self._format_resume_contribution(messages),
+                kind='resume_ack',
+                interrupts=ACK_INTERRUPTS_EXECUTION,
+            )
             return
         self._execute_flow()
     
