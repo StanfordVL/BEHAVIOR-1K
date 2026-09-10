@@ -359,6 +359,100 @@ Notes worth keeping:
   order of 60 000 steps, against 4 000 for the two-apple Pomaria task -- or
   re-sample for a tighter draw, or centre the furniture deliberately.
 
+## Heterogeneous robots and one-LLM-per-team (2026-09-10)
+
+Three changes, done in order, each verified before the next.
+
+### 1. A team layout JSON says who is in the scene
+
+`coop2/behavior_env/team_config.py`, `--team-config PATH` on the runners. One
+file carries what each robot is, where it starts and who it works with, because
+those three are not independent -- a team is a set of named robots, and a name
+means nothing until that robot has a model and a place to stand.
+
+    {"robots": [
+      {"name": "agent_0", "model": "R1",    "position": [-8.5, -1.5], "team": "alpha"},
+      {"name": "agent_1", "model": "Tiago", "room": "living_room_0",  "team": "alpha"},
+      {"name": "agent_2", "model": "R1",    "room": "kitchen_0",      "team": "bravo"}
+    ]}
+
+Exactly one of `position` (exact world coordinates) or `room` (a room *instance*,
+sampled inside it) per robot. `place_robots` applies pinned poses first so that
+sampled robots keep clear of them rather than the reverse, and `cluster_radius`
+became per room -- keeping everyone within 6 m of the first robot placed is
+unsatisfiable once robots are in different rooms. A pinned pose too close to
+another warns rather than refuses: two robots deliberately close together is a
+legitimate thing to study.
+
+Verified on GPU with `coop2/team_layouts/pomaria_mixed.json`: 3 robots built
+(the layout beat `--agents 99`), models r1/**tiago**/r1, the pinned robot at
+drift 0.000 m, and the other two in `living_room_0` and `kitchen_0` as asked.
+
+**Robot models are a registry, not a fixed list**, because importing non-BEHAVIOR
+robots is planned. Such a robot needs one thing from coop2 -- a primitives-style
+YAML carrying the controller stack the symbolic primitives require -- so that is
+the whole extension point: `"config": "/path/to/myrobot_primitives.yaml"` in the
+layout, or `register_robot_model(name, path)` at import time. Nothing else here
+asks what kind of robot it is driving; `q_to_action` and the base joints are the
+only interface. Only r1, r1pro and tiago ship such a YAML.
+
+### 2. One LLM per team
+
+`coop2/comm_topology/llm_team.py`, `python -m coop2.experiment.run_team`. A team
+shares one brain: every member's observation goes into one prompt and the answer
+is one plan per robot, so the allocation is made once and is visible. Four robots
+on the two-apple task, one call:
+
+  [team_0] allocation: The two apples are split between agent_1 and agent_3, the
+  robots currently positioned within reach of distinct apples. Agents 0 and 2
+  wait rather than duplicating claims.
+
+**The barrier is the whole design problem, and it deadlocks if done naively.**
+The requirement is that members return to reasoning together, once all have
+finished. But the plan loop does not step the env while any agent is not ready
+(`run_*.py`: `while not all(agent.ready)`), so a member that finished early and
+simply waited would freeze the world -- and its teammates need the world to
+advance to finish. That deadlocks on the first uneven round.
+
+So an early finisher stays **ready** and holds position: a short `wait` plan,
+repeated until the team is complete. The idle time is real and shows up in the
+plan log as `wait_for_team(...)`, which is the honest price of a joint decision
+point. `TeamBrain._awaiting` tracks who is done *across* those holds, so a member
+idling three times is still "waiting to plan", not "planning again".
+
+Messages interrupt the whole team; the brain answers resume-or-replan per robot
+in one call. Per robot because a message that changes one robot's job usually
+leaves the others' plans good. No deadlock there -- an interrupt reaches every
+member at once.
+
+One call per round, not N: the runners spawn a thread per agent, so the brain
+locks and the first thread through makes the call while the rest read the result.
+
+A team of one behaves exactly like the individual topology, which is why an
+unteamed robot gets a team of its own: one-LLM-per-robot is this code at N=1,
+not a second code path. `--team-size K` groups `--agents N` without a JSON file.
+
+**Trap, found by the first GPU run.** The hold plan was built through
+`parse_plan_response`, whose `_ensure_task_terminal_action` appends an action
+matching the plan's TaskSpecification. Written as `holding(<self>)` that appended
+`grasp(<self>)` -- a robot planning to pick *itself* up, which really appeared in
+a run's plan log. Holds are constructed directly now, and the test asserts a hold
+has exactly one action rather than only checking the first.
+
+### 3. gpt-5.6-terra when the team prompt is too much for luna
+
+No code change -- `--model gpt-5.6-terra`. Both models honour the team schema
+(probed directly). On four robots, same seed and task, terra allocated both
+apples correctly on its first team call where luna needed a second round:
+
+| model | goal @ step | holds | team LLM calls |
+|---|---|---|---|
+| gpt-5.6-luna | 1203 | 8 | 2 |
+| gpt-5.6-terra | **358** | 2 | **1** |
+
+One seed, so this is not a ranking -- but the mechanism behind the gap is
+visible, not inferred: one planning round against two.
+
 ## Open defects
 
 Fixed ones are not listed here -- the fix and its reasoning live in the commit
