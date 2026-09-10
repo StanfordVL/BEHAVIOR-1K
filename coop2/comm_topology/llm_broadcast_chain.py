@@ -90,7 +90,11 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         """Build the system prompt for this position in the chain."""
         if self._system_prompt is None:
             base = build_system_prompt(self.agent_id, max_actions=6, include_env_description=True)
-            self._system_prompt = base + get_broadcast_chain_role(self.speaker_order, self.n_agents)
+            self._system_prompt = (
+                base
+                + "\n\n"
+                + get_broadcast_chain_role(self.speaker_order, self.n_agents).strip()
+            )
         return self._system_prompt
     
     def _generate_message(self, context: str) -> str:

@@ -475,7 +475,11 @@ def build_system_prompt(
     parts = []
     
     # Identity
-    parts.append(f"You are agent '{agent_id}' in a multi-agent cooperative crafting game.")
+    # "crafting game" was crafter's wording and survived the port. It contradicted
+    # the very next line of ENV_DESCRIPTION -- "one of several robots working
+    # together in a house" -- so the prompt opened by telling the model two
+    # different things about what it was.
+    parts.append(f"You are agent '{agent_id}' in a multi-agent cooperative household task.")
     parts.append("")
     
     # Environment description
@@ -483,11 +487,18 @@ def build_system_prompt(
         parts.append(ENV_DESCRIPTION)
         parts.append("")
     
+    # Wrapped to the same ~78 columns as the rules above, with two-space
+    # continuations. These four bullets were the only unwrapped lines in the
+    # whole system prompt (89, 87 and 95 characters against a hard wrap
+    # everywhere else), which is what made the line breaks look arbitrary.
     parts.append(f"""PLAN RESPONSE:
 - Return a structured plan that matches the response schema.
-- Choose one task and at most {max_actions} actions; 3-6 short executable actions are usually enough.
-- Use exact item_id values from the current prompt for navigation and resource targets.
-- Coordinate when the cooperative config, messages, or repair evidence require multiple agents.
+- Choose one task and at most {max_actions} actions; 3-6 short executable
+  actions are usually enough.
+- Use exact item_id values from the current prompt for navigation and
+  resource targets.
+- Coordinate when the cooperative config, messages, or repair evidence
+  require multiple agents.
 - Briefly explain why this plan is the next useful step.""")
     
     return "\n".join(parts)
@@ -563,13 +574,19 @@ def build_observation_prompt(
         parts.append(format_visible_area(visible_area))
         parts.append("")
     
-    # Symbolic view (detailed view with entity IDs)
+    # Symbolic view (detailed view with entity IDs). Its own tail is the action
+    # catalogue under "You can do:", built from the same target_hints() call the
+    # env renders into info["target_hints"] -- so appending both put every id in
+    # the room twice, and each out-of-range one four times (a navigate_to line
+    # and an unreachable line, both repeating the distance). The grouped form is
+    # the one ENV_DESCRIPTION tells the agent to read ids from, so it wins; the
+    # flat form stays as the fallback for a caller that has hints but no view.
     if symbolic_view:
         parts.append("SYMBOLIC VIEW:")
         parts.append(symbolic_view)
         parts.append("")
-
-    if target_hints:
+    elif target_hints:
+        parts.append("YOU CAN DO:")
         parts.append(target_hints)
         parts.append("")
 

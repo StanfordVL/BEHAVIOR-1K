@@ -188,13 +188,15 @@ def build_interrupt_prompt(
         lines.append(coop_config)
         lines.append("")
     
-    # Symbolic view (detailed view with entity IDs)
+    # Symbolic view (detailed view with entity IDs). It already ends with the
+    # same catalogue grouped one line per target, so emitting target_hints as
+    # well listed every id in the room a second time. Kept as the fallback for
+    # a caller that has hints but no view.
     if symbolic_view:
         lines.append("## Symbolic View")
         lines.append(symbolic_view)
         lines.append("")
-
-    if target_hints:
+    elif target_hints:
         lines.append("## Current Reachable Targets")
         lines.append(target_hints)
         lines.append("")

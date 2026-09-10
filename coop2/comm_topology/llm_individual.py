@@ -61,7 +61,7 @@ class LLMIndividualAgent(BaseLLMAgent):
         """Build system prompt with individual role."""
         if self._system_prompt is None:
             base = build_system_prompt(self.agent_id, max_actions=6, include_env_description=True)
-            self._system_prompt = base + INDIVIDUAL_ROLE
+            self._system_prompt = base + "\n\n" + INDIVIDUAL_ROLE.strip()
         return self._system_prompt
     
     def _generate_plan_with_role(self, messages: Optional[List[Dict]] = None) -> SymbolicPlan:

@@ -71,7 +71,7 @@ class LLMLeaderAgent(CentralizedLeaderFlow, BaseLLMAgent):
         """Build system prompt with leader role injected."""
         if self._system_prompt is None:
             base = build_system_prompt(self.agent_id, max_actions=6, include_env_description=True)
-            self._system_prompt = base + LEADER_ROLE
+            self._system_prompt = base + "\n\n" + LEADER_ROLE.strip()
         return self._system_prompt
     
     def _format_planning_request(self) -> str:
@@ -175,7 +175,7 @@ class LLMFollowerAgent(CentralizedFollowerFlow, BaseLLMAgent):
         """Build system prompt with follower role injected."""
         if self._system_prompt is None:
             base = build_system_prompt(self.agent_id, max_actions=6, include_env_description=True)
-            self._system_prompt = base + FOLLOWER_ROLE
+            self._system_prompt = base + "\n\n" + FOLLOWER_ROLE.strip()
         return self._system_prompt
 
     def _current_plan_summary(self) -> str:
