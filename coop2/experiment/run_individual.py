@@ -33,6 +33,7 @@ from coop2.cognitive import (
     save_metrics_csv,
 )
 from coop2.cognitive.viz import RealtimeVisualizationWrapper
+from coop2.cognitive.agent.llm_io_log import LLMIORecorder
 from coop2.experiment.agent_timeline import plot_from_run_dir
 from coop2.comm_topology import LLMIndividualAgent, create_llm_individual_topology
 try:
@@ -101,6 +102,10 @@ def run_individual_experiment(
     # Initialize LLM client
     print("Initializing LLM client...")
     llm_client = LLMClient.from_env(model=llm_model, verbose=llm_verbose)
+    # Every prompt and completion of the run, one JSON object per line, flushed
+    # as it goes. Attached to the client because all the agents share it; the
+    # agent supplies its own id and env_step when it records.
+    llm_client.io_recorder = LLMIORecorder(os.path.join(output_dir, "llm_calls.jsonl"))
     print(f"  Model: {llm_client.model}")
     if llm_verbose:
         print("  LLM verbose mode: ON (showing API inputs/outputs)")

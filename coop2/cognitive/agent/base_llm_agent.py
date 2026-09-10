@@ -122,8 +122,20 @@ class BaseLLMAgent(Agent):
                 print(content)
             print(f"{'=' * 80}\n")
 
-    def _record_llm_usage(self, usage: Dict[str, Any]):
-        """Record token/API usage from one LLM call."""
+    def _record_llm_usage(
+        self,
+        usage: Dict[str, Any],
+        label: Optional[str] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
+        response: Any = None,
+    ):
+        """Record token/API usage from one LLM call, and the call itself.
+
+        The prompt and completion are persisted through the recorder the runner
+        hangs on the shared LLM client, if there is one -- attributed here
+        rather than in the client because the client is shared by every agent
+        and cannot tell whose call it is serving.
+        """
         self.api_calls += 1
         self.total_tokens_used += usage["total_tokens"]
         self.prompt_tokens += usage["prompt_tokens"]
@@ -135,6 +147,18 @@ class BaseLLMAgent(Agent):
         self.api_rate_limit_retries += int(usage.get("rate_limit_retry_count", 0) or 0)
         self.api_error_retries += int(usage.get("api_error_retry_count", 0) or 0)
         self.guard_filter_events += int(usage.get("guard_filter_count", 0) or 0)
+
+        if label is not None:
+            recorder = getattr(self.llm_client, "io_recorder", None)
+            if recorder is not None:
+                recorder.record(
+                    agent_id=self.agent_id,
+                    env_step=self.env_step,
+                    label=label,
+                    messages=messages,
+                    response=response,
+                    usage=usage,
+                )
 
     def _record_llm_error(self, error: Exception):
         """Record an LLM-call failure for run-level monitoring."""
@@ -243,7 +267,7 @@ class BaseLLMAgent(Agent):
                 messages=prompt_messages,
                 temperature=self.temperature,
             )
-            self._record_llm_usage(usage)
+            self._record_llm_usage(usage, label, prompt_messages, response)
 
             plan = parse_plan_response(
                 llm_response=response,
@@ -273,7 +297,7 @@ class BaseLLMAgent(Agent):
                 response_format=None,
                 temperature=self.temperature if temperature is None else temperature,
             )
-            self._record_llm_usage(usage)
+            self._record_llm_usage(usage, "Message Generation", messages, response)
             return str(response)
         except Exception as e:
             self._record_llm_error(e)
@@ -398,7 +422,7 @@ class BaseLLMAgent(Agent):
                 response_format=None,
                 temperature=self.temperature,
             )
-            self._record_llm_usage(usage)
+            self._record_llm_usage(usage, "Repair Intention", messages, response)
             return str(response).strip()
         except Exception as e:
             self._record_llm_error(e)
@@ -476,7 +500,9 @@ class BaseLLMAgent(Agent):
             response, usage = self.llm_client.generate_interrupt_decision(
                 messages=interrupt_messages, temperature=self.temperature
             )
-            self._record_llm_usage(usage)
+            self._record_llm_usage(
+                usage, "Interrupt Decision", interrupt_messages, response
+            )
             decision, _ = parse_interrupt_response(
                 llm_response=response,
                 agent_id=self.agent_id,
@@ -540,7 +566,9 @@ class BaseLLMAgent(Agent):
                 temperature=self.temperature
             )
             
-            self._record_llm_usage(usage)
+            self._record_llm_usage(
+                usage, "Interrupt Decision", interrupt_messages, response
+            )
             
             if self.verbose:
                 print(f"    LLM reasoning: {response.reasoning}")
