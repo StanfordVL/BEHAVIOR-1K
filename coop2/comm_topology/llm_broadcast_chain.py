@@ -24,23 +24,27 @@ from coop2.cognitive.agent.prompts import build_system_prompt
 from coop2.cognitive.plan import SymbolicPlan
 
 
-#: Does the acknowledgement a receiver sends downstream interrupt an agent that
-#: is mid-primitive, the way a fresh proposal does?
+#: One pass down the chain is a **wave**, and the invariant is that each agent
+#: emits at most one message per wave, in chain order.
 #:
-#: **No, deliberately.** A proposal broadcast interrupts because the sender's
-#: intention changed and downstream agents should reconsider now. An
-#: acknowledgement carries no new intention, and making it interrupt makes the
-#: chain diverge: every message a receiver gets would produce a message to
-#: everyone below it, so with r reasoning broadcasts per agent the traffic
-#: doubles at each position -- for 9 agents and r=8 that is ~4000 interrupts
-#: against the 305 measured today, each one an LLM round trip.
+#: That invariant is the whole reason the relay is affordable, and it is easy
+#: to lose. "Speak whenever a message arrives" loses it immediately: agent_1
+#: broadcasts to 2..6, all five of them speak, and agent_3 speaks twice -- once
+#: for agent_1's message and again for agent_2's -- so one wave compounds into
+#: many. Gating the relay on the *immediate predecessor* gives exactly the
+#: intended shape instead, because only one agent is ever the successor of the
+#: agent that just spoke:
 #:
-#: With this False the acknowledgement still reaches every downstream agent and
-#: still lands in their `broadcast_history`; the broker just buffers it for an
-#: agent in X instead of stopping it (`messages.py`: an agent in W is
-#: interrupted by any message regardless). Flip it to True to measure the
-#: interrupting variant -- budget for it first.
-ACK_INTERRUPTS_EXECUTION = False
+#:     agent_1 speaks -> agent_2 relays -> agent_3 relays -> ... -> agent_5 relays
+#:
+#: N-1 relays, one per agent, in order, and a relay never starts a second wave.
+#: Everyone below still *receives* the original broadcast and still puts it in
+#: broadcast_history; what the gate removes is the duplicated re-fan-out.
+#:
+#: A relay interrupts, and has to: an agent mid-primitive that merely buffers
+#: the message never runs handle_interrupt, so the wave would die at the first
+#: busy agent instead of reaching the end of the chain.
+RELAY_INTERRUPTS_EXECUTION = True
 
 
 def get_broadcast_chain_role(speaker_order: int, n_agents: int) -> str:
@@ -118,6 +122,18 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
             "then support, adapt, or choose a different plan from their own observation."
         )
     
+    def _is_my_turn_to_relay(self, messages: List[Dict]) -> bool:
+        """Does this batch contain the message from my immediate predecessor?
+
+        The wave is passed on by exactly one agent at each step -- the one the
+        speaker spoke to first. Everyone else below heard it too, and says
+        nothing, which is what keeps a wave a wave.
+        """
+        if not self.wait_for:
+            return False  # the first speaker has no predecessor to relay for
+        predecessor = self.wait_for[0]
+        return any(msg.get("sender") == predecessor for msg in messages)
+
     def _format_resume_contribution(self, messages: List[Dict]) -> str:
         """What a receiver says downstream when it keeps the plan it had."""
         senders = ", ".join(sorted({msg["sender"] for msg in messages})) or "a teammate"
@@ -164,12 +180,17 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
             verbose_prefix="BROADCAST CHAIN calling LLM for plan...",
         )
     
-    def _execute_flow(self) -> SymbolicPlan:
+    def _execute_flow(self, broadcast: bool = True) -> SymbolicPlan:
         """
         Execute the Broadcast Chain decision flow:
         1. Wait for message from previous agent (if not first)
         2. Generate a current plan using earlier proposals
         3. Broadcast that current plan to following agents
+
+        Args:
+            broadcast: emit step 3. False when replanning inside a wave this
+                agent is not the relay for -- it still replans, it just does not
+                add a second message to a wave that already has one.
         """
         # Step 1: Wait for previous agent (only if they're not ready)
         if self.wait_for and self._any_waiting_agent_not_ready(self._all_agents):
@@ -188,11 +209,12 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         self.plan = self._generate_plan_with_role()
 
         # Step 4: Broadcast to all following agents
-        self._broadcast(
-            self._generate_message(self._format_current_plan_contribution()),
-            kind='proposal',
-            interrupts=True,
-        )
+        if broadcast:
+            self._broadcast(
+                self._generate_message(self._format_current_plan_contribution()),
+                kind='proposal',
+                interrupts=True,
+            )
 
         return self.plan
     
@@ -224,20 +246,25 @@ class LLMBroadcastChainAgent(BaseLLMAgent):
         # mid-trip used to throw away all the travel already paid for. On
         # RESUME nothing is touched: the primitive keeps running with its
         # accrued delay, and the plan continues from where it was.
+        # Pass the wave on if it is this agent's turn, and only then. Both
+        # branches speak: a receiver that stays the course is telling the agents
+        # below it the one thing they cannot otherwise learn -- that this target
+        # is committed and will not be reconsidered -- which is exactly what a
+        # later speaker needs in order to pick a different apple. Before, only
+        # REPLAN spoke, so 81 % of messages died where they landed.
+        relay = self._is_my_turn_to_relay(messages)
         if self.decide_interrupt(messages=messages) is InterruptDecision.RESUME:
-            # Speak anyway. A receiver that stays the course is telling the
-            # agents below it something they cannot otherwise learn -- that this
-            # target is now committed and is not going to be reconsidered --
-            # which is exactly the claim a later speaker needs in order to pick
-            # a different apple. Silence on RESUME meant 81 % of all messages
-            # died at whichever agent received them.
-            self._broadcast(
-                self._format_resume_contribution(messages),
-                kind='resume_ack',
-                interrupts=ACK_INTERRUPTS_EXECUTION,
-            )
+            if relay:
+                self._broadcast(
+                    self._format_resume_contribution(messages),
+                    kind='resume_ack',
+                    interrupts=RELAY_INTERRUPTS_EXECUTION,
+                )
             return
-        self._execute_flow()
+        # Replan regardless; broadcast only as the wave's relay, so a replan
+        # triggered by a message from further up does not inject a second
+        # message into a wave that already has one.
+        self._execute_flow(broadcast=relay)
     
     def reset(self):
         """Reset agent state."""
