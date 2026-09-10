@@ -1,0 +1,210 @@
+"""CPU-only test for the one-LLM-per-team topology.
+
+No Isaac, no GPU, no model: a stub client counts calls and returns canned team
+responses. What is pinned is the part that cannot be checked by reading the code
+-- the barrier -- because getting it wrong deadlocks rather than fails.
+
+The trap: the plan loop does not step the environment while any agent is
+not ready. So a member that finished early and simply waited for its teammates
+would freeze the world, and those teammates need the world to advance in order
+to finish. The design has early finishers stay ready and hold position instead,
+and these tests are what keep that true.
+
+Run:
+    python feasibility_verify/test_llm_team_stubbed.py
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from coop2.cognitive.agent.llm_client import (
+    InterruptDecision,
+    LLMTeamInterruptResponse,
+    LLMTeamPlanResponse,
+    NavigateToAction,
+    Task,
+    TaskSpecification,
+    TeamAgentInterruptDecision,
+    TeamAgentPlan,
+)
+from coop2.comm_topology.llm_team import TEAM_HOLD_TICKS, create_llm_team_topology
+
+
+def ok(message: str) -> None:
+    print(f"  ok: {message}")
+
+
+USAGE = {"total_tokens": 10, "prompt_tokens": 6, "completion_tokens": 4, "latency_seconds": 0.1}
+
+
+class StubClient:
+    """Counts calls and hands back a plan for every member of the team asked about."""
+
+    model = "stub"
+
+    def __init__(self):
+        self.plan_calls = 0
+        self.interrupt_calls = 0
+        self.last_prompt = None
+        self.interrupt_script = {}
+
+    def _members_in(self, messages):
+        """Read the agent ids out of the prompt the brain built."""
+        text = messages[-1]["content"]
+        return [line.split()[2] for line in text.split("\n") if line.startswith("=== ROBOT ")]
+
+    def generate_team_plan(self, messages, temperature=0.7):
+        self.plan_calls += 1
+        self.last_prompt = messages[-1]["content"]
+        plans = [
+            TeamAgentPlan(
+                agent_id=name,
+                task=TaskSpecification(task=Task.ONTOP, object_type="apple.n.01_1",
+                                       reference="coffee_table.n.01_1"),
+                actions=[NavigateToAction(target="apple.n.01_1")],
+                reasoning=f"{name} goes for the apple",
+            )
+            for name in self._members_in(messages)
+        ]
+        return LLMTeamPlanResponse(plans=plans, reasoning="split by distance"), dict(USAGE)
+
+    def generate_team_interrupt_decision(self, messages, temperature=0.7):
+        self.interrupt_calls += 1
+        decisions = []
+        for name in self._members_in(messages):
+            choice = self.interrupt_script.get(name, InterruptDecision.RESUME)
+            decisions.append(
+                TeamAgentInterruptDecision(
+                    agent_id=name,
+                    decision=choice,
+                    reasoning="scripted",
+                    new_plan=None,
+                )
+            )
+        return LLMTeamInterruptResponse(decisions=decisions, reasoning="scripted"), dict(USAGE)
+
+
+def make_team(size, name="alpha"):
+    client = StubClient()
+    ids = [f"agent_{i}" for i in range(size)]
+    agents = create_llm_team_topology(
+        llm_client=client, teams={name: ids}, verbose=False, goal_instruction="do the thing"
+    )
+    for agent in agents.values():
+        agent.symbolic_view = f"view for {agent.agent_id}"
+        agent.observe({}, 0)
+    return client, agents, ids
+
+
+def main() -> int:
+    print("test 1: a team does not plan until every member has finished")
+    client, agents, ids = make_team(4)
+    # Three members finish; the fourth is still executing and never calls in.
+    for name in ids[:3]:
+        agents[name].handle_reasoning()
+    assert client.plan_calls == 0, "planned before the team was complete"
+    for name in ids[:3]:
+        plan = agents[name].plan
+        assert plan is not None, f"{name} has no plan at all -- it would never become ready"
+        assert plan.actions[0].action_type == "wait", plan.actions[0].action_type
+        assert plan.actions[0].args["ticks"] == TEAM_HOLD_TICKS
+        # Exactly one action. A hold that goes through parse_plan_response picks
+        # up a terminal action derived from its TaskSpecification -- expressed as
+        # holding(<self>) that appended grasp(<self>), a robot planning to pick
+        # itself up, which reached a real run before it was caught.
+        assert len(plan.actions) == 1, [a.action_type for a in plan.actions]
+    ok("3 of 4 finished -> no LLM call, and each early finisher holds rather than stalling")
+
+    print("test 2: the last member closes the barrier and everyone gets a real plan")
+    agents[ids[3]].handle_reasoning()
+    assert client.plan_calls == 1, client.plan_calls
+    assert agents[ids[3]].plan.actions[0].action_type == "navigate_to"
+    # The other three are still holding; they take their plans on their next
+    # pass through reasoning, which is what happens when their hold expires.
+    for name in ids[:3]:
+        agents[name].handle_reasoning()
+    assert client.plan_calls == 1, f"one round must be one call, got {client.plan_calls}"
+    for name in ids:
+        plan = agents[name].plan
+        assert plan.actions[0].action_type == "navigate_to", (name, plan.actions[0].action_type)
+        assert plan.agent_id == name
+    ok("one call for the whole round, and every robot ends up with its own plan")
+
+    print("test 3: the prompt carries every member's observation, once each")
+    prompt = client.last_prompt
+    for name in ids:
+        assert f"=== ROBOT {name} ===" in prompt, f"{name} missing from the team prompt"
+        assert prompt.count(f"view for {name}") == 1, f"{name}'s observation duplicated"
+    assert "do the thing" in prompt, "the global objective is missing"
+    ok("4 observations, one section each, plus the objective")
+
+    print("test 4: a team of one behaves exactly like the individual topology")
+    solo_client, solo_agents, solo_ids = make_team(1, name="solo")
+    solo_agents[solo_ids[0]].handle_reasoning()
+    assert solo_client.plan_calls == 1
+    # No hold is ever taken: the barrier is satisfied by the only member.
+    assert solo_agents[solo_ids[0]].plan.actions[0].action_type == "navigate_to"
+    ok("N=1 plans immediately and never holds, so per-robot LLM is this code with N=1")
+
+    print("test 5: an interrupt is answered once, per robot")
+    client, agents, ids = make_team(3)
+    client.interrupt_script = {ids[1]: InterruptDecision.REPLAN}
+    for name in ids:
+        agents[name].plan = None
+    for name in ids[:2]:
+        agents[name].handle_interrupt()
+    assert client.interrupt_calls == 0, "decided before the whole team was interrupted"
+    agents[ids[2]].handle_interrupt()
+    assert client.interrupt_calls == 1, client.interrupt_calls
+    ok("no decision until all 3 are interrupted, then exactly one call for the team")
+
+    print("test 6: a member the model forgot is held, not left planless")
+    class Forgetful(StubClient):
+        def generate_team_plan(self, messages, temperature=0.7):
+            response, usage = super().generate_team_plan(messages, temperature)
+            response.plans = response.plans[:-1]  # drop the last robot
+            return response, usage
+
+    client = Forgetful()
+    ids = ["agent_0", "agent_1"]
+    agents = create_llm_team_topology(llm_client=client, teams={"t": ids}, verbose=False)
+    for agent in agents.values():
+        agent.symbolic_view = f"view for {agent.agent_id}"
+        agent.observe({}, 0)
+    for name in ids:
+        agents[name].handle_reasoning()
+    # A member with no plan never becomes ready, which would strand the whole
+    # run at the next barrier -- so the brain gives it a hold instead.
+    assert agents[ids[1]].plan is not None
+    assert agents[ids[1]].plan.actions[0].action_type == "wait"
+    assert len(agents[ids[1]].plan.actions) == 1, [
+        a.action_type for a in agents[ids[1]].plan.actions
+    ]
+    ok("a skipped robot gets a hold, so it still becomes ready")
+
+    print("test 7: an LLM failure falls back rather than ending the run")
+    class Broken(StubClient):
+        def generate_team_plan(self, messages, temperature=0.7):
+            raise RuntimeError("no model today")
+
+    client = Broken()
+    ids = ["agent_0", "agent_1"]
+    agents = create_llm_team_topology(llm_client=client, teams={"t": ids}, verbose=False)
+    for agent in agents.values():
+        agent.observe({}, 0)
+    for name in ids:
+        agents[name].handle_reasoning()
+    for name in ids:
+        assert agents[name].plan is not None, f"{name} stranded with no plan after an LLM error"
+    ok("every robot still has a plan after the call raised")
+
+    print("\nALL TESTS PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

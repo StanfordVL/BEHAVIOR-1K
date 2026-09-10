@@ -584,6 +584,69 @@ class LLMClient:
         """Convenience method to generate an interrupt decision response."""
         return self.generate(messages, response_format=LLMInterruptResponse, temperature=temperature)
 
+    def generate_team_plan(self, messages: List[Dict], temperature: float = 0.7) -> tuple:
+        """One call that plans for every robot on a team."""
+        return self.generate(messages, response_format=LLMTeamPlanResponse, temperature=temperature)
+
+    def generate_team_interrupt_decision(self, messages: List[Dict], temperature: float = 0.7) -> tuple:
+        """One call that decides resume-or-replan for every robot on a team."""
+        return self.generate(messages, response_format=LLMTeamInterruptResponse, temperature=temperature)
+
+
+class TeamAgentPlan(BaseModel):
+    """One team member's plan, inside a single team-wide response.
+
+    Same three fields as :class:`LLMPlanResponse` plus the agent it is for, so
+    the team response is N of these rather than a nested map -- a list keeps the
+    JSON schema simple enough for structured output, and the agent_id travels
+    *with* the plan rather than as a key that can drift from it.
+    """
+
+    agent_id: str = Field(description="Which robot this plan is for; must be one of the team's ids")
+    task: TaskSpecification = Field(description="The task specification with type and optional target object")
+    actions: List[LLMAction] = Field(description="List of actions for this robot to execute")
+    reasoning: str = Field(description="Brief explanation of why this robot is doing this")
+
+
+class LLMTeamPlanResponse(BaseModel):
+    """One call, one plan per robot on the team.
+
+    The team brain sees every member's observation at once, so the interesting
+    field is ``reasoning``: it is where the allocation is justified, and the only
+    place the division of labour is visible before the robots act on it.
+    """
+
+    plans: List[TeamAgentPlan] = Field(description="Exactly one plan per robot on the team")
+    reasoning: str = Field(description="Why the work is divided between the robots this way")
+
+
+class TeamAgentInterruptDecision(BaseModel):
+    """Resume or replan, decided per robot after the team was interrupted."""
+
+    agent_id: str = Field(description="Which robot this decision is for")
+    decision: InterruptDecision = Field(
+        description="Whether this robot resumes its current plan or gets a new one"
+    )
+    reasoning: str = Field(description="Why, given the message and this robot's own progress")
+    new_plan: Optional[LLMPlanResponse] = Field(
+        default=None,
+        description="Required when decision is 'replan'; ignored when it is 'resume'",
+    )
+
+
+class LLMTeamInterruptResponse(BaseModel):
+    """A message interrupts the whole team; the brain answers for each member.
+
+    Per-agent rather than team-wide on purpose: a message that changes what one
+    robot should do usually leaves the others' plans perfectly good, and making
+    the whole team replan would throw away work the message never contradicted.
+    """
+
+    decisions: List[TeamAgentInterruptDecision] = Field(
+        description="Exactly one decision per robot on the team"
+    )
+    reasoning: str = Field(description="What the message means for the team as a whole")
+
 
 # ============================================================================
 # Utility functions
