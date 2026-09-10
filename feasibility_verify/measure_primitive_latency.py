@@ -4,7 +4,7 @@
 
 * ``navigate_to`` is dominated by the **travel charge** -- hold-position ticks
   emitted in proportion to the straight-line distance before the teleport
-  (``DEFAULT_TRAVEL_TICKS_PER_METER``, 30 ticks/m). It is a function of distance,
+  (``DEFAULT_TRAVEL_TICKS_PER_METER``, 60 ticks/m). It is a function of distance,
   so a single median is meaningless without the distances it came from.
 * the manipulation verbs are dominated by ``_settle_robot``, i.e. physics coming
   to rest, capped by ``MAX_STEPS_FOR_SETTLING``.
