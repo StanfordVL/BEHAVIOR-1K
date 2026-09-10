@@ -229,6 +229,7 @@ class MultiFingerGripperController(GripperController):
         # Choose what to do based on control mode
         if self._mode == "binary":
             should_open = target_batch[:, 0] >= 0.0 if not self._inverted else target_batch[:, 0] > 0.0  # (N,)
+            closing_mask = should_open if self._inverted else ~should_open  # (N,)
             open_limit = (
                 self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
                 if self._open_qpos is None
@@ -241,6 +242,7 @@ class MultiFingerGripperController(GripperController):
             )  # (ctrl_dim,)
             u = cb.where(should_open[:, None], open_limit, closed_limit)  # (N, ctrl_dim)
         else:
+            closing_mask = None
             # Broadcast single-column target across control_dim if needed
             if target_batch.shape[1] == 1:
                 u = target_batch * cb.ones(self.control_dim)
@@ -257,20 +259,21 @@ class MultiFingerGripperController(GripperController):
             u = u * ~violation
 
         # Update grasping state for all members
-        self._update_grasping_state(all_joint_pos, u)
+        self._update_grasping_state(all_joint_pos, u, closing_mask)
 
         # Zero out unregistered members
         u[unregistered_mask] = 0.0
 
         return u  # array with shape (N, control_dim)
 
-    def _update_grasping_state(self, joint_pos, control):
+    def _update_grasping_state(self, joint_pos, control, closing_mask):
         """
         Updates internal inferred grasping state for the controller at @controller_idx.
 
         Args:
             joint_pos (Array): joint positions for this group's members' controlled DOFs, shape (N, ctrl_dim)
             control (Array): the control signal being applied, shape (N, ctrl_dim)
+            closing_mask (None or Array): whether each binary controller member is commanding close, shape (N,)
         """
         rows = self.view_row_indices
         all_joint_vel = ControllableObjectViewAPI.get_all_joint_velocities(self.routing_path, estimate=True)[rows, :][
@@ -322,12 +325,28 @@ class MultiFingerGripperController(GripperController):
 
                 # Then the gripper is grasping something, which stops the gripper from reaching its desired state
                 is_grasping_true = valid_grasp_pos & valid_grasp_vel  # (N,)
+                if self._mode == "binary":
+                    is_grasping_true = is_grasping_true & closing_mask
 
-                # Build per-member result: UNKNOWN overrides where non_uniform or no_move
+                # Once a binary gripper has detected a grasp, keep it through transient velocity spikes while the
+                # command is still closing. Explicit opening, a failed close, or reaching the commanded endpoint
+                # still clears the grasp and preserves the existing no-op behavior.
                 is_grasping_result = [
                     IsGraspingState.UNKNOWN
                     if (non_uniform_mask[i] or no_move_mask[i])
-                    else (IsGraspingState.TRUE if is_grasping_true[i] else IsGraspingState.FALSE)
+                    else (
+                        IsGraspingState.TRUE
+                        if (
+                            is_grasping_true[i]
+                            or (
+                                self._mode == "binary"
+                                and closing_mask[i]
+                                and self._is_grasping[i] == IsGraspingState.TRUE
+                                and valid_grasp_pos[i]
+                            )
+                        )
+                        else IsGraspingState.FALSE
+                    )
                     for i in range(self.n_members)
                 ]
 

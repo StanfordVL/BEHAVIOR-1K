@@ -30,6 +30,17 @@ m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_TRANSLATION = 1e-2  # 1cm
 m.CONTAINER_JOINT_POSITION_DELTA_THRESHOLD_ROTATION = math.radians(1)  # 1 degree
 
 
+def _orient_face_normals_outward(points, face_centroids, face_normals):
+    """Return convex-mesh face normals oriented away from the mesh interior."""
+    # The mean of the mesh vertices is a convex combination of those vertices, so for a
+    # full-dimensional convex container mesh it lies inside the hull.  An outward normal
+    # therefore has a non-positive dot product with the vector from its face to this point.
+    mesh_interior = points.mean(dim=0)
+    points_toward_interior = mesh_interior.unsqueeze(0) - face_centroids
+    inward = (points_toward_interior * face_normals).sum(dim=-1) > 0
+    return th.where(inward.unsqueeze(-1), -face_normals, face_normals)
+
+
 # Tensorized Inside state.
 #
 # VALUES shape: (S, N, N) bool — VALUES[s, inner, container] is True iff
@@ -336,8 +347,21 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                         if mesh._mesh_type != "Mesh":
                             continue
 
-                        centroids = mesh.mesh_face_centroids  # (F, 3) local-unscaled
-                        normals = mesh.mesh_face_normals  # (F, 3) local-unscaled
+                        # Build one outward-facing halfspace per convex hull facet, matching
+                        # the hull that GeomPrim.check_local_points_in_volume() tests against.
+                        hull_faces = th.as_tensor(mesh.delaunay_triangulation.convex_hull, dtype=th.long)
+                        hull_vertices = mesh.points[hull_faces]
+                        centroids = hull_vertices.mean(dim=1)  # (F_hull, 3) local-unscaled
+                        edge1 = hull_vertices[:, 1] - hull_vertices[:, 0]
+                        edge2 = hull_vertices[:, 2] - hull_vertices[:, 0]
+                        normals = th.cross(edge1, edge2, dim=1)
+                        normal_lengths = th.linalg.vector_norm(normals, dim=1, keepdim=True)
+                        normals = normals / th.clamp(normal_lengths, min=1e-8)
+                        normals = _orient_face_normals_outward(
+                            points=mesh.points,
+                            face_centroids=centroids,
+                            face_normals=normals,
+                        )  # (F_hull, 3) local-unscaled
                         face_count = centroids.shape[0]
                         if face_count == 0:
                             continue

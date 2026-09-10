@@ -37,6 +37,11 @@ def _is_system_particle_template_name(obj_name: str, system_names: set[str]) -> 
 
 
 def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: dict) -> None:
+    """Tells each object which non-kinematic states the demo saved for it, and in what order.
+
+    Reading a frame back walks the saved numbers in that order, so it has to follow the recording
+    rather than whatever states the current code gives the object.
+    """
     state = recorded_scene_file.get("state", {})
     object_registry_state = (
         state.get("registry", {}).get("object_registry", {})
@@ -49,7 +54,68 @@ def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: 
         if obj is None or obj.states is None:
             continue
 
-        obj._recorded_non_kin_state_names = set(recorded_obj_state.get("non_kin", {}))
+        recorded_names = tuple(recorded_obj_state.get("non_kin", {}))
+        obj._recorded_non_kin_state_names = set(recorded_names)
+        obj._recorded_non_kin_state_order = recorded_names
+
+
+def _add_recorded_non_kin_states_to_scene_file(scene_file: dict, recorded_scene_files: list[dict]) -> None:
+    """Passes each object the list of non-kinematic states the recording saved for it, as a
+    constructor arg.
+
+    Which states an object gets is decided by its synset abilities, which may have changed since the
+    demo was recorded; without this list an object can be built without a state that every saved
+    frame still contains.  Edits @scene_file in place.  If several demos share one environment, each
+    object gets the combined list from all of them, ordered by where each name first appears.
+    """
+    init_info = scene_file["objects_info"]["init_info"]
+    names_by_object = {}
+    for recorded_scene_file in recorded_scene_files:
+        state = recorded_scene_file.get("state", {})
+        object_registry_state = (
+            state.get("registry", {}).get("object_registry", {})
+            if "registry" in state
+            else state.get("object_registry", {})
+        )
+        for obj_name, recorded_obj_state in object_registry_state.items():
+            ordered_names = names_by_object.setdefault(obj_name, [])
+            for state_name in recorded_obj_state.get("non_kin", {}):
+                if state_name not in ordered_names:
+                    ordered_names.append(state_name)
+
+    for obj_name, state_names in names_by_object.items():
+        if obj_name not in init_info:
+            raise ValueError(
+                f"Recorded state schema names object {obj_name!r}, but that object has no init_info "
+                "in the replay scene file."
+            )
+        init_info[obj_name].setdefault("args", {})["recorded_non_kin_state_names"] = state_names
+
+
+def _recorded_non_kin_state_name_union(recorded_scene_file: dict) -> set[str] | None:
+    """Returns every non-kinematic state name that appears anywhere in one demo, pooled across all
+    its objects.
+
+    Each frame is one flat array of numbers, read back one object and one state at a time, so an
+    object that expects a state the recording never saved eats the numbers meant for whatever comes
+    next, and everything after it is off by that much.  Objects created mid-episode (e.g. the halves
+    left by slicing) are not in the recorded scene file, so their own list is unknown; this pooled
+    list is the safe stand-in, because a name missing from it was never saved for anything.
+    Returns None if the recording has no per-object state at all.
+    """
+    state = recorded_scene_file.get("state", {})
+    object_registry_state = (
+        state.get("registry", {}).get("object_registry", {})
+        if "registry" in state
+        else state.get("object_registry", {})
+    )
+    if not object_registry_state:
+        return None
+
+    names: set[str] = set()
+    for recorded_obj_state in object_registry_state.values():
+        names.update(recorded_obj_state.get("non_kin", {}))
+    return names
 
 
 class DataWrapper(EnvironmentWrapper):
@@ -399,7 +465,8 @@ class DataPlaybackWrapper(DataWrapper):
         config["env"]["flatten_obs_space"] = True
 
         # Set the scene file either to the one stored in the hdf5 or the hot swap scene file
-        config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+        recorded_scene_file = json.loads(f["data"].attrs["scene_file"])
+        config["scene"]["scene_file"] = recorded_scene_file
         if full_scene_file:
             with open(full_scene_file, "r") as json_file:
                 full_scene_json = json.load(json_file)
@@ -410,7 +477,12 @@ class DataPlaybackWrapper(DataWrapper):
             config["scene"]["load_room_types"] = None
             config["scene"]["load_room_instances"] = load_room_instances
         else:
-            config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+            config["scene"]["scene_file"] = recorded_scene_file
+
+        _add_recorded_non_kin_states_to_scene_file(
+            scene_file=config["scene"]["scene_file"],
+            recorded_scene_files=[recorded_scene_file],
+        )
 
         # Use dummy task if not loading task
         if not include_task:
@@ -780,10 +852,16 @@ class DataPlaybackWrapper(DataWrapper):
                         continue
                     obj = scene.object_registry("name", remove_obj_name)
                     scene.remove_object(obj)
+                recorded_non_kin_names = _recorded_non_kin_state_name_union(self.recorded_scene_file)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
                     if _is_system_particle_template_info(add_obj_info, added_systems):
                         continue
                     obj = create_object_from_init_info(add_obj_info)
+                    # Objects created by a transition are not in the recorded scene file, so they
+                    # have no saved state list of their own. Give them the pooled list instead, so
+                    # reading back later frames stays on the right numbers.
+                    if recorded_non_kin_names is not None:
+                        obj._recorded_non_kin_state_names = set(recorded_non_kin_names)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
                 # Step physics to initialize any new objects
