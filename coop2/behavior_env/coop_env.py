@@ -71,6 +71,7 @@ class CooperativeBehaviorEnv:
         bddl_activity: Optional[str] = None,
         bddl_instance_id: int = 0,
         video_path: Optional[str] = None,
+        team_layout: Optional[Any] = None,
         **kwargs: Any,
     ):
         # crafter kwargs (area/view/size/n_players/reward) arrive from the
@@ -82,6 +83,13 @@ class CooperativeBehaviorEnv:
             n_agents = int(kwargs["n_players"])
 
         self.scene_model = scene_model
+        # A TeamLayout, when given, is the authority on who is in the scene:
+        # how many robots, what each one is, where it starts and whose team it
+        # is on. n_agents/robot_model stay as the flag-driven fallback so
+        # `--agents N` keeps working without a second code path.
+        self.team_layout = team_layout
+        if team_layout is not None:
+            n_agents = team_layout.n_agents
         self.n_agents = int(n_agents)
         self.seed = seed
         self.length = int(length)
@@ -129,7 +137,10 @@ class CooperativeBehaviorEnv:
         self.engine_verbose = bool(kwargs.get('engine_verbose') or _os.environ.get('COOP2_ENGINE_VERBOSE'))
         self.outcomes_seen = 0
 
-        self.agent_names: List[str] = [f"agent_{i}" for i in range(self.n_agents)]
+        self.agent_names: List[str] = (
+            list(team_layout.agent_names) if team_layout is not None
+            else [f"agent_{i}" for i in range(self.n_agents)]
+        )
         self.possible_agents: List[str] = list(self.agent_names)
 
         self.env = None
@@ -231,6 +242,7 @@ class CooperativeBehaviorEnv:
         config = build_multi_robot_config(
             robot_poses=[(park(i), [0.0, 0.0, 0.0, 1.0]) for i in range(self.n_agents)],
             robot_model=self.robot_model,
+            robot_models=(list(self.team_layout.models) if self.team_layout is not None else None),
             scene_model=self.scene_model,
             load_object_categories=None,
             objects=self.extra_objects,
@@ -245,7 +257,9 @@ class CooperativeBehaviorEnv:
         import os as _os  # noqa: PLC0415
 
         verbose_poses = bool(_os.environ.get("COOP2_PLACEMENT_VERBOSE"))
-        _, self.placement_room = place_robots(self.env, seed=self.seed, room=self.room)
+        _, self.placement_room = place_robots(
+            self.env, seed=self.seed, room=self.room, layout=self.team_layout
+        )
         if verbose_poses:
             report_robot_poses(self.env, "after place_robots")
         prepare_robots(self.env)

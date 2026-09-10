@@ -110,12 +110,20 @@ def create_llm_individual_topology(
     temperature: float = 0.7,
     verbose: bool = True,
     goal_instruction: str = "",
+    agent_ids: Optional[List[str]] = None,
 ) -> Dict[str, LLMIndividualAgent]:
     """
     Create LLM-powered agents for individual topology (no communication).
+
+    ``agent_ids`` names the agents explicitly, which a team layout does; without
+    it they are ``agent_0 ... agent_{n-1}`` as before. The ids are the keys of
+    the action dict, the observation dict and every metric, so they have to be
+    the same strings the env uses for its robots.
     """
     agents = {}
-    team_agent_ids = [f"agent_{i}" for i in range(n_agents)]
+    team_agent_ids = list(agent_ids) if agent_ids else [f"agent_{i}" for i in range(n_agents)]
+    if len(team_agent_ids) != n_agents:
+        raise ValueError(f"got {len(team_agent_ids)} agent ids for {n_agents} agents")
     for i in range(n_agents):
         agent_id = team_agent_ids[i]
         agents[agent_id] = LLMIndividualAgent(

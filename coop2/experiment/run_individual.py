@@ -62,6 +62,7 @@ def run_individual_experiment(
     bddl_instance_id=0,
     headless=True,
     keep_viewer=False,
+    team_config=None,
 ):
     """
     Run experiment with individual LLM agents (no communication).
@@ -110,8 +111,20 @@ def run_individual_experiment(
     if llm_verbose:
         print("  LLM verbose mode: ON (showing API inputs/outputs)")
     
-    # Create environment
-    agent_names = [f"agent_{i}" for i in range(n_agents)]
+    # Create environment. A team layout, when given, is the authority on who is
+    # in the scene -- how many robots, what model each is, where it starts --
+    # so it overrides --agents rather than being checked against it.
+    team_layout = None
+    if team_config:
+        from coop2.behavior_env.team_config import load_team_layout  # noqa: PLC0415
+
+        team_layout = load_team_layout(team_config)
+        n_agents = team_layout.n_agents
+        print(f"\n[layout] {team_config}\n{team_layout.describe()}")
+    agent_names = (
+        list(team_layout.agent_names) if team_layout is not None
+        else [f"agent_{i}" for i in range(n_agents)]
+    )
     env_kwargs = dict(
         area=(64, 64),
         view=(9, 9),
@@ -150,6 +163,8 @@ def run_individual_experiment(
         # episode early; there is no proxy check any more.
         env_kwargs["bddl_activity"] = bddl_activity
         env_kwargs["bddl_instance_id"] = bddl_instance_id
+    if team_layout is not None:
+        env_kwargs["team_layout"] = team_layout
     base_env = CooperativeEnv(**env_kwargs)
     # Diagnostic hook: keep a handle so a harness can inspect counters after
     # the run without threading a return value through.
@@ -174,6 +189,7 @@ def run_individual_experiment(
         temperature=0.7,
         verbose=verbose,
         goal_instruction=goal_instruction,
+        agent_ids=agent_names,
     )
     
     # Wrap with planning environment
@@ -353,6 +369,10 @@ if __name__ == "__main__":
                              "run ends only on the step or wall-clock limit.")
     parser.add_argument("--bddl-instance-id", type=int, default=0,
                         help="activity_instance_id of the cached template to load")
+    parser.add_argument("--team-config", type=str, default=None, metavar="PATH",
+                        help="JSON describing the robots: model, start position "
+                             "(exact [x, y] or a room instance) and team, per robot. "
+                             "Overrides --agents. See coop2/behavior_env/team_config.py.")
     parser.add_argument("--gui", action="store_true",
                         help="Open the Isaac Sim viewport. Needs a DISPLAY, and note that "
                              "--show is a no-op: the visualisation wrapper is a stub, and "
@@ -383,4 +403,5 @@ if __name__ == "__main__":
         bddl_instance_id=args.bddl_instance_id,
         headless=not (args.gui or args.keep_viewer),
         keep_viewer=args.keep_viewer,
+        team_config=args.team_config,
     )

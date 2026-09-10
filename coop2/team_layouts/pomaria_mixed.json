@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "Example layout for Pomaria_1_int. Exercises every option: two robot models,",
+    "one robot pinned to exact coordinates and two placed by room, two rooms, and",
+    "two teams. agent_0 is pinned inside living_room_0 near the coffee table at",
+    "(-9.61, -0.35); agent_2 starts in a different room on its own team."
+  ],
+  "robots": [
+    {"name": "agent_0", "model": "R1",    "position": [-8.5, -1.5],    "team": "alpha"},
+    {"name": "agent_1", "model": "Tiago", "room": "living_room_0",     "team": "alpha"},
+    {"name": "agent_2", "model": "R1",    "room": "kitchen_0",         "team": "bravo"}
+  ]
+}
