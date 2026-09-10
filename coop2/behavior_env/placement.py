@@ -183,6 +183,15 @@ def robot_radius(robot) -> float:
         return 0.6
 
 
+
+def _robot_named(robots, name):
+    """The robot object with @name, for a room lookup keyed by name."""
+    for robot in robots:
+        if robot.name == name:
+            return robot
+    raise KeyError(name)
+
+
 def place_robots(
     env,
     separation: Optional[float] = None,
@@ -191,6 +200,7 @@ def place_robots(
     room: Optional[str] = None,
     prefer_indoor: bool = True,
     cluster_radius: Optional[float] = 6.0,
+    layout: Optional[Any] = None,
 ) -> Tuple[List[Tuple[float, float]], Optional[str]]:
     """Teleport every robot into one room, mutually separated and connected.
 
@@ -223,30 +233,81 @@ def place_robots(
     scene = env.scene
     chosen_room = room if room is not None else pick_room(scene, robots[0], prefer_indoor=prefer_indoor)
 
-    anchor = None
+    # A layout says, per robot, either exact coordinates or a room of its own.
+    # Without one every robot is sampled in `chosen_room`, which is the old
+    # behaviour and stays the default.
+    def target_room_for(robot) -> str:
+        if layout is None:
+            return chosen_room
+        spec = layout.spec_for(robot.name)
+        # "*" is homogeneous_layout's placeholder for "whichever room the env
+        # picked", so a --agents N run does not have to know the room's name.
+        if not spec.room or spec.room == "*":
+            return chosen_room
+        return spec.room
+
+    def explicit_xy_for(robot):
+        if layout is None:
+            return None
+        spec = layout.spec_for(robot.name)
+        return (spec.position[0], spec.position[1]) if spec.placed_explicitly else None
+
+    # Explicit poses are honoured first, so that sampled robots keep clear of
+    # them rather than the other way round: a sampled robot can move, a robot
+    # the caller pinned to a coordinate cannot.
+    order = sorted(robots, key=lambda r: explicit_xy_for(r) is None)
+
+    anchors: Dict[str, Any] = {}
+    chosen_by_name: Dict[str, Tuple[float, float]] = {}
     chosen: List[Tuple[float, float]] = []
-    for robot in robots:
-        placed = None
-        # Sample in batches so a crowded room fails fast rather than spinning.
-        for candidate in sample_free_points(
-            scene, robot, count=400, reference_point=anchor, room=chosen_room, max_attempts=4000
-        ):
-            if any(math.hypot(candidate[0] - x, candidate[1] - y) < separation for x, y in chosen):
-                continue
-            if cluster_radius is not None and chosen:
-                if math.hypot(candidate[0] - chosen[0][0], candidate[1] - chosen[0][1]) > cluster_radius:
+    for robot in order:
+        placed = explicit_xy_for(robot)
+        if placed is not None:
+            # Not sampled, so not filtered: the caller asked for this spot. Warn
+            # rather than refuse, because "put two robots close together" is a
+            # legitimate thing to want to study.
+            too_close = [
+                name for name, (x, y) in chosen_by_name.items()
+                if math.hypot(placed[0] - x, placed[1] - y) < separation
+            ]
+            if too_close:
+                print(f"[placement] warning: {robot.name} was pinned to "
+                      f"({placed[0]:.2f}, {placed[1]:.2f}), within {separation:.2f} m of "
+                      f"{', '.join(too_close)}; they may interpenetrate")
+        else:
+            room_for_robot = target_room_for(robot)
+            # cluster_radius is per room: with robots in different rooms, keeping
+            # everyone within 6 m of the *first* robot placed would be
+            # unsatisfiable by construction.
+            anchor = anchors.get(room_for_robot)
+            group = [
+                chosen_by_name[name] for name in chosen_by_name
+                if layout is None or target_room_for(_robot_named(robots, name)) == room_for_robot
+            ]
+            # Sample in batches so a crowded room fails fast rather than spinning.
+            for candidate in sample_free_points(
+                scene, robot, count=400, reference_point=anchor, room=room_for_robot,
+                max_attempts=4000,
+            ):
+                if any(math.hypot(candidate[0] - x, candidate[1] - y) < separation
+                       for x, y in chosen_by_name.values()):
                     continue
-            placed = candidate
-            break
-        if placed is None:
-            raise RuntimeError(
-                f"Could not place {robot.name} in {chosen_room!r} at {separation:.2f} m separation "
-                f"within {cluster_radius} m of the group. Use a bigger room or fewer robots "
-                "(feasibility_verify/survey_scene_capacity.py --by-room)."
-            )
-        chosen.append(placed)
-        if anchor is None:
-            anchor = th.tensor([placed[0], placed[1], z], dtype=th.float32)
+                if cluster_radius is not None and group:
+                    if math.hypot(candidate[0] - group[0][0], candidate[1] - group[0][1]) > cluster_radius:
+                        continue
+                placed = candidate
+                break
+            if placed is None:
+                raise RuntimeError(
+                    f"Could not place {robot.name} in {room_for_robot!r} at {separation:.2f} m separation "
+                    f"within {cluster_radius} m of the group. Use a bigger room or fewer robots "
+                    "(feasibility_verify/survey_scene_capacity.py --by-room)."
+                )
+            if room_for_robot not in anchors:
+                anchors[room_for_robot] = th.tensor(
+                    [placed[0], placed[1], z], dtype=th.float32
+                )
+        chosen_by_name[robot.name] = placed
         robot.set_position_orientation(
             position=th.tensor([placed[0], placed[1], z], dtype=th.float32),
             orientation=th.tensor([0.0, 0.0, 0.0, 1.0], dtype=th.float32),
@@ -260,6 +321,16 @@ def place_robots(
         # joint targets it cannot reach. Same defect as the object placement that
         # used to fling apples out of the house; same fix, upstream's own helper.
         robot.keep_still()
+
+    # Report in env.robots order, not placement order, because every caller
+    # zips this against env.robots.
+    chosen = [chosen_by_name[robot.name] for robot in robots]
+    if layout is not None:
+        summary = ", ".join(
+            f"{robot.name}={'pinned' if explicit_xy_for(robot) else target_room_for(robot)}"
+            for robot in robots
+        )
+        print(f"[placement] {summary}")
     print(f"[placement] room {chosen_room!r}: {[(round(x, 2), round(y, 2)) for x, y in chosen]}")
     return chosen, chosen_room
 

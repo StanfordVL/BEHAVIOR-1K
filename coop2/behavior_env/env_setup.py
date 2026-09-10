@@ -82,6 +82,7 @@ def build_multi_robot_config(
     robot_poses: Sequence[Tuple[Sequence[float], Sequence[float]]],
     robot_model: str = "R1",
     scene_model: str = "Rs_int",
+    robot_models: Optional[Sequence[str]] = None,
     load_object_categories: Optional[Sequence[str]] = ("floors", "walls", "coffee_table"),
     objects: Optional[Sequence[Dict[str, Any]]] = None,
     agent_names: Optional[Sequence[str]] = None,
@@ -101,7 +102,16 @@ def build_multi_robot_config(
 
     Args:
         robot_poses: ``[(position_xyz, orientation_xyzw), ...]``, one per robot.
-        robot_model: "R1" recommended. **Avoid R1Pro on RTX-50 class GPUs**:
+        robot_models: per-robot model names, for a **heterogeneous** team. One
+            entry per pose; overrides ``robot_model``. Each robot's controller
+            stack comes from its own ``<model>_primitives.yaml``, because that
+            file is the whole reason this function exists -- an R1 template
+            cloned onto a Tiago would give it joints it does not have. The
+            env/scene/task skeleton still comes from one file (the first
+            robot's): those sections are the same across the shipped configs
+            and only the ``robots`` entry differs.
+        robot_model: "R1" recommended, and used for every robot when
+            ``robot_models`` is not given. **Avoid R1Pro on RTX-50 class GPUs**:
             cuRobo drops the DEFAULT embodiment at cuda capability (12,0)
             while ``update_obstacles`` / ``check_collisions`` index
             ``self.mg[DEFAULT]`` unconditionally, giving a ``KeyError``.
@@ -117,25 +127,59 @@ def build_multi_robot_config(
             (``Environment`` gates robot obs on ``maxdim(...) > 0``).
         task: defaults to ``DummyTask``.
     """
-    config_path = os.path.join(og.example_config_path, f"{robot_model.lower()}_primitives.yaml")
-    with open(config_path, "r", encoding="utf-8") as config_file:
-        config = yaml.safe_load(config_file)
+    models = list(robot_models) if robot_models else [robot_model] * len(robot_poses)
+    if len(models) != len(robot_poses):
+        raise ValueError(f"Got {len(models)} robot models for {len(robot_poses)} robot poses.")
 
-    template = copy.deepcopy(config["robots"][0])
-    # "type" is deprecated in favour of "model"; drop it so we don't rely on
-    # the lowercasing fallback.
-    template.pop("type", None)
-    template["model"] = robot_model.lower()
-    if symbolic_only:
-        template["obs_modalities"] = []
+    def load_model_config(model: str) -> Dict[str, Any]:
+        """The primitives YAML for @model: registered path, else by name.
+
+        The registry is what lets a robot that does not ship with BEHAVIOR be
+        used here -- it maps a model name to the config that describes it, and
+        that config is the only thing coop2 needs to drive a new robot.
+        """
+        path = None
+        try:
+            from coop2.behavior_env.team_config import robot_model_config_path  # noqa: PLC0415
+
+            path = robot_model_config_path(model)
+        except (ImportError, KeyError):
+            path = None
+        if path is None:
+            path = os.path.join(og.example_config_path, f"{model.lower()}_primitives.yaml")
+        if not os.path.exists(path):
+            raise ValueError(
+                f"No primitives config for robot model {model!r} ({path}). The symbolic "
+                "primitives need that file's controller stack. Only r1, r1pro and tiago "
+                "ship one; register any other robot with "
+                "coop2.behavior_env.team_config.register_robot_model(name, config_path) "
+                "or give it a 'config' in the team layout JSON."
+            )
+        with open(path, "r", encoding="utf-8") as config_file:
+            return yaml.safe_load(config_file)
+
+    # The skeleton (env/scene/task) comes from the first robot's file. Those
+    # sections are identical across the shipped primitives configs -- only the
+    # `robots` entry differs -- and every one of them is overwritten below.
+    config = load_model_config(models[0])
+    templates: Dict[str, Dict[str, Any]] = {}
+    for model in dict.fromkeys(models):
+        template = copy.deepcopy(load_model_config(model)["robots"][0])
+        # "type" is deprecated in favour of "model"; drop it so we don't rely on
+        # the lowercasing fallback.
+        template.pop("type", None)
+        template["model"] = model.lower()
+        if symbolic_only:
+            template["obs_modalities"] = []
+        templates[model] = template
 
     names = list(agent_names) if agent_names is not None else [f"agent_{i}" for i in range(len(robot_poses))]
     if len(names) != len(robot_poses):
         raise ValueError(f"Got {len(names)} agent names for {len(robot_poses)} robot poses.")
 
     robots: List[Dict[str, Any]] = []
-    for name, (position, orientation) in zip(names, robot_poses):
-        robot_config = copy.deepcopy(template)
+    for name, model, (position, orientation) in zip(names, models, robot_poses):
+        robot_config = copy.deepcopy(templates[model])
         robot_config["name"] = name
         robot_config["position"] = list(position)
         robot_config["orientation"] = list(orientation)
