@@ -396,10 +396,32 @@ layout, or `register_robot_model(name, path)` at import time. Nothing else here
 asks what kind of robot it is driving; `q_to_action` and the base joints are the
 only interface. Only r1, r1pro and tiago ship such a YAML.
 
-### 2. One LLM per team
+### 2. One LLM per team -- the unit of all three topologies
 
-`coop2/comm_topology/llm_team.py`, `python -m coop2.experiment.run_team`. A team
-shares one brain: every member's observation goes into one prompt and the answer
+`coop2/comm_topology/llm_team.py`. **Not a fourth mode.** individual /
+broadcast_chain / centralized describe how *teams* address each other; inside
+every team one LLM plans for all its robots. All three runners take
+`--team-size K` (or `--team-config`) and default to 1, which is exactly their old
+one-LLM-per-robot behaviour -- a generalisation, not a replacement. There is no
+`run_team.py`.
+
+A team **speaks** through its first member (the broker and the ordering
+primitives are keyed by agent id) but is **addressed** as a whole: `send_to`
+holds every member, so an inter-team message interrupts all four of its robots.
+Verified on GPU, 8 robots in 2 teams of 4:
+
+    centralized      team_0 -> 4 agents (leader_broadcast)   x3
+                     team_1 -> 1 agent  (follower_response)  x4
+    broadcast_chain  team_0 -> 4 agents (broadcast_chain)    x2
+    individual       no messages at all
+
+Three brains carry the roles: `ChainTeamBrain` waits on the preceding team's
+speaker then broadcasts its allocation onward; `LeaderTeamBrain` interrupts the
+follower teams for status, waits, then plans; `FollowerTeamBrain` answers from
+its own state rather than spending an LLM call to paraphrase what it already
+knows. What a team heard goes into its next prompt.
+
+A team shares one brain: every member's observation goes into one prompt and the answer
 is one plan per robot, so the allocation is made once and is visible. Four robots
 on the two-apple task, one call:
 
@@ -431,6 +453,13 @@ locks and the first thread through makes the call while the rest read the result
 A team of one behaves exactly like the individual topology, which is why an
 unteamed robot gets a team of its own: one-LLM-per-robot is this code at N=1,
 not a second code path. `--team-size K` groups `--agents N` without a JSON file.
+
+**A robot has no role and no speaker order of its own any more** -- both belong
+to its team. Three leftovers from the per-robot world were each caught by a run
+rather than by reading: a helper that built agents before `team_layout` was in
+scope, `agent.speaker_order` in the chain runner, and
+`isinstance(agent, LLMLeaderAgent)` in the centralized one. They read
+`agent.brain` now.
 
 **Trap, found by the first GPU run.** The hold plan was built through
 `parse_plan_response`, whose `_ensure_task_terminal_action` appends an action
