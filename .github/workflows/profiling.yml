@@ -98,6 +98,7 @@ jobs:
           name: profiling-${{ matrix.name }}
           path: OmniGibson/output.json
           if-no-files-found: warn
+          retention-days: 1
 
       - name: Upload deep profile outputs
         uses: actions/upload-artifact@v4
@@ -116,6 +117,7 @@ jobs:
             OmniGibson/non_physics_step.prof
             OmniGibson/non_physics_step.html
           if-no-files-found: warn
+          retention-days: 1
 
   report:
     name: Compile Profiling Report

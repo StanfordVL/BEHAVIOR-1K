@@ -36,6 +36,7 @@ jobs:
           name: ${{ github.run_id }}-tests-bddl
           path: bddl3/bddl_tests.xml
           overwrite: true
+          retention-days: 1
 
   check_example_list:
     name: Check Example List Up To Date
@@ -171,6 +172,7 @@ jobs:
           name: ${{ github.run_id }}-snapshots
           path: OmniGibson/tests/snapshots/actual/
           overwrite: true
+          retention-days: 1
 
       - name: Deploy artifact
         if: always()
@@ -179,6 +181,7 @@ jobs:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}
           path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
           overwrite: true
+          retention-days: 1
 
   upload_report:
     name: Test Report
