@@ -1,10 +1,21 @@
-"""One LLM for a whole team of robots.
+"""One LLM for a whole team of robots -- the unit every topology is built from.
 
-Every other topology here gives each robot its own LLM and its own decision
-point. This one gives a *team* one brain: it sees every member's observation in
-a single prompt and answers with one plan per robot, so the division of labour is
-made once, with all of it visible, instead of emerging from N independent agents
-that cannot see each other's intentions.
+A *team* has one brain: it sees every member's observation in a single prompt and
+answers with one plan per robot, so the division of labour inside a team is made
+once, with all of it visible, instead of emerging from N agents that cannot see
+each other's intentions.
+
+This is not a fourth topology. It is the **unit** the three existing ones are
+expressed in: individual / broadcast_chain / centralized describe how teams talk
+to *each other*, while inside every team it is always one LLM driving four
+robots. Set the team size to 1 and each topology collapses to its old
+one-LLM-per-robot behaviour, which is what makes this a generalisation rather
+than a replacement.
+
+A team speaks through one member, its **spokesagent** (the first), because the
+message broker is keyed by agent id and the ordering primitives the chain and the
+leader already use take agent ids. But a team is *addressed* as a whole: messages
+go to every member of the recipient team, so the interrupt reaches all of them.
 
 Three rules follow from that, and each one costs something:
 
@@ -48,6 +59,7 @@ code path.
 from __future__ import annotations
 
 import threading
+import time
 from typing import Any, Dict, List, Optional
 
 from coop2.cognitive.agent import LLMClient
@@ -58,7 +70,15 @@ from coop2.cognitive.agent.prompts import build_system_prompt
 from coop2.cognitive.action.action import SymbolicAction
 from coop2.cognitive.plan import SymbolicPlan
 
-__all__ = ["LLMTeamAgent", "TeamBrain", "create_llm_team_topology"]
+__all__ = [
+    "ChainTeamBrain",
+    "FollowerTeamBrain",
+    "LLMTeamAgent",
+    "LeaderTeamBrain",
+    "TEAM_BRAIN_ROLES",
+    "TeamBrain",
+    "create_llm_team_topology",
+]
 
 
 TEAM_ROLE = """
@@ -118,6 +138,82 @@ class TeamBrain:
         self._interrupted: set = set()
         self.rounds = 0
         self.holds = 0
+        #: Topology wiring, in agent ids. ``wait_for`` holds the *spokesagents*
+        #: of the teams this one waits on; ``send_to`` holds **every member** of
+        #: the teams it addresses, so a message interrupts a whole team.
+        self.wait_for: List[str] = []
+        self.send_to: List[str] = []
+        #: Every agent in the run, for the readiness check the ordering uses.
+        self.all_agents: Dict[str, Any] = {}
+        #: What this team heard since it last planned, folded into its prompt.
+        self._heard: List[Dict] = []
+
+    @property
+    def speaker(self) -> Optional["LLMTeamAgent"]:
+        """The member that speaks for the team."""
+        for name in self.member_ids:
+            if name in self.members:
+                return self.members[name]
+        return None
+
+    # -- topology hooks ----------------------------------------------------
+
+    def before_plan(self) -> None:
+        """Communication that must happen before the team plans. Default: none."""
+
+    def after_plan(self) -> None:
+        """Communication that follows from the plan. Default: none."""
+
+    def _collect_heard(self) -> None:
+        """Drain every member's inbox into the team's shared record."""
+        for name in self.member_ids:
+            member = self.members.get(name)
+            if member is None:
+                continue
+            for message in member.get_messages(clear_buffer=True) or []:
+                self._heard.append(message)
+
+    def _heard_block(self) -> str:
+        if not self._heard:
+            return ""
+        lines = ["\nWHAT THE OTHER TEAMS SAID:"]
+        for message in self._heard:
+            lines.append(f"  From {message.get('sender', 'unknown')}: {message.get('content', '')}")
+        return "\n".join(lines)
+
+    def _say(self, content: str, kind: str, interrupts: bool) -> None:
+        """Send @content to every member of the teams this one addresses."""
+        speaker = self.speaker
+        if not self.send_to or speaker is None or speaker.message_broker is None:
+            return
+        speaker.send_message(
+            recipients=list(self.send_to),
+            content=content,
+            metadata={"type": kind, "team": self.team_name, "interrupts_execution": interrupts},
+        )
+        if self.verbose:
+            print(f"  [{self.team_name}] -> {len(self.send_to)} agents ({kind}): {content[:60]}...")
+
+    def _await_speakers(self, timeout: float = 30.0) -> None:
+        """Block until the teams this one waits on have spoken, or committed."""
+        speaker = self.speaker
+        if speaker is None or not self.wait_for:
+            return
+        if not speaker._any_waiting_agent_not_ready(self.all_agents, self.wait_for):
+            return
+        deadline = time.monotonic() + timeout
+        while not speaker.wait_for_messages_from(self.wait_for):
+            if not speaker._any_waiting_agent_not_ready(self.all_agents, self.wait_for):
+                break
+            if time.monotonic() >= deadline:
+                print(f"  [{self.team_name}] waited {timeout:.0f}s for {self.wait_for}; releasing")
+                break
+            time.sleep(0.05)
+
+    def _plan_summary(self, plans: Dict[str, SymbolicPlan]) -> str:
+        """One line per robot, for telling another team what this one will do."""
+        parts = [f"{name}: {plan.specification}" for name, plan in sorted(plans.items())]
+        return f"[{self.team_name}] " + "; ".join(parts)
 
     # -- registration ------------------------------------------------------
 
@@ -147,8 +243,15 @@ class TeamBrain:
 
             # Every member is done. One call for the whole team; whichever
             # thread got here first does it and the others take from the result.
+            # The topology's communication brackets that call: whoever this team
+            # waits on has to have spoken before it plans, and whatever it tells
+            # other teams follows from the plan it just made.
+            self.before_plan()
+            self._collect_heard()
             self._pending_plans = self._generate_team_plans()
             self.rounds += 1
+            self.after_plan()
+            self._heard = []
             self._awaiting.discard(agent_id)
             return self._pending_plans.pop(agent_id, None)
 
@@ -308,6 +411,9 @@ class TeamBrain:
                      f"{', '.join(m.agent_id for m in members)}")
         for member in members:
             parts.append("\n" + self._member_block(member))
+        heard = self._heard_block()
+        if heard:
+            parts.append(heard)
         parts.append(
             f"\nReturn exactly {len(members)} plans, one per robot, using each "
             "robot's own ids. Say in `reasoning` how you divided the work."
@@ -340,6 +446,78 @@ class TeamBrain:
             {"role": "system", "content": self._system_prompt(anchor)},
             {"role": "user", "content": "\n".join(parts)},
         ]
+
+
+
+class ChainTeamBrain(TeamBrain):
+    """Teams speak in order; each broadcasts what it committed to the later ones.
+
+    The ordering mechanism is the predecessor becoming *ready*: whatever it was
+    going to say it has said, so nothing more is coming and the world must not be
+    held for it. Same rule the per-robot chain uses, lifted a level -- what is
+    ordered now is teams, and each message carries a whole team's allocation
+    rather than one robot's intention.
+    """
+
+    def before_plan(self) -> None:
+        self._await_speakers()
+
+    def after_plan(self) -> None:
+        if self._pending_plans:
+            self._say(self._plan_summary(self._pending_plans), "broadcast_chain", interrupts=True)
+
+
+class LeaderTeamBrain(TeamBrain):
+    """Asks every follower team what it is doing, then plans for its own robots.
+
+    The request interrupts the follower teams, which is the point: a follower
+    that is mid-plan has to answer with where it actually is, not with what it
+    intended several hundred ticks ago.
+    """
+
+    def before_plan(self) -> None:
+        self._say(
+            f"[{self.team_name}] Leader planning request: report each robot's position, "
+            "what it holds, one useful target it can reach, and what it proposes to do next. "
+            "Keep it short.",
+            "leader_broadcast",
+            interrupts=True,
+        )
+        self._await_speakers()
+
+
+class FollowerTeamBrain(TeamBrain):
+    """Waits for the leader's request, answers for its robots, then plans.
+
+    The answer is assembled from the team's own state rather than generated:
+    it is a status report, and spending an LLM call to paraphrase facts the
+    brain already has would double this topology's cost for nothing.
+    """
+
+    def before_plan(self) -> None:
+        self._await_speakers()
+        self._say(self._status_report(), "follower_response", interrupts=False)
+
+    def _status_report(self) -> str:
+        parts = []
+        for name in self.member_ids:
+            member = self.members.get(name)
+            if member is None:
+                continue
+            plan = member.plan
+            spec = plan.specification if plan is not None else "no plan"
+            parts.append(f"{name} was doing {spec}")
+        return f"[{self.team_name}] " + "; ".join(parts)
+
+
+#: Which brain each topology uses for which team. `individual` is the plain
+#: TeamBrain: teams never address each other, so the only coordination in the
+#: run is the one that happens *inside* each team.
+TEAM_BRAIN_ROLES = {
+    "individual": "no team talks to any other",
+    "broadcast_chain": "teams speak in order, each broadcasting to the later ones",
+    "centralized": "the first team leads; the rest report to it",
+}
 
 
 def _as_plan_response(entry: Any):
@@ -421,31 +599,80 @@ class LLMTeamAgent(BaseLLMAgent):
 def create_llm_team_topology(
     llm_client: LLMClient,
     teams: Dict[str, List[str]],
+    topology: str = "individual",
     temperature: float = 0.7,
     verbose: bool = True,
     goal_instruction: str = "",
 ) -> Dict[str, LLMTeamAgent]:
-    """One :class:`TeamBrain` per team, one :class:`LLMTeamAgent` per robot.
+    """One brain per team, one agent per robot, wired for @topology.
+
+    The topology decides how teams address **each other**; inside every team it
+    is always one LLM for all its robots. With teams of one this reproduces the
+    old per-robot behaviour of the same topology, which is why there is no
+    separate code path for it.
 
     Args:
-        teams: ``{team name: [agent ids]}``, straight from the layout.
+        teams: ``{team name: [agent ids]}``, straight from the layout. Order
+            matters: it is the chain's speaking order, and the first team leads
+            under `centralized`.
     """
-    agents: Dict[str, LLMTeamAgent] = {}
-    for team_name, members in teams.items():
-        brain = TeamBrain(
+    if topology not in TEAM_BRAIN_ROLES:
+        raise ValueError(f"unknown topology {topology!r}; have {sorted(TEAM_BRAIN_ROLES)}")
+
+    names = list(teams)
+    brains: Dict[str, TeamBrain] = {}
+    for index, team_name in enumerate(names):
+        if topology == "broadcast_chain":
+            factory = ChainTeamBrain
+        elif topology == "centralized":
+            factory = LeaderTeamBrain if index == 0 else FollowerTeamBrain
+        else:
+            factory = TeamBrain
+        brains[team_name] = factory(
             team_name=team_name,
-            member_ids=list(members),
+            member_ids=list(teams[team_name]),
             llm_client=llm_client,
             temperature=temperature,
             verbose=verbose,
             goal_instruction=goal_instruction,
         )
-        for agent_id in members:
+
+    agents: Dict[str, LLMTeamAgent] = {}
+    for team_name in names:
+        for agent_id in teams[team_name]:
             agents[agent_id] = LLMTeamAgent(
                 agent_id,
-                brain,
+                brains[team_name],
                 temperature=temperature,
                 verbose=verbose,
                 goal_instruction=goal_instruction,
             )
+
+    # Wiring, in agent ids: a team is *addressed* as a whole (every member, so
+    # the interrupt reaches all of it) but *speaks* through its first member,
+    # because the broker and the ordering primitives are keyed by agent id.
+    def speaker_of(team_name: str) -> str:
+        return teams[team_name][0]
+
+    def members_of(team_names) -> List[str]:
+        return [agent_id for name in team_names for agent_id in teams[name]]
+
+    if topology == "broadcast_chain":
+        for index, team_name in enumerate(names):
+            brain = brains[team_name]
+            brain.wait_for = [speaker_of(names[index - 1])] if index > 0 else []
+            brain.send_to = members_of(names[index + 1:])
+    elif topology == "centralized":
+        leader, followers = names[0], names[1:]
+        brains[leader].wait_for = [speaker_of(name) for name in followers]
+        brains[leader].send_to = members_of(followers)
+        for name in followers:
+            brains[name].wait_for = [speaker_of(leader)]
+            brains[name].send_to = [speaker_of(leader)]
+
+    for brain in brains.values():
+        brain.all_agents = agents
+    for agent in agents.values():
+        agent.wait_for = list(agent.brain.wait_for)
+        agent.send_to = list(agent.brain.send_to)
     return agents

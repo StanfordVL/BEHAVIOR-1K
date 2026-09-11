@@ -1,7 +1,7 @@
 """
 Run LLM agents with the Individual topology.
 
-Uses LLMIndividualAgent from comm_topology.llm_individual
+Uses one LLM per team (comm_topology.llm_team); teams never address each other here.
 with NO communication - each agent plans independently using LLM.
 
 Decision Flow:
@@ -35,7 +35,8 @@ from coop2.cognitive import (
 from coop2.cognitive.viz import RealtimeVisualizationWrapper
 from coop2.cognitive.agent.llm_io_log import LLMIORecorder
 from coop2.experiment.agent_timeline import plot_from_run_dir
-from coop2.comm_topology import LLMIndividualAgent, create_llm_individual_topology
+from coop2.behavior_env.team_config import homogeneous_layout, load_team_layout
+from coop2.comm_topology.llm_team import create_llm_team_topology
 try:
     from llm_usage import print_llm_usage_summary
 except ImportError:
@@ -63,6 +64,7 @@ def run_individual_experiment(
     headless=True,
     keep_viewer=False,
     team_config=None,
+    team_size=None,
 ):
     """
     Run experiment with individual LLM agents (no communication).
@@ -114,17 +116,17 @@ def run_individual_experiment(
     # Create environment. A team layout, when given, is the authority on who is
     # in the scene -- how many robots, what model each is, where it starts --
     # so it overrides --agents rather than being checked against it.
-    team_layout = None
+    # A team is the unit of every topology now: one LLM drives all the robots on
+    # a team, and the topology decides how teams address each other. --team-size
+    # 1 gives back the old one-LLM-per-robot behaviour of this same topology.
     if team_config:
-        from coop2.behavior_env.team_config import load_team_layout  # noqa: PLC0415
-
         team_layout = load_team_layout(team_config)
         n_agents = team_layout.n_agents
-        print(f"\n[layout] {team_config}\n{team_layout.describe()}")
-    agent_names = (
-        list(team_layout.agent_names) if team_layout is not None
-        else [f"agent_{i}" for i in range(n_agents)]
-    )
+    else:
+        team_layout = homogeneous_layout(n_agents, room=room, team_size=team_size or 1)
+    print(f"\n[layout] {team_config or f'--agents {n_agents} --team-size {team_size or 1}'}"
+          f"\n{team_layout.describe()}")
+    agent_names = list(team_layout.agent_names)
     env_kwargs = dict(
         area=(64, 64),
         view=(9, 9),
@@ -163,8 +165,7 @@ def run_individual_experiment(
         # episode early; there is no proxy check any more.
         env_kwargs["bddl_activity"] = bddl_activity
         env_kwargs["bddl_instance_id"] = bddl_instance_id
-    if team_layout is not None:
-        env_kwargs["team_layout"] = team_layout
+    env_kwargs["team_layout"] = team_layout
     base_env = CooperativeEnv(**env_kwargs)
     # Diagnostic hook: keep a handle so a harness can inspect counters after
     # the run without threading a return value through.
@@ -183,13 +184,13 @@ def run_individual_experiment(
     if goal_instruction:
         print(f"  Goal: {goal_instruction}")
     
-    agents = create_llm_individual_topology(
-        n_agents=n_agents,
+    agents = create_llm_team_topology(
         llm_client=llm_client,
+        teams={name: list(members) for name, members in team_layout.teams.items()},
+        topology="individual",
         temperature=0.7,
         verbose=verbose,
         goal_instruction=goal_instruction,
-        agent_ids=agent_names,
     )
     
     # Wrap with planning environment
@@ -369,6 +370,10 @@ if __name__ == "__main__":
                              "run ends only on the step or wall-clock limit.")
     parser.add_argument("--bddl-instance-id", type=int, default=0,
                         help="activity_instance_id of the cached template to load")
+    parser.add_argument("--team-size", type=int, default=None, metavar="K",
+                        help="Robots per team; one LLM plans for a whole team. "
+                             "Default 1, which is the old one-LLM-per-robot behaviour. "
+                             "Ignored when --team-config names the teams itself.")
     parser.add_argument("--team-config", type=str, default=None, metavar="PATH",
                         help="JSON describing the robots: model, start position "
                              "(exact [x, y] or a room instance) and team, per robot. "
@@ -404,4 +409,5 @@ if __name__ == "__main__":
         headless=not (args.gui or args.keep_viewer),
         keep_viewer=args.keep_viewer,
         team_config=args.team_config,
+        team_size=args.team_size,
     )

@@ -202,6 +202,43 @@ def main() -> int:
         assert agents[name].plan is not None, f"{name} stranded with no plan after an LLM error"
     ok("every robot still has a plan after the call raised")
 
+    print("test 8: the three topologies wire teams, not robots")
+    from coop2.comm_topology.llm_team import (
+        ChainTeamBrain, FollowerTeamBrain, LeaderTeamBrain, TeamBrain,
+    )
+
+    teams = {"t0": ["a0", "a1"], "t1": ["a2", "a3"], "t2": ["a4", "a5"]}
+
+    def brains_of(topology):
+        agents = create_llm_team_topology(
+            llm_client=StubClient(), teams=teams, topology=topology, verbose=False
+        )
+        out = {}
+        for agent in agents.values():
+            out[agent.brain.team_name] = agent.brain
+        return out
+
+    solo = brains_of("individual")
+    assert all(isinstance(b, TeamBrain) and not b.send_to and not b.wait_for
+               for b in solo.values())
+
+    chain = brains_of("broadcast_chain")
+    assert all(isinstance(b, ChainTeamBrain) for b in chain.values())
+    # A team *speaks* through its first member but is *addressed* as a whole:
+    # wait_for holds speakers only, send_to holds every member, so an inter-team
+    # message interrupts all four robots of the recipient team.
+    assert chain["t1"].wait_for == ["a0"], chain["t1"].wait_for
+    assert chain["t0"].send_to == ["a2", "a3", "a4", "a5"], chain["t0"].send_to
+    assert chain["t2"].send_to == [], "the last team has nobody downstream"
+
+    central = brains_of("centralized")
+    assert isinstance(central["t0"], LeaderTeamBrain)
+    assert isinstance(central["t1"], FollowerTeamBrain)
+    assert central["t0"].wait_for == ["a2", "a4"], "leader waits on follower speakers"
+    assert central["t0"].send_to == ["a2", "a3", "a4", "a5"], "leader addresses whole teams"
+    assert central["t1"].wait_for == ["a0"] and central["t1"].send_to == ["a0"]
+    ok("individual/chain/centralized wire teams; speakers are waited on, whole teams addressed")
+
     print("\nALL TESTS PASSED")
     return 0
 

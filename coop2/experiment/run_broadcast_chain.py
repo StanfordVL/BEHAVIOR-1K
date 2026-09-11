@@ -36,7 +36,8 @@ from coop2.cognitive import (
 from coop2.cognitive.viz import RealtimeVisualizationWrapper
 from coop2.cognitive.agent.llm_io_log import LLMIORecorder
 from coop2.experiment.agent_timeline import plot_from_run_dir
-from coop2.comm_topology import create_llm_broadcast_chain_topology
+from coop2.behavior_env.team_config import homogeneous_layout, load_team_layout
+from coop2.comm_topology.llm_team import create_llm_team_topology
 try:
     from llm_usage import print_llm_usage_summary
 except ImportError:
@@ -63,6 +64,8 @@ def run_broadcast_chain_experiment(
     bddl_instance_id=0,
     headless=True,
     keep_viewer=False,
+    team_config=None,
+    team_size=None,
 ):
     """
     Run the Broadcast Chain condition.
@@ -111,7 +114,18 @@ def run_broadcast_chain_experiment(
         print("  LLM verbose mode: ON (showing API inputs/outputs)")
     
     # Create environment
-    agent_names = [f"agent_{i}" for i in range(n_agents)]
+    # A team is the unit of every topology now: one LLM drives all the robots on
+    # a team, and the topology decides how teams address each other. --team-size
+    # 1 gives back the old one-LLM-per-robot behaviour of this same topology.
+    if team_config:
+        team_layout = load_team_layout(team_config)
+        n_agents = team_layout.n_agents
+    else:
+        team_layout = homogeneous_layout(n_agents, room=room, team_size=team_size or 1)
+    print(f"\n[layout] {team_config or f'--agents {n_agents} --team-size {team_size or 1}'}"
+          f"\n{team_layout.describe()}")
+    agent_names = list(team_layout.agent_names)
+
     env_kwargs = dict(
         area=(64, 64),
         view=(9, 9),
@@ -141,6 +155,7 @@ def run_broadcast_chain_experiment(
         # episode early; there is no proxy check any more.
         env_kwargs["bddl_activity"] = bddl_activity
         env_kwargs["bddl_instance_id"] = bddl_instance_id
+    env_kwargs["team_layout"] = team_layout
     base_env = CooperativeEnv(**env_kwargs)
     if hasattr(base_env, "set_team_score_time_limit"):
         base_env.set_team_score_time_limit(time_limit_seconds)
@@ -154,11 +169,13 @@ def run_broadcast_chain_experiment(
     if time_limit_seconds:
         print(f"  Team-score deadline: {max_steps} env steps or {time_limit_seconds} seconds, whichever comes first")
     
-    agents = create_llm_broadcast_chain_topology(
-        n_agents=n_agents,
+    agents = create_llm_team_topology(
         llm_client=llm_client,
+        teams={name: list(members) for name, members in team_layout.teams.items()},
+        topology="broadcast_chain",
         temperature=0.7,
         verbose=verbose,
+        goal_instruction=goal_instruction,
     )
 
     # Every agent plans against the same objective. BaseLLMAgent prepends it to
@@ -230,8 +247,11 @@ def run_broadcast_chain_experiment(
             if env.current_step % 10 == 0:
                 print(f"\n--- Step {env.current_step}/{max_steps} ---")
                 for agent_id, agent in agents.items():
-                    role = f"SPEAKER-{agent.speaker_order}"
-                    print(f"  {agent_id} ({role}): {agent.api_calls} API calls, {agent.total_tokens_used} tokens")
+                    # The chain orders *teams* now, so a robot's place in it is
+                    # its team's, not its own -- there is no per-robot speaker
+                    # order any more. Tokens are the brain's, shared by the team.
+                    print(f"  {agent_id} ({agent.brain.team_name}): "
+                          f"{agent.api_calls} API calls, {agent.total_tokens_used} tokens")
             
             done = any(terminated.values()) or any(truncated.values())
     
@@ -265,8 +285,13 @@ def run_broadcast_chain_experiment(
     
     usage_summary = print_llm_usage_summary(
         agents,
-        role_getter=lambda _agent_id, agent: f"speaker-{agent.speaker_order}",
-        extra_getter=lambda _agent_id, agent: {"speaker_order": agent.speaker_order},
+        # A robot's place in the chain is its team's: teams speak in order, and
+        # every robot on a team shares that turn.
+        role_getter=lambda _agent_id, agent: f"team-{agent.brain.team_name}",
+        extra_getter=lambda _agent_id, agent: {
+            "team": agent.brain.team_name,
+            "teammates": list(agent.brain.member_ids),
+        },
     )
     total_api_calls = usage_summary["total_api_calls"]
     total_tokens = usage_summary["total_tokens"]
@@ -349,6 +374,14 @@ if __name__ == "__main__":
                              "run ends only on the step or wall-clock limit.")
     parser.add_argument("--bddl-instance-id", type=int, default=0,
                         help="activity_instance_id of the cached template to load")
+    parser.add_argument("--team-size", type=int, default=None, metavar="K",
+                        help="Robots per team; one LLM plans for a whole team. "
+                             "Default 1, which is the old one-LLM-per-robot behaviour. "
+                             "Ignored when --team-config names the teams itself.")
+    parser.add_argument("--team-config", type=str, default=None, metavar="PATH",
+                        help="JSON describing the robots: model, start position "
+                             "(exact [x, y] or a room instance) and team, per robot. "
+                             "Overrides --agents. See coop2/behavior_env/team_config.py.")
     parser.add_argument("--gui", action="store_true",
                         help="Open the Isaac Sim viewport. Needs a DISPLAY, and note that "
                              "--show is a no-op: the visualisation wrapper is a stub, and "
@@ -379,4 +412,6 @@ if __name__ == "__main__":
         bddl_instance_id=args.bddl_instance_id,
         headless=not (args.gui or args.keep_viewer),
         keep_viewer=args.keep_viewer,
+        team_config=args.team_config,
+        team_size=args.team_size,
     )
