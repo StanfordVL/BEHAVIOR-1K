@@ -6,9 +6,9 @@ import logging
 import os
 import traceback
 import xml.etree.ElementTree as ET
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from xml.dom import minidom
 
-from dask.distributed import LocalCluster, as_completed
 import fs.copy
 from fs.tempfs import TempFS
 from fs.osfs import OSFS
@@ -473,7 +473,7 @@ def process_link(
         joint_xml = ET.SubElement(tree_root, "joint")
         joint_xml.attrib = {
             "name": f"j_{child_node[3]}",
-            "type": {"P": "prismatic", "R": "revolute", "F": "fixed"}[joint_type],
+            "type": {"P": "prismatic", "R": "revolute", "F": "fixed", "C": "continuous"}[joint_type],
         }
 
         joint_parent_xml = ET.SubElement(joint_xml, "parent")
@@ -482,14 +482,14 @@ def process_link(
         joint_child_xml.attrib = {"link": child_node[3]}
 
         mesh_offset = np.zeros(3)
-        if joint_type in ("P", "R"):
+        if joint_type in ("P", "R", "C"):
             upper_canonical_points = transform_points(
                 G.nodes[child_node]["upper_points"],
                 base_link_center + rotated_parent_frame,
                 canonical_orientation,
             )
 
-            if joint_type == "R":
+            if joint_type in ("R", "C"):
                 # Revolute joint
                 num_v_lower = lower_canonical_points.shape[0]
                 num_v_upper = upper_canonical_points.shape[0]
@@ -572,8 +572,9 @@ def process_link(
             joint_axis_xml.attrib = {
                 "xyz": " ".join([str(item) for item in joint_axis])
             }
-            joint_limit_xml = ET.SubElement(joint_xml, "limit")
-            joint_limit_xml.attrib = {"lower": str(0.0), "upper": str(upper_limit)}
+            if joint_type != "C":  # Continuous joints do not have limits
+                joint_limit_xml = ET.SubElement(joint_xml, "limit")
+                joint_limit_xml.attrib = {"lower": str(0.0), "upper": str(upper_limit)}
         else:
             # Fixed joints are quite simple.
             joint_origin = child_center
@@ -857,7 +858,7 @@ def process_object(root_node, target, relevant_nodes, requried_meta_types, outpu
             json.dump(out_metadata, f, cls=NumpyEncoder)
 
 
-def process_target(target, objects_path, kb, model_whitelist, dask_client):
+def process_target(target, objects_path, kb, model_whitelist, executor):
     object_futures = {}
 
     # Build the mesh tree using our mesh tree library. The scene code also uses this system.
@@ -891,7 +892,7 @@ def process_target(target, objects_path, kb, model_whitelist, dask_client):
         output_dirname_abs = os.path.join(objects_path, output_dirname)
         os.makedirs(output_dirname_abs, exist_ok=True)
         object_futures[
-            dask_client.submit(
+            executor.submit(
                 process_object,
                 root_node,
                 target,
@@ -944,30 +945,28 @@ def main():
         # Load the mesh list from the object list json.
         errors = {}
 
-        cluster = LocalCluster()
-        dask_client = cluster.get_client()
-
         targets = get_targets("combined")
 
         obj_futures = {}
 
-        for target in tqdm.tqdm(targets, desc="Processing targets to queue objects"):
-            obj_futures.update(
-                process_target(
-                    target, objects_dir, kb, model_whitelist, dask_client
+        with ProcessPoolExecutor() as executor:
+            for target in tqdm.tqdm(targets, desc="Processing targets to queue objects"):
+                obj_futures.update(
+                    process_target(
+                        target, objects_dir, kb, model_whitelist, executor
+                    )
                 )
-            )
 
-        for future in tqdm.tqdm(
-            as_completed(obj_futures.keys()),
-            total=len(obj_futures),
-            desc="Processing objects",
-        ):
-            try:
-                future.result()
-            except:
-                name = obj_futures[future]
-                errors[name] = traceback.format_exc()
+            for future in tqdm.tqdm(
+                as_completed(obj_futures.keys()),
+                total=len(obj_futures),
+                desc="Processing objects",
+            ):
+                try:
+                    future.result()
+                except:
+                    name = obj_futures[future]
+                    errors[name] = traceback.format_exc()
 
         print("Finished processing")
 

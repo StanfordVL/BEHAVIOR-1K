@@ -388,6 +388,43 @@ def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
         bottom_cabinet.states[VerticalAdjacency].set_value(None)
 
 
+def test_temperature_marks_changed_objects(env, stove, bagel, cookable_dishtowel):
+    """Regression test: objects whose temperature changes must be individually flagged as
+    state-updated.
+
+    TensorizedValueState stores all objects' scalar values in a 1-D tensor (shape (N,)), and
+    global_update() is responsible for calling state_updated() on each object whose value
+    changed so it stays "active" for that step. A previous implementation collapsed the object
+    axis when detecting changes, so only the first tracked object (index 0) was ever flagged.
+    This caused heated-but-asleep objects (e.g. food cooking in a closed oven) to be excluded
+    from the serialized state during data collection. Here we heat two objects at once and
+    assert both get flagged, which fails if only a single (index-0) object is marked.
+    """
+    dishtowel = cookable_dishtowel
+    scene = env.scene
+
+    # Position the stove on the floor plane and place both cookable objects on top of it
+    place_obj_on_floor_plane(stove, x_offset=1.0)
+    bagel.set_position_orientation(position=[0.78, -0.2, 0.88], orientation=[0, 0, 0, 1])
+    dishtowel.set_position_orientation(position=[0.84, -0.15, 0.89], orientation=[0, 0, 0, 1])
+    assert bagel.states[Temperature].set_value(m.object_states.temperature.DEFAULT_TEMPERATURE)
+    assert dishtowel.states[Temperature].set_value(m.object_states.temperature.DEFAULT_TEMPERATURE)
+
+    # Turn the stove on and let it start heating both objects
+    stove.states[ToggledOn].set_value(True)
+    for _ in range(5):
+        og.sim.step()
+
+    # Precondition: both objects' temperatures actually changed (so both should be flagged)
+    assert bagel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
+    assert dishtowel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
+
+    # The set of objects flagged on the most recent step must include every changed object,
+    # not just the first one tracked by the Temperature state.
+    assert bagel in scene.updated_state_objects
+    assert dishtowel in scene.updated_state_objects
+
+
 def test_temperature(env, microwave, stove, fridge, plywood, bagel, cookable_dishtowel):
     dishtowel = cookable_dishtowel
 

@@ -31,7 +31,7 @@ from bddl.knowledge_base import (
 )
 
 # Import necessary components from existing code
-from knowledgebase.filters import status_color, status_color_transition_rule
+from knowledgebase.filters import status_color, status_color_transition_rule, format_size
 
 MODELS = [
     AttachmentPair,
@@ -130,6 +130,7 @@ def setup_jinja_env() -> Environment:
     env.filters["status_color"] = status_color
     env.filters["status_color_transition_rule"] = status_color_transition_rule
     env.filters["tocolor"] = status_color  # Alias for tocolor filter
+    env.filters["format_size"] = format_size
 
     # Add url_for function to global context
     env.globals["url_for"] = url_for

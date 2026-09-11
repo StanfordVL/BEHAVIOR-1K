@@ -5,6 +5,7 @@ import random
 import subprocess
 from dask.distributed import Client, as_completed
 import fs.copy
+from fs.osfs import OSFS
 import fs.path
 from fs.tempfs import TempFS
 import tqdm
@@ -53,18 +54,28 @@ def main():
         ParallelZipFS("systems.zip") as systems_fs,
         TempFS(temp_dir=str(TMP_DIR)) as dataset_fs,
     ):
-        # Copy everything over to the dataset FS
+        # Copy everything over to the dataset FS, under a behavior-1k-assets/ subdir
+        # so that OmniGibson's get_dataset_path("behavior-1k-assets") (which resolves
+        # to gm.DATA_PATH/behavior-1k-assets) finds the assets.
         print("Copying input to dataset fs...")
-        fs.copy.copy_fs(metadata_fs, dataset_fs)
-        fs.copy.copy_fs(systems_fs, dataset_fs)
-        fs.copy.copy_fs(objects_fs, dataset_fs)
-        # fs.copy.copy_fs(objects_fs.opendir("objects/sink"), dataset_fs.makedirs("objects/sink"))
+        staged_fs = dataset_fs.makedirs("behavior-1k-assets")
+        fs.copy.copy_fs(metadata_fs, staged_fs)
+        fs.copy.copy_fs(systems_fs, staged_fs)
+        fs.copy.copy_fs(objects_fs, staged_fs)
+
+        # Copy omnigibson-robot-assets/ and the key alongside the dataset (at gm.DATA_PATH root).
+        fs.copy.copy_fs(
+            OSFS("/scr/BEHAVIOR-1K/datasets/omnigibson-robot-assets"),
+            dataset_fs.makedirs("omnigibson-robot-assets"),
+        )
+        with open("/scr/BEHAVIOR-1K/datasets/omnigibson.key", "rb") as f:
+            dataset_fs.writefile("omnigibson.key", f)
 
         print("Launching cluster...")
         dask_client = launch_cluster(WORKER_COUNT)
 
         # Start the batched run
-        object_glob = [x.path for x in dataset_fs.glob("objects/*/*/")]
+        object_glob = [x.path for x in staged_fs.glob("objects/*/*/")]
         print("Queueing batches.")
         print("Total count: ", len(object_glob))
 

@@ -90,7 +90,7 @@ def load_submissions():
 def generate_combined_leaderboard():
     """Generate a single leaderboard page."""
 
-    with mkdocs_gen_files.open("challenge/leaderboard.md", "w") as fd:
+    with mkdocs_gen_files.open("challenge/archive/2025/leaderboard.md", "w") as fd:
         fd.write("# Challenge Leaderboard\n\n")
         fd.write(
             '!!! warning "Provisional 2025 Challenge Leaderboard"\n'

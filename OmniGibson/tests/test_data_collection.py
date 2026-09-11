@@ -8,9 +8,15 @@ import os
 
 import omnigibson as og
 from omnigibson.envs import HDF5CollectionWrapper, HDF5PlaybackWrapper, LeRobotPlaybackWrapper, LeRobotDataWrapper
+from omnigibson.envs.data_wrapper import (
+    _align_scene_object_states_with_recorded_schema,
+    _is_system_particle_template_info,
+    _is_system_particle_template_name,
+)
 from omnigibson.envs.hdf5_data_wrapper import HDF5DataWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
@@ -40,6 +46,91 @@ class _MinimalHDF5Wrapper(HDF5DataWrapper):
         self.max_state_size = 0
         self.current_transitions = dict()
         self.checkpoint_rollback_trajs = None
+
+
+def test_system_particle_template_transition_helpers():
+    system_names = {"diced__head_cabbage"}
+    template_info = {
+        "class_module": "omnigibson.objects.usd_object",
+        "class_name": "USDObject",
+        "args": {
+            "name": "diced__head_cabbage_template",
+            "category": "diced__head_cabbage",
+            "relative_prim_path": "/diced__head_cabbage/template",
+            "usd_path": "/workspace/OmniGibson/omnigibson/data/og_dataset/systems/diced__head_cabbage/rflakn/usd/rflakn.usd",
+        },
+    }
+    normal_object_info = {
+        "class_module": "omnigibson.objects.dataset_object",
+        "class_name": "DatasetObject",
+        "args": {
+            "name": "diced__head_cabbage_1",
+            "category": "diced__head_cabbage",
+            "relative_prim_path": "/diced__head_cabbage_1",
+        },
+    }
+
+    assert _is_system_particle_template_info(template_info, system_names)
+    assert not _is_system_particle_template_info(normal_object_info, system_names)
+    assert _is_system_particle_template_name("diced__head_cabbage_template", system_names)
+    assert not _is_system_particle_template_name("diced__head_cabbage_1", system_names)
+
+
+def test_macro_physical_particle_system_update_handles_waits_for_physics_view(monkeypatch):
+    system = MacroPhysicalParticleSystem.__new__(MacroPhysicalParticleSystem)
+    system.particles_view = "stale_view"
+
+    mock_sim = MagicMock()
+    mock_sim.is_playing.return_value = False
+    mock_sim.physics_sim_view = MagicMock()
+    monkeypatch.setattr(og, "sim", mock_sim)
+
+    system.update_handles()
+
+    assert system.particles_view is None
+    mock_sim.physics_sim_view.create_rigid_body_view.assert_not_called()
+
+    system.particles_view = "stale_view"
+    mock_sim.is_playing.return_value = True
+    mock_sim.physics_sim_view = None
+
+    system.update_handles()
+
+    assert system.particles_view is None
+
+
+def test_align_scene_object_states_with_recorded_schema_marks_serialized_states():
+    class RecordedState:
+        pass
+
+    class ExtraState:
+        pass
+
+    obj = MagicMock()
+    obj.states = {
+        RecordedState: MagicMock(stateful=True),
+        ExtraState: MagicMock(stateful=True),
+    }
+    scene = MagicMock()
+    scene.object_registry.return_value = obj
+    recorded_scene_file = {
+        "state": {
+            "registry": {
+                "object_registry": {
+                    "toaster_91": {
+                        "non_kin": {
+                            "RecordedState": {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    _align_scene_object_states_with_recorded_schema(scene=scene, recorded_scene_file=recorded_scene_file)
+
+    assert set(obj.states) == {RecordedState, ExtraState}
+    assert obj._recorded_non_kin_state_names == {"RecordedState"}
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +249,7 @@ def test_lerobot_obs_mapping_proprio():
         "robot::fetch:proprio::proprio": _MockGymSpace((12,)),
     }
 
-    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
+    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env)
 
     assert "robot::fetch:proprio::proprio" in mapping
     assert mapping["robot::fetch:proprio::proprio"] == "observation.state"
@@ -173,7 +264,7 @@ def test_lerobot_obs_mapping_rgb():
         "robot::fetch:eef_link:Camera:0::rgb": _MockGymSpace((128, 128, 4)),
     }
 
-    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
+    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env)
 
     assert mapping["robot::fetch:eef_link:Camera:0::rgb"] == "observation.rgb.eef_link_camera_0"
     key = "observation.rgb.eef_link_camera_0"
@@ -188,7 +279,7 @@ def test_lerobot_obs_mapping_depth():
         "robot::fetch:eef_link:Camera:0::depth_linear": _MockGymSpace((128, 128)),
     }
 
-    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env, fps=30)
+    mapping, features = LeRobotDataWrapper.get_lerobot_obs_mapping(mock_env)
 
     assert "observation.depth_linear.eef_link_camera_0" in features
     assert features["observation.depth_linear.eef_link_camera_0"]["dtype"] == "video"

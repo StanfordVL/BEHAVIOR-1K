@@ -2,23 +2,22 @@
     (:domain behavior-1k)
 
     (:objects
-        water_glass.n.02_1 water_glass.n.02_2 - water_glass.n.02
-        shelf.n.01_1 - shelf.n.01
-        recycling_bin.n.01_1 - recycling_bin.n.01
-        floor.n.01_1 - floor.n.01
-        water.n.06_1 - water.n.06
+        water_glass.n.02_1 water_glass.n.02_2 water_glass.n.02_3 water_glass.n.02_4 - water_glass.n.02
+        ashcan.n.01_1 - ashcan.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
         sink.n.01_1 - sink.n.01
         agent.n.01_1 - agent.n.01
     )
     
     (:init 
-        (ontop water_glass.n.02_1 shelf.n.01_1) 
-        (ontop water_glass.n.02_2 floor.n.01_1)
-        (ontop recycling_bin.n.01_1 floor.n.01_1) 
-        (insource sink.n.01_1 water.n.06_1) 
         (inroom sink.n.01_1 bathroom) 
         (inroom floor.n.01_1 bathroom) 
-        (inroom shelf.n.01_1 bathroom) 
+        (inroom floor.n.01_2 bedroom) 
+        (ontop water_glass.n.02_1 sink.n.01_1) 
+        (ontop water_glass.n.02_2 sink.n.01_1)
+        (ontop water_glass.n.02_3 sink.n.01_1)
+        (ontop water_glass.n.02_4 sink.n.01_1)
+        (ontop ashcan.n.01_1 floor.n.01_2) 
         (ontop agent.n.01_1 floor.n.01_1)
     )
     
@@ -26,7 +25,7 @@
         (and 
             (forall
                 (?water_glass.n.02 - water_glass.n.02)
-                (inside ?water_glass.n.02 ?recycling_bin.n.01_1)
+                (inside ?water_glass.n.02 ?ashcan.n.01_1)
             )
         )
     )

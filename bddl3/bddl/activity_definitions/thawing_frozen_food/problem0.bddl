@@ -2,41 +2,58 @@
     (:domain behavior-1k)
 
     (:objects
-     	date.n.08_1 - date.n.08
+        chicken_breast.n.02_1 - chicken_breast.n.02
+        bread_slice.n.01_1 - bread_slice.n.01
+        plate.n.04_1 plate.n.04_2 - plate.n.04
+        microwave.n.02_1 - microwave.n.02
+        countertop.n.01_1 - countertop.n.01
     	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
-    	olive.n.04_1 - olive.n.04
-    	lobster.n.01_1 lobster.n.01_2 - lobster.n.01
     	floor.n.01_1 - floor.n.01
     	agent.n.01_1 - agent.n.01
     )
-    
-    (:init 
-        (inside date.n.08_1 electric_refrigerator.n.01_1) 
-        (inside olive.n.04_1 electric_refrigerator.n.01_1) 
-        (inside lobster.n.01_1 electric_refrigerator.n.01_1) 
-        (inside lobster.n.01_2 electric_refrigerator.n.01_1) 
-        (frozen lobster.n.01_1) 
-        (frozen lobster.n.01_2)
-        (frozen date.n.08_1) 
-        (frozen olive.n.04_1)
-        (inroom electric_refrigerator.n.01_1 kitchen) 
-        (inroom floor.n.01_1 kitchen) 
+
+    (:init
+        (ontop chicken_breast.n.02_1 plate.n.04_1)
+        (ontop bread_slice.n.01_1 plate.n.04_2)
+        (inside plate.n.04_1 electric_refrigerator.n.01_1)
+        (inside plate.n.04_2 electric_refrigerator.n.01_1)
+        (frozen chicken_breast.n.02_1)
+        (frozen bread_slice.n.01_1)
+        (inroom microwave.n.02_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen)
         (ontop agent.n.01_1 floor.n.01_1)
     )
-    
-    (:goal 
-        (and 
-            (forall 
-                (?lobster.n.01 - lobster.n.01)
-                (not
-                    (frozen ?lobster.n.01)
+
+    (:goal
+        (and
+            (not
+                (frozen chicken_breast.n.02_1)
+            )
+            (exists
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (ontop chicken_breast.n.02_1 ?plate.n.04)
+                    (inside ?plate.n.04 microwave.n.02_1)
                 )
             )
+            (toggled_on microwave.n.02_1)
             (not
-                (frozen ?date.n.08_1)
+                (open microwave.n.02_1)
             )
             (not
-                (frozen ?olive.n.04_1)
+                (open electric_refrigerator.n.01_1)
+            )
+            (not
+                (frozen bread_slice.n.01_1)
+            )
+            (exists
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (ontop bread_slice.n.01_1 ?plate.n.04)
+                    (ontop ?plate.n.04 countertop.n.01_1)
+                )
             )
         )
     )

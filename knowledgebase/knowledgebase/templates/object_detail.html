@@ -13,7 +13,7 @@
     Original category: {{ object.original_category_name }} | Provider: {{ object.provider }}
   </h4>
   <div class="text-center">
-    <b>Bounding Box Size:</b> {{ "%.2f"|format(object.bounding_box_size.0) }}, {{ "%.2f"|format(object.bounding_box_size.1) }}, {{ "%.2f"|format(object.bounding_box_size.2) }}
+    <b>Bounding Box Size:</b> {{ object.bounding_box_size.0|format_size }}, {{ object.bounding_box_size.1|format_size }}, {{ object.bounding_box_size.2|format_size }}
   </div>
 
   <div class="text-center mb-4">

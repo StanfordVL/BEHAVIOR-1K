@@ -19,10 +19,12 @@ from b1k_pipeline.usd_conversion.make_maps import generate_maps_for_current_scen
 
 
 if __name__ == "__main__":
-    og.launch()
-
     dataset_root = sys.argv[1]
-    gm.DATASET_PATH = str(dataset_root)
+
+    with gm.unlocked():
+        gm.DATA_PATH = str(dataset_root)
+
+    og.launch()
 
     urdf_path = pathlib.Path(dataset_root) / sys.argv[2]
     scene_basename = urdf_path.stem
@@ -46,6 +48,6 @@ if __name__ == "__main__":
         pass
 
     # Clear the sim
-    og.sim.clear()
+    og.clear()
 
     og.shutdown()

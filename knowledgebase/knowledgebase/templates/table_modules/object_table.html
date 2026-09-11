@@ -26,7 +26,7 @@
       {% endif %}
       <td>{{ object.owner.name }}</td>
       <td>{{ object.owner.synset.name }}</td>
-      <td>{{ "%.2f"|format(object.bounding_box_size.0) }}, {{ "%.2f"|format(object.bounding_box_size.1) }}, {{ "%.2f"|format(object.bounding_box_size.2) }}</td>
+      <td>{{ object.bounding_box_size.0|format_size }}, {{ object.bounding_box_size.1|format_size }}, {{ object.bounding_box_size.2|format_size }}</td>
       <td>{% for ml in object.meta_links %} {{ ml.name }}, {% endfor %}</td>
       <td>{{ object.roomobjects|length }}</td>
       <td class="{% if object.ready %}bg-success{% else %}bg-warning|tocolor{% endif %}">{{ object.ready }}</td>

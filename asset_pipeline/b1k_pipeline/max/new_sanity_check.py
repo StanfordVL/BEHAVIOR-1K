@@ -755,11 +755,23 @@ class SanityCheck:
                         f"{obj.name} element {i} has too many vertices ({len(m.vertices)} > {max_vertices_per_element})",
                     )
                 self.expect(m.is_volume, f"{obj.name} element {i} is not a volume")
-                # self.expect(m.is_convex, f"{obj.name} element {i} may be non-convex. The checker says so, but it's not 100% accurate, so please verify that all elements are indeed convex.", level="WARNING")
                 self.expect(
                     len(m.split()) == 1,
                     f"{obj.name} element {i} has elements trimesh still finds splittable e.g. are not watertight / connected",
                 )
+
+                # Check that the volume of the mesh and the volume of the convex hull are close.
+                hull = m.convex_hull
+                self.expect(
+                    hull.volume > 0,
+                    f"{obj.name} element {i} has non-positive volume convex hull, which likely indicates a problem with the mesh.",
+                )
+                if hull.volume > 0:
+                    volume_ratio = m.volume / hull.volume
+                    self.expect(
+                        volume_ratio > 0.99,
+                        f"{obj.name} element {i} has volume {m.volume} that is very different from the volume of its convex hull {hull.volume} (ratio {volume_ratio}), which indicates that the mesh is not close to convex.",
+                    )
 
         except Exception as e:
             self.expect(False, str(e))
@@ -1162,7 +1174,7 @@ class SanityCheck:
             # Check that there is a base link row
             assert (
                 "base_link" in group["name_link_name"].unique()
-            ), f"Model ID {model_id} instance {instance_id} is missing base link."
+            ), f"Model ID {model_id} instance {instance_id} is missing base link. Found: {group['name_link_name'].unique()}"
             base_link_row = group[group["name_link_name"] == "base_link"].iloc[0]
             base_link_transform = base_link_row.object.objecttransform
             inverse_base_link_transform = rt.inverse(base_link_transform)

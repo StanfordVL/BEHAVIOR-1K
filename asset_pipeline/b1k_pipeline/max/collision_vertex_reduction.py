@@ -82,7 +82,10 @@ def process_convex_obj(obj, force=False):
     # Check if any of the meshes is not a volume
     not_volume = any(not m.is_volume for m in convex_meshes)
 
-    if not force and not too_many_verts and not not_volume:
+    # Check if any of the meshes is nonconvex
+    not_convex = any(m.volume / m.convex_hull.volume < 0.99 for m in convex_meshes)
+
+    if not force and not too_many_verts and not not_volume and not not_convex:
         return
 
     print("Reducing", obj.name)
@@ -151,15 +154,15 @@ def process_all_convex_meshes(objs=None):
 
 
 def main():
-    # for obj in rt.selection:
-    #     assert (
-    #         "Mcollision" in obj.name
-    #         or "Mfillable" in obj.name
-    #         or "Mopenfillable" in obj.name
-    #     ), "Please select a collision or fillable object"
-    #     process_convex_obj(obj, force=True)
+    for obj in rt.selection:
+        assert (
+            "Mcollision" in obj.name
+            or "Mfillable" in obj.name
+            or "Mopenfillable" in obj.name
+        ), "Please select a collision or fillable object"
+        process_convex_obj(obj, force=True)
 
-    process_all_convex_meshes()
+    # process_all_convex_meshes()
 
 
 if __name__ == "__main__":

@@ -69926,6 +69926,7 @@
                                                 "nonSubstance": {},
                                                 "rigidBody": {},
                                                 "rustable": {},
+                                                "sceneObject": {},
                                                 "scratchable": {},
                                                 "stainable": {},
                                                 "stickyable": {},
@@ -70076,14 +70077,17 @@
                                               "abilities": {
                                                 "disinfectable": {},
                                                 "dustyable": {},
+                                                "fillable": {},
+                                                "freezable": {},
                                                 "grassyable": {},
                                                 "heatSource": {
                                                   "requires_toggled_on": 1.0,
                                                   "requires_closed": 0.0,
                                                   "requires_inside": 1.0,
-                                                  "temperature": 148.889,
+                                                  "temperature": 150.0,
                                                   "heating_rate": 0.1
                                                 },
+                                                "heatable": {},
                                                 "moldyable": {},
                                                 "nonSubstance": {},
                                                 "rigidBody": {},
@@ -111269,6 +111273,7 @@
                                     "nonSubstance": {},
                                     "rigidBody": {},
                                     "rustable": {},
+                                    "sceneObject": {},
                                     "scratchable": {},
                                     "stainable": {},
                                     "stickyable": {},
@@ -119557,12 +119562,6 @@
                                     "breakable": {},
                                     "disinfectable": {},
                                     "dustyable": {},
-                                    "flammable": {
-                                      "ignition_temperature": 250.0,
-                                      "fire_temperature": 1000.0,
-                                      "heating_rate": 0.04,
-                                      "distance_threshold": 0.2
-                                    },
                                     "grassyable": {},
                                     "heatSource": {
                                       "requires_toggled_on": 1.0,
@@ -129340,6 +129339,7 @@
                                             "nonSubstance": {},
                                             "rigidBody": {},
                                             "rustable": {},
+                                            "sceneObject": {},
                                             "scratchable": {},
                                             "stainable": {},
                                             "stickyable": {},
@@ -141324,6 +141324,7 @@
                                             "nonSubstance": {},
                                             "rigidBody": {},
                                             "rustable": {},
+                                            "sceneObject": {},
                                             "scratchable": {},
                                             "stainable": {},
                                             "stickyable": {},
@@ -141341,6 +141342,7 @@
                                         "nonSubstance": {},
                                         "rigidBody": {},
                                         "rustable": {},
+                                        "sceneObject": {},
                                         "scratchable": {},
                                         "stainable": {},
                                         "stickyable": {},
@@ -141429,6 +141431,7 @@
                                     "nonSubstance": {},
                                     "rigidBody": {},
                                     "rustable": {},
+                                    "sceneObject": {},
                                     "scratchable": {},
                                     "stainable": {},
                                     "stickyable": {},
@@ -142482,12 +142485,6 @@
                                   "abilities": {
                                     "disinfectable": {},
                                     "dustyable": {},
-                                    "flammable": {
-                                      "ignition_temperature": 250.0,
-                                      "fire_temperature": 1000.0,
-                                      "heating_rate": 0.04,
-                                      "distance_threshold": 0.2
-                                    },
                                     "grassyable": {},
                                     "heatSource": {
                                       "requires_toggled_on": 1.0,

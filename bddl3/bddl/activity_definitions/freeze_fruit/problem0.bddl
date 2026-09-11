@@ -43,16 +43,11 @@
                 (inside ?strawberry.n.01 ?tupperware.n.01)
             )
             (forall 
-                (?apple.n.01 - apple.n.01) 
-                (frozen ?apple.n.01)
-            ) 
-            (forall 
-                (?strawberry.n.01 - strawberry.n.01) 
-                (frozen ?strawberry.n.01)
-            )
-            (forall 
                 (?tupperware.n.01 - tupperware.n.01) 
                 (inside ?tupperware.n.01 ?electric_refrigerator.n.01_1)
+            )
+            (not
+                (open ?electric_refrigerator.n.01_1)
             ) 
         )
     )

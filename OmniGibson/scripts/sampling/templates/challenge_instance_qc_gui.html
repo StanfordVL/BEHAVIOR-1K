@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Challenge Instance QC</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --ink: #2c3e50;
+      --muted: #5a6c7d;
+      --line: #d9e2ec;
+      --accent: #1577d8;
+      --accent-strong: #0f6fd8;
+      --accent-soft: rgba(21, 119, 216, 0.1);
+      --warn: #b42318;
+      --ok: #1f7a4d;
+      --shadow: 0 8px 24px rgba(44, 62, 80, 0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    .app {
+      display: grid;
+      grid-template-columns: minmax(240px, 312px) 1fr;
+      min-height: 100vh;
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      padding: 16px 14px;
+      overflow: auto;
+    }
+    .brand {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 16px;
+      padding: 2px 2px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand-logo {
+      width: 42px;
+      height: 32px;
+      object-fit: contain;
+    }
+    .brand-logo-fallback {
+      border-radius: 6px;
+      background: linear-gradient(65deg, #0f6fd8 0, #2793ea 100%);
+    }
+    .brand-name {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    h1 {
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.15;
+      margin: 2px 0 0;
+      letter-spacing: 0;
+    }
+    .task-list {
+      display: grid;
+      gap: 8px;
+    }
+    .task-button {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 10px 10px;
+      display: grid;
+      grid-template-columns: 10px 1fr;
+      gap: 9px;
+      align-items: center;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .task-button:hover {
+      background: var(--panel-soft);
+      border-color: rgba(21, 119, 216, 0.35);
+    }
+    .task-button.active {
+      border-color: var(--accent);
+      background: #eef7ff;
+      box-shadow: 0 0 0 2px rgba(21, 119, 216, 0.12);
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 99px;
+      background: var(--ok);
+    }
+    .dot.bad { background: var(--warn); }
+    main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.96);
+      padding: 14px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .title {
+      display: grid;
+      gap: 2px;
+    }
+    .title strong { color: var(--ink); font-size: 18px; font-weight: 700; }
+    .title span { color: var(--muted); font-size: 13px; }
+    .mode {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+    .mode button {
+      border: 0;
+      padding: 9px 14px;
+      background: transparent;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .mode button.active {
+      background: linear-gradient(65deg, var(--accent-strong) 0, #2793ea 100%);
+      color: white;
+    }
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+      min-height: 0;
+    }
+    .map-shell {
+      position: relative;
+      padding: 18px 18px 78px;
+      min-width: 0;
+      overflow: auto;
+      background: var(--bg);
+    }
+    .map-frame {
+      position: relative;
+      margin: 0 auto;
+      width: min(100%, 1200px);
+      border: 1px solid var(--line);
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .map-frame img, .map-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .map-frame svg {
+      position: absolute;
+      inset: 0;
+    }
+    .room-label {
+      font-size: 11px;
+      font-weight: 700;
+      fill: var(--ink);
+      paint-order: stroke;
+      stroke: rgba(255, 255, 255, 0.9);
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+    .legend {
+      position: absolute;
+      right: 32px;
+      bottom: 112px;
+      max-width: 240px;
+      max-height: 38%;
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      z-index: 3;
+    }
+    .legend-row {
+      display: grid;
+      grid-template-columns: 11px 1fr;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      margin: 2px 0;
+      padding: 4px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+    }
+    .legend-row:hover {
+      background: var(--accent-soft);
+    }
+    .legend-row.off {
+      opacity: 0.38;
+    }
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+    .instance-control {
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      margin: 10px auto 0;
+      width: min(100%, 1200px);
+    }
+    .instance-toggle {
+      width: 34px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 800;
+    }
+    .instance-panel {
+      display: grid;
+      grid-template-columns: auto minmax(180px, 520px) 42px;
+      align-items: center;
+      gap: 10px;
+      width: min(100%, 620px);
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .instance-panel.hidden {
+      display: none;
+    }
+    .instance-panel input {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .side-panel {
+      border-left: 1px solid var(--line);
+      background: var(--panel-soft);
+      padding: 16px;
+      overflow: auto;
+    }
+    .sheet-card {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid rgba(21, 119, 216, 0.28);
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 8px 20px rgba(44, 62, 80, 0.07);
+    }
+    .sheet-question {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .sheet-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .sheet-button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 10px;
+    }
+    .sheet-button.active {
+      border-color: var(--accent);
+      background: linear-gradient(65deg, var(--accent-strong) 0, #2793ea 100%);
+      color: white;
+    }
+    .checks {
+      display: grid;
+      gap: 8px;
+    }
+    .check-section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 8px 20px rgba(44, 62, 80, 0.07);
+      overflow: hidden;
+    }
+    .check-section.ok {
+      border-color: rgba(31, 122, 77, 0.44);
+    }
+    .check-section.bad {
+      border-color: rgba(180, 35, 24, 0.48);
+      box-shadow: 0 10px 26px rgba(180, 35, 24, 0.12);
+    }
+    .check-section-header {
+      width: 100%;
+      border: 0;
+      border-left: 5px solid var(--ok);
+      background: #eef8f2;
+      color: var(--ink);
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 20px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 10px;
+      text-align: left;
+      font: inherit;
+    }
+    .check-section.bad .check-section-header {
+      border-left-color: var(--warn);
+      background: #fff1ee;
+    }
+    .section-arrow {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+      text-align: center;
+    }
+    .section-name {
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .section-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--ok);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .check-section.bad .section-status {
+      color: var(--warn);
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(31, 122, 77, 0.12);
+    }
+    .check-section.bad .status-dot {
+      background: var(--warn);
+      box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.12);
+    }
+    .check-list {
+      padding: 10px;
+    }
+    .check-list.hidden {
+      display: none;
+    }
+    .check {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px;
+      background: white;
+      display: grid;
+      gap: 4px;
+    }
+    .check-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .answer.ok { color: var(--ok); }
+    .answer.bad { color: var(--warn); }
+    .detail {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    @media (max-width: 920px) {
+      .app { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 220px; }
+      .content { grid-template-columns: 1fr; }
+      .side-panel { border-left: 0; border-top: 1px solid var(--line); }
+      .legend { right: 24px; bottom: 112px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand">
+        {% if logo_uri %}
+        <img class="brand-logo" src="{{ logo_uri }}" alt="">
+        {% else %}
+        <span class="brand-logo brand-logo-fallback"></span>
+        {% endif %}
+        <div>
+          <div class="brand-name">BEHAVIOR</div>
+          <h1>Challenge Instance QC</h1>
+        </div>
+      </div>
+      <div class="task-list" id="taskList"></div>
+    </aside>
+    <main>
+      <header>
+        <div class="title">
+          <strong id="taskTitle"></strong>
+          <span id="taskSubtitle"></span>
+        </div>
+        <div class="mode">
+          <button id="robotMode" class="active" type="button">Robot poses</button>
+          <button id="objectMode" type="button">Object poses</button>
+        </div>
+      </header>
+      <div class="content">
+        <section class="map-shell">
+          <div class="map-frame" id="mapFrame">
+            <img id="mapImage" alt="Task floor map">
+            <svg id="overlay"></svg>
+          </div>
+          <div class="instance-control">
+            <button
+              class="instance-toggle"
+              id="instanceToggle"
+              type="button"
+              aria-expanded="false"
+              aria-label="Toggle instance filter"
+            >v</button>
+            <div class="instance-panel hidden" id="instancePanel">
+              <label for="instanceSlider">Instance</label>
+              <input id="instanceSlider" type="range" min="0" max="300" value="0">
+              <strong id="instanceValue">0</strong>
+            </div>
+          </div>
+          <div class="legend" id="legend"></div>
+        </section>
+        <section class="side-panel">
+          <div class="sheet-card">
+            <div class="sheet-question">Did you update the sheet?</div>
+            <div class="sheet-actions">
+              <button class="sheet-button" id="sheetYes" type="button">Yes</button>
+              <button class="sheet-button active" id="sheetNo" type="button">No</button>
+            </div>
+          </div>
+          <div class="checks">
+            <section class="check-section" id="datasetSection">
+              <button
+                class="check-section-header"
+                id="datasetHeader"
+                type="button"
+                aria-expanded="true"
+                aria-controls="globalChecks"
+              >
+                <span class="section-arrow" id="datasetArrow">v</span>
+                <span class="section-name">Dataset checks</span>
+                <span class="section-status" id="datasetStatus"></span>
+              </button>
+              <div class="checks check-list" id="globalChecks"></div>
+            </section>
+            <section class="check-section" id="taskSection">
+              <button
+                class="check-section-header"
+                id="taskHeader"
+                type="button"
+                aria-expanded="true"
+                aria-controls="checks"
+              >
+                <span class="section-arrow" id="taskArrow">v</span>
+                <span class="section-name">Task checks</span>
+                <span class="section-status" id="taskStatus"></span>
+              </button>
+              <div class="checks check-list" id="checks"></div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script>
+    const DATA = {{ gui_data | tojson }};
+    let currentTask = DATA.tasks[0]?.task;
+    let mode = "robot";
+    let instanceFilterOpen = false;
+    let selectedInstance = 0;
+    let instanceRenderFrame = null;
+    let sheetUpdated = false;
+    const checkSectionsOpen = {
+      dataset: true,
+      task: true,
+    };
+    const visibleObjectsByTask = {};
+    const taskList = document.getElementById("taskList");
+    const taskTitle = document.getElementById("taskTitle");
+    const taskSubtitle = document.getElementById("taskSubtitle");
+    const mapImage = document.getElementById("mapImage");
+    const overlay = document.getElementById("overlay");
+    const legend = document.getElementById("legend");
+    const instanceToggle = document.getElementById("instanceToggle");
+    const instancePanel = document.getElementById("instancePanel");
+    const instanceSlider = document.getElementById("instanceSlider");
+    const instanceValue = document.getElementById("instanceValue");
+    const globalChecks = document.getElementById("globalChecks");
+    const checks = document.getElementById("checks");
+    const datasetSection = document.getElementById("datasetSection");
+    const taskSection = document.getElementById("taskSection");
+    const datasetHeader = document.getElementById("datasetHeader");
+    const taskHeader = document.getElementById("taskHeader");
+    const datasetArrow = document.getElementById("datasetArrow");
+    const taskArrow = document.getElementById("taskArrow");
+    const datasetStatus = document.getElementById("datasetStatus");
+    const taskStatus = document.getElementById("taskStatus");
+    const sheetYes = document.getElementById("sheetYes");
+    const sheetNo = document.getElementById("sheetNo");
+    const robotMode = document.getElementById("robotMode");
+    const objectMode = document.getElementById("objectMode");
+
+    function taskByName(name) {
+      return DATA.tasks.find(task => task.task === name);
+    }
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      robotMode.classList.toggle("active", mode === "robot");
+      objectMode.classList.toggle("active", mode === "object");
+      render();
+    }
+
+    function getVisibleObjects(task) {
+      if (!visibleObjectsByTask[task.task]) {
+        visibleObjectsByTask[task.task] = new Set(Object.keys(task.objectPoints));
+      }
+      return visibleObjectsByTask[task.task];
+    }
+
+    function pointPassesInstance(point) {
+      return !instanceFilterOpen || Number(point.instance) === selectedInstance;
+    }
+
+    function clampSelectedInstance() {
+      const maxInstance = Math.max(0, Number(DATA.expectedInstances) || 300);
+      selectedInstance = Math.min(Math.max(Number(selectedInstance) || 0, 0), maxInstance);
+      return maxInstance;
+    }
+
+    function renderInstanceFilteredOverlay() {
+      if (instanceRenderFrame !== null) {
+        return;
+      }
+      instanceRenderFrame = requestAnimationFrame(() => {
+        instanceRenderFrame = null;
+        clampSelectedInstance();
+        const task = taskByName(currentTask);
+        if (!task) {
+          renderEmptyTaskState();
+          return;
+        }
+        renderOverlay(task);
+        renderInstanceControl();
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function renderTaskList() {
+      taskList.replaceChildren();
+      DATA.tasks.forEach(task => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "task-button" + (task.task === currentTask ? " active" : "");
+        const dot = document.createElement("span");
+        dot.className = "dot" + (task.ok ? "" : " bad");
+        const label = document.createElement("span");
+        label.textContent = task.task;
+        button.append(dot, label);
+        button.addEventListener("click", () => {
+          currentTask = task.task;
+          render();
+        });
+        taskList.appendChild(button);
+      });
+    }
+
+    function circle(x, y, r, color, opacity, extra = "") {
+      return [
+        `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r}"`,
+        `fill="${color}" fill-opacity="${opacity}"`,
+        `stroke="white" stroke-width="0.55" ${extra} />`,
+      ].join(" ");
+    }
+
+    function renderOverlay(task) {
+      const map = task.map;
+      if (!map) {
+        overlay.innerHTML = "";
+        return;
+      }
+      overlay.setAttribute("viewBox", `0 0 ${map.width} ${map.height}`);
+      let html = "";
+      map.rooms.forEach(room => {
+        if (room.chosen) {
+          html += [
+            `<text class="room-label"`,
+            `x="${room.x.toFixed(1)}"`,
+            `y="${room.y.toFixed(1)}"`,
+            `text-anchor="middle">${escapeHtml(room.name)}</text>`,
+          ].join(" ");
+        }
+      });
+
+      if (mode === "robot") {
+        task.robotPoints.forEach(point => {
+          if (!pointPassesInstance(point)) return;
+          html += circle(point.x, point.y, 4.2, "#111111", 0.58);
+        });
+      } else {
+        const visibleObjects = getVisibleObjects(task);
+        Object.keys(task.objectPoints).forEach(name => {
+          if (!visibleObjects.has(name)) return;
+          const color = task.objectColors[name] || "#666666";
+          task.objectPoints[name].forEach(point => {
+            if (!pointPassesInstance(point)) return;
+            const radius = name.includes("dust.") || name.includes("sand.") ? 2.2 : 3.4;
+            const opacity = name.includes("dust.") || name.includes("sand.") ? 0.62 : 0.48;
+            html += circle(point.x, point.y, radius, color, opacity);
+          });
+        });
+      }
+      overlay.innerHTML = html;
+    }
+
+    function renderLegend(task) {
+      legend.replaceChildren();
+      if (mode === "robot") {
+        const row = document.createElement("button");
+        row.className = "legend-row";
+        row.type = "button";
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = "#111111";
+        const label = document.createElement("span");
+        label.textContent = "robot";
+        row.append(swatch, label);
+        legend.appendChild(row);
+        return;
+      }
+      const names = Object.keys(task.objectPoints);
+      const visibleObjects = getVisibleObjects(task);
+      names.forEach(name => {
+        const color = task.objectColors[name] || "#666666";
+        const label = task.objectLabels[name] || name;
+        const offClass = visibleObjects.has(name) ? "" : " off";
+        const row = document.createElement("button");
+        row.className = `legend-row${offClass}`;
+        row.type = "button";
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = color;
+        const labelNode = document.createElement("span");
+        labelNode.textContent = label;
+        row.append(swatch, labelNode);
+        row.addEventListener("click", () => {
+          if (visibleObjects.has(name)) {
+            visibleObjects.delete(name);
+          } else {
+            visibleObjects.add(name);
+          }
+          render();
+        });
+        legend.appendChild(row);
+      });
+    }
+
+    function renderInstanceControl() {
+      instancePanel.classList.toggle("hidden", !instanceFilterOpen);
+      instanceToggle.textContent = instanceFilterOpen ? "^" : "v";
+      instanceToggle.setAttribute("aria-expanded", instanceFilterOpen ? "true" : "false");
+      const maxInstance = clampSelectedInstance();
+      instanceSlider.max = maxInstance;
+      instanceSlider.value = selectedInstance;
+      instanceValue.textContent = instanceFilterOpen ? selectedInstance.toString() : "all";
+    }
+
+    function renderCheckList(target, checkList) {
+      target.replaceChildren();
+      checkList.forEach(check => {
+        const statusClass = check.ok ? "ok" : "bad";
+        const answer = check.ok ? "Yes" : "No";
+        const row = document.createElement("div");
+        row.className = "check";
+        const top = document.createElement("div");
+        top.className = "check-top";
+        const text = document.createElement("span");
+        text.textContent = check.text;
+        const status = document.createElement("span");
+        status.className = `answer ${statusClass}`;
+        status.textContent = answer;
+        top.append(text, status);
+        row.appendChild(top);
+        if (check.detail) {
+          const detail = document.createElement("div");
+          detail.className = "detail";
+          detail.textContent = check.detail;
+          row.appendChild(detail);
+        }
+        target.appendChild(row);
+      });
+    }
+
+    function renderCheckSection(section, header, arrow, status, list, checkList, isOpen) {
+      const ok = checkList.every(check => check.ok);
+      section.classList.toggle("ok", ok);
+      section.classList.toggle("bad", !ok);
+      arrow.textContent = isOpen ? "v" : ">";
+      header.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      status.innerHTML = ok
+        ? `<span class="status-dot"></span>`
+        : `<span class="status-dot"></span><span>Needs check</span>`;
+      list.classList.toggle("hidden", !isOpen);
+    }
+
+    function renderSheetQuestion() {
+      sheetYes.classList.toggle("active", sheetUpdated);
+      sheetNo.classList.toggle("active", !sheetUpdated);
+    }
+
+    function renderChecks(task) {
+      renderCheckList(globalChecks, DATA.globalChecks);
+      renderCheckList(checks, task.checks);
+      renderCheckSections(DATA.globalChecks, task.checks);
+    }
+
+    function renderCheckSections(globalCheckList, taskCheckList) {
+      renderCheckSection(
+        datasetSection,
+        datasetHeader,
+        datasetArrow,
+        datasetStatus,
+        globalChecks,
+        globalCheckList,
+        checkSectionsOpen.dataset
+      );
+      renderCheckSection(
+        taskSection,
+        taskHeader,
+        taskArrow,
+        taskStatus,
+        checks,
+        taskCheckList,
+        checkSectionsOpen.task
+      );
+    }
+
+    function renderEmptyTaskState() {
+      renderTaskList();
+      taskTitle.textContent = "No tasks found";
+      taskSubtitle.textContent = "Check dataset metadata and selected task folders";
+      mapImage.removeAttribute("src");
+      mapImage.style.aspectRatio = "";
+      overlay.replaceChildren();
+      legend.replaceChildren();
+      const taskChecks = [{
+        text: "Selected tasks are available",
+        ok: false,
+        detail: "No selected tasks were loaded. Check metadata/available_tasks.yaml, metadata/task_custom_lists.json, and metadata/B100_task_misc.csv.",
+      }];
+      renderCheckList(globalChecks, DATA.globalChecks);
+      renderCheckList(checks, taskChecks);
+      renderCheckSections(DATA.globalChecks, taskChecks);
+      renderInstanceControl();
+      renderSheetQuestion();
+    }
+
+    function render() {
+      const task = taskByName(currentTask);
+      if (!task) {
+        renderEmptyTaskState();
+        return;
+      }
+      clampSelectedInstance();
+      renderTaskList();
+      taskTitle.textContent = task.task;
+      const prefix = task.task_id === null || task.task_id === undefined ? "" : `${task.task_id} · `;
+      taskSubtitle.textContent = `${prefix}${task.scene || "missing scene"}`;
+      if (task.map) {
+        mapImage.src = task.map.image;
+        mapImage.style.aspectRatio = `${task.map.width} / ${task.map.height}`;
+      } else {
+        mapImage.removeAttribute("src");
+        mapImage.style.aspectRatio = "";
+      }
+      renderOverlay(task);
+      renderLegend(task);
+      renderChecks(task);
+      renderInstanceControl();
+      renderSheetQuestion();
+    }
+
+    robotMode.addEventListener("click", () => setMode("robot"));
+    objectMode.addEventListener("click", () => setMode("object"));
+    datasetHeader.addEventListener("click", () => {
+      checkSectionsOpen.dataset = !checkSectionsOpen.dataset;
+      render();
+    });
+    taskHeader.addEventListener("click", () => {
+      checkSectionsOpen.task = !checkSectionsOpen.task;
+      render();
+    });
+    sheetYes.addEventListener("click", () => {
+      sheetUpdated = true;
+      renderSheetQuestion();
+    });
+    sheetNo.addEventListener("click", () => {
+      sheetUpdated = false;
+      renderSheetQuestion();
+    });
+    instanceToggle.addEventListener("click", () => {
+      instanceFilterOpen = !instanceFilterOpen;
+      if (!instanceFilterOpen) {
+        selectedInstance = 0;
+      }
+      render();
+    });
+    instanceSlider.addEventListener("input", () => {
+      selectedInstance = Number(instanceSlider.value);
+      renderInstanceFilteredOverlay();
+    });
+    render();
+  </script>
+</body>
+</html>

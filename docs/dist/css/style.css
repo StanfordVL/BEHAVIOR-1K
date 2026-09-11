@@ -268,14 +268,15 @@ body:has(.body-wrap) .md-main {
 .hero-announcement {
     margin-top: 24px;
     padding: 16px 24px;
-    background: rgba(21, 119, 216, 0.5);
-    border: 1px solid #1577d8;
+    background: linear-gradient(135deg, rgba(140, 21, 21, 0.78), rgba(119, 79, 26, 0.68));
+    border: 1px solid rgba(245, 203, 120, 0.78);
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: nowrap;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .hero-announcement p {
@@ -295,23 +296,24 @@ body:has(.body-wrap) .md-main {
 }
 
 .hero-announcement .button-primary {
-    background: #1577d8 !important;
-    background: linear-gradient(65deg, #0f6fd8 0, #2793ea 100%) !important;
+    background: #f5cb78 !important;
+    background: linear-gradient(65deg, #f5cb78 0, #e58b3a 100%) !important;
+    color: #24120f !important;
 }
 
 .hero-announcement .button-primary:hover {
-    background: #1d8cfb !important;
-    background: linear-gradient(65deg, #1d8cfb 0, #3bb8ff 100%) !important;
+    background: #ffd98f !important;
+    background: linear-gradient(65deg, #ffd98f 0, #f0a24b 100%) !important;
 }
 
 .hero-announcement a:not(.button) {
-    color: #64b5f6 !important;
+    color: #f5cb78 !important;
     text-decoration: none;
     font-weight: 600;
 }
 
 .hero-announcement a:not(.button):hover {
-    color: #90caf9 !important;
+    color: #ffd98f !important;
     text-decoration: underline;
 }
 
@@ -669,7 +671,7 @@ body:has(.body-wrap) .md-main {
     .team-grid {
         gap: 1.5rem;
     }
-    
+
     .team-member {
         width: 100px;
     }

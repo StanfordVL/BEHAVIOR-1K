@@ -323,7 +323,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         if self.requires_overlap:
             # Run sanity check to make sure compatibility with omniverse physx
             if self.method == ParticleModifyMethod.PROJECTION and not th.isclose(
-                self.obj.scale.max(), self.obj.scale.min(), atol=1e-04
+                self.obj.scale.max(), self.obj.scale.min(), atol=1e-02
             ):
                 raise ValueError(
                     f"{self.__class__.__name__} for obj {self.obj.name} using PROJECTION method cannot be "

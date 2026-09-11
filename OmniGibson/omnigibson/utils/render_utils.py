@@ -6,7 +6,6 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ensure_usd_api
 
 
 # Create module logger
@@ -82,46 +81,3 @@ def create_pbr_material(prim_path):
 
     # Return generated material
     return lazy.isaacsim.core.utils.prims.get_prim_at_path(material_path)
-
-
-def force_pbr_material_for_link(entity_prim, link_name):
-    if "meta__" in link_name:
-        # Don't override the meta link material
-        return
-
-    entity_prim_path = entity_prim.GetPrimPath().__str__()
-    looks_prim = entity_prim.GetChild("Looks")
-    link_prim = entity_prim.GetChild(link_name)
-    assert link_prim, f"Could not find link {link_name} for {entity_prim_path}"
-
-    link_visuals_prim = link_prim.GetChild("visuals")
-    if not looks_prim:
-        log.debug(f"Could not find Looks prim for {entity_prim_path}")
-        return
-
-    if not link_visuals_prim:
-        log.warning(f"Could not find visuals prim for link {link_name} of {entity_prim_path}")
-        return
-
-    binding_api = ensure_usd_api(link_visuals_prim, lazy.pxr.UsdShade.MaterialBindingAPI)
-
-    material_path = binding_api.GetDirectBinding().GetMaterialPath().pathString
-    if "OmniGlass" in material_path:
-        # Don't override the glass material
-        return
-
-    # Find the material prim that has the link's name in it
-    link_pbr_material_pattern = f"__{link_name}_pbr"
-    for mtl_prim in looks_prim.GetChildren():
-        mtl_prim_name = mtl_prim.GetName()
-        if link_pbr_material_pattern in mtl_prim_name:
-            # Bind that material and stop
-            lazy.omni.kit.commands.execute(
-                "BindMaterialCommand",
-                prim_path=link_visuals_prim.GetPrimPath().__str__(),
-                material_path=mtl_prim.GetPrimPath().__str__(),
-                strength=None,
-            )
-            return
-    else:
-        log.warning(f"Could not find PBR material for link {link_name} of {entity_prim_path}")

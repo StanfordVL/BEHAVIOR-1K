@@ -4,7 +4,7 @@ coffee_maker.n.01,1,0,1,93,0.1
 microwave.n.02,1,1,1,100,0.1
 oven.n.01,1,1,1,250,0.1
 electric_kettle.n.01,1,0,1,100,0.1
-toaster.n.02,1,0,1,148.889,0.1
+toaster.n.02,1,0,1,150,0.1
 iron.n.04,1,0,0,180,0.1
 radiator.n.02,1,0,0,91,0.1
 toaster_oven.n.01,1,1,1,204,0.1

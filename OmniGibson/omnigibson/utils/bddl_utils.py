@@ -598,7 +598,8 @@ class BDDLSampler:
                 - None or str: None if successful, otherwise the associated error message
         """
         # Auto-initialize all sampleable objects
-        with og.sim.playing():
+        og.sim.play()
+        try:
             # Update the scene to include the latest robots / objects
             self._env.scene.update_initial_file()
             self._env.scene.reset()
@@ -621,7 +622,9 @@ class BDDLSampler:
 
             self._env.scene.update_initial_file()
 
-        return True, None
+            return True, None
+        finally:
+            og.sim.stop()
 
     def _parse_inroom_object_room_assignment(self):
         """

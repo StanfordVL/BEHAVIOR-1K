@@ -38,3 +38,5 @@
 /patch_sampled.success
 /generate_max_object_images.success
 /combined_file_manifest.json
+/check_collisions_challenge.json
+/check_collisions_challenge.success

@@ -2,6 +2,7 @@ import torch as th
 from utils import SYSTEM_EXAMPLES, place_obj_on_floor_plane
 
 import omnigibson as og
+from omnigibson.systems import MacroParticleSystem, MicroParticleSystem
 from omnigibson.utils.constants import semantic_class_id_to_name
 
 
@@ -39,42 +40,34 @@ def test_segmentation_modalities(env, breakfast_table, dishtowel):
     seg_semantic = all_observation["seg_semantic"]
     seg_semantic_info = all_info["seg_semantic"]
     assert set(int(x.item()) for x in th.unique(seg_semantic)) == set(seg_semantic_info.keys())
-    expected_dict = {
-        825831922: "floors",
-        884110082: "stain",
-        1949122937: "breakfast_table",
-        3051938632: "white_rice",
-        3330677804: "water",
-        4207839377: "dishtowel",
-    }
-    assert set(seg_semantic_info.values()) == set(expected_dict.values())
+    expected_semantic_names = {"floors", "breakfast_table", "dishtowel", *SYSTEM_EXAMPLES.keys()}
+    assert set(seg_semantic_info.values()) == expected_semantic_names
 
     seg_instance = all_observation["seg_instance"]
     seg_instance_info = all_info["seg_instance"]
     assert set(int(x.item()) for x in th.unique(seg_instance)) == set(seg_instance_info.keys())
-    expected_dict = {
-        2: "groundPlane",
-        3: "water",
-        5: "stain",
-        6: "white_rice",
-        7: "breakfast_table",
-        8: "dishtowel",
-    }
-    assert set(seg_instance_info.values()) == set(expected_dict.values())
+    expected_instance_names = {"groundPlane", "breakfast_table", "dishtowel", *SYSTEM_EXAMPLES.keys()}
+    assert set(seg_instance_info.values()) == expected_instance_names
 
     seg_instance_id = all_observation["seg_instance_id"]
     seg_instance_id_info = all_info["seg_instance_id"]
     assert set(int(x.item()) for x in th.unique(seg_instance_id)) == set(seg_instance_id_info.keys())
-    expected_dict = {
-        1: "/World/ground_plane/geom",
-        2: "/World/scene_0/breakfast_table/base_link/visuals",
-        3: "/World/scene_0/dishtowel/base_link/visuals",
-        4: "/World/scene_0/water/waterInstancer0/prototype0",
-        5: "/World/scene_0/white_rice/white_riceInstancer0/prototype0",
-        7: "/World/scene_0/breakfast_table/base_link/stainParticle1",
-        8: "/World/scene_0/breakfast_table/base_link/stainParticle0",
+    expected_instance_id_paths = {
+        "/World/ground_plane/geom",
+        *[visual_mesh.prim_path for visual_mesh in breakfast_table.root_link.visual_meshes.values()],
+        *[visual_mesh.prim_path for visual_mesh in dishtowel.root_link.visual_meshes.values()],
     }
-    assert set(seg_instance_id_info.values()) == set(expected_dict.values())
+    for system in systems:
+        if isinstance(system, MicroParticleSystem):
+            for instancer in system.particle_instancers.values():
+                instancer_scope_path = instancer.prim_path.rsplit("/instancer", 1)[0]
+                expected_instance_id_paths.update(
+                    f"{instancer_scope_path}/prototype{int(prototype_id.item())}"
+                    for prototype_id in th.unique(instancer.particle_prototype_ids)
+                )
+        elif isinstance(system, MacroParticleSystem):
+            expected_instance_id_paths.update(particle.prim_path for particle in system.particles.values())
+    assert set(seg_instance_id_info.values()) == expected_instance_id_paths
 
     for system in systems:
         env.scene.clear_system(system.name)

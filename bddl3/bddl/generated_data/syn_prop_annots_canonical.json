@@ -6130,6 +6130,7 @@
         "disinfectable": {}
     },
     "carrel.n.02": {
+        "sceneObject": {},
         "rigidBody": {},
         "nonSubstance": {},
         "wetable": {},
@@ -11510,6 +11511,7 @@
     "food_processor.n.01": {
         "fillable": {},
         "toggleable": {},
+        "sceneObject": {},
         "rigidBody": {},
         "nonSubstance": {},
         "heatable": {},
@@ -11527,6 +11529,7 @@
         "disinfectable": {}
     },
     "footstool.n.01": {
+        "sceneObject": {},
         "rigidBody": {},
         "nonSubstance": {},
         "wetable": {},
@@ -12579,7 +12582,6 @@
         "disinfectable": {}
     },
     "grill.n.02": {
-        "flammable": {},
         "toggleable": {},
         "heatSource": {},
         "sceneObject": {},
@@ -22938,7 +22940,6 @@
     },
     "space_heater.n.01": {
         "breakable": {},
-        "flammable": {},
         "toggleable": {},
         "heatSource": {},
         "rigidBody": {},
@@ -24609,10 +24610,13 @@
         "disinfectable": {}
     },
     "toaster.n.02": {
+        "fillable": {},
         "toggleable": {},
         "heatSource": {},
         "rigidBody": {},
         "nonSubstance": {},
+        "heatable": {},
+        "freezable": {},
         "wetable": {},
         "stickyable": {},
         "dustyable": {},
@@ -26085,6 +26089,7 @@
     "water_glass.n.02": {
         "breakable": {},
         "fillable": {},
+        "sceneObject": {},
         "rigidBody": {},
         "nonSubstance": {},
         "heatable": {},

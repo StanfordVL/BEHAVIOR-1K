@@ -13,7 +13,7 @@ from omnigibson.macros import gm
 
 # Set some macros. Is this kosher?
 gm.HEADLESS = True
-gm.USE_GPU_DYNAMICS = True
+# gm.USE_GPU_DYNAMICS = True
 gm.USE_ENCRYPTED_ASSETS = True
 gm.FORCE_LIGHT_INTENSITY = None
 gm.ENABLE_TRANSITION_RULES = False
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         assert (
             obj_synset is not None
         ), f"Could not find synset for category {obj_category}"
-        if "cloth" in obj_synset.abilities:
+        if "cloth" in obj_synset.abilities and False:  # Temporarily disabled cloth processing.
             og.clear(**clear_kwargs)
             empty_scene = Scene()
             og.sim.import_scene(empty_scene)

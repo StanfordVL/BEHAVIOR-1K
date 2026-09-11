@@ -1,135 +1,51 @@
 # BEHAVIOR Challenge Updates
 
-On this page, we provide updates regarding the first **BEHAVIOR Challenge**, including important bug fixes, new feature announcements, and clarifications about challenge rules.
+On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, including important bug fixes, new feature announcements, and clarifications about challenge rules.
 
 ---
 
-### 11/07/2025 {#11072025}
+### 08/24/2026 {#08242026}
 
 **Challenge rule clarifications:**
 
-1. To ensure a smooth and timely evaluation for the hidden test cases, we would like to estimate the number of expected submissions. If you plan on submitting your results, please take a moment to fill out this [short, anonymous form](https://forms.gle/HBRHAGxKrwLFSo578)
+1. Please use the `v3.9.2` tag of the `BEHAVIOR-1K` repository for challenge evaluation. It includes the fixes below.
 
 **Bug fixes:**
 
-1. Fixed broken links for Baseline tutorials.
-2. Fixed keyframe-only loading bug for `obs_loaders`.
-3. Fixed `task_to_task_index` in LeRobot Metadata.
+1. Corrected the arm, gripper, and trunk velocity observations in the 2026 challenge demonstration dataset. These fields now use the raw simulator joint velocities from the original HDF5 demonstrations, and `meta/stats.json` has been recomputed accordingly. The affected fields are:
 
-All fixes have been pushed to the main branch.
+    - `state[10:17]`: `arm_left_qvel`
+    - `state[26:28]`: `gripper_left_qvel`
+    - `state[35:42]`: `arm_right_qvel`
+    - `state[51:53]`: `gripper_right_qvel`
+    - `state[57:61]`: `trunk_qvel`
+
+    Actions and all other dataset fields are unchanged.
+
+2. Updated partial-scene evaluation to load the exact room instances specified for each task in `B100_task_misc.csv`. This keeps the evaluation scene consistent with the challenge task metadata.
+
+3. Fixed observation loading with `RGBDFullResWrapper` by refreshing simulator handles after changing camera resolutions and before rebuilding the observation space.
+
+4. Fixed bugs affecting the challenge leaderboard and submission form.
 
 **New features:**
 
-1. Added MoMaGen / JoyLo Documentation. 
+1. Introduced a [participant registration form](https://forms.gle/Kf4ABLmDKbuK5Yhj6) for the 2026 BEHAVIOR Challenge.
 
 ---
 
-### 10/30/2025 {#10302025}
+### 07/27/2026 {#07272026}
 
 **Challenge rule clarifications:**
 
-1. For the Standard track, you are allowed to use any offline-stored information during training, as long as you don't query the simulator for privileged information during evaluation.
-2. For Docker submissions, you can use any hosting (public or private), as long as we are able to evaluate your policy and you provide clear instructions on how to access and run evaluation with your submission. The simpler the access is, the better.
-3. For running baselines, please always use the latest main branch of the `BEHAVIOR-1K` repo (which we will use for our internal policy evaluation), and the latest branch of the baseline repositories.
+1. Please use the `v3.9.2` tag of the `BEHAVIOR-1K` repository for evaluation and replay workflows, rather than the older `v3.9.0` tag. Since `v3.9.0`, `v3.9.2` includes important challenge updates, including LeRobot v3 / Hugging Face demo download instructions, evaluator Torch thread configuration, sponsor-page content, synchronized BDDL generated data, and synchronized asset synset metadata.
 
 **Bug fixes:**
 
-1. Fixed various bugs in the evaluation script.
-2. Fixed OpenVLA proprioception indices.
-3. Updated submission Google Form.
-
-All fixes have been pushed to the main branch.
+1. Updated the released demonstration dataset so `observation.state[0:3]` now records the R1Pro base velocity in the robot-local frame. Previously, these dimensions were populated from raw holonomic base joint velocities; the corrected values rotate the base x/y joint velocities by the base yaw and keep the yaw velocity as the third component. This matches the action convention used by the R1Pro base controller.
+2. Fixed the released depth videos for the 2026 demonstration dataset. See the Hugging Face discussion for details: [behavior-1k/2026-challenge-demos discussion #2](https://huggingface.co/datasets/behavior-1k/2026-challenge-demos/discussions/2).
 
 **New features:**
 
-1. We have released language annotations for all 50 tasks. Note: the memory prefix has been temporarily removed; we will add it back once QA is complete.  
-2. We have included the task ID as part of the observation dict. 
-3. We added [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changes the robot base mass to the value used during data collection. This can help minimize the physics gap between data collection and policy rollout. 
-4. We added a [score_utils](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/score_utils.py) script that you can run to pre-validate your submission. 
-
----
-
-### 10/08/2025 {#10082025}
-
-**Challenge rule clarifications:**
-
-1. During evaluation, only the task-relevant object poses and the robot’s initial pose will be randomized.  
-   The object instances and the poses of background, scene-level objects will remain the same. 
-2. For both tracks, you are allowed to use privileged information during training (e.g., other observation modalities, task info, etc.), as long as you are not using them during evaluation.
-
-**Bug fixes:**
-
-1. Fixed a gripper joint range bug in `eval_utils.py`.  
-2. Reverted assets from USDZ to USD format to improve loading speed.  
-   Please re-download the assets to take advantage of this improvement.  
-3. Fixed partial credit assignment during evaluation.
-4. Fixed robot initial pose mismatch across evaluation rollouts.
-
-All fixes have been pushed to the main branch.
-
-**New features:**
-
-1. We updated the [submission guideline](./submission.md) and added a [sample submission Dockerfile](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/docker/submission.Dockerfile) for reference.  
-2. We are excited to announce that [NVIDIA](https://www.nvidia.com/en-us/) will be sponsoring our challenge!  
-   The updated prize pool is as follows:
-    - First Place: $1000 + GeForce 5080  
-    - Second Place: $500 + (Jetson Orin Nano Super or $1000 Brev Credits)  
-    - Third Place: $300 + $500 Brev Credits  
-
----
-
-### 09/28/2025 {#09282025}
-
-**Challenge rule clarifications:**
-
-1. No formal registration is required to participate in the challenge.  
-   Feel free to submit your results directly if you have one!
-
-**Bug fixes:**
-
-1. Fixed multi-worker sharding and action chunk indexing in `BehaviorLeRobotDataset` under chunk streaming mode.  
-2. Fixed incorrect robot start pose in the evaluation script.  
-3. Provided improved baseline checkpoints.  
-   Please refer to [baselines.md](./baselines.md) for details.
-
-All fixes have been pushed to the main branch.
-
-**New features:**
-
-1. Added several new CLI arguments for evaluation, including  
-   `testing_on_train_instances`, `max_steps`, and `partial_scene_load`.  
-   See [base_config.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/base_config.yaml) for more details.
-
----
-
-### 09/19/2025 {#09192025}
-
-**Challenge rule clarifications:**
-
-1. BDDL task definitions are allowed to be used in both tracks.  
-   These definitions are fixed and will remain the same during evaluation.  
-2. You may collect additional data yourself (via teleoperation, RL, scripted policies, etc.) for both tracks.  
-   However, you may not collect data on evaluation instances, as these are reserved for testing the generalization capability of your submitted policy.  
-3. There are no restrictions on the type of policy used for either track.  
-   Methods such as IL, RL, or TAMP are all allowed.  
-   Additional components like SLAM or LLM-based querying are also permitted.  
-4. Currently, the success score (Q) is the only metric used for ranking submissions.  
-   If two submissions achieve the same score, secondary metrics will be used to break ties.  
-5. The timeout for each evaluation is set to 2× the mean task completion time of the 200 human demonstrations and thus varies across tasks.  
-6. In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task.  
-   Use the first 10 instances for evaluation results (see [evaluation.md](./evaluation.md#evaluation-protocol-and-logistics));  
-   the remaining 10 are not used for evaluation and may serve as a test set before evaluating your final policy.
-
-**Bug fixes:**
-
-1. Fixed the Windows installation setup script.  
-2. Fixed timestamp type mismatch in `BehaviorLeRobotDataset`.  
-3. Improved connection-loss handling in `WebsocketClientPolicy`.  
-4. Fixed various evaluation-related bugs.
-
-All fixes have been pushed to the main branch.
-
-**New features:**
-
-1. Added a new tutorial on configuring the action space during evaluation.  
-   See [evaluation.md](./evaluation.md#configure-robot-action-space) for details.
+1. Added `meta/tasks.jsonl` with natural-language task descriptions for all 100 challenge tasks. The first 50 tasks follow the 2025 challenge descriptions with spelling/grammar fixes where needed; the remaining 50 were derived from the 2026 annotations and task definitions.
+2. Uploaded per-episode language annotations for all 20,000 demonstrations.

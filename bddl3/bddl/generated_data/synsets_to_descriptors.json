@@ -52379,10 +52379,6 @@
             "dusty"
         ],
         [
-            "on_fire",
-            "on_fire"
-        ],
-        [
             "grassy",
             "grassy"
         ],
@@ -108516,10 +108512,6 @@
             "dusty"
         ],
         [
-            "on_fire",
-            "on_fire"
-        ],
-        [
             "grassy",
             "grassy"
         ],
@@ -116033,8 +116025,16 @@
             "dusty"
         ],
         [
+            "frozen",
+            "frozen"
+        ],
+        [
             "grassy",
             "grassy"
+        ],
+        [
+            "hot",
+            "hot"
         ],
         [
             "moldy",

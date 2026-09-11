@@ -1,7 +1,6 @@
 black>=22.10.0
-dask[distributed]==2023.5.0
-dvc~=3.42.0
-dvc-gs~=3.0.1
+dvc~=3.67.1
+dvc-gs~=3.0.2
 fs>=2.4.16
 jupyter>=1.0.0
 matplotlib>=3.5.2
