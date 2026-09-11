@@ -150,17 +150,38 @@ def main() -> int:
     assert solo_agents[solo_ids[0]].plan.actions[0].action_type == "navigate_to"
     ok("N=1 plans immediately and never holds, so per-robot LLM is this code with N=1")
 
-    print("test 5: an interrupt is answered once, per robot")
+    print("test 5: the team is interrupted together and answered in one call")
     client, agents, ids = make_team(3)
     client.interrupt_script = {ids[1]: InterruptDecision.REPLAN}
     for name in ids:
         agents[name].plan = None
-    for name in ids[:2]:
-        agents[name].handle_interrupt()
+
+    # Concurrently, because that is how it happens: the broker interrupts every
+    # member of a team in one call, so their threads arrive together. Members
+    # that arrive early **block in I** rather than bouncing back to ready --
+    # a member that bounced showed as "waiting" on the timeline while its
+    # teammates were still interrupted, which is the bug this pins.
+    import threading
+
+    barrier_state = {}
+
+    def arrive(name):
+        barrier_state[name] = agents[name].handle_interrupt()
+
+    threads = [threading.Thread(target=arrive, args=(name,)) for name in ids[:2]]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=1.0)
+    assert all(t.is_alive() for t in threads), "early arrivals must block, not return"
     assert client.interrupt_calls == 0, "decided before the whole team was interrupted"
+
     agents[ids[2]].handle_interrupt()
+    for thread in threads:
+        thread.join(timeout=5.0)
+    assert not any(t.is_alive() for t in threads), "blocked members must be released"
     assert client.interrupt_calls == 1, client.interrupt_calls
-    ok("no decision until all 3 are interrupted, then exactly one call for the team")
+    ok("2 of 3 block in I; the third closes the barrier and one call answers all")
 
     print("test 6: a member the model forgot is held, not left planless")
     class Forgetful(StubClient):
@@ -238,6 +259,31 @@ def main() -> int:
     assert central["t0"].send_to == ["a2", "a3", "a4", "a5"], "leader addresses whole teams"
     assert central["t1"].wait_for == ["a0"] and central["t1"].send_to == ["a0"]
     ok("individual/chain/centralized wire teams; speakers are waited on, whole teams addressed")
+
+    print("test 9: when the team thinks, every member is reasoning")
+    from coop2.cognitive.agent.agent import AgentState
+
+    client, agents, ids = make_team(4)
+    # Three finish early and hold, then actually start executing those holds --
+    # which is the state they are really in while the fourth robot works.
+    for name in ids[:3]:
+        agents[name].handle_reasoning()
+        agents[name].set_ready()
+        agents[name].start_execution()
+        assert agents[name].state == AgentState.X, agents[name].state
+
+    # The fourth arrives and closes the barrier.
+    agents[ids[3]].handle_reasoning()
+
+    # Every teammate must now be reasoning, not still executing a hold. Only the
+    # member that closed the barrier was reasoning before this fix, so the
+    # timeline showed one red bar and three green ones during a team call.
+    for name in ids[:3]:
+        assert agents[name].state == AgentState.R, (name, agents[name].state)
+        assert not agents[name].ready, f"{name} is still marked ready"
+    # And the hold each was running is terminal, or create_agent_thread would
+    # decline to re-plan it and the member would never become ready again.
+    ok("holders are recalled into R, with their holds marked terminal")
 
     print("\nALL TESTS PASSED")
     return 0

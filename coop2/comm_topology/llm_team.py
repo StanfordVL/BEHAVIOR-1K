@@ -101,6 +101,11 @@ you answer with one plan per robot, in the same call.
 #: soon after the last member lands, rather than overshooting by a long wait.
 TEAM_HOLD_TICKS = 60
 
+#: How long a member blocks in I waiting for its teammates to be interrupted
+#: too. Generous because it should never be reached: the broker interrupts every
+#: member of a team in the same call, so they arrive within milliseconds.
+INTERRUPT_BARRIER_TIMEOUT = 30.0
+
 
 class TeamBrain:
     """The shared LLM behind one team, and the barrier its members meet at.
@@ -136,6 +141,8 @@ class TeamBrain:
         self._pending_plans: Dict[str, SymbolicPlan] = {}
         self._pending_decisions: Dict[str, Any] = {}
         self._interrupted: set = set()
+        #: Set once a round's decisions exist, so members blocked in I wake up.
+        self._decided = threading.Event()
         self.rounds = 0
         self.holds = 0
         #: Topology wiring, in agent ids. ``wait_for`` holds the *spokesagents*
@@ -241,11 +248,19 @@ class TeamBrain:
             if not self._awaiting.issuperset(self.member_ids):
                 return None
 
-            # Every member is done. One call for the whole team; whichever
-            # thread got here first does it and the others take from the result.
-            # The topology's communication brackets that call: whoever this team
-            # waits on has to have spoken before it plans, and whatever it tells
-            # other teams follows from the plan it just made.
+            # Every member is done. Before anything else, pull the teammates
+            # that are still holding out of their holds and into R, so the whole
+            # team is *reasoning* while the one call happens -- and so that
+            # anything this team says to another team is said by a team that has
+            # already stopped acting. Without this only the member that closed
+            # the barrier showed as reasoning and the rest kept executing.
+            self._recall_holders(except_id=agent_id)
+
+            # One call for the whole team; whichever thread got here first does
+            # it and the others take from the result. The topology's
+            # communication brackets that call: whoever this team waits on has
+            # to have spoken before it plans, and whatever it tells other teams
+            # follows from the plan it just made.
             self.before_plan()
             self._collect_heard()
             self._pending_plans = self._generate_team_plans()
@@ -254,6 +269,47 @@ class TeamBrain:
             self._heard = []
             self._awaiting.discard(agent_id)
             return self._pending_plans.pop(agent_id, None)
+
+
+    def _recall_holders(self, except_id: str) -> None:
+        """Bring every holding teammate into R for the duration of the call.
+
+        A member waiting for the team is *executing* a hold, which is what keeps
+        the world moving while its teammates finish. Once the barrier closes
+        nobody needs the world any more, so the holds are ended here and the
+        whole team reasons together.
+
+        Ending a hold takes two steps, and one alone is not enough.
+        ``set_unready`` puts the member in R, but ``create_agent_thread`` only
+        calls ``handle_reasoning`` when ``needs_new_plan()`` is also true -- and
+        that asks the *plan* whether it is finished. A member left in R with a
+        live hold plan would answer no, return early, never become ready, and
+        hang the run. So the hold is marked terminal first.
+
+        The stale ``wait`` primitive it leaves in the engine is not a leak: the
+        wrapper aborts it when the replacement plan is committed
+        (``_reset_symbolic_action_state``), which is the same path an
+        interrupt-and-replan already takes.
+        """
+        from coop2.cognitive.plan.plan import SymbolicPlanStatus  # noqa: PLC0415
+
+        for name in self.member_ids:
+            if name == except_id:
+                continue
+            member = self.members.get(name)
+            if member is None:
+                continue
+            plan = member.plan
+            if plan is not None and str(plan.specification).startswith("wait_for_team"):
+                plan.status = SymbolicPlanStatus.INTERRUPTED
+            # 'plan_terminated' is exactly what happened -- the hold above was
+            # just ended -- and it is the reason that transitions X -> R, which
+            # is the state the member should be in while the team thinks. A
+            # member already in W or R is left alone: it is not holding.
+            from coop2.cognitive.agent.agent import AgentState  # noqa: PLC0415
+
+            if member.state == AgentState.X:
+                member.set_unready(reason="plan_terminated")
 
     def note_hold(self) -> None:
         with self._lock:
@@ -324,13 +380,33 @@ class TeamBrain:
                 self._interrupted.discard(agent_id)
                 return self._pending_decisions.pop(agent_id)
 
+            if not self._interrupted:
+                # First arrival of a new round: nobody has decided yet.
+                self._decided.clear()
             self._interrupted.add(agent_id)
-            if not self._interrupted.issuperset(self.member_ids):
-                return None
+            complete = self._interrupted.issuperset(self.member_ids)
+            if complete:
+                self._pending_decisions = self._decide_interrupts(messages)
+                self._decided.set()
+                self._interrupted.discard(agent_id)
+                return self._pending_decisions.pop(agent_id, None)
 
-            self._pending_decisions = self._decide_interrupts(messages)
+        # Not everyone has arrived. **Block here**, staying in I, rather than
+        # returning and being marked ready again: a member that bounced straight
+        # back to W showed as "waiting" on the timeline while its teammates were
+        # still interrupted, and the team is supposed to decide together. This
+        # cannot deadlock the way the planning barrier could -- the message
+        # interrupted every member at once, so they are all on their way here,
+        # and nothing needs the world to advance in the meantime.
+        if self._decided.wait(timeout=INTERRUPT_BARRIER_TIMEOUT):
+            with self._lock:
+                self._interrupted.discard(agent_id)
+                return self._pending_decisions.pop(agent_id, None)
+        print(f"  [{self.team_name}] waited {INTERRUPT_BARRIER_TIMEOUT:.0f}s for the team "
+              f"to be interrupted and it never completed; resuming")
+        with self._lock:
             self._interrupted.discard(agent_id)
-            return self._pending_decisions.pop(agent_id, None)
+        return None
 
     def _decide_interrupts(self, messages: List[Dict]) -> Dict[str, Any]:
         members = [self.members[name] for name in self.member_ids if name in self.members]
