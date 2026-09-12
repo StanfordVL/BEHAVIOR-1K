@@ -63,6 +63,7 @@ m.HIGHLIGHT_INTENSITY = 10000.0  # Highlight intensity to apply, range [0, 10000
 # Physics settings for objects -- see https://nvidia-omniverse.github.io/PhysX/physx/5.3.1/docs/RigidBodyDynamics.html?highlight=velocity%20iteration#solver-iterations
 m.DEFAULT_SOLVER_POSITION_ITERATIONS = 32
 m.DEFAULT_SOLVER_VELOCITY_ITERATIONS = 1
+m.THIN_SOLVER_POSITION_ITERATIONS = 64  # higher iteration count for thin objects
 
 m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]  # (x,y,z) scale of generated steam relative to its object, range [0, inf)
 m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1  # scale of steam density relative to its object, range [0, inf)
@@ -379,6 +380,17 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self._prim_type != PrimType.CLOTH and not self.kinematic_only:
             self.solver_position_iteration_count = m.DEFAULT_SOLVER_POSITION_ITERATIONS
             self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
+            if gm.ENABLE_CCD:
+                for link in self._links.values():
+                    if hasattr(link, "ccd_enabled"):
+                        link.ccd_enabled = True
+
+            if any(
+                th.min(mesh.aabb_extent).item() < gm.THIN_OBJECT_THRESHOLD
+                for link in self._links.values()
+                for mesh in link.collision_meshes.values()
+            ):
+                self.solver_position_iteration_count = m.THIN_SOLVER_POSITION_ITERATIONS
 
         # Add link materials if specified
         if self._link_physics_materials is not None:
