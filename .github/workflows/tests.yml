@@ -68,8 +68,8 @@ jobs:
       matrix:
         test_file:
           - test_controllers
-          # - test_curobo
-          # - test_data_collection  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2016
+          - test_curobo
+          - test_data_collection
           - test_dump_load_states
           - test_envs
           - test_multiple_envs
