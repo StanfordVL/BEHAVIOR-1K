@@ -284,6 +284,29 @@ class DataPlaybackWrapper(DataWrapper):
     NOTE: This assumes a HDF5CollectionWrapper environment has been used to collect data!
     """
 
+    @staticmethod
+    def _configure_cached_scene_loading(config: dict) -> None:
+        """
+        Configure env loading so playback uses recorded scene objects while rebuilding robots from config.
+
+        The cached scene file is the source of truth for replayed objects and object state. Robots are different,
+        playback may override their sensors / observation modalities below, and those overrides only take effect
+        when Environment._load_robots() constructs robots from config. The cached robot state is still replayed later
+        by scene.restore().
+        """
+        task_config = config["task"]
+        scene_config = config["scene"]
+
+        if task_config["type"] == "BehaviorTask":
+            task_config["online_object_sampling"] = False
+            task_config["use_presampled_robot_pose"] = False
+            scene_config["load_object_categories"] = None
+
+        # Scene files also contain the collection-time robot. Skip importing it here so Environment._load_robots()
+        # rebuilds the robot from config
+        scene_config["include_robots"] = False
+        config["objects"] = []
+
     @classmethod
     def create_from_hdf5(
         cls,
@@ -369,8 +392,9 @@ class DataPlaybackWrapper(DataWrapper):
             DataPlaybackWrapper: Generated playback environment
         """
         # Read from the HDF5 file
-        f = h5py.File(input_path, "r")
-        config = json.loads(f["data"].attrs["config"])
+        with h5py.File(input_path, "r") as f:
+            config = json.loads(f["data"].attrs["config"])
+            scene_file = json.loads(f["data"].attrs["scene_file"])
 
         # Hot swap in additional info for playing back data
 
@@ -388,7 +412,7 @@ class DataPlaybackWrapper(DataWrapper):
         config["env"]["flatten_obs_space"] = True
 
         # Set the scene file either to the one stored in the hdf5 or the hot swap scene file
-        config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+        config["scene"]["scene_file"] = scene_file
         if full_scene_file:
             with open(full_scene_file, "r") as json_file:
                 full_scene_json = json.load(json_file)
@@ -398,8 +422,6 @@ class DataPlaybackWrapper(DataWrapper):
             # Overwrite rooms type to avoid loading room types from the hdf5 file
             config["scene"]["load_room_types"] = None
             config["scene"]["load_room_instances"] = load_room_instances
-        else:
-            config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
 
         # Use dummy task if not loading task
         if not include_task:
@@ -408,15 +430,7 @@ class DataPlaybackWrapper(DataWrapper):
         # Maybe include task observations
         config["task"]["include_obs"] = include_task_obs
 
-        # Set scene file and disable online object sampling if BehaviorTask is being used
-        if config["task"]["type"] == "BehaviorTask":
-            config["task"]["online_object_sampling"] = False
-            # Don't use presampled robot pose
-            config["task"]["use_presampled_robot_pose"] = False
-
-        # Because we're loading directly from the cached scene file, we need to disable any additional objects that are being added since
-        # they will already be cached in the original scene file
-        config["objects"] = []
+        cls._configure_cached_scene_loading(config)
 
         # Set observation modalities and update sensor config
         for robot_cfg in config["robots"]:
