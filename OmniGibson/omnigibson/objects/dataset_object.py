@@ -269,6 +269,20 @@ class DatasetObject(USDObject):
         # Run super last
         super()._post_load()
 
+        # Set thin_walled on any OmniGlass materials for glass-tagged links so the renderer places
+        # the surface at the correct depth (without this, the refraction offset displaces the glass forward)
+        metadata = self.metadata
+        if metadata and "link_tags" in metadata:
+            has_glass = any("glass" in tags for tags in metadata["link_tags"].values())
+            if has_glass:
+                with og.sim.editing_usd():
+                    glass_mtl_prim_path = f"{self.prim_path}/Looks/OmniGlass"
+                    glass_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(glass_mtl_prim_path)
+                    if glass_prim and glass_prim.IsValid():
+                        shader = lazy.omni.usd.get_shader_from_material(lazy.pxr.UsdShade.Material(glass_prim))
+                        if shader:
+                            shader.CreateInput("thin_walled", lazy.pxr.Sdf.ValueTypeNames.Bool).Set(True)
+
         category_mass = None
         category_density = None
         if self._load_config["dataset_name"] == "behavior-1k-assets":
