@@ -329,9 +329,9 @@ class EntityPrim(XFormPrim):
             if uniform_scale:
                 scale_along_axis = self.scale[0]
             else:
-                assert (
-                    not self.initialized
-                ), "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                assert not self.initialized, (
+                    "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                )
                 for link in self.links.values():
                     if joint.body0 == link.prim_path:
                         # Find the parent link frame orientation in the object frame. Note that we
@@ -534,9 +534,9 @@ class EntityPrim(XFormPrim):
         # Assert all nodes have in-degree of 1 except root
         in_degrees = {node: G.in_degree(node) for node in G.nodes}
         assert in_degrees[self.root_link_name] == 0, "Root link should have in-degree of 0!"
-        assert all(
-            [in_degrees[node] == 1 for node in G.nodes if node != self.root_link_name]
-        ), "All non-root links should have in-degree of 1!"
+        assert all([in_degrees[node] == 1 for node in G.nodes if node != self.root_link_name]), (
+            "All non-root links should have in-degree of 1!"
+        )
 
         self._articulation_tree = G
 
@@ -1016,12 +1016,12 @@ class EntityPrim(XFormPrim):
         if og.sim.is_stopped():
             this_position, this_orientation = XFormPrim.get_position_orientation(self, frame=frame)
             root_link_position, root_link_orientation = self.root_link.get_position_orientation(frame=frame)
-            assert th.allclose(
-                this_position, root_link_position, atol=1e-2
-            ), "Position mismatch between entity prim and root link"
-            assert th.allclose(
-                this_orientation, root_link_orientation, atol=1e-2
-            ), "Orientation mismatch between entity prim and root link"
+            assert th.allclose(this_position, root_link_position, atol=1e-2), (
+                "Position mismatch between entity prim and root link"
+            )
+            assert th.allclose(this_orientation, root_link_orientation, atol=1e-2), (
+                "Orientation mismatch between entity prim and root link"
+            )
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
             if self.kinematic_only:
                 for link in self._links.values():
@@ -1041,21 +1041,21 @@ class EntityPrim(XFormPrim):
                 orientation = th.as_tensor(orientation, dtype=th.float32)
 
                 # Assert validity of the orientation
-                assert math.isclose(
-                    th.norm(orientation).item(), 1, abs_tol=1e-3
-                ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+                assert math.isclose(th.norm(orientation).item(), 1, abs_tol=1e-3), (
+                    f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+                )
 
                 # Convert to from scene-relative to world if necessary
                 if frame == "scene":
-                    assert (
-                        self.scene is not None
-                    ), "cannot set position and orientation relative to scene without a scene"
+                    assert self.scene is not None, (
+                        "cannot set position and orientation relative to scene without a scene"
+                    )
                     position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
                 # Check that the articulation view is valid and can write directly to PhysX
-                assert (
-                    self._articulation_view.is_physics_handle_valid()
-                ), "Unexpected: articulation view is not valid while simulation is playing."
+                assert self._articulation_view.is_physics_handle_valid(), (
+                    "Unexpected: articulation view is not valid while simulation is playing."
+                )
                 self._articulation_view.set_world_poses(
                     positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
                 )

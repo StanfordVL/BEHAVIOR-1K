@@ -207,18 +207,18 @@ class BaseController(Serializable, Registerable, Recreatable):
             isaac_kd = m.DEFAULT_ISAAC_KD if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.VELOCITY:
             # No kp should be specified, but kd should be
-            assert (
-                isaac_kp is None
-            ), f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
+            assert isaac_kp is None, (
+                f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
+            )
             isaac_kd = m.DEFAULT_ISAAC_KP if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.EFFORT:
             # Neither kp nor kd should be specified
-            assert (
-                isaac_kp is None
-            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
-            assert (
-                isaac_kd is None
-            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
+            assert isaac_kp is None, (
+                f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
+            )
+            assert isaac_kd is None, (
+                f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
+            )
         else:
             raise ValueError(
                 f"Expected control type to be one of: [POSITION, VELOCITY, EFFORT], but got: {self.control_type}"
@@ -376,9 +376,9 @@ class BaseController(Serializable, Registerable, Recreatable):
             command (Array[float]): inputted command to preprocess and extract relevant goal(s)
         """
         # Sanity check the command
-        assert (
-            len(command) == self.command_dim
-        ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
+        assert len(command) == self.command_dim, (
+            f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
+        )
 
         preprocessed = self._preprocess_command(command)
         goal_dict = self._update_goal(controller_idx, preprocessed)
