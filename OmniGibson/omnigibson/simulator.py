@@ -2036,6 +2036,13 @@ def _launch_simulator(*args, **kwargs):
             # Run Serializable.load_state (which calls _load_state)
             super().load_state(state=state, serialized=serialized)
 
+            # Recreate any attachment joints that were deferred during _load_state.  All objects are now
+            # at their correct kinematic positions, so _attach() can find the right link by proximity
+            # and create the joint without moving anything.
+            from omnigibson.object_states.attached_to import AttachedTo
+
+            AttachedTo.flush_pending_reattach()
+
             # Highlight that at the current step, the non-kinematic states are potentially inaccurate because a sim
             # step is needed to propagate specific states in physics backend
             # TODO: This should be resolved in a future omniverse release!
