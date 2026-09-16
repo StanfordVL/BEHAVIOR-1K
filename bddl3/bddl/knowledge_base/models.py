@@ -1040,6 +1040,21 @@ class Task:
         """Whether this task's definition contains wildcard instances."""
         return "*" in self.definition
 
+    @cached_property
+    def wildcard_synsets(self):
+        """Set of synsets that have a wildcard instance declared in this task."""
+        if not self.has_wildcards:
+            return set()
+        synsets = set()
+        for line in self.definition.splitlines():
+            stripped = line.strip()
+            if "*" not in stripped or " - " not in stripped:
+                continue
+            instances_part, synset = stripped.split(" - ", 1)
+            if "*" in instances_part:
+                synsets.add(synset.strip())
+        return synsets
+
     def parse_base_scope(self):
         """Parse the base (non-wildcard) object scope from the raw definition.
 
@@ -1128,6 +1143,25 @@ class Task:
         if self.has_wildcards:
             from bddl.wildcard import expand_wildcards
             problem = expand_wildcards(problem, scene_layout, self.knowledgebase)
+        return CompiledTask(self, problem)
+
+    def compile_base(self):
+        """Compile the wildcard-stripped (base) version of this task.
+        """
+        problem = self._strip_wildcards(self.definition) if self.has_wildcards else self.definition
+        return CompiledTask(self, problem)
+
+    def compile_from_inst_to_name(self, inst_to_name):
+        """Compile this task using cached instance names for wildcard expansion.
+
+        Args:
+            inst_to_name: Dict mapping BDDL instance name to scene object
+                name, as written by :meth:`BehaviorTask.update_bddl_scope_metadata`.
+        """
+        problem = self.definition
+        if self.has_wildcards:
+            from bddl.wildcard import expand_wildcards_from_inst_to_name
+            problem = expand_wildcards_from_inst_to_name(problem, inst_to_name, self.knowledgebase)
         return CompiledTask(self, problem)
 
     @cached_property

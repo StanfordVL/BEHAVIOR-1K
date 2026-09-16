@@ -49,7 +49,11 @@ def prompt_choice(prompt, options, multi=False):
     for i, opt in enumerate(options):
         print(f"  [{i}] {opt}")
     while True:
-        raw = input("Enter index or name" + (" (comma-separated for multiple)" if multi else "") + ": ").strip()
+        raw = input(
+            "Enter index or name" + (" (comma-separated for multiple, empty to skip)" if multi else "") + ": "
+        ).strip()
+        if multi and not raw:
+            return []
         chosen = []
         for part in raw.split(","):
             part = part.strip()
@@ -492,6 +496,8 @@ def autogenerate_task_custom_list(activity_name, use_room_gui=True, floor=0):
                 available_models,
                 multi=True,
             )
+            if not models:
+                continue
             whitelist[synset][cat_name] = {m: None for m in models}
 
     task_entry = {
