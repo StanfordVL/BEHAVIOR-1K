@@ -719,7 +719,8 @@ class VisionSensor(BaseSensor):
         width = self._image_width
         if self._viewport is not None:
             width, _ = self._viewport.viewport_api.get_texture_resolution()
-            self._viewport.viewport_api.set_texture_resolution((width, height))
+            with og.sim.editing_usd():
+                self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
         with og.sim.editing_usd():
@@ -758,7 +759,8 @@ class VisionSensor(BaseSensor):
         height = self._image_height
         if self._viewport is not None:
             _, height = self._viewport.viewport_api.get_texture_resolution()
-            self._viewport.viewport_api.set_texture_resolution((width, height))
+            with og.sim.editing_usd():
+                self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
         with og.sim.editing_usd():
@@ -893,7 +895,8 @@ class VisionSensor(BaseSensor):
                 "Cannot set active_camera_path because this sensor has no viewport. "
                 "Set gm.HEADLESS=False to enable viewport textures."
             )
-        self._viewport.viewport_api.set_active_camera(path)
+        with og.sim.editing_usd():
+            self._viewport.viewport_api.set_active_camera(path)
         # Requires 6 updates to propagate changes
         for i in range(6):
             og.sim.render()
