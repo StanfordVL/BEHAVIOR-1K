@@ -1,0 +1,104 @@
+name: Type Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck_bddl:
+    name: Type Check (bddl3)
+    runs-on: [self-hosted, linux, gpu]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine diff range
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: .github/scripts/resolve_diff_range.sh
+
+      - name: Install BDDL
+        run: pip install -e .[dev]
+        working-directory: bddl3
+
+      - name: Check types on changed files
+        continue-on-error: true # TODO: make blocking once the existing backlog is cleaned up
+        run: >
+          python .github/scripts/check_types_diff.py
+          --package-dir bddl3
+          --base ${{ steps.range.outputs.base_sha }}
+          --head ${{ github.sha }}
+
+  typecheck_omnigibson:
+    name: Type Check (OmniGibson)
+    runs-on: [self-hosted, linux, gpu]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Determine diff range
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: .github/scripts/resolve_diff_range.sh
+
+      - name: Install BDDL
+        run: pip install -e .
+        working-directory: bddl3
+
+      - name: Install OmniGibson
+        run: pip install -e .[dev,primitives,eval] --no-build-isolation
+        working-directory: OmniGibson
+
+      - name: Check types on changed files
+        continue-on-error: true # TODO: make blocking once the existing backlog is cleaned up
+        run: >
+          python .github/scripts/check_types_diff.py
+          --package-dir OmniGibson
+          --base ${{ steps.range.outputs.base_sha }}
+          --head ${{ github.sha }}
+
+  typecheck_joylo:
+    name: Type Check (joylo)
+    runs-on: [self-hosted, linux, gpu]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine diff range
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: .github/scripts/resolve_diff_range.sh
+
+      - name: Install joylo
+        run: pip install -e .[dev]
+        working-directory: joylo
+
+      - name: Check types on changed files
+        continue-on-error: true # TODO: make blocking once the existing backlog is cleaned up
+        run: >
+          python .github/scripts/check_types_diff.py
+          --package-dir joylo
+          --base ${{ steps.range.outputs.base_sha }}
+          --head ${{ github.sha }}

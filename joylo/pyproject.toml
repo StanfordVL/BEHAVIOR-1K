@@ -41,7 +41,7 @@ dev = [
   "jupyterlab",
   "mypy",
   "neovim",
-  "pyright",
+  "pyright>=1.1.390",
   "pytest",
   "python-lsp-server[all]",
 ]
@@ -50,3 +50,7 @@ dev = [
 packages = { find = {} }
 include-package-data = true
 zip-safe = false
+
+[tool.pyright]
+include = ["gello", "scripts"]
+exclude = ["**/__pycache__"]
