@@ -24,6 +24,9 @@ m = create_module_macros(module_path=__file__)
 # Mass-normalized kinetic energy threshold below which an actor may go to sleep
 m.DEFAULT_SLEEP_THRESHOLD = 0.00005
 
+# Index tensor used to select the single articulation / rigid body wrapped by per-prim PhysX tensor views.
+_ARTICULATION_INDICES = th.tensor([0], dtype=th.int32)
+
 
 class EntityPrim(XFormPrim):
     """
@@ -127,13 +130,8 @@ class EntityPrim(XFormPrim):
         self.update_links()
         self._compute_articulation_tree()
 
-        # Prepare the articulation view.
-        if self.articulated:
-            # Import now to avoid too-eager load of Omni classes due to inheritance
-            from omnigibson.utils.deprecated_utils import ArticulationView
-
-            with og.sim.editing_usd():
-                self._articulation_view = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
+        # The PhysX articulation tensor view (omni.physics.tensors) is only valid while simulation is playing,
+        # so we defer its creation until update_handles() is called.
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -275,17 +273,19 @@ class EntityPrim(XFormPrim):
         self.update_handles()
 
         # Handle case separately based on whether we are actually articulated or not
-        if self._articulation_view and not self.kinematic_only:
-            self._n_dof = self._articulation_view.num_dof
+        if self._articulation_view is not None and not self.kinematic_only:
+            meta = self._articulation_view.shared_metatype
+            self._n_dof = self._articulation_view.max_dofs
 
             # Additionally grab DOF info if we have non-fixed joints
             if self._n_dof > 0:
-                for i in range(self._articulation_view._metadata.joint_count):
+                dof_paths = self._articulation_view.dof_paths[0]
+                for i in range(meta.joint_count):
                     # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
-                    if self._articulation_view._metadata.joint_dof_counts[i] > 0:
-                        joint_name = self._articulation_view._metadata.joint_names[i]
-                        joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
-                        joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
+                    if meta.joint_dof_counts[i] > 0:
+                        joint_name = meta.joint_names[i]
+                        joint_dof_offset = meta.joint_dof_offsets[i]
+                        joint_path = dof_paths[joint_dof_offset]
                         joint = JointPrim(
                             relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, joint_path),
                             name=f"{self._name}:joint_{joint_name}",
@@ -443,8 +443,8 @@ class EntityPrim(XFormPrim):
         int: Number of fixed joints owned by this articulation
         """
         # If the articulation view is available, use it.
-        if self._articulation_view and self._articulation_view._metadata:
-            return sum(1 for joint_dof in self._articulation_view._metadata.joint_dof_counts if joint_dof == 0)
+        if self._articulation_view is not None:
+            return sum(1 for joint_dof in self._articulation_view.shared_metatype.joint_dof_counts if joint_dof == 0)
 
         _, num, _ = count_joints(self.prim)
         return num
@@ -641,18 +641,27 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure that we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to set joint positions!"
 
         # Possibly de-normalize the inputs
         if normalized:
             positions = self._denormalize_positions(positions=positions, indices=indices)
 
-        # Set the DOF states
+        # Write to the PhysX tensor buffer at the specified joint indices (or all joints if None)
         if drive:
-            with og.sim.editing_usd():
-                self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
+            cur = self._articulation_view.get_dof_position_targets()
+            if indices is None:
+                cur[0] = positions
+            else:
+                cur[0, indices] = positions
+            self._articulation_view.set_dof_position_targets(cur, _ARTICULATION_INDICES)
         else:
-            with og.sim.editing_usd():
-                self._articulation_view.set_joint_positions(positions, joint_indices=indices)
+            cur = self._articulation_view.get_dof_positions()
+            if indices is None:
+                cur[0] = positions
+            else:
+                cur[0, indices] = positions
+            self._articulation_view.set_dof_positions(cur, _ARTICULATION_INDICES)
             og.sim.sync_physx_to_fabric()
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
@@ -674,18 +683,27 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to set joint velocities!"
 
         # Possibly de-normalize the inputs
         if normalized:
             velocities = self._denormalize_velocities(velocities=velocities, indices=indices)
 
-        # Set the DOF states
+        # Write to the PhysX tensor buffer at the specified joint indices (or all joints if None)
         if drive:
-            with og.sim.editing_usd():
-                self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
+            cur = self._articulation_view.get_dof_velocity_targets()
+            if indices is None:
+                cur[0] = velocities
+            else:
+                cur[0, indices] = velocities
+            self._articulation_view.set_dof_velocity_targets(cur, _ARTICULATION_INDICES)
         else:
-            with og.sim.editing_usd():
-                self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
+            cur = self._articulation_view.get_dof_velocities()
+            if indices is None:
+                cur[0] = velocities
+            else:
+                cur[0, indices] = velocities
+            self._articulation_view.set_dof_velocities(cur, _ARTICULATION_INDICES)
 
     def set_joint_efforts(self, efforts, indices=None, normalized=False):
         """
@@ -703,14 +721,19 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to set joint efforts!"
 
         # Possibly de-normalize the inputs
         if normalized:
             efforts = self._denormalize_efforts(efforts=efforts, indices=indices)
 
-        # Set the DOF states
-        with og.sim.editing_usd():
-            self._articulation_view.set_joint_efforts(efforts, joint_indices=indices)
+        # Write to the PhysX actuation force tensor buffer
+        cur = self._articulation_view.get_dof_actuation_forces()
+        if indices is None:
+            cur[0] = efforts
+        else:
+            cur[0, indices] = efforts
+        self._articulation_view.set_dof_actuation_forces(cur, _ARTICULATION_INDICES)
 
     def _normalize_positions(self, positions, indices=None):
         """
@@ -828,9 +851,17 @@ class EntityPrim(XFormPrim):
         """
         assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
 
-        # Reinitialize the articulation view
-        if self._articulation_view is not None:
-            self._articulation_view.initialize(og.sim.physics_sim_view)
+        # (Re)create the PhysX articulation tensor view directly from the physics sim view.
+        # The view is valid for the lifetime of the current physics_sim_view; update_handles()
+        # is called whenever the sim view is refreshed, so we simply rebuild the view here.
+        if self.articulated:
+            self._articulation_view = og.sim.physics_sim_view.create_articulation_view(
+                [f"{self.prim_path}/{self.root_link_name}"]
+            )
+            assert (
+                self._articulation_view is not None
+            ), f"Could not create PhysX articulation view at {self.prim_path}/{self.root_link_name}"
+            assert self._articulation_view.is_homogeneous
 
         # Update all links and joints as well
         for link in self._links.values():
@@ -855,8 +886,9 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to read joint positions!"
 
-        joint_positions = self._articulation_view.get_joint_positions().view(self.n_dof)
+        joint_positions = self._articulation_view.get_dof_positions().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
@@ -888,8 +920,9 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to read joint velocities!"
 
-        joint_velocities = self._articulation_view.get_joint_velocities().view(self.n_dof)
+        joint_velocities = self._articulation_view.get_dof_velocities().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
@@ -906,8 +939,9 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to read joint efforts!"
 
-        joint_efforts = self._articulation_view.get_measured_joint_efforts().view(self.n_dof)
+        joint_efforts = self._articulation_view.get_dof_projected_joint_forces().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
@@ -924,8 +958,9 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to read joint position targets!"
 
-        joint_positions = self._articulation_view.get_joint_position_targets().view(self.n_dof)
+        joint_positions = self._articulation_view.get_dof_position_targets().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
@@ -942,8 +977,9 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+        assert og.sim.is_playing(), "Simulator must be playing to read joint velocity targets!"
 
-        joint_velocities = self._articulation_view.get_joint_velocity_targets().view(self.n_dof)
+        joint_velocities = self._articulation_view.get_dof_velocity_targets().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
@@ -1052,13 +1088,11 @@ class EntityPrim(XFormPrim):
                     ), "cannot set position and orientation relative to scene without a scene"
                     position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
-                # Check that the articulation view is valid and can write directly to PhysX
-                assert (
-                    self._articulation_view.is_physics_handle_valid()
-                ), "Unexpected: articulation view is not valid while simulation is playing."
-                self._articulation_view.set_world_poses(
-                    positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
-                )
+                # Write the root pose directly into the PhysX tensor buffer. Orientation is (x,y,z,w) internally.
+                pose = self._articulation_view.get_root_transforms()
+                pose[0, 0:3] = position
+                pose[0, 3:7] = orientation
+                self._articulation_view.set_root_transforms(pose, _ARTICULATION_INDICES)
                 og.sim.sync_physx_to_fabric()
             else:
                 self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
@@ -1433,7 +1467,11 @@ class EntityPrim(XFormPrim):
             n-array: (N,) shaped per-DOF coriolis and centrifugal forces experienced by the entity, if articulated
         """
         assert self.articulated, "Cannot get coriolis and centrifugal forces for non-articulated entity!"
-        return self._articulation_view.get_coriolis_and_centrifugal_forces(clone=clone).view(self.n_dof)
+        assert og.sim.is_playing(), "Simulator must be playing to read coriolis forces!"
+        vals = self._articulation_view.get_coriolis_and_centrifugal_compensation_forces()
+        if clone:
+            vals = vals.clone()
+        return vals.view(self.n_dof)
 
     def get_generalized_gravity_forces(self, clone=True):
         """
@@ -1444,7 +1482,11 @@ class EntityPrim(XFormPrim):
             n-array: (N, N) shaped per-DOF gravity forces, if articulated
         """
         assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
-        return self._articulation_view.get_generalized_gravity_forces(clone=clone).view(self.n_dof)
+        assert og.sim.is_playing(), "Simulator must be playing to read gravity forces!"
+        vals = self._articulation_view.get_gravity_compensation_forces()
+        if clone:
+            vals = vals.clone()
+        return vals.view(self.n_dof)
 
     def get_mass_matrix(self, clone=True):
         """
@@ -1455,7 +1497,11 @@ class EntityPrim(XFormPrim):
             n-array: (N, N) shaped per-DOF mass matrix, if articulated
         """
         assert self.articulated, "Cannot get mass matrix for non-articulated entity!"
-        return self._articulation_view.get_mass_matrices(clone=clone).view(self.n_dof, self.n_dof)
+        assert og.sim.is_playing(), "Simulator must be playing to read mass matrix!"
+        vals = self._articulation_view.get_mass_matrices()
+        if clone:
+            vals = vals.clone()
+        return vals.view(self.n_dof, self.n_dof)
 
     def get_jacobian(self, clone=True):
         """
@@ -1468,7 +1514,11 @@ class EntityPrim(XFormPrim):
                 (i.e.: there is an additional "floating" joint tying the robot to the world frame)
         """
         assert self.articulated, "Cannot get jacobian for non-articulated entity!"
-        return self._articulation_view.get_jacobians(clone=clone).squeeze(dim=0)
+        assert og.sim.is_playing(), "Simulator must be playing to read jacobian!"
+        vals = self._articulation_view.get_jacobians()
+        if clone:
+            vals = vals.clone()
+        return vals.squeeze(dim=0)
 
     def get_relative_jacobian(self, clone=True):
         """
