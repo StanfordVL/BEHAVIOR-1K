@@ -92,6 +92,9 @@ class RigidPrim(XFormPrim):
         ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.RigidBodyAPI)
         ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxRigidBodyAPI)
         ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
+        # Pre-apply so that adding/removing collision filter targets during simulation
+        # only calls AddTarget/RemoveTarget (not Apply), avoiding PhysX tensor view rebuilds.
+        ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.FilteredPairsAPI)
 
         # Check if it's part of an articulation view
         self._belongs_to_articulation = (

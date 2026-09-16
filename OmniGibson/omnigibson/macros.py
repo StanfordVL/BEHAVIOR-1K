@@ -183,6 +183,10 @@ gm.ENABLE_HQ_RENDERING = False
 # objects from tunneling through each other)
 gm.ENABLE_CCD = False
 
+# Minimum collision mesh dimension (meters) below which an object/link is considered "thin"
+# Used to trigger contact offset overrides, higher solver iterations, etc.
+gm.THIN_OBJECT_THRESHOLD = 0.05
+
 # Pairs setting -- USD default is 256 * 1024, physx default apparently is 32 * 1024.
 gm.GPU_PAIRS_CAPACITY = 256 * 1024
 # Aggregate pairs setting -- default is 1024, but is often insufficient for large scenes
