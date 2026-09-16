@@ -225,9 +225,9 @@ def _launch_app():
         # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
         # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
         # ensure that the kit file is always up to date.
-        assert (
-            "EXP_PATH" in os.environ
-        ), "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+        assert "EXP_PATH" in os.environ, (
+            "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+        )
         exp_path = os.environ["EXP_PATH"]
         kit_file = Path(__file__).parent / kit_file_name
         kit_file_target = Path(exp_path) / kit_file_name
@@ -404,9 +404,9 @@ def _launch_simulator(*args, **kwargs):
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
         ):
-            assert (
-                lazy.isaacsim.core.utils.stage.get_current_stage() is None
-            ), "Stage should not exist when creating a new Simulator instance"
+            assert lazy.isaacsim.core.utils.stage.get_current_stage() is None, (
+                "Stage should not exist when creating a new Simulator instance"
+            )
 
             # Here we assign self as the Simulator instance and as og.sim, because certain functions
             # called downstream during the initialization of this object will try to access og.sim.
@@ -689,18 +689,18 @@ def _launch_simulator(*args, **kwargs):
             """
             render_physics_ratio = rendering_dt / physics_dt
             sim_render_ratio = sim_step_dt / rendering_dt
-            assert math.isclose(
-                render_physics_ratio, round(render_physics_ratio)
-            ), f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
-            assert (
-                rendering_dt >= physics_dt
-            ), f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
-            assert math.isclose(
-                sim_render_ratio, round(sim_render_ratio)
-            ), f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
-            assert (
-                sim_step_dt >= rendering_dt
-            ), f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+            assert math.isclose(render_physics_ratio, round(render_physics_ratio)), (
+                f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
+            )
+            assert rendering_dt >= physics_dt, (
+                f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
+            )
+            assert math.isclose(sim_render_ratio, round(sim_render_ratio)), (
+                f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
+            )
+            assert sim_step_dt >= rendering_dt, (
+                f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+            )
 
             # If we're headless, we also enforce that sim_step_dt == rendering_dt because it doesn't make sense
             # to waste rendering that is not observed by the user

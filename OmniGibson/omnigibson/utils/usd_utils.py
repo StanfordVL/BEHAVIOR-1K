@@ -149,9 +149,9 @@ def create_joint(
         assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
 
         # Make sure at least body0 or body1 is specified
-        assert (
-            body0 is not None or body1 is not None
-        ), "At least either body0 or body1 must be specified when creating a joint!"
+        assert body0 is not None or body1 is not None, (
+            "At least either body0 or body1 must be specified when creating a joint!"
+        )
 
         # Create the joint
         joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(current_stage, prim_path)
@@ -848,9 +848,9 @@ class CollisionAPI:
             assert og.sim is None or og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
 
             # Make sure the group doesn't already exist
-            assert (
-                col_group not in cls.ACTIVE_COLLISION_GROUPS
-            ), f"Cannot create collision group {col_group} because it already exists!"
+            assert col_group not in cls.ACTIVE_COLLISION_GROUPS, (
+                f"Cannot create collision group {col_group} because it already exists!"
+            )
 
             # Create the group
             col_group_prim_path = f"/World/collision_groups/{col_group}"
@@ -871,9 +871,9 @@ class CollisionAPI:
         """
         with og.sim.editing_usd():
             # Make sure collision group exists
-            assert (
-                col_group in cls.ACTIVE_COLLISION_GROUPS
-            ), f"Cannot add to collision group {col_group} because it does not exist!"
+            assert col_group in cls.ACTIVE_COLLISION_GROUPS, (
+                f"Cannot add to collision group {col_group} because it does not exist!"
+            )
 
             # Add this prim to the collision group
             cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
@@ -1219,9 +1219,9 @@ class BatchControlViewAPIImpl:
         # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
         self._view = og.sim.physics_sim_view.create_articulation_view(self._pattern)
         view_prim_paths = self._view.prim_paths
-        assert (
-            set(view_prim_paths) == expected_prim_paths
-        ), f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
+        assert set(view_prim_paths) == expected_prim_paths, (
+            f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
+        )
 
         # Create the mapping from prim path to index
         self._idx = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
@@ -1722,12 +1722,11 @@ def get_robot_kinematic_tree_pattern(articulation_root_path: str) -> str:
     assert scene_id.startswith("scene_"), f"Prim path 2nd component {articulation_root_path} does not start with scene_"
     components = robot_name.split("__")
     assert len(components) == 3, (
-        f"Robot prim path's 3rd component {robot_name} does not match "
-        "expected format of prefix__robottype__robotname."
+        f"Robot prim path's 3rd component {robot_name} does not match expected format of prefix__robottype__robotname."
     )
-    assert (
-        components[0] == "controllable"
-    ), f"Prim path {articulation_root_path} 3rd component does not start with 'controllable__'"
+    assert components[0] == "controllable", (
+        f"Prim path {articulation_root_path} 3rd component does not start with 'controllable__'"
+    )
     return articulation_root_path.replace(f"/{scene_id}/", "/scene_*/").replace(
         f"/{robot_name}", f"/{components[0]}__{components[1]}__*"
     )
@@ -2335,9 +2334,9 @@ def add_asset_to_stage(asset_path, prim_path):
         assert asset_type in {"usd", "usda", "obj", "usdz"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
         # Make sure the path exists
-        assert os.path.exists(
-            asset_path
-        ), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
+        assert os.path.exists(asset_path), (
+            f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
+        )
 
         # Add reference to stage and grab prim
         lazy.isaacsim.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
@@ -2403,9 +2402,9 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     # When the scene is set to None, this prim is not in a scene but is global e.g. like the
     # viewer camera or one of the scene prims.
     if scene is None:
-        assert not absolute_prim_path.startswith(
-            "/World/scene_"
-        ), f"Expected global prim path, got {absolute_prim_path}"
+        assert not absolute_prim_path.startswith("/World/scene_"), (
+            f"Expected global prim path, got {absolute_prim_path}"
+        )
         return absolute_prim_path[len("/World") :]
 
     return absolute_prim_path[len(scene.prim_path) :]
