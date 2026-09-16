@@ -343,11 +343,7 @@ class MultiFingerGripperController(GripperController):
 
         # Take care of the special case of binary control
         if self._mode == "binary":
-            goal_sign = -1 if self._is_grasping[controller_idx] == IsGraspingState.TRUE else 1
-            if self._inverted:
-                goal_sign = -1 * goal_sign
-            target = cb.array([goal_sign])
-
+            target = cb.copy(self._goals["target"][controller_idx])
         else:
             if self._motor_type == "position":
                 target = ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]
@@ -367,11 +363,7 @@ class MultiFingerGripperController(GripperController):
 
         # Take care of the special case of binary control
         if self._mode == "binary":
-            command_val = -1 if self._is_grasping[controller_idx] == IsGraspingState.TRUE else 1
-            if self._inverted:
-                command_val = -1 * command_val
-            return cb.array([command_val])
-
+            return cb.copy(self._goals["target"][controller_idx])
         if self._motor_type == "position":
             command = ControllableObjectViewAPI.get_joint_positions(prim_path)[self.dof_idx]
         elif self._motor_type == "velocity":
