@@ -75,6 +75,7 @@ jobs:
           - test_multiple_envs
           - test_object_removal
           - test_object_states
+          - test_poses
           # - test_primitives
           - test_robot_states_flatcache
           - test_robot_teleoperation
