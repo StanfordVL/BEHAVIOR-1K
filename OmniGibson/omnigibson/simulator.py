@@ -1608,8 +1608,14 @@ def _launch_simulator(*args, **kwargs):
                 # view APIs (snapshot-only, drained once per render-step in
                 # _refresh_state_caches), contacts accumulate per sub-step into pending
                 # buffers that update() later walks, so they must be drained here.
-                RigidContactAPI.read_from_physx()
-                wp.synchronize_stream(wp.get_stream())
+                # Warmup-gated like the view-API calls above: play()'s two back-to-back
+                # internal warmup physics steps have no cache drain between them, so they
+                # overflow the pending buffers whenever n_physics_timesteps_per_render is
+                # 1, and play()'s update_handles() rebuilds the contact views right after,
+                # discarding any warmup capture regardless.
+                if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                    RigidContactAPI.read_from_physx()
+                    wp.synchronize_stream(wp.get_stream())
 
                 # Record that we are done with the step context. Joint-break callbacks below
                 # are post-step user code: they may call update_handles() / read Fabric, which
