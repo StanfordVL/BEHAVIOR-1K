@@ -177,6 +177,10 @@ class TensorizedState:
         for s_idx in range(S):
             for obj_idx in th.where(changed_mask[s_idx])[0].tolist():
                 obj = cls.IDX_OBJS[s_idx][obj_idx]
+                if obj is None:
+                    # Column vacated in this scene (e.g. mid-play object removal) but kept
+                    # alive by another scene sharing the relative prim path — see IDX_OBJS.
+                    continue
                 obj.state_updated()
 
     @classmethod

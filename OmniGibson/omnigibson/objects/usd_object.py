@@ -98,6 +98,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config=None,
         abilities=None,
         include_default_states=True,
+        recorded_non_kin_state_names=None,
         expected_file_hash=None,
         **kwargs,
     ):
@@ -129,6 +130,10 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             include_default_states (bool): whether to include the default object states from @get_default_states
+            recorded_non_kin_state_names (None or list[str]): Non-kinematic state classes present in a recording
+                that this object is being constructed to replay. Missing current states are constructed before
+                initialization so serialized rows from an older taxonomy retain their recorded layout. None for
+                ordinary, non-playback construction.
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
@@ -158,6 +163,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._visual_states = None
         self._current_texture_state = None
         self._include_default_states = include_default_states
+        self._recorded_non_kin_state_build_order = (
+            None if recorded_non_kin_state_names is None else tuple(recorded_non_kin_state_names)
+        )
+        self._recorded_non_kin_state_names = (
+            None if self._recorded_non_kin_state_build_order is None else set(self._recorded_non_kin_state_build_order)
+        )
+        # Set to the exact per-demo order by the playback wrapper after reset. The constructor
+        # receives a union because one environment can replay multiple recordings.
+        self._recorded_non_kin_state_order = None
 
         # Load abilities from taxonomy if needed & possible
         # TODO: Move this to dataset object? Loads B1K abilities for non-B1K objects.
@@ -559,6 +573,19 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                             "ability": ability,
                             "params": state_type.postprocess_ability_params(state_params, self.scene),
                         }
+
+        # A recording's flattened object state is not self-describing: if the current taxonomy
+        # has dropped a state, merely filtering out newly-added current states leaves the reader
+        # short and every subsequent object is parsed at the wrong offset. Construct only the
+        # missing recorded states here, after current abilities have supplied their parameters
+        # but before dependencies and tensor views are initialized. States requiring unavailable
+        # parameters or incompatible assets are deliberately allowed to fail loudly below.
+        if self._recorded_non_kin_state_build_order is not None:
+            for state_name in self._recorded_non_kin_state_build_order:
+                if state_name not in REGISTERED_OBJECT_STATES:
+                    raise ValueError(f"Object {self.name}: recording references unknown object state {state_name!r}")
+                state_type = REGISTERED_OBJECT_STATES[state_name]
+                states_info.setdefault(state_type, {"ability": None, "params": dict()})
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
@@ -1132,21 +1159,48 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Combine these two arrays
         return th.cat([state_flat, non_kin_state_flat])
 
+    def _deserialize_non_kin_states(self, state, idx):
+        # Iterate over all states and deserialize their states if they're stateful. When replaying
+        # a recording, use its exact order; membership-only filtering is insufficient because
+        # taxonomy changes can reorder dependencies as well as add or remove states.
+        non_kin_state_dic = dict()
+        recorded_order = getattr(self, "_recorded_non_kin_state_order", None)
+        if recorded_order is None:
+            recorded_names = getattr(self, "_recorded_non_kin_state_names", None)
+            state_items = [
+                (get_state_name(state_type), state_instance)
+                for state_type, state_instance in self._states.items()
+                if state_instance.stateful and (recorded_names is None or get_state_name(state_type) in recorded_names)
+            ]
+        else:
+            current_states = {
+                get_state_name(state_type): state_instance for state_type, state_instance in self._states.items()
+            }
+            missing = [state_name for state_name in recorded_order if state_name not in current_states]
+            if missing:
+                raise ValueError(
+                    f"Object {self.name}: recording contains non-kinematic state(s) {missing}, but the replay "
+                    "object could not construct them. Refusing to deserialize the remaining row at wrong offsets."
+                )
+            state_items = [(state_name, current_states[state_name]) for state_name in recorded_order]
+
+        for state_name, state_instance in state_items:
+            if state_instance.stateful:
+                non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
+                idx += deserialized_items
+            else:
+                raise ValueError(
+                    f"Object {self.name}: recorded non-kinematic state {state_name!r} is no longer stateful; "
+                    "its serialized width cannot be consumed safely."
+                )
+
+        return non_kin_state_dic, idx
+
     def deserialize(self, state):
         # Call super method first
         state_dic, idx = super().deserialize(state=state)
 
-        # Iterate over all states and deserialize their states if they're stateful
-        non_kin_state_dic = dict()
-        recorded_non_kin_state_names = getattr(self, "_recorded_non_kin_state_names", None)
-        for state_type, state_instance in self._states.items():
-            state_name = get_state_name(state_type)
-            if recorded_non_kin_state_names is not None and state_name not in recorded_non_kin_state_names:
-                continue
-            if state_instance.stateful:
-                non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
-                idx += deserialized_items
-        state_dic["non_kin"] = non_kin_state_dic
+        state_dic["non_kin"], idx = self._deserialize_non_kin_states(state=state, idx=idx)
 
         return state_dic, idx
 

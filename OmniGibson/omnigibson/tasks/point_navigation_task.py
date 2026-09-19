@@ -347,8 +347,12 @@ class PointNavigationTask(BaseTask):
             # stepping the simulator and checking for collisions. We should consider alternatives.
             initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env, env_idx)
 
-            # Land the robot
-            robot.set_position_orientation(position=initial_pos, orientation=initial_quat)
+            # Land the robot. The sampled pose comes from scene.get_random_point() → trav_map.map_to_world,
+            # which returns coordinates in the scene's own local frame. With multi-scene envs, scene_N's
+            # scene_prim is offset from world origin, so we must mark the pose as scene-relative and let
+            # set_position_orientation convert to world — otherwise the holonomic base joints get set to
+            # reach a world pose well outside their reasonable range and the articulation diverges to NaN.
+            robot.set_position_orientation(position=initial_pos, orientation=initial_quat, frame="scene")
 
             # Store the sampled values internally
             self._initial_pos[env_idx] = initial_pos

@@ -74,8 +74,8 @@ def _next_to_kernel(
         values[s, i, j] = wp.uint8(0)
         return
 
-    # OR over horizontal axes in both directions. Branchless — drops the legacy short-circuit
-    # between the self and other paths; total work is bounded by 2 * HORIZONTAL_DIRECTION_COUNT.
+    # OR over horizontal rays from both objects. Branchless — drops the legacy short-circuit
+    # between the self and other paths; total work is bounded by twice the horizontal K span.
     hit = wp.uint8(0)
     for k in range(_HORIZONTAL_K_START, _HORIZONTAL_K_END):
         if adjacency_values[s, adj_i, adj_j, k] != wp.uint8(0):
