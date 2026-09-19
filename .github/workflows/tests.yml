@@ -72,7 +72,11 @@ jobs:
           # - test_data_collection  # TODO: https://github.com/StanfordVL/BEHAVIOR-1K/issues/2016
           - test_dump_load_states
           - test_envs
-          - test_multiple_envs
+          - test_multiple_envs_dummy_api
+          - test_multiple_envs_dummy_scene
+          - test_multiple_envs_heat_narrow_phase
+          - test_multiple_envs_heat_states
+          - test_multiple_envs_transition_rules
           - test_object_removal
           - test_object_states
           # - test_primitives
@@ -86,6 +90,17 @@ jobs:
           - test_snapshots
           - test_transition_rules
         include:
+        # The three BehaviorTask multi-env suites share one env (see the `behavior_env` fixture in
+        # tests/conftest.py), so running them in a single job loads house_double_floor_lower once
+        # instead of once per file. They stay separate files; only the job is shared.
+          - test_file: test_multiple_envs_behavior_scene
+            extra_files: >-
+              tests/test_multiple_envs_behavior_task.py
+        # The task-type suites share the same gm macros, so one job pays the Isaac startup cost once.
+          - test_file: test_multiple_envs_task_tensors
+            extra_files: >-
+              tests/test_multiple_envs_grasp.py
+              tests/test_multiple_envs_point_tasks.py
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
           - {test_file: test_examples, example: "environments.vector_env_demo"}
@@ -134,7 +149,7 @@ jobs:
 
       - name: Run tests
         run: >
-          pytest -s tests/${{ matrix.test_file }}.py
+          pytest -s tests/${{ matrix.test_file }}.py ${{ matrix.extra_files || '' }}
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
           ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
           --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml

@@ -4,12 +4,15 @@ import shutil
 import torch as th
 from lerobot.configs import DepthEncoderConfig, VideoEncoderConfig
 from lerobot.datasets import LeRobotDataset
+from lerobot.datasets.io_utils import write_info
 from lerobot.utils.constants import HF_LEROBOT_HOME
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.envs.env_base import Environment
 from omnigibson.envs.data_wrapper import DataWrapper, DataPlaybackWrapper
 from omnigibson.eval.utils.obs_utils import DEPTH_SHIFT, MAX_DEPTH, MIN_DEPTH
+from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.utils.asset_utils import get_omnigibson_git_hash
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.tasks.behavior_task import BehaviorTask
 
@@ -49,6 +52,12 @@ class LeRobotDataWrapper(DataWrapper):
             task_name (None or str): If specified, task that will be recorded in LeRobot dataset. If not specified,
                 will try to automatically infer if the wrapped environment is a BehaviorTask
         """
+        # LeRobot dataset assumes a single scene with a single robot for deterministic obs mapping.
+        # Fail fast before any env.scene / env.scene.robots[0] reads (e.g., _init_lerobot_kwargs below).
+        assert env.num_envs == 1, f"LeRobotDataWrapper is single-env only; got num_envs={env.num_envs}."
+        assert (
+            len(env.scene.robots) == 1
+        ), f"LeRobotDataWrapper requires exactly one robot per scene; got {len(env.scene.robots)}."
         self._init_lerobot_kwargs(
             repo_id=output_path,
             root_dir=root_dir,
@@ -77,7 +86,7 @@ class LeRobotDataWrapper(DataWrapper):
         self.lerobot_dataset_kwargs = {
             "repo_id": repo_id,
             "root": f"{root_dir}/{repo_id}",
-            "robot_type": env.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
+            "robot_type": env.scene.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
             "use_videos": True,
             "streaming_encoding": True,
             "camera_encoder": VideoEncoderConfig(
@@ -193,9 +202,10 @@ class LeRobotDataWrapper(DataWrapper):
                 raise ValueError(f"Encoded video {video_key} has fps={video_fps}, expected fps={self.fps}")
 
     def _process_obs(self, obs: dict[str, th.Tensor], info: dict) -> dict[str, th.Tensor]:
-        # Add tfs to flattened obs
-        robot_tf_inv = T.pose_inv(T.pose2mat(self.env.robots[0].get_position_orientation()))
-        for sensor_group in (self.env.external_sensors, self.env.robots[0].sensors):
+        # Add tfs to flattened obs (single-env wrapper: scene index 0)
+        robot_tf_inv = T.pose_inv(T.pose2mat(self.env.scene.robots[0].get_position_orientation()))
+        external_sensors = self.env.external_sensors[0] if self.env.external_sensors is not None else None
+        for sensor_group in (external_sensors, self.env.scene.robots[0].sensors):
             if sensor_group is None:
                 continue
             for name, sensor in sensor_group.items():
@@ -251,9 +261,11 @@ class LeRobotDataWrapper(DataWrapper):
                 resume = True
                 log.info(f"Resuming from existing LeRobot dataset at: {abs_output_path}")
 
-        # For now, we only support a single robot for the sake of deterministic mapping ofrobot obs
-        assert len(env.robots) == 1, "Only one robot supported for LeRobot dataset storage!"
-        robot = env.robots[0]
+        # For now, we only support a single scene with a single robot for the sake of deterministic mapping of robot obs
+        assert (
+            len(env.scenes) == 1 and len(env.scene.robots) == 1
+        ), "Only one scene with one robot supported for LeRobot dataset storage!"
+        robot = env.scene.robots[0]
 
         # Create LeRobot dataset, define features to store
         # Define standard features (RL-related entries, language instructions)
@@ -303,6 +315,24 @@ class LeRobotDataWrapper(DataWrapper):
             self.dataset = LeRobotDataset.resume(
                 **resume_kwargs,
             )
+
+        # Add in camera K matrices
+        cam_intrinsics = dict()
+
+        external_sensors = env.external_sensors[0] if env.external_sensors is not None else {}
+        for sensor_name, sensor in external_sensors.items():
+            if isinstance(sensor, VisionSensor):
+                K = sensor.intrinsic_matrix.cpu()
+                cam_intrinsics[sensor_name] = K.numpy().tolist()
+        for sensor_name, sensor in env.scene.robots[0].sensors.items():
+            if isinstance(sensor, VisionSensor):
+                # Remove robot naming prefix
+                sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
+                K = sensor.intrinsic_matrix.cpu()
+                cam_intrinsics[sensor_name] = K.numpy().tolist()
+        self.dataset.meta.info["cam_intrinsics"] = cam_intrinsics
+        self.dataset.meta.info["omnigibson_git_hash"] = get_omnigibson_git_hash()
+        write_info(self.dataset.meta.info, self.dataset.meta.root)
 
     def process_traj_to_dataset(self, traj_data: list[dict]) -> None:
         # Write to LeRobot dataset

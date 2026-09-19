@@ -52,7 +52,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         og.log.info("Resetting environment")
         env.reset()
         for i in range(100):
-            action = env.robots[0].action_space.sample()
+            action = env.scene.robots[0].action_space.sample()
             state, reward, terminated, truncated, info = env.step(action * 0.1)
             if terminated or truncated:
                 og.log.info("Episode finished after {} timesteps".format(i + 1))

@@ -9,6 +9,10 @@ from omnigibson.macros import gm
 
 HEAD_RESOLUTION = (720, 720)
 WRIST_RESOLUTION = (480, 480)
+# Standard eval camera roles. Eval wrappers key their camera_spec() resolution by these roles; the
+# Evaluator maps each role to a concrete robot sensor via the robot config's
+# eval.camera_sensor_names (see get_robot_camera_names) when baking resolution at env creation.
+EVAL_CAMERA_ROLES = ("left_wrist", "right_wrist", "head")
 DEFAULT_EVAL_SEED = 0
 EVAL_TIMEOUT_MULTIPLIER = 1.5
 NUM_TEST_INSTANCES = 40

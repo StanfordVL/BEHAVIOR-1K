@@ -1,3 +1,5 @@
+import torch as th
+
 from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
@@ -20,25 +22,28 @@ class MaxCollision(FailureCondition):
         self._robot_idn = robot_idn
         self._ignore_self_collisions = ignore_self_collisions
         self._max_collisions = max_collisions
-        self._n_collisions = 0
+        self._n_collisions = None
 
         # Run super init
         super().__init__()
 
-    def reset(self, task, env):
+    def reset(self, task, env, env_indices):
         # Call super first
-        super().reset(task, env)
+        super().reset(task, env, env_indices)
 
         # Also reset collision counter
-        self._n_collisions = 0
+        if self._n_collisions is None:
+            self._n_collisions = th.zeros(env.num_envs, dtype=th.int64)
+        self._n_collisions[env_indices] = 0
 
     def _step(self, task, env, action):
         # Terminate if the robot has collided more than self._max_collisions times
-        robot = env.robots[self._robot_idn]
-        floors = list(env.scene.object_registry("category", "floors", []))
-        ignore_objs = floors + [robot] if self._ignore_self_collisions else floors
-        in_contact = RigidContactAPI.is_in_contact(
-            scene_idx=robot.scene.idx, query_set=[robot], with_set=None, ignore_set=ignore_objs, current_only=False
-        )
-        self._n_collisions += int(in_contact)
+        for env_idx in range(env.num_envs):
+            robot = env.scenes[env_idx].robots[self._robot_idn]
+            floors = list(env.scenes[env_idx].object_registry("category", "floors", []))
+            ignore_objs = floors + [robot] if self._ignore_self_collisions else floors
+            in_contact = RigidContactAPI.is_in_contact(
+                scene_idx=robot.scene.idx, query_set=[robot], with_set=None, ignore_set=ignore_objs, current_only=False
+            )
+            self._n_collisions[env_idx] += int(in_contact)
         return self._n_collisions > self._max_collisions

@@ -20,8 +20,8 @@ from omnigibson.object_states.factory import (
     get_fire_states,
     get_requirements_for_ability,
     get_state_name,
+    get_states_and_params_for_ability,
     get_states_by_dependency_order,
-    get_states_for_ability,
     get_steam_states,
     get_texture_change_priority,
     get_texture_change_states,
@@ -98,6 +98,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config=None,
         abilities=None,
         include_default_states=True,
+        recorded_non_kin_state_names=None,
         expected_file_hash=None,
         **kwargs,
     ):
@@ -129,6 +130,10 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             include_default_states (bool): whether to include the default object states from @get_default_states
+            recorded_non_kin_state_names (None or list[str]): Non-kinematic state classes present in a recording
+                that this object is being constructed to replay. Missing current states are constructed before
+                initialization so serialized rows from an older taxonomy retain their recorded layout. None for
+                ordinary, non-playback construction.
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
@@ -158,6 +163,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._visual_states = None
         self._current_texture_state = None
         self._include_default_states = include_default_states
+        self._recorded_non_kin_state_build_order = (
+            None if recorded_non_kin_state_names is None else tuple(recorded_non_kin_state_names)
+        )
+        self._recorded_non_kin_state_names = (
+            None if self._recorded_non_kin_state_build_order is None else set(self._recorded_non_kin_state_build_order)
+        )
+        # Set to the exact per-demo order by the playback wrapper after reset. The constructor
+        # receives a union because one environment can replay multiple recordings.
+        self._recorded_non_kin_state_order = None
 
         # Load abilities from taxonomy if needed & possible
         # TODO: Move this to dataset object? Loads B1K abilities for non-B1K objects.
@@ -309,6 +323,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             )
             n_fixed_joints += 1
 
+        # Add articulated_ prefix into prim path so ArticulationView can use a simple pattern match
+        # Only for non-robot articulated objects
+        if (
+            not kinematic_only
+            and (n_joints > 0 or n_fixed_joints > 0)
+            and not self._relative_prim_path.startswith("/controllable")
+        ):
+            self._relative_prim_path = f"/articulated__{self.name}"
+
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
@@ -337,8 +360,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         This is useful for pre-compiling scene USDs, speeding up load times especially for parallel envs.
         """
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
-        prim_path = "/World" + self._relative_prim_path
         usd_path = self._prepare_to_load()
+        prim_path = "/World" + self._relative_prim_path
         prim = stage.GetPrimAtPath(prim_path)
         assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
         prim = stage.DefinePrim(prim_path, "Xform")
@@ -535,11 +558,34 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                         break
                 if compatible:
                     params = self._abilities[ability]
-                    for state_type in get_states_for_ability(ability):
+                    for state_type, state_params in get_states_and_params_for_ability(ability, params):
+                        # Fail loudly instead of silently letting the last ability's params win —
+                        # a single state instance can't serve two abilities (e.g. an object that
+                        # is both a heatSource and flammable is not supported; the BDDL data
+                        # generation sanity checks enforce this at the synset level). Raised
+                        # unconditionally (not an assert) so python -O cannot skip it.
+                        if state_type in states_info:
+                            raise ValueError(
+                                f"Object {self.name}: state {state_type.__name__} is requested by multiple abilities "
+                                f"({states_info[state_type]['ability']} and {ability}); this is not supported."
+                            )
                         states_info[state_type] = {
                             "ability": ability,
-                            "params": state_type.postprocess_ability_params(params, self.scene),
+                            "params": state_type.postprocess_ability_params(state_params, self.scene),
                         }
+
+        # A recording's flattened object state is not self-describing: if the current taxonomy
+        # has dropped a state, merely filtering out newly-added current states leaves the reader
+        # short and every subsequent object is parsed at the wrong offset. Construct only the
+        # missing recorded states here, after current abilities have supplied their parameters
+        # but before dependencies and tensor views are initialized. States requiring unavailable
+        # parameters or incompatible assets are deliberately allowed to fail loudly below.
+        if self._recorded_non_kin_state_build_order is not None:
+            for state_name in self._recorded_non_kin_state_build_order:
+                if state_name not in REGISTERED_OBJECT_STATES:
+                    raise ValueError(f"Object {self.name}: recording references unknown object state {state_name!r}")
+                state_type = REGISTERED_OBJECT_STATES[state_name]
+                states_info.setdefault(state_type, {"ability": None, "params": dict()})
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
@@ -586,8 +632,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if emitter_type == EmitterType.FIRE:
             fire_at_meta_link = True
             if OnFire in self.states:
-                # Note whether the heat source link is explicitly set
-                link = self.states[OnFire].link
+                # Flammable object: the fire is placed at the companion heat source's link
+                # (the heatsource meta link when annotated, e.g. a candle wick; the root link
+                # otherwise). OnFire itself is a pure threshold detector and carries no link.
+                heat_source = self.states.get(HeatSourceOrSink)
+                link = heat_source.link if heat_source is not None else self.root_link
                 fire_at_meta_link = link != self.root_link
             elif HeatSourceOrSink in self.states:
                 # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
@@ -1110,21 +1159,48 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Combine these two arrays
         return th.cat([state_flat, non_kin_state_flat])
 
+    def _deserialize_non_kin_states(self, state, idx):
+        # Iterate over all states and deserialize their states if they're stateful. When replaying
+        # a recording, use its exact order; membership-only filtering is insufficient because
+        # taxonomy changes can reorder dependencies as well as add or remove states.
+        non_kin_state_dic = dict()
+        recorded_order = getattr(self, "_recorded_non_kin_state_order", None)
+        if recorded_order is None:
+            recorded_names = getattr(self, "_recorded_non_kin_state_names", None)
+            state_items = [
+                (get_state_name(state_type), state_instance)
+                for state_type, state_instance in self._states.items()
+                if state_instance.stateful and (recorded_names is None or get_state_name(state_type) in recorded_names)
+            ]
+        else:
+            current_states = {
+                get_state_name(state_type): state_instance for state_type, state_instance in self._states.items()
+            }
+            missing = [state_name for state_name in recorded_order if state_name not in current_states]
+            if missing:
+                raise ValueError(
+                    f"Object {self.name}: recording contains non-kinematic state(s) {missing}, but the replay "
+                    "object could not construct them. Refusing to deserialize the remaining row at wrong offsets."
+                )
+            state_items = [(state_name, current_states[state_name]) for state_name in recorded_order]
+
+        for state_name, state_instance in state_items:
+            if state_instance.stateful:
+                non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
+                idx += deserialized_items
+            else:
+                raise ValueError(
+                    f"Object {self.name}: recorded non-kinematic state {state_name!r} is no longer stateful; "
+                    "its serialized width cannot be consumed safely."
+                )
+
+        return non_kin_state_dic, idx
+
     def deserialize(self, state):
         # Call super method first
         state_dic, idx = super().deserialize(state=state)
 
-        # Iterate over all states and deserialize their states if they're stateful
-        non_kin_state_dic = dict()
-        recorded_non_kin_state_names = getattr(self, "_recorded_non_kin_state_names", None)
-        for state_type, state_instance in self._states.items():
-            state_name = get_state_name(state_type)
-            if recorded_non_kin_state_names is not None and state_name not in recorded_non_kin_state_names:
-                continue
-            if state_instance.stateful:
-                non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
-                idx += deserialized_items
-        state_dic["non_kin"] = non_kin_state_dic
+        state_dic["non_kin"], idx = self._deserialize_non_kin_states(state=state, idx=idx)
 
         return state_dic, idx
 

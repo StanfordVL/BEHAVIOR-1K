@@ -1,9 +1,8 @@
-import math
 from typing import Literal
 
 import torch as th
 
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.usd_utils import RigidBodyViewAPI
 
 from .rigid_prim import RigidPrim
 
@@ -27,12 +26,6 @@ class RigidKinematicPrim(RigidPrim):
         name,
         load_config=None,
     ):
-        # Caches for kinematic-only objects
-        # This exists because RigidPrimView uses USD pose read, which is very slow
-        # For scene-relative poses, we also manually compute pose transforms, which can be slow if repeatedly queried
-        self._kinematic_pose_cache = dict()  # "scene", "world" keys
-
-        # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
             name=name,
@@ -61,59 +54,9 @@ class RigidKinematicPrim(RigidPrim):
             frame (Literal): The frame in which to set the position and orientation. Defaults to world.
                 Scene frame sets position relative to the scene.
         """
-        # Use the XFormPrim implementation directly
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
-        # Invalidate kinematic-only object pose cache when new pose is set
-        self.clear_kinematic_only_cache()
-
-    def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
-        """
-        Gets prim's pose with respect to the specified frame.
-
-        Args:
-            frame (Literal): frame to get the pose with respect to. Default to world.
-                scene frame gets position relative to the scene.
-            clone (bool): Whether to clone the internal buffer or not when grabbing data
-
-        Returns:
-            2-tuple:
-                - th.Tensor: (x,y,z) position in the specified frame
-                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
-        """
-        # If we don't have the raw (world-frame) pose, query it now
-        if "world" not in self._kinematic_pose_cache:
-            # If this is the first time we're getting the pose, use XFormPrim implementation
-            position, orientation = XFormPrim.get_position_orientation(self, clone=clone)
-
-            # Assert that the orientation is a unit quaternion
-            assert math.isclose(
-                th.norm(orientation).item(), 1, abs_tol=1e-3
-            ), f"{self.prim_path} orientation {orientation} is not a unit quaternion."
-
-            # Cache world pose
-            self._kinematic_pose_cache["world"] = (position, orientation)
-
-        # Grab the pose in the desired frame
-        if frame == "scene":
-            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-            if "scene" not in self._kinematic_pose_cache:
-                # Transform the pose into the scene-relative frame
-                self._kinematic_pose_cache["scene"] = self.scene.convert_world_pose_to_scene_relative(
-                    *self._kinematic_pose_cache["world"]
-                )
-            pos, ori = self._kinematic_pose_cache["scene"]
-        else:
-            pos, ori = self._kinematic_pose_cache["world"]
-
-        return pos, ori
-
-    def clear_kinematic_only_cache(self):
-        """
-        Clears the internal kinematic only cached pose. Useful if the parent prim's pose
-        changes without explicitly calling this prim's pose setter
-        """
-        self._kinematic_pose_cache = dict()
+        RigidBodyViewAPI.invalidate_kinematic([self])
 
     # The following methods implement the same interface as RigidDynamicPrim, but as no-op
     # versions for kinematic-only prims. This allows code to call these methods on any RigidPrim

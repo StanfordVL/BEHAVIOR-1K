@@ -115,12 +115,12 @@ def env(shared_env):
 
 @pytest.fixture
 def robot(env):
-    return env.robots[0]
+    return env.scene.robots[0]
 
 
 @pytest.fixture
 def prim_gen(env):
-    return SymbolicSemanticActionPrimitives(env, env.robots[0])
+    return SymbolicSemanticActionPrimitives(env, env.scene.robots[0])
 
 
 @pytest.fixture
