@@ -518,6 +518,14 @@ class BatchedEvaluator:
         snapshotting each scene's initial state -- otherwise the robot drifts under gravity before the
         snapshot.
         """
+        # Hold everything BEFORE the first step as well: without this the first step_physics()
+        # runs on the freshly loaded state with nothing held, which is the gravity drift this
+        # settle exists to prevent. Every later step is already covered by the keep_still() at the
+        # end of the loop body.
+        for env_idx in env_indices:
+            for inst, entity in self.instance_eval_states[env_idx].env_accessor.object_scope.items():
+                if not is_system_bddl_inst(inst) and entity is not None:
+                    entity.keep_still()
         for _ in range(25):
             og.sim.step_physics()
             for env_idx in env_indices:
