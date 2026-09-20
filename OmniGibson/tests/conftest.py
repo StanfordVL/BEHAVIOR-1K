@@ -7,6 +7,8 @@ from omnigibson.objects import DatasetObject
 from omnigibson.robots import Robot
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod
 
+from utils import MULTI_ENV_ROBOTS
+
 
 @pytest.fixture
 def stopped_env():
@@ -413,6 +415,128 @@ def oyster(stopped_env):
     obj = DatasetObject(name="oyster", category="oyster", model="enzocs")
     _add_obj(stopped_env, obj)
     return obj
+
+
+@pytest.fixture(scope="module", params=MULTI_ENV_ROBOTS)
+def robot_model(request):
+    """Robot model name under test (a string like "fetch").
+
+    Module-scoped and parametrized so pytest groups all tests for one robot together, which lets
+    `make_multi_env` build a single env per robot instead of one per test.
+
+    NOTE: named `robot_model`, not `robot` -- the `robot` fixture above returns a Robot *object*.
+    """
+    return request.param
+
+
+@pytest.fixture(scope="module")
+def make_multi_env():
+    """Module-scoped *factory* for multi-env Environments, reusing one env across tests.
+
+    NOTE: named `make_multi_env`, not `multi_env` -- test_multiple_envs_{heat_states,
+    heat_narrow_phase,transition_rules}.py already define a module fixture called `multi_env`
+    that is an Environment, not a factory. Keeping the names distinct avoids two things with the
+    same name meaning different types.
+
+    Building an Environment is by far the dominant cost of the multi-env suites, so this keeps a
+    single env alive for the whole module and only rebuilds when a test asks for a different
+    (num_envs, robot, task_type, additional_objects_cfg) combination. Order the tests in a module
+    so that same-configuration tests are adjacent, and parametrize robots via a module-scoped fixture
+    (not @pytest.mark.parametrize) so pytest groups by robot instead of by test function.
+
+    Every call returns a freshly `reset()` env, and the fixture owns teardown -- tests must NOT call
+    og.clear() themselves, or the cached env would be destroyed out from under the next test.
+    """
+    from utils import setup_multi_environment
+
+    state = {"key": None, "env": None}
+
+    def _get(num_envs, robot="fetch", task_type="DummyTask", additional_objects_cfg=None):
+        key = (num_envs, robot, task_type, repr(additional_objects_cfg))
+        if state["key"] != key:
+            if state["env"] is not None:
+                og.clear()
+                state["env"], state["key"] = None, None
+            state["env"] = setup_multi_environment(
+                num_envs=num_envs,
+                robot=robot,
+                task_type=task_type,
+                additional_objects_cfg=additional_objects_cfg,
+            )
+            state["key"] = key
+        elif og.sim.is_stopped():
+            # A prior test may have left the sim stopped (e.g. the stopped-sim setter tests)
+            og.sim.play()
+        state["env"].reset()
+        return state["env"]
+
+    try:
+        yield _get
+    finally:
+        if state["env"] is not None:
+            og.clear()
+
+
+# ---------------------------------------------------------------------------
+# Shared BehaviorTask env, reused across the test_multiple_envs_behavior_* files
+# ---------------------------------------------------------------------------
+#
+# Loading `house_double_floor_lower` x2 with a BehaviorTask takes ~40s and dominates those suites.
+# The three files use an identical config, so when they run in one pytest invocation (see the
+# combined entry in .github/workflows/tests.yml) they share a single env instead of loading one
+# each. The env is cached by config here rather than held in a session-scoped fixture, so a test
+# that needs a *different* config (e.g. use_presampled_robot_pose=False) simply rebuilds, and the
+# ordering between files never matters.
+#
+# NOTE: because the env outlives individual tests, the per-test `reset()` below is load-bearing,
+# not just tidiness. Tests must NOT call og.clear() themselves.
+_BEHAVIOR_ENV_CACHE = {"key": None, "env": None}
+
+
+def _get_behavior_env(num_envs, use_presampled_robot_pose):
+    from utils import setup_behavior_environment
+
+    key = (num_envs, use_presampled_robot_pose)
+    if _BEHAVIOR_ENV_CACHE["key"] != key:
+        if _BEHAVIOR_ENV_CACHE["env"] is not None:
+            # An env built with a different config is still loaded -- tear it down first. Without an
+            # explicit clear, the new env's object-state machinery references prims from the previous
+            # scenes and crashes during play() with `'NoneType' object has no attribute 'state_updated'`.
+            og.clear()
+            _BEHAVIOR_ENV_CACHE["env"], _BEHAVIOR_ENV_CACHE["key"] = None, None
+        _BEHAVIOR_ENV_CACHE["env"] = setup_behavior_environment(
+            num_envs=num_envs, use_presampled_robot_pose=use_presampled_robot_pose
+        )
+        _BEHAVIOR_ENV_CACHE["key"] = key
+    elif og.sim.is_stopped():
+        og.sim.play()
+    _BEHAVIOR_ENV_CACHE["env"].reset()
+    return _BEHAVIOR_ENV_CACHE["env"]
+
+
+@pytest.fixture(scope="session")
+def _behavior_env_owner():
+    """Owns teardown of whatever BehaviorTask env is cached at the end of the session."""
+    yield
+    if _BEHAVIOR_ENV_CACHE["env"] is not None:
+        og.clear()
+        _BEHAVIOR_ENV_CACHE["env"], _BEHAVIOR_ENV_CACHE["key"] = None, None
+
+
+@pytest.fixture
+def behavior_env(_behavior_env_owner):
+    """The standard shared BehaviorTask env (num_envs=2, presampled robot pose), freshly reset."""
+    from utils import BEHAVIOR_NUM_ENVS
+
+    return _get_behavior_env(num_envs=BEHAVIOR_NUM_ENVS, use_presampled_robot_pose=True)
+
+
+@pytest.fixture
+def behavior_env_no_presample(_behavior_env_owner):
+    """BehaviorTask env built with use_presampled_robot_pose=False, freshly reset."""
+    from utils import BEHAVIOR_NUM_ENVS
+
+    return _get_behavior_env(num_envs=BEHAVIOR_NUM_ENVS, use_presampled_robot_pose=False)
 
 
 def pytest_addoption(parser):
