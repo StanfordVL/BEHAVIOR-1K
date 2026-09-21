@@ -413,12 +413,12 @@ def test_curobo():
         print(
             f"Collision checking false positive: {false_positive / n_samples}, false negative: {false_negative / n_samples}."
         )
-        assert (
-            false_positive / n_samples <= max_false_positive_rate
-        ), f"Collision checking false positive rate: {false_positive / n_samples} > {max_false_positive_rate}"
-        assert (
-            false_negative / n_samples <= max_false_negative_rate
-        ), f"Collision checking false negative rate: {false_negative / n_samples} > {max_false_negative_rate}"
+        assert false_positive / n_samples <= max_false_positive_rate, (
+            f"Collision checking false positive rate: {false_positive / n_samples} > {max_false_positive_rate}"
+        )
+        assert false_negative / n_samples <= max_false_negative_rate, (
+            f"Collision checking false negative rate: {false_negative / n_samples} > {max_false_negative_rate}"
+        )
 
         env.scene.reset()
 
