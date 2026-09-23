@@ -93,6 +93,12 @@ class MobileManipulationDefinition:
     # Multiple arm pose support (optional)
     default_arm_pose_key: Optional[str] = None
     default_arm_poses: Optional[Dict[str, List[Any]]] = None
+    # Joint name for each entry of (un)tucked_default_joint_pos, in order (optional). Physics backends
+    # can enumerate sibling joints (joints sharing a parent link) in different orders, so applying these
+    # positional vectors blind to the active backend's own joint order can silently swap values between
+    # joints. When provided, callers should reorder by name into the live backend's joint order instead
+    # of applying positionally.
+    joint_names: Optional[List[str]] = None
 
 
 # === Main Robot Definition ===

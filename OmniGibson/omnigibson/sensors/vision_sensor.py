@@ -324,6 +324,7 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
+
             if modality == "pointcloud":
                 raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
                 # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
