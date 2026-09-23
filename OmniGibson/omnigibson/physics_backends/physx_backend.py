@@ -497,8 +497,6 @@ class PhysXBackend(PhysicsBackend):
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         prim = self.sim.stage.GetPrimAtPath(prim_path)
         values = {"bend": bend, "damping": damping, "shear": shear, "stretch": stretch}
-        # One editing_usd() block for all four, rather than per-attribute: nesting is forbidden and
-        # each entry into the context costs a USD->Fabric sync.
         with self.sim.editing_usd():
             for key, value in values.items():
                 if value is not None:

@@ -327,7 +327,7 @@ class VisionSensor(BaseSensor):
             raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
 
             if modality == "pointcloud":
-                raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+                raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
                 # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
                 # Note: rgb values are in the range of [0, 255], xyz is in world frame
                 concatenated = np.concatenate([raw_obs["pointRgb"][:, :3], raw_obs["data"]], axis=1)
