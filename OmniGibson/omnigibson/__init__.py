@@ -6,7 +6,7 @@ import signal
 import tempfile
 
 from omnigibson.controllers import REGISTERED_CONTROLLERS
-from omnigibson.envs import Environment, VectorEnvironment
+from omnigibson.envs import Environment
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
@@ -52,7 +52,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
 
-__version__ = "3.9.1"
+__version__ = "3.9.2"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -196,5 +196,4 @@ __all__ = [
     "shutdown",
     "sim",
     "tempdir",
-    "VectorEnvironment",
 ]

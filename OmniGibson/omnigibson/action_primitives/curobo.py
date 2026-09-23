@@ -97,9 +97,6 @@ class CuRoboMotionGenerator:
                 Increasing this value will make the motion planner more conservative in its planning with respect
                 to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
-        # Only support one scene for now -- verify that this is the case
-        assert len(og.sim.scenes) == 1
-
         # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
         self.debug = debug
@@ -119,7 +116,7 @@ class CuRoboMotionGenerator:
         # TODO [Wensi]: Check whether this is still true for future releases.
         print(
             """
-            NOTE: Currently (v3.9.1), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
+            NOTE: Currently (v3.9.2), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
                 will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues. 
                 Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used. 
             """

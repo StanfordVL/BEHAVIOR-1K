@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="3.9.1",
+    version="3.9.2",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -78,7 +78,7 @@ setup(
         ],
         "primitives": [
             "ninja~=1.13.0",
-            "warp-lang>=0.9.0,<1.13",
+            "warp-lang==1.12.0",
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@78612f45cef52c3fa0298de243a54cd7ca614414",
         ],
         "eval": [

@@ -374,19 +374,31 @@ if [ "$OMNIGIBSON" = true ]; then
                     "isaacsim_extscache_kit_sdk-5.1.0.0"
                 )
 
+                # --fail keeps an HTTP error page from being saved under a .whl name;
+                # --speed-limit/--speed-time abort a transfer that stalls without erroring.
+                local curl_opts=(-sS --location --fail --connect-timeout 30 --speed-limit 1024 --speed-time 60)
+
                 local wheel_files=()
                 for pkg in "${packages[@]}"; do
                     local pkg_name=${pkg%-*}
                     local filename="${pkg}-cp311-none-manylinux_2_35_${ARCH}.whl"
                     local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
                     local filepath="$temp_dir/$filename"
+                    local attempt
 
                     echo "Downloading $pkg..."
-                    if ! curl -sL "$url" -o "$filepath"; then
-                        echo "ERROR: Failed to download $pkg"
-                        rm -rf "$temp_dir"
-                        return 1
-                    fi
+                    for attempt in 1 2 3 4 5; do
+                        if curl "${curl_opts[@]}" "$url" -o "$filepath"; then
+                            break
+                        fi
+                        if [ "$attempt" -eq 5 ]; then
+                            echo "ERROR: Failed to download $pkg"
+                            rm -rf "$temp_dir"
+                            return 1
+                        fi
+                        echo "Retrying $pkg ($attempt/5)..."
+                        sleep 5
+                    done
 
                     # Rename for older GLIBC
                     if check_glibc_old; then
