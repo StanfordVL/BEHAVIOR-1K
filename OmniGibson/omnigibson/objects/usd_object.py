@@ -263,6 +263,17 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             return scale.float()
         return th.ones(3)
 
+    def _apply_usd_hotfixes(self, stage, default_prim):
+        """
+        Hook for patching the object's USD in place before anything else inspects it. Subclasses can override to
+        fix up asset-side annotation bugs that we cannot currently re-export the assets for.
+
+        Args:
+            stage (Usd.Stage): The side stage opened by _preapply_articulation_root.
+            default_prim (Usd.Prim): The default prim of @stage.
+        """
+        pass
+
     def _preapply_articulation_root(self, usd_path):
         """
         Opens @usd_path with the pxr library, strips any existing ArticulationRootAPI, determines the correct prim to
@@ -270,6 +281,9 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         stage = lazy.pxr.Usd.Stage.Open(usd_path)
         default_prim = stage.GetDefaultPrim()
+
+        # Apply any asset-specific hotfixes first, so that the joint / link counting below sees the final structure
+        self._apply_usd_hotfixes(stage, default_prim)
 
         for p in stage.Traverse():
             p.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
