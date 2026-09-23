@@ -2,12 +2,11 @@ import torch as th
 import warp as wp
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import RigidContactAPI
+from omnigibson.utils.usd_utils import RigidContactAPI, create_tensor_from_list
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -162,12 +161,8 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
                         :n_scenes, obj_idx_old
                     ]
                     new_delay_counter_cpu[:n_scenes, obj_idx_new] = prev_delay_counter_cpu[:n_scenes, obj_idx_old]
-            cls.PREVIOUSLY_TOUCHING = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                new_previously_touching_cpu, "int32", device="cuda"
-            )
-            cls.DELAY_COUNTER = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                new_delay_counter_cpu, "float32", device="cuda"
-            )
+            cls.PREVIOUSLY_TOUCHING = create_tensor_from_list(new_previously_touching_cpu, "int32", device="cuda")
+            cls.DELAY_COUNTER = create_tensor_from_list(new_delay_counter_cpu, "float32", device="cuda")
             cls._currently_touching = wp.zeros((S, O), dtype=wp.int32, device="cuda")
 
         # Initialize new VALUE slots (not carried over) to True (slicer starts active)
@@ -221,12 +216,8 @@ class SlicerActive(TensorizedAbsoluteState, BooleanStateMixin):
             with_mask_data = sliceable_col.unsqueeze(0).to(th.uint8)  # (1, C_s) CPU uint8 tensor
             query_masks_data = th.stack(slicer_masks).to(th.uint8)  # (O, R_s) CPU uint8 tensor
 
-            cls._slicer_contact_query_masks.append(
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(query_masks_data, "uint8", device="cuda")
-            )
-            cls._sliceable_contact_col_mask.append(
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(with_mask_data, "uint8", device="cuda")
-            )
+            cls._slicer_contact_query_masks.append(create_tensor_from_list(query_masks_data, "uint8", device="cuda"))
+            cls._sliceable_contact_col_mask.append(create_tensor_from_list(with_mask_data, "uint8", device="cuda"))
             cls._currently_touching_per_scene.append(cls._currently_touching[scene_idx])
 
     @classmethod
