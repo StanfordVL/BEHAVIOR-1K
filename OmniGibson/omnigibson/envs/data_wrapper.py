@@ -37,6 +37,11 @@ def _is_system_particle_template_name(obj_name: str, system_names: set[str]) -> 
 
 
 def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: dict) -> None:
+    """Tells each object which non-kinematic states the demo saved for it, and in what order.
+
+    Reading a frame back walks the saved numbers in that order, so it has to follow the recording
+    rather than whatever states the current code gives the object.
+    """
     state = recorded_scene_file.get("state", {})
     object_registry_state = (
         state.get("registry", {}).get("object_registry", {})
@@ -49,7 +54,68 @@ def _align_scene_object_states_with_recorded_schema(scene, recorded_scene_file: 
         if obj is None or obj.states is None:
             continue
 
-        obj._recorded_non_kin_state_names = set(recorded_obj_state.get("non_kin", {}))
+        recorded_names = tuple(recorded_obj_state.get("non_kin", {}))
+        obj._recorded_non_kin_state_names = set(recorded_names)
+        obj._recorded_non_kin_state_order = recorded_names
+
+
+def _add_recorded_non_kin_states_to_scene_file(scene_file: dict, recorded_scene_files: list[dict]) -> None:
+    """Passes each object the list of non-kinematic states the recording saved for it, as a
+    constructor arg.
+
+    Which states an object gets is decided by its synset abilities, which may have changed since the
+    demo was recorded; without this list an object can be built without a state that every saved
+    frame still contains.  Edits @scene_file in place.  If several demos share one environment, each
+    object gets the combined list from all of them, ordered by where each name first appears.
+    """
+    init_info = scene_file["objects_info"]["init_info"]
+    names_by_object = {}
+    for recorded_scene_file in recorded_scene_files:
+        state = recorded_scene_file.get("state", {})
+        object_registry_state = (
+            state.get("registry", {}).get("object_registry", {})
+            if "registry" in state
+            else state.get("object_registry", {})
+        )
+        for obj_name, recorded_obj_state in object_registry_state.items():
+            ordered_names = names_by_object.setdefault(obj_name, [])
+            for state_name in recorded_obj_state.get("non_kin", {}):
+                if state_name not in ordered_names:
+                    ordered_names.append(state_name)
+
+    for obj_name, state_names in names_by_object.items():
+        if obj_name not in init_info:
+            raise ValueError(
+                f"Recorded state schema names object {obj_name!r}, but that object has no init_info "
+                "in the replay scene file."
+            )
+        init_info[obj_name].setdefault("args", {})["recorded_non_kin_state_names"] = state_names
+
+
+def _recorded_non_kin_state_name_union(recorded_scene_file: dict) -> set[str] | None:
+    """Returns every non-kinematic state name that appears anywhere in one demo, pooled across all
+    its objects.
+
+    Each frame is one flat array of numbers, read back one object and one state at a time, so an
+    object that expects a state the recording never saved eats the numbers meant for whatever comes
+    next, and everything after it is off by that much.  Objects created mid-episode (e.g. the halves
+    left by slicing) are not in the recorded scene file, so their own list is unknown; this pooled
+    list is the safe stand-in, because a name missing from it was never saved for anything.
+    Returns None if the recording has no per-object state at all.
+    """
+    state = recorded_scene_file.get("state", {})
+    object_registry_state = (
+        state.get("registry", {}).get("object_registry", {})
+        if "registry" in state
+        else state.get("object_registry", {})
+    )
+    if not object_registry_state:
+        return None
+
+    names: set[str] = set()
+    for recorded_obj_state in object_registry_state.values():
+        names.update(recorded_obj_state.get("non_kin", {}))
+    return names
 
 
 class DataWrapper(EnvironmentWrapper):
@@ -84,8 +150,9 @@ class DataWrapper(EnvironmentWrapper):
             env, (Environment, EnvironmentWrapper)
         ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class or EnvironmentWrapper!"
 
-        # Only one scene is supported for now
-        assert len(og.sim.scenes) == 1, "Only one scene is currently supported for DataWrapper env!"
+        # DataWrapper is single-env only: create_dataset, step, and trajectory-processing
+        # all assume one env's worth of state/obs/rewards at a time.
+        assert env.num_envs == 1, f"DataWrapper is single-env only; got num_envs={env.num_envs}."
 
         self.traj_count = 0
         self.step_count = 0
@@ -143,8 +210,16 @@ class DataWrapper(EnvironmentWrapper):
         if isinstance(action, dict):
             action = th.cat([act for act in action.values()])
 
-        next_obs, reward, terminated, truncated, info = self.env.step(action, n_render_iterations=n_render_iterations)
+        obs_list, rewards, terminateds, truncateds, infos = self.env.step(
+            action, n_render_iterations=n_render_iterations
+        )
         self.step_count += 1
+
+        next_obs = obs_list[0]
+        reward = rewards[0].item()
+        terminated = terminateds[0].item()
+        truncated = truncateds[0].item()
+        info = infos[0]
 
         self._record_step_trajectory(action, next_obs, reward, terminated, truncated, info)
 
@@ -209,7 +284,8 @@ class DataWrapper(EnvironmentWrapper):
         if len(self.current_traj_history) > 0:
             self.flush_current_traj()
 
-        self.current_obs, info = self.env.reset()
+        obs_list, info = self.env.reset()
+        self.current_obs = obs_list[0]
         # Store initial obs as the first entry in the trajectory
         self.current_traj_history.append({"obs": self._process_obs(self.current_obs, info)})
 
@@ -234,8 +310,9 @@ class DataWrapper(EnvironmentWrapper):
             bool: Whether the current episode should be saved or discarded
         """
         # Only save successful demos and if actually recording,
-        # or there's only one observation in the trajectory (i.e. the initial obs after reset)
-        return (self.env.task.success or not self.only_successes) and not (
+        # or there's only one observation in the trajectory (i.e. the initial obs after reset).
+        # Single-env data wrapper: index task.success (now a (num_envs,) bool tensor) at scene 0.
+        return (bool(self.env.task.success[0]) or not self.only_successes) and not (
             len(self.current_traj_history) == 1 and set(self.current_traj_history[0].keys()) == {"obs"}
         )
 
@@ -388,7 +465,8 @@ class DataPlaybackWrapper(DataWrapper):
         config["env"]["flatten_obs_space"] = True
 
         # Set the scene file either to the one stored in the hdf5 or the hot swap scene file
-        config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+        recorded_scene_file = json.loads(f["data"].attrs["scene_file"])
+        config["scene"]["scene_file"] = recorded_scene_file
         if full_scene_file:
             with open(full_scene_file, "r") as json_file:
                 full_scene_json = json.load(json_file)
@@ -399,7 +477,12 @@ class DataPlaybackWrapper(DataWrapper):
             config["scene"]["load_room_types"] = None
             config["scene"]["load_room_instances"] = load_room_instances
         else:
-            config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+            config["scene"]["scene_file"] = recorded_scene_file
+
+        _add_recorded_non_kin_states_to_scene_file(
+            scene_file=config["scene"]["scene_file"],
+            recorded_scene_files=[recorded_scene_file],
+        )
 
         # Use dummy task if not loading task
         if not include_task:
@@ -504,6 +587,10 @@ class DataPlaybackWrapper(DataWrapper):
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
             kwargs (dict): Arguments to pass to super class
         """
+        # Playback is single-env only: env.scene reads and indexing on obs_list[0] / infos[0]
+        # later assume one env. Fail fast before env.scene.save() (below) runs in multi-env.
+        assert env.num_envs == 1, f"DataPlaybackWrapper is single-env only; got num_envs={env.num_envs}."
+
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
 
@@ -685,7 +772,7 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If not controlling robots, disable for all robots
         if not self.include_robot_control:
-            for robot in self.robots:
+            for robot in self.scene.robots:
                 robot.control_enabled = False
                 # Set all controllers to effort mode with zero gain, this keeps the robot still
                 for controller in robot.controllers.values():
@@ -712,7 +799,8 @@ class DataPlaybackWrapper(DataWrapper):
             first_time_load_n_iteration = 10
             for _ in range(first_time_load_n_iteration):
                 og.sim.render()
-            self.current_obs, init_info = self.env.get_obs()
+            obs_list, init_info = self.env.get_obs()
+            self.current_obs = obs_list[0]
             assert len(self.current_traj_history) == 1 and set(self.current_traj_history[-1].keys()) == {
                 "obs"
             }, "Expected reset() to have inserted an initial obs-only entry into the trajectory history!"
@@ -739,13 +827,15 @@ class DataPlaybackWrapper(DataWrapper):
                         system.set_particles_velocities(
                             lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
                         )
-
             # Take a small step with the action to propagate physics after loading the state
-            self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+            obs_list, _, _, _, infos = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+            self.current_obs = obs_list[0]
+            info = infos[0]
             if post_state_update_callback is not None:
                 post_state_update_callback()
                 og.sim.render()
-                self.current_obs, _ = self.env.get_obs()
+                obs_list, _ = self.env.get_obs()
+                self.current_obs = obs_list[0]
 
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
@@ -762,10 +852,16 @@ class DataPlaybackWrapper(DataWrapper):
                         continue
                     obj = scene.object_registry("name", remove_obj_name)
                     scene.remove_object(obj)
+                recorded_non_kin_names = _recorded_non_kin_state_name_union(self.recorded_scene_file)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
                     if _is_system_particle_template_info(add_obj_info, added_systems):
                         continue
                     obj = create_object_from_init_info(add_obj_info)
+                    # Objects created by a transition are not in the recorded scene file, so they
+                    # have no saved state list of their own. Give them the pooled list instead, so
+                    # reading back later frames stays on the right numbers.
+                    if recorded_non_kin_names is not None:
+                        obj._recorded_non_kin_state_names = set(recorded_non_kin_names)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
                 # Step physics to initialize any new objects

@@ -246,6 +246,13 @@ class XFormPrim(BasePrim):
 
         og.sim.fabric_hierarchy.update_world_xforms()
 
+        # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+        # that are now one frame behind. Flag them as stale so the next state read forces a
+        # refresh via the lazy-refresh gate in TensorizedState._get_value.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.caches_dirty = True
+
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """
         Gets prim's pose with respect to the specified frame.
@@ -381,18 +388,6 @@ class XFormPrim(BasePrim):
     def aabb_extent(self):
         min_corner, max_corner = self.aabb
         return max_corner - min_corner
-
-    def get_world_scale(self):
-        """
-        Gets prim's scale with respect to the world's frame.
-
-        Returns:
-            th.tensor: scale applied to the prim's dimensions in the world frame. shape is (3, ).
-        """
-        prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
-        transform = lazy.pxr.Gf.Transform()
-        transform.SetMatrix(prim_tf)
-        return th.tensor(transform.GetScale())
 
     @property
     def scaled_transform(self):

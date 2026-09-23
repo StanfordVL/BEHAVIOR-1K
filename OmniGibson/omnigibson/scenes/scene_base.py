@@ -378,33 +378,44 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
-        self._scene_prim.set_position_orientation(
-            position=th.tensor([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
-        )
+        initial_scene_prim_pos = th.tensor([0.0, 0.0, initial_scene_prim_z_offset if self.idx != 0 else 0.0])
+        self._scene_prim.set_position_orientation(position=initial_scene_prim_pos)
 
         # Now load the objects with their own logic
         with og.sim.adding_objects(objs=self._init_objs.values()):
             for obj_name, obj in self._init_objs.items():
                 # Import into the simulator
                 self.add_object(obj, _batched_call=True)
-                # Set the init pose accordingly
+                # Set the init pose accordingly. The init pose is authored in the scene frame, and the
+                # scene prim currently sits at the temporary z offset above, so include that offset in
+                # this world-frame write. Otherwise the offset gets baked into the object's USD local
+                # transform (local = scene_z - (-offset) = scene_z + |offset|), and once the scene prim
+                # moves to its final tile position every object inherits a +|offset| world-z error.
+                # Later scene-relative load_state writes hide this for most objects, but any object
+                # that never receives one (e.g. scene furniture under the eval's partial-scene-load
+                # path, such as the stove burner in cook_hot_dogs) physically stays ~100 m above its
+                # scene in every env other than env 0.
                 obj.set_position_orientation(
-                    position=self._init_state[obj_name]["root_link"]["pos"],
+                    position=th.as_tensor(self._init_state[obj_name]["root_link"]["pos"]) + initial_scene_prim_pos,
                     orientation=self._init_state[obj_name]["root_link"]["ori"],
                 )
 
         # Position the scene prim based on the last scene's right edge
+        # NOTE: for empty scenes (no objects), the computed AABB is degenerate, so we manually use a zero extent
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
-            left_edge_to_center = -aabb_min[0]
+            left_edge_to_center = 0.0 if len(self._init_objs) == 0 else -aabb_min[0]
             scene_position = th.tensor([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
             identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
             self._scene_prim.set_position_orientation(position=scene_position, orientation=identity_quat)
-            new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
+            if len(self._init_objs) == 0:
+                new_scene_edge = last_scene_edge + scene_margin
+            else:
+                new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
             scene_position = th.zeros(3)
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
-            new_scene_edge = aabb_max[0]
+            new_scene_edge = 0.0 if len(self._init_objs) == 0 else aabb_max[0]
 
         return new_scene_edge, scene_position
 
@@ -567,7 +578,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 obj_info["root_link"]["pos"], obj_info["root_link"]["ori"] = T.pose_transform(
                     *T.mat2pose(self.pose), pos, ori
                 )
-            # TODO: also handle system registry here
+            # NOTE: system registry states need no such conversion -- particle systems dump/load
+            # their particle poses in the SCENE frame (see BaseSystem._dump_state and
+            # PhysxParticleInstancer._dump_state), so load_state below places each scene's particles
+            # at that scene's own world offset.
             self.load_state(init_state, serialized=False)
         self._initial_file = self.save(as_dict=True)
 
@@ -863,6 +877,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Restores this scene given @scene_file
 
+        This does NOT move the scene prim to the pose recorded in @scene_file: that
+        pose identifies the frame the file was captured in, and object poses are
+        re-based from it into this scene's current frame. See ``_dump_state``.
+
         Args:
             scene_file (str or dict): Full path of either JSON file or loaded scene file to load, which contains
                 information to recreate a scene. Should be the output of self.save()
@@ -903,27 +921,37 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 f"Got mismatch in scene type: current is type {self.__class__.__name__}, trying to load type {init_info['class_name']}"
             )
 
-        # Synchronize systems -- we need to check for pruning currently-existing systems,
-        # as well as creating any non-existing systems
+        # Work out every topology change before touching either systems or objects. System
+        # clear/init can remove/add particle template objects, so it must participate in the
+        # same stop -> mutate topology -> play lifecycle as ordinary object changes.
         current_systems = set(self.active_systems.keys())
         load_systems = set(scene_info["state"]["registry"]["system_registry"].keys())
         systems_to_remove = current_systems - load_systems
         systems_to_add = load_systems - current_systems
+        load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
+        current_obj_names = set(self.object_registry.get_dict("name").keys())
+        object_topology_changed = current_obj_names != load_obj_names
+
+        restart_sim = bool(systems_to_remove or systems_to_add or object_topology_changed) and og.sim.is_playing()
+
+        if restart_sim:
+            og.sim.stop()
+
+        # Synchronize systems -- we need to check for pruning currently-existing systems,
+        # as well as creating any non-existing systems. This is deliberately after stop():
+        # MacroParticleSystem.clear() removes its particle template object, and doing that
+        # while playing enters Simulator.removing_objects(), which first dumps the entire
+        # simulation through tensor views that a prior transition may already have invalidated.
         for name in systems_to_remove:
             self.clear_system(name)
         for name in systems_to_add:
             self.get_system(name, force_init=True)
 
+        # System init / clear can itself add or remove particle-template objects. Recompute the
+        # object delta afterwards so those objects are not removed twice or recreated manually.
         current_obj_names = set(self.object_registry.get_dict("name").keys())
-        load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
-
         objs_to_remove = current_obj_names - load_obj_names
         objs_to_add = load_obj_names - current_obj_names
-
-        restart_sim = (objs_to_add or objs_to_remove) and og.sim.is_playing()
-
-        if restart_sim:
-            og.sim.stop()
 
         # Delete any extra objects that currently exist in the scene stage
         objects_to_remove = [self.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove]
@@ -1115,6 +1143,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self.system_registry.remove(system)
             system.clear()
 
+            # Clearing a system deletes prims, which invalidates the PhysX tensor views of
+            # unrelated objects. Update handles accordingly.
+            og.sim.update_handles()
+
     @property
     def active_systems(self):
         return {system.name: system for system in self.systems if not isinstance(system, Cloth)}
@@ -1229,6 +1261,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._objects_info
 
     def _dump_state(self):
+        """Dumps this scene's state.
+
+        ``pos``/``ori`` record where the scene sat when the state was taken; loading uses them to
+        shift object poses over to wherever the scene sits now, and never moves the scene itself.
+        Moving it would stack every scene on the same spot when running several at once, so their
+        objects would collide.
+        """
         # Default state for the scene is from the registry alone
         pos, ori = self.get_position_orientation()
         return {
@@ -1241,11 +1280,103 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Load scene state, then registry
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
-            self.set_position_orientation(position=state["pos"], orientation=state["ori"])
-            # Now update the rest of the state as normal
-            self._registry.load_state(state=state["registry"], serialized=False)
+            # ("pos", "ori") say where the scene sat when the state was taken. Leave this scene
+            # where it is and shift the object poses over instead, so that running several
+            # scenes at once does not pile them all onto the recorded spot and let their
+            # objects collide.
+            rec_pos = th.as_tensor(state["pos"], dtype=th.float32).reshape(3)
+            rec_ori = th.as_tensor(state["ori"], dtype=th.float32).reshape(4)
+            cur_pos, cur_ori = self.get_position_orientation()
+            registry_state = state["registry"]
+            if not (th.equal(rec_pos, cur_pos) and th.equal(rec_ori, cur_ori)):
+                # rel = cur ∘ rec⁻¹ moves a recorded pose over to this scene. When the two
+                # match, this branch is skipped and the poses load unchanged.
+                inv_rec_pos, inv_rec_ori = T.invert_pose_transform(rec_pos, rec_ori)
+                rel_pos, rel_ori = T.pose_transform(cur_pos, cur_ori, inv_rec_pos, inv_rec_ori)
+                registry_state = self._rebase_registry_state_poses(registry_state, rel_pos, rel_ori)
+            self._registry.load_state(state=registry_state, serialized=False)
         else:
             self._registry.load_state(state=state, serialized=False)
+
+    @staticmethod
+    def _rebase_registry_state_poses(registry_state, rel_pos, rel_ori):
+        """Returns a copy of @registry_state with object poses moved over by (rel_pos, rel_ori).
+
+        Objects have their positions moved and their velocities rotated. Particle systems are
+        different: their positions are already stored relative to the scene, so only their
+        velocities need rotating. Velocities are only ever rotated, never moved.
+
+        The input dicts are left untouched, since callers reuse them across calls.
+        """
+        rebased = dict(registry_state)
+        object_registry = registry_state.get("object_registry")
+        if object_registry is None:
+            return rebased
+        new_object_registry = {}
+        for name, obj_state in object_registry.items():
+            root = obj_state.get("root_link") if isinstance(obj_state, dict) else None
+            if not isinstance(root, dict) or "pos" not in root:
+                new_object_registry[name] = obj_state
+                continue
+            new_root = dict(root)
+            new_root["pos"], new_root["ori"] = T.pose_transform(
+                rel_pos,
+                rel_ori,
+                th.as_tensor(root["pos"], dtype=th.float32).reshape(3),
+                th.as_tensor(root["ori"], dtype=th.float32).reshape(4),
+            )
+            for vec_key in ("lin_vel", "ang_vel", "particle_velocities"):
+                if vec_key in root:
+                    vec = th.as_tensor(root[vec_key], dtype=th.float32)
+                    new_root[vec_key] = T.quat_apply(rel_ori, vec).reshape(vec.shape)
+            if "particle_positions" in root:
+                pts = th.as_tensor(root["particle_positions"], dtype=th.float32)
+                new_root["particle_positions"] = (T.quat_apply(rel_ori, pts) + rel_pos).reshape(pts.shape)
+            new_obj_state = dict(obj_state)
+            new_obj_state["root_link"] = new_root
+            new_object_registry[name] = new_obj_state
+        rebased["object_registry"] = new_object_registry
+
+        system_registry = registry_state.get("system_registry")
+        if isinstance(system_registry, dict):
+            new_system_registry = {}
+            for name, sys_state in system_registry.items():
+                if not isinstance(sys_state, dict):
+                    new_system_registry[name] = sys_state
+                    continue
+                new_sys_state = Scene._rebase_system_velocities(sys_state, rel_ori)
+                new_system_registry[name] = new_sys_state
+            rebased["system_registry"] = new_system_registry
+        return rebased
+
+    @staticmethod
+    def _rebase_system_velocities(sys_state, rel_ori):
+        """Returns a copy of a system state with its world-frame velocity fields rotated.
+
+        Recurses one level into nested per-instancer dicts (micro systems keep a dict of
+        instancer states), and leaves every other field -- including scene-relative
+        particle positions and orientations -- untouched.
+        """
+        rotated = dict(sys_state)
+        changed = False
+        for key in ("particle_velocities", "lin_velocities", "ang_velocities"):
+            value = sys_state.get(key)
+            if value is None:
+                continue
+            vec = th.as_tensor(value, dtype=th.float32)
+            if vec.numel() == 0:
+                continue
+            rotated[key] = T.quat_apply(rel_ori, vec.reshape(-1, 3)).reshape(vec.shape)
+            changed = True
+        for key, value in sys_state.items():
+            if key in ("particle_velocities", "lin_velocities", "ang_velocities"):
+                continue
+            if isinstance(value, dict):
+                nested = Scene._rebase_system_velocities(value, rel_ori)
+                if nested is not value:
+                    rotated[key] = nested
+                    changed = True
+        return rotated if changed else sys_state
 
     def serialize(self, state):
         return th.cat([state["pos"], state["ori"], self._registry.serialize(state=state["registry"])])

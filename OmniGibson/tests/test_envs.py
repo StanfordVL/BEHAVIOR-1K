@@ -39,7 +39,7 @@ def task_tester(task_type):
 
     env.reset()
     for _ in range(5):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scenes[0].robots[0].action_space.sample())
 
     # Clear the sim
     og.clear()
@@ -88,7 +88,7 @@ def test_rs_int_full_load():
 
     env.reset()
     for _ in range(5):
-        env.step(env.robots[0].action_space.sample())
+        env.step(env.scenes[0].robots[0].action_space.sample())
 
     # Clear the sim
     og.clear()

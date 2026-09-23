@@ -157,6 +157,13 @@ class RigidDynamicPrim(RigidPrim):
         self._rigid_prim_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
         og.sim.sync_physx_to_fabric()
 
+        # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+        # that are now one frame behind. Flag them as stale so the next state read forces a
+        # refresh via the lazy-refresh gate in TensorizedState._get_value.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.caches_dirty = True
+
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
         Gets prim's pose with respect to the specified frame.

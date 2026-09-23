@@ -5,8 +5,8 @@ from typing import Optional
 
 
 class AgentMetric(MetricBase):
-    def __init__(self, human_stats: Optional[dict] = None):
-        super().__init__()
+    def __init__(self, human_stats: Optional[dict] = None, env_idx: int = 0, env_accessor=None):
+        super().__init__(env_idx=env_idx, env_accessor=env_accessor)
         self.initialized = False
         self.human_stats = human_stats
         if human_stats is None:
@@ -18,12 +18,12 @@ class AgentMetric(MetricBase):
                 "right": self.human_stats["right_eef_displacement"],
             }
 
-    def reset(self, env):
-        self.state[env.scene] = dict()
+    def reset(self, env=None):
+        self.state[self._scene(env)] = dict()
         self.initialized = False
 
     def _compute_step_metrics(self, env, action, obs, reward, terminated, truncated, info):
-        robot = env.robots[0]
+        robot = env.robot if env is self.env_accessor else self._scene(env).robots[0]
         self.next_state_cache = {
             "base": {"position": robot.get_position_orientation()[0]},
             **{arm: {"position": robot.get_eef_position(arm)} for arm in robot.arm_names},

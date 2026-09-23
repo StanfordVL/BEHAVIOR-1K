@@ -4,6 +4,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 from omnigibson.systems import FluidSystem, GranularSystem, MacroPhysicalParticleSystem, MacroVisualParticleSystem
 from omnigibson.utils.constants import PrimType
 
@@ -71,3 +72,173 @@ def remove_all_systems(scene):
     for system in scene.active_systems.values():
         system.remove_all_particles()
     og.sim.step()
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers for test_multiple_envs_*.py
+# ---------------------------------------------------------------------------
+
+MULTI_ENV_ROBOTS = ["fetch", "tiago", "r1", "r1pro"]
+
+MULTI_ENV_TASK_TYPES = ["DummyTask", "PointNavigationTask", "PointReachingTask", "GraspTask"]
+
+GRASP_OBJECTS_CFG = [
+    {
+        "type": "PrimitiveObject",
+        "name": "grasp_obj",
+        "primitive_type": "Cube",
+        "rgba": [1.0, 0, 0, 1.0],
+        "scale": [0.04, 0.04, 0.04],
+        "mass": 0.1,
+        "position": [0.5, 0.0, 0.55],
+    }
+]
+
+ROBOT_JOINT_COUNTS = {"fetch": 8, "tiago": 8, "r1": 10, "r1pro": 11}
+
+
+def _grasp_reset_pose_path(robot):
+    """Create a temporary precached reset pose file sized for the given robot."""
+    import json
+    import tempfile
+
+    n_joints = ROBOT_JOINT_COUNTS[robot]
+    reset_poses = [{"joint_pos": [0.0] * n_joints, "base_pos": [0.0, 0.0, 0.0], "base_ori": [0.0, 0.0, 0.0, 1.0]}]
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    json.dump(reset_poses, f)
+    f.close()
+    return f.name
+
+
+def multi_env_task_cfg(task_type, robot="fetch"):
+    """Return the task config dict for a given task type string."""
+    if task_type == "GraspTask":
+        return {
+            "type": "GraspTask",
+            "obj_name": "grasp_obj",
+            "objects_config": GRASP_OBJECTS_CFG,
+            "termination_config": {"max_steps": 10},
+            "precached_reset_pose_path": _grasp_reset_pose_path(robot),
+        }
+    return {"type": task_type}
+
+
+def _init_multi_env_macros():
+    """Set simulator macros (only once, before first Environment is created)."""
+    if og.sim is None:
+        gm.RENDER_VIEWER_CAMERA = False
+        gm.ENABLE_OBJECT_STATES = True
+        gm.USE_GPU_DYNAMICS = True
+        gm.ENABLE_FLATCACHE = False
+        gm.ENABLE_TRANSITION_RULES = False
+    else:
+        og.sim.stop()
+
+
+# ---------------------------------------------------------------------------
+# Map of the test_multiple_envs_* suites
+#
+# Two axes: which task backs the env, and what is under test.
+#
+#                     | DummyTask (minimal env)        | BehaviorTask (real task)
+#   ------------------|--------------------------------|-----------------------------------
+#   env contract      | test_multiple_envs_dummy_api    | (covered by dummy_api -- the
+#                     |                                 |  vectorized Environment contract
+#                     |                                 |  is task-independent)
+#   world / frames    | test_multiple_envs_dummy_scene  | test_multiple_envs_behavior_scene
+#   task semantics    | --                              | test_multiple_envs_behavior_task
+#
+#   _api   -> the vectorized Environment contract: construction, step/reset return shapes,
+#             selective reset, per-env counters, scene layout.
+#   _scene -> the world: scene placement, frame conversions, robot getters/setters, dump/load.
+#
+# Cross-cutting suites, one per concern rather than one per task:
+#   test_multiple_envs_task_tensors -- the (num_envs,) reward/done/success contract, parametrized
+#                                      over MULTI_ENV_TASK_TYPES
+#   test_multiple_envs_point_tasks  -- PointNavigationTask + PointReachingTask goal behavior
+#   test_multiple_envs_grasp        -- GraspTask specifics
+#   test_multiple_envs_heat_*       -- temperature / heat-source states (need their own process)
+#   test_multiple_envs_transition_rules -- needs gm.ENABLE_TRANSITION_RULES=True, so it cannot
+#                                      share a process with the others (macros lock once read)
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Shared BehaviorTask multi-env setup
+#
+# test_multiple_envs_behavior_{infra_api,infra_scene,task}.py all exercise the *same* BehaviorTask
+# environment (same scene, robot, activity and macros), and loading it is by far the dominant cost of
+# those suites. The config and the loader live here so that a single env can be shared across all
+# three files when they run in one pytest invocation (see the `behavior_env` fixture in conftest.py
+# and the combined entry in .github/workflows/tests.yml).
+# ---------------------------------------------------------------------------
+BEHAVIOR_NUM_ENVS = 2
+BEHAVIOR_ACTIVITY_NAME = "picking_up_trash"
+BEHAVIOR_SCENE_MODEL = "house_double_floor_lower"
+BEHAVIOR_R_POTENTIAL = 1.0
+
+
+def _init_behavior_env_macros():
+    """Set simulator macros (only once, before the first Environment is created)."""
+    if og.sim is None:
+        gm.RENDER_VIEWER_CAMERA = False
+        gm.ENABLE_OBJECT_STATES = True
+        gm.USE_GPU_DYNAMICS = False
+        gm.ENABLE_FLATCACHE = False
+        gm.ENABLE_TRANSITION_RULES = False
+    else:
+        og.sim.stop()
+
+
+def setup_behavior_environment(num_envs=BEHAVIOR_NUM_ENVS, use_presampled_robot_pose=True):
+    """Create an Environment with BehaviorTask and R1Pro."""
+    _init_behavior_env_macros()
+    cfg = {
+        "env": {"num_envs": num_envs},
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": BEHAVIOR_SCENE_MODEL,
+            "load_room_types": ["living_room", "kitchen"],
+        },
+        "robots": [{"model": "r1pro", "obs_modalities": []}],
+        "task": {
+            "type": "BehaviorTask",
+            "activity_name": BEHAVIOR_ACTIVITY_NAME,
+            "activity_definition_id": 0,
+            "activity_instance_id": 0,
+            "online_object_sampling": False,
+            "use_presampled_robot_pose": use_presampled_robot_pose,
+            "termination_config": {"max_steps": 500},
+            "reward_config": {"r_potential": BEHAVIOR_R_POTENTIAL},
+        },
+    }
+    print(
+        f"  Setting up BehaviorTask env: num_envs={num_envs}, robot=r1pro, "
+        f"activity={BEHAVIOR_ACTIVITY_NAME}, presampled_pose={use_presampled_robot_pose}"
+    )
+    env = og.Environment(configs=cfg)
+    print("  BehaviorTask environment created successfully")
+    return env
+
+
+def setup_multi_environment(num_envs, robot="fetch", task_type="DummyTask", additional_objects_cfg=None):
+    """Create an Environment with *num_envs* cloned scenes."""
+    _init_multi_env_macros()
+
+    cfg = {
+        "env": {"num_envs": num_envs},
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["floors", "walls"],
+        },
+        "robots": [{"model": robot, "obs_modalities": []}],
+        "task": multi_env_task_cfg(task_type, robot=robot),
+    }
+    if additional_objects_cfg:
+        cfg["objects"] = additional_objects_cfg
+
+    print(f"  Setting up env: num_envs={num_envs}, robot={robot}, task={task_type}")
+    env = og.Environment(configs=cfg)
+    print("  Environment created successfully")
+    return env
