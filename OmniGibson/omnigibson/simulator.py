@@ -94,25 +94,6 @@ def with_profiler(name):
     return decorator
 
 
-# Create module logger
-log = create_module_logger(module_name=__name__)
-
-# Create settings for this module
-m = create_module_macros(module_path=__file__)
-
-m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
-m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
-
-m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
-
-m.SCENE_MARGIN = 10.0
-m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
-
-m.KIT_FILES = {
-    (5, 1, 0): "omnigibson_5_1_0.kit",
-}
-
-
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
     log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
