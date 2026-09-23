@@ -179,37 +179,17 @@ def suppress_omni_log(channels):
     Args:
         channels (None or list of str): Logging channel(s) to suppress. If None, will globally disable logger
     """
-    # Record the state to restore to after the context exists
-    log = lazy.omni.log.get_log()
-
-    if gm.DEBUG:
-        # Do nothing
-        pass
-    elif channels is None:
-        # Globally disable log
-        log.enabled = False
+    # Whether there is an application log to suppress at all is the render backend's business. Before
+    # og.sim exists this is only ever reached from the Kit launch sequence itself (which is, by
+    # construction, launching Kit), so go straight to Kit's own implementation there.
+    if og.sim is not None:
+        ctx = og.sim.render_backend.suppress_log(channels)
     else:
-        # For some reason, all enabled states always return False even if the logging is clearly enabled for the
-        # given channel, so we assume all channels are enabled
-        # We do, however, check what behavior was assigned to this channel, since we force an override during this context
-        channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
+        from omnigibson.render_backends.kit_backend import suppress_kit_log
 
-        # Suppress the channels
-        for channel in channels:
-            log.set_channel_enabled(channel, False, lazy.omni.log.SettingBehavior.OVERRIDE)
-
-    yield
-
-    if gm.DEBUG:
-        # Do nothing
-        pass
-    elif channels is None:
-        # Globally re-enable log
-        log.enabled = True
-    else:
-        # Unsuppress the channels
-        for channel in channels:
-            log.set_channel_enabled(channel, True, channel_behavior[channel])
+        ctx = suppress_kit_log(channels)
+    with ctx:
+        yield
 
 
 @contextlib.contextmanager
@@ -362,7 +342,9 @@ class CameraMover:
         self.set_lights(self.light_val)
 
     def set_lights(self, intensity):
-        world = lazy.isaacsim.core.utils.prims.get_prim_at_path("/World")
+        from omnigibson.utils.usd_utils import get_prim_at_path
+
+        world = get_prim_at_path("/World")
         for prim in world.GetChildren():
             for prim_child in prim.GetChildren():
                 for prim_child_child in prim_child.GetChildren():
