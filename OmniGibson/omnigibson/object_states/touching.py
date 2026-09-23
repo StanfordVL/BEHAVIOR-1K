@@ -1,13 +1,12 @@
 import torch as th
 import warp as wp
 
-import omnigibson.lazy as lazy
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import RigidContactAPI
+from omnigibson.utils.usd_utils import RigidContactAPI, create_tensor_from_list
 
 
 # Tensorized Touching state.
@@ -169,12 +168,8 @@ class Touching(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
                 row_mask_cpu[obj_idx] = RigidContactAPI.get_contact_row_mask(scene_idx, link_paths).to(th.uint8)
                 col_mask_cpu[obj_idx] = RigidContactAPI.get_contact_col_mask(scene_idx, link_paths).to(th.uint8)
 
-            cls._obj_row_mask.append(
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(row_mask_cpu, "uint8", device="cuda")
-            )
-            cls._obj_col_mask.append(
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(col_mask_cpu, "uint8", device="cuda")
-            )
+            cls._obj_row_mask.append(create_tensor_from_list(row_mask_cpu, "uint8", device="cuda"))
+            cls._obj_col_mask.append(create_tensor_from_list(col_mask_cpu, "uint8", device="cuda"))
             cls._obj_to_col.append(wp.zeros((N, C_s), dtype=wp.int32, device="cuda"))
 
     @classmethod

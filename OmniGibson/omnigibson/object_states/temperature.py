@@ -1,7 +1,6 @@
 import torch as th
 import warp as wp
 
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
@@ -10,7 +9,7 @@ from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsolut
 from omnigibson.object_states.tensorized_state import TensorizedState, _wp_from_torch
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import RigidBodyViewAPI
+from omnigibson.utils.usd_utils import RigidBodyViewAPI, create_tensor_from_list
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -362,8 +361,6 @@ class Temperature(TensorizedAbsoluteState):
             cls.INFLUENCE_MASK_CPU = None
             cls.INFLUENCE_MASK_CPU_WP = None
             return
-
-        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
 
         hss_self_temp_idx = th.full((N_hss,), -1, dtype=th.int32)
         hss_self_inside_idx = th.full((N_hss,), -1, dtype=th.int32)

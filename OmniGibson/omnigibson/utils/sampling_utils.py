@@ -334,7 +334,7 @@ def raytest(
 
     # For efficiency's sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
     if only_closest and ignore_bodies is None and ignore_collisions is None:
-        result = og.sim.psqi.raycast_closest(
+        result = og.sim.physics_backend.raycast_closest(
             origin=start_point.tolist(),
             dir=direction.tolist(),
             distance=distance.tolist(),
@@ -366,7 +366,7 @@ def raytest(
             return True if callback is None else callback(hit)
 
         # Grab all collisions
-        og.sim.psqi.raycast_all(
+        og.sim.physics_backend.raycast_all(
             origin=start_point.tolist(),
             dir=direction.tolist(),
             distance=distance.tolist(),
