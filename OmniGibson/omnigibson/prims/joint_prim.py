@@ -9,7 +9,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.constants import JointAxis, JointType
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import create_joint, is_prim_path_valid
 from omnigibson.utils.numpy_utils import gf_quat_to_torch, vtarray_to_torch
 
 # Create settings for this module
@@ -151,15 +151,15 @@ class JointPrim(BasePrim):
         """
         # It's a bit tricky to get the joint index here. We need to find the first dof at this prim path
         # first, then get the corresponding joint index from that dof offset.
-        self._joint_dof_offset = list(self._articulation_view._dof_paths[0]).index(self.prim_path)
-        joint_dof_offsets = self._articulation_view._metadata.joint_dof_offsets
+        self._joint_dof_offset = self._articulation_view.dof_index_of_path(self.prim_path)
+        joint_dof_offsets = self._articulation_view.joint_dof_offsets
         # Note that we are finding the last occurrence of the dof offset, since that corresponds to the joint index
         # The first occurrence can be a fixed link that is 0-dof, meaning the offset will be repeated.
         self._joint_idx = next(
             i for i in reversed(range(len(joint_dof_offsets))) if joint_dof_offsets[i] == self._joint_dof_offset
         )
-        self._joint_name = self._articulation_view._metadata.joint_names[self._joint_idx]
-        self._n_dof = self._articulation_view._metadata.joint_dof_counts[self._joint_idx]
+        self._joint_name = self._articulation_view.joint_names[self._joint_idx]
+        self._n_dof = self._articulation_view.joint_dof_counts[self._joint_idx]
 
     def set_control_type(self, control_type, kp=None, kd=None):
         """
@@ -226,7 +226,7 @@ class JointPrim(BasePrim):
             body0 (str): Absolute prim path to the body prim to set as this joint's parent link.
         """
         # Make sure prim path is valid
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        assert is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
         self._prim.GetRelationship("physics:body0").SetTargets([lazy.pxr.Sdf.Path(body0)])
         self._body0 = None
 
@@ -253,7 +253,7 @@ class JointPrim(BasePrim):
             body1 (str): Absolute prim path to the body prim to set as this joint's child link.
         """
         # Make sure prim path is valid
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        assert is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
         self._prim.GetRelationship("physics:body1").SetTargets([lazy.pxr.Sdf.Path(body1)])
         self._body1 = None
 
@@ -936,4 +936,4 @@ class JointPrim(BasePrim):
         Returns:
             bool: True if this joint is a mimic joint, else False
         """
-        return self.prim.HasAPI(lazy.pxr.PhysxSchema.PhysxMimicJointAPI)
+        return og.sim.physics_backend.is_mimic_joint(self.prim)
