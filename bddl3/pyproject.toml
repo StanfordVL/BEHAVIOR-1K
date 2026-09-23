@@ -1,0 +1,7 @@
+[tool.pyright]
+include = ["bddl"]
+exclude = [
+  "bddl/generated_data",
+  "bddl/data_generation",
+  "**/__pycache__",
+]
