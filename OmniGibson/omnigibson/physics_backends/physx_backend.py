@@ -492,7 +492,8 @@ class PhysXBackend(PhysicsBackend):
             p_local_full = vtarray_to_torch(prim.GetAttribute("points").Get())
             p_local_full[idxs] = p_local
             p_local = p_local_full
-        prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray(p_local.tolist()))
+        with self.sim.editing_usd():
+            prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray(p_local.tolist()))
 
     def get_cloth_particle_velocities(self, prim_path):
         prim = self.sim.stage.GetPrimAtPath(prim_path)
@@ -501,7 +502,8 @@ class PhysXBackend(PhysicsBackend):
     def set_cloth_particle_velocities(self, prim_path, velocities):
         prim = self.sim.stage.GetPrimAtPath(prim_path)
         velocities = th.as_tensor(velocities, dtype=th.float32)
-        prim.GetAttribute("velocities").Set(lazy.pxr.Vt.Vec3fArray(velocities.tolist()))
+        with self.sim.editing_usd():
+            prim.GetAttribute("velocities").Set(lazy.pxr.Vt.Vec3fArray(velocities.tolist()))
 
     _CLOTH_STIFFNESS_ATTRS = {
         "bend": "physxAutoParticleCloth:springBendStiffness",
@@ -517,9 +519,12 @@ class PhysXBackend(PhysicsBackend):
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         prim = self.sim.stage.GetPrimAtPath(prim_path)
         values = {"bend": bend, "damping": damping, "shear": shear, "stretch": stretch}
-        for key, value in values.items():
-            if value is not None:
-                prim.GetAttribute(self._CLOTH_STIFFNESS_ATTRS[key]).Set(value)
+        # One editing_usd() block for all four, rather than per-attribute: nesting is forbidden and
+        # each entry into the context costs a USD->Fabric sync.
+        with self.sim.editing_usd():
+            for key, value in values.items():
+                if value is not None:
+                    prim.GetAttribute(self._CLOTH_STIFFNESS_ATTRS[key]).Set(value)
 
     # ---- Joint-break events ----
 
