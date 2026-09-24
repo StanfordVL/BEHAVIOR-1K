@@ -403,7 +403,8 @@ class KitRenderBackend(RenderBackend):
     # render backend.
 
     def create_default_pbr_material(self, scope_path, material_path, target_prim_path):
-        from omnigibson.utils.usd_utils import bind_material, create_pbr_material
+        from omnigibson.utils.physx_utils import bind_material
+        from omnigibson.utils.render_utils import create_pbr_material
 
         with self.sim.editing_usd():
             self.sim.stage.DefinePrim(scope_path, "Scope")
