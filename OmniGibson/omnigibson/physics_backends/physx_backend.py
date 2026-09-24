@@ -240,6 +240,13 @@ class PhysXBackend(PhysicsBackend):
             .create_subscription_to_pop(joint_break_fn)
         )
 
+    def stop_step_callbacks(self):
+        for attr in ("_pre_physics_step_callback", "_post_physics_step_callback", "_simulation_event_callback"):
+            subscription = getattr(self, attr, None)
+            if subscription is not None:
+                subscription.unsubscribe()
+                setattr(self, attr, None)
+
     def apply_engine_settings(
         self,
         gravity,
