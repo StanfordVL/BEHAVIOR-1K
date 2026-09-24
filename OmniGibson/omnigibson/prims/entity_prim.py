@@ -449,7 +449,7 @@ class EntityPrim(XFormPrim):
         int: Number of fixed joints owned by this articulation
         """
         # If the articulation view is available, use it.
-        if self._articulation_view:
+        if self._articulation_view and self._articulation_view.has_dof_metadata:
             return sum(1 for joint_dof in self._articulation_view.joint_dof_counts if joint_dof == 0)
 
         _, num, _ = count_joints(self.prim)
