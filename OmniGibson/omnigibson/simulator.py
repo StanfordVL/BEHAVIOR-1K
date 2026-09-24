@@ -1302,8 +1302,9 @@ def _launch_simulator(*args, **kwargs):
                 # overflow the pending buffers whenever n_physics_timesteps_per_render is
                 # 1, and play()'s update_handles() rebuilds the contact views right after,
                 # discarding any warmup capture regardless.
-                RigidContactAPI.read_from_physx()
-                wp.synchronize_stream(wp.get_stream())
+                if not self._physics_backend.in_warmup():
+                    RigidContactAPI.read_from_physx()
+                    wp.synchronize_stream(wp.get_stream())
 
                 # Record that we are done with the step context. Joint-break callbacks below
                 # are post-step user code: they may call update_handles() / read Fabric, which
@@ -1790,13 +1791,8 @@ def _launch_simulator(*args, **kwargs):
             # Stop the physics
             self.stop()
 
-            # Clean subscribed callbacks -- start_step_callbacks() (see __init__) now stores these
-            # subscription handles on the physics_backend instance itself, not on Simulator, so there's
-            # nothing to unsubscribe here directly; each backend's own subscription objects are cleaned
-            # up when that backend instance is garbage-collected.
-            # self._pre_physics_step_callback.unsubscribe()
-            # self._post_physics_step_callback.unsubscribe()
-            # self._simulation_event_callback.unsubscribe()
+            # Clean subscribed callbacks
+            self._physics_backend.stop_step_callbacks()
 
             # Clear all tiled vision sensors first -- their render products reference per-scene cameras,
             # so they must be destroyed before the scenes (and the cameras) are removed

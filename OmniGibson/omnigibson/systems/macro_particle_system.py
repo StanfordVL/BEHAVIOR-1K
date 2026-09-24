@@ -213,15 +213,9 @@ class MacroParticleSystem(BaseSystem):
         """
         Perform any necessary processing on the particle object to extract further information.
         """
-        # Update color if the particle object has any material. has_material() reflects the raw USD
-        # binding (always true if one is authored, regardless of backend); .material is the actual
-        # loaded MaterialPrim wrapper, which is deliberately only populated when the render backend
-        # authors materials (see
-        # xform_prim.py's _post_load()). Check
-        # the wrapper itself rather than the raw binding so this falls back to the default color
-        # instead of crashing when no wrapper was loaded.
+        # Update color if the particle object has any material
         color = th.ones(3)
-        if self.particle_object.material is not None:
+        if self.particle_object.has_material():
             color = self.particle_object.material.average_diffuse_color
         self._color = color
 
