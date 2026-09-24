@@ -114,6 +114,14 @@ class PhysicsBackend(ABC):
         """Construct the sim-lifecycle context this backend uses for play/pause/stop/current_time bookkeeping."""
 
     @abstractmethod
+    def stop_step_callbacks(self):
+        """
+        Tears down the subscriptions made by start_step_callbacks(). Must be called before the owning
+        Simulator goes away: a live subscription keeps firing into the old Simulator's callbacks, so
+        skipping this leaves the next Simulator with two of everything.
+        """
+
+    @abstractmethod
     def start_step_callbacks(self, pre_step_fn, post_step_fn, joint_break_fn):
         """
         Register the given callables to be invoked right before / after each physics step, and whenever
@@ -362,8 +370,8 @@ class PhysicsBackend(ABC):
         position/velocity/effort get+set, position/velocity targets, coriolis/gravity/mass-matrix/
         jacobian, world-pose set, solver iteration counts, and the public ``joint_count``/
         ``joint_dof_counts``/``joint_names``/``joint_dof_offsets``/``dof_path``/``dof_index_of_path``
-        DOF-layout accessors (deliberately public -- no caller should need to reach into backend-private
-        metadata).
+        DOF-layout accessors, plus ``has_dof_metadata`` reporting whether those accessors are usable
+        yet (deliberately public -- no caller should need to reach into backend-private metadata).
         """
 
     # ---- Per-prim rigid-body view I/O (backs RigidDynamicPrim) ----

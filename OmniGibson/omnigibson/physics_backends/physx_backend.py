@@ -33,6 +33,12 @@ def _get_physx_articulation_view_cls():
             """
 
             @property
+            def has_dof_metadata(self):
+                # False until the view is initialized against a live physics scene, in which case the
+                # DOF-layout accessors below are unusable and callers must fall back to inspecting USD.
+                return self._metadata is not None
+
+            @property
             def joint_count(self):
                 return self._metadata.joint_count
 
@@ -249,6 +255,13 @@ class PhysXBackend(PhysicsBackend):
             .get_simulation_event_stream_v2()
             .create_subscription_to_pop(joint_break_fn)
         )
+
+    def stop_step_callbacks(self):
+        for attr in ("_pre_physics_step_callback", "_post_physics_step_callback", "_simulation_event_callback"):
+            subscription = getattr(self, attr, None)
+            if subscription is not None:
+                subscription.unsubscribe()
+                setattr(self, attr, None)
 
     def apply_engine_settings(
         self,
