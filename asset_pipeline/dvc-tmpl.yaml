@@ -67,6 +67,7 @@ stages:
     # List the objects found in the entry.
     foreach: ${scenes}
     do:
+
       cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/check_collisions.py'
       deps:
       - b1k_pipeline/max/check_collisions.py
@@ -183,10 +184,23 @@ stages:
       deps:
       - b1k_pipeline/max/generate_camera_images.py
       - cad/${item}/processed.max
-      - artifacts/pipeline/sanitycheck.success
+      # - artifacts/pipeline/sanitycheck.success
       outs:
       - cad/${item}/artifacts/camera_images
       - cad/${item}/artifacts/generate_camera_images.json
+
+  generate_camera_images_og:
+    foreach: ${scenes}
+    do:
+      cmd: 'python -m b1k_pipeline.generate_camera_images_og ${item}'
+      deps:
+      - artifacts/og_dataset.zip
+      - artifacts/pipeline/pack_dataset.success
+      - b1k_pipeline/generate_camera_images_og.py
+      - b1k_pipeline/utils.py
+      - cad/${item}/artifacts/object_list.json
+      outs:
+      - cad/${item}/artifacts/camera_images_og.zip
 
   generate_camera_images_success:
     cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/generate_camera_images.json artifacts/pipeline/generate_camera_images.success scenes'

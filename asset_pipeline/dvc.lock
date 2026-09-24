@@ -6974,8 +6974,8 @@ stages:
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 63af91ae8453c5beabba88c9b9bf0725
-      size: 17969
+      md5: d4ba06677037d73d40df2c0ae823e748
+      size: 19120
     - path: cad/objects/batch-00/processed.max
       hash: md5
       md5: 3c844fad4c6bb0eee71a7dd37dc79d2b
@@ -6983,16 +6983,16 @@ stages:
     outs:
     - path: cad/objects/batch-00/artifacts/object_list.json
       hash: md5
-      md5: 615bd09549fef080569d005d645db5d6
-      size: 144394
+      md5: 16395cc0520e1d8cda676b435f8b4db8
+      size: 144414
   object_list@objects/batch-01:
     cmd: python b1k_pipeline/batch_3dsmax.py cad/objects/batch-01/processed.max 
       b1k_pipeline/max/object_list.py
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 63af91ae8453c5beabba88c9b9bf0725
-      size: 17969
+      md5: d4ba06677037d73d40df2c0ae823e748
+      size: 19120
     - path: cad/objects/batch-01/processed.max
       hash: md5
       md5: 06b5e2840f4e8532d989f49195397724
@@ -7000,16 +7000,16 @@ stages:
     outs:
     - path: cad/objects/batch-01/artifacts/object_list.json
       hash: md5
-      md5: 1eeec2c0a79166b4175ff3c2a853f572
-      size: 157406
+      md5: 8843a748a8f0b0c90c50f364b4510360
+      size: 157426
   object_list@objects/batch-02:
     cmd: python b1k_pipeline/batch_3dsmax.py cad/objects/batch-02/processed.max 
       b1k_pipeline/max/object_list.py
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 63af91ae8453c5beabba88c9b9bf0725
-      size: 17969
+      md5: d4ba06677037d73d40df2c0ae823e748
+      size: 19120
     - path: cad/objects/batch-02/processed.max
       hash: md5
       md5: ead7a7562300c6d1c9f44668b7885e37
@@ -7017,16 +7017,16 @@ stages:
     outs:
     - path: cad/objects/batch-02/artifacts/object_list.json
       hash: md5
-      md5: d351a93090e45e938d5bc3e17e856b3b
-      size: 253573
+      md5: 719211963ed6f0185d9357bf66b9688b
+      size: 253593
   object_list@objects/batch-03:
     cmd: python b1k_pipeline/batch_3dsmax.py cad/objects/batch-03/processed.max 
       b1k_pipeline/max/object_list.py
     deps:
     - path: b1k_pipeline/max/object_list.py
       hash: md5
-      md5: 63af91ae8453c5beabba88c9b9bf0725
-      size: 17969
+      md5: d4ba06677037d73d40df2c0ae823e748
+      size: 19120
     - path: cad/objects/batch-03/processed.max
       hash: md5
       md5: 106a4adc25c7ca47264153c430bf21f8
@@ -7034,8 +7034,8 @@ stages:
     outs:
     - path: cad/objects/batch-03/artifacts/object_list.json
       hash: md5
-      md5: a43b23ef72b097e3edbacb9771eaf4be
-      size: 121091
+      md5: 678a6f3590a6730a8f84e9ab94fa57ae
+      size: 121111
   object_list@objects/batch-04:
     cmd: python b1k_pipeline/batch_3dsmax.py cad/objects/batch-04/processed.max 
       b1k_pipeline/max/object_list.py
@@ -22426,3 +22426,120 @@ stages:
       hash: md5
       md5: d41d8cd98f00b204e9800998ecf8427e
       size: 0
+  generate_camera_images@scenes/house_single_floor:
+    cmd: python b1k_pipeline/batch_3dsmax.py 
+      cad/scenes/house_single_floor/processed.max 
+      b1k_pipeline/max/generate_camera_images.py
+    deps:
+    - path: b1k_pipeline/max/generate_camera_images.py
+      hash: md5
+      md5: e8482291b3d9da8859ba18b32e3953be
+      size: 3458
+    - path: cad/scenes/house_single_floor/processed.max
+      hash: md5
+      md5: ee31c7c405f409978a4911dfcd5cb939
+      size: 610726760
+    outs:
+    - path: cad/scenes/house_single_floor/artifacts/camera_images
+      hash: md5
+      md5: 31d82b032d8736e0e3741b4292e57ff5.dir
+      size: 3781999
+      nfiles: 3
+    - path: cad/scenes/house_single_floor/artifacts/generate_camera_images.json
+      hash: md5
+      md5: 16dbf5eafc0084c6e60171b3a8910826
+      size: 65
+  generate_camera_images@scenes/house_double_floor_lower:
+    cmd: python b1k_pipeline/batch_3dsmax.py 
+      cad/scenes/house_double_floor_lower/processed.max 
+      b1k_pipeline/max/generate_camera_images.py
+    deps:
+    - path: b1k_pipeline/max/generate_camera_images.py
+      hash: md5
+      md5: e8482291b3d9da8859ba18b32e3953be
+      size: 3458
+    - path: cad/scenes/house_double_floor_lower/processed.max
+      hash: md5
+      md5: 39a0ea3533e44836c01e7ff492f7e953
+      size: 268040516
+    outs:
+    - path: cad/scenes/house_double_floor_lower/artifacts/camera_images
+      hash: md5
+      md5: 5e4877875883eb77609369acfd146bb1.dir
+      size: 8048324
+      nfiles: 10
+    - path: 
+        cad/scenes/house_double_floor_lower/artifacts/generate_camera_images.json
+      hash: md5
+      md5: 7ffc60bae312edb0934013df21f3fec9
+      size: 100
+  generate_camera_images@scenes/office_cubicles_right:
+    cmd: python b1k_pipeline/batch_3dsmax.py 
+      cad/scenes/office_cubicles_right/processed.max 
+      b1k_pipeline/max/generate_camera_images.py
+    deps:
+    - path: b1k_pipeline/max/generate_camera_images.py
+      hash: md5
+      md5: e8482291b3d9da8859ba18b32e3953be
+      size: 3458
+    - path: cad/scenes/office_cubicles_right/processed.max
+      hash: md5
+      md5: 55e58f89bcc156b8cf88aa175a391336
+      size: 62597734
+    outs:
+    - path: cad/scenes/office_cubicles_right/artifacts/camera_images
+      hash: md5
+      md5: a3dfbc83f99822793dddd450e71b30f8.dir
+      size: 5114533
+      nfiles: 6
+    - path: 
+        cad/scenes/office_cubicles_right/artifacts/generate_camera_images.json
+      hash: md5
+      md5: daa3725ffefaf6f37ae127264d134dbe
+      size: 80
+  generate_camera_images@scenes/restaurant_diner:
+    cmd: python b1k_pipeline/batch_3dsmax.py 
+      cad/scenes/restaurant_diner/processed.max 
+      b1k_pipeline/max/generate_camera_images.py
+    deps:
+    - path: b1k_pipeline/max/generate_camera_images.py
+      hash: md5
+      md5: e8482291b3d9da8859ba18b32e3953be
+      size: 3458
+    - path: cad/scenes/restaurant_diner/processed.max
+      hash: md5
+      md5: 1dfb51842f1fb26008d3f28597d9ca38
+      size: 33199730
+    outs:
+    - path: cad/scenes/restaurant_diner/artifacts/camera_images
+      hash: md5
+      md5: 754cf0b282ab3ff9929f951d9c6417a5.dir
+      size: 12033920
+      nfiles: 11
+    - path: cad/scenes/restaurant_diner/artifacts/generate_camera_images.json
+      hash: md5
+      md5: bfb53ea90cb6da0077ec6d987d57ca62
+      size: 105
+  generate_camera_images@scenes/hotel_suite_large:
+    cmd: python b1k_pipeline/batch_3dsmax.py 
+      cad/scenes/hotel_suite_large/processed.max 
+      b1k_pipeline/max/generate_camera_images.py
+    deps:
+    - path: b1k_pipeline/max/generate_camera_images.py
+      hash: md5
+      md5: e8482291b3d9da8859ba18b32e3953be
+      size: 3458
+    - path: cad/scenes/hotel_suite_large/processed.max
+      hash: md5
+      md5: 3559f4690236583a4fcb8e8e82c0e746
+      size: 139003590
+    outs:
+    - path: cad/scenes/hotel_suite_large/artifacts/camera_images
+      hash: md5
+      md5: 9cf25cbec5475875086a94234c723048.dir
+      size: 12672778
+      nfiles: 14
+    - path: cad/scenes/hotel_suite_large/artifacts/generate_camera_images.json
+      hash: md5
+      md5: 0c68fa2c2cf5cce55e1370a101eb1d6b
+      size: 123
