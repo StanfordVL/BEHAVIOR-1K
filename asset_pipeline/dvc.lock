@@ -14336,8 +14336,8 @@ stages:
       size: 39631
     - path: b1k_pipeline/export_scenes_global.py
       hash: md5
-      md5: 3d46fe98f19081b0ca794b7c5757009f
-      size: 9114
+      md5: 55e6a8787910e53b154dfe39211223f0
+      size: 11491
     - path: b1k_pipeline/mesh_tree.py
       hash: md5
       md5: fa39df171001202b68c954917872be8f
@@ -14605,8 +14605,8 @@ stages:
       size: 24115740
     - path: cad/scenes/hotel_suite_large/artifacts/object_list.json
       hash: md5
-      md5: 9fb6f2322661c22216ae161894d2cdff
-      size: 246609
+      md5: 6fbc0b7b5ae975a166856880b6fedd31
+      size: 252297
     - path: cad/scenes/hotel_suite_small/artifacts/meshes.zip
       hash: md5
       md5: 5758c92a3cbc21f6363bdd83e620f1c1
@@ -14621,8 +14621,8 @@ stages:
       size: 37145628
     - path: cad/scenes/house_double_floor_lower/artifacts/object_list.json
       hash: md5
-      md5: a47c51a8a734ea0cc918de618a82794c
-      size: 444307
+      md5: b3abc4b1654d6209cfd9f90df1177042
+      size: 448210
     - path: cad/scenes/house_double_floor_upper/artifacts/meshes.zip
       hash: md5
       md5: f94e014549c7c12d2a150bbcfb26d4f2
@@ -14637,8 +14637,8 @@ stages:
       size: 90321900
     - path: cad/scenes/house_single_floor/artifacts/object_list.json
       hash: md5
-      md5: 3732e15559b2f9335b35f3f9a0aa1f05
-      size: 1194591
+      md5: b0b47923b96471abbb06a51984b7794e
+      size: 1195749
     - path: cad/scenes/office_bike/artifacts/meshes.zip
       hash: md5
       md5: e43fe9010375fce60d4e097e8a92f8e9
@@ -14661,8 +14661,8 @@ stages:
       size: 4563549
     - path: cad/scenes/office_cubicles_right/artifacts/object_list.json
       hash: md5
-      md5: 1332927225b2edf6227d7bbf93cd13de
-      size: 356427
+      md5: 2e92f49f4fa5a25fb65f3ad6575f1560
+      size: 358757
     - path: cad/scenes/office_large/artifacts/meshes.zip
       hash: md5
       md5: 8f2a16b5f690db01ac827594cfdae810
@@ -14749,8 +14749,8 @@ stages:
       size: 5179336
     - path: cad/scenes/restaurant_diner/artifacts/object_list.json
       hash: md5
-      md5: 233c369e9787249f19c1353d320d8431
-      size: 158467
+      md5: bbe5b4c5e8a53077170ef93c0ec7d3fe
+      size: 162791
     - path: cad/scenes/restaurant_hotel/artifacts/meshes.zip
       hash: md5
       md5: abf15b35b5fcffba6342089ba95d13d2
@@ -14815,8 +14815,8 @@ stages:
     outs:
     - path: artifacts/parallels/scenes.zip
       hash: md5
-      md5: 122b9c25e32406e66979906dadd01ef9
-      size: 2479603
+      md5: 14393e21a1e855e3324e0fe6f088a452
+      size: 2485478
     - path: artifacts/pipeline/export_scenes.json
       hash: md5
       md5: 664e2cb0fc4ca688ad97e1a8a3d8095a
@@ -22138,21 +22138,29 @@ stages:
     deps:
     - path: artifacts/parallels/objects.zip
       hash: md5
-      md5: 4e9972811b9042041f83faa4c13abb8a
-      size: 28289303296
+      md5: 9e6ab3630ae3684d31b94f67cb6ce128
+      size: 28024803796
+    - path: artifacts/parallels/scenes.zip
+      hash: md5
+      md5: 14393e21a1e855e3324e0fe6f088a452
+      size: 2485478
     - path: artifacts/pipeline/export_objs.success
+      hash: md5
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 0
+    - path: artifacts/pipeline/export_scenes.success
       hash: md5
       md5: d41d8cd98f00b204e9800998ecf8427e
       size: 0
     - path: b1k_pipeline/export_glbs.py
       hash: md5
-      md5: 7997dd21fcae458da6cb5af1f4f60c66
-      size: 2567
+      md5: d02511eff032631e83d380ca9523e65d
+      size: 33057
     outs:
     - path: artifacts/parallels/objects_glb.zip
       hash: md5
-      md5: 410a47f37bd93c46fa9a740dfb3dcdc7
-      size: 13652398451
+      md5: fd468fe40a972469c099c430e906ff26
+      size: 1898130807
   check_collisions_challenge:
     cmd: python -m b1k_pipeline.check_collisions_challenge
     deps:
@@ -22267,8 +22275,8 @@ stages:
       size: 28024803796
     - path: artifacts/parallels/scenes.zip
       hash: md5
-      md5: 122b9c25e32406e66979906dadd01ef9
-      size: 2479603
+      md5: 14393e21a1e855e3324e0fe6f088a452
+      size: 2485478
     - path: artifacts/pipeline/export_objs.success
       hash: md5
       md5: d41d8cd98f00b204e9800998ecf8427e
@@ -22277,10 +22285,14 @@ stages:
       hash: md5
       md5: d41d8cd98f00b204e9800998ecf8427e
       size: 0
+    - path: b1k_pipeline/assets/skybox.png
+      hash: md5
+      md5: a62dbe0a5d7094a9e71f90f392d25e63
+      size: 3561760
     - path: b1k_pipeline/export_scenes_mujoco.py
       hash: md5
-      md5: 584c78c6610868e2c040230c124f335b
-      size: 8300
+      md5: 0b7e5103a87f7145425164b158a92c50
+      size: 11518
     - path: params.yaml
       hash: md5
       md5: d06bb997f278646a03a4f108469d1b94
@@ -22288,8 +22300,8 @@ stages:
     outs:
     - path: artifacts/parallels/scenes_mujoco.zip
       hash: md5
-      md5: 36e161b722d7dfc329494000b609561a
-      size: 2680893
+      md5: 22749bb71f08bdd141954d96ec854068
+      size: 6188637
     - path: artifacts/pipeline/export_scenes_mujoco.json
       hash: md5
       md5: 664e2cb0fc4ca688ad97e1a8a3d8095a
@@ -22337,13 +22349,13 @@ stages:
       size: 12554
     - path: b1k_pipeline/export_objects_mujoco.py
       hash: md5
-      md5: 5f538eea5c10c4d4ca704c918a7d259c
-      size: 25550
+      md5: fa992c52b35d50cbf4686ffcb15a0f68
+      size: 25809
     outs:
     - path: artifacts/parallels/objects_mujoco.zip
       hash: md5
-      md5: 792fdc9873f60dbe302ecdf9be81174f
-      size: 34285819480
+      md5: 9804b6e256878324dd471935bd585ca6
+      size: 34285727663
     - path: artifacts/pipeline/export_objects_mujoco.json
       hash: md5
       md5: 664e2cb0fc4ca688ad97e1a8a3d8095a
@@ -22383,12 +22395,12 @@ stages:
       size: 28024803796
     - path: artifacts/parallels/objects_mujoco.zip
       hash: md5
-      md5: 792fdc9873f60dbe302ecdf9be81174f
-      size: 34285819480
+      md5: 9804b6e256878324dd471935bd585ca6
+      size: 34285727663
     - path: artifacts/parallels/scenes_mujoco.zip
       hash: md5
-      md5: 36e161b722d7dfc329494000b609561a
-      size: 2680893
+      md5: 9c3bcbe71549020b9a902459e399fa5d
+      size: 2657524
     - path: artifacts/parallels/systems.zip
       hash: md5
       md5: e727f39b6fe35adb9262c4b32fdc7760
@@ -22416,8 +22428,8 @@ stages:
     outs:
     - path: artifacts/og_dataset_mujoco.zip
       hash: md5
-      md5: f5575a0dbeb2e119b1743ee8b90f172a
-      size: 33710153809
+      md5: 8dd959f86cd95581959b0620b8fc8149
+      size: 33710046011
     - path: artifacts/pipeline/pack_mujoco_dataset.json
       hash: md5
       md5: 2ad066aadc9c024dff5e8d3c6587590d
