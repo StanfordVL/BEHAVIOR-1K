@@ -160,7 +160,7 @@ class ClothPrim(GeomPrim):
                 th.tensor(0),
             )
             overlap_vol = overlap_x * overlap_y * overlap_z
-            true_vol = th.prod(true_aabb[1] - true_aabb[0])
+            true_vol = T.prod3(true_aabb[1] - true_aabb[0])
             if true_vol == 0.0 or (overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD).item():
                 success = True
                 break
@@ -212,7 +212,7 @@ class ClothPrim(GeomPrim):
                     break
 
                 ms.meshing_isotropic_explicit_remeshing(
-                    iterations=5, adaptive=True, targetlen=pymeshlab.AbsoluteValue(particle_distance)
+                    iterations=5, adaptive=True, targetlen=pymeshlab.PureValue(particle_distance)
                 )
 
                 # If the cloth has multiple pieces, only keep the largest one
@@ -405,7 +405,8 @@ class ClothPrim(GeomPrim):
                     [0, 1, 1],
                     [-1, 0, 1],
                     [0, -1, 1],
-                ]
+                ],
+                dtype=th.float32,
             )
             * box_half_extent
         )
@@ -952,8 +953,8 @@ class ClothPrim(GeomPrim):
             [
                 state_flat,
                 th.tensor([state["particle_group"], state["n_particles"]], dtype=th.float32),
-                state["particle_positions"].reshape(-1),
-                state["particle_velocities"].reshape(-1),
+                state["particle_positions"].reshape(-1).to(state_flat.device),
+                state["particle_velocities"].reshape(-1).to(state_flat.device),
             ]
         )
 

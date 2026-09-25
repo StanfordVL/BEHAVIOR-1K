@@ -64,7 +64,9 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
     obj_aabb_center, obj_aabb_extent = obj.aabb_center, obj.aabb_extent
     obj_aabb_offset = obj.get_position_orientation()[0] - obj_aabb_center
 
-    target_obj_aabb_pos = th.tensor([0, 0, obj_aabb_extent[2] / 2.0]) + th.tensor([x_offset, y_offset, z_offset])
+    target_obj_aabb_pos = th.tensor([0, 0, obj_aabb_extent[2] / 2.0], device=obj_aabb_offset.device) + th.tensor(
+        [x_offset, y_offset, z_offset], device=obj_aabb_offset.device
+    )
     obj.set_position_orientation(position=target_obj_aabb_pos + obj_aabb_offset)
 
 

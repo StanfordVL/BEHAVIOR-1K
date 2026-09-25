@@ -499,7 +499,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
 
         avg_finger_offset = th.mean(
-            th.tensor([length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()])
+            th.tensor(
+                [length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()],
+            )
         )
         pregrasp_offset = avg_finger_offset + m.GRASP_APPROACH_DISTANCE
 
@@ -1641,7 +1643,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             diff_pos = end_pose[0] - self.robot.get_position_orientation()[0]
             intermediate_pose = (
                 end_pose[0],
-                T.euler2quat(th.tensor([0, 0, math.atan2(diff_pos[1], diff_pos[0])], dtype=th.float32)),
+                T.euler2quat(
+                    th.tensor([0, 0, math.atan2(diff_pos[1], diff_pos[0])], dtype=th.float32, device=end_pose[0].device)
+                ),
             )
             body_intermediate_pose = self._world_pose_to_robot_pose(intermediate_pose)
             diff_yaw = T.quat2euler(body_intermediate_pose[1])[2].item()
@@ -1659,10 +1663,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         / th.norm(body_target_pose[0][:2])
                         * self.robot.linear_velocity_gain_for_primitives
                     )
-                    base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
+                    base_action = th.tensor(
+                        [direction_vec[0], direction_vec[1], 0.0], dtype=th.float32, device=action.device
+                    )
                     action[self.robot.controller_action_idx["base"]] = base_action
                 elif ControllerView.is_controller_type(base_group_key, DifferentialDriveController):
-                    base_action = th.tensor([self.robot.linear_velocity_gain_for_primitives, 0.0], dtype=th.float32)
+                    base_action = th.tensor(
+                        [self.robot.linear_velocity_gain_for_primitives, 0.0], dtype=th.float32, device=action.device
+                    )
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     raise ValueError(
@@ -1826,10 +1834,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # We want to sample only from the side-facing faces.
         face_normal_axis = random.choice([0, 1])
         face_normal_direction = random.choice([-1, 1])
-        face_center = aabb_center + th.eye(3)[face_normal_axis] * aabb_extent * face_normal_direction
+        eye3 = th.eye(3, device=aabb_center.device)
+        face_center = aabb_center + eye3[face_normal_axis] * aabb_extent * face_normal_direction
         face_lateral_axis = 0 if face_normal_axis == 1 else 1
-        face_lateral_half_extent = th.eye(3)[face_lateral_axis] * aabb_extent / 2
-        face_vertical_half_extent = th.eye(3)[2] * aabb_extent / 2
+        face_lateral_half_extent = eye3[face_lateral_axis] * aabb_extent / 2
+        face_vertical_half_extent = eye3[2] * aabb_extent / 2
         face_min = face_center - face_vertical_half_extent - face_lateral_half_extent
         face_max = face_center + face_vertical_half_extent + face_lateral_half_extent
         return th.rand(face_min.size()) * (face_max - face_min) + face_min
@@ -1890,7 +1899,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 bb_center = held_obj.aabb_center
                 # Compute bbox pose in the object base link frame
                 bb_pos_in_base, bb_orn_in_base = T.relative_pose_transform(
-                    bb_center, th.tensor([0, 0, 0, 1], dtype=th.float32), *held_obj.get_position_orientation()
+                    bb_center,
+                    th.tensor([0, 0, 0, 1], dtype=th.float32, device=bb_center.device),
+                    *held_obj.get_position_orientation(),
                 )
             else:
                 _, _, bb_extents, bb_pos_in_base = held_obj.get_base_aligned_bbox()
@@ -1899,7 +1910,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             sampling_results = sample_cuboid_for_predicate(pred_map[predicate], target_obj, bb_extents)
             if sampling_results[0][0] is None:
                 continue
-            sampled_bb_center = sampling_results[0][0] + th.tensor([0, 0, m.PREDICATE_SAMPLING_Z_OFFSET])
+            sampled_bb_center = sampling_results[0][0] + th.tensor(
+                [0, 0, m.PREDICATE_SAMPLING_Z_OFFSET], device=sampling_results[0][0].device
+            )
             sampled_bb_orn = sampling_results[0][2]
 
             # Tobj_in_world @ Tbbox_in_obj = Tbbox_in_world
@@ -2006,8 +2019,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
             # base_joints[2] (z) is relative to root_link; convert to world frame
             root_pos = self.robot.root_link.get_position_orientation()[0]
-            pos = th.tensor([pose_2d[0], pose_2d[1], root_pos[2] + base_joints[2]], dtype=th.float32)
-            euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)
+            pos = th.tensor(
+                [pose_2d[0], pose_2d[1], root_pos[2] + base_joints[2]], dtype=th.float32, device=root_pos.device
+            )
+            euler_intrinsic_xyz = th.tensor(
+                [base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32, device=root_pos.device
+            )
             mat = T.euler_intrinsic2mat(euler_intrinsic_xyz)
             orn = T.mat2quat(mat)
         else:

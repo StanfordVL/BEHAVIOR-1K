@@ -353,11 +353,11 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
                     joint_pos = joint_range[1]
                 else:
                     # Convert the range to the format numpy accepts.
-                    low = min(joint_range)
-                    high = max(joint_range)
+                    low = float(min(joint_range))
+                    high = float(max(joint_range))
 
                     # Sample a position.
-                    joint_pos = (th.rand(1) * (high - low) + low).item()
+                    joint_pos = random.uniform(low, high)
 
                 # Save sampled position. JointPrim.set_pos flips TensorizedState.caches_dirty,
                 # so the next get_value() below will trigger a refresh and observe the new pose.
