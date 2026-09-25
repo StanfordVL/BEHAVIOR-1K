@@ -3,7 +3,11 @@
 import pytest
 
 from bddl.knowledge_base import KnowledgeBase, Task, Synset
-from bddl.condition_evaluation import compile_state, evaluate_state
+from bddl.condition_evaluation import (
+    _maximum_matching_size,
+    compile_state,
+    evaluate_state,
+)
 from bddl.logic_base import Expression
 from bddl.predicates import (
     Predicate,
@@ -388,6 +392,106 @@ class TestConditionEvaluation:
         # No bowls covered -> forall succeeds
         ok, _ = evaluate_state(compiled, lambda cls, *e: False)
         assert ok is True
+
+    def test_evaluate_forpairs_requires_one_to_one_pairing(self):
+        """forpairs needs a real matching, not just non-empty rows and columns.
+
+        Glasses 1 and 2 are next to plate 1 only; glass 3 is next to plates 2
+        and 3. Every glass has some plate and every plate has some glass, so
+        counting satisfied rows and columns reaches 3 either way, but the
+        largest set of pairs sharing no glass and no plate has size 2.
+        """
+        scope = {
+            "wineglass.n.01_1", "wineglass.n.01_2", "wineglass.n.01_3",
+            "plate.n.04_1", "plate.n.04_2", "plate.n.04_3",
+        }
+        object_map = {
+            "wineglass.n.01": [
+                "wineglass.n.01_1", "wineglass.n.01_2", "wineglass.n.01_3",
+            ],
+            "plate.n.04": ["plate.n.04_1", "plate.n.04_2", "plate.n.04_3"],
+        }
+        parsed = [
+            [
+                "forpairs",
+                ["?glass", "-", "wineglass.n.01"],
+                ["?plate", "-", "plate.n.04"],
+                ["ontop", "?glass", "?plate"],
+            ]
+        ]
+        compiled = compile_state(parsed, scope=scope, object_map=object_map)
+
+        no_perfect_matching = {
+            ("wineglass.n.01_1", "plate.n.04_1"),
+            ("wineglass.n.01_2", "plate.n.04_1"),
+            ("wineglass.n.01_3", "plate.n.04_2"),
+            ("wineglass.n.01_3", "plate.n.04_3"),
+        }
+        ok, _ = evaluate_state(
+            compiled, lambda cls, *e: tuple(e) in no_perfect_matching
+        )
+        assert ok is False
+
+        # Give glass 2 its own plate and a full pairing exists.
+        perfect_matching = no_perfect_matching | {
+            ("wineglass.n.01_2", "plate.n.04_2")
+        }
+        ok, _ = evaluate_state(
+            compiled, lambda cls, *e: tuple(e) in perfect_matching
+        )
+        assert ok is True
+
+    def test_evaluate_fornpairs_requires_one_to_one_pairing(self):
+        """fornpairs needs N pairs that share no instance on either side."""
+        scope = {
+            "wineglass.n.01_1", "wineglass.n.01_2", "wineglass.n.01_3",
+            "plate.n.04_1", "plate.n.04_2", "plate.n.04_3",
+        }
+        object_map = {
+            "wineglass.n.01": [
+                "wineglass.n.01_1", "wineglass.n.01_2", "wineglass.n.01_3",
+            ],
+            "plate.n.04": ["plate.n.04_1", "plate.n.04_2", "plate.n.04_3"],
+        }
+        parsed = [
+            [
+                "fornpairs",
+                ["3"],
+                ["?glass", "-", "wineglass.n.01"],
+                ["?plate", "-", "plate.n.04"],
+                ["ontop", "?glass", "?plate"],
+            ]
+        ]
+        compiled = compile_state(parsed, scope=scope, object_map=object_map)
+
+        only_two_disjoint_pairs = {
+            ("wineglass.n.01_1", "plate.n.04_1"),
+            ("wineglass.n.01_2", "plate.n.04_1"),
+            ("wineglass.n.01_3", "plate.n.04_2"),
+            ("wineglass.n.01_3", "plate.n.04_3"),
+        }
+        ok, _ = evaluate_state(
+            compiled, lambda cls, *e: tuple(e) in only_two_disjoint_pairs
+        )
+        assert ok is False
+
+        three_disjoint_pairs = only_two_disjoint_pairs | {
+            ("wineglass.n.01_2", "plate.n.04_2")
+        }
+        ok, _ = evaluate_state(
+            compiled, lambda cls, *e: tuple(e) in three_disjoint_pairs
+        )
+        assert ok is True
+
+    def test_maximum_matching_size(self):
+        """The matching helper agrees with hand-computed matchings."""
+        assert _maximum_matching_size([[1, 0, 0], [1, 0, 0], [0, 1, 1]]) == 2
+        assert _maximum_matching_size([[1, 0, 0], [1, 1, 0], [0, 1, 1]]) == 3
+        assert _maximum_matching_size([[0, 0], [0, 0]]) == 0
+        assert _maximum_matching_size([[1, 1], [1, 1]]) == 2
+        # A single column cannot serve two rows.
+        assert _maximum_matching_size([[1], [1]]) == 1
+        assert _maximum_matching_size([]) == 0
 
 
 # ---------------------------------------------------------------------------
