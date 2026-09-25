@@ -3,6 +3,7 @@ import random
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.objects.usd_object import REGISTERED_OBJECTS
@@ -130,7 +131,9 @@ class GraspTask(BaseTask):
                 robot.set_position_orientation(*robot_pose)
 
                 # Check if the robot has toppled
-                robot_up = T.quat_apply(robot.get_position_orientation()[1], th.tensor([0, 0, 1], dtype=th.float32))
+                robot_up = T.quat_apply(
+                    robot.get_position_orientation()[1], th.tensor([0, 0, 1], dtype=th.float32, device=og.sim.device)
+                )
                 if robot_up[2] < 0.75:
                     raise ValueError("Robot has toppled over")
 

@@ -605,7 +605,9 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             )
 
             # Also add a random world Z-axis offset to the orientation
-            random_z_orientation = T.axisangle2quat(th.as_tensor([0, 0, th.rand(1) * 2 * th.pi]))
+            random_z_orientation = T.axisangle2quat(
+                th.as_tensor([0, 0, th.rand(1) * 2 * th.pi], device=aabb_low.device)
+            )
             orientation = T.quat_multiply(orientation, random_z_orientation)
 
             # First half: use inset bounds (smarter sampling)

@@ -202,7 +202,12 @@ class GeomPrim(XFormPrim):
 
     def check_local_points_in_volume(self, particle_positions_in_mesh_frame):
         if self._mesh_type == "Mesh":
-            return th.as_tensor(self.delaunay_triangulation.find_simplex(particle_positions_in_mesh_frame.numpy())) >= 0
+            return (
+                th.as_tensor(
+                    self.delaunay_triangulation.find_simplex(particle_positions_in_mesh_frame.cpu().numpy()),
+                )
+                >= 0
+            )
         elif self._mesh_type == "Sphere":
             return check_points_in_sphere(
                 size=self.get_attribute("radius"),
@@ -230,9 +235,23 @@ class GeomPrim(XFormPrim):
         # Move particles into local frame
         world_pose_w_scale = self.scaled_transform
         particle_positions_world_homogeneous = th.cat(
-            (particle_positions_world, th.ones((particle_positions_world.shape[0], 1))), dim=1
+            (
+                particle_positions_world,
+                th.ones((particle_positions_world.shape[0], 1), device=particle_positions_world.device),
+            ),
+            dim=1,
         )
-        particle_positions_local = (particle_positions_world_homogeneous @ th.linalg.inv(world_pose_w_scale).T)[:, :3]
+        inv_transform = th.linalg.inv(world_pose_w_scale)
+        # NOTE: deliberately NOT `homogeneous @ inv_transform.T` -- that matmul form is a confirmed-broken
+        # CUDA kernel on this GPU/torch combination (RTX 5090, sm_120, torch 2.11.0+cu130) specifically for
+        # a batch size >1 against a non-contiguous 4x4 matrix (scaled_transform has stride (1,4), a
+        # transposed view): it silently returns wrong results for every row once N>1, while N=1 and CPU are
+        # both correct (see det3x3/prod3/quat_multiply in transform_utils.py for the same class of bug on
+        # this hardware). This broadcast-multiply-sum form computes the identical math via elementwise ops
+        # instead of a batched GEMM, sidestepping the broken kernel -- verified correct against N=1 and CPU
+        # for the same inputs.
+        homogeneous = particle_positions_world_homogeneous.to(world_pose_w_scale.device)
+        particle_positions_local = (homogeneous.unsqueeze(1) * inv_transform).sum(dim=-1)[:, :3]
         return self.check_local_points_in_volume(particle_positions_local)
 
     @property
@@ -241,10 +260,15 @@ class GeomPrim(XFormPrim):
         if points is None:
             return None
         position, orientation = self.get_position_orientation(frame="parent")
-        scale = self.scale
+        # points/scale are always CPU (raw USD-authored geometry), but position/orientation now track
+        # og.sim.device (see usd_utils.get_local_pose()) -- match points' device here since this is a
+        # purely local-frame geometric computation, not something that needs to combine with live
+        # physics-state tensors elsewhere (callers needing that go through transform_local_points_to_world,
+        # which does its own device matching against the target world transform).
+        scale = self.scale.to(points.device)
         points_scaled = points * scale
-        points_rotated = (T.quat2mat(orientation) @ points_scaled.T).T
-        points_transformed = points_rotated + position
+        points_rotated = (T.quat2mat(orientation.to(points.device)) @ points_scaled.T).T
+        points_transformed = points_rotated + position.to(points.device)
         return points_transformed
 
     @property

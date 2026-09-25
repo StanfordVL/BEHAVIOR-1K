@@ -1789,8 +1789,9 @@ class RecipeRule(BaseTransitionRule):
                 log.warning(
                     f"Failed to spawn object {obj.name} in container {container.name}! Directly placing on top instead."
                 )
-                pos = th.tensor(container.aabb_center, dtype=th.float32) + th.tensor(
-                    [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0], dtype=th.float32
+                pos = container.aabb_center + th.tensor(
+                    [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0],
+                    dtype=th.float32,
                 )
                 obj.set_bbox_center_position_orientation(position=pos)
 
@@ -2005,8 +2006,8 @@ class CookingPhysicalParticleRule(RecipeRule):
 
         # Stabilize generated particles
         if isinstance(cooked_system, MacroPhysicalParticleSystem):
-            new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles)
             lin_vel, ang_vel = cooked_system.get_particles_velocities()
+            new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles)
             lin_vel[new_particle_indices] = 0
             ang_vel[new_particle_indices] = 0
             cooked_system.set_particles_velocities(lin_vels=lin_vel, ang_vels=ang_vel)

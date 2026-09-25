@@ -196,12 +196,12 @@ class AttachedTo(
                             m.ATTACHMENT_JOINT_VISUAL_WIDTH,
                             m.ATTACHMENT_JOINT_VISUAL_WIDTH,
                             length,
-                        ]
+                        ],
                     )
                     / link.scale
                 )
                 visualizer.set_position_orientation(
-                    position=direction * (length / 2.0) / link.scale,
+                    position=direction.to(link.scale.device) * (length / 2.0) / link.scale,
                     orientation=quat_offset,
                     frame="parent",
                 )

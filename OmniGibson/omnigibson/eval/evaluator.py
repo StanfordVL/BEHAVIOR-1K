@@ -429,7 +429,7 @@ class BatchedEvaluator:
             batched_action = batched_action.unsqueeze(0)
         actions = th.zeros((self.num_envs, action_dim), dtype=th.float32)
         for env_idx in active_env_indices:
-            actions[env_idx] = batched_action[env_idx].to(actions.dtype)
+            actions[env_idx] = batched_action[env_idx].to(dtype=actions.dtype, device=actions.device)
         terminated, truncated, _ = self._apply_actions(actions, active_env_indices)
         return terminated, truncated
 

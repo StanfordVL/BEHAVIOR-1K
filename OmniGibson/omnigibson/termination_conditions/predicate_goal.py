@@ -1,6 +1,5 @@
 import torch as th
 
-
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
 

@@ -404,7 +404,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.idx != 0:
             aabb_min, aabb_max = og.sim.render_backend.compute_world_aabb(scene_absolute_path)
             left_edge_to_center = 0.0 if len(self._init_objs) == 0 else -aabb_min[0]
-            scene_position = th.tensor([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
+            scene_position = th.tensor(
+                [last_scene_edge + scene_margin + left_edge_to_center, 0, 0], device=og.sim.device
+            )
             identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
             self._scene_prim.set_position_orientation(position=scene_position, orientation=identity_quat)
             if len(self._init_objs) == 0:
@@ -570,12 +572,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             init_state = recursively_convert_to_torch(init_state)
             # In VectorEnvironment, the scene pose loaded from the file should be updated
             init_state["pos"], init_state["ori"] = self._pose_info["pos_ori"]
+            scene_pos, scene_ori = T.mat2pose(self.pose)
             for obj_name, obj_info in init_state["registry"]["object_registry"].items():
                 # Convert the pose to be in the scene's coordinate frame
                 pos, ori = obj_info["root_link"]["pos"], obj_info["root_link"]["ori"]
                 # apply scene pose to all objects in this scene
                 obj_info["root_link"]["pos"], obj_info["root_link"]["ori"] = T.pose_transform(
-                    *T.mat2pose(self.pose), pos, ori
+                    scene_pos, scene_ori, pos.to(scene_pos.device), ori.to(scene_pos.device)
                 )
             # NOTE: system registry states need no such conversion -- particle systems dump/load
             # their particle poses in the SCENE frame (see BaseSystem._dump_state and

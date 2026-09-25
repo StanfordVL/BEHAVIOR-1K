@@ -213,9 +213,15 @@ class MacroParticleSystem(BaseSystem):
         """
         Perform any necessary processing on the particle object to extract further information.
         """
-        # Update color if the particle object has any material
+        # Update color if the particle object has any material. has_material() reflects the raw USD
+        # binding (always true if one is authored, regardless of backend); .material is the actual
+        # loaded MaterialPrim wrapper, which is deliberately only populated when the render backend
+        # authors materials (see
+        # xform_prim.py's _post_load()). Check
+        # the wrapper itself rather than the raw binding so this falls back to the default color
+        # instead of crashing when no wrapper was loaded.
         color = th.ones(3)
-        if self.particle_object.has_material():
+        if self.particle_object.material is not None:
             color = self.particle_object.material.average_diffuse_color
         self._color = color
 
@@ -280,11 +286,13 @@ class MacroParticleSystem(BaseSystem):
 
         # Update the tensors
         n_particles = len(positions)
-        orientations = T.random_quaternion(n_particles) if orientations is None else orientations
+        orientations = (
+            T.random_quaternion(n_particles, device=positions.device) if orientations is None else orientations
+        )
         scales = self.sample_scales(n=n_particles) if scales is None else scales
 
-        positions = th.cat([current_positions, positions], dim=0)
-        orientations = th.cat([current_orientations, orientations], dim=0)
+        positions = th.cat([current_positions.to(positions.device), positions], dim=0)
+        orientations = th.cat([current_orientations.to(orientations.device), orientations], dim=0)
 
         # Add particles
         for scale in scales:
@@ -443,7 +451,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
                 if not self._CLIP_INTO_OBJECTS and z_extent > 0:
                     z_offsets = (
-                        th.tensor([z_extent * particle.scale[2] for particle in self._group_particles[group].values()])
+                        th.tensor(
+                            [z_extent * particle.scale[2] for particle in self._group_particles[group].values()],
+                        )
                         / 2.0
                     )
                     # Shift the particles halfway up
@@ -460,12 +470,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
         if not get_prim_at_path(prim_path):
             with og.sim.editing_usd():
-                lazy.omni.kit.commands.execute(
-                    "CopyPrim",
-                    path_from=self.particle_object.prim_path,
-                    path_to=prim_path,
-                )
-            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+                og.sim.render_backend.copy_prim(self.particle_object.prim_path, prim_path)
+            prim = get_prim_at_path(prim_path)
             add_semantic_label(prim=prim, label=self.name)
         result = GeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
@@ -593,7 +599,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scales = self.sample_scales_by_group(group=group, n=max_samples)
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
-        avg_scale = th.pow(th.prod(obj.scale), 1 / 3)
+        avg_scale = th.pow(T.prod3(obj.scale), 1 / 3)
 
         bbox_extents_global = scales * self.particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
@@ -678,7 +684,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         """
         n_particles = len(particles) if particles else 0
         if n_particles == 0:
-            return (th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 4))
+            return (
+                th.empty(0, device=og.sim.device).reshape(0, 3),
+                th.empty(0, device=og.sim.device).reshape(0, 4),
+            )
 
         if local:
             poses = th.zeros((n_particles, 4, 4))
@@ -835,8 +844,14 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             position = pos if position is None else position
             orientation = ori if orientation is None else orientation
 
-        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+        position = (
+            position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32, device=og.sim.device)
+        )
+        orientation = (
+            orientation
+            if isinstance(orientation, th.Tensor)
+            else th.tensor(orientation, dtype=th.float32, device=og.sim.device)
+        )
 
         name = list(self.particles.keys())[idx]
         global_mat = th.zeros((4, 4))
@@ -857,8 +872,14 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             position = pos if position is None else position
             orientation = ori if orientation is None else orientation
 
-        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+        position = (
+            position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32, device=og.sim.device)
+        )
+        orientation = (
+            orientation
+            if isinstance(orientation, th.Tensor)
+            else th.tensor(orientation, dtype=th.float32, device=og.sim.device)
+        )
 
         name = list(self.particles.keys())[idx]
         local_mat = th.zeros((4, 4))
@@ -1238,8 +1259,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # Compute particle radius
         vertices = (
             th.tensor(self.particle_object.get_attribute("points"))
-            * self.particle_object.scale
-            * self.max_scale.reshape(1, 3)
+            * self.particle_object.scale.cpu()
+            * self.max_scale.cpu().reshape(1, 3)
         )
 
         particle_offset, particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
@@ -1248,7 +1269,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         if particle_radius < m.MIN_PARTICLE_RADIUS:
             ratio = m.MIN_PARTICLE_RADIUS / particle_radius
-            self.particle_object.scale *= ratio
+            self.particle_object.scale = self.particle_object.scale * ratio.to(self.particle_object.scale.device)
             particle_offset *= ratio
             particle_radius = m.MIN_PARTICLE_RADIUS
 
@@ -1304,7 +1325,10 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             pos, ori = tfs[:, :3], tfs[:, 3:]
             pos = pos + T.quat2mat(ori) @ self._particle_offset
         else:
-            pos, ori = th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 4)
+            pos, ori = (
+                th.empty(0, device=og.sim.device).reshape(0, 3),
+                th.empty(0, device=og.sim.device).reshape(0, 4),
+            )
         return pos, ori
 
     def get_particles_local_pose(self):

@@ -712,7 +712,9 @@ class BehaviorTask(BaseTask):
                 if obj.name != agent.name:
                     for arm in agent.arm_names:
                         grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj)
-                        low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
+                        low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.tensor(
+                            [float(grasping_object)], device=og.sim.device
+                        )
             else:
                 low_dim_obs[f"{inst}_real"] = th.zeros(1)
                 low_dim_obs[f"{inst}_pos"] = th.zeros(3)

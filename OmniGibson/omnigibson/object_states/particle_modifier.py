@@ -559,15 +559,16 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         if condition_type == ParticleModifyCondition.FUNCTION:
             cond = value
         elif condition_type == ParticleModifyCondition.SATURATED:
-            cond = lambda obj: self.obj.scene.is_system_active(value) and obj.states[Saturated].get_value(
-                self.obj.scene.get_system(value)
+            cond = lambda obj: (
+                self.obj.scene.is_system_active(value)
+                and obj.states[Saturated].get_value(self.obj.scene.get_system(value))
             )
         elif condition_type == ParticleModifyCondition.TOGGLEDON:
             cond = lambda obj: obj.states[ToggledOn].get_value() == value
         elif condition_type == ParticleModifyCondition.GRAVITY:
             # Particles spawn in negative z-axis direction, so check positive dot product of link frame with global
-            cond = (
-                lambda obj: (
+            cond = lambda obj: (
+                (
                     th.dot(
                         T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1])
                         @ th.tensor([0, 0, 1], dtype=th.float32),
@@ -945,7 +946,9 @@ class ParticleRemover(ParticleModifier):
             inbound_idxs = (
                 self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()
                 if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION
-                else th.tensor(list(self.obj.states[ContactParticles].get_value(system, self.link)))
+                else th.tensor(
+                    list(self.obj.states[ContactParticles].get_value(system, self.link)), device=og.sim.device
+                )
             )
             modification_limit = self.physical_particle_modification_limit
 
@@ -1146,7 +1149,9 @@ class ParticleApplier(ParticleModifier):
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
             local_pos, local_quat = self.projection_mesh.get_position_orientation(frame="parent")
             assert th.all(
-                th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
+                th.isclose(
+                    local_pos + th.tensor([0, 0, height / 2.0], device=local_pos.device), th.zeros_like(local_pos)
+                )
             ), "Projection mesh tip should align with metalink position!"
             local_euler = T.quat2euler(local_quat)
             assert th.all(
@@ -1210,7 +1215,11 @@ class ParticleApplier(ParticleModifier):
         ), f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [
-            th.arange(l + system.particle_radius, h - system.particle_radius + 1e-10, system.particle_radius * 2)
+            th.arange(
+                l + system.particle_radius,
+                h - system.particle_radius + 1e-10,
+                system.particle_radius * 2,
+            )
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
@@ -1229,7 +1238,9 @@ class ParticleApplier(ParticleModifier):
         self._in_mesh_local_particle_positions = (
             points_in_local_frame
             if n_max_particles > len(points)
-            else points_in_local_frame[th.randperm(len(points_in_local_frame))[:n_max_particles]]
+            else points_in_local_frame[
+                th.randperm(len(points_in_local_frame), device=points_in_local_frame.device)[:n_max_particles]
+            ]
         )
         # Also programmatically compute the directions of each particle position -- this is the normalized
         # vector pointing from source to the particle
@@ -1277,7 +1288,7 @@ class ParticleApplier(ParticleModifier):
                 # Create an attachment group if necessary
                 if group not in system.groups:
                     system.create_attachment_group(obj=self.obj)
-                avg_scale = th.pow(th.prod(self.obj.scale), 1 / 3)
+                avg_scale = th.pow(T.prod3(self.obj.scale), 1 / 3)
                 scales = system.sample_scales_by_group(group=group, n=len(start_points))
                 cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
             else:
@@ -1334,7 +1345,7 @@ class ParticleApplier(ParticleModifier):
             # Generate particle info -- maps group name to particle info for that group,
             # i.e.: positions, orientations, and link_prim_paths
             particles_info = defaultdict(lambda: defaultdict(lambda: []))
-            modifier_avg_scale = th.pow(th.prod(self.obj.scale), 1 / 3)
+            modifier_avg_scale = th.pow(T.prod3(self.obj.scale), 1 / 3)
             for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
                 hit_obj = self.obj.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
@@ -1351,7 +1362,7 @@ class ParticleApplier(ParticleModifier):
                     # scale differences between the two objects, so that "moving" the particle to the new object won't
                     # cause it to unexpectedly shrink / grow based on that parent's (potentially) different scale
                     particles_info[group]["scales"].append(
-                        scale * modifier_avg_scale / th.pow(th.prod(hit_obj.scale), 1 / 3)
+                        scale * modifier_avg_scale / th.pow(T.prod3(hit_obj.scale), 1 / 3)
                     )
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group
@@ -1503,7 +1514,10 @@ class ParticleApplier(ParticleModifier):
         pos = self.link.get_position_orientation()[0]
         start_points = th.ones((n_samples, 3)) * pos.reshape(1, 3)
         end_points = th.rand(n_samples, 3) * (upper - lower) + lower
-        sides, axes = th.randint(2, size=(n_samples,)), th.randint(3, size=(n_samples,))
+        sides, axes = (
+            th.randint(2, size=(n_samples,), device=pos.device),
+            th.randint(3, size=(n_samples,), device=pos.device),
+        )
         end_points[th.arange(n_samples), axes] = lower_upper[sides, axes]
 
         return start_points, end_points
