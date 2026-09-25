@@ -218,8 +218,10 @@ class RigidPrim(XFormPrim):
                 volume, com = get_mesh_volume_and_com(mesh.prim)
                 # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
                 local_pos, local_orn = mesh.get_position_orientation(frame="parent")
-                vols.append(volume * th.prod(mesh.scale))
-                coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
+                vols.append(volume * T.prod3(mesh.scale))
+                # com is always CPU (trimesh-derived, no device concept), but local_pos/local_orn/
+                # mesh.scale now track og.sim.device -- match that here.
+                coms.append(T.quat2mat(local_orn) @ (com.to(local_orn.device) * mesh.scale) + local_pos)
                 # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
                 # boundingCube approximation for the underlying collision approximation for GPU compatibility
                 if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) and not check_extent_radius_ratio(mesh, com):
@@ -249,7 +251,9 @@ class RigidPrim(XFormPrim):
         # If we have any collision meshes, compute the center of mass from collision geometry
         if len(coms) > 0:
             coms_tensor = th.stack(coms)
-            vols_tensor = th.tensor(vols).unsqueeze(1)
+            # vols' elements are 0-d tensors now (volume * T.prod3(mesh.scale) tracks og.sim.device) --
+            # th.stack (not th.tensor, which mishandles/CPU-defaults a list of tensors) to match.
+            vols_tensor = th.stack(vols).unsqueeze(1)
             com = th.sum(coms_tensor * vols_tensor, dim=0) / th.sum(vols_tensor)
             self.center_of_mass = com
 
@@ -674,7 +678,7 @@ class RigidPrim(XFormPrim):
         in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool)
         meshes_to_check = self.visual_meshes if use_visual_meshes else self.collision_meshes
         for mesh in meshes_to_check.values():
-            in_volume |= mesh.check_points_in_volume(particle_positions_world)
+            in_volume |= mesh.check_points_in_volume(particle_positions_world).to(particle_positions_world.device)
         return in_volume
 
     @cached_property
@@ -687,7 +691,7 @@ class RigidPrim(XFormPrim):
         min_n_particles = int(math.ceil(1.0 / precision))
 
         # Determine equally-spaced sampling distance to achieve this minimum particle count
-        aabb_volume = th.prod(self.visual_aabb_extent)
+        aabb_volume = T.prod3(self.visual_aabb_extent)
         sampling_distance = th.pow(aabb_volume / min_n_particles, 1 / 3.0)
         low, high = self.aabb
         n_particles_per_axis = ((high - low) / sampling_distance).int() + 1

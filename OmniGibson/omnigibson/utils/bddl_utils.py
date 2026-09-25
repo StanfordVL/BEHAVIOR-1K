@@ -12,6 +12,7 @@ from bddl import predicates as bddl_predicates
 from bddl.predicates import Predicate
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
@@ -970,8 +971,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: T.prod3(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: T.prod3(x[2].aabb_extent))))
 
                         # Sample!
                         for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1371,8 +1372,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: T.prod3(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: T.prod3(x[2].aabb_extent))))
 
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:

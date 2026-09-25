@@ -4,6 +4,7 @@ import os
 import cv2
 import torch as th
 
+import omnigibson as og
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.motion_planning_utils import astar
 from omnigibson.utils.ui_utils import create_module_logger
@@ -193,7 +194,10 @@ class TraversableMap(BaseMap):
         if path_map is None:
             # No traversable path found
             return None, None
-        path_world = self.map_to_world(path_map)
+        # map_to_world's output tracks path_map's (CPU, local-map-computed) device, but target_world is a
+        # live world-frame position that may be og.sim.device-resident -- land here so the th.tile/th.cat
+        # below (and whatever the caller does with the returned path) doesn't hit a device mismatch.
+        path_world = self.map_to_world(path_map).to(og.sim.device)
         geodesic_distance = th.sum(th.norm(path_world[1:] - path_world[:-1], dim=1))
         path_world = path_world[:: self.waypoint_interval]
 
@@ -201,7 +205,9 @@ class TraversableMap(BaseMap):
             path_world = path_world[: self.num_waypoints]
             num_remaining_waypoints = self.num_waypoints - path_world.shape[0]
             if num_remaining_waypoints > 0:
-                remaining_waypoints = th.tile(target_world, (num_remaining_waypoints, 1))
+                remaining_waypoints = th.tile(
+                    th.as_tensor(target_world, device=og.sim.device), (num_remaining_waypoints, 1)
+                )
                 path_world = th.cat((path_world, remaining_waypoints), dim=0)
 
         return path_world, geodesic_distance

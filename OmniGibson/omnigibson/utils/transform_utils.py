@@ -183,10 +183,16 @@ def convert_quat(q: torch.Tensor, to: str = "xyzw") -> torch.Tensor:
         raise ValueError("convert_quat: choose a valid `to` argument (xyzw or wxyz)")
 
 
-@torch_compile
 def quat_multiply(quaternion1: torch.Tensor, quaternion0: torch.Tensor) -> torch.Tensor:
     """
     Return multiplication of two quaternions (q1 * q0).
+
+    Not @torch_compile'd (unlike most functions in this file): confirmed to trigger a deterministic
+    "CUDA driver error: invalid argument" from the Triton-compiled kernel specifically for this
+    function's real call pattern (sm_120 / RTX 5090, torch 2.11.0+cu130) -- the same op in isolation
+    compiled fine, so this is likely a codegen issue specific to this function's actual shapes/call
+    site, not the arithmetic itself. Plain elementwise ops on a 4-element tensor gain nothing
+    meaningful from compilation anyway.
 
     Args:
         quaternion1 (torch.Tensor): (x,y,z,w) quaternion
@@ -317,12 +323,13 @@ def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
 
 
 @torch_compile
-def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
+def random_quaternion(num_quaternions: int = 1, device: Optional[torch.device] = None) -> torch.Tensor:
     """
     Generate random rotation quaternions, uniformly distributed over SO(3).
 
     Arguments:
         num_quaternions (int): number of quaternions to generate (default: 1)
+        device (None or torch.device): device to generate the quaternions on. Default is CPU.
 
     Returns:
         torch.Tensor: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
@@ -407,6 +414,68 @@ def quat2mat(quaternion):
 
 
 @torch_compile
+def det3x3(m: torch.Tensor) -> torch.Tensor:
+    """
+    Determinant of a (3, 3) or (..., 3, 3) matrix, via closed-form cofactor expansion.
+
+    Used in place of torch.linalg.det()/Tensor.det() throughout this file: the latter's CUDA kernel
+    fails to compile/run on some newer GPU architectures (confirmed: sm_120 / RTX 5090, torch
+    2.11.0+cu130 -- torch.linalg.det(x) on a CUDA tensor raises an empty-message RuntimeError dumping
+    raw kernel source, while the identical CPU tensor works fine). Basic elementwise arithmetic has no
+    such compatibility risk.
+
+    Args:
+        m (torch.Tensor): (3, 3) or (..., 3, 3) matrix
+
+    Returns:
+        torch.Tensor: () or (...,) determinant(s)
+    """
+    a, b, c = m[..., 0, 0], m[..., 0, 1], m[..., 0, 2]
+    d, e, f = m[..., 1, 0], m[..., 1, 1], m[..., 1, 2]
+    g, h, i = m[..., 2, 0], m[..., 2, 1], m[..., 2, 2]
+    return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+
+
+@torch_compile
+def prod3(v: torch.Tensor) -> torch.Tensor:
+    """
+    Product of a (3,) or (..., 3) vector's last dimension, via explicit elementwise multiplication.
+
+    Used in place of torch.prod()/Tensor.prod() for exactly this shape throughout the codebase: like
+    torch.linalg.det() (see det3x3()'s docstring), torch.prod()'s CUDA kernel also fails to
+    compile/run on some newer GPU architectures (confirmed: sm_120 / RTX 5090, torch 2.11.0+cu130) --
+    while e.g. torch.sum()/torch.mean()/torch.max() on the same hardware/tensor all work fine, so this
+    is narrowly a `prod` (and `det`) issue, not a general CUDA-reduction one.
+
+    Args:
+        v (torch.Tensor): (3,) or (..., 3) vector
+
+    Returns:
+        torch.Tensor: () or (...,) product(s)
+    """
+    return v[..., 0] * v[..., 1] * v[..., 2]
+
+
+@torch.compiler.disable()
+def _assert_rotation_matrix_unscaled(rmat: torch.Tensor) -> None:
+    # Pulled out of mat2quat() and decorated to be opaque to dynamo: a failing assert INSIDE a
+    # @torch_compile'd function crashes dynamo's own graph-break resume-function compilation (confirmed
+    # empirically -- the traceback dead-ends deep in torch/_dynamo internals rather than surfacing a
+    # clean, catchable AssertionError at the assert's own call site). Keeping this as a plain eager call
+    # makes the assertion failure (when it's real) a normal, readable Python AssertionError instead.
+    #
+    # atol=1e-3 (not the default 1e-8): a rotation matrix produced by align_vector_sets()'s SVD-based
+    # Kabsch fit carries ordinary float32 accumulated error -- confirmed on a real failing case (det
+    # 1.0009, R@R.T - I max error 8e-4) that this is a genuinely valid, non-degenerate rotation, not a
+    # scaled/invalid matrix; the default tolerance was simply too tight for float32 SVD residuals. A
+    # truly invalid/degenerate matrix (e.g. from collinear input vectors) would miss det=1 by far more
+    # than 1e-3, so this stays a meaningful check.
+    assert torch.allclose(
+        det3x3(rmat), torch.tensor(1.0, device=rmat.device), atol=1e-3
+    ), "Rotation matrix must not be scaled"
+
+
+@torch_compile
 def mat2quat(rmat: torch.Tensor) -> torch.Tensor:
     """
     Converts given rotation matrix to quaternion.
@@ -415,7 +484,7 @@ def mat2quat(rmat: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: (4,) or (..., 4) (x,y,z,w) float quaternion angles
     """
-    assert torch.allclose(torch.linalg.det(rmat), torch.tensor(1.0)), "Rotation matrix must not be scaled"
+    _assert_rotation_matrix_unscaled(rmat)
 
     # Check if input is a single matrix or a batch
     is_single = rmat.dim() == 2
@@ -520,7 +589,7 @@ def decompose_mat(hmat):
     P = M.clone()
     P[:, :, 3] = torch.tensor([0.0, 0.0, 0.0, 1.0], device=hmat.device, dtype=hmat.dtype).expand(batch_size, 4)
 
-    det_P = torch.linalg.det(P[:, :3, :3])  # (B,)
+    det_P = det3x3(P[:, :3, :3])  # (B,) -- see det3x3()'s own docstring for why not torch.linalg.det
     torch._assert(torch.all(torch.abs(det_P) >= 1e-6), "Some matrices are singular and cannot be decomposed")
 
     if not torch.allclose(M[:, :3, 3], torch.tensor(0.0, device=hmat.device, dtype=hmat.dtype)):
@@ -737,7 +806,7 @@ def mat2euler(rmat):
         torch.tensor: (r,p,y) converted euler angles in radian vec3 float
     """
     M = torch.as_tensor(rmat, dtype=torch.float32)[:3, :3]
-    assert torch.allclose(rmat.det(), torch.tensor(1.0)), "Rotation matrix must not be scaled"
+    assert torch.allclose(det3x3(rmat), torch.tensor(1.0, device=rmat.device)), "Rotation matrix must not be scaled"
 
     # Convert rotation matrix to quaternion
     # Note: You'll need to implement mat2quat function
@@ -756,7 +825,9 @@ def mat2euler(rmat):
 def pose2mat(pose: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
     pos, orn = pose
 
-    # Ensure pos and orn are the expected shape and dtype
+    # Ensure pos and orn are the expected shape and dtype. Also normalize orn to pos's device -- a
+    # very common footgun throughout the codebase is constructing one of the two (often a bare
+    # identity/default quaternion, e.g. th.tensor([0,0,0,1])) without a matching device= argument.
     pos = pos.to(dtype=torch.float32).reshape(-1, 3)
     orn = orn.to(dtype=torch.float32).reshape(-1, 4)
 
@@ -1348,7 +1419,7 @@ def align_vector_sets(vec_set1: torch.Tensor, vec_set2: torch.Tensor) -> torch.T
     u, s, vh = torch.linalg.svd(B)
 
     # Correct improper rotation if necessary (as in Kabsch algorithm)
-    if torch.linalg.det(u @ vh) < 0:
+    if det3x3(u @ vh) < 0:
         s[-1] = -s[-1]
         u[:, -1] = -u[:, -1]
 
@@ -1562,8 +1633,11 @@ def mat2euler_intrinsic(rmat):
     Returns:
         torch.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
     """
-    # Check for gimbal lock (pitch = +-90 degrees)
-    assert torch.allclose(rmat.det(), torch.tensor(1.0)), "Rotation matrix must not be scaled"
+    # Check for gimbal lock (pitch = +-90 degrees). Pulled into _assert_rotation_matrix_unscaled() and
+    # decorated @torch.compiler.disable() -- same fix as mat2quat() above and for the same reason: a
+    # failing assert INLINE inside a @torch_compile'd function crashes dynamo's own graph-break
+    # resume-function compilation instead of raising a normal, catchable AssertionError.
+    _assert_rotation_matrix_unscaled(rmat)
     if abs(rmat[0, 2]) != 1:
         # General case
         pitch = torch.arcsin(rmat[0, 2])

@@ -120,6 +120,13 @@ class VisionSensor(BaseSensor):
     SENSORS = dict()
 
     SEMANTIC_REMAPPER = Remapper()
+
+    # Counter bumped whenever a semantic label is authored at runtime. On Isaac Sim 6.0, semantic
+    # labels added after a render product's annotators are attached never get registered into the existing
+    # render products' instance mappings (idToLabels), so then the results are unlabeled. Each
+    # sensor tracks the version it last synced to and refreshes its render product when it falls behind.
+    # See _refresh_semantic_instance_mapping for the workaround.
+    _SEMANTIC_LABELS_VERSION = 0
     INSTANCE_REMAPPER = Remapper()
     INSTANCE_ID_REMAPPER = Remapper()
     INSTANCE_REGISTRY = {0: "background", 1: "unlabelled"}

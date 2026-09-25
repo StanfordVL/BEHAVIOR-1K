@@ -115,7 +115,10 @@ class PointReachingTask(PointNavigationTask):
 
         # Sample goal position to be within requested height range if specified
         if self._height_range is not None:
-            goal_pos[2] += th.rand(1) * (self._height_range[1] - self._height_range[0]) + self._height_range[0]
+            goal_pos[2] += (
+                th.rand(1, device=goal_pos.device) * (self._height_range[1] - self._height_range[0])
+                + self._height_range[0]
+            )
 
         return initial_pos, initial_ori, goal_pos
 

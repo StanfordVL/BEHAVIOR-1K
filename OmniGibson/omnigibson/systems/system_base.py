@@ -664,8 +664,12 @@ class VisualParticleSystem(BaseSystem):
 
         # Convert these into scaling factors for the x and y axes for our particle object
         particle_bbox = self.particle_object.aabb_extent
-        minimum = th.tensor([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
-        maximum = th.tensor([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
+        minimum = th.tensor(
+            [bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0], device=particle_bbox.device
+        )
+        maximum = th.tensor(
+            [bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0], device=particle_bbox.device
+        )
 
         return minimum, maximum
 
@@ -685,7 +689,9 @@ class VisualParticleSystem(BaseSystem):
 
         # Sample based on whether we're scaling relative to parent or not
         scales = (
-            th.rand(n, 3) * (self._group_scales[group][1] - self._group_scales[group][0]) + self._group_scales[group][0]
+            th.rand(n, 3, device=self._group_scales[group][1].device)
+            * (self._group_scales[group][1] - self._group_scales[group][0])
+            + self._group_scales[group][0]
             if self._scale_relative_to_parent
             else self.sample_scales(n=n)
         )
@@ -695,8 +701,8 @@ class VisualParticleSystem(BaseSystem):
         # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
         # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
         obj = self._group_objects[group]
-        avg_scale = th.pow(th.prod(obj.scale), 1 / 3)
-        return scales / avg_scale
+        avg_scale = th.pow(T.prod3(obj.scale), 1 / 3)
+        return scales.to(avg_scale.device) / avg_scale
 
     def generate_particles(
         self,
@@ -938,7 +944,8 @@ class PhysicalParticleSystem(BaseSystem):
         ), f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."
 
         arrs = [
-            th.arange(l + self.particle_radius, h - self.particle_radius, sampling_distance) for l, h in zip(low, high)
+            th.arange(l + self.particle_radius, h - self.particle_radius, sampling_distance, device=low.device)
+            for l, h in zip(low, high)
         ]
 
         # Generate 3D-rectangular grid of points
@@ -959,7 +966,9 @@ class PhysicalParticleSystem(BaseSystem):
 
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
-            particle_positions = particle_positions[th.randperm(len(particle_positions))[: int(max_samples)]]
+            particle_positions = particle_positions[
+                th.randperm(len(particle_positions), device=particle_positions.device)[: int(max_samples)]
+            ]
 
         return self.generate_particles(
             positions=particle_positions,
@@ -1011,7 +1020,9 @@ class PhysicalParticleSystem(BaseSystem):
         particle_positions = th.stack([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
-            particle_positions = particle_positions[th.randperm(len(particle_positions))[:max_samples]]
+            particle_positions = particle_positions[
+                th.randperm(len(particle_positions), device=particle_positions.device)[:max_samples]
+            ]
 
         n_particles = len(particle_positions)
         success = n_particles >= min_samples_for_success

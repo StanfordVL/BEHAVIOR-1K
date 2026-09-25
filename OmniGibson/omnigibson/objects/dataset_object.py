@@ -337,7 +337,7 @@ class DatasetObject(USDObject):
                 [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],
                 [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
                 [0.0, 0.0, 1.0],
-            ]
+            ],
         )
         rotated_quat = T.mat2quat(rot_matrix @ T.quat2mat(chosen_orientation))
         return rotated_quat
@@ -435,7 +435,9 @@ class DatasetObject(USDObject):
 
             # If there exists a center of mass annotation, apply it now
             if self.prim.HasAttribute("ig:centerOfMass"):
-                center_of_mass_in_object_frame = th.tensor(self.get_attribute(attr="ig:centerOfMass"))
+                center_of_mass_in_object_frame = th.tensor(
+                    self.get_attribute(attr="ig:centerOfMass"), device=og.sim.device
+                )
 
                 # Here we assume that the local frame of the object is the same as the local frame of the root link. We also do NOT need to apply a scale
                 # since the center of mass is already in the local frame of the object and thus the unscaled local frame of the root link.
@@ -626,7 +628,7 @@ class DatasetObject(USDObject):
                         quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
                     )
                     jnt_frame_rot = T.quat2mat(local_ori)
-                    scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
+                    scale_in_child_lf = th.abs(jnt_frame_rot.to(scale_in_parent_lf.device).T @ scale_in_parent_lf)
                     scales[child_name] = scale_in_child_lf
                     progress = True
 

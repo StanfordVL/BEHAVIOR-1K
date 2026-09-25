@@ -1367,9 +1367,13 @@ class RigidContactAPIImpl:
                 # for newly added bodies), then overwrite with previously cached values for
                 # every pair of bodies that already existed before the rebuild.
                 initial_impulses = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
+                # get_contact_force_matrix() now correctly returns data on og.sim.device (may be CPU or
+                # CUDA depending on backend/config) -- pin_memory() below requires CPU regardless, and
+                # the GPU-resident copies further down explicitly want CUDA regardless too, so both
+                # branches normalize the source device themselves rather than assuming either.
                 initial_contacts = th.any(initial_impulses != 0, dim=-1)
-                self._CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
-                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.clone().pin_memory()
+                self._CONTACT_MATRIX[scene_idx] = initial_contacts.cpu().clone().pin_memory()
+                self._CURRENT_CONTACT_MATRIX[scene_idx] = initial_contacts.cpu().clone().pin_memory()
                 self._CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
                 self._CURRENT_CONTACT_MATRIX_GPU[scene_idx] = initial_contacts.cuda()
 
@@ -2049,7 +2053,8 @@ def setup_collision_apis(prim):
     Apply collision-related physics APIs to a USD prim. This should be called for prims
     that are identified as collision meshes (e.g. those appearing under a "collisions" scope prim).
 
-    This applies the CollisionAPI, PhysxCollisionAPI, and (for meshes) MeshCollisionAPI to the prim,
+    This applies the CollisionAPI, whatever collider schema the physics backend needs on top of it,
+    and (for meshes) MeshCollisionAPI to the prim,
     sets a default convex hull collision approximation for mesh types, and enables/disables collisions
     based on the global VISUAL_ONLY setting.
 
@@ -2131,6 +2136,12 @@ def get_world_pose(prim_path):
     """
     matrix = _get_world_transform_with_scale(prim_path)
     quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+    # Must land on og.sim.device explicitly -- the live component of this matrix (if any) is spliced in
+    # via _live_matrix_from_pose(), which round-trips through pxr.Gf types (.tolist()), stripping any
+    # device info from the source (possibly CUDA-resident) physics-backend tensor. Without an explicit
+    # device= here, this always silently defaults to CPU, breaking combination with other pose queries
+    # (e.g. RigidDynamicPrim.get_position_orientation(), which stays on whatever device physics state
+    # actually lives on) whenever physics runs on a non-CPU device.
     position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
     orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
     return position, orientation
@@ -2804,10 +2815,9 @@ def get_robot_kinematic_tree_pattern(articulation_root_path: str) -> str:
     scene_id, robot_name = articulation_root_path.split("/")[2:4]
     assert scene_id.startswith("scene_"), f"Prim path 2nd component {articulation_root_path} does not start with scene_"
     components = robot_name.split("__")
-    assert len(components) == 3, (
-        f"Robot prim path's 3rd component {robot_name} does not match "
-        "expected format of prefix__robottype__robotname."
-    )
+    assert (
+        len(components) == 3
+    ), f"Robot prim path's 3rd component {robot_name} does not match expected format of prefix__robottype__robotname."
     assert (
         components[0] == "controllable"
     ), f"Prim path {articulation_root_path} 3rd component does not start with 'controllable__'"
@@ -3084,6 +3094,8 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
         stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
             use og.sim.stage
     """
+    assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
+
     with og.sim.editing_usd(stage=stage):
         MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
             "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
@@ -3095,7 +3107,6 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
             "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
         }
 
-        assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
         evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
         u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
         v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
@@ -3152,7 +3163,11 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     kwargs = dict(vertices=vertices, faces=faces)
 
     if include_normals:
-        kwargs["vertex_normals"] = vtarray_to_torch(mesh_prim.GetAttribute("normals").Get())
+        normals = mesh_prim.GetAttribute("normals").Get()
+        # Not every mesh authors normals (trimesh can compute them from face winding instead) --
+        # Get() returns None in that case, which vtarray_to_torch can't convert.
+        if normals is not None:
+            kwargs["vertex_normals"] = vtarray_to_torch(normals)
 
     if include_texcoord:
         raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
@@ -3217,7 +3232,9 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
         trimesh_mesh = mesh_prim_shape_to_trimesh_mesh(mesh_prim)
 
     if world_frame:
-        trimesh_mesh.apply_transform(get_world_pose_with_scale(mesh_prim.GetPath().pathString))
+        # trimesh is numpy-only (no CUDA/device concept at all) -- must move off og.sim.device explicitly
+        # regardless of what device that is, unlike most other get_world_pose_with_scale() callers.
+        trimesh_mesh.apply_transform(get_world_pose_with_scale(mesh_prim.GetPath().pathString).cpu())
 
     return trimesh_mesh
 

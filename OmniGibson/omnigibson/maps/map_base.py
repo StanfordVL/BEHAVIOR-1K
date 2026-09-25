@@ -56,6 +56,9 @@ class BaseMap:
         :return: 2D location in map reference frame (image)
         """
 
-        xy = th.as_tensor(xy)
+        # Map data (trav_map/room_sem_map/etc.) is always loaded on CPU, but callers routinely pass in
+        # og.sim.device-resident world positions (e.g. a robot's live pose) -- force CPU here so map-space
+        # indexing downstream doesn't hit a device mismatch against the CPU-resident map tensors.
+        xy = th.as_tensor(xy).cpu()
         point_wrt_map = xy / self.map_resolution + self.map_size / 2.0
         return th.flip(point_wrt_map, dims=tuple(range(point_wrt_map.dim()))).int()

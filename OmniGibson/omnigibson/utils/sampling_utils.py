@@ -118,7 +118,7 @@ def draw_debug_markers(hit_positions, radius=0.01):
         hit_positions ((n, 3)-array): Desired positions to place markers at
         radius (float): Radius of the generated virtual marker
     """
-    color = th.cat([th.rand(3), [1]])
+    color = th.cat([th.rand(3), th.tensor([1.0])])
     for vec in hit_positions:
         for dim in range(3):
             start_point = vec + th.eye(3)[dim] * radius
@@ -271,7 +271,30 @@ def raytest_batch(
 
             Note that only "hit" = False exists in the dict if no hit was found
     """
-    # For now, we do a naive for loop over individual raytests until a better API comes out
+    # Hand the whole batch to the backend in one call when we can. The condition matches the one
+    # raytest() uses for its own single-ray fast path -- a filtered or all-hits query needs the
+    # per-hit callback machinery that lives in raytest(). Worth doing because a backend's per-call
+    # raycast overhead can dwarf the per-ray work on a backend whose batch entry point amortizes it,
+    # where a batch of 32 rays costs what a single ray does.
+    if only_closest and ignore_bodies is None and ignore_collisions is None:
+        if len(start_points) == 0:
+            return []
+        starts = _stack_points(start_points)
+        diffs = _stack_points(end_points) - starts
+        distances = th.norm(diffs, dim=-1)
+        results = og.sim.physics_backend.raycast_closest_batch(
+            origins=starts.tolist(),
+            dirs=(diffs / distances.unsqueeze(-1)).tolist(),
+            distances=distances.tolist(),
+        )
+        # Same tensor conversion raytest() applies to its own single-ray result
+        for result in results:
+            if result["hit"]:
+                result["position"] = th.tensor(result["position"])
+                result["normal"] = th.tensor(result["normal"])
+        return results
+
+    # Filtered / all-hits queries: one raytest() per ray until a better backend API exists
     results = []
     for start_point, end_point in zip(start_points, end_points):
         results.append(
@@ -286,6 +309,13 @@ def raytest_batch(
         )
 
     return results
+
+
+def _stack_points(points):
+    """(N, 3) tensor from either an already-stacked tensor or a sequence of per-point 3-arrays."""
+    if isinstance(points, th.Tensor):
+        return points
+    return th.stack([p if isinstance(p, th.Tensor) else th.tensor(p, device=og.sim.device) for p in points])
 
 
 def raytest(
@@ -325,9 +355,14 @@ def raytest(
 
             Note that only "hit" = False exists in the dict if no hit was found
     """
-    # Make sure start point, end point are torch tensors
-    start_point = th.tensor(start_point) if not isinstance(start_point, th.Tensor) else start_point
-    end_point = th.tensor(end_point) if not isinstance(end_point, th.Tensor) else end_point
+    # Make sure start point, end point are torch tensors, and share a device if only one of the two
+    # was already a tensor (a caller-supplied plain list must match the other point's device, since
+    # they're differenced together below).
+    if not isinstance(start_point, th.Tensor):
+        device = end_point.device if isinstance(end_point, th.Tensor) else og.sim.device
+        start_point = th.tensor(start_point, device=device)
+    if not isinstance(end_point, th.Tensor):
+        end_point = th.tensor(end_point, device=start_point.device)
     point_diff = end_point - start_point
     distance = th.norm(point_diff)
     direction = point_diff / distance
@@ -485,10 +520,14 @@ def sample_raytest_start_end_full_grid_topdown(
 
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
     x = th.linspace(
-        -half_extent_with_offset[0], half_extent_with_offset[0], int(half_extent_with_offset[0] * 2 / ray_spacing) + 1
+        -half_extent_with_offset[0],
+        half_extent_with_offset[0],
+        int(half_extent_with_offset[0] * 2 / ray_spacing) + 1,
     )
     y = th.linspace(
-        -half_extent_with_offset[1], half_extent_with_offset[1], int(half_extent_with_offset[1] * 2 / ray_spacing) + 1
+        -half_extent_with_offset[1],
+        half_extent_with_offset[1],
+        int(half_extent_with_offset[1] * 2 / ray_spacing) + 1,
     )
     n_rays = len(x) * len(y)
 
@@ -953,7 +992,9 @@ def sample_cuboid_on_object(
                     continue
 
                 # Get projection of the base onto the plane, fit a rotation, and compute the new center hit / corners.
-                hit_positions = th.stack([ray_res.get("position", th.tensor([0.0] * 3)) for ray_res in cast_results])
+                hit_positions = th.stack(
+                    [ray_res.get("position", th.tensor([0.0] * 3, device=og.sim.device)) for ray_res in cast_results]
+                )
                 projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
                 padding = cuboid_bottom_padding * plane_normal
                 projected_hits += padding
@@ -976,7 +1017,10 @@ def sample_cuboid_on_object(
                 corner_vectors = (
                     0.5
                     * this_cuboid_dimensions
-                    * th.tensor([[1, 1, -1], [-1, 1, -1], [-1, -1, -1], [1, -1, -1]], dtype=th.float32)
+                    * th.tensor(
+                        [[1, 1, -1], [-1, 1, -1], [-1, -1, -1], [1, -1, -1]],
+                        dtype=th.float32,
+                    )
                 )
                 corner_positions = cuboid_centroid.unsqueeze(0) + T.quat_apply(rotation, corner_vectors)
 
@@ -1126,7 +1170,9 @@ def check_hit_max_angle_from_z_axis(hit_normal, max_angle_with_z_axis, refusal_l
         bool: True if the angle between @hit_normal and the global z-axis is less than @max_angle_with_z_axis,
             otherwise False
     """
-    hit_angle_with_z = th.arccos(th.clip(th.dot(hit_normal, th.tensor([0.0, 0.0, 1.0])), -1.0, 1.0))
+    hit_angle_with_z = th.arccos(
+        th.clip(th.dot(hit_normal, th.tensor([0.0, 0.0, 1.0], device=hit_normal.device)), -1.0, 1.0)
+    )
     if hit_angle_with_z > max_angle_with_z_axis:
         if m.DEBUG_SAMPLING:
             refusal_log.append("normal %r" % hit_normal)
