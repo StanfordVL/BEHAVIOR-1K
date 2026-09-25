@@ -464,7 +464,9 @@ class OVXRSystem(TeleopSystem):
                                     self.robot.teleop_rotation_offset[arm_name],
                                 )
                             ),
-                            th.tensor([trigger_press], dtype=th.float32),
+                            th.tensor(
+                                [trigger_press], dtype=th.float32, device=controller_pose_in_robot_frame[0].device
+                            ),
                         )
                     )
                     self.teleop_action.is_valid[arm_name] = self._is_valid_transform(

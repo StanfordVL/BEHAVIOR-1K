@@ -196,7 +196,10 @@ class ScanSensor(BaseSensor):
         base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
         scan_local = (T.quat2mat(base_ori).T @ (scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
-        scan_local = th.cat([th.tensor([[0, 0]]), scan_local, th.tensor([[0, 0]])], dim=0)
+        scan_local = th.cat(
+            [th.tensor([[0, 0]], device=scan_local.device), scan_local, th.tensor([[0, 0]], device=scan_local.device)],
+            dim=0,
+        )
 
         # flip y axis
         scan_local[:, 1] *= -1

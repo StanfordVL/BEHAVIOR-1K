@@ -461,10 +461,14 @@ class SerializableRegistry(Registry, Serializable):
 
                 # Handle the case where serialize returns an empty tensor
                 if serialized.numel() == 0:
-                    hash_key_tensor = th.tensor([getattr(obj, self.hash_key)], dtype=th.float32)
+                    hash_key_tensor = th.tensor(
+                        [getattr(obj, self.hash_key)], dtype=th.float32, device=serialized.device
+                    )
                     state_flat.append(hash_key_tensor)
                 else:
-                    hash_key_tensor = th.tensor([getattr(obj, self.hash_key)], dtype=serialized.dtype)
+                    hash_key_tensor = th.tensor(
+                        [getattr(obj, self.hash_key)], dtype=serialized.dtype, device=serialized.device
+                    )
                     state_flat.append(th.cat([hash_key_tensor, serialized.flatten()]))
 
             state_flat = th.cat(state_flat)

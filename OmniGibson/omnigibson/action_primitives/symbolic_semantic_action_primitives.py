@@ -570,7 +570,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             [
                 link.get_position_orientation()[0]
                 for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()
-            ]
+            ],
         )
         heating_distance_threshold = heat_source_obj.states[object_states.HeatSourceOrSink].distance_threshold
 
