@@ -293,7 +293,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     pose_frame = robot_config.pop("pose_frame", "scene")
                     if position is not None:
                         position = (
-                            position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+                            position
+                            if isinstance(position, th.Tensor)
+                            else th.tensor(position, dtype=th.float32, device=og.sim.device)
                         )
                     if orientation is not None:
                         orientation = (

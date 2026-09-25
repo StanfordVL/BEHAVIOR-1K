@@ -230,9 +230,10 @@ class MovingAverageFilter(Filter):
         self.fully_filled[controller_idx] = state["fully_filled"]
 
     def serialize(self, state, controller_idx):
+        past_samples = state["past_samples"].flatten()
         return th.cat(
             [
-                state["past_samples"].flatten(),
+                past_samples,
                 th.tensor([state["current_idx"]], dtype=th.float32),
                 th.tensor([state["fully_filled"]], dtype=th.float32),
             ]

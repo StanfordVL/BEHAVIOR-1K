@@ -3,6 +3,7 @@ import random
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -65,9 +66,16 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     # Pick an axis and a direction.
     approach_axis = random.choice([0, 1, 2])
     approach_direction = random.choice([-1, 1]) if approach_axis != 2 else 1
-    constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * th.eye(3)[approach_axis]
+    constant_dimension_in_base_frame = (
+        approach_direction
+        * bbox_extent_in_base_frame
+        * th.eye(3, device=bbox_extent_in_base_frame.device)[approach_axis]
+    )
     randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - th.abs(constant_dimension_in_base_frame)
-    dim_lo, dim_hi = th.tensor([-1, -1, 0]), th.tensor([1, 1, 1])
+    dim_lo, dim_hi = (
+        th.tensor([-1, -1, 0], device=bbox_extent_in_base_frame.device),
+        th.tensor([1, 1, 1], device=bbox_extent_in_base_frame.device),
+    )
     random_dimensions_in_base_frame = (dim_hi - dim_lo) * th.rand(
         dim_lo.size()
     ) + dim_lo  # note that we don't allow going below center
@@ -91,7 +99,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     grasp_y /= th.norm(grasp_y)
     grasp_z = th.linalg.cross(grasp_x, grasp_y)
     grasp_z /= th.norm(grasp_z)
-    grasp_mat = th.tensor([grasp_x, grasp_y, grasp_z]).T
+    grasp_mat = th.stack([grasp_x, grasp_y, grasp_z]).T
     grasp_quat = T.mat2quat(grasp_mat)
 
     grasp_pose = (grasp_center_pos, grasp_quat)
@@ -197,7 +205,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     # Pick the closer of the two faces along the push axis as our favorite.
     points_along_push_axis = (
-        th.tensor([canonical_push_axis, -canonical_push_axis]) * bbox_extent_in_link_frame[push_axis_idx] / 2
+        th.stack([canonical_push_axis, -canonical_push_axis]) * bbox_extent_in_link_frame[push_axis_idx] / 2
     )
     (
         push_axis_closer_side_idx,
@@ -232,7 +240,9 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     # Now apply the grasp offset.
     avg_finger_offset = th.mean(
-        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+        th.tensor(
+            [length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()], device=og.sim.device
+        )
     )
     dist_from_grasp_pos = avg_finger_offset + 0.05
     offset_grasp_pose_in_bbox_frame = (
@@ -267,7 +277,9 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         -0.05 * approach_direction_in_world_frame if should_open else 0.05 * approach_direction_in_world_frame
     )
     avg_finger_offset = th.mean(
-        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+        th.tensor(
+            [length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()], device=og.sim.device
+        )
     )
     waypoint_start_pose = (
         grasp_pose_in_world_frame[0]
@@ -371,7 +383,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     canonical_open_direction = th.eye(3)[open_axis_idx]
     points_along_open_axis = (
-        th.tensor([canonical_open_direction, -canonical_open_direction]) * bbox_extent_in_link_frame[open_axis_idx] / 2
+        th.stack([canonical_open_direction, -canonical_open_direction]) * bbox_extent_in_link_frame[open_axis_idx] / 2
     )
     current_yaw = relevant_joint.get_state()[0][0]
     closed_yaw = relevant_joint.lower_limit
@@ -389,7 +401,9 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     # Find the correct side of the lateral axis & go some distance along that direction.
     canonical_joint_axis = th.eye(3)[joint_axis_idx]
-    lateral_away_from_origin = th.eye(3)[lateral_axis_idx] * th.sign(origin_towards_bbox[lateral_axis_idx])
+    lateral_away_from_origin = th.eye(3, device=og.sim.device)[lateral_axis_idx] * th.sign(
+        origin_towards_bbox[lateral_axis_idx]
+    )
     min_lateral_pos_wrt_surface_center = (
         lateral_away_from_origin * -th.tensor(origin_wrt_bbox[0])
         - canonical_joint_axis * bbox_extent_in_link_frame[lateral_axis_idx] / 2
@@ -415,7 +429,9 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     # Now apply the grasp offset.
     avg_finger_offset = th.mean(
-        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+        th.tensor(
+            [length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()], device=og.sim.device
+        )
     )
     dist_from_grasp_pos = avg_finger_offset + 0.05
     offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * dist_from_grasp_pos
@@ -457,7 +473,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
-    movement_in_world_frame = th.tensor(targets[-1][0]) - th.tensor(offset_grasp_pose_in_world_frame[0])
+    movement_in_world_frame = targets[-1][0] - offset_grasp_pose_in_world_frame[0]
     grasp_required = th.dot(movement_in_world_frame, approach_direction_in_world_frame) < 0
 
     return (
@@ -487,7 +503,7 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     side /= th.norm(3)
     up = th.linalg.cross(forward, side)
     # assert math.isclose(th.norm(up).item(), 1, abs_tol=1e-3)
-    rotmat = th.tensor([forward, side, up]).T
+    rotmat = th.stack([forward, side, up]).T
     return T.mat2quat(rotmat)
 
 
@@ -530,14 +546,16 @@ def _get_closest_point_to_point_in_world_frame(
     Returns:
         tuple: The index of the closest vector, the closest vector in the arbitrary frame, and the closest vector in the world frame.
     """
-    vectors_in_world = th.tensor(
+    vectors_in_world = th.stack(
         [
             T.pose_transform(*arbitrary_frame_to_world_frame, vector, [0, 0, 0, 1])[0]
             for vector in vectors_in_arbitrary_frame
         ]
     )
 
-    vector_distances_to_point = th.norm(vectors_in_world - th.tensor(point_in_world)[None, :], dim=1)
+    vector_distances_to_point = th.norm(
+        vectors_in_world - th.as_tensor(point_in_world, device=vectors_in_world.device)[None, :], dim=1
+    )
     closer_option_idx = th.argmin(vector_distances_to_point)
     vector_in_arbitrary_frame = vectors_in_arbitrary_frame[closer_option_idx]
     vector_in_world_frame = vectors_in_world[closer_option_idx]

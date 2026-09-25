@@ -524,7 +524,7 @@ class BatchedEvaluator:
         actions = th.zeros((self.num_envs, action_dim), dtype=th.float32)
         healthy_indices = [env_idx for env_idx in active_env_indices if env_idx not in failures]
         for env_idx in healthy_indices:
-            actions[env_idx] = batched_action[env_idx].to(actions.dtype)
+            actions[env_idx] = batched_action[env_idx].to(dtype=actions.dtype, device=actions.device)
         if healthy_indices:
             sim_start = time.monotonic()
             terminated, truncated, _ = self._apply_actions(actions, healthy_indices)

@@ -15,7 +15,10 @@ from omnigibson.utils.numpy_utils import pil_to_tensor
 
 
 def _formatted_aabb(obj):
-    return T.pose2mat((obj.aabb_center, th.tensor([0, 0, 0, 1], dtype=th.float32))), obj.aabb_extent
+    return (
+        T.pose2mat((obj.aabb_center, th.tensor([0, 0, 0, 1], dtype=th.float32, device=obj.aabb_center.device))),
+        obj.aabb_extent,
+    )
 
 
 class SceneGraphBuilder(object):
@@ -75,7 +78,12 @@ class SceneGraphBuilder(object):
 
         # Get rid of any rotation outside xy plane
         z_angle = T.z_angle_from_quat(robot_to_world[1])
-        robot_to_world = T.pose2mat((robot_to_world[0], T.euler2quat(th.tensor([0, 0, z_angle], dtype=th.float32))))
+        robot_to_world = T.pose2mat(
+            (
+                robot_to_world[0],
+                T.euler2quat(th.tensor([0, 0, z_angle], dtype=th.float32, device=robot_to_world[0].device)),
+            )
+        )
 
         return robot_to_world
 

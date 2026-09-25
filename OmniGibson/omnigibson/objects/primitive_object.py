@@ -395,6 +395,9 @@ class PrimitiveObject(USDObject):
         return th.cat(
             [
                 state_flat,
+                # radius/height/size are plain config floats, not physics state -- must match
+                # state_flat's device explicitly (defaults to CPU otherwise, breaking th.cat whenever
+                # physics state lives on CUDA).
                 th.tensor([state["radius"], state["height"], state["size"]]),
             ]
         )

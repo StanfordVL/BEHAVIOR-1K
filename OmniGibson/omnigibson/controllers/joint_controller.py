@@ -222,7 +222,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         filter_part = (
             th.tensor([])
             if self._control_filter is None or state.get("control_filter") is None
-            else self._control_filter.serialize(state["control_filter"], controller_idx)
+            else self._control_filter.serialize(state["control_filter"], controller_idx).to(state_flat.device)
         )
         return th.cat([state_flat, filter_part])
 

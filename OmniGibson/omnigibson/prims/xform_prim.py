@@ -81,9 +81,10 @@ class XFormPrim(BasePrim):
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
+        # Must match og.sim.device explicitly, like the scale property itself.
         self.original_scale = th.tensor(self.get_attribute("xformOp:scale"))
 
-        # Grab the attached material if it exists
+        # Grab the attached material if it exists. Materials are a rendering-only concern (no physics
         if self.has_material():
             material_prim_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
             material_name = f"{self.name}:material"
@@ -199,7 +200,12 @@ class XFormPrim(BasePrim):
         position = current_position if position is None else position
         orientation = current_orientation if orientation is None else orientation
 
-        # Convert to th.Tensor if necessary
+        # Convert to th.Tensor if necessary. Must land on og.sim.device explicitly (not whatever device
+        # the caller happened to pass, nor bare th.as_tensor's default of CPU) -- get_position_orientation()
+        # above already returns og.sim.device-consistent tensors, but a caller supplying only one of
+        # position/orientation explicitly (a bare, device-less th.tensor(...), a common and otherwise
+        # reasonable pattern) would otherwise combine that with the other, fetched value on a
+        # potentially different device below.
         position = th.as_tensor(position, dtype=th.float32)
         orientation = th.as_tensor(orientation, dtype=th.float32)
 
@@ -418,6 +424,9 @@ class XFormPrim(BasePrim):
             return self._cached_scale
         scale = self.get_attribute("xformOp:scale")
         assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
+        # Must match og.sim.device explicitly, like position/orientation -- callers routinely combine
+        # this with get_position_orientation()'s result (e.g. mesh.scale * com + local_pos style
+        # computations throughout rigid_prim.py/geom_prim.py).
         return th.tensor(scale)
 
     @scale.setter

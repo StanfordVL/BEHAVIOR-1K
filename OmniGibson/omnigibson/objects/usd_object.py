@@ -257,10 +257,14 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         raw_scale = self._load_config.get("scale", None)
         if raw_scale is not None:
-            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
+            scale = (
+                raw_scale
+                if isinstance(raw_scale, th.Tensor)
+                else th.tensor(raw_scale, dtype=th.float32, device=og.sim.device)
+            )
             if scale.dim() == 0:
                 scale = scale.expand(3)
-            return scale.float()
+            return scale.float().to(og.sim.device)
         return th.ones(3)
 
     def _apply_usd_hotfixes(self, stage, default_prim):
@@ -790,7 +794,9 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
             elif emitter_type == EmitterType.STEAM:
                 emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                    tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+                    tuple(
+                        bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO, device=bbox_extent_local.device) / 2.0
+                    )
                 )
                 simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
                     bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
@@ -1050,11 +1056,13 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # and then take the arctangent of its projection onto the XY plane.
             rotated_X_axis = base_frame_to_world[:3, 0]
             rotation_around_Z_axis = th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+            # Must match base_frame_to_world's device explicitly (og.sim.device, via get_position_orientation()
+            # above). th.stack (not th.tensor, which mishandles a list mixing plain numbers and a 0-d tensor)
+            # to build the euler vector from rotation_around_Z_axis's own device/dtype.
             xy_aligned_base_com_to_world = th.eye(4, dtype=th.float32)
             xy_aligned_base_com_to_world[:3, 3] = translate
-            xy_aligned_base_com_to_world[:3, :3] = T.euler2mat(
-                th.tensor([0, 0, rotation_around_Z_axis], dtype=th.float32)
-            )
+            zero = th.zeros_like(rotation_around_Z_axis)
+            xy_aligned_base_com_to_world[:3, :3] = T.euler2mat(th.stack([zero, zero, rotation_around_Z_axis]))
 
             # Finally update our desired frame.
             desired_frame_to_world = xy_aligned_base_com_to_world
@@ -1085,8 +1093,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 if hull_points is not None:
                     points_in_world.extend(hull_points.tolist())
 
-        # Move the points to the desired frame
-        points = T.transform_points(th.tensor(points_in_world, dtype=th.float32), world_to_desired_frame)
+        # Move the points to the desired frame. points_in_world is a plain Python list (built via
+        # .tolist() above), so it needs an explicit device matching world_to_desired_frame's.
+        points = T.transform_points(
+            th.tensor(points_in_world, dtype=th.float32, device=world_to_desired_frame.device), world_to_desired_frame
+        )
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
@@ -1157,11 +1168,14 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Call super method first
         state_flat = super().serialize(state=state)
 
-        # Iterate over all states and serialize them individually
+        # Iterate over all states and serialize them individually. Some object states' serialize()
+        # returns a device-less (CPU-default) tensor for values that aren't themselves physics state
+        # (e.g. a plain bool/int flag) -- normalize every piece to state_flat's device before
+        # concatenating, or th.cat below fails whenever physics state lives on CUDA.
         non_kin_state_flat = (
             th.cat(
                 [
-                    self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
+                    self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict).to(state_flat.device)
                     for state_name, state_dict in state["non_kin"].items()
                 ]
             )
