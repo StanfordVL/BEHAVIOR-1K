@@ -89,9 +89,9 @@ class BehaviorTask(BaseTask):
         assert_valid_key(key=activity_name, valid_keys=get_behavior_activities(), name="Behavior Task")
 
         # Make sure to not use presampled robot pose if we're using online object sampling
-        assert not (
-            online_object_sampling and use_presampled_robot_pose
-        ), "Cannot use presampled robot pose if online_object_sampling is True!"
+        assert not (online_object_sampling and use_presampled_robot_pose), (
+            "Cannot use presampled robot pose if online_object_sampling is True!"
+        )
 
         # Activity info
         self.activity_name = activity_name

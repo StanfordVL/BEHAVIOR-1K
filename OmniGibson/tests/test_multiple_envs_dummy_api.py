@@ -38,20 +38,20 @@ class TestEnvConstruction:
         scene_positions = [s.get_position_orientation()[0] for s in env.scenes]
 
         # Scene 0 anchors the layout at the origin
-        assert th.allclose(
-            scene_positions[0], th.zeros(3), atol=1e-3
-        ), f"Scene 0 should sit at the origin, got {scene_positions[0]}"
+        assert th.allclose(scene_positions[0], th.zeros(3), atol=1e-3), (
+            f"Scene 0 should sit at the origin, got {scene_positions[0]}"
+        )
 
         # Scenes are tiled along +X only, in index order, with at least SCENE_MARGIN of clearance
         for i in range(1, NUM_ENVS):
             delta = scene_positions[i] - scene_positions[i - 1]
             print(f"  Scene {i - 1} -> {i} offset: {delta}")
-            assert (
-                delta[0] >= SCENE_MARGIN
-            ), f"Scenes {i - 1} and {i} are only {delta[0]:.2f} apart in X (expected >= {SCENE_MARGIN})"
-            assert th.allclose(
-                delta[1:], th.zeros(2), atol=1e-3
-            ), f"Scenes should only be offset along X, but scene {i} is offset by {delta} from {i - 1}"
+            assert delta[0] >= SCENE_MARGIN, (
+                f"Scenes {i - 1} and {i} are only {delta[0]:.2f} apart in X (expected >= {SCENE_MARGIN})"
+            )
+            assert th.allclose(delta[1:], th.zeros(2), atol=1e-3), (
+                f"Scenes should only be offset along X, but scene {i} is offset by {delta} from {i - 1}"
+            )
 
         # The layout must not leak into the scenes: each robot sits at the same pose *within* its
         # own scene, and its world pose is exactly that local pose shifted by the scene origin.
@@ -61,15 +61,15 @@ class TestEnvConstruction:
             local_pos, local_ori = env.scenes[i].robots[0].get_position_orientation(frame="scene")
             world_pos, _ = env.scenes[i].robots[0].get_position_orientation()
             print(f"  Scene {i} robot: local={local_pos}, world={world_pos}")
-            assert th.allclose(
-                local_pos, ref_local_pos, atol=1e-3
-            ), f"Env {i} robot scene-local position {local_pos} differs from env 0's {ref_local_pos}"
-            assert th.allclose(
-                local_ori, ref_local_ori, atol=1e-3
-            ), f"Env {i} robot scene-local orientation {local_ori} differs from env 0's {ref_local_ori}"
-            assert th.allclose(
-                world_pos, scene_positions[i] + local_pos, atol=1e-3
-            ), f"Env {i} robot world position {world_pos} is not its scene origin plus its local position"
+            assert th.allclose(local_pos, ref_local_pos, atol=1e-3), (
+                f"Env {i} robot scene-local position {local_pos} differs from env 0's {ref_local_pos}"
+            )
+            assert th.allclose(local_ori, ref_local_ori, atol=1e-3), (
+                f"Env {i} robot scene-local orientation {local_ori} differs from env 0's {ref_local_ori}"
+            )
+            assert th.allclose(world_pos, scene_positions[i] + local_pos, atol=1e-3), (
+                f"Env {i} robot world position {world_pos} is not its scene origin plus its local position"
+            )
 
 
 # ===================================================================
@@ -111,9 +111,9 @@ class TestStepAndReset:
 
         pos_after = env.scenes[0].robots[0].get_position_orientation(frame="scene")[0]
         print(f"  pos_before={pos_before}, pos_after={pos_after}")
-        assert th.allclose(
-            pos_before, pos_after, atol=0.05
-        ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
+        assert th.allclose(pos_before, pos_after, atol=0.05), (
+            f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
+        )
 
     def test_per_env_step_counters(self, make_multi_env):
         """episode_steps is a (num_envs,) tensor that tracks steps independently."""
