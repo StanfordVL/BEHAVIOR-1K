@@ -534,12 +534,12 @@ class CameraMover:
             dict: Mapping from relevant keypresses to corresponding delta command to apply to the camera pose
         """
         return {
-            lazy.carb.input.KeyboardInput.D: th.tensor([self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.A: th.tensor([-self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.W: th.tensor([0, 0, -self.delta]),
-            lazy.carb.input.KeyboardInput.S: th.tensor([0, 0, self.delta]),
-            lazy.carb.input.KeyboardInput.T: th.tensor([0, self.delta, 0]),
-            lazy.carb.input.KeyboardInput.G: th.tensor([0, -self.delta, 0]),
+            lazy.carb.input.KeyboardInput.D: th.tensor([self.delta, 0, 0], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.A: th.tensor([-self.delta, 0, 0], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.W: th.tensor([0, 0, -self.delta], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.S: th.tensor([0, 0, self.delta], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.T: th.tensor([0, self.delta, 0], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.G: th.tensor([0, -self.delta, 0], device=og.sim.device),
         }
 
     def _sub_keyboard_event(self, event, *args, **kwargs):
@@ -845,14 +845,14 @@ class KeyboardRobotController:
             n-array: Generated random action vector (normalized)
         """
         action_lo, action_hi = -1, 1
-        return th.rand(self.action_dim) * (action_hi - action_lo) + action_lo
+        return th.rand(self.action_dim, device=og.sim.device) * (action_hi - action_lo) + action_lo
 
     def get_teleop_action(self):
         """
         Returns:
             n-array: Generated action vector based on received user inputs from the keyboard
         """
-        action = th.zeros(self.action_dim)
+        action = th.zeros(self.action_dim, device=og.sim.device)
 
         # Handle the action if any key is actively being pressed
         if self.active_action is not None:

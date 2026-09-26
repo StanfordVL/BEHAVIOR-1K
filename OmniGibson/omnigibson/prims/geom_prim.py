@@ -205,6 +205,7 @@ class GeomPrim(XFormPrim):
             return (
                 th.as_tensor(
                     self.delaunay_triangulation.find_simplex(particle_positions_in_mesh_frame.cpu().numpy()),
+                    device=particle_positions_in_mesh_frame.device,
                 )
                 >= 0
             )

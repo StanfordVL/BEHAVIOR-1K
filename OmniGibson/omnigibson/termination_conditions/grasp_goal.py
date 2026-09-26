@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
 
@@ -19,7 +20,7 @@ class GraspGoal(SuccessCondition):
         if self._objs is None:
             self._objs = [env.scenes[i].object_registry("name", self.obj_name) for i in range(env.num_envs)]
 
-        results = th.zeros(env.num_envs, dtype=th.bool)
+        results = th.zeros(env.num_envs, dtype=th.bool, device=og.sim.device)
         for env_idx in range(env.num_envs):
             obj = self._objs[env_idx]
             robot = env.scenes[env_idx].robots[0]

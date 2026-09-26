@@ -88,7 +88,7 @@ class TeleopSystem(TeleopPolicy):
             return robot_obs
 
         base_pos, base_orn = self.robot.get_position_orientation()
-        robot_obs.base = th.cat((base_pos[:2], th.tensor([T.quat2euler(base_orn)[2]])))
+        robot_obs.base = th.cat((base_pos[:2], th.tensor([T.quat2euler(base_orn)[2]], device=base_pos.device)))
 
         if self.robot_arms:
             for i, arm in enumerate(self.robot_arms):
@@ -104,7 +104,7 @@ class TeleopSystem(TeleopPolicy):
                 # if we are grasping, we manually set the gripper position to be at most 0.5
                 gripper_group_key, gripper_ci = self.robot.controllers[f"gripper_{self.robot.arm_names[i]}"]
                 if ControllerView.is_grasping(gripper_group_key, gripper_ci):
-                    gripper_pos = th.min(gripper_pos, th.tensor([0.5]))
+                    gripper_pos = th.min(gripper_pos, th.tensor([0.5], device=gripper_pos.device))
                 robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
 
         return robot_obs
@@ -337,7 +337,7 @@ class OVXRSystem(TeleopSystem):
         Returns:
             tuple(th.tensor, th.Tensor): the position and orientation in the OmniGibson coordinate system
         """
-        pos, orn = T.mat2pose(th.tensor(transform).T)
+        pos, orn = T.mat2pose(th.tensor(transform, device=og.sim.device).T)
         return pos, orn
 
     def og2xr(self, pos: th.tensor, orn: th.tensor) -> th.Tensor:
@@ -526,8 +526,8 @@ class OVXRSystem(TeleopSystem):
         Function that resets the transform of the VR system (w.r.t.) head
         """
         if self.align_anchor_to == "touchpad":
-            pos = th.tensor([0.0, 0.0, 1.0])
-            orn = th.tensor([0.0, 0.0, 0.0, 1.0])
+            pos = th.tensor([0.0, 0.0, 1.0], device=og.sim.device)
+            orn = th.tensor([0.0, 0.0, 0.0, 1.0], device=og.sim.device)
         else:
             if self.anchor_prim is not None:
                 reference_frame = self.anchor_prim
@@ -671,12 +671,12 @@ class OVXRSystem(TeleopSystem):
                                 self.robot.teleop_rotation_offset[robot_arm_name],
                             )
                         ),
-                        th.tensor([0]),
+                        th.tensor([0], device=og.sim.device),
                     )
                 )
                 # Get each finger joint's rotation angle from hand tracking data
                 # joint_angles is a 5 x 3 array of joint rotations (from thumb to pinky, from base to tip)
-                joint_angles = th.zeros((5, 3))
+                joint_angles = th.zeros((5, 3), device=og.sim.device)
                 raw_hand_data = self.raw_data["hand_data"][hand]["pos"]
                 for i in range(5):
                     for j in range(3):

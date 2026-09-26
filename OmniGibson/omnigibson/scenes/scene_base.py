@@ -493,7 +493,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Cache this scene's pose using the position we just set, rather than reading
         # it back from the prim, since the physics engine may not have processed the
         # update yet (sim is stopped during load).
-        identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+        identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0], device=scene_position.device)
         pos_ori = (scene_position, identity_quat)
         pose = T.pose2mat(pos_ori)
         self._pose_info = {

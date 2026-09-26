@@ -48,8 +48,8 @@ class BaseSystem(Serializable):
         # Whether this system has been initialized or not
         self.initialized = False
 
-        self.min_scale = min_scale if min_scale is not None else th.ones(3)
-        self.max_scale = max_scale if max_scale is not None else th.ones(3)
+        self.min_scale = min_scale if min_scale is not None else th.ones(3, device=og.sim.device)
+        self.max_scale = max_scale if max_scale is not None else th.ones(3, device=og.sim.device)
 
         self._uuid = get_uuid(self.name)
         UUID_TO_SYSTEM_NAME[self._uuid] = self.name
@@ -227,7 +227,7 @@ class BaseSystem(Serializable):
         Returns:
             (n, 3) array: Array of sampled scales
         """
-        return th.rand(n, 3) * (self.max_scale - self.min_scale) + self.min_scale
+        return th.rand(n, 3, device=self.max_scale.device) * (self.max_scale - self.min_scale) + self.min_scale
 
     def get_particles_position_orientation(self):
         """
@@ -889,7 +889,10 @@ class PhysicalParticleSystem(BaseSystem):
         Returns:
             n-array: (n_particles,) boolean array, True if in contact, otherwise False
         """
-        in_contact = th.zeros(len(positions), dtype=bool)
+        in_contact = th.zeros(len(positions), dtype=bool, device=positions.device)
+        if not og.sim.physics_backend.supports_scene_queries:
+            # No scene-query interface on this backend; report no contact rather than crashing.
+            return in_contact
         for idx, pos in enumerate(positions):
             # TODO: Maybe multiply particle contact radius * 2?
             in_contact[idx] = og.sim.physics_backend.overlap_sphere_any(self.particle_contact_radius, pos.tolist())
@@ -1009,9 +1012,9 @@ class PhysicalParticleSystem(BaseSystem):
             # the grid is fully dense - particles are sitting next to each other
             ray_spacing=radius * 2 if sampling_distance is None else sampling_distance,
             # assume the particles are extremely small - sample cuboids of size 0 for better performance
-            cuboid_dimensions=th.zeros(3),
+            cuboid_dimensions=th.zeros(3, device=og.sim.device),
             # raycast start inside the aabb in x-y plane and outside the aabb in the z-axis
-            aabb_offset=th.tensor([-radius, -radius, radius]),
+            aabb_offset=th.tensor([-radius, -radius, radius], device=og.sim.device),
             # bottom padding should be the same as the particle radius
             cuboid_bottom_padding=radius,
             # undo_cuboid_bottom_padding should be False - the sampled positions are above the surface by its radius

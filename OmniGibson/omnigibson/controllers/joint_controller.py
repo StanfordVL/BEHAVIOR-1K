@@ -220,7 +220,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
     def serialize(self, state, controller_idx):
         state_flat = super().serialize(state=state, controller_idx=controller_idx)
         filter_part = (
-            th.tensor([])
+            th.tensor([], device=state_flat.device)
             if self._control_filter is None or state.get("control_filter") is None
             else self._control_filter.serialize(state["control_filter"], controller_idx).to(state_flat.device)
         )

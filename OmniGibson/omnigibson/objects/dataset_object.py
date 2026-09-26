@@ -322,12 +322,12 @@ class DatasetObject(USDObject):
             raise ValueError("No orientation probabilities set")
         if len(self.orientations) == 0:
             # Set default value
-            chosen_orientation = th.tensor([0, 0, 0, 1.0])
+            chosen_orientation = th.tensor([0, 0, 0, 1.0], device=og.sim.device)
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
             probabilities = th.tensor(probabilities, dtype=th.float32) / th.sum(probabilities)
             option = th.multinomial(probabilities, 1).item()
-            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"])
+            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"], device=og.sim.device)
 
         # Randomize yaw from -pi to pi
         rot_lo, rot_hi = -1, 1
@@ -338,6 +338,7 @@ class DatasetObject(USDObject):
                 [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
                 [0.0, 0.0, 1.0],
             ],
+            device=og.sim.device,
         )
         rotated_quat = T.mat2quat(rot_matrix @ T.quat2mat(chosen_orientation))
         return rotated_quat
@@ -384,9 +385,9 @@ class DatasetObject(USDObject):
         if bounding_box is not None and self._load_config.get("scale", None) is None:
             native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
             if native_bb_attr.IsValid():
-                native_bb = th.tensor(list(native_bb_attr.Get()))
-                bb = th.as_tensor(bounding_box, dtype=th.float32)
-                scale = th.ones(3)
+                native_bb = th.tensor(list(native_bb_attr.Get()), device=og.sim.device)
+                bb = th.as_tensor(bounding_box, dtype=th.float32, device=og.sim.device)
+                scale = th.ones(3, device=og.sim.device)
                 valid_idxes = native_bb > 1e-4
                 scale[valid_idxes] = bb[valid_idxes] / native_bb[valid_idxes]
                 return scale
@@ -396,7 +397,7 @@ class DatasetObject(USDObject):
         # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
         # If neither was provided, default to ones(3) (no scaling).
         if self._load_config.get("scale", None) is None:
-            self._load_config["scale"] = th.ones(3)
+            self._load_config["scale"] = th.ones(3, device=og.sim.device)
         assert th.all(
             th.abs(self._load_config["scale"]) > 1e-4
         ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
@@ -484,10 +485,10 @@ class DatasetObject(USDObject):
             orientation = self.get_position_orientation()[1]
         if position is not None:
             rotated_offset = T.pose_transform(
-                th.tensor([0, 0, 0], dtype=th.float32),
+                th.tensor([0, 0, 0], dtype=th.float32, device=orientation.device),
                 orientation,
                 self.scaled_bbox_center_in_base_frame,
-                th.tensor([0, 0, 0, 1], dtype=th.float32),
+                th.tensor([0, 0, 0, 1], dtype=th.float32, device=orientation.device),
             )[0]
             position = position + rotated_offset
         self.set_position_orientation(position=position, orientation=orientation)
@@ -531,7 +532,7 @@ class DatasetObject(USDObject):
         assert (
             "ig:nativeBB" in self.property_names
         ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
-        return th.tensor(self.get_attribute(attr="ig:nativeBB"))
+        return th.tensor(self.get_attribute(attr="ig:nativeBB"), device=og.sim.device)
 
     @property
     def base_link_offset(self):
@@ -541,7 +542,7 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) base link offset if it exists
         """
-        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"))
+        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"), device=og.sim.device)
 
     @property
     def metadata(self):

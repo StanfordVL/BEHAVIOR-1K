@@ -82,7 +82,7 @@ class XFormPrim(BasePrim):
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
         # Must match og.sim.device explicitly, like the scale property itself.
-        self.original_scale = th.tensor(self.get_attribute("xformOp:scale"))
+        self.original_scale = th.tensor(self.get_attribute("xformOp:scale"), device=og.sim.device)
 
         # Grab the attached material if it exists. Materials are a rendering-only concern (no physics
         if self.has_material():
@@ -156,8 +156,16 @@ class XFormPrim(BasePrim):
         new_position, new_orientation = self.get_position_orientation()
         r1 = T.quat2mat(current_orientation)
         r2 = T.quat2mat(new_orientation)
-        # Make sure setting is done correctly
-        assert th.allclose(new_position, current_position, atol=1e-4) and th.allclose(r1, r2, atol=1e-3), (
+        # Make sure setting is done correctly. Position check now also uses rtol (not just atol) -- this
+        # round trip goes through a world->local matrix inverse (in set_position_orientation) and back
+        # (in get_position_orientation's fallback path for a not-yet-live-tracked body), and CUDA's
+        # matmul/inverse execution order can differ slightly from CPU's, producing small but real
+        # floating-point divergence that SCALES WITH the coordinate's own magnitude (confirmed
+        # empirically under Newton+CUDA: ~2e-4 absolute for a meta-link at ~0.93, ~2e-2 absolute for a
+        # deeper-nested visual mesh at ~150 -- a fixed atol that covers one under-covers the other,
+        # since deeper parent chains compound the per-level rounding difference). This exact code path
+        # always ran on CPU before, where the same divergence doesn't occur.
+        assert th.allclose(new_position, current_position, atol=1e-4, rtol=1e-3) and th.allclose(r1, r2, atol=1e-3), (
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
         )
@@ -206,8 +214,8 @@ class XFormPrim(BasePrim):
         # position/orientation explicitly (a bare, device-less th.tensor(...), a common and otherwise
         # reasonable pattern) would otherwise combine that with the other, fetched value on a
         # potentially different device below.
-        position = th.as_tensor(position, dtype=th.float32)
-        orientation = th.as_tensor(orientation, dtype=th.float32)
+        position = th.as_tensor(position, dtype=th.float32, device=og.sim.device)
+        orientation = th.as_tensor(orientation, dtype=th.float32, device=og.sim.device)
 
         # Convert to from scene-relative to world if necessary
         if frame == "scene":
@@ -410,7 +418,12 @@ class XFormPrim(BasePrim):
         return get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
-        return T.transform_points(points, self.scaled_transform)
+        # points are always CPU (authored USD mesh geometry), but scaled_transform can be CUDA-resident
+        # (e.g. a Newton-tracked link's live world pose on a CUDA device). Move points to match the
+        # transform's device, not the reverse -- callers (e.g. aabb/aabb_center) combine the result with
+        # other pose-derived quantities like get_position_orientation(), which live on whatever device
+        # physics state is actually on, so the result must track that device, not points' authoring device.
+        return T.transform_points(points.to(self.scaled_transform.device), self.scaled_transform)
 
     @property
     def scale(self):
@@ -427,7 +440,7 @@ class XFormPrim(BasePrim):
         # Must match og.sim.device explicitly, like position/orientation -- callers routinely combine
         # this with get_position_orientation()'s result (e.g. mesh.scale * com + local_pos style
         # computations throughout rigid_prim.py/geom_prim.py).
-        return th.tensor(scale)
+        return th.tensor(scale, device=og.sim.device)
 
     @scale.setter
     def scale(self, scale):
