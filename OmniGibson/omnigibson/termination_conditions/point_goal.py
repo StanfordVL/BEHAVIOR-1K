@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
@@ -34,7 +35,7 @@ class PointGoal(SuccessCondition):
             task, PointNavigationTask
         ), f"Cannot use {self.__class__.__name__} with a non-PointNavigationTask task instance!"
         # Terminate if point goal is reached (distance below threshold)
-        results = th.zeros(env.num_envs, dtype=th.bool)
+        results = th.zeros(env.num_envs, dtype=th.bool, device=og.sim.device)
         for env_idx in range(env.num_envs):
             current = task.get_current_pos(env, env_idx)
             goal = task.get_goal_pos(env_idx)

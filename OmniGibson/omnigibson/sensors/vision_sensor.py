@@ -221,55 +221,69 @@ class VisionSensor(BaseSensor):
         with og.sim.editing_usd():
             self._render_product = og.sim.render_backend.create_camera_resource(self.prim_path, resolution)
 
-        # Create a new viewport to link to this camera or link to a pre-existing one
-        viewport_name = self._load_config["viewport_name"]
-        should_create_viewport = viewport_name is not None or not gm.HEADLESS
-        viewport = None
-        if should_create_viewport and viewport_name is not None:
-            vp_names_to_handles = {vp.name: vp for vp in lazy.omni.kit.viewport.window.get_viewport_window_instances()}
-            assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
-            viewport = vp_names_to_handles[viewport_name]
-        elif should_create_viewport:
+        # A backend without camera-capture support (e.g. NullRenderBackend) can't produce an image at
+        # all, so there's nothing meaningful to construct standalone. Camera attributes (focal length
+        # etc., pure USD attrs) are still set below regardless, since they're harmless and cheap even
+        # when nothing ever reads them.
+        if og.sim.render_backend.supports_camera_capture:
             with og.sim.editing_usd():
-                viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
-            # Take a render step to make sure the viewport is generated before docking it
-            og.sim.render()
-            # Grab the newly created viewport and dock it to the GUI
-            # The first viewport is always the "main" global camera, and any additional cameras are auxiliary views
-            # These auxiliary views will be stacked in a single column
-            # Thus, the first auxiliary viewport should be generated to the left of the main dockspace, and any
-            # subsequent viewports should be equally spaced according to the number of pre-existing auxiliary views
-            n_auxiliary_sensors = len(self.SENSORS) - 1
-            if n_auxiliary_sensors == 1:
-                # This is the first auxiliary viewport, dock to the left of the main dockspace
-                dock_window(
-                    space=lazy.omni.ui.Workspace.get_window("DockSpace"),
-                    name=viewport.name,
-                    location=lazy.omni.ui.DockPosition.LEFT,
-                    ratio=0.25,
-                )
-            elif n_auxiliary_sensors > 1:
-                # This is any additional auxiliary viewports, dock equally-spaced in the auxiliary column
-                # We also need to re-dock any prior viewports!
-                for i in range(2, n_auxiliary_sensors + 1):
-                    dock_window(
-                        space=lazy.omni.ui.Workspace.get_window(f"Viewport {i - 1}"),
-                        name=f"Viewport {i}",
-                        location=lazy.omni.ui.DockPosition.BOTTOM,
-                        ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i),
-                    )
+                self._render_product = og.sim.render_backend.create_camera_resource(self.prim_path, resolution)
 
-        self._viewport = viewport
-        if self._viewport is not None:
-            # Link the camera and viewport together
-            self._viewport.viewport_api.set_active_camera(self.prim_path)
-
-            # Requires 4 render updates to propagate changes
-            for i in range(4):
+        # GUI viewport windows (omni.kit.viewport/omni.ui) are Kit-specific and have no equivalent on a
+        # non-Kit capture backend (e.g. NewtonRenderBackend) -- gated separately from camera capture
+        # above.
+        if og.sim.render_backend.supports_viewport:
+            # Create a new viewport to link to this camera or link to a pre-existing one
+            viewport_name = self._load_config["viewport_name"]
+            should_create_viewport = viewport_name is not None or not gm.HEADLESS
+            viewport = None
+            if should_create_viewport and viewport_name is not None:
+                vp_names_to_handles = {
+                    vp.name: vp for vp in lazy.omni.kit.viewport.window.get_viewport_window_instances()
+                }
+                assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
+                viewport = vp_names_to_handles[viewport_name]
+            elif should_create_viewport:
+                with og.sim.editing_usd():
+                    viewport = lazy.omni.kit.viewport.utility.create_viewport_window()
+                # Take a render step to make sure the viewport is generated before docking it
                 og.sim.render()
+                # Grab the newly created viewport and dock it to the GUI
+                # The first viewport is always the "main" global camera, and any additional cameras are auxiliary views
+                # These auxiliary views will be stacked in a single column
+                # Thus, the first auxiliary viewport should be generated to the left of the main dockspace, and any
+                # subsequent viewports should be equally spaced according to the number of pre-existing auxiliary views
+                n_auxiliary_sensors = len(self.SENSORS) - 1
+                if n_auxiliary_sensors == 1:
+                    # This is the first auxiliary viewport, dock to the left of the main dockspace
+                    dock_window(
+                        space=lazy.omni.ui.Workspace.get_window("DockSpace"),
+                        name=viewport.name,
+                        location=lazy.omni.ui.DockPosition.LEFT,
+                        ratio=0.25,
+                    )
+                elif n_auxiliary_sensors > 1:
+                    # This is any additional auxiliary viewports, dock equally-spaced in the auxiliary column
+                    # We also need to re-dock any prior viewports!
+                    for i in range(2, n_auxiliary_sensors + 1):
+                        dock_window(
+                            space=lazy.omni.ui.Workspace.get_window(f"Viewport {i - 1}"),
+                            name=f"Viewport {i}",
+                            location=lazy.omni.ui.DockPosition.BOTTOM,
+                            ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i),
+                        )
 
-            # Set the viewer size (requires taking one render step afterwards)
-            self._viewport.viewport_api.set_texture_resolution(resolution)
+            self._viewport = viewport
+            if self._viewport is not None:
+                # Link the camera and viewport together
+                self._viewport.viewport_api.set_active_camera(self.prim_path)
+
+                # Requires 4 render updates to propagate changes
+                for i in range(4):
+                    og.sim.render()
+
+                # Set the viewer size (requires taking one render step afterwards)
+                self._viewport.viewport_api.set_texture_resolution(resolution)
 
         # Also update relevant camera params from load config
         self.focal_length = self._load_config["focal_length"]
@@ -312,6 +326,12 @@ class VisionSensor(BaseSensor):
         # Make sure we're initialized
         assert self.initialized, "Cannot grab vision observations without first initializing this VisionSensor!"
 
+        if not og.sim.render_backend.supports_camera_capture:
+            raise NotImplementedError(
+                "Vision sensor observations require a render backend with camera-capture support, which the "
+                "current render backend does not have."
+            )
+
         # Run super first to grab any upstream obs
         obs, info = super()._get_obs()
 
@@ -331,7 +351,6 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
-
             if modality == "pointcloud":
                 raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
                 # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
@@ -472,6 +491,9 @@ class VisionSensor(BaseSensor):
             width (int): Width of the new render product, in pixels
             height (int): Height of the new render product, in pixels
         """
+        if not og.sim.render_backend.supports_camera_capture:
+            # No render product exists standalone -- nothing to recreate (see _post_load()).
+            return
         with og.sim.editing_usd():
             for annotator in self._annotators.values():
                 if annotator is not None:
@@ -743,6 +765,10 @@ class VisionSensor(BaseSensor):
         Args:
             modality (str): Name of the modality to add to the Replicator backend
         """
+        if not og.sim.render_backend.supports_camera_capture:
+            # No capture backend exists standalone -- leave the annotator unset; _get_obs() raises a
+            # clear NotImplementedError for vision modalities on this backend rather than crash here.
+            return
         if self._annotators.get(modality, None) is None:
             with og.sim.editing_usd():
                 self._annotators[modality] = og.sim.render_backend.create_annotator(self.raw_sensor_types[modality])

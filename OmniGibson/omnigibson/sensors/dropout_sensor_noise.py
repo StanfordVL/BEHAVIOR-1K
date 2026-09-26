@@ -35,7 +35,7 @@ class DropoutSensorNoise(BaseSensorNoise):
             return obs
 
         # Corrupt with randomized dropout
-        valid_mask = th.bernoulli(th.full(obs.shape, 1.0 - self._dropout_prob)).to(th.int64)
+        valid_mask = th.bernoulli(th.full(obs.shape, 1.0 - self._dropout_prob, device=obs.device)).to(th.int64)
         obs[valid_mask == 0] = self._dropout_value
         return obs
 

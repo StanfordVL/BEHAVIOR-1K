@@ -265,7 +265,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             if scale.dim() == 0:
                 scale = scale.expand(3)
             return scale.float().to(og.sim.device)
-        return th.ones(3)
+        return th.ones(3, device=og.sim.device)
 
     def _apply_usd_hotfixes(self, stage, default_prim):
         """
@@ -1059,7 +1059,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # Must match base_frame_to_world's device explicitly (og.sim.device, via get_position_orientation()
             # above). th.stack (not th.tensor, which mishandles a list mixing plain numbers and a 0-d tensor)
             # to build the euler vector from rotation_around_Z_axis's own device/dtype.
-            xy_aligned_base_com_to_world = th.eye(4, dtype=th.float32)
+            xy_aligned_base_com_to_world = th.eye(4, dtype=th.float32, device=base_frame_to_world.device)
             xy_aligned_base_com_to_world[:3, 3] = translate
             zero = th.zeros_like(rotation_around_Z_axis)
             xy_aligned_base_com_to_world[:3, :3] = T.euler2mat(th.stack([zero, zero, rotation_around_Z_axis]))
@@ -1180,7 +1180,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 ]
             )
             if len(state["non_kin"]) > 0
-            else th.empty(0)
+            else th.empty(0, device=state_flat.device)
         )
 
         # Combine these two arrays

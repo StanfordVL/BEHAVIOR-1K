@@ -121,8 +121,8 @@ def draw_debug_markers(hit_positions, radius=0.01):
     color = th.cat([th.rand(3), th.tensor([1.0])])
     for vec in hit_positions:
         for dim in range(3):
-            start_point = vec + th.eye(3)[dim] * radius
-            end_point = vec - th.eye(3)[dim] * radius
+            start_point = vec + th.eye(3, device=vec.device)[dim] * radius
+            end_point = vec - th.eye(3, device=vec.device)[dim] * radius
             draw_line(start_point, end_point, color)
 
 
@@ -150,7 +150,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     ray_direction = destination - source
 
     # Get an orthogonal vector using a random vector.
-    random_vector = th.randn(3)
+    random_vector = th.randn(3, device=ray_direction.device)
     random_vector /= th.norm(random_vector)
     orthogonal_vector_1 = th.linalg.cross(ray_direction, random_vector)
     orthogonal_vector_1 /= th.norm(orthogonal_vector_1)
@@ -163,13 +163,13 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     assert th.all(th.isfinite(orthogonal_vectors))
 
     # Convert the offset into a 2-vector if it already isn't one.
-    offset = th.tensor([1, 1]) * offset
+    offset = th.tensor([1, 1], device=ray_direction.device) * offset
 
     # Compute the grid of rays
     steps = (offset / new_ray_per_horizontal_distance).int() * 2 + 1
-    steps = th.maximum(steps, th.tensor(3))
-    x_range = th.linspace(-offset[0], offset[0], steps[0])
-    y_range = th.linspace(-offset[1], offset[1], steps[1])
+    steps = th.maximum(steps, th.tensor(3, device=steps.device))
+    x_range = th.linspace(-offset[0], offset[0], steps[0], device=offset.device)
+    y_range = th.linspace(-offset[1], offset[1], steps[1], device=offset.device)
     ray_grid = th.stack(th.meshgrid(x_range, y_range, indexing="ij"), dim=-1)
     ray_grid_flattened = ray_grid.reshape(-1, 2)
 
@@ -209,7 +209,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
     results = []
     for i in range(count):
         # Get the uniform sample first.
-        position = th.rand(3)
+        position = th.rand(3, device=mins.device)
 
         # Sample the bimodal normal.
         bottom = (0 - bimodal_mean_fraction) / bimodal_stdev_fraction
@@ -279,6 +279,8 @@ def raytest_batch(
     if only_closest and ignore_bodies is None and ignore_collisions is None:
         if len(start_points) == 0:
             return []
+        if not og.sim.physics_backend.supports_scene_queries:
+            return [{"hit": False} for _ in start_points]
         starts = _stack_points(start_points)
         diffs = _stack_points(end_points) - starts
         distances = th.norm(diffs, dim=-1)
@@ -290,8 +292,8 @@ def raytest_batch(
         # Same tensor conversion raytest() applies to its own single-ray result
         for result in results:
             if result["hit"]:
-                result["position"] = th.tensor(result["position"])
-                result["normal"] = th.tensor(result["normal"])
+                result["position"] = th.tensor(result["position"], device=og.sim.device)
+                result["normal"] = th.tensor(result["normal"], device=og.sim.device)
         return results
 
     # Filtered / all-hits queries: one raytest() per ray until a better backend API exists
@@ -355,6 +357,10 @@ def raytest(
 
             Note that only "hit" = False exists in the dict if no hit was found
     """
+    if not og.sim.physics_backend.supports_scene_queries:
+        # No scene-query interface on this backend; report no hits rather than crashing.
+        return {"hit": False} if only_closest else []
+
     # Make sure start point, end point are torch tensors, and share a device if only one of the two
     # was already a tensor (a caller-supplied plain list must match the other point's device, since
     # they're differenced together below).
@@ -375,8 +381,8 @@ def raytest(
             distance=distance.tolist(),
         )
         if result["hit"]:
-            result["position"] = th.tensor(result["position"])
-            result["normal"] = th.tensor(result["normal"])
+            result["position"] = th.tensor(result["position"], device=og.sim.device)
+            result["normal"] = th.tensor(result["normal"], device=og.sim.device)
         return result
     else:
         # Compose callback function for finding raycasts
@@ -390,8 +396,8 @@ def raytest(
                 hits.append(
                     {
                         "hit": True,
-                        "position": th.tensor(hit.position),
-                        "normal": th.tensor(hit.normal),
+                        "position": th.tensor(hit.position, device=og.sim.device),
+                        "normal": th.tensor(hit.normal, device=og.sim.device),
                         "distance": hit.distance,
                         "collision": hit.collision,
                         "rigidBody": hit.rigid_body,
@@ -458,8 +464,8 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     half_extent = bbox_bf_extent / 2
     half_extent_with_offset = half_extent + aabb_offset
 
-    start_points = th.zeros((num_samples, max_sampling_attempts, 3))
-    end_points = th.zeros((num_samples, max_sampling_attempts, 3))
+    start_points = th.zeros((num_samples, max_sampling_attempts, 3), device=half_extent_with_offset.device)
+    end_points = th.zeros((num_samples, max_sampling_attempts, 3), device=half_extent_with_offset.device)
     for i in range(num_samples):
         # Sample the starting positions in advance.
         # TODO: Narrow down the sampling domain so that we don't sample scenarios where the center is in-domain but the
@@ -523,11 +529,13 @@ def sample_raytest_start_end_full_grid_topdown(
         -half_extent_with_offset[0],
         half_extent_with_offset[0],
         int(half_extent_with_offset[0] * 2 / ray_spacing) + 1,
+        device=half_extent_with_offset.device,
     )
     y = th.linspace(
         -half_extent_with_offset[1],
         half_extent_with_offset[1],
         int(half_extent_with_offset[1] * 2 / ray_spacing) + 1,
+        device=half_extent_with_offset.device,
     )
     n_rays = len(x) * len(y)
 
@@ -535,7 +543,7 @@ def sample_raytest_start_end_full_grid_topdown(
         [
             th.tile(x, (len(y),)),
             th.repeat_interleave(y, len(x)),
-            th.ones(n_rays) * half_extent_with_offset[2],
+            th.ones(n_rays, device=half_extent_with_offset.device) * half_extent_with_offset[2],
         ]
     ).T
 
@@ -1020,6 +1028,7 @@ def sample_cuboid_on_object(
                     * th.tensor(
                         [[1, 1, -1], [-1, 1, -1], [-1, -1, -1], [1, -1, -1]],
                         dtype=th.float32,
+                        device=this_cuboid_dimensions.device,
                     )
                 )
                 corner_positions = cuboid_centroid.unsqueeze(0) + T.quat_apply(rotation, corner_vectors)
@@ -1041,8 +1050,8 @@ def sample_cuboid_on_object(
                 if not undo_cuboid_bottom_padding:
                     padding = cuboid_bottom_padding * center_hit_normal
                     cuboid_centroid += padding
-                plane_normal = th.zeros(3)
-                rotation = th.tensor([0, 0, 0, 1], dtype=th.float32)
+                plane_normal = th.zeros(3, device=cuboid_centroid.device)
+                rotation = th.tensor([0, 0, 0, 1], dtype=th.float32, device=cuboid_centroid.device)
 
             # We've found a nice attachment point. Continue onto next point to sample.
             results[i] = (cuboid_centroid, plane_normal, rotation, hit_link, refusal_reasons)
@@ -1086,7 +1095,7 @@ def compute_rotation_from_grid_sample(
 
     grid_in_planar_coordinates = two_d_grid.reshape(-1, 2)
     grid_in_planar_coordinates = grid_in_planar_coordinates[hits]
-    grid_in_object_coordinates = th.zeros((len(grid_in_planar_coordinates), 3))
+    grid_in_object_coordinates = th.zeros((len(grid_in_planar_coordinates), 3), device=this_cuboid_dimensions.device)
     grid_in_object_coordinates[:, :2] = grid_in_planar_coordinates
     grid_in_object_coordinates[:, 2] = -this_cuboid_dimensions[2] / 2.0
 
@@ -1198,7 +1207,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
         3-array: computed (x,y,z) point on the AABB surface
     """
     # Get the ray casting direction - we want to do it parallel to the sample axis.
-    ray_direction = th.tensor([0, 0, 0])
+    ray_direction = th.tensor([0, 0, 0], device=aabb_min.device)
     ray_direction[axis] = 1
     ray_direction *= -1 if is_top else 1
 

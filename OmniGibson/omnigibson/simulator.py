@@ -4,6 +4,8 @@ import json
 import logging
 import math
 import os
+import sys
+import tempfile
 import traceback
 from omnigibson.utils.profiling_utils import Profiler
 
@@ -86,6 +88,91 @@ def with_profiler(name):
         return wrapper
 
     return decorator
+
+
+# Helper functions for starting omnigibson
+def print_save_usd_warning(_):
+    log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
+
+
+class SuppressLogsUntilError:
+    """
+    Suppress stdout/stderr logs until an error occurs, at which point dump everything.
+    """
+
+    def __init__(self, _):
+        self._old_stdout = None
+        self._old_stderr = None
+        self._tmpfile = None
+        self._tmppath = None
+        self._running = False
+
+    def __enter__(self):
+        # Temp file to buffer logs
+        self._tmpfile = tempfile.NamedTemporaryFile(delete=False, mode="w+")
+        self._tmppath = self._tmpfile.name
+        self._tmpfile.close()
+
+        # Save original fds
+        sys.stdout.flush()
+        sys.stderr.flush()
+        self._old_stdout = os.dup(1)
+        self._old_stderr = os.dup(2)
+
+        # Redirect stdout/stderr → temp file
+        fd = os.open(self._tmppath, os.O_WRONLY | os.O_APPEND)
+        os.dup2(fd, 1)
+        os.dup2(fd, 2)
+        os.close(fd)
+
+        # Start background reader
+        self._running = True
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Stop background reader
+        self._running = False
+
+        # Restore stdout/stderr
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(self._old_stdout, 1)
+        os.dup2(self._old_stderr, 2)
+        os.close(self._old_stdout)
+        os.close(self._old_stderr)
+
+        # On error → dump everything + traceback
+        if exc_type is not None:
+            print("\n=== Isaac Sim logs (dump on error) ===\n")
+            with open(self._tmppath, "r") as f:
+                print(f.read())
+            print("=== End of Isaac Sim logs ===\n")
+
+            print("Python traceback:\n")
+            traceback.print_exception(exc_type, exc_val, exc_tb)
+
+        # Cleanup
+        try:
+            os.remove(self._tmppath)
+        except OSError:
+            pass
+
+        return False  # let exception propagate
+
+
+class _StandaloneApp:
+    """
+    Lightweight stand-in for Isaac Sim's `SimulationApp`, used when the selected physics backend
+    reports `runs_inside_kit = False`. Only implements what `og.app` is touched for elsewhere
+    (truthiness, `.shutdown()`, and `.close()` -- `og.shutdown()` calls the latter specifically).
+    """
+
+    def shutdown(self):
+        pass
+
+    def close(self):
+        pass
 
 
 def _launch_app():
@@ -848,7 +935,7 @@ def _launch_simulator(*args, **kwargs):
         # toggle.py's _check_overlap) that aren't behind the physics_backend abstraction yet.
         # physics_sim_view is trivially equivalent to self._physics_backend.physics_sim_view for PhysX
         # (PhysXBackend.physics_sim_view is exactly `self._sim_context.physics_sim_view`), so routing it
-
+        # through the backend makes it work transparently for Newton too.
         @property
         def physics_sim_view(self):
             return self._physics_backend.physics_sim_view

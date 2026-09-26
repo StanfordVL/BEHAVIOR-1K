@@ -110,7 +110,7 @@ class ClothPrim(GeomPrim):
         # Remesh the object if necessary
         force_remesh = self._load_config.get("force_remesh", False)
         should_remesh_because_of_scale = self._load_config.get("remesh", True) and not th.allclose(
-            self.scale, th.ones(3)
+            self.scale, th.ones(3, device=self.scale.device)
         )
         # TODO: Remove the legacy check after the next dataset release
         should_remesh_because_legacy = self._load_config.get(
@@ -149,15 +149,15 @@ class ClothPrim(GeomPrim):
             true_aabb = positions.min(dim=0).values, positions.max(dim=0).values
             overlap_x = th.max(
                 th.min(true_aabb[1][0], keypoint_aabb[1][0]) - th.max(true_aabb[0][0], keypoint_aabb[0][0]),
-                th.tensor(0),
+                th.tensor(0, device=positions.device),
             )
             overlap_y = th.max(
                 th.min(true_aabb[1][1], keypoint_aabb[1][1]) - th.max(true_aabb[0][1], keypoint_aabb[0][1]),
-                th.tensor(0),
+                th.tensor(0, device=positions.device),
             )
             overlap_z = th.max(
                 th.min(true_aabb[1][2], keypoint_aabb[1][2]) - th.max(true_aabb[0][2], keypoint_aabb[0][2]),
-                th.tensor(0),
+                th.tensor(0, device=positions.device),
             )
             overlap_vol = overlap_x * overlap_y * overlap_z
             true_vol = T.prod3(true_aabb[1] - true_aabb[0])
@@ -407,6 +407,7 @@ class ClothPrim(GeomPrim):
                     [0, -1, 1],
                 ],
                 dtype=th.float32,
+                device=box_half_extent.device,
             )
             * box_half_extent
         )
@@ -429,9 +430,9 @@ class ClothPrim(GeomPrim):
             plane_as_prim.load(None)
 
             # Build the plane orientation from the plane normal
-            horiz_dir = pc - th.tensor([0, 0, box_half_extent[2]])
+            horiz_dir = pc - th.tensor([0, 0, box_half_extent[2]], device=pc.device)
             plane_z = -1 * horiz_dir / th.norm(horiz_dir)
-            plane_x = th.tensor([0, 0, 1], dtype=th.float32)
+            plane_x = th.tensor([0, 0, 1], dtype=th.float32, device=plane_z.device)
             plane_y = th.cross(plane_z, plane_x)
             plane_mat = th.stack([plane_x, plane_y, plane_z], dim=1)
             plane_quat = T.mat2quat(plane_mat)
@@ -737,6 +738,10 @@ class ClothPrim(GeomPrim):
         """
         contacts = []
 
+        if not og.sim.physics_backend.supports_scene_queries:
+            # No scene-query interface on this backend; report no contacts rather than crashing.
+            return contacts
+
         positions = self.keypoint_particle_positions if keypoints_only else self.compute_particle_positions()
         for pos in positions:
 
@@ -906,7 +911,11 @@ class ClothPrim(GeomPrim):
         Returns:
             int: Particle group this instancer belongs to
         """
-        return self.get_attribute(attr="physxParticle:particleGroup")
+        # Unauthored on backends that never call clothify_mesh_prim()'s PhysX-specific particle-cloth
+        # authoring (e.g. Newton, whose self-collision handling doesn't use this concept at all) --
+        # default to 0 rather than None so downstream state serialization doesn't break.
+        group = self.get_attribute(attr="physxParticle:particleGroup")
+        return 0 if group is None else group
 
     @particle_group.setter
     def particle_group(self, group):
@@ -952,7 +961,7 @@ class ClothPrim(GeomPrim):
         return th.cat(
             [
                 state_flat,
-                th.tensor([state["particle_group"], state["n_particles"]], dtype=th.float32),
+                th.tensor([state["particle_group"], state["n_particles"]], dtype=th.float32, device=state_flat.device),
                 state["particle_positions"].reshape(-1).to(state_flat.device),
                 state["particle_velocities"].reshape(-1).to(state_flat.device),
             ]

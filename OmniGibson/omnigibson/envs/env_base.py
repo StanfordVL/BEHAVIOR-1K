@@ -116,10 +116,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._external_sensors = None
         self._external_sensors_include_in_obs = None
         self._loaded = None
-        self._current_episodes = th.zeros(self.num_envs, dtype=th.int32)
+        self._current_episodes = th.zeros(self.num_envs, dtype=th.int32, device=self.device)
 
         # Variables reset at the beginning of each episode
-        self._current_steps = th.zeros(self.num_envs, dtype=th.int32)
+        self._current_steps = th.zeros(self.num_envs, dtype=th.int32, device=self.device)
 
         # Scene list
         self._scenes = []
@@ -186,7 +186,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Reset bookkeeping variables
         self._reset_variables()
-        self._current_episodes = th.zeros(self.num_envs, dtype=th.int32)
+        self._current_episodes = th.zeros(self.num_envs, dtype=th.int32, device=self.device)
 
         # - Potentially overwrite the USD entry for the scene if none is specified and we're online sampling -
 
@@ -301,7 +301,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         orientation = (
                             orientation
                             if isinstance(orientation, th.Tensor)
-                            else th.tensor(orientation, dtype=th.float32)
+                            else th.tensor(orientation, dtype=th.float32, device=og.sim.device)
                         )
 
                     robot = Robot(**robot_config)
@@ -687,7 +687,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             dict: Same keys, with values converted to flattened float tensors.
         """
         return {
-            k: th.as_tensor(v, dtype=th.float).flatten()
+            k: th.as_tensor(v, dtype=th.float, device=og.sim.device).flatten()
             if isinstance(v, Iterable) and not isinstance(v, (dict, OrderedDict, str))
             else v
             for k, v in action_dict.items()
@@ -711,7 +711,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             return [self._convert_action_dict_to_tensor(a) for a in action]
         elif isinstance(action, Iterable):
             # Convert numpy arrays and lists to tensors
-            action = th.as_tensor(action, dtype=th.float)
+            action = th.as_tensor(action, dtype=th.float, device=og.sim.device)
             if action.dim() == 1:
                 action = action.unsqueeze(0)
             return action
@@ -781,8 +781,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
             infos[env_idx]["obs_info"] = obs_info_list[env_idx]
 
         # Split terminated vs truncated per env
-        terminateds = th.zeros(self.num_envs, dtype=th.bool)
-        truncateds = th.zeros(self.num_envs, dtype=th.bool)
+        terminateds = th.zeros(self.num_envs, dtype=th.bool, device=self.device)
+        truncateds = th.zeros(self.num_envs, dtype=th.bool, device=self.device)
         for env_idx in range(self.num_envs):
             for tc_name, tc_data in infos[env_idx]["done"]["termination_conditions"].items():
                 if tc_data["done"]:
@@ -846,7 +846,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             get_obs (bool): Whether to return observations after reset.
         """
         if env_indices is None:
-            env_indices = th.arange(self.num_envs)
+            env_indices = th.arange(self.num_envs, device=self.device)
 
         # Reset the task
         self.task.reset(self, env_indices=env_indices)

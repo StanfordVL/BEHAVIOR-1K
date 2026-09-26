@@ -2,6 +2,7 @@ import math
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 from omnigibson.utils.motion_planning_utils import detect_robot_collision_in_sim
@@ -60,7 +61,7 @@ class GraspReward(BaseRewardFunction):
         if self._objs is None:
             self._objs = [env.scenes[i].object_registry("name", self.obj_name) for i in range(env.num_envs)]
 
-        rewards = th.zeros(env.num_envs, dtype=th.float32)
+        rewards = th.zeros(env.num_envs, dtype=th.float32, device=og.sim.device)
         infos = [dict() for _ in range(env.num_envs)]
 
         for env_idx in range(env.num_envs):
