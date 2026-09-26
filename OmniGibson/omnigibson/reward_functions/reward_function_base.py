@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import torch as th
 
+import omnigibson as og
 from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_REWARD_FUNCTIONS = dict()
@@ -68,7 +69,7 @@ class BaseRewardFunction(Registerable, metaclass=ABCMeta):
         """
         if self._num_envs is None:
             self._num_envs = env.num_envs
-            self._reward = th.zeros(self._num_envs, dtype=th.float32)
+            self._reward = th.zeros(self._num_envs, dtype=th.float32, device=og.sim.device)
             self._info = [dict() for _ in range(self._num_envs)]
         self._reward[env_indices] = 0.0
         for idx in env_indices:

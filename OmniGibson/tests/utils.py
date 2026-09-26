@@ -30,9 +30,9 @@ def retrieve_obj_cfg(obj):
 
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
-    pos = th.rand(3) * (pos_hi - pos_low) + pos_low
+    pos = th.rand(3, device=og.sim.device) * (pos_hi - pos_low) + pos_low
     ori_lo, ori_hi = -math.pi, math.pi
-    orn = T.euler2quat(th.rand(3) * (ori_hi - ori_lo) + ori_lo)
+    orn = T.euler2quat(th.rand(3, device=og.sim.device) * (ori_hi - ori_lo) + ori_lo)
     return pos, orn
 
 
@@ -49,8 +49,8 @@ def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.0
 
     target_objA_aabb_pos = (
         objB_aabb_center
-        + th.tensor([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
-        + th.tensor([x_offset, y_offset, z_offset])
+        + th.tensor([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0], device=objB_aabb_center.device)
+        + th.tensor([x_offset, y_offset, z_offset], device=objB_aabb_center.device)
     )
     objA.set_position_orientation(position=target_objA_aabb_pos + objA_aabb_offset)
 

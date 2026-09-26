@@ -86,7 +86,7 @@ class GraspTask(BaseTask):
             if self._reset_poses is not None:
                 joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
                 robot_pose = random.choice(self._reset_poses)
-                joint_pos = th.tensor(robot_pose["joint_pos"])
+                joint_pos = th.tensor(robot_pose["joint_pos"], device=og.sim.device)
                 robot.set_joint_positions(joint_pos, joint_control_idx)
                 robot_pos = th.tensor(robot_pose["base_pos"])
                 robot_orn = th.tensor(robot_pose["base_ori"])
@@ -164,7 +164,7 @@ class GraspTask(BaseTask):
             env_indices (th.Tensor): indices of environments to reset
         """
         if env_indices is None:
-            env_indices = th.arange(self._num_envs)
+            env_indices = th.arange(self._num_envs, device=og.sim.device)
 
         # Reset the scene, agent, and variables
         # Try up to 20 times per env
@@ -193,7 +193,7 @@ class GraspTask(BaseTask):
         for joint in arm_joints:
             val = random.uniform(joint.lower_limit, joint.upper_limit)
             joint_positions.append(val)
-        return th.tensor(joint_positions), joint_control_idx
+        return th.tensor(joint_positions, device=og.sim.device), joint_control_idx
 
     def _get_obs(self, env, env_idx):
         obj = env.scenes[env_idx].object_registry("name", self.obj_name)

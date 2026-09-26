@@ -632,7 +632,7 @@ class CuRoboMotionGenerator:
                 # For holonomic robots (e.g. Tiago, R1), it is @robot.root_link ("base_footprint_x"), not @robot.base_footprint_link_name ("base_link")
                 curobo_base_link_name = self.base_link[emb_sel]
                 robot_pos, robot_quat = self.robot.links[curobo_base_link_name].get_position_orientation()
-                target_pose = th.zeros((target_pos_link.shape[0], 4, 4))
+                target_pose = th.zeros((target_pos_link.shape[0], 4, 4), device=target_pos_link.device)
                 target_pose[:, 3, 3] = 1.0
                 target_pose[:, :3, :3] = T.quat2mat(target_quat_link)
                 target_pose[:, :3, 3] = target_pos_link

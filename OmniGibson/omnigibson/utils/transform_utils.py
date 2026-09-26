@@ -335,7 +335,7 @@ def random_quaternion(num_quaternions: int = 1, device: Optional[torch.device] =
         torch.Tensor: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
     """
     # Generate four random numbers between 0 and 1
-    rand = torch.rand(num_quaternions, 4)
+    rand = torch.rand(num_quaternions, 4, device=device)
 
     # Use the formula from Ken Shoemake's "Uniform Random Rotations"
     r1 = torch.sqrt(1.0 - rand[:, 0])
@@ -829,10 +829,10 @@ def pose2mat(pose: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
     # very common footgun throughout the codebase is constructing one of the two (often a bare
     # identity/default quaternion, e.g. th.tensor([0,0,0,1])) without a matching device= argument.
     pos = pos.to(dtype=torch.float32).reshape(-1, 3)
-    orn = orn.to(dtype=torch.float32).reshape(-1, 4)
+    orn = orn.to(dtype=torch.float32, device=pos.device).reshape(-1, 4)
 
     batch_size = pos.shape[0]
-    homo_pose_mat = torch.eye(4, dtype=torch.float32).unsqueeze(0).repeat(batch_size, 1, 1)
+    homo_pose_mat = torch.eye(4, dtype=torch.float32, device=pos.device).unsqueeze(0).repeat(batch_size, 1, 1)
 
     homo_pose_mat[:, :3, :3] = quat2mat(orn)
     homo_pose_mat[:, :3, 3] = pos
@@ -1477,7 +1477,7 @@ def check_quat_right_angle(quat: torch.Tensor, atol: float = 5e-2) -> torch.Tens
 @torch_compile
 def z_angle_from_quat(quat):
     """Get the angle around the Z axis produced by the quaternion."""
-    rotated_X_axis = quat_apply(quat, torch.tensor([1, 0, 0], dtype=torch.float32))
+    rotated_X_axis = quat_apply(quat, torch.tensor([1, 0, 0], dtype=torch.float32, device=quat.device))
     return torch.arctan2(rotated_X_axis[1], rotated_X_axis[0])
 
 
@@ -1598,7 +1598,7 @@ def delta_rotation_matrix(omega, delta_t):
 
     # If angular speed is zero, return identity matrix
     if omega_magnitude == 0:
-        return torch.eye(3)
+        return torch.eye(3, device=omega.device)
 
     # Rotation angle
     theta = omega_magnitude * delta_t
@@ -1608,7 +1608,7 @@ def delta_rotation_matrix(omega, delta_t):
 
     # Skew-symmetric matrix K
     u_x, u_y, u_z = axis[0], axis[1], axis[2]
-    K = torch.zeros((3, 3))
+    K = torch.zeros((3, 3), device=omega.device)
     K[0, 1] = -u_z
     K[0, 2] = u_y
     K[1, 0] = u_z
@@ -1617,7 +1617,7 @@ def delta_rotation_matrix(omega, delta_t):
     K[2, 1] = u_x
 
     # Rodrigues' rotation formula
-    R = torch.eye(3) + torch.sin(theta) * K + (1 - torch.cos(theta)) * (K @ K)
+    R = torch.eye(3, device=omega.device) + torch.sin(theta) * K + (1 - torch.cos(theta)) * (K @ K)
 
     return R
 
