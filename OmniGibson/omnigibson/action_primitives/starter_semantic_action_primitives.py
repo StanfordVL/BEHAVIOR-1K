@@ -496,11 +496,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         grasp_pos, grasp_quat = random.choice(grasp_poses)
 
         # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
-        approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
+        approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0], device=grasp_quat.device)
 
         avg_finger_offset = th.mean(
             th.tensor(
                 [length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()],
+                device=grasp_quat.device,
             )
         )
         pregrasp_offset = avg_finger_offset + m.GRASP_APPROACH_DISTANCE
@@ -509,7 +510,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # The sampled grasp pose is robot-agnostic
         # We need to multiply by the quaternion of the robot's eef frame of top-down grasping (x-forward, y-right, z-down)
-        grasp_quat = T.quat_multiply(grasp_quat, th.tensor([1.0, 0.0, 0.0, 0.0]))
+        grasp_quat = T.quat_multiply(grasp_quat, th.tensor([1.0, 0.0, 0.0, 0.0], device=grasp_quat.device))
 
         pregrasp_pose = (pregrasp_pos, grasp_quat)
         grasp_pose = (grasp_pos, grasp_quat)
@@ -1057,7 +1058,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
 
         # Store the previous eef pose for checking if we got stuck
-        prev_eef_pos = th.zeros(3)
+        prev_eef_pos = th.zeros(3, device=og.sim.device)
 
         # All we need to do here is save the target joint position so that empty action takes us towards it
         controller_name = f"arm_{self.arm}"
@@ -1426,7 +1427,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             head1_joint_goal = default_head_pos[0]
             head2_joint_goal = default_head_pos[1]
 
-        return th.tensor([head1_joint_goal, head2_joint_goal])
+        return th.tensor([head1_joint_goal, head2_joint_goal], device=og.sim.device)
 
     def _empty_action(self, follow_arm_targets=True):
         """
@@ -1438,7 +1439,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to do nothing
         """
-        action = th.zeros(self.robot.action_dim)
+        action = th.zeros(self.robot.action_dim, device=og.sim.device)
         for name, (group_key, controller_idx) in self.robot.controllers.items():
             # if desired arm targets are available, generate an action that moves the arms to the saved pose targets
             if follow_arm_targets and name in self._arm_targets:
@@ -1785,7 +1786,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for _ in range(self._curobo_batch_size):
                 for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_FOR_CORRECT_ROOM):
                     distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
-                    yaw = th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo
+                    yaw = th.rand(1, device=og.sim.device) * (yaw_hi - yaw_lo) + yaw_lo
                     candidate_2d_pose = th.cat(
                         [
                             target_pose[0][0] + distance * th.cos(yaw),
@@ -1841,7 +1842,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         face_vertical_half_extent = eye3[2] * aabb_extent / 2
         face_min = face_center - face_vertical_half_extent - face_lateral_half_extent
         face_max = face_center + face_vertical_half_extent + face_lateral_half_extent
-        return th.rand(face_min.size()) * (face_max - face_min) + face_min
+        return th.rand(face_min.size(), device=aabb_center.device) * (face_max - face_min) + face_min
 
     # def _sample_pose_in_room(self, room: str):
     #     """
@@ -1905,7 +1906,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 )
             else:
                 _, _, bb_extents, bb_pos_in_base = held_obj.get_base_aligned_bbox()
-                bb_orn_in_base = th.tensor([0, 0, 0, 1], dtype=th.float32)
+                bb_orn_in_base = th.tensor([0, 0, 0, 1], dtype=th.float32, device=bb_pos_in_base.device)
 
             sampling_results = sample_cuboid_for_predicate(pred_map[predicate], target_obj, bb_extents)
             if sampling_results[0][0] is None:
@@ -1923,7 +1924,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # Check that the pose is near one of the poses in the near_poses list if provided.
             if near_poses:
-                sampled_pos = th.tensor([sampled_obj_pose[0]])
+                sampled_pos = th.tensor([sampled_obj_pose[0]], device=sampled_obj_pose.device)
                 if not th.any(th.norm(near_poses - sampled_pos, dim=1) < near_poses_threshold):
                     continue
 
@@ -1967,7 +1968,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             joint_pos = current_joint_pos.clone()
             if root_pos is not None:
                 joint_pos[self.robot.base_control_idx] = th.tensor(
-                    [pose[0] - root_pos[0], pose[1] - root_pos[1], pose[2]]
+                    [pose[0] - root_pos[0], pose[1] - root_pos[1], pose[2]], device=joint_pos.device
                 )
             else:
                 joint_pos[self.robot.base_control_idx] = pose
@@ -2028,8 +2029,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             mat = T.euler_intrinsic2mat(euler_intrinsic_xyz)
             orn = T.mat2quat(mat)
         else:
-            pos = th.tensor([pose_2d[0], pose_2d[1], 0.0], dtype=th.float32)
-            orn = T.euler2quat(th.tensor([0.0, 0.0, pose_2d[2]], dtype=th.float32))
+            pos = th.tensor([pose_2d[0], pose_2d[1], 0.0], dtype=th.float32, device=og.sim.device)
+            orn = T.euler2quat(th.tensor([0.0, 0.0, pose_2d[2]], dtype=th.float32, device=og.sim.device))
         return pos, orn
 
     def _world_pose_to_robot_pose(self, pose):

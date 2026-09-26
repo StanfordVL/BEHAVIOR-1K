@@ -5,6 +5,7 @@ import numpy as np
 import torch as th
 from PIL import Image
 
+import omnigibson as og
 from omnigibson import object_states
 from omnigibson.object_states.factory import get_state_name
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
@@ -65,8 +66,8 @@ class SceneGraphBuilder(object):
         return self._G.copy()
 
     def _get_desired_frame(self):
-        desired_frame_to_world = th.eye(4)
-        world_to_desired_frame = th.eye(4)
+        desired_frame_to_world = th.eye(4, device=og.sim.device)
+        world_to_desired_frame = th.eye(4, device=og.sim.device)
         if self._egocentric:
             desired_frame_to_world = self._get_robot_to_world_transform(self._robots[0])
             world_to_desired_frame = T.pose_inv(desired_frame_to_world)

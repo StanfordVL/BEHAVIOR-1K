@@ -16,6 +16,7 @@ def add_semantic_label(prim, label, instance_name="class"):
         label (str): The semantic label to add (will be converted to a list internally)
         instance_name (str): The instance name for the label. Defaults to "class"
     """
+
     with og.sim.editing_usd():
         og.sim.render_backend.add_semantic_labels(prim, label, instance_name=instance_name)
 
@@ -363,7 +364,7 @@ def change_pcd_frame(pcd: th.Tensor, rel_pose: th.Tensor) -> th.Tensor:
     rel_rot = T.quat2mat(rel_quat)
 
     # Create transformation matrix
-    tf = th.eye(4)
+    tf = th.eye(4, device=pcd.device)
     tf[:3, :3] = rel_rot
     tf[:3, 3] = rel_pos
 

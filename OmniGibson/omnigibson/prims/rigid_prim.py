@@ -675,7 +675,7 @@ class RigidPrim(XFormPrim):
                 In either case, this assumes the given meshes are convex hulls. For visual meshes, we enforce this
                 constraint by explicitly converting them into convex hulls
         """
-        in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool)
+        in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool, device=particle_positions_world.device)
         meshes_to_check = self.visual_meshes if use_visual_meshes else self.collision_meshes
         for mesh in meshes_to_check.values():
             in_volume |= mesh.check_points_in_volume(particle_positions_world).to(particle_positions_world.device)

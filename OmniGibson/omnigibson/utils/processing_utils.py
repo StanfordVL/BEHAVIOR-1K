@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import Serializable
 
@@ -40,7 +41,7 @@ class Filter(Serializable):
 
     def serialize(self, state):
         # Default is no state, so do nothing
-        return th.empty(0, dtype=th.float32)
+        return th.empty(0, dtype=th.float32, device=og.sim.device)
 
     def deserialize(self, state):
         # Default is no state, so do nothing
@@ -234,8 +235,8 @@ class MovingAverageFilter(Filter):
         return th.cat(
             [
                 past_samples,
-                th.tensor([state["current_idx"]], dtype=th.float32),
-                th.tensor([state["fully_filled"]], dtype=th.float32),
+                th.tensor([state["current_idx"]], dtype=th.float32, device=past_samples.device),
+                th.tensor([state["fully_filled"]], dtype=th.float32, device=past_samples.device),
             ]
         )
 
