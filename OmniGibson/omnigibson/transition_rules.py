@@ -951,8 +951,8 @@ class SlicingRule(BaseTransitionRule):
                 # List of dicts gets replaced by {'0':dict, '1':dict, ...}
 
                 # Get bounding box info
-                part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
-                part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
+                part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32, device=pos.device)
+                part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32, device=pos.device)
 
                 # Scale the offset accordingly.
                 # If the scale of the sliceable object is uniform, we can just take its scale
@@ -975,7 +975,7 @@ class SlicingRule(BaseTransitionRule):
                     name=part_obj_name,
                     category=part["category"],
                     model=part["model"],
-                    bounding_box=th.tensor(part["bb_size"], dtype=th.float32)
+                    bounding_box=th.tensor(part["bb_size"], dtype=th.float32, device=pos.device)
                     * scale,  # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
                 )
 
@@ -1281,7 +1281,7 @@ class RecipeRule(BaseTransitionRule):
 
                 # Convert to numpy array for faster indexing
                 category_to_valid_indices[obj_category] = th.tensor(
-                    category_to_valid_indices[obj_category], dtype=th.int32
+                    category_to_valid_indices[obj_category], dtype=th.int32, device=og.sim.device
                 )
         return category_to_valid_indices
 
@@ -1602,7 +1602,7 @@ class RecipeRule(BaseTransitionRule):
         # We check for either the object AABB being contained OR the object being on top of the container, in the
         # case that the container is too flat for the volume to contain the object
         in_volume = container.states[ContainedParticles].link.check_points_in_volume(obj_positions) | th.tensor(
-            [obj.states[OnTop].get_value(container) for obj in self._objects]
+            [obj.states[OnTop].get_value(container) for obj in self._objects], device=obj_positions.device
         )
 
         # Container itself is never within its own volume
@@ -1636,7 +1636,7 @@ class RecipeRule(BaseTransitionRule):
         for category, objects in objects_by_category.items():
             # Exclude fixed base objects for performance
             objects = [obj for obj in objects if not obj.fixed_base]
-            self._category_idxs[category] = i + th.arange(len(objects))
+            self._category_idxs[category] = i + th.arange(len(objects), device=og.sim.device)
             self._objects += list(objects)
             for obj in objects:
                 self._objects_to_idx[obj] = i
@@ -1751,7 +1751,7 @@ class RecipeRule(BaseTransitionRule):
             for system_name, particle_idxs in execution_info["relevant_systems"].items():
                 system = self.scene.get_system(system_name)
                 volume += len(particle_idxs) * math.pi * (system.particle_radius**3) * 4 / 3
-                system.remove_particles(idxs=th.tensor(list(particle_idxs)))
+                system.remove_particles(idxs=th.tensor(list(particle_idxs), device=og.sim.device))
 
         if not self.is_multi_instance:
             # Remove either all objects or only the ones specified in the input objects of the recipe
@@ -1792,6 +1792,7 @@ class RecipeRule(BaseTransitionRule):
                 pos = container.aabb_center + th.tensor(
                     [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0],
                     dtype=th.float32,
+                    device=container.aabb_center.device,
                 )
                 obj.set_bbox_center_position_orientation(position=pos)
 
@@ -2007,7 +2008,7 @@ class CookingPhysicalParticleRule(RecipeRule):
         # Stabilize generated particles
         if isinstance(cooked_system, MacroPhysicalParticleSystem):
             lin_vel, ang_vel = cooked_system.get_particles_velocities()
-            new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles)
+            new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles, device=lin_vel.device)
             lin_vel[new_particle_indices] = 0
             ang_vel[new_particle_indices] = 0
             cooked_system.set_particles_velocities(lin_vels=lin_vel, ang_vels=ang_vel)

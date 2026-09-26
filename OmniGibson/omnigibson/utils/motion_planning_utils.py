@@ -482,6 +482,10 @@ def detect_robot_collision(context, verbose=False):
     Returns:
         valid_hit(bool): Whether the robot is in collision
     """
+    if not og.sim.physics_backend.supports_scene_queries:
+        # No scene-query interface on this backend; report no collisions rather than crashing.
+        return False
+
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 

@@ -268,7 +268,7 @@ class BehaviorTask(BaseTask):
         super().reset(env, env_indices=env_indices)
 
         if env_indices is None:
-            env_indices = th.arange(self._num_envs)
+            env_indices = th.arange(self._num_envs, device=og.sim.device)
 
         # Use presampled robot pose if specified (only available for officially supported mobile manipulators)
         if self.use_presampled_robot_pose:
@@ -690,7 +690,7 @@ class BehaviorTask(BaseTask):
         objs_rpy = T.quat2euler(
             th.stack(
                 [
-                    obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0])
+                    obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0], device=og.sim.device)
                     for _, obj, obj_exist in obj_entries
                 ]
             )
@@ -705,7 +705,7 @@ class BehaviorTask(BaseTask):
             obj_entries, objs_rpy, objs_rpy_cos, objs_rpy_sin
         ):
             if obj_exist:
-                low_dim_obs[f"{inst}_real"] = th.tensor([1.0])
+                low_dim_obs[f"{inst}_real"] = th.tensor([1.0], device=og.sim.device)
                 low_dim_obs[f"{inst}_pos"] = obj.states[Pose].get_value()[0]
                 low_dim_obs[f"{inst}_ori_cos"] = obj_rpy_cos
                 low_dim_obs[f"{inst}_ori_sin"] = obj_rpy_sin
@@ -716,12 +716,12 @@ class BehaviorTask(BaseTask):
                             [float(grasping_object)], device=og.sim.device
                         )
             else:
-                low_dim_obs[f"{inst}_real"] = th.zeros(1)
-                low_dim_obs[f"{inst}_pos"] = th.zeros(3)
-                low_dim_obs[f"{inst}_ori_cos"] = th.zeros(3)
-                low_dim_obs[f"{inst}_ori_sin"] = th.zeros(3)
+                low_dim_obs[f"{inst}_real"] = th.zeros(1, device=og.sim.device)
+                low_dim_obs[f"{inst}_pos"] = th.zeros(3, device=og.sim.device)
+                low_dim_obs[f"{inst}_ori_cos"] = th.zeros(3, device=og.sim.device)
+                low_dim_obs[f"{inst}_ori_sin"] = th.zeros(3, device=og.sim.device)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.zeros(1)
+                    low_dim_obs[f"{inst}_in_gripper_{arm}"] = th.zeros(1, device=og.sim.device)
 
         return low_dim_obs, dict()
 

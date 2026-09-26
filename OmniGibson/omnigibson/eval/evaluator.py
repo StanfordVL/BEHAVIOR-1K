@@ -427,7 +427,7 @@ class BatchedEvaluator:
         batched_action = self.policy.forward(obs=self._batch_obs())  # (num_envs, action_dim)
         if batched_action.ndim == 1:
             batched_action = batched_action.unsqueeze(0)
-        actions = th.zeros((self.num_envs, action_dim), dtype=th.float32)
+        actions = th.zeros((self.num_envs, action_dim), dtype=th.float32, device=og.sim.device)
         for env_idx in active_env_indices:
             actions[env_idx] = batched_action[env_idx].to(dtype=actions.dtype, device=actions.device)
         terminated, truncated, _ = self._apply_actions(actions, active_env_indices)
@@ -548,7 +548,7 @@ class BatchedEvaluator:
             instance_eval_state.active = True
             self._load_instance_state(instance_eval_state.instance_id, instance_eval_state)
         self._settle_and_finalize(env_indices)
-        obs_list, _ = self.env.reset(env_indices=th.tensor(env_indices, dtype=th.long))
+        obs_list, _ = self.env.reset(env_indices=th.tensor(env_indices, dtype=th.long, device=og.sim.device))
         for env_idx in env_indices:
             self._reset_light_synchronizer(self.instance_eval_states[env_idx])
         # Light toggles change visibility after the reset obs was captured; re-render + re-fetch so the
@@ -557,7 +557,7 @@ class BatchedEvaluator:
         if self.should_sync_lights:
             for _ in range(3):
                 og.sim.render()
-            obs_list, _ = self.env.get_obs(env_indices=th.tensor(env_indices, dtype=th.long))
+            obs_list, _ = self.env.get_obs(env_indices=th.tensor(env_indices, dtype=th.long, device=og.sim.device))
         task_name = self.cfg.task.name
         # One batched policy for the complete batch: reset its per-environment state once.
         self.policy.reset()
@@ -588,7 +588,7 @@ class BatchedEvaluator:
             cam_rel_poses.append(th.cat(T.relative_pose_transform(*(camera.get_position_orientation()), *base_pose)))
         if cam_rel_poses:
             obs[f"{robot.name}::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
-        obs["task_id"] = th.tensor([TASK_NAMES_TO_INDICES[self.cfg.task.name]], dtype=th.int64)
+        obs["task_id"] = th.tensor([TASK_NAMES_TO_INDICES[self.cfg.task.name]], dtype=th.int64, device=og.sim.device)
         return obs
 
     def _write_video(self, instance_eval_state: InstanceEvaluationState) -> None:

@@ -7,6 +7,7 @@ from inspect import isclass
 
 import torch as th
 
+import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger
@@ -473,9 +474,9 @@ class SerializableRegistry(Registry, Serializable):
 
             state_flat = th.cat(state_flat)
         else:
-            state_flat = th.tensor([])
+            state_flat = th.tensor([], device=og.sim.device)
 
-        return th.cat([th.tensor([n_objs], dtype=th.float32), state_flat])
+        return th.cat([th.tensor([n_objs], dtype=th.float32, device=og.sim.device), state_flat])
 
     def deserialize(self, state):
         state_dict = dict()

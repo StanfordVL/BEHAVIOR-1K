@@ -197,6 +197,7 @@ class AttachedTo(
                             m.ATTACHMENT_JOINT_VISUAL_WIDTH,
                             length,
                         ],
+                        device=link.scale.device,
                     )
                     / link.scale
                 )

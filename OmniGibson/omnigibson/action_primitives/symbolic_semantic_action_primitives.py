@@ -8,6 +8,7 @@ import torch as th
 from aenum import IntEnum, auto
 from typing import Any
 
+import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
@@ -571,6 +572,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
                 link.get_position_orientation()[0]
                 for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()
             ],
+            device=og.sim.device,
         )
         heating_distance_threshold = heat_source_obj.states[object_states.HeatSourceOrSink].distance_threshold
 

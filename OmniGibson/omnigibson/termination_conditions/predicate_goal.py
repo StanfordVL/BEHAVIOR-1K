@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
 
@@ -36,7 +37,7 @@ class PredicateGoal(SuccessCondition):
 
     def _step(self, task, env, action):
         # Terminate if all goal conditions are met in the task
-        results = th.zeros(env.num_envs, dtype=th.bool)
+        results = th.zeros(env.num_envs, dtype=th.bool, device=og.sim.device)
         for env_idx in range(env.num_envs):
             done, self._goal_status[env_idx] = self._check_goal_fn(env_idx)
             results[env_idx] = done

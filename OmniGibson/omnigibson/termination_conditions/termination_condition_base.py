@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 
 import torch as th
 
+import omnigibson as og
 from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_TERMINATION_CONDITIONS = dict()
@@ -78,7 +79,7 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
         """
         if self._num_envs is None:
             self._num_envs = env.num_envs
-            self._done = th.zeros(self._num_envs, dtype=th.bool)
+            self._done = th.zeros(self._num_envs, dtype=th.bool, device=og.sim.device)
         self._done[env_indices] = False
 
     @property
