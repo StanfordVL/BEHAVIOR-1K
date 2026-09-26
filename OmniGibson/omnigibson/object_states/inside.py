@@ -4,7 +4,6 @@ import torch as th
 import warp as wp
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 from omnigibson.macros import macros, create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contains import m as contains_m
@@ -18,7 +17,7 @@ from omnigibson.utils.object_state_utils import (
     is_pose_reachable_for_predicate,
 )
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import RigidBodyViewAPI, RigidContactAPI, rigid_inverse_mat44
+from omnigibson.utils.usd_utils import RigidBodyViewAPI, RigidContactAPI, create_tensor_from_list, rigid_inverse_mat44
 import omnigibson.utils.transform_utils as T
 
 
@@ -313,9 +312,7 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         aabb_map = AABB.OBJ_IDXS or {}
         for rel_path, idx in cls.OBJ_IDXS.items():
             aabb_idx_cpu[idx] = aabb_map.get(rel_path, -1)
-        cls._aabb_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            aabb_idx_cpu, "int32", device="cuda"
-        )
+        cls._aabb_idx = create_tensor_from_list(aabb_idx_cpu, "int32", device="cuda")
 
         # Walk every Inside-tracked object's container meta-links and collect each visual mesh.
         # Only USD Mesh-typed visual meshes are supported; primitive types are skipped.
@@ -396,13 +393,11 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             cls._inv_world = None
             cls._outside_flag = None
         else:
-            cls._mesh_container_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            cls._mesh_container_idx = create_tensor_from_list(
                 [r["container"] for r in mesh_records], "int32", device="cuda"
             )
-            cls._mesh_scene_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                [r["scene"] for r in mesh_records], "int32", device="cuda"
-            )
-            cls._mesh_parent_link = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
+            cls._mesh_scene_idx = create_tensor_from_list([r["scene"] for r in mesh_records], "int32", device="cuda")
+            cls._mesh_parent_link = create_tensor_from_list(
                 [r["parent_link"] for r in mesh_records], "int32", device="cuda"
             )
             # mat44 / vec3 have no scalar-only helper — wp.array reinterprets the CPU torch
@@ -417,9 +412,7 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             cls._face_centroid = wp.array(face_centroids_flat_cpu, dtype=wp.vec3, device="cuda")
             cls._face_normal = wp.array(face_normals_flat_cpu, dtype=wp.vec3, device="cuda")
 
-            cls._face_to_mesh = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                face_to_mesh_list, "int32", device="cuda"
-            )
+            cls._face_to_mesh = create_tensor_from_list(face_to_mesh_list, "int32", device="cuda")
 
             # Per-step scratch — allocate directly as wp.array.
             cls._inv_world = wp.zeros(M, dtype=wp.mat44, device="cuda")

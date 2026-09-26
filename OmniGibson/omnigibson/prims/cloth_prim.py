@@ -586,16 +586,7 @@ class ClothPrim(GeomPrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
                 cartesian coordinates relative to the world frame
         """
-        pos, ori = self.get_position_orientation()
-        ori = T.quat2mat(ori)
-        scale = self.scale
-
-        # Don't copy to save compute, since we won't be returning a reference to the underlying object anyways
-        p_local = vtarray_to_torch(self.get_attribute(attr="points"))
-        p_local = p_local[idxs] if idxs is not None else p_local
-        p_world = (ori @ (p_local * scale).T).T + pos
-
-        return p_world
+        return og.sim.physics_backend.get_cloth_particle_positions(self.prim_path, idxs=idxs)
 
     def set_particle_positions(self, positions, idxs=None):
         """
@@ -611,18 +602,7 @@ class ClothPrim(GeomPrim):
             len(positions) == n_expected
         ), f"Got mismatch in particle setting size: {len(positions)}, vs. number of expected particles {n_expected}!"
 
-        translation, rotation = self.get_position_orientation()
-        rotation = T.quat2mat(rotation)
-        scale = self.scale
-        p_local = (rotation.T @ (positions - translation).T).T / scale
-
-        # Fill the idxs if requested
-        if idxs is not None:
-            p_local_old = vtarray_to_torch(self.get_attribute(attr="points"))
-            p_local_old[idxs] = p_local
-            p_local = p_local_old
-
-        self.set_attribute(attr="points", val=lazy.pxr.Vt.Vec3fArray(p_local.tolist()))
+        og.sim.physics_backend.set_cloth_particle_positions(self.prim_path, positions, idxs=idxs)
 
     @property
     def keypoint_idx(self):
@@ -694,8 +674,7 @@ class ClothPrim(GeomPrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame.
         """
-        # the velocities attribute is w.r.t the world frame already
-        return vtarray_to_torch(self.get_attribute(attr="velocities"))
+        return og.sim.physics_backend.get_cloth_particle_velocities(self.prim_path)
 
     @particle_velocities.setter
     def particle_velocities(self, vel):
@@ -710,8 +689,7 @@ class ClothPrim(GeomPrim):
             vel.shape[0] == self._n_particles
         ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
 
-        # the velocities attribute is w.r.t the world frame already
-        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(vel.tolist()))
+        og.sim.physics_backend.set_cloth_particle_velocities(self.prim_path, vel)
 
     def compute_face_normals(self, face_ids=None):
         """
@@ -765,7 +743,9 @@ class ClothPrim(GeomPrim):
                 contacts.append((hit.rigid_body, pos))
                 return True
 
-            og.sim.psqi.overlap_sphere(self.cloth_system.particle_contact_offset, pos.tolist(), report_hit, False)
+            og.sim.physics_backend.overlap_sphere(
+                self.cloth_system.particle_contact_offset, pos.tolist(), report_hit, False
+            )
 
         return contacts
 
@@ -861,7 +841,7 @@ class ClothPrim(GeomPrim):
         Returns:
             float: spring bend stiffness of the particle system
         """
-        return self.get_attribute("physxAutoParticleCloth:springBendStiffness")
+        return og.sim.physics_backend.get_cloth_stiffness(self.prim_path)["bend"]
 
     @bend_stiffness.setter
     def bend_stiffness(self, bend_stiffness):
@@ -869,7 +849,7 @@ class ClothPrim(GeomPrim):
         Args:
             bend_stiffness (float): spring bend stiffness of the particle system
         """
-        self.set_attribute("physxAutoParticleCloth:springBendStiffness", bend_stiffness)
+        og.sim.physics_backend.set_cloth_stiffness(self.prim_path, bend=bend_stiffness)
 
     @property
     def damping(self):
@@ -877,7 +857,7 @@ class ClothPrim(GeomPrim):
         Returns:
             float: spring damping of the particle system
         """
-        return self.get_attribute("physxAutoParticleCloth:springDamping")
+        return og.sim.physics_backend.get_cloth_stiffness(self.prim_path)["damping"]
 
     @damping.setter
     def damping(self, damping):
@@ -885,7 +865,7 @@ class ClothPrim(GeomPrim):
         Args:
             damping (float): spring damping of the particle system
         """
-        self.set_attribute("physxAutoParticleCloth:springDamping", damping)
+        og.sim.physics_backend.set_cloth_stiffness(self.prim_path, damping=damping)
 
     @property
     def shear_stiffness(self):
@@ -893,7 +873,7 @@ class ClothPrim(GeomPrim):
         Returns:
             float: spring shear_stiffness of the particle system
         """
-        return self.get_attribute("physxAutoParticleCloth:springShearStiffness")
+        return og.sim.physics_backend.get_cloth_stiffness(self.prim_path)["shear"]
 
     @shear_stiffness.setter
     def shear_stiffness(self, shear_stiffness):
@@ -901,7 +881,7 @@ class ClothPrim(GeomPrim):
         Args:
             shear_stiffness (float): spring shear_stiffness of the particle system
         """
-        self.set_attribute("physxAutoParticleCloth:springShearStiffness", shear_stiffness)
+        og.sim.physics_backend.set_cloth_stiffness(self.prim_path, shear=shear_stiffness)
 
     @property
     def stretch_stiffness(self):
@@ -909,7 +889,7 @@ class ClothPrim(GeomPrim):
         Returns:
             float: spring stretch_stiffness of the particle system
         """
-        return self.get_attribute("physxAutoParticleCloth:springStretchStiffness")
+        return og.sim.physics_backend.get_cloth_stiffness(self.prim_path)["stretch"]
 
     @stretch_stiffness.setter
     def stretch_stiffness(self, stretch_stiffness):
@@ -917,7 +897,7 @@ class ClothPrim(GeomPrim):
         Args:
             stretch_stiffness (float): spring stretch_stiffness of the particle system
         """
-        self.set_attribute("physxAutoParticleCloth:springStretchStiffness", stretch_stiffness)
+        og.sim.physics_backend.set_cloth_stiffness(self.prim_path, stretch=stretch_stiffness)
 
     @property
     def particle_group(self):

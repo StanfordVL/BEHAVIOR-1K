@@ -1318,7 +1318,7 @@ class Robot(USDObject, GymObservable):
 
         # Rows are dynamic rigid bodies in the robot's scene; columns are the robot's fingers.
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            self._rigid_contact_view = og.sim.physics_sim_view.create_rigid_contact_view(
+            self._rigid_contact_view = og.sim.physics_backend.physics_sim_view.create_rigid_contact_view(
                 pattern=f"/World/scene_{self.scene.idx}/*/*",
                 filter_patterns=finger_paths,
                 max_contact_data_count=len(finger_paths) * 8,

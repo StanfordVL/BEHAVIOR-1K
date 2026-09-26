@@ -3,14 +3,13 @@ import random
 import torch as th
 import warp as wp
 
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ArticulatedObjectViewAPI
+from omnigibson.utils.usd_utils import ArticulatedObjectViewAPI, create_tensor_from_list
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -270,27 +269,13 @@ class Open(TensorizedAbsoluteState, BooleanStateMixin):
                 row = ArticulatedObjectViewAPI.get_view_row(obj.articulation_root_path)
                 obj_view_rows_cpu[scene_idx, obj_idx] = row
 
-        cls.OPENABLE_MASK = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            openable_mask_cpu, "uint8", device="cuda"
-        )
-        cls.THRESHOLDS_S1 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            thresholds_s1_cpu, "float32", device="cuda"
-        )
-        cls.DIRECTIONS_S1 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            directions_s1_cpu, "float32", device="cuda"
-        )
-        cls.THRESHOLDS_S2 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            thresholds_s2_cpu, "float32", device="cuda"
-        )
-        cls.DIRECTIONS_S2 = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            directions_s2_cpu, "float32", device="cuda"
-        )
-        cls.BOTH_SIDES = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            both_sides_cpu, "uint8", device="cuda"
-        )
-        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            obj_view_rows_cpu, "int32", device="cuda"
-        )
+        cls.OPENABLE_MASK = create_tensor_from_list(openable_mask_cpu, "uint8", device="cuda")
+        cls.THRESHOLDS_S1 = create_tensor_from_list(thresholds_s1_cpu, "float32", device="cuda")
+        cls.DIRECTIONS_S1 = create_tensor_from_list(directions_s1_cpu, "float32", device="cuda")
+        cls.THRESHOLDS_S2 = create_tensor_from_list(thresholds_s2_cpu, "float32", device="cuda")
+        cls.DIRECTIONS_S2 = create_tensor_from_list(directions_s2_cpu, "float32", device="cuda")
+        cls.BOTH_SIDES = create_tensor_from_list(both_sides_cpu, "uint8", device="cuda")
+        cls.OBJ_IDXES_IN_ARTICULATION_VIEW = create_tensor_from_list(obj_view_rows_cpu, "int32", device="cuda")
 
     @classmethod
     def _update_values(cls, values):

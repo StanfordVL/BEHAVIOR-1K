@@ -15,7 +15,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import PhysicsMaterial, mesh_prim_shape_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -332,5 +332,6 @@ class GeomPrim(XFormPrim):
             if path == "":
                 return None
             else:
-                self._applied_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(prim_path=path)
+                with og.sim.editing_usd():
+                    self._applied_physics_material = PhysicsMaterial(prim_path=path)
                 return self._applied_physics_material
