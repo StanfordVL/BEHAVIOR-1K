@@ -373,6 +373,14 @@ class KitRenderBackend(RenderBackend):
     ``PhysXBackend`` does on the physics side.
     """
 
+    runs_inside_kit = True
+    supports_camera_capture = True
+    supports_viewport = True
+    supports_materials = True
+    supports_bbox = True
+    supports_pointcloud = True
+    supports_tiled_rendering = True
+
     def apply_renderer_settings(self):
         self.sim._set_renderer_settings()
         # Set the lighting mode to be stage by default

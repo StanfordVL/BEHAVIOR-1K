@@ -737,6 +737,11 @@ class ClothPrim(GeomPrim):
             list of (contact_prim_path, position) pairs
         """
         contacts = []
+
+        if not og.sim.physics_backend.supports_scene_queries:
+            # No scene-query interface on this backend; report no contacts rather than crashing.
+            return contacts
+
         positions = self.keypoint_particle_positions if keypoints_only else self.compute_particle_positions()
         for pos in positions:
 
@@ -906,7 +911,11 @@ class ClothPrim(GeomPrim):
         Returns:
             int: Particle group this instancer belongs to
         """
-        return self.get_attribute(attr="physxParticle:particleGroup")
+        # Unauthored on backends that never call clothify_mesh_prim()'s PhysX-specific particle-cloth
+        # authoring (e.g. Newton, whose self-collision handling doesn't use this concept at all) --
+        # default to 0 rather than None so downstream state serialization doesn't break.
+        group = self.get_attribute(attr="physxParticle:particleGroup")
+        return 0 if group is None else group
 
     @particle_group.setter
     def particle_group(self, group):
