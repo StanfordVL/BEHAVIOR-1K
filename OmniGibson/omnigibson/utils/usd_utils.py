@@ -2142,8 +2142,8 @@ def get_world_pose(prim_path):
     # device= here, this always silently defaults to CPU, breaking combination with other pose queries
     # (e.g. RigidDynamicPrim.get_position_orientation(), which stays on whatever device physics state
     # actually lives on) whenever physics runs on a non-CPU device.
-    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
-    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32, device=og.sim.device)
+    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32, device=og.sim.device)
     return position, orientation
 
 
@@ -2175,8 +2175,8 @@ def get_local_pose(prim_path):
     matrix = _get_local_transform_with_scale(prim_path)
     quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
     # See get_world_pose()'s equivalent comment -- must match og.sim.device explicitly, not default CPU.
-    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
-    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
+    position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32, device=og.sim.device)
+    orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32, device=og.sim.device)
     return position, orientation
 
 
@@ -2477,7 +2477,7 @@ class BatchControlViewAPIImpl:
             # Build block-diagonal rotation transform per robot: (N, 6, 6)
             all_quats = cb.to_torch(self.get_all_position_orientation()[1])  # (N, 4)
             ori_t_batch = TT.quat2mat(all_quats).transpose(-2, -1)  # (N, 3, 3)
-            tf = th.zeros(all_vels.shape[0], 6, 6, dtype=all_vels.dtype)
+            tf = th.zeros(all_vels.shape[0], 6, 6, dtype=all_vels.dtype, device=all_vels.device)
             tf[:, :3, :3] = ori_t_batch
             tf[:, 3:, 3:] = ori_t_batch
 
@@ -2746,7 +2746,7 @@ class BatchControlViewAPIImpl:
             N, n_links = all_link_tfs.shape[:2]
 
             # Build link homogeneous transform matrices: (N, n_links, 4, 4)
-            tfs = th.zeros(N, n_links, 4, 4, dtype=th.float32)
+            tfs = th.zeros(N, n_links, 4, 4, dtype=th.float32, device=all_link_tfs.device)
             tfs[:, :, 3, 3] = 1.0
             tfs[:, :, :3, 3] = all_link_tfs[:, :, :3]
             # quat2mat doesn't handle rank-3 input; flatten the N*n_links batch dimension
@@ -2755,7 +2755,7 @@ class BatchControlViewAPIImpl:
             # Build batched base pose inverses: (N, 4, 4)
             # For a rigid transform [R, t; 0, 1], the inverse is [R^T, -R^T t; 0, 1]
             base_rot_T = TT.quat2mat(all_quat).transpose(-2, -1)  # (N, 3, 3)
-            base_tf_inv = th.zeros(N, 4, 4, dtype=th.float32)
+            base_tf_inv = th.zeros(N, 4, 4, dtype=th.float32, device=all_pos.device)
             base_tf_inv[:, 3, 3] = 1.0
             base_tf_inv[:, :3, :3] = base_rot_T
             base_tf_inv[:, :3, 3] = -(base_rot_T @ all_pos.unsqueeze(-1)).squeeze(-1)
@@ -2764,7 +2764,7 @@ class BatchControlViewAPIImpl:
             rel_tfs = base_tf_inv.unsqueeze(1) @ tfs
 
             # Convert back to (N, n_links, 7) pos + quat
-            rel_poses = th.zeros(N, n_links, 7, dtype=th.float32)
+            rel_poses = th.zeros(N, n_links, 7, dtype=th.float32, device=all_link_tfs.device)
             rel_poses[:, :, :3] = rel_tfs[:, :, :3, 3]
             rel_poses[:, :, 3:] = TT.mat2quat(rel_tfs[:, :, :3, :3].reshape(-1, 3, 3)).reshape(N, n_links, 4)
 
@@ -2784,7 +2784,7 @@ class BatchControlViewAPIImpl:
             ori_t_batch = TT.quat2mat(all_quats).transpose(-2, -1)
 
             # Build block-diagonal transform tf = [[ori_t, 0], [0, ori_t]]: (N, 6, 6)
-            tf = th.zeros(N, 6, 6, dtype=all_jacobians.dtype)
+            tf = th.zeros(N, 6, 6, dtype=all_jacobians.dtype, device=all_jacobians.device)
             tf[:, :3, :3] = ori_t_batch
             tf[:, 3:, 3:] = ori_t_batch
 
@@ -3808,20 +3808,20 @@ def _compute_relative_poses_torch(
     all_tfs: th.Tensor,
     base_pose: Tuple[th.Tensor, th.Tensor],
 ):
-    tfs = th.zeros((n_links, 4, 4), dtype=th.float32)
+    tfs = th.zeros((n_links, 4, 4), dtype=th.float32, device=all_tfs.device)
     # base vel is the final -1 index
     link_tfs = all_tfs[idx, :]
     tfs[:, 3, 3] = 1.0
     tfs[:, :3, 3] = link_tfs[:, :3]
     tfs[:, :3, :3] = TT.quat2mat(link_tfs[:, 3:])
-    base_tf_inv = th.zeros((1, 4, 4), dtype=th.float32)
+    base_tf_inv = th.zeros((1, 4, 4), dtype=th.float32, device=all_tfs.device)
     base_tf_inv[0, :, :] = TT.pose_inv(TT.pose2mat(base_pose))
 
     # (1, 4, 4) @ (n_links, 4, 4) -> (n_links, 4, 4)
     rel_tfs = base_tf_inv @ tfs
 
     # Re-convert to quat form
-    rel_poses = th.zeros((n_links, 7), dtype=th.float32)
+    rel_poses = th.zeros((n_links, 7), dtype=th.float32, device=all_tfs.device)
     rel_poses[:, :3] = rel_tfs[:, :3, 3]
     rel_poses[:, 3:] = TT.mat2quat(rel_tfs[:, :3, :3])
 
