@@ -571,8 +571,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 (
                     th.dot(
                         T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1])
-                        @ th.tensor([0, 0, 1], dtype=th.float32),
-                        th.tensor([0, 0, 1], dtype=th.float32),
+                        @ th.tensor([0, 0, 1], dtype=th.float32, device=og.sim.device),
+                        th.tensor([0, 0, 1], dtype=th.float32, device=og.sim.device),
                     )
                     > 0
                 )
@@ -1219,6 +1219,7 @@ class ParticleApplier(ParticleModifier):
                 l + system.particle_radius,
                 h - system.particle_radius + 1e-10,
                 system.particle_radius * 2,
+                device=low.device,
             )
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
@@ -1293,7 +1294,7 @@ class ParticleApplier(ParticleModifier):
                 cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
             else:
                 scales = None
-                cuboid_dimensions = th.zeros(3)
+                cuboid_dimensions = th.zeros(3, device=start_points.device)
 
             # Sample the rays to see where particle can be generated
             results = sample_cuboid_on_object(
@@ -1486,7 +1487,7 @@ class ParticleApplier(ParticleModifier):
             pos=pos,
             quat=quat,
             scale=self.obj.scale,
-            particle_positions=points,
+            particle_positions=points.to(pos.device),
         )
 
         return points[:n_samples, :], points[n_samples:, :]
@@ -1512,13 +1513,13 @@ class ParticleApplier(ParticleModifier):
 
         # Sample in all directions, shooting from the center of the link / object frame
         pos = self.link.get_position_orientation()[0]
-        start_points = th.ones((n_samples, 3)) * pos.reshape(1, 3)
-        end_points = th.rand(n_samples, 3) * (upper - lower) + lower
+        start_points = th.ones((n_samples, 3), device=pos.device) * pos.reshape(1, 3)
+        end_points = th.rand(n_samples, 3, device=pos.device) * (upper - lower) + lower
         sides, axes = (
             th.randint(2, size=(n_samples,), device=pos.device),
             th.randint(3, size=(n_samples,), device=pos.device),
         )
-        end_points[th.arange(n_samples), axes] = lower_upper[sides, axes]
+        end_points[th.arange(n_samples, device=pos.device), axes] = lower_upper[sides, axes]
 
         return start_points, end_points
 
