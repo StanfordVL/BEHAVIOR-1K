@@ -318,7 +318,7 @@ class EntityPrim(XFormPrim):
         Helper function to update internal joint limits for prismatic joints based on the object's scale
         """
         # If the scale is [1, 1, 1], we can skip this step
-        if th.allclose(self.scale, th.ones(3)):
+        if th.allclose(self.scale, th.ones(3, device=self.scale.device)):
             return
 
         prismatic_joints = {
@@ -351,6 +351,7 @@ class EntityPrim(XFormPrim):
                         joint_local_orn = th.tensor(
                             [*local_rot0.GetImaginary(), local_rot0.GetReal()],
                             dtype=th.float32,
+                            device=link_local_orn.device,
                         )
 
                         # Compute the joint frame orientation in the object frame
@@ -361,7 +362,7 @@ class EntityPrim(XFormPrim):
                         #     f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
 
                         # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
-                        axis_in_joint_frame = th.zeros(3)
+                        axis_in_joint_frame = th.zeros(3, device=link_local_orn.device)
                         axis_in_joint_frame[JointAxis.index(joint.axis)] = 1.0
 
                         # Compute the joint axis unit vector in the object frame
@@ -1048,9 +1049,10 @@ class EntityPrim(XFormPrim):
                 position = current_position if position is None else position
                 orientation = current_orientation if orientation is None else orientation
 
-                # Convert to th.Tensor if necessary
-                position = th.as_tensor(position, dtype=th.float32)
-                orientation = th.as_tensor(orientation, dtype=th.float32)
+                # Convert to th.Tensor if necessary. Must land on og.sim.device explicitly -- see
+                # XFormPrim.set_position_orientation()'s equivalent comment for why.
+                position = th.as_tensor(position, dtype=th.float32, device=og.sim.device)
+                orientation = th.as_tensor(orientation, dtype=th.float32, device=og.sim.device)
 
                 # Assert validity of the orientation
                 assert math.isclose(
@@ -1117,7 +1119,7 @@ class EntityPrim(XFormPrim):
             n-array: minimum values for this robot's joints. If joint does not have a range, returns -1000
                 for that joint
         """
-        return th.tensor([joint.lower_limit for joint in self._joints.values()])
+        return th.tensor([joint.lower_limit for joint in self._joints.values()], device=og.sim.device)
 
     # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
@@ -1127,7 +1129,7 @@ class EntityPrim(XFormPrim):
             n-array: maximum values for this robot's joints. If joint does not have a range, returns 1000
                 for that joint
         """
-        return th.tensor([joint.upper_limit for joint in self._joints.values()])
+        return th.tensor([joint.upper_limit for joint in self._joints.values()], device=og.sim.device)
 
     @property
     def joint_range(self):
@@ -1143,7 +1145,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum velocities for this robot's joints
         """
-        return th.tensor([joint.max_velocity for joint in self._joints.values()])
+        return th.tensor([joint.max_velocity for joint in self._joints.values()], device=og.sim.device)
 
     @property
     def max_joint_efforts(self):
@@ -1151,7 +1153,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum efforts for this robot's joints
         """
-        return th.tensor([joint.max_effort for joint in self._joints.values()])
+        return th.tensor([joint.max_effort for joint in self._joints.values()], device=og.sim.device)
 
     @property
     def joint_position_limits(self):
@@ -1198,7 +1200,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: n-DOF length array specifying whether joint has a limit or not
         """
-        return th.tensor([j.has_limit for j in self._joints.values()])
+        return th.tensor([j.has_limit for j in self._joints.values()], device=og.sim.device)
 
     @property
     def disabled_collision_link_names(self):
@@ -1482,7 +1484,7 @@ class EntityPrim(XFormPrim):
         """
         jac = self.get_jacobian(clone=clone)
         ori_t = T.quat2mat(self.get_position_orientation()[1]).T
-        tf = th.zeros((1, 6, 6), dtype=th.float32)
+        tf = th.zeros((1, 6, 6), dtype=th.float32, device=ori_t.device)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t
         return tf @ jac
@@ -1515,8 +1517,8 @@ class EntityPrim(XFormPrim):
         """
         if self.kinematic_only:
             return
-        self.set_linear_velocity(velocity=th.zeros(3))
-        self.set_angular_velocity(velocity=th.zeros(3))
+        self.set_linear_velocity(velocity=th.zeros(3, device=og.sim.device))
+        self.set_angular_velocity(velocity=th.zeros(3, device=og.sim.device))
         if self.initialized:
             for joint in self._joints.values():
                 joint.keep_still()
@@ -1568,7 +1570,15 @@ class EntityPrim(XFormPrim):
     def serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and
         # adding them to the a flattened array
-        state_flat = [th.tensor([state["is_asleep"]], dtype=th.int), self.root_link.serialize(state=state["root_link"])]
+        root_link_state = self.root_link.serialize(state=state["root_link"])
+        # is_asleep is a plain bool (not already a device-tagged tensor coming from physics state), so
+        # it must be placed on whatever device the rest of this object's state lives on explicitly --
+        # th.tensor(...) with no device defaults to CPU, which silently breaks th.cat below whenever
+        # physics state lives on CUDA (e.g. USE_GPU_DYNAMICS=True).
+        state_flat = [
+            th.tensor([state["is_asleep"]], dtype=th.int, device=root_link_state.device),
+            root_link_state,
+        ]
         if self.n_joints > 0:
             state_flat += [
                 state["joint_pos"],
