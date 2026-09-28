@@ -52,7 +52,7 @@ def sync_light_visibility_from_toggles(scene):
         if category not in LIGHT_CONTROL_CATEGORIES or states is None or ToggledOn not in states:
             continue
 
-        visible = states[ToggledOn].value
+        visible = states[ToggledOn].get_value()
         if category == "electric_switch":
             _sync_room_lights_for_switch(scene, obj, visible)
         else:
@@ -114,7 +114,7 @@ class LightToggleSynchronizer:
             states = getattr(obj, "states", None)
             if category not in LIGHT_CONTROL_CATEGORIES or states is None or ToggledOn not in states:
                 continue
-            values[obj.name] = states[ToggledOn].value
+            values[obj.name] = states[ToggledOn].get_value()
         return values
 
     def _toggle_targets(self, obj_name):
