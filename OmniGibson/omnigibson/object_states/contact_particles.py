@@ -31,6 +31,10 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
             system_name=system.name
         ), "Can only get ContactParticles for a PhysicalParticleSystem!"
 
+        if not og.sim.physics_backend.supports_scene_queries:
+            # No scene-query interface on this backend; report no contacts rather than crashing.
+            return set()
+
         # Variables to update mid-iteration
         contacts = set()
         idx = 0

@@ -255,6 +255,12 @@ class ControllerView:
         return cb.to_torch(isaac_kd)
 
     @classmethod
+    def isaac_gains_are_default(cls, group_key: str) -> bool:
+        """Whether BOTH isaac gains came from the backend-wide default rather than the config."""
+        controller = cls._controller_groups[group_key]
+        return controller.isaac_kp_is_default and controller.isaac_kd_is_default
+
+    @classmethod
     def get_command_input_limits(cls, group_key: str):
         limits = cls._controller_groups[group_key].command_input_limits
         if limits is None:
