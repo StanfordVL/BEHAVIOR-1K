@@ -585,9 +585,9 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         time_flat = cls._robots_can_toggle_time.reshape((S * O,))
 
         threshold_seconds = m.CAN_TOGGLE_SECONDS
-        assert (
-            threshold_seconds > og.sim.get_sim_step_dt()
-        ), f"m.CAN_TOGGLE_SECONDS ({threshold_seconds}s) must exceed one sim step dt ({og.sim.get_sim_step_dt()}s)"
+        assert threshold_seconds > og.sim.get_sim_step_dt(), (
+            f"m.CAN_TOGGLE_SECONDS ({threshold_seconds}s) must exceed one sim step dt ({og.sim.get_sim_step_dt()}s)"
+        )
 
         mask_flat.zero_()
 

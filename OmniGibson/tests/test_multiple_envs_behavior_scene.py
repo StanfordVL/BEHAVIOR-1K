@@ -60,9 +60,9 @@ class TestBehaviorTaskTensors:
 
         for rf_name, rf in env.task._reward_functions.items():
             print(f"  reward fn '{rf_name}': shape={rf._reward.shape}, values={rf._reward}")
-            assert rf._reward.shape == (
-                NUM_ENVS,
-            ), f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
+            assert rf._reward.shape == (NUM_ENVS,), (
+                f"Reward function '{rf_name}' _reward has wrong shape: {rf._reward.shape}"
+            )
 
         # BehaviorTask must have the potential reward
         assert "potential" in env.task._reward_functions
@@ -79,9 +79,9 @@ class TestBehaviorTaskTensors:
 
         for tc_name, tc in env.task._termination_conditions.items():
             print(f"  termination '{tc_name}': shape={tc._done.shape}, dtype={tc._done.dtype}, values={tc._done}")
-            assert tc._done.shape == (
-                NUM_ENVS,
-            ), f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
+            assert tc._done.shape == (NUM_ENVS,), (
+                f"Termination condition '{tc_name}' _done has wrong shape: {tc._done.shape}"
+            )
             assert tc._done.dtype == th.bool
 
         # BehaviorTask must have timeout and predicate conditions
