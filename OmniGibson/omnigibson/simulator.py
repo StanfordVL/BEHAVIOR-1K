@@ -66,11 +66,6 @@ m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
-m.KIT_FILES = {
-    (6, 0, 0): "omnigibson_6_0_0.kit",
-    (6, 0, 1): "omnigibson_6_0_0.kit",
-}
-
 
 def with_profiler(name):
     def decorator(fn):

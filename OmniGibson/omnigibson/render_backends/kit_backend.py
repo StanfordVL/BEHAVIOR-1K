@@ -39,7 +39,8 @@ m = create_module_macros(module_path=__file__)
 
 # Maps each supported (major, minor, patch) Isaac Sim version to its `.kit` experience file.
 m.KIT_FILES = {
-    (5, 1, 0): "omnigibson_5_1_0.kit",
+    (6, 0, 0): "omnigibson_6_0_0.kit",
+    (6, 0, 1): "omnigibson_6_0_0.kit",
 }
 
 
