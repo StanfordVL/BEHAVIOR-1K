@@ -7,7 +7,7 @@ import json
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs import HDF5CollectionWrapper
-from omnigibson.macros import macros
+from omnigibson.macros import gm, macros
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
@@ -269,7 +269,7 @@ class OGRobotServer:
         # # Set lower position iteration count for faster sim speed
         # og.sim._physics_context._physx_scene_api.GetMaxPositionIterationCountAttr().Set(8)
         # og.sim._physics_context._physx_scene_api.GetMaxVelocityIterationCountAttr().Set(1)
-        if og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND == "physx":
             isregistry = lazy.carb.settings.acquire_settings_interface()
             isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 0)
         # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, int(1 / og.sim.get_physics_dt()))
@@ -300,7 +300,7 @@ class OGRobotServer:
         og.sim.play()
 
         # Make sure robot fingers are extra grippy (PhysX-only: isaacsim PhysicsMaterial API)
-        if APPLY_EXTRA_GRIP and og.sim.physics_backend.runs_inside_kit:
+        if APPLY_EXTRA_GRIP and gm.PHYSICS_BACKEND == "physx":
             gripper_mat = lazy.isaacsim.core.api.materials.PhysicsMaterial(
                 prim_path=f"{self.robot.prim_path}/Looks/gripper_mat",
                 name="gripper_material",

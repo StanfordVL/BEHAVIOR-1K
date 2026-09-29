@@ -1,6 +1,6 @@
 """
-Drop-in replacement for Isaac Sim's `isaacsim.core.api.SimulationContext`, used by physics backends
-that report `runs_inside_kit = False`. Provides only the subset of that class's interface a
+Drop-in replacement for Isaac Sim's `isaacsim.core.api.SimulationContext`, used by non-PhysX physics
+backends. Provides only the subset of that class's interface a
 `PhysicsBackend` actually needs (dt/time bookkeeping, a USD stage, and play/pause/stop state) without
 launching Isaac Sim's Kit application itself (that decision belongs to whichever backend -- physics or
 render -- actually needs Kit; see `simulator.py::_launch_app()`).
@@ -109,7 +109,7 @@ class StandaloneSimulationContext:
 
     def render(self):
         # No Kit viewport/renderer exists standalone. Rendering and sensors are out of scope for the
-        # standalone physics-backend path (see PhysicsBackend.runs_inside_kit).
+        # standalone physics-backend path (gm.PHYSICS_BACKEND != "physx").
         pass
 
     def step(self, render=True):

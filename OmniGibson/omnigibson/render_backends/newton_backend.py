@@ -141,7 +141,6 @@ class NewtonRenderBackend(RenderBackend):
     supports the ``rgb`` modality (see module docstring).
     """
 
-    runs_inside_kit = False
     supports_camera_capture = True
 
     def __init__(self, sim=None):

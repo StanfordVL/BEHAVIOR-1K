@@ -175,7 +175,7 @@ class EntityPrim(XFormPrim):
         # non-Kit backend (no renderer to bind them for -- see XFormPrim._post_load()).
         materials = set()
         material_paths = set()
-        if og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND == "physx":
             for link in self._links.values():
                 xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
                 for xform in xforms:
