@@ -2,7 +2,6 @@ import torch as th
 import warp as wp
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 from omnigibson.object_states.adjacency import Adjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
@@ -12,6 +11,7 @@ from omnigibson.utils.object_state_utils import get_reachability_sampling_contex
 from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import create_tensor_from_list
 
 
 # Adjacency axis layout: k=0 is +Z (other above self), k=1 is -Z (other below self).
@@ -83,7 +83,7 @@ class Under(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
         for rel_path, idx in cls.OBJ_IDXS.items():
             adj_idx_cpu[idx] = adj_map.get(rel_path, -1)
 
-        cls._adj_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(adj_idx_cpu, "int32", device="cuda")
+        cls._adj_idx = create_tensor_from_list(adj_idx_cpu, "int32", device="cuda")
 
     @classmethod
     def _update_values(cls, values):

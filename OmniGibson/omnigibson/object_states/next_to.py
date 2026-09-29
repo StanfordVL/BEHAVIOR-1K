@@ -1,13 +1,13 @@
 import torch as th
 import warp as wp
 
-import omnigibson.lazy as lazy
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import Adjacency, _HORIZONTAL_K_END, _HORIZONTAL_K_START
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import create_tensor_from_list
 
 
 # NextTo(self, other) is true when AABBs are close enough AND other lies on any of self's
@@ -125,10 +125,8 @@ class NextTo(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             aabb_idx_cpu[idx] = aabb_map.get(rel_path, -1)
             adj_idx_cpu[idx] = adj_map.get(rel_path, -1)
 
-        cls._aabb_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            aabb_idx_cpu, "int32", device="cuda"
-        )
-        cls._adj_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(adj_idx_cpu, "int32", device="cuda")
+        cls._aabb_idx = create_tensor_from_list(aabb_idx_cpu, "int32", device="cuda")
+        cls._adj_idx = create_tensor_from_list(adj_idx_cpu, "int32", device="cuda")
 
     @classmethod
     def _update_values(cls, values):

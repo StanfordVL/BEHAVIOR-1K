@@ -82,17 +82,17 @@ def test_macro_physical_particle_system_update_handles_waits_for_physics_view(mo
 
     mock_sim = MagicMock()
     mock_sim.is_playing.return_value = False
-    mock_sim.physics_sim_view = MagicMock()
+    mock_sim.physics_backend.physics_sim_view = MagicMock()
     monkeypatch.setattr(og, "sim", mock_sim)
 
     system.update_handles()
 
     assert system.particles_view is None
-    mock_sim.physics_sim_view.create_rigid_body_view.assert_not_called()
+    mock_sim.physics_backend.physics_sim_view.create_rigid_body_view.assert_not_called()
 
     system.particles_view = "stale_view"
     mock_sim.is_playing.return_value = True
-    mock_sim.physics_sim_view = None
+    mock_sim.physics_backend.physics_sim_view = None
 
     system.update_handles()
 

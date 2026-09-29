@@ -10,6 +10,8 @@ from omnigibson.utils.usd_utils import (
     scene_relative_prim_path_to_absolute,
     get_sdf_value_type_name,
     activate_prim_and_children,
+    is_prim_path_valid,
+    get_prim_at_path,
 )
 
 # Create module logger
@@ -106,8 +108,8 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._scene_assigned = True
 
         # Check if the prim path exists in the stage
-        if lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
-            existing_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+        if is_prim_path_valid(self.prim_path):
+            existing_prim = get_prim_at_path(self.prim_path)
 
             # Note: A prim path can be valid but the prim itself may be inactive.
             # This commonly occurs after transition rules when scene prims get deleted -
@@ -250,7 +252,7 @@ class BasePrim(Serializable, Recreatable, ABC):
         Returns:
             bool: True is the current prim path corresponds to a valid prim in stage. False otherwise.
         """
-        return lazy.isaacsim.core.utils.prims.is_prim_path_valid(self.prim_path)
+        return is_prim_path_valid(self.prim_path)
 
     def is_attribute_valid(self, attr):
         """
@@ -271,7 +273,8 @@ class BasePrim(Serializable, Recreatable, ABC):
         Returns:
             any: value of the requested @attribute
         """
-        return self._prim.GetAttribute(attr).Get()
+        attribute = self._prim.GetAttribute(attr)
+        return attribute.Get() if attribute.IsValid() else None
 
     def set_attribute(self, attr, val):
         """
@@ -282,7 +285,10 @@ class BasePrim(Serializable, Recreatable, ABC):
             val (any): Value to set for the attribute. This should be the valid type for that attribute.
         """
         with og.sim.editing_usd():
-            self._prim.GetAttribute(attr).Set(val)
+            attribute = self._prim.GetAttribute(attr)
+            if not attribute.IsValid():
+                attribute = self._prim.CreateAttribute(attr, get_sdf_value_type_name(val))
+            attribute.Set(val)
 
     def create_attribute(self, attr, val):
         """
