@@ -5,6 +5,7 @@ import numpy as np
 import torch as th
 from PIL import Image
 
+import omnigibson as og
 from omnigibson import object_states
 from omnigibson.object_states.factory import get_state_name
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
@@ -15,7 +16,10 @@ from omnigibson.utils.numpy_utils import pil_to_tensor
 
 
 def _formatted_aabb(obj):
-    return T.pose2mat((obj.aabb_center, th.tensor([0, 0, 0, 1], dtype=th.float32))), obj.aabb_extent
+    return (
+        T.pose2mat((obj.aabb_center, th.tensor([0, 0, 0, 1], dtype=th.float32, device=obj.aabb_center.device))),
+        obj.aabb_extent,
+    )
 
 
 class SceneGraphBuilder(object):
@@ -62,8 +66,8 @@ class SceneGraphBuilder(object):
         return self._G.copy()
 
     def _get_desired_frame(self):
-        desired_frame_to_world = th.eye(4)
-        world_to_desired_frame = th.eye(4)
+        desired_frame_to_world = th.eye(4, device=og.sim.device)
+        world_to_desired_frame = th.eye(4, device=og.sim.device)
         if self._egocentric:
             desired_frame_to_world = self._get_robot_to_world_transform(self._robots[0])
             world_to_desired_frame = T.pose_inv(desired_frame_to_world)
@@ -75,7 +79,12 @@ class SceneGraphBuilder(object):
 
         # Get rid of any rotation outside xy plane
         z_angle = T.z_angle_from_quat(robot_to_world[1])
-        robot_to_world = T.pose2mat((robot_to_world[0], T.euler2quat(th.tensor([0, 0, z_angle], dtype=th.float32))))
+        robot_to_world = T.pose2mat(
+            (
+                robot_to_world[0],
+                T.euler2quat(th.tensor([0, 0, z_angle], dtype=th.float32, device=robot_to_world[0].device)),
+            )
+        )
 
         return robot_to_world
 

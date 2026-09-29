@@ -601,20 +601,22 @@ class Inside(TensorizedRelativeState, KinematicsMixin, BooleanStateMixin):
             orientation = (
                 self.obj.sample_orientation()
                 if (hasattr(self.obj, "orientations") and self.obj.orientations is not None)
-                else th.tensor([0, 0, 0, 1.0])
+                else th.tensor([0, 0, 0, 1.0], device=aabb_low.device)
             )
 
             # Also add a random world Z-axis offset to the orientation
-            random_z_orientation = T.axisangle2quat(th.as_tensor([0, 0, th.rand(1) * 2 * th.pi]))
+            random_z_orientation = T.axisangle2quat(
+                th.as_tensor([0, 0, th.rand(1) * 2 * th.pi], device=aabb_low.device)
+            )
             orientation = T.quat_multiply(orientation, random_z_orientation)
 
             # First half: use inset bounds (smarter sampling)
             # Second half: use full bounds (fallback for large objects)
             # Also fallback if inset bounds are invalid (object too large for container)
             if attempt_idx < total_attempts // 2 and th.all(inset_aabb_low < inset_aabb_high):
-                pos = inset_aabb_low + th.rand(3) * (inset_aabb_high - inset_aabb_low)
+                pos = inset_aabb_low + th.rand(3, device=inset_aabb_low.device) * (inset_aabb_high - inset_aabb_low)
             else:
-                pos = aabb_low + th.rand(3) * (aabb_high - aabb_low)
+                pos = aabb_low + th.rand(3, device=aabb_low.device) * (aabb_high - aabb_low)
 
             # Rejection sampling #1: Verify the sampled point is actually inside the container volume
             if not container_link.check_points_in_volume(pos.unsqueeze(0)).item():

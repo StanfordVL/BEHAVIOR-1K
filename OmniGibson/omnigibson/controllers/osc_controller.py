@@ -628,7 +628,7 @@ def _compute_osc_torques_batch_torch(
     angle_diff = (rest_qpos - q + math.pi) % (2 * math.pi) - math.pi
     u_null = (kd_null * (-qd) + kp_null * angle_diff).unsqueeze(-1)
     u_null = mm @ u_null
-    eye = th.eye(control_dim, dtype=th.float32).unsqueeze(0)
+    eye = th.eye(control_dim, dtype=th.float32, device=mm.device).unsqueeze(0)
     nullspace_proj = eye - j_eef_T @ j_eef_inv
     u = u + nullspace_proj @ u_null
 
