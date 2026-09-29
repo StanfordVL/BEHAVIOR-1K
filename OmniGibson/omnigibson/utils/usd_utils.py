@@ -2170,7 +2170,7 @@ def _live_matrix_from_pose(raw_matrix, live_pose):
 
 
 def _get_world_pose_with_scale_from_fabric_hierarchy(prim_path):
-    if not og.sim.physics_backend.runs_inside_kit:
+    if gm.PHYSICS_BACKEND != "physx":
         # No Fabric exists for a non-Kit backend, and USD's own xform attributes are never synced from
         # live physics simulation either (no render-facing mirror to push updates into -- see
         # PhysicsBackend.sync_to_render_layer()'s own no-op for this backend) -- they only reflect
@@ -2248,7 +2248,7 @@ def _get_local_transform_with_scale(prim_path):
 
 
 def _get_local_pose_with_scale_from_fabric_hierarchy(prim_path):
-    if not og.sim.physics_backend.runs_inside_kit:
+    if gm.PHYSICS_BACKEND != "physx":
         # No Fabric exists for a non-Kit backend; compute the local transform directly from USD instead.
         prim = og.sim.stage.GetPrimAtPath(prim_path)
         return lazy.pxr.UsdGeom.Xformable(prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default())
@@ -2343,7 +2343,7 @@ class BatchControlViewAPIImpl:
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
 
     def _set_dof_position_targets(self, data, indices, cast=True):
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             # No Isaac tensor-view frontend/backend split exists for a non-Kit backend.
             self._view.set_dof_position_targets_fast(data, indices)
             return
@@ -2358,7 +2358,7 @@ class BatchControlViewAPIImpl:
             raise Exception("Failed to set DOF positions in backend")
 
     def _set_dof_velocity_targets(self, data, indices, cast=True):
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             self._view.set_dof_velocity_targets_fast(data, indices)
             return
         # No casting results in better efficiency
@@ -2372,7 +2372,7 @@ class BatchControlViewAPIImpl:
             raise Exception("Failed to set DOF velocities in backend")
 
     def _set_dof_actuation_forces(self, data, indices, cast=True):
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             self._view.set_dof_actuation_forces_fast(data, indices)
             return
         # No casting results in better efficiency
@@ -3654,7 +3654,7 @@ def create_tensor_from_list(data, dtype, device=None):
 def compute_path_world_aabb(prim_path):
     """
     Pure-pxr replacement for ``omni.usd.get_context().compute_path_world_bounding_box``, used when no
-    Kit application is running (see ``PhysicsBackend.runs_inside_kit``).
+    Kit application is running (``gm.PHYSICS_BACKEND != "physx"``).
 
     Returns:
         2-tuple: (aabb_min, aabb_max), each a 3-tuple of floats.
@@ -3813,7 +3813,7 @@ def delete_or_deactivate_prim(prim_path):
 def copy_mesh_prim_to_path(source_prim_path, dest_prim_path):
     """
     Pure-pxr replacement for ``omni.kit.commands.execute("CopyPrim", ...)``, used when no Kit
-    application is running (see ``PhysicsBackend.runs_inside_kit``). Scoped to a single, childless Mesh
+    application is running (``gm.PHYSICS_BACKEND != "physx"``). Scoped to a single, childless Mesh
     prim (the only case this is needed for -- cloth entity loading's mesh-promotion step in
     entity_prim.py) rather than a general-purpose recursive prim copy: copies the prim's type and every
     authored attribute value (geometry, transform ops, etc.), but not children or relationships.
@@ -3835,7 +3835,7 @@ def copy_mesh_prim_to_path(source_prim_path, dest_prim_path):
 def copy_prim_tree_to_path(source_prim_path, dest_prim_path):
     """
     Pure-pxr replacement for ``omni.kit.commands.execute("CopyPrim", ...)``, used when no Kit
-    application is running (see ``PhysicsBackend.runs_inside_kit``). Unlike ``copy_mesh_prim_to_path()``
+    application is running (``gm.PHYSICS_BACKEND != "physx"``). Unlike ``copy_mesh_prim_to_path()``
     (scoped to a single childless Mesh prim), this recursively copies an entire prim subtree -- every
     descendant's type, authored attribute values, and applied API schemas, plus relationship targets
     (rewritten to point at the corresponding copied descendant when the target itself falls inside the

@@ -8,6 +8,7 @@ from utils import SYSTEM_EXAMPLES, get_random_pose, place_obj_on_floor_plane, pl
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 from omnigibson.macros import macros as m
 from omnigibson.object_states import (
     AABB,
@@ -124,7 +125,7 @@ def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
 
 def test_on_top(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
-    if not og.sim.physics_backend.runs_inside_kit:
+    if gm.PHYSICS_BACKEND != "physx":
         # Warm-up step (Newton only): the very first og.sim.step() after object creation also runs
         # each object's deferred initialize() (obj.states get built there) and the tensorized-state
         # view rebuild that follows it. Under the Newton backend, if that first step lands exactly on
@@ -245,7 +246,7 @@ def test_rigid_contact_bodies(env, breakfast_table, bowl):
         og.sim.step()
     # Sleep has no Newton-backend equivalent (bodies there never sleep, is_asleep is always False) --
     # only check it for backends that actually implement sleep state.
-    if og.sim.physics_backend.runs_inside_kit:
+    if gm.PHYSICS_BACKEND == "physx":
         assert breakfast_table.is_asleep, "Table should be asleep"
         assert bowl.root_link.is_asleep, "Bowl should be asleep"
     assert RigidContactAPI.is_in_contact(

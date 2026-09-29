@@ -1162,7 +1162,6 @@ class _NewtonPhysicsSimView:
 
 
 class NewtonBackend(PhysicsBackend):
-    runs_inside_kit = False
     # overlap_sphere/overlap_box/overlap_sphere_any and raycast_closest/raycast_all are implemented
     # (approximate AABB-based overlap against tracked rigid-body shapes; real BVH raycasting via
     # newton.intersect_ray). overlap_mesh/overlap_shape remain NotImplementedError -- only reachable from
@@ -1314,7 +1313,7 @@ class NewtonBackend(PhysicsBackend):
         # hybrid), attach to Kit's own USD context stage instead of a private in-memory one, so Kit
         # actually has something to render. render_backend is constructed before create_physics_context
         # is called (see Simulator.__init__) specifically so this check is possible here.
-        use_kit_stage = self.sim.render_backend.runs_inside_kit
+        use_kit_stage = gm.RENDER_BACKEND == "kit"
         self._sim_context = StandaloneSimulationContext(
             backend=self, physics_dt=physics_dt, rendering_dt=rendering_dt, device=device, use_kit_stage=use_kit_stage
         )
@@ -1686,7 +1685,7 @@ class NewtonBackend(PhysicsBackend):
         get_live_world_pose() fallback, see that method below) already correctly reflect the live
         simulated pose. No-op standalone (no Kit renderer to push toward at all).
         """
-        if not self.sim.render_backend.runs_inside_kit:
+        if gm.RENDER_BACKEND != "kit":
             return
         if self._rebuilding or self._state_0 is None or self._state_0.body_q is None:
             return
@@ -2037,7 +2036,7 @@ class NewtonBackend(PhysicsBackend):
                 ignore_paths=ignore_paths_by_obj.get(obj),
             )
 
-            if not self.sim.render_backend.runs_inside_kit:
+            if gm.RENDER_BACKEND != "kit":
                 # Under Kit rendering, Kit reads the original USD's visual mesh subtree directly, so
                 # baking it into the physics model too would be pure waste. Newton's own standalone
                 # viewers (omnigibson/utils/newton_viewer_recording.py) have no such separate path --
