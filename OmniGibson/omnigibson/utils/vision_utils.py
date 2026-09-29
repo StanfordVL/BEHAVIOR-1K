@@ -21,6 +21,13 @@ def add_semantic_label(prim, label, instance_name="class"):
         lazy.isaacsim.core.utils.semantics.upgrade_prim_semantics_to_labels(prim=prim)
         lazy.isaacsim.core.utils.semantics.add_labels(prim=prim, labels=[label], instance_name=instance_name)
 
+    # Labels authored after a render product's annotators are attached do not get picked up by the
+    # existing render products' instance mappings (Isaac Sim 6.0 regression), so flag the semantics
+    # as stale.
+    from omnigibson.sensors.vision_sensor import VisionSensor
+
+    VisionSensor.mark_semantics_stale()
+
 
 class RandomScale:
     """Rescale the input PIL.Image to the given size.

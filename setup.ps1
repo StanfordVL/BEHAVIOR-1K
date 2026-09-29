@@ -257,8 +257,8 @@ if ($NewEnv) {
         exit 1
     }
 
-    # Create environment with only Python 3.11
-    conda create -n $NewEnvName python=3.11 -c conda-forge -y
+    # Create environment with only Python 3.12
+    conda create -n $NewEnvName python=3.12 -c conda-forge -y
 
     # Activate environment
     Invoke-CondaActivate $NewEnvName
@@ -318,8 +318,8 @@ if ($OmniGibson) {
     # Check Python version
     $pythonVersion = (& python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')") -join "`n"
     $pythonVersion = $pythonVersion.Trim()
-    if ($pythonVersion -ne "3.11") {
-        Write-Error "ERROR: Python 3.11 required, found $pythonVersion"
+    if ($pythonVersion -ne "3.12") {
+        Write-Error "ERROR: Python 3.12 required, found $pythonVersion"
         exit 1
     }
     
@@ -381,15 +381,15 @@ if ($extrasList.Count -gt 0) {
     if (-not $isaacInstalled) {
         # Isaac Sim packages to install
         $packages = @(
-            "omniverse_kit-107.3.1.206797", "isaacsim_kernel-5.1.0.0", "isaacsim_app-5.1.0.0",
-            "isaacsim_core-5.1.0.0", "isaacsim_gui-5.1.0.0", "isaacsim_utils-5.1.0.0",
-            "isaacsim_storage-5.1.0.0", "isaacsim_asset-5.1.0.0", "isaacsim_sensor-5.1.0.0",
-            "isaacsim_robot_motion-5.1.0.0", "isaacsim_robot-5.1.0.0", "isaacsim_benchmark-5.1.0.0",
-            "isaacsim_code_editor-5.1.0.0", "isaacsim_ros1-5.1.0.0", "isaacsim_cortex-5.1.0.0",
-            "isaacsim_example-5.1.0.0", "isaacsim_replicator-5.1.0.0", "isaacsim_rl-5.1.0.0",
-            "isaacsim_robot_setup-5.1.0.0", "isaacsim_ros2-5.1.0.0", "isaacsim_template-5.1.0.0",
-            "isaacsim_test-5.1.0.0", "isaacsim-5.1.0.0", "isaacsim_extscache_physics-5.1.0.0",
-            "isaacsim_extscache_kit-5.1.0.0", "isaacsim_extscache_kit_sdk-5.1.0.0"
+            "omniverse_kit-110.1.1.305458", "isaacsim_kernel-6.0.1.0", "isaacsim_app-6.0.1.0",
+            "isaacsim_core-6.0.1.0", "isaacsim_gui-6.0.1.0", "isaacsim_utils-6.0.1.0",
+            "isaacsim_storage-6.0.1.0", "isaacsim_asset-6.0.1.0", "isaacsim_sensor-6.0.1.0",
+            "isaacsim_robot_motion-6.0.1.0", "isaacsim_robot-6.0.1.0", "isaacsim_benchmark-6.0.1.0",
+            "isaacsim_code_editor-6.0.1.0", "isaacsim_ros1-6.0.1.0", "isaacsim_cortex-6.0.1.0",
+            "isaacsim_example-6.0.1.0", "isaacsim_replicator-6.0.1.0", "isaacsim_rl-6.0.1.0",
+            "isaacsim_robot_setup-6.0.1.0", "isaacsim_ros2-6.0.1.0", "isaacsim_template-6.0.1.0",
+            "isaacsim_test-6.0.1.0", "isaacsim-6.0.1.0", "isaacsim_extscache_physics-6.0.1.0",
+            "isaacsim_extscache_kit-6.0.1.0", "isaacsim_extscache_kit_sdk-6.0.1.0"
         )
                 
         $tempDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
@@ -399,7 +399,7 @@ if ($extrasList.Count -gt 0) {
             foreach ($pkg in $packages) {
                 $pkgParts = $pkg -split "-"
                 $pkgName = ($pkgParts[0..($pkgParts.Length-2)] -join "-").Replace("_", "-")
-                $filename = "$pkg-cp311-none-win_amd64.whl"
+                $filename = "$pkg-cp312-none-win_amd64.whl"
                 $url = "https://pypi.nvidia.com/$pkgName/$filename"
                 $filepath = Join-Path $tempDir $filename
                 

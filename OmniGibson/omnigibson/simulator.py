@@ -73,7 +73,8 @@ m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 m.KIT_FILES = {
-    (5, 1, 0): "omnigibson_5_1_0.kit",
+    (6, 0, 0): "omnigibson_6_0_0.kit",
+    (6, 0, 1): "omnigibson_6_0_0.kit",
 }
 
 
@@ -91,25 +92,6 @@ def with_profiler(name):
         return wrapper
 
     return decorator
-
-
-# Create module logger
-log = create_module_logger(module_name=__name__)
-
-# Create settings for this module
-m = create_module_macros(module_path=__file__)
-
-m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
-m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
-
-m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
-
-m.SCENE_MARGIN = 10.0
-m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
-
-m.KIT_FILES = {
-    (5, 1, 0): "omnigibson_5_1_0.kit",
-}
 
 
 # Helper functions for starting omnigibson
@@ -494,21 +476,21 @@ def _launch_simulator(*args, **kwargs):
             # Store other references to variables that will be initialized later
             self._scenes = []
             # The callback will be called right *before* the physics step
-            self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+            self._pre_physics_step_callback = lazy.omni.physx.get_physx_interface().subscribe_physics_on_step_events(
                 lambda _: self._on_pre_physics_step(),
                 pre_step=True,
                 order=0,
             )
             # The callback will be called right *after* the physics step
-            self._post_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+            self._post_physics_step_callback = lazy.omni.physx.get_physx_interface().subscribe_physics_on_step_events(
                 lambda _: self._on_post_physics_step(),
                 pre_step=False,
                 order=0,
             )
             self._simulation_event_callback = (
-                self._physics_context._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
-                    self._on_simulation_event
-                )
+                lazy.omni.physx.get_physx_interface()
+                .get_simulation_event_stream_v2()
+                .create_subscription_to_pop(self._on_simulation_event)
             )
 
             # List of objects that need to be initialized during whenever the next sim step occurs
@@ -1164,11 +1146,11 @@ def _launch_simulator(*args, **kwargs):
 
         @property
         def pi(self):
-            return self._physics_context._physx_interface
+            return lazy.omni.physx.get_physx_interface()
 
         @property
         def psi(self):
-            return self._physics_context._physx_sim_interface
+            return lazy.omni.physx.get_physx_simulation_interface()
 
         @property
         def psqi(self):
