@@ -377,7 +377,7 @@ class PhysicsBackend(ABC):
         (e.g. sim not yet played) or not applicable. Only meaningful for a backend whose USD prim
         attributes don't automatically reflect live physics state (see sync_to_render_layer() above);
         the sole consumer is usd_utils.py's raw-USD pose-reading fallback
-        (_get_world_pose_with_scale_from_fabric_hierarchy), used when runs_inside_kit is False. A
+        (_get_world_pose_with_scale_from_fabric_hierarchy), used when gm.PHYSICS_BACKEND != "physx". A
         backend with a working Fabric/USD sync (e.g. PhysX) never needs this, so the default is a
         no-op returning None, meaning "fall back to reading USD directly" (PhysX's existing, correct
         behavior).

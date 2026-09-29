@@ -6,7 +6,7 @@ rewrite), adapted to bake visual-only shapes into the SAME already-open simulati
 USD file for this pass; we don't have per-object files, so this walks ``stage`` directly under
 ``root_path`` instead).
 
-Only used when ``not og.sim.render_backend.runs_inside_kit`` (Newton's own standalone viewers,
+Only used when ``gm.RENDER_BACKEND != "kit"`` (Newton's own standalone viewers,
 ``ViewerGL``/``ViewerRTX`` -- see ``omnigibson/utils/newton_viewer_recording.py``): under Kit
 rendering, OmniGibson's Newton physics model carries collision geometry only, and Kit renders the
 original USD's separate visual mesh subtree directly, so baking visual shapes into the model there

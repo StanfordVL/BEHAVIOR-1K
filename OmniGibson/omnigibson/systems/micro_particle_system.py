@@ -462,7 +462,7 @@ class MicroParticleSystem(BaseSystem):
         # a Newton equivalent, and Newton's own particle/cloth authoring happens per-object at
         # model-build time instead (see NewtonBackend._rebuild()), not via a shared system prim. Leave
         # system_prim/_material unset (None) for this backend.
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             return
 
         # Run sanity checks
@@ -710,7 +710,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # (self.particle_instancers stays empty for this backend), so query the backend directly.
         # object_states (Filled/Covered/Contains/particle_modifier) and transition_rules all read this
         # to decide whether a system has any particles, so it must reflect the live backend state.
-        if self.initialized and not og.sim.physics_backend.runs_inside_kit:
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
             og.sim.physics_backend.create_particle_system(self.name)
             return len(og.sim.physics_backend.get_particle_positions(self.name))
         return sum([instancer.n_particles for instancer in self.particle_instancers.values()])
@@ -769,7 +769,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         )
 
     def _clear(self):
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             # Backend-side particles live directly in the model, not in a PhysxParticleInstancer, so
             # there's nothing in self.particle_instancers to clean up -- clear the backend's copy instead.
             og.sim.physics_backend.create_particle_system(self.name)
@@ -872,7 +872,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # backend's own model, with only a single global instancer's worth of concept needed (multiple
         # instancers per system are already unsupported today, see generate_particle_instancer's own
         # n_instancers == 0 assertion), so instancer_idn is ignored for this backend.
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             og.sim.physics_backend.remove_particles(self.name, idxs)
             return
 
@@ -931,7 +931,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # instancers per system are already unsupported today, see generate_particle_instancer's own
         # n_instancers == 0 assertion), so instancer_idn/particle_group/orientations/scales/
         # prototype_indices are ignored for this backend (no physical meaning for pointlike particles).
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             og.sim.physics_backend.create_particle_system(self.name)
             og.sim.physics_backend.generate_particles(self.name, positions, velocities=velocities)
             return None
@@ -1201,7 +1201,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Orientations have no physical meaning for MPM's pointlike particles (see generate_particles());
         # report canonical orientation for every particle so shape-matched callers (e.g. ContactParticles'
         # AABB pre-filter, ParticleRemover's visual/cloth-path particle selection) don't break.
-        if self.initialized and not og.sim.physics_backend.runs_inside_kit:
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
             og.sim.physics_backend.create_particle_system(self.name)
             positions = og.sim.physics_backend.get_particle_positions(self.name)
             orientations = th.zeros((len(positions), 4))
@@ -1220,7 +1220,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return self.get_particle_position_orientation(idx=idx)
 
     def set_particles_position_orientation(self, positions=None, orientations=None):
-        if self.initialized and not og.sim.physics_backend.runs_inside_kit:
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
             # orientations are ignored -- no physical meaning for Newton's pointlike particles.
             if positions is not None:
                 og.sim.physics_backend.set_particle_positions(self.name, positions)
@@ -1234,7 +1234,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     def set_particle_position_orientation(self, idx, position=None, orientation=None):
-        if self.initialized and not og.sim.physics_backend.runs_inside_kit:
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
             # orientation is ignored -- no physical meaning for Newton's pointlike particles, matching
             # set_particles_position_orientation()'s bulk convention.
             if position is not None:
@@ -1383,7 +1383,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         )
 
     def remove_all_particles(self):
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             # Backend-side particles live directly in the model, not in a PhysxParticleInstancer (which
             # stays empty under Newton) -- clear the backend's copy instead, matching _clear()'s gating.
             og.sim.physics_backend.create_particle_system(self.name)
@@ -1454,7 +1454,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         # No PhysX particle-system material/isosurface infrastructure exists standalone -- material,
         # color, and rendering are Kit/RTX concerns with no Newton equivalent (see
         # MicroParticleSystem.initialize(), which already leaves self._material unset for this backend).
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             return
 
         # Assert that the material is an OmniSurface material.
@@ -1607,7 +1607,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         # Copy it to the standardized prim path
         prototype_path = f"{self.prim_path}/prototype0"
         with og.sim.editing_usd():
-            if og.sim.physics_backend.runs_inside_kit:
+            if gm.PHYSICS_BACKEND == "physx":
                 lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
             else:
                 copy_mesh_prim_to_path(visual_geom.prim_path, prototype_path)
@@ -1681,7 +1681,7 @@ class Cloth(MicroParticleSystem):
         # per-object, structurally, in NewtonBackend._rebuild() (it detects PrimType.CLOTH objects and
         # calls builder.add_cloth_mesh() directly against the mesh's raw USD geometry), not via this
         # PhysX-particle-system-authoring call at object-load time.
-        if not og.sim.physics_backend.runs_inside_kit:
+        if gm.PHYSICS_BACKEND != "physx":
             return
 
         with og.sim.editing_usd():
