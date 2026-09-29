@@ -24,6 +24,15 @@ class PhysicsBackend(ABC):
     Abstract base class for a physics engine backend.
     """
 
+    # Whether this backend supports PhysX-specific particle / cloth / lidar features, engine-level
+    # contact reporting, and scene queries (raycasts/overlaps). These have no engine-agnostic
+    # equivalent today, so callers should guard on these flags rather than assume support.
+    supports_particles = False
+    supports_cloth = False
+    supports_lidar = False
+    supports_contact_reporting = False
+    supports_scene_queries = False
+
     def __init__(self, sim=None):
         self.sim = sim
 
@@ -94,7 +103,7 @@ class PhysicsBackend(ABC):
         One-time, process-level setup performed once before any Simulator/Kit app exists (called from
         `Simulator._launch_app()` on a transient, sim-less backend instance). Default no-op; a backend
         that needs to set process-global state before its own package is imported (e.g. an env var that
-        must be set before `pxr` is first imported) overrides this.
+        must be set before `pxr`/`newton` is first imported) overrides this.
         """
 
     def before_play(self, sim):
@@ -361,6 +370,20 @@ class PhysicsBackend(ABC):
         """
         return False
 
+    def get_live_world_pose(self, prim_path):
+        """
+        Live (position (3,), orientation (4,) xyzw) world-frame pose for a tracked rigid body's own
+        prim path, read directly from this backend's own simulation state -- or None if untracked
+        (e.g. sim not yet played) or not applicable. Only meaningful for a backend whose USD prim
+        attributes don't automatically reflect live physics state (see sync_to_render_layer() above);
+        the sole consumer is usd_utils.py's raw-USD pose-reading fallback
+        (_get_world_pose_with_scale_from_fabric_hierarchy), used when gm.PHYSICS_BACKEND != "physx". A
+        backend with a working Fabric/USD sync (e.g. PhysX) never needs this, so the default is a
+        no-op returning None, meaning "fall back to reading USD directly" (PhysX's existing, correct
+        behavior).
+        """
+        return None
+
     # ---- Per-prim articulation view I/O (backs EntityPrim / JointPrim) ----
 
     @abstractmethod
@@ -486,6 +509,42 @@ class PhysicsBackend(ABC):
     @abstractmethod
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         """Set any subset of this cloth's bend/damping/shear/stretch stiffness values (None = unchanged)."""
+
+    # ---- Fluid/granular particle-system state I/O (backs MicroPhysicalParticleSystem; only meaningful
+    # when supports_particles). Unlike cloth (one mesh, particle count fixed at load), a particle
+    # *system* is a named, dynamically-resizable set of particles -- generate/remove change how many
+    # particles exist at runtime. Matches the existing "only one instancer per system" constraint
+    # (MicroPhysicalParticleSystem.generate_particle_instancer's own assertion), so there is no
+    # per-instancer identity to track here, just a system name. All positions/velocities are
+    # world-frame.
+
+    @abstractmethod
+    def create_particle_system(self, system_name):
+        """Register a new, initially-empty named particle system."""
+
+    @abstractmethod
+    def generate_particles(self, system_name, positions, velocities=None):
+        """Add new particles (world-frame positions, optional velocities, else zero) to a system."""
+
+    @abstractmethod
+    def remove_particles(self, system_name, idxs):
+        """Remove particles at the given indices from a system."""
+
+    @abstractmethod
+    def get_particle_positions(self, system_name):
+        """Return an (N, 3) world-frame particle position tensor for a system."""
+
+    @abstractmethod
+    def set_particle_positions(self, system_name, positions, idxs=None):
+        """Set world-frame particle positions (shape must match get_particle_positions)."""
+
+    @abstractmethod
+    def get_particle_velocities(self, system_name):
+        """Return an (N, 3) world-frame particle velocity tensor for a system."""
+
+    @abstractmethod
+    def set_particle_velocities(self, system_name, velocities, idxs=None):
+        """Set world-frame particle velocities (shape must match get_particle_velocities)."""
 
     # ---- Joint-break events ----
 

@@ -374,7 +374,6 @@ class KitRenderBackend(RenderBackend):
     ``PhysXBackend`` does on the physics side.
     """
 
-    runs_inside_kit = True
     supports_camera_capture = True
     supports_viewport = True
     supports_materials = True
