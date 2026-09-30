@@ -80,9 +80,9 @@ def resolve_instance_ids(task_name: str, instance_indices: list[int], mode: str 
         else TEST_INSTANCE_IDS[NUM_PUBLIC_TEST_INSTANCES:]
     )
     num_split_instances = NUM_PUBLIC_TEST_INSTANCES if mode == "public_test" else NUM_HIDDEN_TEST_INSTANCES
-    assert set(instance_indices).issubset(
-        set(range(num_split_instances))
-    ), f"Instance indices must be in range({num_split_instances}) for mode {mode}"
+    assert set(instance_indices).issubset(set(range(num_split_instances))), (
+        f"Instance indices must be in range({num_split_instances}) for mode {mode}"
+    )
     return [int(test_instances[i]) for i in instance_indices]
 
 
@@ -205,9 +205,9 @@ class BatchedEvaluator:
         # Number of logical environments evaluated concurrently. Defaults to 1.
         self.num_envs = int(cfg.get("num_envs", 1))
         self.env = self.load_env(env_wrapper=self.cfg.env_wrapper)
-        assert (
-            self.env.num_envs == self.num_envs
-        ), f"Env created with num_envs={self.env.num_envs} but BatchedEvaluator expected {self.num_envs}."
+        assert self.env.num_envs == self.num_envs, (
+            f"Env created with num_envs={self.env.num_envs} but BatchedEvaluator expected {self.num_envs}."
+        )
 
         self.instance_eval_states = self._create_instance_eval_states()
         # All environments share the same robot config, so resolve eval camera names once and
@@ -308,8 +308,7 @@ class BatchedEvaluator:
                 missing_camera_sensors.append(f"{camera_id}: {sensor_name}")
         if missing_camera_sensors:
             raise ValueError(
-                "Configured eval.camera_sensor_names entries were not found in robot.sensors: "
-                f"{missing_camera_sensors}"
+                f"Configured eval.camera_sensor_names entries were not found in robot.sensors: {missing_camera_sensors}"
             )
 
         if self.cfg.get("write_video", False):

@@ -115,9 +115,9 @@ class ParticleSource(ParticleApplier):
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        assert self.obj.scene.is_physical_particle_system(
-            system_name=system.name
-        ), "ParticleSource only supports PhysicalParticleSystem"
+        assert self.obj.scene.is_physical_particle_system(system_name=system.name), (
+            "ParticleSource only supports PhysicalParticleSystem"
+        )
         return m.MAX_SOURCE_PARTICLES_PER_STEP
 
     @classmethod
@@ -224,9 +224,9 @@ class ParticleSink(ParticleRemover):
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        assert self.obj.scene.is_physical_particle_system(
-            system_name=system.name
-        ), "ParticleSink only supports PhysicalParticleSystem"
+        assert self.obj.scene.is_physical_particle_system(system_name=system.name), (
+            "ParticleSink only supports PhysicalParticleSystem"
+        )
         return m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
 
     @property

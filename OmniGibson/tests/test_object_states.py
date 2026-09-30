@@ -456,9 +456,9 @@ def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
     og.sim.step()
 
     bowl_to_bc_h = bowl.states[Adjacency].get_value(bottom_cabinet)
-    assert bool(
-        bowl_to_bc_h[2:].any()
-    ), "bowl placed beside bottom_cabinet should fire at least one horizontal axis from bowl's side"
+    assert bool(bowl_to_bc_h[2:].any()), (
+        "bowl placed beside bottom_cabinet should fire at least one horizontal axis from bowl's side"
+    )
 
     # _set_value must raise on Adjacency
     with pytest.raises(NotImplementedError):
@@ -927,12 +927,12 @@ def test_toggled_on_requires_closed(env, microwave):
     # _robots_can_toggle_time is a wp.array — wp.to_torch gives a zero-copy view we can poke.
     wp.to_torch(ToggledOn._robots_can_toggle_time)[s, obj_idx] = 100.0
     og.sim.step()
-    assert not microwave.states[
-        ToggledOn
-    ].get_value(), "requires_closed kernel should knock VALUES back to 0 while Open is True"
-    assert (
-        wp.to_torch(ToggledOn._robots_can_toggle_time)[s, obj_idx].item() == 0.0
-    ), "requires_closed kernel should reset the seconds counter to 0"
+    assert not microwave.states[ToggledOn].get_value(), (
+        "requires_closed kernel should knock VALUES back to 0 while Open is True"
+    )
+    assert wp.to_torch(ToggledOn._robots_can_toggle_time)[s, obj_idx].item() == 0.0, (
+        "requires_closed kernel should reset the seconds counter to 0"
+    )
 
     # Close the door — set_value should now succeed.
     microwave.states[Open].set_value(False)
@@ -983,18 +983,18 @@ def test_zero_dt_refresh_does_not_advance_time_dependent_states(env, microwave, 
         og.sim._refresh_state_caches()
 
     assert th.equal(Temperature.VALUES[s_mw, temp_idx], snap_temp), (
-        f"Temperature drifted on Δt=0 refresh: " f"{snap_temp.item()} -> {Temperature.VALUES[s_mw, temp_idx].item()}"
+        f"Temperature drifted on Δt=0 refresh: {snap_temp.item()} -> {Temperature.VALUES[s_mw, temp_idx].item()}"
     )
     slicer_after = wp.to_torch(SlicerActive.DELAY_COUNTER)[s_knife, slicer_idx]
-    assert th.equal(
-        slicer_after, snap_slicer
-    ), f"SlicerActive counter drifted on Δt=0 refresh: {snap_slicer.item()} -> {slicer_after.item()}"
+    assert th.equal(slicer_after, snap_slicer), (
+        f"SlicerActive counter drifted on Δt=0 refresh: {snap_slicer.item()} -> {slicer_after.item()}"
+    )
 
     # A real og.sim.step() advances time by sim_step_dt — Temperature should decay.
     og.sim.step()
-    assert (
-        Temperature.VALUES[s_mw, temp_idx].item() < 100.0
-    ), "Temperature should decay toward DEFAULT_TEMPERATURE after a real step"
+    assert Temperature.VALUES[s_mw, temp_idx].item() < 100.0, (
+        "Temperature should decay toward DEFAULT_TEMPERATURE after a real step"
+    )
 
 
 def test_particle_source(env, furniture_sink):

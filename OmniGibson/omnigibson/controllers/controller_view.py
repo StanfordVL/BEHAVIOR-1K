@@ -265,9 +265,9 @@ class ControllerView:
     @classmethod
     def get_motor_type(cls, group_key: str) -> str:
         controller = cls._controller_groups[group_key]
-        assert hasattr(
-            controller, "motor_type"
-        ), f"Controller {type(controller).__name__} does not have a 'motor_type' attribute"
+        assert hasattr(controller, "motor_type"), (
+            f"Controller {type(controller).__name__} does not have a 'motor_type' attribute"
+        )
         return controller.motor_type
 
     @classmethod
