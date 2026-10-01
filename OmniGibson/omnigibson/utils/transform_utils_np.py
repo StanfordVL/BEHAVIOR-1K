@@ -1200,8 +1200,10 @@ def vecs2axisangle(vec0, vec1):
     vec0 = normalize(vec0, axis=-1)
     vec1 = normalize(vec1, axis=-1)
 
-    # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
-    return np.cross(vec0, vec1) * np.arccos((vec0 * vec1).sum(-1, keepdims=True))
+    # Get the normalized axis of rotation, and multiply by arccos of the dot product which is the angle
+    axis = normalize(np.cross(vec0, vec1), axis=-1)
+    angle = np.arccos((vec0 * vec1).sum(-1, keepdims=True))
+    return axis * angle
 
 
 def vecs2quat(vec0, vec1, normalized=False):
