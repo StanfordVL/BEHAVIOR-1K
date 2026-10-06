@@ -82,6 +82,9 @@ class AttachedTo(
     JointBreakSubscribedStateMixin,
     LinkBasedStateMixin,
 ):
+    # Pending (self, other) pairs queued during _load_state and flushed by flush_pending_reattach()
+    # after all objects' kinematic states have been restored, so that _attach() sees correct positions.
+    _pending_reattach: list = []
     """
     Handles attachment between two rigid objects, by creating a fixed/spherical joint between self.obj (child) and
     other (parent). At any given moment, an object can only be attached to at most one other object, i.e.
@@ -545,25 +548,47 @@ class AttachedTo(
             assert attached_obj is not None, "attached_obj_uuid does not match any object in the scene."
 
         if self.parent != attached_obj:
-            # If it's currently attached to something else, detach.
+            # If it's currently attached to something else, detach immediately.
             if self.parent is not None:
                 self.set_value(self.parent, False)
-                # assert self.parent is None, "parent reference is not cleared after detachment"
                 if self.parent is not None:
                     log.warning("parent reference is not cleared after detachment")
 
-            # If the loaded state requires attachment, attach.
+            # Defer joint creation: all objects' kinematic states must be fully loaded before _attach
+            # can find the correct link (by proximity) and create the joint without any position
+            # adjustment.  flush_pending_reattach() is called by og.sim.load_state() after the
+            # registry iteration is complete.
             if attached_obj is not None:
-                self.set_value(
-                    attached_obj,
-                    True,
-                    bypass_alignment_checking=True,
-                    check_physics_stability=False,
-                    can_joint_break=True,
+                AttachedTo._pending_reattach.append((self, attached_obj))
+
+    @classmethod
+    def flush_pending_reattach(cls):
+        """
+        Process all deferred attachment requests queued during load_state.
+
+        Must be called after all objects' kinematic states have been restored so that
+        _find_attachment_links() can locate the correct link by proximity and _attach()
+        can create the joint without moving either object.
+        """
+        pending = list(cls._pending_reattach)
+        cls._pending_reattach.clear()
+        for state_instance, attached_obj in pending:
+            # Skip if already attached (e.g. another pending entry already handled it)
+            if state_instance.parent == attached_obj:
+                continue
+            # Use position-based matching now that both objects are at their correct positions.
+            child_link, parent_link = state_instance._find_attachment_links(
+                attached_obj, bypass_alignment_checking=False
+            )
+            if child_link is not None:
+                state_instance._attach(attached_obj, child_link, parent_link, can_joint_break=True)
+                if state_instance.parent != attached_obj:
+                    log.warning(f"parent reference not updated after deferred attachment for {state_instance.obj.name}")
+            else:
+                log.warning(
+                    f"Could not find attachment links for {state_instance.obj.name} -> {attached_obj.name} "
+                    f"during flush_pending_reattach; the joint will be missing until the next load_state."
                 )
-                # assert self.parent == attached_obj, "parent reference is not updated after attachment"
-                if self.parent != attached_obj:
-                    log.warning("parent reference is not updated after attachment")
 
     def serialize(self, state):
         return th.tensor([state["attached_obj_uuid"]], dtype=th.float32)
