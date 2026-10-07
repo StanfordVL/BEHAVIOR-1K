@@ -737,11 +737,6 @@ class ClothPrim(GeomPrim):
             list of (contact_prim_path, position) pairs
         """
         contacts = []
-
-        if not og.sim.physics_backend.supports_scene_queries:
-            # No scene-query interface on this backend; report no contacts rather than crashing.
-            return contacts
-
         positions = self.keypoint_particle_positions if keypoints_only else self.compute_particle_positions()
         for pos in positions:
 

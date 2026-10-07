@@ -890,9 +890,6 @@ class PhysicalParticleSystem(BaseSystem):
             n-array: (n_particles,) boolean array, True if in contact, otherwise False
         """
         in_contact = th.zeros(len(positions), dtype=bool, device=positions.device)
-        if not og.sim.physics_backend.supports_scene_queries:
-            # No scene-query interface on this backend; report no contact rather than crashing.
-            return in_contact
         for idx, pos in enumerate(positions):
             # TODO: Maybe multiply particle contact radius * 2?
             in_contact[idx] = og.sim.physics_backend.overlap_sphere_any(self.particle_contact_radius, pos.tolist())
