@@ -125,19 +125,6 @@ def test_attached_to(env, bookcase_back, bookcase_shelf, bookcase_baseboard):
 
 def test_on_top(env, breakfast_table, bowl, dishtowel):
     place_obj_on_floor_plane(breakfast_table)
-    if gm.PHYSICS_BACKEND != "physx":
-        # Warm-up step (Newton only): the very first og.sim.step() after object creation also runs
-        # each object's deferred initialize() (obj.states get built there) and the tensorized-state
-        # view rebuild that follows it. Under the Newton backend, if that first step lands exactly on
-        # an object's first real placement, Adjacency's ray-cast view ends up with a stale reading for
-        # a couple steps (confirmed empirically: bowl is fine, but dishtowel spuriously reads adjacency
-        # "above" the table for several steps). Placing everything once and stepping once first avoids
-        # this. Not needed (and empirically harmful to the settling below) under PhysX.
-        for obj in (bowl, dishtowel):
-            place_objA_on_objB_bbox(obj, breakfast_table)
-        og.sim.step()
-
-    place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
         place_objA_on_objB_bbox(obj, breakfast_table)
         for _ in range(7):

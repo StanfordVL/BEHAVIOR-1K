@@ -62,6 +62,8 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
 
         # Iterate over all particles and aggregate contacts
         positions = system.get_particles_position_orientation()[0]
+        # The AABB state is a CPU mirror, while particle poses live on og.sim.device
+        lower, upper = lower.to(positions.device), upper.to(positions.device)
         # Only check positions that are within the relaxed AABB of this object
         inbound_idxs = ((lower < positions) & (positions < upper)).all(dim=-1).nonzero()
         dist = system.particle_contact_radius + m.CONTACT_TOLERANCE

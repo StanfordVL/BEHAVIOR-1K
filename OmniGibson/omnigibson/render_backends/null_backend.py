@@ -10,9 +10,10 @@ rendering, since ``Simulator._launch_app()`` launches Kit if *either* backend ne
 """
 
 from omnigibson.render_backends.base import RenderBackend
+from omnigibson.render_backends.usd_stage_services import UsdStageServicesMixin
 
 
-class NullRenderBackend(RenderBackend):
+class NullRenderBackend(UsdStageServicesMixin, RenderBackend):
     """
     Render backend that renders nothing. All capability flags stay at their False defaults.
     """
