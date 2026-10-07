@@ -169,7 +169,7 @@ class VisionSensor(BaseSensor):
 
         # Create variables that will be filled in later at runtime
         self._viewport = None  # Viewport from which to grab data
-        self._annotators = None
+        self._annotators = {}  # Populated by _initialize(); empty until then so remove() is safe on a never-initialized sensor
         self._render_product = None
         self._image_height = image_height  # used when viewport is not created
         self._image_width = image_width  # used when viewport is not created
@@ -217,9 +217,6 @@ class VisionSensor(BaseSensor):
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
         self._image_width, self._image_height = resolution
-
-        with og.sim.editing_usd():
-            self._render_product = og.sim.render_backend.create_camera_resource(self.prim_path, resolution)
 
         # A backend without camera-capture support (e.g. NullRenderBackend) can't produce an image at
         # all, so there's nothing meaningful to construct standalone. Camera attributes (focal length

@@ -26,6 +26,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.render_backends.base import RenderBackend
+from omnigibson.render_backends.usd_stage_services import UsdStageServicesMixin
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import get_world_pose
 
@@ -135,7 +136,7 @@ class _NewtonAnnotator:
         self.camera_resource = None
 
 
-class NewtonRenderBackend(RenderBackend):
+class NewtonRenderBackend(UsdStageServicesMixin, RenderBackend):
     """
     Renders through Newton's own standalone ``ViewerGL`` -- no Kit application, no Replicator. Only
     supports the ``rgb`` modality (see module docstring).

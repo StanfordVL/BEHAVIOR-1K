@@ -172,10 +172,10 @@ class EntityPrim(XFormPrim):
         assert th.all(self.original_scale == 1.0), "scale should be [1, 1, 1] at the EntityPrim (object) level"
 
         # Cache material information. Materials are a rendering-only concern, not loaded at all for a
-        # non-Kit backend (no renderer to bind them for -- see XFormPrim._post_load()).
+        # render backend that doesn't author them (see XFormPrim._post_load()).
         materials = set()
         material_paths = set()
-        if gm.PHYSICS_BACKEND == "physx":
+        if og.sim.render_backend.supports_materials:
             for link in self._links.values():
                 xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
                 for xform in xforms:
@@ -893,7 +893,7 @@ class EntityPrim(XFormPrim):
         Returns:
             th.Tensor: (n_dof,) boolean tensor. True for rotational DOFs, False for translational.
         """
-        return th.as_tensor(self._articulation_view.get_dof_is_rotational())
+        return th.as_tensor(self._articulation_view.get_dof_is_rotational(), device=og.sim.device)
 
     def get_joint_velocities(self, normalized=False):
         """

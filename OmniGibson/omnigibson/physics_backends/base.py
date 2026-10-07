@@ -376,8 +376,7 @@ class PhysicsBackend(ABC):
         prim path, read directly from this backend's own simulation state -- or None if untracked
         (e.g. sim not yet played) or not applicable. Only meaningful for a backend whose USD prim
         attributes don't automatically reflect live physics state (see sync_to_render_layer() above);
-        the sole consumer is usd_utils.py's raw-USD pose-reading fallback
-        (_get_world_pose_with_scale_from_fabric_hierarchy), used when gm.PHYSICS_BACKEND != "physx". A
+        the main consumer is that backend's own get_world_transform_with_scale(). A
         backend with a working Fabric/USD sync (e.g. PhysX) never needs this, so the default is a
         no-op returning None, meaning "fall back to reading USD directly" (PhysX's existing, correct
         behavior).
@@ -545,6 +544,60 @@ class PhysicsBackend(ABC):
     @abstractmethod
     def set_particle_velocities(self, system_name, velocities, idxs=None):
         """Set world-frame particle velocities (shape must match get_particle_velocities)."""
+
+    # ---- Runtime attachment constraints ----
+
+    def create_attachment_constraint(
+        self,
+        prim_path,
+        joint_type,
+        body0,
+        body1,
+        joint_frame_in_parent_frame_pos,
+        joint_frame_in_parent_frame_quat,
+        joint_frame_in_child_frame_pos,
+        joint_frame_in_child_frame_quat,
+    ):
+        """
+        Rigidly (FixedJoint) or point-wise (SphericalJoint) attaches @body1 to @body0 at runtime, e.g. for
+        assisted grasping. This default implementation authors a USD joint for the engine to pick up; a
+        backend only needs to override it when it can toggle such a constraint more cheaply than that.
+
+        Args:
+            prim_path (str): where a USD joint prim would be created (also used as an identifier)
+            joint_type (str): "FixedJoint" or "SphericalJoint"
+            body0 (str): prim path of the parent body
+            body1 (str): prim path of the child body
+            joint_frame_in_parent_frame_pos (th.tensor): joint frame position in @body0's (scaled) frame
+            joint_frame_in_parent_frame_quat (th.tensor): joint frame (x,y,z,w) orientation in @body0's frame
+            joint_frame_in_child_frame_pos (th.tensor): joint frame position in @body1's (scaled) frame
+            joint_frame_in_child_frame_quat (th.tensor): joint frame (x,y,z,w) orientation in @body1's frame
+
+        Returns:
+            any: opaque handle to pass to remove_attachment_constraint()
+        """
+        from omnigibson.utils.usd_utils import create_joint
+
+        return create_joint(
+            prim_path=prim_path,
+            joint_type=joint_type,
+            body0=body0,
+            body1=body1,
+            enabled=True,
+            exclude_from_articulation=True,
+            joint_frame_in_parent_frame_pos=joint_frame_in_parent_frame_pos,
+            joint_frame_in_parent_frame_quat=joint_frame_in_parent_frame_quat,
+            joint_frame_in_child_frame_pos=joint_frame_in_child_frame_pos,
+            joint_frame_in_child_frame_quat=joint_frame_in_child_frame_quat,
+        )
+
+    def remove_attachment_constraint(self, handle):
+        """Removes a constraint previously created by create_attachment_constraint()."""
+        import omnigibson as og
+        from omnigibson.utils.usd_utils import delete_or_deactivate_prim
+
+        delete_or_deactivate_prim(handle.GetPath().pathString)
+        og.sim.update_handles()
 
     # ---- Joint-break events ----
 

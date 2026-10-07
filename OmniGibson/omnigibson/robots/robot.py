@@ -53,10 +53,8 @@ from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
     RigidContactAPI,
-    create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
-    delete_or_deactivate_prim,
     get_prim_at_path,
 )
 
@@ -2152,8 +2150,7 @@ class Robot(USDObject, GymObservable):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        delete_or_deactivate_prim(self._ag_obj_constraints[arm].GetPath().pathString)
-        og.sim.update_handles()
+        og.sim.physics_backend.remove_attachment_constraint(self._ag_obj_constraints[arm])
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = None
         self._ag_release_counter[arm] = 0
@@ -3698,13 +3695,11 @@ class Robot(USDObject, GymObservable):
         """
         # Create the joint
         joint_prim_path = f"{self.eef_links[arm].prim_path}/ag_constraint"
-        joint_prim = create_joint(
+        joint_prim = og.sim.physics_backend.create_attachment_constraint(
             prim_path=joint_prim_path,
             joint_type=constraint_params["joint_type"],
             body0=self.eef_links[arm].prim_path,
             body1=constraint_params["target_obj"].links[constraint_params["target_link_name"]].prim_path,
-            enabled=True,
-            exclude_from_articulation=True,
             joint_frame_in_parent_frame_pos=constraint_params["parent_frame_pos"],
             joint_frame_in_parent_frame_quat=constraint_params["parent_frame_orn"],
             joint_frame_in_child_frame_pos=constraint_params["child_frame_pos"],
