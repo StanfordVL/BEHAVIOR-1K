@@ -28,7 +28,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import get_world_pose_with_scale
+from omnigibson.utils.usd_utils import _live_matrix_from_pose, get_world_pose_with_scale
 
 log = create_module_logger(module_name=__name__)
 
@@ -37,6 +37,72 @@ def _wp_to_torch(array):
     import warp as wp
 
     return wp.to_torch(array)
+
+
+_SPHERE_SHAPE_OVERLAP_KERNEL = None
+
+
+def _sphere_shape_overlap_kernel():
+    """
+    Lazily-built warp kernel testing a sphere against each (already AABB-prefiltered) candidate shape's exact
+    geometry: overlap iff the shape's signed distance at the sphere center is <= the radius. Follows newton's own
+    particle-vs-shape contact kernel conventions (shape-local query point; meshes queried unscaled, distances
+    measured scaled). Built lazily since newton must not be imported before enable_extensions() runs.
+    """
+    global _SPHERE_SHAPE_OVERLAP_KERNEL
+    if _SPHERE_SHAPE_OVERLAP_KERNEL is not None:
+        return _SPHERE_SHAPE_OVERLAP_KERNEL
+
+    import warp as wp
+    from newton import GeoType
+    from newton._src.geometry.kernels import sdf_box, sdf_capsule, sdf_cone, sdf_cylinder, sdf_sphere
+    from newton._src.core.types import Axis
+
+    @wp.kernel
+    def kernel(
+        center: wp.vec3,
+        radius: float,
+        cand_shape: wp.array(dtype=wp.int32),
+        body_q: wp.array(dtype=wp.transform),
+        shape_body: wp.array(dtype=wp.int32),
+        shape_transform: wp.array(dtype=wp.transform),
+        shape_type: wp.array(dtype=wp.int32),
+        shape_scale: wp.array(dtype=wp.vec3),
+        shape_source_ptr: wp.array(dtype=wp.uint64),
+        out: wp.array(dtype=wp.int32),
+    ):
+        k = wp.tid()
+        s = cand_shape[k]
+        X_ws = shape_transform[s]
+        b = shape_body[s]
+        if b >= 0:
+            X_ws = wp.transform_multiply(body_q[b], X_ws)
+        x = wp.transform_point(wp.transform_inverse(X_ws), center)
+        geo_type = shape_type[s]
+        scale = shape_scale[s]
+        d = float(-1.0e6)  # unsupported types keep the conservative AABB answer (overlap)
+        if geo_type == GeoType.SPHERE:
+            d = sdf_sphere(x, scale[0])
+        elif geo_type == GeoType.BOX:
+            d = sdf_box(x, scale[0], scale[1], scale[2])
+        elif geo_type == GeoType.CAPSULE:
+            d = sdf_capsule(x, scale[0], scale[1], int(Axis.Z))
+        elif geo_type == GeoType.CYLINDER:
+            d = sdf_cylinder(x, scale[0], scale[1], int(Axis.Z))
+        elif geo_type == GeoType.CONE:
+            d = sdf_cone(x, scale[0], scale[1], int(Axis.Z))
+        elif (geo_type == GeoType.MESH or geo_type == GeoType.CONVEX_MESH) and shape_source_ptr[s] != wp.uint64(0):
+            mesh = shape_source_ptr[s]
+            # Unbounded search so a point deep inside a solid still finds its closest face (and its sign)
+            q = wp.mesh_query_point_sign_normal(mesh, wp.cw_div(x, scale), 1.0e6)
+            if q.result:
+                closest = wp.cw_mul(wp.mesh_eval_position(mesh, q.face, q.u, q.v), scale)
+                d = wp.length(x - closest) * q.sign
+        if d <= radius:
+            out[k] = 1
+
+    _SPHERE_SHAPE_OVERLAP_KERNEL = kernel
+    return kernel
 
 
 def _assign(wp_array, idx, value):
@@ -282,6 +348,11 @@ class NewtonArticulationHandle:
         return self._valid
 
     @property
+    def has_dof_metadata(self):
+        # The DOF-layout accessors below are only populated by initialize().
+        return self._valid
+
+    @property
     def num_dof(self):
         return int(self._global_qd_idx.numel())
 
@@ -377,7 +448,7 @@ class NewtonArticulationHandle:
         vel = _wp_to_torch(self._backend._control.joint_target_qd)[self._global_qd_idx].unsqueeze(0)
         return _AppliedActions(pos, vel)
 
-    def get_dof_types(self):
+    def get_dof_is_rotational(self):
         # Per-DOF rotational/translational classification -- True for rotational, False for
         # translational. Every joint this handle tracks is a simple 1-dof revolute or prismatic joint
         # (initialize() explicitly excludes free/floating joints, which never appear as named DOFs
@@ -529,11 +600,13 @@ class NewtonRigidBodyHandle:
         # its own revolute/prismatic joint instead). See set_world_poses()'s own comment for why this
         # matters -- populated in initialize(), like NewtonArticulationHandle's identical attribute.
         self._root_free_joint_q_start = None
+        self._root_free_joint_qd_start = None
 
     def initialize(self, physics_sim_view):
         self._body_idx = self._backend._path_body_map.get(self.prim_path)
         self._valid = self._body_idx is not None
         self._root_free_joint_q_start = None
+        self._root_free_joint_qd_start = None
         if self._valid:
             import newton
 
@@ -544,6 +617,7 @@ class NewtonRigidBodyHandle:
             for j in range(model.joint_count):
                 if joint_child[j] == self._body_idx and joint_type[j] == JOINT_FREE:
                     self._root_free_joint_q_start = int(model.joint_q_start.numpy()[j])
+                    self._root_free_joint_qd_start = int(model.joint_qd_start.numpy()[j])
                     break
 
     @property
@@ -564,10 +638,13 @@ class NewtonRigidBodyHandle:
 
             pos, quat_wxyz_from_xyzw = get_world_pose(self.prim_path)
             return pos.unsqueeze(0), _xyzw_to_wxyz(quat_wxyz_from_xyzw).unsqueeze(0)
+        # body_q is a zero-copy view of the live warp state buffer, which the solver overwrites in place.
+        # Callers that keep a pose (e.g. KinematicsMixin's change-detection snapshots) rely on clone=True
+        # actually decoupling it from future steps, as PhysX's views do.
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         pos = body_q[self._body_idx, :3].unsqueeze(0)
         quat_wxyz = _xyzw_to_wxyz(body_q[self._body_idx, 3:7]).unsqueeze(0)
-        return pos, quat_wxyz
+        return (pos.clone(), quat_wxyz.clone()) if clone else (pos, quat_wxyz)
 
     def set_world_poses(self, positions, orientations):
         if not self._valid:
@@ -598,41 +675,83 @@ class NewtonRigidBodyHandle:
     def get_linear_velocities(self, clone=True):
         if not self._valid:
             return th.zeros(1, 3, device=self._backend.sim.device)
-        return _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, :3].unsqueeze(0)
+        vel = _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, :3].unsqueeze(0)
+        return vel.clone() if clone else vel
+
+    def _set_root_free_joint_qd(self, offset, values):
+        # Like set_world_poses()'s joint_q mirror: joint_qd is the authoritative state, and any FK (e.g. the
+        # one a later pose write triggers) recomputes body_qd from it -- so a body_qd-only write gets reverted
+        # (e.g. keep_still() followed by a teleport kept the body's old fall velocity). A free joint's qd is
+        # [COM linear, angular] in the world frame, the same layout as body_qd.
+        if self._root_free_joint_qd_start is None:
+            return
+        qd_start = self._root_free_joint_qd_start + offset
+        joint_qd = _wp_to_torch(self._backend._state_0.joint_qd)
+        joint_qd[qd_start : qd_start + 3] = (
+            th.as_tensor(values).reshape(-1).to(device=joint_qd.device, dtype=joint_qd.dtype)
+        )
 
     def set_linear_velocities(self, velocities):
         if not self._valid:
             return
         _assign(self._backend._state_0.body_qd, (self._body_idx, slice(0, 3)), velocities)
+        self._set_root_free_joint_qd(0, velocities)
 
     def get_angular_velocities(self, clone=True):
         if not self._valid:
             return th.zeros(1, 3, device=self._backend.sim.device)
-        return _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, 3:6].unsqueeze(0)
+        vel = _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, 3:6].unsqueeze(0)
+        return vel.clone() if clone else vel
 
     def set_angular_velocities(self, velocities):
         if not self._valid:
             return
         _assign(self._backend._state_0.body_qd, (self._body_idx, slice(3, 6)), velocities)
+        self._set_root_free_joint_qd(3, velocities)
 
     def get_coms(self, clone=True):
         com = _wp_to_torch(self._backend._model.body_com)[self._body_idx].reshape(1, 1, 3)
+        if clone:
+            com = com.clone()
         return com, th.tensor([[[1.0, 0.0, 0.0, 0.0]]], device=com.device)
 
     def set_coms(self, positions):
         _assign(self._backend._model.body_com, self._body_idx, th.as_tensor(positions).reshape(-1)[:3])
 
+    # Mass and density are authored on the body's USD MassAPI, which every _rebuild() imports from -- the
+    # live model is rebuilt from USD on any object add/remove, so a model-only write would silently revert
+    # (and is impossible before the model exists, which is exactly when DatasetObject assigns its category
+    # masses). A live model is additionally updated in place, or rebuilt when only density changed.
+
+    def _mass_api(self, apply=False):
+        prim = self._backend.sim.stage.GetPrimAtPath(self.prim_path)
+        return lazy.pxr.UsdPhysics.MassAPI.Apply(prim) if apply else lazy.pxr.UsdPhysics.MassAPI(prim)
+
     def get_masses(self):
-        return _wp_to_torch(self._backend._model.body_mass)[self._body_idx].unsqueeze(0)
+        if self._valid:
+            return _wp_to_torch(self._backend._model.body_mass)[self._body_idx].unsqueeze(0).clone()
+        mass = self._mass_api().GetMassAttr().Get()
+        return th.tensor([0.0 if mass is None else float(mass)], device=self._backend.sim.device)
 
     def set_masses(self, masses):
-        _assign(self._backend._model.body_mass, self._body_idx, th.as_tensor(masses).reshape(-1)[0])
+        mass = float(th.as_tensor(masses).reshape(-1)[0])
+        self._mass_api(apply=True).CreateMassAttr().Set(mass)
+        if not self._valid:
+            return
+        if mass <= 0.0:
+            # Mass now comes from density x collider volume, which only an import can compute
+            self._backend._mass_properties_dirty = True
+            return
+        self._backend._scale_body_mass(self._body_idx, mass)
 
     def get_densities(self):
-        return th.zeros(1, device=self._backend.sim.device)
+        density = self._mass_api().GetDensityAttr().Get()
+        return th.tensor([0.0 if density is None else float(density)], device=self._backend.sim.device)
 
     def set_densities(self, densities):
-        pass
+        self._mass_api(apply=True).CreateDensityAttr().Set(float(th.as_tensor(densities).reshape(-1)[0]))
+        if self._valid:
+            self._backend._mass_properties_dirty = True
 
     def enable_gravities(self):
         pass
@@ -782,6 +901,43 @@ class _NewtonBatchArticulationView:
             target[self._handles[row]._global_qd_idx] = data[row]
 
 
+class _ParticleImportRoot:
+    """
+    Stands in for a scene object in _rebuild_impl()'s import loop, for a macro particle system. Imported from the
+    system prim (the particles' physics material lives there, beside the "particles" scope) while ignoring every
+    other child, e.g. the particle template.
+    """
+
+    prim_type = PrimType.RIGID
+    fixed_base = False
+    is_particle_root = True
+
+    def __init__(self, system_prim):
+        self.prim_path = str(system_prim.GetPath())
+        self.ignore_paths = [
+            str(child.GetPath())
+            for child in system_prim.GetChildren()
+            if child.GetName() != "particles" and not child.IsA(lazy.pxr.UsdShade.Material)
+        ]
+
+
+def _match_body_paths(backend, pattern):
+    """(prim paths, body indices) of model bodies matching @pattern, where `*` matches within one path component
+    (PhysX tensor-view semantics) -- so e.g. "/World/scene_*/*/*" matches object links, not macro particles nested
+    one level deeper."""
+    matched = set(_match_paths(pattern, backend._path_body_map))
+    matched = [(path, idx) for path, idx in backend._path_body_map.items() if path in matched]
+    return [path for path, _ in matched], [idx for _, idx in matched]
+
+
+def _match_paths(pattern, paths):
+    """The subset of @paths matching @pattern, with `*` matching within a single path component."""
+    import re
+
+    regex = re.compile(re.escape(pattern).replace(r"\*", "[^/]*"))
+    return [path for path in paths if regex.fullmatch(path)]
+
+
 class _NewtonRigidBodyBatchView:
     """Duck-typed stand-in for PhysX's pattern-based `omni.physics.tensors.RigidBodyView`, backing
     `RigidContactAPI`'s own `create_rigid_body_view(pattern)` usage as well as
@@ -790,17 +946,41 @@ class _NewtonRigidBodyBatchView:
     Includes every matched body regardless of dynamic/kinematic status, matching PhysX's own semantics --
     unlike `_NewtonRigidContactView`'s sensor rows, which are dynamic-only."""
 
-    def __init__(self, backend, body_indices, prim_paths):
+    def __init__(self, backend, body_indices, prim_paths, pattern=None):
         self._backend = backend
+        # A pattern-created view re-resolves its bodies whenever the model is rebuilt (or a deferred rebuild is
+        # pending) -- see _refresh_if_stale()
+        self._pattern = pattern
+        self._generation = backend._model_generation
+        self._set_bodies(body_indices, prim_paths)
+
+    def _set_bodies(self, body_indices, prim_paths):
+        backend = self._backend
         self._body_indices = th.as_tensor(body_indices, dtype=th.long, device=backend.sim.device)
         self._prim_paths = list(prim_paths)
         # body_idx -> q_start of the FREE joint whose child is that body, for every body in this view
         # that's a free-floating root (e.g. a real MassAPI/RigidBodyAPI particle) -- see
         # set_transforms()'s own comment for why writes need this too, mirroring
         # NewtonRigidBodyHandle.set_world_poses()'s identical single-body fix.
-        self._root_free_joint_q_start = self._compute_root_free_joint_q_starts()
+        self._root_free_joint_q_start = self._compute_root_free_joint_starts(qd=False)
+        # Same, for qd_start -- see set_velocities()
+        self._root_free_joint_qd_start = self._compute_root_free_joint_starts(qd=True)
 
-    def _compute_root_free_joint_q_starts(self):
+    def _refresh_if_stale(self):
+        if self._pattern is None:
+            return
+        backend = self._backend
+        # Only a view that would actually see the pending particles (e.g. a particle system's own view) forces
+        # the deferred rebuild -- scene-wide views (RigidBodyViewAPI, RigidContactAPI) are re-created on every
+        # update_handles(), which runs once per added particle, and must not rebuild each time
+        if backend._macro_particles_dirty and _match_paths(self._pattern, backend._macro_particle_roots()):
+            backend.ensure_model_current()
+        if self._generation != backend._model_generation:
+            self._generation = self._backend._model_generation
+            paths, idxs = _match_body_paths(self._backend, self._pattern)
+            self._set_bodies(idxs, paths)
+
+    def _compute_root_free_joint_starts(self, qd):
         model = self._backend._model
         if model is None or model.joint_count == 0:
             return {}
@@ -808,24 +988,27 @@ class _NewtonRigidBodyBatchView:
 
         joint_child = model.joint_child.numpy()
         joint_type = model.joint_type.numpy()
-        joint_q_start = model.joint_q_start.numpy()
+        joint_start = (model.joint_qd_start if qd else model.joint_q_start).numpy()
         free_joint = int(newton.JointType.FREE)
         body_set = {int(b) for b in self._body_indices.tolist()}
         return {
-            int(joint_child[j]): int(joint_q_start[j])
+            int(joint_child[j]): int(joint_start[j])
             for j in range(model.joint_count)
             if joint_type[j] == free_joint and int(joint_child[j]) in body_set
         }
 
     @property
     def prim_paths(self):
+        self._refresh_if_stale()
         return self._prim_paths
 
     @property
     def count(self):
+        self._refresh_if_stale()
         return len(self._prim_paths)
 
     def get_transforms(self):
+        self._refresh_if_stale()
         # [x, y, z, qx, qy, qz, qw] -- PhysX's own documented convention (w-last), which also happens
         # to be exactly Newton's native body_q layout, so no conversion is needed.
         if self.count == 0:
@@ -870,7 +1053,16 @@ class _NewtonRigidBodyBatchView:
             else self._body_indices[th.as_tensor(indices, device=self._body_indices.device)]
         )
         body_qd = _wp_to_torch(self._backend._state_0.body_qd)
-        body_qd[idx] = th.as_tensor(data).to(device=body_qd.device, dtype=body_qd.dtype)
+        data = th.as_tensor(data).to(device=body_qd.device, dtype=body_qd.dtype)
+        body_qd[idx] = data
+        # joint_qd is authoritative and the next FK would revert a body_qd-only write -- see
+        # NewtonRigidBodyHandle._set_root_free_joint_qd()
+        if self._root_free_joint_qd_start:
+            joint_qd = _wp_to_torch(self._backend._state_0.joint_qd)
+            for row, body_idx in enumerate(idx.tolist()):
+                qd_start = self._root_free_joint_qd_start.get(body_idx)
+                if qd_start is not None:
+                    joint_qd[qd_start : qd_start + 6] = data[row]
 
 
 class _NewtonRigidContactView:
@@ -1115,18 +1307,17 @@ class _NewtonPhysicsSimView:
         return _NewtonBatchArticulationView(self._backend, matched)
 
     def create_rigid_contact_view(self, pattern, filter_patterns, max_contact_data_count):
-        import re
-
         import newton
 
-        regex = pattern.replace("*", ".*")
+        # `*` matches within one path component, as in PhysX -- see _match_paths()
+        matching = set(_match_paths(pattern, self._backend._path_body_map))
         body_flags = _wp_to_torch(self._backend._model.body_flags) if self._backend._model is not None else None
         # Sensor (row) set is dynamic-only, matching PhysX's own semantics (confirmed by
         # RigidContactAPIImpl.initialize_view()'s own assertion that view.sensor_paths equals only
         # the dynamic subset of the requested pattern).
         sensor_paths, sensor_body_idx = [], []
         for path, idx in self._backend._path_body_map.items():
-            if not re.fullmatch(regex, path):
+            if path not in matching:
                 continue
             if body_flags is not None and not bool(int(body_flags[idx]) & int(newton.BodyFlags.DYNAMIC)):
                 continue
@@ -1152,13 +1343,8 @@ class _NewtonPhysicsSimView:
         )
 
     def create_rigid_body_view(self, pattern):
-        import re
-
-        regex = pattern.replace("*", ".*")
-        matched = [(path, idx) for path, idx in self._backend._path_body_map.items() if re.fullmatch(regex, path)]
-        return _NewtonRigidBodyBatchView(
-            self._backend, body_indices=[idx for _, idx in matched], prim_paths=[path for path, _ in matched]
-        )
+        paths, idxs = _match_body_paths(self._backend, pattern)
+        return _NewtonRigidBodyBatchView(self._backend, body_indices=idxs, prim_paths=paths, pattern=pattern)
 
 
 class NewtonBackend(PhysicsBackend):
@@ -1218,6 +1404,9 @@ class NewtonBackend(PhysicsBackend):
     # Whether to override every robot joint's authored USD effort limit with inf -- see the use site in
     # _rebuild_impl() for the full rationale. Exposed as a flag purely so it can be A/B'd.
     _FORCE_INF_ROBOT_EFFORT = True
+    # Disabled WELD equality slots preallocated on every rebuild for create_attachment_constraint() (two
+    # arms' worth of assisted grasps for two robots). Grows on demand, at the cost of one rebuild.
+    _MIN_ATTACHMENT_SLOTS = 4
 
     def __init__(self, sim=None):
         super().__init__(sim)
@@ -1299,8 +1488,44 @@ class NewtonBackend(PhysicsBackend):
         # _rebuild_impl() whenever self._breakable_joints changes; decremented once per step in
         # _check_joint_breaks().
         self._joints_settle_steps_remaining = 0
+        # Runtime attachment constraints (assisted grasping) -- handle -> spec dict, see
+        # create_attachment_constraint(). Kept across rebuilds and re-applied onto the fresh model's pool
+        # of disabled WELD slots (self._attachment_slots, newton equality-constraint indices) afterwards.
+        self._attachment_constraints = {}
+        self._attachment_slots = []
+        # Set when a body's density (or a zero mass, meaning "derive from density") is authored on a live
+        # model -- see NewtonRigidBodyHandle.set_masses(). Consumed by step_physics_once() like _joints_dirty.
+        self._mass_properties_dirty = False
+        # MacroPhysicalParticleSystem particles are individual rigid-body prims under their system (not scene
+        # objects), imported by _rebuild_impl() after every object so object body indices stay stable. Adding a
+        # particle calls update_handles() each time, so a particle-set change only flags the model stale here;
+        # it is rebuilt once, lazily (see ensure_model_current()). _model_generation lets pattern-based body
+        # views (_NewtonRigidBodyBatchView) notice a rebuild and re-resolve their bodies.
+        self._known_macro_particle_paths = frozenset()
+        self._macro_particles_dirty = False
+        self._ensuring_model_current = False
+        self._model_generation = 0
+        self._attachment_slot_count = self._MIN_ATTACHMENT_SLOTS
 
     # ---- Lifecycle ----
+
+    @classmethod
+    def create_app(cls):
+        # Newton drives its engine directly, so Kit is only needed when it is the renderer (the
+        # physics=Newton + render=Kit hybrid).
+        if gm.RENDER_BACKEND == "kit":
+            from omnigibson.render_backends.kit_backend import launch_kit_app
+
+            return launch_kit_app()
+        from omnigibson.simulator import _StandaloneApp
+
+        return _StandaloneApp()
+
+    def add_ground_plane(self, prim_path, visible=True, color=None):
+        # The physics-side ground plane is added by _rebuild_impl()'s builder.add_ground_plane(); this
+        # is just a bare USD placeholder so og.sim.floor_plane stays non-None for code that expects it.
+        with self.sim.editing_usd():
+            self.sim.stage.DefinePrim(prim_path, "Xform")
 
     def enable_extensions(self):
         # Newton's OpenUSD parallel physics traversal has produced native crashes on collider-dense
@@ -1324,6 +1549,11 @@ class NewtonBackend(PhysicsBackend):
         self._pre_step_cb = pre_step_fn
         self._post_step_cb = post_step_fn
         self._joint_break_cb = joint_break_fn
+
+    def stop_step_callbacks(self):
+        self._pre_step_cb = None
+        self._post_step_cb = None
+        self._joint_break_cb = None
 
     def apply_engine_settings(
         self,
@@ -1397,6 +1627,8 @@ class NewtonBackend(PhysicsBackend):
         self._sim_context.render()
 
     def step(self, render):
+        # Apply any deferred particle-set change before physics runs (it can't be done mid-step)
+        self.ensure_model_current()
         self._sim_context.step(render=render)
 
     # Relative margin added on top of a body's triangle-inequality deficit by _balance_body_inertia().
@@ -1515,6 +1747,10 @@ class NewtonBackend(PhysicsBackend):
         return graph
 
     def step_physics_once(self, current_time):
+        if self._mass_properties_dirty or self._macro_particles_dirty:
+            self._mass_properties_dirty = False
+            self._macro_particles_dirty = False
+            self._joints_dirty = True
         if self._joints_dirty:
             # A joint was added/removed since the last rebuild (e.g. AttachedTo attach/detach) --
             # refresh_physics_sim_view()'s object-path-set check has no way to notice this, so
@@ -1644,6 +1880,44 @@ class NewtonBackend(PhysicsBackend):
     def physics_sim_view(self):
         return _NewtonPhysicsSimView(self)
 
+    def _macro_particle_roots(self):
+        """{particle prim path: owning system} for every live MacroPhysicalParticleSystem particle."""
+        from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
+
+        paths = {}
+        for scene in self.sim.scenes:
+            for system in scene.active_systems.values():
+                if not isinstance(system, MacroPhysicalParticleSystem) or not system.initialized:
+                    continue
+                root = self.sim.stage.GetPrimAtPath(f"{system.prim_path}/particles")
+                if not root.IsValid():
+                    continue
+                for child in root.GetChildren():
+                    if child.IsActive() and child.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+                        paths[str(child.GetPath())] = system
+        return paths
+
+    def ensure_model_current(self):
+        """
+        Applies a lazily-deferred model change (e.g. new macro particles) now, if one is pending and it's safe to.
+        Followed by a full update_handles() -- exactly what an object add/remove's rebuild gets -- since every
+        scene-wide view (RigidContactAPI, RigidBodyViewAPI, the state graph) still indexes the old model's tables.
+        """
+        if (
+            not self._macro_particles_dirty
+            or self._rebuilding
+            or self._ensuring_model_current
+            or self.sim.currently_stepping
+        ):
+            return
+        self._ensuring_model_current = True
+        try:
+            self._macro_particles_dirty = False
+            self._rebuild()
+            self.sim.update_handles()
+        finally:
+            self._ensuring_model_current = False
+
     def refresh_physics_sim_view(self):
         # Newton's Model is immutable post-finalize() -- unlike PhysX (where this just recreates a
         # cheap tensor view over an already-updated scene graph), reflecting a dynamic object
@@ -1653,6 +1927,8 @@ class NewtonBackend(PhysicsBackend):
         # current object set moments earlier, in the same play() call).
         if self._model is None or not self.is_playing():
             return
+        if frozenset(self._macro_particle_roots()) != self._known_macro_particle_paths:
+            self._macro_particles_dirty = True
         current_paths = frozenset(obj.prim_path for scene in self.sim.scenes for obj in scene.objects)
         if current_paths != self._known_object_paths:
             # Sync every currently-built fluid system's live state back into self._fluid_systems before
@@ -1725,6 +2001,56 @@ class NewtonBackend(PhysicsBackend):
 
         if self.sim.fabric_hierarchy is not None:
             self.sim.fabric_hierarchy.update_world_xforms()
+
+    # ---- Batched DOF target writes ----
+    # @view is a _NewtonArticulationBatchView, which takes plain tensors -- no frontend/backend tensor
+    # descriptor split to cast through, so @cast is irrelevant here.
+
+    def set_dof_position_targets(self, view, data, indices, cast=False):
+        view.set_dof_position_targets_fast(data, indices)
+
+    def set_dof_velocity_targets(self, view, data, indices, cast=False):
+        view.set_dof_velocity_targets_fast(data, indices)
+
+    def set_dof_actuation_forces(self, view, data, indices, cast=False):
+        view.set_dof_actuation_forces_fast(data, indices)
+
+    # ---- Prim transform reads ----
+
+    def get_world_transform_with_scale(self, prim_path):
+        # USD's own xform attributes are never synced from live physics here (see
+        # sync_to_render_layer()), so they only reflect this prim's load-time/last-authored pose.
+        # Compute the raw USD transform first (needed regardless, for its SCALE component -- physics
+        # never changes scale); if this prim is itself a tracked physics body, splice in the live
+        # translation/rotation instead of the stale USD ones.
+        prim = self.sim.stage.GetPrimAtPath(prim_path)
+        raw_matrix = lazy.pxr.UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+        live_pose = self.get_live_world_pose(prim_path)
+        if live_pose is not None:
+            return _live_matrix_from_pose(raw_matrix, live_pose)
+        # prim_path itself isn't a tracked body, but an ANCESTOR might be (e.g. a visual/collision
+        # sub-mesh, or an "emitter" dummy mesh, under a tracked rigid-body link -- see
+        # objects/usd_object.py::_create_emitter_apis()). The raw hierarchy walk above used each
+        # ancestor's stale USD pose -- if the nearest tracked ancestor has moved, compose the prim's
+        # static local-to-ancestor offset with ITS live pose instead. Without this, a prim's world pose
+        # read via its tracked parent (e.g. XformPrim.set_position_orientation's parent-transform
+        # lookup) and via this raw walk (e.g. its own get_position_orientation()) could disagree,
+        # breaking get-then-set-then-get round trips.
+        ancestor_prim = prim.GetParent()
+        while ancestor_prim and ancestor_prim.IsValid():
+            ancestor_live_pose = self.get_live_world_pose(str(ancestor_prim.GetPath()))
+            if ancestor_live_pose is not None:
+                ancestor_raw_matrix = lazy.pxr.UsdGeom.Xformable(ancestor_prim).ComputeLocalToWorldTransform(
+                    lazy.pxr.Usd.TimeCode.Default()
+                )
+                local_to_ancestor = raw_matrix * ancestor_raw_matrix.GetInverse()
+                return local_to_ancestor * _live_matrix_from_pose(ancestor_raw_matrix, ancestor_live_pose)
+            ancestor_prim = ancestor_prim.GetParent()
+        return raw_matrix
+
+    def get_local_transform_with_scale(self, prim_path):
+        prim = self.sim.stage.GetPrimAtPath(prim_path)
+        return lazy.pxr.UsdGeom.Xformable(prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default())
 
     def get_live_world_pose(self, prim_path):
         if self._rebuilding or self._state_0 is None or self._state_0.body_q is None:
@@ -2009,7 +2335,12 @@ class NewtonBackend(PhysicsBackend):
         path_cloth_particle_map = {}
         robot_joint_paths = set()
         low_friction_body_idx = set()
-        for obj in objects:
+        # Macro-particle roots go last, so every object's body indices are unaffected by particle changes
+        macro_particle_paths = self._macro_particle_roots()
+        particle_systems = sorted({system.prim_path for system in macro_particle_paths.values()})
+        import_roots = objects + [_ParticleImportRoot(self.sim.stage.GetPrimAtPath(path)) for path in particle_systems]
+        for obj in import_roots:
+            is_particle_root = getattr(obj, "is_particle_root", False)
             if obj.prim_type == PrimType.CLOTH:
                 # Cloth has no rigid bodies/joints at all -- entirely separate from the add_usd() rigid
                 # import path below, imported instead via add_cloth_mesh() into the same builder/model.
@@ -2033,7 +2364,7 @@ class NewtonBackend(PhysicsBackend):
                 # specific visual bug -- but it's still the semantically correct setting to carry, and
                 # protects against a regression if that ever changes).
                 hide_collision_shapes=True,
-                ignore_paths=ignore_paths_by_obj.get(obj),
+                ignore_paths=getattr(obj, "ignore_paths", None) or ignore_paths_by_obj.get(obj),
             )
 
             if gm.RENDER_BACKEND != "kit":
@@ -2110,6 +2441,11 @@ class NewtonBackend(PhysicsBackend):
                 for idx in range(joint_count_before, len(builder.joint_articulation))
                 if builder.joint_articulation[idx] < 0
             )
+            if is_particle_root:
+                # Each particle is its own free body, not one articulation spanning them all
+                for idx in unassigned:
+                    builder.add_articulation([idx], label=f"{obj.prim_path}_{idx}")
+                continue
             run_start = None
             for i, idx in enumerate(unassigned):
                 if run_start is None:
@@ -2128,6 +2464,9 @@ class NewtonBackend(PhysicsBackend):
         # wrapping it into its own articulation instead would recreate the original "Multiple joints
         # lead to body N" conflict this whole mechanism exists to avoid.
         self._breakable_joints = {}
+        # (parent_body, child_body, is_spherical, parent pos/quat, child pos/quat) per cross-object joint, for
+        # _fix_cross_object_constraint_frames() once the solver exists.
+        self._cross_object_constraints = []
         for joints in cross_object_joints.values():
             for prim, body0_path, body1_path in joints:
                 body0_idx = path_body_map.get(body0_path)
@@ -2144,10 +2483,23 @@ class NewtonBackend(PhysicsBackend):
                     child_xform=child_xform,
                     collision_filter_parent=True,
                 )
-                if prim.IsA(lazy.pxr.UsdPhysics.SphericalJoint):
+                is_spherical = prim.IsA(lazy.pxr.UsdPhysics.SphericalJoint)
+                if is_spherical:
                     joint_idx = builder.add_joint_ball(**joint_kwargs)
                 else:
                     joint_idx = builder.add_joint_fixed(**joint_kwargs)
+                # USD joint frames live in each body's *scaled* local frame; MuJoCo anchors are unscaled
+                self._cross_object_constraints.append(
+                    (
+                        body0_idx,
+                        body1_idx,
+                        is_spherical,
+                        th.tensor(tuple(parent_xform.p)) * self._body_scale(body0_path),
+                        th.tensor(tuple(parent_xform.q)),
+                        th.tensor(tuple(child_xform.p)) * self._body_scale(body1_path),
+                        th.tensor(tuple(child_xform.q)),
+                    )
+                )
                 joint_path = str(prim.GetPath())
                 path_joint_map[joint_path] = joint_idx
                 break_force, break_torque = self._read_joint_break_thresholds(prim)
@@ -2161,6 +2513,24 @@ class NewtonBackend(PhysicsBackend):
             # See __init__'s own comment on self._joints_settle_steps_remaining -- a freshly-added
             # WELD/CONNECT constraint needs a few steps to settle before break-force checking starts.
             self._joints_settle_steps_remaining = 1
+
+        # Pool of disabled WELD equality slots for create_attachment_constraint() -- see there for why
+        # these are retargeted in place instead of adding a joint (and rebuilding) per grasp. MuJoCo
+        # rejects a world-world equality, so an idle slot parks on world <-> body 0 instead.
+        self._attachment_slot_count = max(self._attachment_slot_count, len(self._attachment_constraints))
+        self._attachment_slots = []
+        if builder.body_count > 0:
+            for _ in range(self._attachment_slot_count):
+                slot = builder.add_custom_values(
+                    **{
+                        "mujoco:equality_constraint_type": int(newton.EqType.WELD),
+                        "mujoco:equality_constraint_body1": -1,
+                        "mujoco:equality_constraint_body2": 0,
+                        "mujoco:equality_constraint_enabled": False,
+                        "mujoco:equality_constraint_label": "og_attachment_slot",
+                    }
+                )
+                self._attachment_slots.append(slot["mujoco:equality_constraint_type"])
 
         self._path_body_map = path_body_map
         self._body_path_map = {idx: path for path, idx in path_body_map.items()}
@@ -2683,6 +3053,9 @@ class NewtonBackend(PhysicsBackend):
         # to every solver branch above -- see the method's own docstring for why the mu drop alone
         # isn't enough.
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
+        # Re-apply any attachment constraints that were live before this rebuild onto the fresh pool.
+        self._sync_attachment_slots()
+        self._fix_cross_object_constraint_frames()
 
         # Bind every already-registered articulation/rigid-body handle to this freshly-built model now,
         # rather than waiting for each owning object's own (lazy, one-at-a-time) Simulator.update_handles()
@@ -2721,6 +3094,8 @@ class NewtonBackend(PhysicsBackend):
         self._contacts_dirty = True
 
         self._known_object_paths = frozenset(obj.prim_path for obj in objects)
+        self._known_macro_particle_paths = frozenset(macro_particle_paths)
+        self._model_generation += 1
         self._restore_state(captured_state)
 
     # Rough starting-point stiffness values for cloth -- NOT a principled port of PhysX's spring-based
@@ -2850,7 +3225,15 @@ class NewtonBackend(PhysicsBackend):
         """
         if self._model is None:
             return None
-        captured = {"articulations": {}, "rigid_bodies": {}, "cloth": {}}
+        captured = {"articulations": {}, "rigid_bodies": {}, "cloth": {}, "macro_particles": {}}
+        # Macro particles have no per-prim handles; snapshot their bodies directly by path
+        if self._known_macro_particle_paths and self._state_0 is not None and self._state_0.body_q is not None:
+            body_q = _wp_to_torch(self._state_0.body_q)
+            body_qd = _wp_to_torch(self._state_0.body_qd)
+            for path in self._known_macro_particle_paths:
+                idx = self._path_body_map.get(path)
+                if idx is not None:
+                    captured["macro_particles"][path] = (body_q[idx].clone(), body_qd[idx].clone())
         for path in self._path_cloth_particle_map:
             captured["cloth"][path] = {
                 "particle_q": self.get_cloth_particle_positions(path).clone(),
@@ -2926,6 +3309,11 @@ class NewtonBackend(PhysicsBackend):
                 handle.set_gains(kps=data["gains_ke"], kds=data["gains_kd"])
             if data["world_pos"] is not None and self._path_body_map.get(handle._root_link_prim_path) is not None:
                 handle.set_world_poses(data["world_pos"], data["world_quat"])
+        particle_paths = [p for p in captured.get("macro_particles", {}) if p in self._path_body_map]
+        if particle_paths:
+            view = _NewtonRigidBodyBatchView(self, [self._path_body_map[p] for p in particle_paths], particle_paths)
+            view.set_transforms(th.stack([captured["macro_particles"][p][0] for p in particle_paths]))
+            view.set_velocities(th.stack([captured["macro_particles"][p][1] for p in particle_paths]))
         for path, data in captured["rigid_bodies"].items():
             handle = self._rigid_body_handles.get(path)
             if handle is None or not handle.is_physics_handle_valid():
@@ -3143,6 +3531,21 @@ class NewtonBackend(PhysicsBackend):
             newton.eval_fk(self._model, self._state_0.joint_q, self._state_0.joint_qd, self._state_0)
         self._bvh_dirty = True
 
+    def _scale_body_mass(self, body_idx, mass):
+        """Sets a live body's mass, scaling its inertia by the same factor (same geometry, uniform density)."""
+        import newton
+
+        model = self._model
+        old_mass = float(_wp_to_torch(model.body_mass)[body_idx])
+        ratio = mass / old_mass if old_mass > 0.0 else 1.0
+        _wp_to_torch(model.body_mass)[body_idx] = mass
+        _wp_to_torch(model.body_inv_mass)[body_idx] = 1.0 / mass
+        _wp_to_torch(model.body_inertia)[body_idx] *= ratio
+        _wp_to_torch(model.body_inv_inertia)[body_idx] /= ratio
+        if self._solver is not None:
+            self._solver.notify_model_changed(newton.ModelFlags.BODY_INERTIAL_PROPERTIES)
+            self._step_graphs = {}
+
     def _notify_dof_properties_changed(self):
         if self._solver is not None:
             import newton
@@ -3301,7 +3704,38 @@ class NewtonBackend(PhysicsBackend):
             clamped = th.maximum(lower[idxs], th.minimum(upper[idxs], center))
             dist = (clamped - center).norm(dim=-1)
             idxs = idxs[dist <= sphere_radius]
+            if len(idxs) > 0:
+                # AABBs alone wildly over-report for concave objects (every point inside a pot "overlaps"
+                # it), so confirm the survivors against each shape's actual geometry
+                idxs = idxs[self._sphere_overlaps_shapes(sphere_center, sphere_radius, idxs)]
         return shape_body[idxs].tolist()
+
+    def _sphere_overlaps_shapes(self, center, radius, shape_idxs):
+        """Bool mask over @shape_idxs: whether a sphere at @center with @radius overlaps each shape's geometry."""
+        import warp as wp
+
+        model = self._model
+        dev = model.device
+        cand = wp.from_torch(shape_idxs.to(device=_wp_to_torch(model.shape_body).device, dtype=th.int32))
+        out = wp.zeros(len(shape_idxs), dtype=wp.int32, device=dev)
+        wp.launch(
+            _sphere_shape_overlap_kernel(),
+            dim=len(shape_idxs),
+            inputs=[
+                wp.vec3(*[float(c) for c in center]),
+                float(radius),
+                cand,
+                self._state_0.body_q,
+                model.shape_body,
+                model.shape_transform,
+                model.shape_type,
+                model.shape_scale,
+                model.shape_source_ptr,
+                out,
+            ],
+            device=dev,
+        )
+        return _wp_to_torch(out).bool().to(shape_idxs.device)
 
     def overlap_sphere(self, radius, pos, reportFn, anyHit=False):
         query_lower = [p - radius for p in pos]
@@ -3398,6 +3832,156 @@ class NewtonBackend(PhysicsBackend):
         shape1 = _wp_to_torch(self._contact_report_contacts.rigid_contact_shape1)[:n].long()
         force = _wp_to_torch(self._contact_report_contacts.force)[:n, :3]
         return shape0, shape1, force
+
+    def create_attachment_constraint(
+        self,
+        prim_path,
+        joint_type,
+        body0,
+        body1,
+        joint_frame_in_parent_frame_pos,
+        joint_frame_in_parent_frame_quat,
+        joint_frame_in_child_frame_pos,
+        joint_frame_in_child_frame_quat,
+    ):
+        """
+        Assisted grasping attaches and detaches objects many times per episode. The base implementation's
+        USD joint would trigger a full model rebuild each time (see _on_usd_joint_changed()), so instead
+        this retargets one of the model's preallocated, disabled WELD equality slots onto (body0, body1)
+        and enables it in place, without a rebuild. A SphericalJoint is the same WELD with torquescale=0, which zeroes both the
+        rotational Jacobian rows and residual, leaving a pure point (CONNECT-like) constraint.
+
+        Returns @prim_path as the handle; no USD prim is created.
+        """
+        assert joint_type in ("FixedJoint", "SphericalJoint"), f"Unsupported attachment joint type: {joint_type}"
+        # The joint frames follow USD's convention of being expressed in each body's *scaled* local frame,
+        # whereas MuJoCo's weld anchors live in the unscaled body frame.
+        parent_quat = th.as_tensor(joint_frame_in_parent_frame_quat, dtype=th.float32).cpu()
+        child_quat = th.as_tensor(joint_frame_in_child_frame_quat, dtype=th.float32).cpu()
+        self._attachment_constraints[prim_path] = {
+            "body0": body0,
+            "body1": body1,
+            "anchor0": th.as_tensor(joint_frame_in_parent_frame_pos, dtype=th.float32).cpu() * self._body_scale(body0),
+            "anchor1": th.as_tensor(joint_frame_in_child_frame_pos, dtype=th.float32).cpu() * self._body_scale(body1),
+            # Orientation of body1 relative to body0 implied by both sides' joint frames coinciding.
+            "rel_quat": T.quat_multiply(parent_quat, T.quat_inverse(child_quat)),
+            "torquescale": 1.0 if joint_type == "FixedJoint" else 0.0,
+        }
+        if len(self._attachment_constraints) > len(self._attachment_slots):
+            # Pool exhausted -- grow it with a rebuild, which step_physics_once() runs before the next step.
+            self._joints_dirty = True
+        else:
+            self._sync_attachment_slots()
+        return prim_path
+
+    def remove_attachment_constraint(self, handle):
+        if self._attachment_constraints.pop(handle, None) is not None:
+            self._sync_attachment_slots()
+
+    def _body_scale(self, prim_path):
+        from pxr import Gf
+
+        from omnigibson.physics_backends.newton_visuals import raw_world_transform
+
+        scale = Gf.Transform(raw_world_transform(self.sim.stage.GetPrimAtPath(prim_path))).GetScale()
+        return th.tensor(tuple(scale), dtype=th.float32)
+
+    def _sync_attachment_slots(self):
+        """Writes every live attachment constraint onto the current model's slot pool (in insertion order)
+        and disables the rest. Rewrites the whole pool each call -- it's a handful of rows."""
+        solver = self._get_mujoco_solver()
+        if solver is None or not self._attachment_slots or solver.mjw_model is None:
+            return
+        import newton
+
+        if solver.model is not self._model:
+            # SolverCoupledProxy hands its MuJoCo entry a view model whose equality rows may be re-indexed.
+            if self._attachment_constraints:
+                log.warning("Attachment constraints are not supported alongside cloth/fluid; ignoring them.")
+            return
+
+        eq_map = _wp_to_torch(solver.mjc_eq_to_newton_eq)[0].tolist()
+        newton_to_mjc_eq = {int(n): i for i, n in enumerate(eq_map) if n >= 0}
+        body_map = _wp_to_torch(solver.mjc_body_to_newton)[0].tolist()
+        newton_to_mjc_body = {int(n): i for i, n in enumerate(body_map)}
+        newton_to_mjc_body[-1] = 0
+
+        attrs = self._model.mujoco
+        eq_obj1id = solver.mjw_model.eq_obj1id.numpy()
+        eq_obj2id = solver.mjw_model.eq_obj2id.numpy()
+        anchor = attrs.equality_constraint_anchor.numpy()
+        relpose = attrs.equality_constraint_relpose.numpy()
+        torquescale = attrs.equality_constraint_torquescale.numpy()
+        enabled = attrs.equality_constraint_enabled.numpy()
+
+        specs = list(self._attachment_constraints.items())
+        for i, slot in enumerate(self._attachment_slots):
+            enabled[slot] = False
+            mjc_eq = newton_to_mjc_eq.get(slot)
+            if mjc_eq is None or i >= len(specs):
+                continue
+            handle, spec = specs[i]
+            mjc_body0 = newton_to_mjc_body.get(self._path_body_map.get(spec["body0"], -2))
+            mjc_body1 = newton_to_mjc_body.get(self._path_body_map.get(spec["body1"], -2))
+            if mjc_body0 is None or mjc_body1 is None:
+                log.warning(f"Attachment constraint {handle} references a body missing from the model; skipping.")
+                continue
+            # MuJoCo weld: obj1's anchor is relpose's translation, obj2's anchor is eq anchor, and
+            # relpose's rotation is obj2's orientation in obj1's frame.
+            eq_obj1id[mjc_eq] = mjc_body0
+            eq_obj2id[mjc_eq] = mjc_body1
+            anchor[slot] = spec["anchor1"].numpy()
+            relpose[slot] = th.cat([spec["anchor0"], spec["rel_quat"]]).numpy()
+            torquescale[slot] = spec["torquescale"]
+            enabled[slot] = True
+
+        solver.mjw_model.eq_obj1id.assign(eq_obj1id)
+        solver.mjw_model.eq_obj2id.assign(eq_obj2id)
+        attrs.equality_constraint_anchor.assign(anchor)
+        attrs.equality_constraint_relpose.assign(relpose)
+        attrs.equality_constraint_torquescale.assign(torquescale)
+        attrs.equality_constraint_enabled.assign(enabled)
+        solver.notify_model_changed(newton.ModelFlags.CONSTRAINT_PROPERTIES)
+        # Matches _notify_dof_properties_changed(): don't replay a graph captured before a notify.
+        self._step_graphs = {}
+
+    def _fix_cross_object_constraint_frames(self):
+        """
+        SolverMuJoCo turns each cross-object (loop-closure) joint into a WELD / CONNECT whose relative pose is
+        left for spec.compile() to auto-compute from the bodies' poses *at compile time* -- the build-time poses
+        seeded from raw USD, not where the bodies actually are when the joint was created (e.g. AttachedTo's
+        attach pose). The constraint then yanks the bodies toward that stale relative pose and can launch them.
+        Overwrite each row with the joint's own authored frames instead, using the same data layout as the
+        attachment slots (see _sync_attachment_slots()).
+        """
+        solver = self._get_mujoco_solver()
+        if solver is None or solver.mjw_model is None or not self._cross_object_constraints:
+            return
+        eq_body_pairs = self._resolve_eq_body_pairs(solver)
+        eq_obj1id = _wp_to_torch(solver.mjw_model.eq_obj1id)
+        body_map = _wp_to_torch(solver.mjc_body_to_newton)[0]
+        eq_data = _wp_to_torch(solver.mjw_model.eq_data)
+        for body0, body1, is_spherical, p_pos, p_quat, c_pos, c_quat in self._cross_object_constraints:
+            eq = eq_body_pairs.get((body0, body1))
+            if eq is None:
+                continue
+            # The row may list the bodies in either order; obj1 is "first" in MuJoCo's semantics below.
+            if int(body_map[int(eq_obj1id[eq])]) != body0:
+                p_pos, p_quat, c_pos, c_quat = c_pos, c_quat, p_pos, p_quat
+            row = eq_data[:, eq]
+            device = row.device
+            if is_spherical:
+                # CONNECT: data[0:3] = anchor on obj1, data[3:6] = anchor on obj2
+                row[:, 0:3] = p_pos.to(device)
+                row[:, 3:6] = c_pos.to(device)
+            else:
+                # WELD: data[0:3] = anchor on obj2, data[3:6] = anchor on obj1, data[6:10] = obj2's
+                # orientation in obj1's frame (wxyz), implied by both sides' joint frames coinciding
+                rel = T.quat_multiply(p_quat, T.quat_inverse(c_quat))
+                row[:, 0:3] = c_pos.to(device)
+                row[:, 3:6] = p_pos.to(device)
+                row[:, 6:10] = rel[[3, 0, 1, 2]].to(device)
+        self._step_graphs = {}
 
     def _resolve_eq_body_pairs(self, solver):
         """{(newton_body0, newton_body1): mjc_eq_idx} for every equality constraint (WELD or CONNECT)

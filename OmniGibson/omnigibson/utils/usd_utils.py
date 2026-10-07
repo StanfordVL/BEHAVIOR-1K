@@ -2169,51 +2169,6 @@ def _live_matrix_from_pose(raw_matrix, live_pose):
     return transform.GetMatrix()
 
 
-def _get_world_pose_with_scale_from_fabric_hierarchy(prim_path):
-    if gm.PHYSICS_BACKEND != "physx":
-        # No Fabric exists for a non-Kit backend, and USD's own xform attributes are never synced from
-        # live physics simulation either (no render-facing mirror to push updates into -- see
-        # PhysicsBackend.sync_to_render_layer()'s own no-op for this backend) -- they only reflect
-        # this prim's load-time/last-explicitly-authored pose. Compute the raw USD transform first
-        # (needed regardless, for its SCALE component -- physics never changes scale, so that part is
-        # always correct); if this prim is itself a tracked physics body, splice in the backend's own
-        # live translation/rotation instead of the stale USD ones.
-        prim = og.sim.stage.GetPrimAtPath(prim_path)
-        raw_matrix = lazy.pxr.UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
-        live_pose = og.sim.physics_backend.get_live_world_pose(prim_path)
-        if live_pose is not None:
-            return _live_matrix_from_pose(raw_matrix, live_pose)
-        # prim_path itself isn't a tracked body, but an ANCESTOR might be (e.g. a visual/collision
-        # sub-mesh, or an "emitter" dummy mesh, under a tracked rigid-body link -- see
-        # objects/usd_object.py::_create_emitter_apis()). ComputeLocalToWorldTransform above walked the
-        # raw (stale) USD hierarchy all the way to the stage root, using each ancestor's own frozen USD
-        # pose along the way -- if the nearest tracked ancestor has actually moved, splice in ITS live
-        # pose instead, composed with the prim's own static local-to-ancestor offset (that offset
-        # doesn't change with physics; only the ancestor's own placement in the world does). Found
-        # necessary empirically: without this, a prim's world pose read via its own tracked parent
-        # directly (e.g. XformPrim.set_position_orientation's internal parent-transform lookup) and via
-        # this raw hierarchy walk (e.g. that same prim's own get_position_orientation()) could
-        # disagree, breaking code that assumes a get-then-set-then-get round trip is stable.
-        ancestor_prim = prim.GetParent()
-        while ancestor_prim and ancestor_prim.IsValid():
-            ancestor_path = str(ancestor_prim.GetPath())
-            ancestor_live_pose = og.sim.physics_backend.get_live_world_pose(ancestor_path)
-            if ancestor_live_pose is not None:
-                ancestor_raw_matrix = lazy.pxr.UsdGeom.Xformable(ancestor_prim).ComputeLocalToWorldTransform(
-                    lazy.pxr.Usd.TimeCode.Default()
-                )
-                local_to_ancestor = raw_matrix * ancestor_raw_matrix.GetInverse()
-                ancestor_live_matrix = _live_matrix_from_pose(ancestor_raw_matrix, ancestor_live_pose)
-                return local_to_ancestor * ancestor_live_matrix
-            ancestor_prim = ancestor_prim.GetParent()
-        return raw_matrix
-
-    # Check that no reads from Fabric are happening during a physics step.
-    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
-
-    return og.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
-
-
 def get_world_pose_with_scale(prim_path):
     """
     This is used when information about the prim's global scale is needed,
@@ -2245,17 +2200,6 @@ def get_local_pose(prim_path):
 
 def _get_local_transform_with_scale(prim_path):
     return og.sim.physics_backend.get_local_transform_with_scale(prim_path)
-
-
-def _get_local_pose_with_scale_from_fabric_hierarchy(prim_path):
-    if gm.PHYSICS_BACKEND != "physx":
-        # No Fabric exists for a non-Kit backend; compute the local transform directly from USD instead.
-        prim = og.sim.stage.GetPrimAtPath(prim_path)
-        return lazy.pxr.UsdGeom.Xformable(prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default())
-
-    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
-
-    return og.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
 
 
 def get_local_pose_with_scale(prim_path):
@@ -3213,47 +3157,14 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     """
     assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
 
-    with og.sim.editing_usd(stage=stage):
-        MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
-            "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
-            "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
-            "Plane": lazy.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
-            "Cylinder": lazy.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
-            "Torus": lazy.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
-            "Cone": lazy.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
-            "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
-        }
-
-        evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
-        u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
-        v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
-        hs_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
-        stage = og.sim.stage if stage is None else stage
-
-        # Default half_scale (i.e. half-extent, half_height, radius) is 1.
-        # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
-        #  (currently it only accepts integer-number and floors 0.5 into 0).
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
-        kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
-        if u_patches is not None and v_patches is not None:
-            kwargs["u_patches"] = u_patches
-            kwargs["v_patches"] = v_patches
-
-        # Import now to avoid too-eager load of Omni classes due to inheritance
-        from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
-
-        CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
-
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
+    og.sim.render_backend.create_primitive_mesh(
+        primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage
+    )
 
 
 def _create_mesh_prim_standalone(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
     """
-    Kit-free equivalent of the `CreateMeshPrimWithDefaultXformCommand` branch above, using trimesh to
+    Kit-free equivalent of `KitRenderBackend.create_primitive_mesh()`, using trimesh to
     generate the raw topology. Matches Kit's own convention of generating a 2cm-wide (extents
     [-0.01, 0.01]) default primitive, since `create_primitive_mesh()` rescales by extents * 50.0
     afterward assuming that convention, regardless of which path generated the raw mesh.

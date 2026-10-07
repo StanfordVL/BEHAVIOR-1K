@@ -128,7 +128,16 @@ class AttachedTo(
 
         self.attachment_joint_visuals = defaultdict(list)
         if m.ENABLE_ATTACHMENT_JOINT_VISUALS:
-            self._create_attachment_joint_visuals()
+            # These are built out of Kit-only machinery (OmniPBRMaterialPrim -> omni.kit.commands). They
+            # are a debug visualization, so skip them with a note rather than taking the whole
+            # environment down -- attachment itself works fine without them.
+            if og.sim.render_backend.supports_materials:
+                self._create_attachment_joint_visuals()
+            else:
+                log.warning(
+                    "ENABLE_ATTACHMENT_JOINT_VISUALS is set, but attachment joint visuals need material "
+                    f"support, which {type(og.sim.render_backend).__name__} lacks; skipping them."
+                )
 
         # Reference to the parent object (DatasetObject)
         self.parent = None

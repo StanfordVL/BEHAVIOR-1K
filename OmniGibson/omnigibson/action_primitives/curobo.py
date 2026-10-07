@@ -13,11 +13,6 @@ from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import multi_dim_linspace
 
 
-# Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
-th.backends.cudnn.benchmark = True
-th.backends.cuda.matmul.allow_tf32 = True
-th.backends.cudnn.allow_tf32 = True
-
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
@@ -97,6 +92,14 @@ class CuRoboMotionGenerator:
                 Increasing this value will make the motion planner more conservative in its planning with respect
                 to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
+        # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
+        # These are process-global, so they must only be applied once cuRobo is actually used: this module is
+        # imported by every robot (see robots/robot.py's curobo_path), and TF32's 10-bit mantissa silently corrupts
+        # world-frame geometry elsewhere in OmniGibson whenever it runs on CUDA (e.g. 0.125m error at 150m).
+        th.backends.cudnn.benchmark = True
+        th.backends.cuda.matmul.allow_tf32 = True
+        th.backends.cudnn.allow_tf32 = True
+
         # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
         self.debug = debug
