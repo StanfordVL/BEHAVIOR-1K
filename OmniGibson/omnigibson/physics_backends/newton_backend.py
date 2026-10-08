@@ -17,6 +17,7 @@ explicitly out of scope -- see ``PhysicsBackend.supports_*`` flags and the ``Not
 
 import math
 import os
+from collections import deque
 
 import torch as th
 
@@ -36,6 +37,11 @@ log = create_module_logger(module_name=__name__)
 def _wp_to_torch(array):
     import warp as wp
 
+    # wp.to_torch() raises on a zero-length CPU array: it falls back to numpy.asarray(), which
+    # cannot infer a dtype from an empty buffer. The CUDA path goes through dlpack and is fine.
+    # Hit on every first _rebuild(), which runs from play() before any object has been loaded.
+    if array.size == 0:
+        return th.from_numpy(array.numpy())
     return wp.to_torch(array)
 
 
@@ -204,6 +210,60 @@ class _AppliedActions:
         self.joint_velocities = joint_velocities
 
 
+def _native_to_handle_dof_cols(handle, dof_start, dof_count):
+    """
+    Column order mapping a native-DOF-ordered articulation matrix onto a handle's own DOF order.
+
+    eval_jacobian()/eval_mass_matrix() lay their columns out in the model's native DOF order, but a
+    handle reports its joints in PhysX's order (see _breadth_first_joint_order). Columns with no
+    handle DOF -- a floating base's 6 virtual ones -- keep their native order at the front, matching
+    PhysX's [virtual_base(6), joints] convention. The identity when the two orders already agree.
+    """
+    handle_cols = [int(g) - dof_start for g in handle._global_qd_idx.tolist()]
+    return sorted(set(range(dof_count)) - set(handle_cols)) + handle_cols
+
+
+def _breadth_first_joint_order(model, global_joint_idx):
+    """
+    Reorders an articulation's joints into the order PhysX enumerates its DOFs.
+
+    PhysX walks an articulation breadth-first, so sibling chains interleave by tree depth: r1pro's
+    two arms come out left_arm_joint1, right_arm_joint1, left_arm_joint2, ... Newton builds its model
+    straight from a USD traversal, which is depth-first -- the whole left chain, then the whole right.
+    Both are internally consistent, but a serialized state is a flat vector read positionally, so a
+    recording made under one backend lands every value on the wrong joint when replayed under the
+    other (silently -- same joint count, same state size, no error). Matching PhysX here makes the
+    state format, dataset recordings and every control index backend-independent.
+
+    Ties within a parent body follow @global_joint_idx's own (ascending, i.e. model-build) order.
+    Any joint the walk cannot reach -- a loop closure, or a joint whose parent is outside this
+    articulation -- is appended in that same order, so the result is always a permutation of the input.
+    """
+    joint_parent = model.joint_parent.numpy()
+    joint_child = model.joint_child.numpy()
+    by_parent = {}
+    for j in global_joint_idx:
+        by_parent.setdefault(int(joint_parent[j]), []).append(j)
+    # An articulation's root bodies are the ones that drive a joint but are never driven by one.
+    child_bodies = {int(joint_child[j]) for j in global_joint_idx}
+    queue = deque(sorted(set(by_parent) - child_bodies))
+    ordered, seen_joints, seen_bodies = [], set(), set(queue)
+    while queue:
+        body = queue.popleft()
+        for j in by_parent.get(body, ()):
+            if j in seen_joints:
+                continue
+            seen_joints.add(j)
+            ordered.append(j)
+            child = int(joint_child[j])
+            if child not in seen_bodies:
+                seen_bodies.add(child)
+                queue.append(child)
+    ordered.extend(j for j in global_joint_idx if j not in seen_joints)
+    assert sorted(ordered) == sorted(global_joint_idx), "joint reordering dropped or duplicated a joint"
+    return ordered
+
+
 class NewtonArticulationHandle:
     """
     Per-robot articulation view backed by the shared `newton.Model`/`State`/`Control` owned by
@@ -305,6 +365,9 @@ class NewtonArticulationHandle:
         global_joint_idx = sorted(
             i for i in range(n_joints_total) if joint_child[i] in body_idx_set and i in path_by_joint_idx
         )
+        # ...then re-emit them in PhysX's DOF order, so this handle (and therefore EntityPrim.joints,
+        # every *_control_idx, and the serialized state layout) is backend-independent.
+        global_joint_idx = _breadth_first_joint_order(model, global_joint_idx)
 
         self._global_joint_idx = global_joint_idx
         self._joint_dof_counts = []
@@ -1846,7 +1909,11 @@ class NewtonBackend(PhysicsBackend):
         dof_end = int(joint_qd_start[art_end].item())
         dof_count = dof_end - dof_start
 
-        return H_all[art_idx, :dof_count, :dof_count]
+        # Both axes are DOF-indexed, so both follow the handle's order -- and must stay consistent
+        # with _compute_jacobian()'s columns, since OSC indexes them with the same convention.
+        cols = _native_to_handle_dof_cols(handle, dof_start, dof_count)
+        H = H_all[art_idx, :dof_count, :dof_count]
+        return H[cols][:, cols]
 
     def _compute_jacobian(self, handle):
         """
@@ -1878,7 +1945,8 @@ class NewtonBackend(PhysicsBackend):
         max_links = model.max_joints_per_articulation
         max_dofs = model.max_dofs_per_articulation
         # Drop row-block 0 (the root body's own jacobian) and trim trailing zero-padding on both axes.
-        return J_all[art_idx].reshape(max_links, 6, max_dofs)[1:link_count, :, :dof_count]
+        J = J_all[art_idx].reshape(max_links, 6, max_dofs)[1:link_count, :, :dof_count]
+        return J[:, :, _native_to_handle_dof_cols(handle, dof_start, dof_count)]
 
     @property
     def physics_sim_view(self):
@@ -2610,9 +2678,17 @@ class NewtonBackend(PhysicsBackend):
             qd_start = joint_qd_start[joint_idx]
             # Zero-DOF joints (e.g. the FIXED joints attaching massless reference frames like
             # laser_link/eyes/eef_link) don't reserve a target_ke/kd slot at all -- their qd_start is
-            # just a "one past the end" placeholder shared with whatever joint comes next (or the total
-            # dof count, if they're last). Nothing to overwrite for these.
-            if qd_start >= len(builder.joint_target_ke):
+            # just a "one past the end" placeholder shared with whatever joint comes NEXT (or the total
+            # dof count, if they're last). Writing at that index therefore lands on the next joint's
+            # DOF and silently overwrites its gains, effort limit and target mode with the fixed
+            # joint's (absent) drive values. Bounding on `qd_start >= len(...)` only catches the case
+            # where such a joint happens to be last; r1pro has six aliased slots, among them
+            # left/right_gripper_joint sitting immediately before each gripper's finger_joint1, and
+            # torso_joint1 sharing with all six wheel/steer joints. Skip on the joint's real DOF count.
+            next_qd_start = (
+                joint_qd_start[joint_idx + 1] if joint_idx + 1 < len(joint_qd_start) else builder.joint_dof_count
+            )
+            if next_qd_start - qd_start <= 0 or qd_start >= len(builder.joint_target_ke):
                 continue
             prim = self.sim.stage.GetPrimAtPath(joint_path)
             drive = lazy.pxr.UsdPhysics.DriveAPI.Get(prim, "angular") or lazy.pxr.UsdPhysics.DriveAPI.Get(
@@ -3088,6 +3164,8 @@ class NewtonBackend(PhysicsBackend):
         # isn't enough.
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
         self._configure_finger_contacts(finger_body_idx)
+        # Also solver-dependent: effort limits only exist once the mjc actuators do.
+        self._apply_actuator_force_limits()
         # Re-apply any attachment constraints that were live before this rebuild onto the fresh pool.
         self._sync_attachment_slots()
         self._fix_cross_object_constraint_frames()
@@ -3920,6 +3998,53 @@ class NewtonBackend(PhysicsBackend):
 
         scale = Gf.Transform(raw_world_transform(self.sim.stage.GetPrimAtPath(prim_path))).GetScale()
         return th.tensor(tuple(scale), dtype=th.float32)
+
+    def _apply_actuator_force_limits(self):
+        """
+        Propagates each joint's effort limit onto its MuJoCo actuator(s).
+
+        SolverMuJoCo does not carry `joint_effort_limit` across when it compiles the model: every
+        actuator comes out with `actuator_forcelimited = False` and `actuator_forcerange = (0, 0)`,
+        MuJoCo's encoding for *unlimited*, so an authored ceiling never reaches the solver that
+        actually runs. MJWarp gates the clamp on the flag rather than the range (forward.py:
+        `if actuator_forcelimited[uid]: force = wp.clamp(force, forcerange[0], forcerange[1])`), so
+        both must be written.
+
+        MuJoCo clamps per actuator, and a POSITION_VELOCITY joint has two (position + velocity), so a
+        joint's combined authority here is up to 2x its limit rather than exactly 1x. That is a far
+        better bound than none, and splitting the limit between them would under-power the servo.
+        """
+        solver = self._get_mujoco_solver()
+        if solver is None or solver.mjw_model is None:
+            return
+        effort = self._model.joint_effort_limit.numpy()
+        actuator_to_dof = _wp_to_torch(solver.mjc_actuator_to_newton_idx)
+        if actuator_to_dof.dim() > 1:
+            actuator_to_dof = actuator_to_dof[0]
+        forcerange = solver.mjw_model.actuator_forcerange.numpy()
+        forcelimited = solver.mjw_model.actuator_forcelimited.numpy()
+        n_actuators = forcerange.shape[1] if forcerange.ndim > 1 else forcerange.shape[0]
+        limited = 0
+        for actuator_idx in range(min(n_actuators, int(actuator_to_dof.shape[0]))):
+            dof = int(actuator_to_dof[actuator_idx])
+            if dof < 0 or dof >= len(effort):
+                continue
+            limit = float(effort[dof])
+            if not math.isfinite(limit) or limit <= 0.0:
+                # inf/0 means "no authored ceiling" -- leave MuJoCo's unlimited encoding in place.
+                forcelimited[actuator_idx] = False
+                continue
+            if forcerange.ndim > 2:
+                forcerange[:, actuator_idx] = (-limit, limit)
+            else:
+                forcerange[actuator_idx] = (-limit, limit)
+            forcelimited[actuator_idx] = True
+            limited += 1
+        solver.mjw_model.actuator_forcerange.assign(forcerange)
+        solver.mjw_model.actuator_forcelimited.assign(forcelimited)
+        # Don't replay a graph captured against the old limits.
+        self._step_graphs = {}
+        log.debug(f"Applied effort limits to {limited}/{n_actuators} MuJoCo actuators.")
 
     def _sync_attachment_slots(self):
         """Writes every live attachment constraint onto the current model's slot pool (in insertion order)
