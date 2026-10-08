@@ -1,5 +1,7 @@
+import json
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 import torch as th
 
@@ -9,6 +11,7 @@ from omnigibson.eval.evaluator import (
     InstanceEvaluationState,
     evaluate_instances_batched,
 )
+from omnigibson.eval.utils.network_utils import PolicyConnectionError, WebsocketClientPolicy, packb
 from omnigibson.metrics import TaskMetric
 
 
@@ -51,11 +54,172 @@ def test_evaluate_instances_batched_tracks_environments_and_requires_equal_batch
         )
 
 
+def test_evaluate_instances_batched_records_connection_failure_without_advancing_step():
+    calls = []
+
+    def step_fn(active_env_indices):
+        calls.append(active_env_indices)
+        if len(calls) == 1:
+            return [True, False], [False, False]
+        raise PolicyConnectionError("reconnect limit reached")
+
+    results = evaluate_instances_batched(
+        instances=[101, 202],
+        num_envs=2,
+        load_fn=lambda instances: None,
+        step_fn=step_fn,
+        record_fn=lambda **record: record,
+    )
+
+    assert calls == [[0, 1], [1]]
+    assert results[101]["step"] == 1
+    assert results[202]["step"] == 1
+    assert results[202]["connection_failure"] == "reconnect limit reached"
+    assert results[202]["truncated"]
+
+
+def test_evaluate_instances_batched_records_connection_failure_during_load():
+    def load_fn(instances):
+        raise PolicyConnectionError("reconnect limit reached")
+
+    results = evaluate_instances_batched(
+        instances=[101],
+        num_envs=1,
+        load_fn=load_fn,
+        step_fn=lambda active_env_indices: pytest.fail("simulation should not step"),
+        record_fn=lambda **record: record,
+    )
+
+    assert results[101]["step"] == 0
+    assert results[101]["connection_failure"] == "reconnect limit reached"
+
+
+@pytest.mark.parametrize("disconnect", [ConnectionResetError("lost connection"), TimeoutError("response timed out")])
+def test_websocket_policy_reconnects_with_the_same_observation(monkeypatch, disconnect):
+    class FakeSocket:
+        def __init__(self, response):
+            self.response = response
+            self.sent = []
+
+        def send(self, data):
+            self.sent.append(data)
+
+        def recv(self, timeout=None):
+            if isinstance(self.response, Exception):
+                raise self.response
+            return self.response
+
+    first_socket = FakeSocket(disconnect)
+    second_socket = FakeSocket(packb({"action": np.array([0.5], dtype=np.float32)}))
+    policy = WebsocketClientPolicy(allow_reconnect=True)
+    policy._ws = first_socket
+    monkeypatch.setattr(policy, "_wait_for_server", lambda max_attempts=None: (second_socket, {}))
+
+    action = policy.act({"observation": th.tensor([1.0])})
+
+    assert th.equal(action, th.tensor([0.5]))
+    assert first_socket.sent == second_socket.sent
+    assert policy._reconnect_attempts == 1
+
+
+def test_websocket_policy_fails_after_three_reconnects(monkeypatch):
+    class BrokenSocket:
+        def send(self, data):
+            raise ConnectionResetError("lost connection")
+
+    policy = WebsocketClientPolicy(allow_reconnect=True)
+    policy._ws = BrokenSocket()
+    reconnects = []
+
+    def reconnect(max_attempts=None):
+        reconnects.append(max_attempts)
+        return BrokenSocket(), {}
+
+    monkeypatch.setattr(policy, "_wait_for_server", reconnect)
+    with pytest.raises(PolicyConnectionError, match="after 3 reconnect attempts"):
+        policy.act({"observation": th.tensor([1.0])})
+
+    assert reconnects == [1, 1, 1]
+
+
+def test_websocket_policy_fails_rollout_when_server_stays_unavailable(monkeypatch):
+    policy = WebsocketClientPolicy(allow_reconnect=True)
+    attempts = []
+
+    def unavailable(max_attempts=None):
+        attempts.append(max_attempts)
+        raise PolicyConnectionError("server unavailable")
+
+    monkeypatch.setattr(policy, "_wait_for_server", unavailable)
+    monkeypatch.setattr("omnigibson.eval.utils.network_utils.time.sleep", lambda seconds: None)
+
+    with pytest.raises(PolicyConnectionError, match="after 3 reconnect attempts"):
+        policy.reset()
+
+    assert attempts == [1, 1, 1, 1]
+
+
+def test_websocket_policy_reconnect_budget_spans_steps(monkeypatch):
+    class ActionThenDisconnectSocket:
+        def __init__(self):
+            self.sent = False
+
+        def send(self, data):
+            if self.sent:
+                raise ConnectionResetError("lost connection")
+            self.sent = True
+
+        def recv(self, timeout=None):
+            return packb({"action": np.array([0.5], dtype=np.float32)})
+
+    policy = WebsocketClientPolicy(allow_reconnect=True)
+    policy._ws = ActionThenDisconnectSocket()
+    monkeypatch.setattr(policy, "_wait_for_server", lambda max_attempts=None: (ActionThenDisconnectSocket(), {}))
+
+    for _ in range(4):
+        assert th.equal(policy.act({"observation": th.tensor([1.0])}), th.tensor([0.5]))
+    with pytest.raises(PolicyConnectionError, match="after 3 reconnect attempts"):
+        policy.act({"observation": th.tensor([1.0])})
+
+    policy.reset()
+    assert policy._reconnect_attempts == 1
+
+
+def test_batched_evaluator_writes_failed_result_after_connection_loss(tmp_path, monkeypatch):
+    evaluator = BatchedEvaluator.__new__(BatchedEvaluator)
+    evaluator.cfg = SimpleNamespace(task=SimpleNamespace(name="turning_on_radio"))
+    evaluator.num_envs = 1
+    evaluator.n_trials = 0
+    evaluator.n_success_trials = 0
+    evaluator.instance_eval_states = [
+        SimpleNamespace(active=True, env_accessor=SimpleNamespace(success=True), metrics=[], video_writer=None)
+    ]
+    evaluator.load_batch = lambda *args, **kwargs: None
+
+    def step_fn(active_env_indices):
+        raise PolicyConnectionError("reconnect limit reached")
+
+    evaluator._step_fn = step_fn
+    monkeypatch.setattr("omnigibson.eval.evaluator.og.sim", SimpleNamespace(get_rendering_dt=lambda: 1 / 30))
+
+    result = evaluator.run([101], metrics_dir=str(tmp_path))[101]
+    saved = json.loads((tmp_path / "turning_on_radio_101_0.json").read_text())
+
+    assert result == saved
+    assert result["steps"] == 0
+    assert result["success"] is False
+    assert result["failure_reason"] == "policy_connection_lost"
+    assert result["q_score"]["final"] == 0.0
+    assert result["time"]["normalized_time"] == pytest.approx(2 / 3)
+    assert result["normalized_agent_distance"] == {"base": 0.0, "left": 0.0, "right": 0.0}
+    assert evaluator.n_trials == 1
+
+
 def test_instance_evaluation_state_owns_one_logical_environment():
     robots = [object(), object()]
     scenes = [SimpleNamespace(robots=[robot]) for robot in robots]
     task = SimpleNamespace(
-        object_scope=[{"object": 0}, {"object": 1}],
+        object_scopes=[{"object": 0}, {"object": 1}],
         success=th.tensor([False, True]),
         get_goal_option_satisfaction=lambda env_idx: [[env_idx == 1]],
     )

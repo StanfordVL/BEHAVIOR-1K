@@ -24,9 +24,15 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-__all__ = ["WebsocketClientPolicy", "WebsocketPolicyServer"]
+__all__ = ["PolicyConnectionError", "WebsocketClientPolicy", "WebsocketPolicyServer"]
 
 ACTION_CHUNK_REQUEST_KEY = "__action_chunk_size__"
+MAX_RECONNECTS_PER_ROLLOUT = 3
+POLICY_RESPONSE_TIMEOUT = 300
+
+
+class PolicyConnectionError(RuntimeError):
+    """The policy connection could not be restored for the current rollout."""
 
 
 class WebsocketClientPolicy:
@@ -54,7 +60,7 @@ class WebsocketClientPolicy:
             api_key (str, optional): API key to include in the Authorization header when connecting to the websocket server, if required.
             allow_reconnect (bool): Whether to allow automatic reconnection if the websocket connection is lost.
                 If False, the client will raise an error if the connection is lost.
-                If True, the client will attempt to reconnect indefinitely with a delay between attempts.
+                If True, the client will attempt to reconnect up to three times per rollout.
             action_chunk_size (int): Number of server-returned actions to execute before requesting a new
                 observation-conditioned action. Values <= 1 disable chunk requests. Only enable this when the
                 server returns an exact open-loop action sequence produced from the current observation.
@@ -68,11 +74,14 @@ class WebsocketClientPolicy:
         self._action_chunk = None
         self._action_chunk_index = 0
         self._chunk_requests_supported = self._action_chunk_size > 1
+        self._reconnect_attempts = 0
 
     def get_server_metadata(self) -> Dict:
         return self._server_metadata
 
-    def _wait_for_server(self) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
+    def _wait_for_server(
+        self, max_attempts: Optional[int] = None
+    ) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
         parsed = urlparse(self._uri)
         host = parsed.hostname
         port = parsed.port
@@ -80,7 +89,9 @@ class WebsocketClientPolicy:
         health_url = f"{http_scheme}://{host}:{port}/healthz"
 
         # First, wait for the health check to pass
+        health_attempts = 0
         while True:
+            health_attempts += 1
             try:
                 response = requests.get(health_url, timeout=2)
                 if response.ok:
@@ -88,11 +99,14 @@ class WebsocketClientPolicy:
                     break
             except Exception:
                 pass
+            if max_attempts is not None and health_attempts >= max_attempts:
+                raise PolicyConnectionError(f"Health check failed for {health_url}")
             logger.info(f"Health check failed, waiting for server at {http_scheme}://{host}:{port}...")
             time.sleep(5)
 
-        # Now attempt websocket connection (rest of the code remains the same)
+        connection_attempts = 0
         while True:
+            connection_attempts += 1
             try:
                 headers = {"Authorization": f"Api-Key {self._api_key}"} if self._api_key else None
                 conn = websockets.sync.client.connect(
@@ -102,13 +116,49 @@ class WebsocketClientPolicy:
                     additional_headers=headers,
                     ping_interval=60,
                     ping_timeout=300,
+                    open_timeout=10,
                 )
-                metadata = unpackb(conn.recv())
+                metadata = unpackb(conn.recv(timeout=10))
                 logger.info("Connected to server!")
                 return conn, metadata
-            except (ConnectionRefusedError, websockets.exceptions.InvalidMessage, EOFError) as e:
+            except (OSError, EOFError, websockets.exceptions.WebSocketException) as e:
+                if max_attempts is not None and connection_attempts >= max_attempts:
+                    raise PolicyConnectionError(f"Websocket connection failed: {e}") from e
                 logger.info(f"Websocket connection failed ({e}), retrying...")
                 time.sleep(5)
+
+    def _reconnect(self, error: Exception) -> None:
+        self._ws = None
+        if not self._allow_reconnect:
+            raise PolicyConnectionError(f"Websocket connection lost: {error}") from error
+        while self._reconnect_attempts < MAX_RECONNECTS_PER_ROLLOUT:
+            self._reconnect_attempts += 1
+            logger.warning(
+                "Connection lost, reconnecting (%s/%s)...",
+                self._reconnect_attempts,
+                MAX_RECONNECTS_PER_ROLLOUT,
+            )
+            try:
+                self._ws, self._server_metadata = self._wait_for_server(max_attempts=1)
+                return
+            except PolicyConnectionError as e:
+                error = e
+                if self._reconnect_attempts < MAX_RECONNECTS_PER_ROLLOUT:
+                    time.sleep(5)
+        raise PolicyConnectionError(
+            f"Policy connection failed after {MAX_RECONNECTS_PER_ROLLOUT} reconnect attempts: {error}"
+        ) from error
+
+    def _ensure_connected(self) -> None:
+        if self._ws is not None:
+            return
+        if self._server_metadata is not None:
+            self._reconnect(ConnectionError("Previous rollout lost its policy connection"))
+            return
+        try:
+            self._ws, self._server_metadata = self._wait_for_server(max_attempts=1 if self._allow_reconnect else None)
+        except PolicyConnectionError as e:
+            self._reconnect(e)
 
     def act(self, obs: Dict) -> th.Tensor:
         if self._action_chunk is not None and self._action_chunk_index < self._action_chunk.shape[-2]:
@@ -116,67 +166,65 @@ class WebsocketClientPolicy:
             self._action_chunk_index += 1
             return action
 
-        if self._ws is None:
-            self._ws, self._server_metadata = self._wait_for_server()
+        self._ensure_connected()
 
         request = obs
         if self._chunk_requests_supported:
             request = dict(obs)
             request[ACTION_CHUNK_REQUEST_KEY] = self._action_chunk_size
         data = self._packer.pack(request)
-        max_retries = 2
-        response = None
-
-        for attempt in range(max_retries + 1):
+        missing_action_retries = 0
+        while True:
             try:
                 self._ws.send(data)
-                response = self._ws.recv()
-                if isinstance(response, str):
-                    raise RuntimeError(f"Error in inference server:\n{response}")
+                response = self._ws.recv(timeout=POLICY_RESPONSE_TIMEOUT)
+            except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
+                self._reconnect(e)
+                continue
 
-                action_dict = unpackb(response)
-                if "action" not in action_dict:
-                    if attempt < max_retries:
-                        logger.warning(
-                            f"Server response missing 'action' key, retrying ({attempt + 1}/{max_retries})..."
-                        )
-                        continue
-                    raise RuntimeError(f"Server response missing 'action' key: {action_dict}")
-                action = th.from_numpy(deepcopy(action_dict["action"])).to(th.float32)
-                if self._chunk_requests_supported:
-                    if "action_chunk" in action_dict:
-                        chunk = th.from_numpy(deepcopy(action_dict["action_chunk"])).to(th.float32)
-                        expected_shape = (*action.shape[:-1], self._action_chunk_size, action.shape[-1])
-                        if chunk.shape != expected_shape:
-                            raise RuntimeError(
-                                f"Server returned action_chunk shape {tuple(chunk.shape)}, expected {expected_shape}."
-                            )
-                        if not th.equal(chunk[..., 0, :], action):
-                            raise RuntimeError("Server action must exactly equal action_chunk[..., 0, :].")
-                        self._action_chunk = chunk
-                        self._action_chunk_index = 1
-                    else:
-                        logger.warning(
-                            "Policy server does not support action chunks; falling back to one request per step."
-                        )
-                        self._chunk_requests_supported = False
-                return action
+            if isinstance(response, str):
+                raise RuntimeError(f"Error in inference server:\n{response}")
 
-            except websockets.exceptions.ConnectionClosedError as e:
-                if self._allow_reconnect and attempt < max_retries:
-                    logger.warning(f"Connection lost, reconnecting (attempt {attempt + 1}/{max_retries})...")
-                    self._ws, self._server_metadata = self._wait_for_server()
+            action_dict = unpackb(response)
+            if "action" not in action_dict:
+                if missing_action_retries < 2:
+                    missing_action_retries += 1
+                    logger.warning("Server response missing 'action' key, retrying (%s/2)...", missing_action_retries)
                     continue
-                raise RuntimeError(f"Websocket connection error: {e}")
+                raise RuntimeError(f"Server response missing 'action' key: {action_dict}")
+            action = th.from_numpy(deepcopy(action_dict["action"])).to(th.float32)
+            if self._chunk_requests_supported:
+                if "action_chunk" in action_dict:
+                    chunk = th.from_numpy(deepcopy(action_dict["action_chunk"])).to(th.float32)
+                    expected_shape = (*action.shape[:-1], self._action_chunk_size, action.shape[-1])
+                    if chunk.shape != expected_shape:
+                        raise RuntimeError(
+                            f"Server returned action_chunk shape {tuple(chunk.shape)}, expected {expected_shape}."
+                        )
+                    if not th.equal(chunk[..., 0, :], action):
+                        raise RuntimeError("Server action must exactly equal action_chunk[..., 0, :].")
+                    self._action_chunk = chunk
+                    self._action_chunk_index = 1
+                else:
+                    logger.warning(
+                        "Policy server does not support action chunks; falling back to one request per step."
+                    )
+                    self._chunk_requests_supported = False
+            return action
 
     def reset(self) -> None:
+        self._reconnect_attempts = 0
         self._action_chunk = None
         self._action_chunk_index = 0
-        if self._ws is None:
-            self._ws, self._server_metadata = self._wait_for_server()
+        self._ensure_connected()
 
         data = self._packer.pack({"reset": True})
-        self._ws.send(data)
+        while True:
+            try:
+                self._ws.send(data)
+                return
+            except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
+                self._reconnect(e)
 
 
 class WebsocketPolicyServer:
