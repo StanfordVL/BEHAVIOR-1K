@@ -539,7 +539,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         n_particles = len(positions)
         if orientations is None:
-            orientations = th.zeros((n_particles, 4), device=positions.device)
+            orientations = th.zeros((n_particles, 4), device=og.sim.device)
             orientations[:, -1] = 1.0
         link_prim_paths = [None] * n_particles if is_cloth else link_prim_paths
 
@@ -548,7 +548,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         bbox_extents_local = [(self.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # Generate particles
-        z_up = th.zeros((3, 1), device=positions.device)
+        z_up = th.zeros((3, 1), device=og.sim.device)
         z_up[-1] = 1.0
         for position, orientation, scale, bbox_extent_local, link_prim_path in zip(
             positions, orientations, scales, bbox_extents_local, link_prim_paths
