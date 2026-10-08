@@ -146,6 +146,7 @@ def main() -> None:
             "_target_": "omnigibson.eval.policies.WebsocketPolicy",
             "host": args.host,
             "port": args.port,
+            "allow_reconnect": True,
             "action_chunk_size": args.replay_action_chunk_size,
         }
     else:

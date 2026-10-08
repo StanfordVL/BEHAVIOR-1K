@@ -30,6 +30,7 @@ from omnigibson.eval.utils.eval_utils import (
     get_robot_camera_names,
 )
 from omnigibson.eval.utils.light_utils import LightToggleSynchronizer, set_light_control_toggles
+from omnigibson.eval.utils.network_utils import PolicyConnectionError
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.eval.utils.score_utils import load_human_stats
 from omnigibson.macros import gm
@@ -113,13 +114,38 @@ def evaluate_instances_batched(
 
     results: Dict[object, object] = {}
     env_idx_to_instance: Dict[int, object] = {env_idx: instance for env_idx, instance in enumerate(instances)}
-    load_fn(dict(env_idx_to_instance))
-
     active = {env_idx: True for env_idx in env_idx_to_instance}
     step = 0
+    try:
+        load_fn(dict(env_idx_to_instance))
+    except PolicyConnectionError as e:
+        return {
+            instance: record_fn(
+                env_idx=env_idx,
+                instance=instance,
+                step=step,
+                terminated=False,
+                truncated=True,
+                connection_failure=str(e),
+            )
+            for env_idx, instance in env_idx_to_instance.items()
+        }
+
     while any(active.values()):
         active_env_indices = sorted(env_idx for env_idx, is_active in active.items() if is_active)
-        terminated, truncated = step_fn(active_env_indices)
+        try:
+            terminated, truncated = step_fn(active_env_indices)
+        except PolicyConnectionError as e:
+            for env_idx in active_env_indices:
+                results[env_idx_to_instance[env_idx]] = record_fn(
+                    env_idx=env_idx,
+                    instance=env_idx_to_instance[env_idx],
+                    step=step,
+                    terminated=False,
+                    truncated=True,
+                    connection_failure=str(e),
+                )
+            break
         step += 1
 
         hit_cap = max_steps is not None and step >= max_steps
@@ -666,17 +692,31 @@ class BatchedEvaluator:
                     self._write_video(self.instance_eval_states[env_idx])
             return terminated, truncated
 
-        def record_fn(env_idx, instance, step, terminated, truncated):
+        def record_fn(env_idx, instance, step, terminated, truncated, connection_failure=None):
             instance_eval_state = self.instance_eval_states[env_idx]
             instance_eval_state.active = False
             self.n_trials += 1
-            success = instance_eval_state.env_accessor.success
+            success = False if connection_failure else instance_eval_state.env_accessor.success
             if success:
                 self.n_success_trials += 1
             result = {"task": task_name, "instance_id": int(instance), "rollout_id": rollout_id, "steps": step}
             result["success"] = success
-            for metric in instance_eval_state.metrics:
-                result.update(metric.aggregate())
+            if not connection_failure or step > 0:
+                for metric in instance_eval_state.metrics:
+                    result.update(metric.aggregate())
+            if connection_failure:
+                result["failure_reason"] = "policy_connection_lost"
+                result["q_score"] = {"final": 0.0}
+                result.setdefault("agent_distance", {"base": 0.0, "left": 0.0, "right": 0.0})
+                result["normalized_agent_distance"] = {"base": 0.0, "left": 0.0, "right": 0.0}
+                result.setdefault(
+                    "time",
+                    {"simulator_steps": step, "simulator_time": step * og.sim.get_rendering_dt()},
+                )
+                result["time"]["normalized_time"] = 1 / EVAL_TIMEOUT_MULTIPLIER
+                logger.warning(
+                    "Policy connection failed at step %s for instance %s: %s", step, instance, connection_failure
+                )
             if metrics_dir is not None:
                 with open(os.path.join(metrics_dir, f"{task_name}_{instance}_{rollout_id}.json"), "w") as f:
                     json.dump(result, f, indent=2, default=float)
