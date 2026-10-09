@@ -2330,7 +2330,12 @@ class NewtonBackend(PhysicsBackend):
         builder.default_shape_cfg.kd = 5.0e1
         builder.default_shape_cfg.kf = 1.0e2
         builder.default_shape_cfg.mu = 0.9
-        builder.add_ground_plane()
+        # Keep the ground plane collidable but stop it rendering: every dataset scene brings its own
+        # floor meshes whose top face sits at exactly z = 0, which is also where this infinite plane
+        # lands, and two coplanar visible surfaces z-fight -- it shows up as bands of the plane's flat
+        # grey flickering across the floor at grazing angles.
+        ground_shape = builder.add_ground_plane()
+        builder.shape_flags[ground_shape] = int(builder.shape_flags[ground_shape]) & ~int(newton.ShapeFlags.VISIBLE)
 
         if self._fluid_systems:
             # Must be registered before any particles referencing "mpm:*" custom attributes are added.
