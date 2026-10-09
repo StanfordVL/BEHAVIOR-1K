@@ -6,55 +6,57 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 ### 10/07/2026 {#10072026}
 
-**BEHAVIOR-1K v3.9.3.post2:**
+**Challenge rule clarifications:**
 
-This release contains a single bug fix for custom robot evaluation. If your submission does not use a custom robot, no update is required; you can continue using the previously specified release.
+1. If your submission uses a custom robot, please update to `v3.9.3.post2`. Otherwise, no update is required; you can continue using the previously specified release.
 
-**Help us plan evaluation timeouts:**
+**Bug fixes:**
 
-Please fill out the [Inference Speed Form](https://forms.gle/5GNqc2eNhFTx4UhN8) with your policy type and expected average inference speed, including time spent on external API calls if applicable. Please include units such as seconds per inference or FPS.
+1. Released `v3.9.3.post2` with a single bug fix for custom robot evaluation.
 
-We are planning a wall-clock timeout for each evaluation episode. Your responses will help us choose a limit that accommodates different policy runtimes while keeping evaluation manageable. Thank you!
+**New features:**
+
+1. Introduced the [Inference Speed Form](https://forms.gle/5GNqc2eNhFTx4UhN8) to help plan evaluation timeouts. Please provide your policy type and expected average inference speed, including time spent on external API calls if applicable, with units such as seconds per inference or FPS. Your responses will help us choose a wall-clock timeout for each evaluation episode that accommodates different policy runtimes while keeping evaluation manageable.
 
 ---
 
 ### 09/28/2026 {#09282026}
 
-**Final submission reminder:**
+**Challenge rule clarifications:**
 
-The challenge deadline is approaching: **October 16, 2026, at 11:59 PM Anywhere on Earth (AoE)**. Please review the following updates before submitting your final solution through the [submission portal](https://behavior-1k-2026-challenge-leaderboard.hf.space/submit).
+1. The submission deadline is **October 16, 2026, at 11:59 PM Anywhere on Earth (AoE)**. Please review these updates before submitting your final solution through the [submission portal](https://behavior-1k-2026-challenge-leaderboard.hf.space/submit).
 
-**BEHAVIOR-1K v3.9.3 release highlights:**
+2. Please use `v3.9.3-post1`, which includes an additional light-toggle state fix over `v3.9.3`. We accept final results evaluated on either `v3.9.2` or the `v3.9.3` series, and will use `v3.9.3-post1` for final hidden-test evaluations. Extensive testing has confirmed consistent physics, visual behavior, and policy performance between v3.9.2 and v3.9.3.
 
-- **Vectorized environments:** Run multiple scenes and task instances concurrently through the standard `Environment` API.
-- **Parallel policy evaluation:** Evaluate multiple challenge instances in batches for substantially higher throughput.
-- **Improved evaluation tooling:** Support for batched policy transport and optional action-chunk replay.
-- **Multi-environment correctness fixes:** More reliable task initialization, rewards, metrics, resets, state restoration, and demonstration replay.
-- **Installation improvements:** More robust Isaac Sim wheel downloads, with clearer failures and retry behavior.
+3. **Tiled rendering is not recommended.** Although it can speed up evaluation, it introduces visual artifacts that may be out of distribution for your policy. We will **not** use tiled rendering for final evaluations.
 
-**Release correction:** The release to use is **v3.9.3-post1**, which includes an additional fix for the light-toggle state.
+4. Ensure that all links in your submission have the necessary viewing permissions so we can inspect your solution and results.
 
-We accept final results evaluated on either **v3.9.2** or the **v3.9.3 series**. We will use **v3.9.3-post1** for final hidden-test evaluations. Extensive testing has confirmed consistent physics, visual behavior, and policy performance between v3.9.2 and v3.9.3.
+5. For each task ID and instance ID, we will use the same policy-server IP address and port throughout the rollout to support history-dependent policies. For IP-based submissions, we will attempt to reconnect up to three times after a network disconnection. If reconnection fails, the rollout will count as a failure.
 
-For parallel evaluation, set `--num-envs` to match the number of instance indices evaluated together. Existing single-environment workflows remain supported with `--num-envs=1`.
+6. Due to limited compute, we will evaluate the top few submissions on hidden test instances before the November announcement. These hidden-test results will determine the final leaderboard ranking.
 
-**Tiled rendering is not recommended.** Although it can speed up evaluation, it introduces visual artifacts that may be out of distribution for your policy. We will **not** use tiled rendering for final evaluations.
+7. Partial submissions are allowed, including results for a subset of tasks or instances. Hidden-test evaluation will follow the tasks and instances covered by your submission; unsubmitted tasks and instances will count as zero.
 
-**Additional guidelines and requirements:**
+8. We will introduce a global episode timer and a per-action response timer to ensure policies remain responsive. Details will be announced as soon as they are available.
 
-1. Ensure that all links in your submission have the necessary viewing permissions so we can inspect your solution and results.
+9. This year's challenge will be hosted at **CoRL 2026 in Austin, Texas, US, November 9–12, 2026**. Top submissions will have the opportunity to present at a workshop and booth. Details about the presentation format and invitations to attend will be sent after the submission deadline.
 
-2. For each task ID and instance ID, we will use the same policy-server IP address and port throughout the rollout to support history-dependent policies. For IP-based submissions, we will attempt to reconnect up to three times after a network disconnection. If reconnection fails, the rollout will count as a failure.
+**Bug fixes:**
 
-3. Due to limited compute, we will evaluate the top few submissions on hidden test instances before the November announcement. These hidden-test results will determine the final leaderboard ranking.
+1. Fixed the light-toggle state in `v3.9.3-post1`.
 
-4. Partial submissions are allowed, including results for a subset of tasks or instances. Hidden-test evaluation will follow the tasks and instances covered by your submission; unsubmitted tasks and instances will count as zero.
+2. Improved multi-environment correctness for task initialization, rewards, metrics, resets, state restoration, and demonstration replay.
 
-5. We will introduce a global episode timer and a per-action response timer to ensure policies remain responsive. Details will be announced as soon as they are available.
+3. Made Isaac Sim wheel downloads more robust, with clearer failures and retry behavior.
 
-**Venue:**
+**New features:**
 
-This year's challenge will be hosted at **CoRL 2026 in Austin, Texas, US, November 9–12, 2026**. Top submissions will have the opportunity to present at a workshop and booth. Details about the presentation format and invitations to attend will be sent after the submission deadline.
+1. Added vectorized environments to run multiple scenes and task instances concurrently through the standard `Environment` API.
+
+2. Added parallel policy evaluation to evaluate multiple challenge instances in batches for substantially higher throughput. Set `--num-envs` to match the number of instance indices evaluated together. Existing single-environment workflows remain supported with `--num-envs=1`.
+
+3. Added support for batched policy transport and optional action-chunk replay.
 
 ---
 
