@@ -91,6 +91,11 @@ m.BASE_JOINT_CONTROLLER_POSITION_KP = 100.0
 m.NEWTON_TRUNK_POSITION_KP = 20000.0
 m.NEWTON_TRUNK_POSITION_KD = 2000.0
 
+# Small finger links need much lower gains than arms: the generic Newton 3000/300 servo
+# overwhelms contacts with lightweight objects. Keep explicit user gains authoritative.
+m.NEWTON_GRIPPER_POSITION_KP = 30.0
+m.NEWTON_GRIPPER_POSITION_KD = 3.0
+
 # Passive damping/stiffness for a holonomic base's unactuated z/rx/ry virtual joints under Newton --
 # see _newton_passive_base_dofs() for why these need it at all. Damping alone was measured to only
 # halve the tip-over (peak pitch 109deg -> 61deg, still climbing) because a damper supplies no
@@ -683,6 +688,14 @@ class Robot(USDObject, GymObservable):
             ):
                 isaac_kp = th.full_like(isaac_kp, m.NEWTON_TRUNK_POSITION_KP)
                 isaac_kd = th.full_like(isaac_kd, m.NEWTON_TRUNK_POSITION_KD)
+            if (
+                name.startswith("gripper_")
+                and gm.PHYSICS_BACKEND == "newton"
+                and control_type == ControlType.POSITION
+                and ControllerView.isaac_gains_are_default(group_key)
+            ):
+                isaac_kp = th.full_like(isaac_kp, m.NEWTON_GRIPPER_POSITION_KP)
+                isaac_kd = th.full_like(isaac_kd, m.NEWTON_GRIPPER_POSITION_KD)
             for i, dof in enumerate(ControllerView.get_dof_idx(group_key).tolist()):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof in unused_dofs

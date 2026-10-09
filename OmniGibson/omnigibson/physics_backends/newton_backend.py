@@ -1404,6 +1404,10 @@ class NewtonBackend(PhysicsBackend):
     # Whether to override every robot joint's authored USD effort limit with inf -- see the use site in
     # _rebuild_impl() for the full rationale. Exposed as a flag purely so it can be A/B'd.
     _FORCE_INF_ROBOT_EFFORT = True
+    # Critically damped finger contacts, with MuJoCo's timestep safety clamp enabled. The
+    # scene-wide soft contacts allow centimeter-scale penetration during gripper closure.
+    _FINGER_CONTACT_SOLREF = (0.01, 1.0)
+    _FINGER_CONTACT_SOLMIX = 1000.0
     # Disabled WELD equality slots preallocated on every rebuild for create_attachment_constraint() (two
     # arms' worth of assisted grasps for two robots). Grows on demand, at the cost of one rebuild.
     _MIN_ATTACHMENT_SLOTS = 4
@@ -2213,6 +2217,24 @@ class NewtonBackend(PhysicsBackend):
         if changed and getattr(solver, "mjw_model", None) is not None:
             solver.mjw_model.geom_priority.assign(mj_model.geom_priority)
 
+    def _configure_finger_contacts(self, body_idx):
+        """Keep finger contacts firm without stiffening resting contacts throughout the scene."""
+        if not body_idx:
+            return
+        solver = self._get_mujoco_solver()
+        if solver is None:
+            return
+        mj_model = solver.mj_model
+        body_map = solver.mjc_body_to_newton.numpy()[0]
+        for geom_idx, mjc_body in enumerate(mj_model.geom_bodyid):
+            if int(body_map[mjc_body]) in body_idx:
+                mj_model.geom_solref[geom_idx] = self._FINGER_CONTACT_SOLREF
+                # Weight finger contact response over the object's soft settings without changing
+                # geom priority, which would also override friction mixing.
+                mj_model.geom_solmix[geom_idx] = self._FINGER_CONTACT_SOLMIX
+        solver.mjw_model.geom_solref.assign(mj_model.geom_solref)
+        solver.mjw_model.geom_solmix.assign(mj_model.geom_solmix)
+
     def _find_cross_object_joints(self, objects):
         """
         Returns {owning_obj: [(joint_prim, body0_path, body1_path), ...]} for every UsdPhysics.Joint
@@ -2335,6 +2357,7 @@ class NewtonBackend(PhysicsBackend):
         path_cloth_particle_map = {}
         robot_joint_paths = set()
         low_friction_body_idx = set()
+        finger_body_idx = set()
         # Macro-particle roots go last, so every object's body indices are unaffected by particle changes
         macro_particle_paths = self._macro_particle_roots()
         particle_systems = sorted({system.prim_path for system in macro_particle_paths.values()})
@@ -2380,6 +2403,12 @@ class NewtonBackend(PhysicsBackend):
             if isinstance(obj, Robot):
                 robot_joint_paths.update(info["path_joint_map"].keys())
                 low_friction_body_idx |= self._apply_floor_contact_friction(builder, obj, info["path_body_map"])
+                if obj.is_manipulation:
+                    for names in obj.finger_link_names.values():
+                        for name in names:
+                            idx = info["path_body_map"].get(f"{obj.prim_path}/{name}")
+                            if idx is not None:
+                                finger_body_idx.add(int(idx))
 
             # add_usd() only auto-wraps an object's joints into an articulation when the object's own
             # USD authors a UsdPhysics.ArticulationRootAPI marker -- true for robots (and, per
@@ -3053,6 +3082,7 @@ class NewtonBackend(PhysicsBackend):
         # to every solver branch above -- see the method's own docstring for why the mu drop alone
         # isn't enough.
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
+        self._configure_finger_contacts(finger_body_idx)
         # Re-apply any attachment constraints that were live before this rebuild onto the fresh pool.
         self._sync_attachment_slots()
         self._fix_cross_object_constraint_frames()
