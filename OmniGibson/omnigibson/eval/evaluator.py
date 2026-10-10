@@ -112,8 +112,9 @@ def evaluate_instances_batched(
     """
     Drive one parallel evaluation batch with exactly one instance per logical environment. Pure
     orchestration: all sim work is delegated to the injected load_fn / step_fn / record_fn. When an
-    instance finishes, its environment is removed from the active list and remains frozen until the
-    complete batch finishes. Returns {instance id -> record_fn's return}.
+    instance finishes, it is recorded immediately (finished environments keep being stepped by the shared
+    simulator, so their state must not be scored later) and its environment is removed from the active
+    list until the complete batch finishes. Returns {instance id -> record_fn's return}.
     """
     if num_envs < 1:
         raise ValueError(f"num_envs must be >= 1, got {num_envs}")
@@ -126,23 +127,20 @@ def evaluate_instances_batched(
         )
 
     results: Dict[object, object] = {}
-    completed = {}
     env_idx_to_instance: Dict[int, object] = {env_idx: instance for env_idx, instance in enumerate(instances)}
     active = {env_idx: True for env_idx in env_idx_to_instance}
     step = 0
 
+    def finish(env_idx: int, **record):
+        active[env_idx] = False
+        instance = env_idx_to_instance[env_idx]
+        results[instance] = record_fn(env_idx=env_idx, instance=instance, **record)
+
     def fail_unfinished(failure_key: str, reason: str):
-        return {
-            instance: record_fn(
-                env_idx=env_idx,
-                instance=instance,
-                **completed.get(
-                    env_idx,
-                    {"step": step, "terminated": False, "truncated": True, failure_key: reason},
-                ),
-            )
-            for env_idx, instance in env_idx_to_instance.items()
-        }
+        for env_idx, is_active in active.items():
+            if is_active:
+                finish(env_idx, step=step, terminated=False, truncated=True, **{failure_key: reason})
+        return results
 
     load_fn(dict(env_idx_to_instance))
 
@@ -197,24 +195,19 @@ def evaluate_instances_batched(
                     if isinstance(error, PolicyConnectionError)
                     else "policy_failure"
                 )
-                completed[env_idx] = {
-                    "step": step if env_idx in failures_after_step else previous_step,
-                    "terminated": False,
-                    "truncated": True,
-                    failure_key: str(error),
-                }
-                active[env_idx] = False
+                finish(
+                    env_idx,
+                    step=step if env_idx in failures_after_step else previous_step,
+                    terminated=False,
+                    truncated=True,
+                    **{failure_key: str(error)},
+                )
                 continue
             term = bool(terminated[env_idx])
             trunc = bool(truncated[env_idx]) or hit_cap
             if term or trunc:
-                completed[env_idx] = {"step": step, "terminated": term, "truncated": trunc}
-                active[env_idx] = False
+                finish(env_idx, step=step, terminated=term, truncated=trunc)
 
-    for env_idx, record in completed.items():
-        results[env_idx_to_instance[env_idx]] = record_fn(
-            env_idx=env_idx, instance=env_idx_to_instance[env_idx], **record
-        )
     return results
 
 
