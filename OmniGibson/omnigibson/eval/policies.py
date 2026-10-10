@@ -46,6 +46,9 @@ class LocalPolicy:
         if self.policy is not None:
             self.policy.reset()
 
+    def set_deadline(self, deadline: Optional[float]) -> None:
+        pass
+
 
 class WebsocketPolicy:
     """
@@ -69,6 +72,7 @@ class WebsocketPolicy:
         self.policy = None
         self._allow_reconnect = allow_reconnect
         self._action_chunk_size = action_chunk_size
+        self._deadline = None
         if host is not None or port is not None:
             self.policy = WebsocketClientPolicy(
                 host=host,
@@ -84,6 +88,12 @@ class WebsocketPolicy:
             allow_reconnect=self._allow_reconnect,
             action_chunk_size=self._action_chunk_size,
         )
+        self.policy.set_deadline(self._deadline)
+
+    def set_deadline(self, deadline: Optional[float]) -> None:
+        self._deadline = deadline
+        if self.policy is not None:
+            self.policy.set_deadline(deadline)
 
     def forward(self, obs: dict, *args, **kwargs) -> th.Tensor:
         if "need_new_action" in obs and not obs["need_new_action"] and self.last_action is not None:

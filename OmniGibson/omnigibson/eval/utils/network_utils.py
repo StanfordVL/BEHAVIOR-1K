@@ -24,15 +24,19 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-__all__ = ["PolicyConnectionError", "WebsocketClientPolicy", "WebsocketPolicyServer"]
+__all__ = ["PolicyConnectionError", "PolicyTimeoutError", "WebsocketClientPolicy", "WebsocketPolicyServer"]
 
 ACTION_CHUNK_REQUEST_KEY = "__action_chunk_size__"
 MAX_RECONNECTS_PER_ROLLOUT = 3
-POLICY_RESPONSE_TIMEOUT = 300
+POLICY_RESPONSE_TIMEOUT = 600
 
 
 class PolicyConnectionError(RuntimeError):
     """The policy connection could not be restored for the current rollout."""
+
+
+class PolicyTimeoutError(RuntimeError):
+    """An action query or the evaluation time budget expired."""
 
 
 class WebsocketClientPolicy:
@@ -75,12 +79,25 @@ class WebsocketClientPolicy:
         self._action_chunk_index = 0
         self._chunk_requests_supported = self._action_chunk_size > 1
         self._reconnect_attempts = 0
+        self._deadline = None
+
+    def set_deadline(self, deadline: Optional[float]) -> None:
+        self._deadline = deadline
+
+    @staticmethod
+    def _remaining(deadline: Optional[float], cap: Optional[float] = None) -> Optional[float]:
+        remaining = None if deadline is None else deadline - time.monotonic()
+        if remaining is not None and remaining <= 0:
+            raise PolicyTimeoutError("Policy evaluation time budget expired")
+        if remaining is None:
+            return cap
+        return min(remaining, cap) if cap is not None else remaining
 
     def get_server_metadata(self) -> Dict:
         return self._server_metadata
 
     def _wait_for_server(
-        self, max_attempts: Optional[int] = None
+        self, max_attempts: Optional[int] = None, deadline: Optional[float] = None
     ) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
         parsed = urlparse(self._uri)
         host = parsed.hostname
@@ -92,8 +109,9 @@ class WebsocketClientPolicy:
         health_attempts = 0
         while True:
             health_attempts += 1
+            health_timeout = self._remaining(deadline, 2)
             try:
-                response = requests.get(health_url, timeout=2)
+                response = requests.get(health_url, timeout=health_timeout)
                 if response.ok:
                     logger.info("Health check passed, attempting websocket connection...")
                     break
@@ -102,7 +120,7 @@ class WebsocketClientPolicy:
             if max_attempts is not None and health_attempts >= max_attempts:
                 raise PolicyConnectionError(f"Health check failed for {health_url}")
             logger.info(f"Health check failed, waiting for server at {http_scheme}://{host}:{port}...")
-            time.sleep(5)
+            time.sleep(self._remaining(deadline, 5))
 
         connection_attempts = 0
         while True:
@@ -115,19 +133,19 @@ class WebsocketClientPolicy:
                     max_size=None,
                     additional_headers=headers,
                     ping_interval=60,
-                    ping_timeout=300,
-                    open_timeout=10,
+                    ping_timeout=None,
+                    open_timeout=self._remaining(deadline, 10),
                 )
-                metadata = unpackb(conn.recv(timeout=10))
+                metadata = unpackb(conn.recv(timeout=self._remaining(deadline, 10)))
                 logger.info("Connected to server!")
                 return conn, metadata
             except (OSError, EOFError, websockets.exceptions.WebSocketException) as e:
                 if max_attempts is not None and connection_attempts >= max_attempts:
                     raise PolicyConnectionError(f"Websocket connection failed: {e}") from e
                 logger.info(f"Websocket connection failed ({e}), retrying...")
-                time.sleep(5)
+                time.sleep(self._remaining(deadline, 5))
 
-    def _reconnect(self, error: Exception) -> None:
+    def _reconnect(self, error: Exception, deadline: Optional[float] = None) -> None:
         self._ws = None
         if not self._allow_reconnect:
             raise PolicyConnectionError(f"Websocket connection lost: {error}") from error
@@ -139,26 +157,28 @@ class WebsocketClientPolicy:
                 MAX_RECONNECTS_PER_ROLLOUT,
             )
             try:
-                self._ws, self._server_metadata = self._wait_for_server(max_attempts=1)
+                self._ws, self._server_metadata = self._wait_for_server(max_attempts=1, deadline=deadline)
                 return
             except PolicyConnectionError as e:
                 error = e
                 if self._reconnect_attempts < MAX_RECONNECTS_PER_ROLLOUT:
-                    time.sleep(5)
+                    time.sleep(self._remaining(deadline, 5))
         raise PolicyConnectionError(
             f"Policy connection failed after {MAX_RECONNECTS_PER_ROLLOUT} reconnect attempts: {error}"
         ) from error
 
-    def _ensure_connected(self) -> None:
+    def _ensure_connected(self, deadline: Optional[float] = None) -> None:
         if self._ws is not None:
             return
         if self._server_metadata is not None:
-            self._reconnect(ConnectionError("Previous rollout lost its policy connection"))
+            self._reconnect(ConnectionError("Previous rollout lost its policy connection"), deadline=deadline)
             return
         try:
-            self._ws, self._server_metadata = self._wait_for_server(max_attempts=1 if self._allow_reconnect else None)
+            self._ws, self._server_metadata = self._wait_for_server(
+                max_attempts=1 if self._allow_reconnect else None, deadline=deadline
+            )
         except PolicyConnectionError as e:
-            self._reconnect(e)
+            self._reconnect(e, deadline=deadline)
 
     def act(self, obs: Dict) -> th.Tensor:
         if self._action_chunk is not None and self._action_chunk_index < self._action_chunk.shape[-2]:
@@ -166,7 +186,10 @@ class WebsocketClientPolicy:
             self._action_chunk_index += 1
             return action
 
-        self._ensure_connected()
+        query_deadline = time.monotonic() + POLICY_RESPONSE_TIMEOUT
+        if self._deadline is not None:
+            query_deadline = min(query_deadline, self._deadline)
+        self._ensure_connected(query_deadline)
 
         request = obs
         if self._chunk_requests_supported:
@@ -177,10 +200,14 @@ class WebsocketClientPolicy:
         while True:
             try:
                 self._ws.send(data)
-                response = self._ws.recv(timeout=POLICY_RESPONSE_TIMEOUT)
+                response = self._ws.recv(timeout=self._remaining(query_deadline))
+            except TimeoutError as e:
+                raise PolicyTimeoutError("Action query exceeded its time limit") from e
             except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
-                self._reconnect(e)
+                self._reconnect(e, deadline=query_deadline)
                 continue
+
+            self._remaining(query_deadline)
 
             if isinstance(response, str):
                 raise RuntimeError(f"Error in inference server:\n{response}")
@@ -210,21 +237,23 @@ class WebsocketClientPolicy:
                         "Policy server does not support action chunks; falling back to one request per step."
                     )
                     self._chunk_requests_supported = False
+            self._remaining(query_deadline)
             return action
 
     def reset(self) -> None:
         self._reconnect_attempts = 0
         self._action_chunk = None
         self._action_chunk_index = 0
-        self._ensure_connected()
+        self._ensure_connected(self._deadline)
 
         data = self._packer.pack({"reset": True})
         while True:
             try:
                 self._ws.send(data)
+                self._remaining(self._deadline)
                 return
             except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
-                self._reconnect(e)
+                self._reconnect(e, deadline=self._deadline)
 
 
 class WebsocketPolicyServer:

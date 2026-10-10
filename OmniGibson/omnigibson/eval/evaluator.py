@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
 from dataclasses import dataclass, field
 from signal import SIGINT, signal
@@ -30,7 +31,7 @@ from omnigibson.eval.utils.eval_utils import (
     get_robot_camera_names,
 )
 from omnigibson.eval.utils.light_utils import LightToggleSynchronizer, set_light_control_toggles
-from omnigibson.eval.utils.network_utils import PolicyConnectionError
+from omnigibson.eval.utils.network_utils import PolicyConnectionError, PolicyTimeoutError
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.eval.utils.score_utils import load_human_stats
 from omnigibson.macros import gm
@@ -95,6 +96,8 @@ def evaluate_instances_batched(
     step_fn: Callable[[List[int]], "tuple[Sequence[bool], Sequence[bool]]"],
     record_fn: Callable[..., object],
     max_steps: Optional[int] = None,
+    time_limit_seconds: Optional[float] = None,
+    start_fn: Optional[Callable[[Optional[float]], None]] = None,
 ) -> "Dict[object, object]":
     """
     Drive one parallel evaluation batch with exactly one instance per logical environment. Pure
@@ -113,6 +116,7 @@ def evaluate_instances_batched(
         )
 
     results: Dict[object, object] = {}
+    completed = {}
     env_idx_to_instance: Dict[int, object] = {env_idx: instance for env_idx, instance in enumerate(instances)}
     active = {env_idx: True for env_idx in env_idx_to_instance}
     step = 0
@@ -131,11 +135,90 @@ def evaluate_instances_batched(
             for env_idx, instance in env_idx_to_instance.items()
         }
 
+    deadline = time.monotonic() + time_limit_seconds if time_limit_seconds is not None else None
+    try:
+        if start_fn is not None:
+            start_fn(deadline)
+    except PolicyConnectionError as e:
+        return {
+            instance: record_fn(
+                env_idx=env_idx,
+                instance=instance,
+                step=step,
+                terminated=False,
+                truncated=True,
+                connection_failure=str(e),
+            )
+            for env_idx, instance in env_idx_to_instance.items()
+        }
+    except PolicyTimeoutError as e:
+        if deadline is None or time.monotonic() < deadline:
+            return {
+                instance: record_fn(
+                    env_idx=env_idx,
+                    instance=instance,
+                    step=step,
+                    terminated=False,
+                    truncated=True,
+                    timeout_failure=str(e),
+                )
+                for env_idx, instance in env_idx_to_instance.items()
+            }
+
+    def group_timed_out():
+        return deadline is not None and time.monotonic() >= deadline
+
+    def group_timeout_results():
+        return {
+            instance: record_fn(
+                env_idx=env_idx,
+                instance=instance,
+                step=step,
+                terminated=False,
+                truncated=True,
+                timeout_failure="group_time_budget_exceeded",
+            )
+            for env_idx, instance in env_idx_to_instance.items()
+        }
+
     while any(active.values()):
+        if group_timed_out():
+            return group_timeout_results()
         active_env_indices = sorted(env_idx for env_idx, is_active in active.items() if is_active)
         try:
             terminated, truncated = step_fn(active_env_indices)
+        except PolicyTimeoutError as e:
+            if group_timed_out():
+                return group_timeout_results()
+            for env_idx, (finished_step, term, trunc) in completed.items():
+                results[env_idx_to_instance[env_idx]] = record_fn(
+                    env_idx=env_idx,
+                    instance=env_idx_to_instance[env_idx],
+                    step=finished_step,
+                    terminated=term,
+                    truncated=trunc,
+                )
+            for env_idx in active_env_indices:
+                results[env_idx_to_instance[env_idx]] = record_fn(
+                    env_idx=env_idx,
+                    instance=env_idx_to_instance[env_idx],
+                    step=step,
+                    terminated=False,
+                    truncated=True,
+                    timeout_failure=str(e),
+                )
+            break
         except PolicyConnectionError as e:
+            if group_timed_out():
+                return group_timeout_results()
+            for env_idx, (finished_step, term, trunc) in completed.items():
+                results[env_idx_to_instance[env_idx]] = record_fn(
+                    env_idx=env_idx,
+                    instance=env_idx_to_instance[env_idx],
+                    step=finished_step,
+                    terminated=term,
+                    truncated=trunc,
+                )
             for env_idx in active_env_indices:
                 results[env_idx_to_instance[env_idx]] = record_fn(
                     env_idx=env_idx,
@@ -147,21 +230,25 @@ def evaluate_instances_batched(
                 )
             break
         step += 1
+        if group_timed_out():
+            return group_timeout_results()
 
         hit_cap = max_steps is not None and step >= max_steps
         for env_idx in active_env_indices:
             term = bool(terminated[env_idx])
             trunc = bool(truncated[env_idx]) or hit_cap
             if term or trunc:
-                results[env_idx_to_instance[env_idx]] = record_fn(
-                    env_idx=env_idx,
-                    instance=env_idx_to_instance[env_idx],
-                    step=step,
-                    terminated=term,
-                    truncated=trunc,
-                )
+                completed[env_idx] = (step, term, trunc)
                 active[env_idx] = False
 
+    for env_idx, (finished_step, term, trunc) in completed.items():
+        results[env_idx_to_instance[env_idx]] = record_fn(
+            env_idx=env_idx,
+            instance=env_idx_to_instance[env_idx],
+            step=finished_step,
+            terminated=term,
+            truncated=trunc,
+        )
     return results
 
 
@@ -313,6 +400,7 @@ class BatchedEvaluator:
         else:
             logger.info(f"Setting timeout to be {self.cfg.max_steps} steps through config.")
             cfg["task"]["termination_config"]["max_steps"] = self.cfg.max_steps
+        self.max_steps = int(cfg["task"]["termination_config"]["max_steps"])
         cfg["task"]["include_obs"] = False
 
         # Run num_envs instances of the same scene model + task in parallel environments.
@@ -565,7 +653,7 @@ class BatchedEvaluator:
     ) -> None:
         """
         Load one instance per logical environment, settle the complete batch, refresh observations,
-        and reset policy, metrics, light synchronizers, and video writers.
+        and reset metrics, light synchronizers, and video writers.
         """
         env_indices = sorted(env_idx_to_instance)
         for env_idx in env_indices:
@@ -585,8 +673,6 @@ class BatchedEvaluator:
                 og.sim.render()
             obs_list, _ = self.env.get_obs(env_indices=th.tensor(env_indices, dtype=th.long))
         task_name = self.cfg.task.name
-        # One batched policy for the complete batch: reset its per-environment state once.
-        self.policy.reset()
         for obs_idx, env_idx in enumerate(env_indices):
             instance_eval_state = self.instance_eval_states[env_idx]
             instance_eval_state.obs = self._preprocess_obs(obs_list[obs_idx], instance_eval_state)
@@ -685,6 +771,11 @@ class BatchedEvaluator:
                 video_fps=video_fps,
             )
 
+        def start_fn(deadline):
+            # Scene loading is outside the budget; policy reset and any reconnect are inside it.
+            self.policy.set_deadline(deadline)
+            self.policy.reset()
+
         def step_fn(active_env_indices):
             terminated, truncated = self._step_fn(active_env_indices)
             if write_video:
@@ -692,20 +783,26 @@ class BatchedEvaluator:
                     self._write_video(self.instance_eval_states[env_idx])
             return terminated, truncated
 
-        def record_fn(env_idx, instance, step, terminated, truncated, connection_failure=None):
+        def record_fn(env_idx, instance, step, terminated, truncated, connection_failure=None, timeout_failure=None):
             instance_eval_state = self.instance_eval_states[env_idx]
             instance_eval_state.active = False
             self.n_trials += 1
-            success = False if connection_failure else instance_eval_state.env_accessor.success
+            failure = connection_failure or timeout_failure
+            success = False if failure else instance_eval_state.env_accessor.success
             if success:
                 self.n_success_trials += 1
             result = {"task": task_name, "instance_id": int(instance), "rollout_id": rollout_id, "steps": step}
             result["success"] = success
-            if not connection_failure or step > 0:
+            if not failure or step > 0:
                 for metric in instance_eval_state.metrics:
                     result.update(metric.aggregate())
-            if connection_failure:
-                result["failure_reason"] = "policy_connection_lost"
+            if failure:
+                if connection_failure:
+                    result["failure_reason"] = "policy_connection_lost"
+                elif timeout_failure == "group_time_budget_exceeded":
+                    result["failure_reason"] = "group_time_budget_exceeded"
+                else:
+                    result["failure_reason"] = "policy_query_timeout"
                 result["q_score"] = {"final": 0.0}
                 result.setdefault("agent_distance", {"base": 0.0, "left": 0.0, "right": 0.0})
                 result["normalized_agent_distance"] = {"base": 0.0, "left": 0.0, "right": 0.0}
@@ -714,9 +811,7 @@ class BatchedEvaluator:
                     {"simulator_steps": step, "simulator_time": step * og.sim.get_rendering_dt()},
                 )
                 result["time"]["normalized_time"] = 1 / EVAL_TIMEOUT_MULTIPLIER
-                logger.warning(
-                    "Policy connection failed at step %s for instance %s: %s", step, instance, connection_failure
-                )
+                logger.warning("Policy evaluation failed at step %s for instance %s: %s", step, instance, failure)
             if metrics_dir is not None:
                 with open(os.path.join(metrics_dir, f"{task_name}_{instance}_{rollout_id}.json"), "w") as f:
                     json.dump(result, f, indent=2, default=float)
@@ -734,6 +829,8 @@ class BatchedEvaluator:
             load_fn=load_fn,
             step_fn=step_fn,
             record_fn=record_fn,
+            time_limit_seconds=self.num_envs * self.max_steps,
+            start_fn=start_fn,
         )
 
     def __enter__(self):
