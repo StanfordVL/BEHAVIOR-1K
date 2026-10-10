@@ -96,12 +96,20 @@ class PhysxParticleInstancer(BasePrim):
         """
         n_new_particles = len(positions)
 
-        velocities = th.zeros((n_new_particles, 3)) if velocities is None else velocities
+        velocities = th.zeros((n_new_particles, 3), device=positions.device) if velocities is None else velocities
         if orientations is None:
-            orientations = th.zeros((n_new_particles, 4))
+            orientations = th.zeros((n_new_particles, 4), device=positions.device)
             orientations[:, -1] = 1.0
-        scales = th.ones((n_new_particles, 3)) * th.ones((1, 3)) if scales is None else scales
-        prototype_indices = th.zeros(n_new_particles, dtype=int) if prototype_indices is None else prototype_indices
+        scales = (
+            th.ones((n_new_particles, 3), device=positions.device) * th.ones((1, 3), device=positions.device)
+            if scales is None
+            else scales
+        )
+        prototype_indices = (
+            th.zeros(n_new_particles, dtype=int, device=positions.device)
+            if prototype_indices is None
+            else prototype_indices
+        )
 
         self.particle_positions = (
             th.vstack([self.particle_positions, positions]) if self.particle_positions.numel() > 0 else positions
@@ -318,10 +326,16 @@ class PhysxParticleInstancer(BasePrim):
             idn=self._idn,
             particle_group=self.particle_group,
             n_particles=self.n_particles,
-            particle_positions=th.stack(local_positions) if len(local_positions) > 0 else th.empty(0, dtype=th.float32),
+            particle_positions=(
+                th.stack(local_positions)
+                if len(local_positions) > 0
+                else th.empty(0, dtype=th.float32, device=og.sim.device)
+            ),
             particle_velocities=self.particle_velocities,
             particle_orientations=(
-                th.stack(local_orientations) if len(local_orientations) > 0 else th.empty(0, dtype=th.float32)
+                th.stack(local_orientations)
+                if len(local_orientations) > 0
+                else th.empty(0, dtype=th.float32, device=og.sim.device)
             ),
             particle_scales=self.particle_scales,
             particle_prototype_ids=self.particle_prototype_ids,
@@ -368,14 +382,15 @@ class PhysxParticleInstancer(BasePrim):
 
     def serialize(self, state):
         # Compress into a 1D array
+        device = state["particle_positions"].device
         return th.cat(
             [
-                th.tensor([state["idn"], state["particle_group"], state["n_particles"]]),
-                state["particle_positions"].reshape(-1),
-                state["particle_velocities"].reshape(-1),
-                state["particle_orientations"].reshape(-1),
-                state["particle_scales"].reshape(-1),
-                state["particle_prototype_ids"],
+                th.tensor([state["idn"], state["particle_group"], state["n_particles"]], device=device),
+                state["particle_positions"].reshape(-1).to(device),
+                state["particle_velocities"].reshape(-1).to(device),
+                state["particle_orientations"].reshape(-1).to(device),
+                state["particle_scales"].reshape(-1).to(device),
+                state["particle_prototype_ids"].to(device),
             ]
         )
 
@@ -465,7 +480,8 @@ class MicroParticleSystem(BaseSystem):
         self._customize_particle_material() if self._customize_particle_material is not None else None
 
     def _clear(self):
-        self._material.remove_user(self)
+        if self._material is not None:
+            self._material.remove_user(self)
 
         super()._clear()
 
@@ -1260,10 +1276,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Array is number of particle instancers, then the corresponding states for each particle instancer
         return th.cat(
             [
-                th.tensor([state["n_instancers"]]),
-                th.tensor(state["instancer_idns"]),
-                th.tensor(state["instancer_particle_groups"]),
-                th.tensor(state["instancer_particle_counts"]),
+                th.tensor([state["n_instancers"]], device=og.sim.device),
+                th.tensor(state["instancer_idns"], device=og.sim.device),
+                th.tensor(state["instancer_particle_groups"], device=og.sim.device),
+                th.tensor(state["instancer_particle_counts"], device=og.sim.device),
                 *[
                     self.particle_instancers[name].serialize(inst_state)
                     for name, inst_state in state["particle_states"].items()
@@ -1527,7 +1543,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Store the contact offset based on a minimum sphere
         # Threshold the lower-bound to avoid super small particles
-        vertices = th.tensor(prototype.get_attribute("points")) * prototype.scale
+        vertices = th.tensor(prototype.get_attribute("points")) * prototype.scale.cpu()
         _, particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
         particle_contact_offset = th.tensor(particle_contact_offset, dtype=th.float32).item()
         if particle_contact_offset < m.MIN_PARTICLE_CONTACT_OFFSET:
@@ -1633,7 +1649,7 @@ class Cloth(MicroParticleSystem):
 
     def serialize(self, state):
         # Nothing by default
-        return th.empty(0, dtype=th.float32)
+        return th.empty(0, dtype=th.float32, device=og.sim.device)
 
     def deserialize(self, state):
         # Nothing by default
