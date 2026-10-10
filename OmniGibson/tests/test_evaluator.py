@@ -275,8 +275,10 @@ def test_multiport_policy_tracks_failures_and_simulation_share_separately(monkey
         policy.forward({"value": th.tensor([[11.0], [22.0]])}, [0])
         assert calls.count(8002) == 1
 
-        policy.elapsed[0] = 9.8
-        sim_failures = policy.charge_simulation(0.6, [0])  # Two environments share the cost.
+        policy.elapsed[0] = 9.0
+        assert policy.charge_simulation(0.6, [0]) == {}  # Only the surviving rollout pays for this step.
+        assert policy.elapsed[0] == pytest.approx(9.6)
+        sim_failures = policy.charge_simulation(0.5, [0])
         assert isinstance(sim_failures[0], PolicyTimeoutError)
         assert policy.elapsed[0] == pytest.approx(10.1)
     finally:

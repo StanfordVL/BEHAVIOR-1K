@@ -200,7 +200,7 @@ class MultiWebsocketPolicy:
         return PolicyBatchResult(actions=actions, failures=failures)
 
     def charge_simulation(self, seconds: float, active_env_indices: list[int]) -> dict[int, Exception]:
-        share = seconds / len(self.clients)
+        share = seconds / len(active_env_indices)
         failures = {}
         for env_idx in active_env_indices:
             self.elapsed[env_idx] += share
