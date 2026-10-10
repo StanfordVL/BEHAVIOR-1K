@@ -174,9 +174,7 @@ class WebsocketClientPolicy:
             self._reconnect(ConnectionError("Previous rollout lost its policy connection"), deadline=deadline)
             return
         try:
-            self._ws, self._server_metadata = self._wait_for_server(
-                max_attempts=1 if self._allow_reconnect else None, deadline=deadline
-            )
+            self._ws, self._server_metadata = self._wait_for_server(deadline=deadline)
         except PolicyConnectionError as e:
             self._reconnect(e, deadline=deadline)
 
@@ -202,6 +200,7 @@ class WebsocketClientPolicy:
                 self._ws.send(data)
                 response = self._ws.recv(timeout=self._remaining(query_deadline))
             except TimeoutError as e:
+                self.close()
                 raise PolicyTimeoutError("Action query exceeded its time limit") from e
             except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
                 self._reconnect(e, deadline=query_deadline)

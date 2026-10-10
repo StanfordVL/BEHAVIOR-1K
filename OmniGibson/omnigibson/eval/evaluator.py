@@ -183,10 +183,15 @@ def evaluate_instances_batched(
             instance: record_fn(
                 env_idx=env_idx,
                 instance=instance,
-                step=step,
-                terminated=False,
-                truncated=True,
-                timeout_failure="group_time_budget_exceeded",
+                **completed.get(
+                    env_idx,
+                    {
+                        "step": step,
+                        "terminated": False,
+                        "truncated": True,
+                        "timeout_failure": "group_time_budget_exceeded",
+                    },
+                ),
             )
             for env_idx, instance in env_idx_to_instance.items()
         }
@@ -773,6 +778,10 @@ class BatchedEvaluator:
             for _ in range(3):
                 og.sim.render()
             obs_list, _ = self.env.get_obs()
+        if isinstance(self.policy, MultiWebsocketPolicy):
+            self.policy.set_time_budget(None)
+        elif hasattr(self.policy, "set_deadline"):
+            self.policy.set_deadline(None)
         self.policy.reset()
         for instance_eval_state in self.instance_eval_states:
             env_idx = instance_eval_state.env_idx
@@ -812,7 +821,7 @@ class BatchedEvaluator:
             # Scene loading is outside the budget; policy reset and any reconnect are inside it.
             if isinstance(self.policy, MultiWebsocketPolicy):
                 self.policy.set_time_budget(self.max_steps)
-            else:
+            elif hasattr(self.policy, "set_deadline"):
                 self.policy.set_deadline(deadline)
             self.policy.reset()
 
