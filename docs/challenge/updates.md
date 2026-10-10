@@ -12,11 +12,11 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 1. **Submission deadline:** October 16, 2026, at **11:59 PM Anywhere on Earth (AoE)**. We will use each team's **latest valid submission** received before the deadline, so please ensure it contains your complete final solution and results.
 
-2. **Average evaluation speed:** Each rollout must average at least **1 FPS**, measured from one action query to the next, including inference, communication, and simulator stepping. We enforce this through an episode timeout of `max_steps × 1 second`, excluding scene startup. Individual steps may take longer than one second. This corresponds to approximately **10.85 hours** of episode timeout for the longest task.
+2. **Evaluation time budget:** Each task has a base time allowance of `max_steps × 1 second` per rollout. When N rollouts of the same task are evaluated together on one GPU, the group has a shared wall-clock budget of `N × max_steps` seconds, excluding scene startup. Individual steps may take longer than one second. For the longest task, this is approximately **10.85 hours** for one rollout or **108.6 hours** for a group of 10. If the group reaches its deadline, all rollouts in that group count as failures.
 
-3. **Per-step timeout:** Each action-query round trip must complete within **600 seconds** and within the remaining episode time.
+3. **Per-step timeout:** Each action-query round trip must complete within **600 seconds** and within the remaining group time budget.
 
-4. **Reconnections:** If the policy-server connection is lost, we will attempt to reconnect up to **three times** before stopping the rollout and counting it as a failure. Reconnection time counts toward the episode timeout.
+4. **Reconnections:** If the policy-server connection is lost, we will attempt to reconnect up to **three times** before stopping the affected rollout and counting it as a failure. Reconnection time counts toward the group time budget.
 
 5. **IP-based submissions:** You are welcome to DM the organizers to schedule a connection and inference-speed test before your final submission.
 

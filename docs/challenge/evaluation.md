@@ -102,7 +102,7 @@ Key arguments:
 
 The evaluator sends flattened observations to the policy server. The server should return a msgpack-encoded response containing an `action` array with the robot action for the current step. The helper server implementation is `WebsocketPolicyServer` in `OmniGibson/omnigibson/eval/utils/network_utils.py`, and the evaluator-side client is `omnigibson.eval.policies.WebsocketPolicy`.
 
-If the websocket connection drops or an action response takes longer than 300 seconds, the evaluator attempts to reconnect up to three times per rollout. It resends the current observation after reconnecting, without advancing the simulation step. If the connection still fails, the active rollout is recorded as a failure with zero score; completed rollouts in the same batch retain their results.
+After scene startup, a batch of N rollouts has a shared wall-clock budget of N × max_steps seconds. If it expires, every rollout in the batch is recorded as a failure. Each action query must complete within 600 seconds and the remaining group time budget. If the websocket connection drops, the evaluator attempts to reconnect up to three times per rollout within those limits. It resends the current observation after reconnecting, without advancing the simulation step. If reconnection fails, the active rollout is recorded as a failure with zero score; completed rollouts in the same batch retain their results.
 
 ### Optional action-chunk replay protocol
 
