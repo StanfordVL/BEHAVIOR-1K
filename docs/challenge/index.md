@@ -49,9 +49,9 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
   <section class="challenge-action-card challenge-action-card--venue">
     <h2>Event Details</h2>
     <ul class="challenge-action-list">
-      <li><strong>Event:</strong> <span>To be announced</span></li>
-      <li><strong>Time:</strong> <span>To be announced</span></li>
-      <li><strong>Location:</strong> <span>To be announced</span></li>
+      <li><strong>Event:</strong> <span>CoRL 2026</span></li>
+      <li><strong>Time:</strong> <span>November 9-12, 2026</span></li>
+      <li><strong>Location:</strong> <span>Austin, Texas, US</span></li>
     </ul>
     <div class="challenge-action-links">
       <a href="https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard">Leaderboard</a>
