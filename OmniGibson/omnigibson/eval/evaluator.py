@@ -34,7 +34,7 @@ from omnigibson.eval.utils.light_utils import LightToggleSynchronizer, set_light
 from omnigibson.eval.utils.network_utils import PolicyConnectionError, PolicyTimeoutError
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.eval.utils.score_utils import load_human_stats
-from omnigibson.eval.policies import MultiWebsocketPolicy
+from omnigibson.eval.policies import MultiWebsocketPolicy, WebsocketPolicy
 from omnigibson.macros import gm
 from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
@@ -130,112 +130,49 @@ def evaluate_instances_batched(
     env_idx_to_instance: Dict[int, object] = {env_idx: instance for env_idx, instance in enumerate(instances)}
     active = {env_idx: True for env_idx in env_idx_to_instance}
     step = 0
-    try:
-        load_fn(dict(env_idx_to_instance))
-    except PolicyConnectionError as e:
-        return {
-            instance: record_fn(
-                env_idx=env_idx,
-                instance=instance,
-                step=step,
-                terminated=False,
-                truncated=True,
-                connection_failure=str(e),
-            )
-            for env_idx, instance in env_idx_to_instance.items()
-        }
 
-    deadline = time.monotonic() + time_limit_seconds if time_limit_seconds is not None else None
-    try:
-        if start_fn is not None:
-            start_fn(deadline)
-    except PolicyConnectionError as e:
-        return {
-            instance: record_fn(
-                env_idx=env_idx,
-                instance=instance,
-                step=step,
-                terminated=False,
-                truncated=True,
-                connection_failure=str(e),
-            )
-            for env_idx, instance in env_idx_to_instance.items()
-        }
-    except PolicyTimeoutError as e:
-        if deadline is None or time.monotonic() < deadline:
-            return {
-                instance: record_fn(
-                    env_idx=env_idx,
-                    instance=instance,
-                    step=step,
-                    terminated=False,
-                    truncated=True,
-                    timeout_failure=str(e),
-                )
-                for env_idx, instance in env_idx_to_instance.items()
-            }
-
-    def group_timed_out():
-        return deadline is not None and time.monotonic() >= deadline
-
-    def group_timeout_results():
+    def fail_unfinished(failure_key: str, reason: str):
         return {
             instance: record_fn(
                 env_idx=env_idx,
                 instance=instance,
                 **completed.get(
                     env_idx,
-                    {
-                        "step": step,
-                        "terminated": False,
-                        "truncated": True,
-                        "timeout_failure": "group_time_budget_exceeded",
-                    },
+                    {"step": step, "terminated": False, "truncated": True, failure_key: reason},
                 ),
             )
             for env_idx, instance in env_idx_to_instance.items()
         }
 
+    load_fn(dict(env_idx_to_instance))
+
+    deadline = time.monotonic() + time_limit_seconds if time_limit_seconds is not None else None
+    try:
+        if start_fn is not None:
+            start_fn(deadline)
+    except PolicyConnectionError as e:
+        return fail_unfinished("connection_failure", str(e))
+    except PolicyTimeoutError as e:
+        if deadline is None or time.monotonic() < deadline:
+            return fail_unfinished("timeout_failure", str(e))
+
+    def group_timed_out():
+        return deadline is not None and time.monotonic() >= deadline
+
     while any(active.values()):
         if group_timed_out():
-            return group_timeout_results()
+            return fail_unfinished("timeout_failure", "group_time_budget_exceeded")
         active_env_indices = sorted(env_idx for env_idx, is_active in active.items() if is_active)
         try:
             step_result = step_fn(active_env_indices)
         except PolicyTimeoutError as e:
             if group_timed_out():
-                return group_timeout_results()
-            for env_idx, record in completed.items():
-                results[env_idx_to_instance[env_idx]] = record_fn(
-                    env_idx=env_idx, instance=env_idx_to_instance[env_idx], **record
-                )
-            for env_idx in active_env_indices:
-                results[env_idx_to_instance[env_idx]] = record_fn(
-                    env_idx=env_idx,
-                    instance=env_idx_to_instance[env_idx],
-                    step=step,
-                    terminated=False,
-                    truncated=True,
-                    timeout_failure=str(e),
-                )
-            break
+                return fail_unfinished("timeout_failure", "group_time_budget_exceeded")
+            return fail_unfinished("timeout_failure", str(e))
         except PolicyConnectionError as e:
             if group_timed_out():
-                return group_timeout_results()
-            for env_idx, record in completed.items():
-                results[env_idx_to_instance[env_idx]] = record_fn(
-                    env_idx=env_idx, instance=env_idx_to_instance[env_idx], **record
-                )
-            for env_idx in active_env_indices:
-                results[env_idx_to_instance[env_idx]] = record_fn(
-                    env_idx=env_idx,
-                    instance=env_idx_to_instance[env_idx],
-                    step=step,
-                    terminated=False,
-                    truncated=True,
-                    connection_failure=str(e),
-                )
-            break
+                return fail_unfinished("timeout_failure", "group_time_budget_exceeded")
+            return fail_unfinished("connection_failure", str(e))
         if not isinstance(step_result, BatchStepResult):
             terminated, truncated = step_result
             failures, advanced, failures_after_step = {}, True, set()
@@ -247,7 +184,7 @@ def evaluate_instances_batched(
         if advanced:
             step += 1
         if group_timed_out():
-            return group_timeout_results()
+            return fail_unfinished("timeout_failure", "group_time_budget_exceeded")
 
         hit_cap = max_steps is not None and step >= max_steps
         for env_idx in active_env_indices:
@@ -569,7 +506,9 @@ class BatchedEvaluator:
         """
         action_dim = self.instance_eval_states[0].env_accessor.robot.action_dim
         if isinstance(self.policy, MultiWebsocketPolicy):
-            policy_result = self.policy.forward(obs=self._batch_obs(), active_env_indices=active_env_indices)
+            policy_result = self.policy.forward(
+                obs=[state.obs for state in self.instance_eval_states], active_env_indices=active_env_indices
+            )
             batched_action, failures = policy_result.actions, policy_result.failures
         else:
             batched_action = self.policy.forward(obs=self._batch_obs())
@@ -847,7 +786,7 @@ class BatchedEvaluator:
             instance_eval_state = self.instance_eval_states[env_idx]
             instance_eval_state.active = False
             self.n_trials += 1
-            failure = connection_failure or timeout_failure or policy_failure
+            failure = any(value is not None for value in (connection_failure, timeout_failure, policy_failure))
             success = False if failure else instance_eval_state.env_accessor.success
             if success:
                 self.n_success_trials += 1
@@ -857,11 +796,11 @@ class BatchedEvaluator:
                 for metric in instance_eval_state.metrics:
                     result.update(metric.aggregate())
             if failure:
-                if connection_failure:
+                if connection_failure is not None:
                     result["failure_reason"] = "policy_connection_lost"
                 elif timeout_failure == "group_time_budget_exceeded":
                     result["failure_reason"] = "group_time_budget_exceeded"
-                elif policy_failure:
+                elif policy_failure is not None:
                     result["failure_reason"] = "policy_error"
                 else:
                     result["failure_reason"] = "policy_query_timeout"
@@ -891,7 +830,7 @@ class BatchedEvaluator:
             load_fn=load_fn,
             step_fn=step_fn,
             record_fn=record_fn,
-            time_limit_seconds=None if isinstance(self.policy, MultiWebsocketPolicy) else self.max_steps,
+            time_limit_seconds=self.max_steps if isinstance(self.policy, WebsocketPolicy) else None,
             start_fn=start_fn,
         )
 

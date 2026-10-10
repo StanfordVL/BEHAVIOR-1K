@@ -82,20 +82,18 @@ def test_evaluate_instances_batched_records_connection_failure_without_advancing
     assert results[202]["truncated"]
 
 
-def test_evaluate_instances_batched_records_connection_failure_during_load():
+def test_evaluate_instances_batched_propagates_connection_failure_during_load():
     def load_fn(instances):
         raise PolicyConnectionError("reconnect limit reached")
 
-    results = evaluate_instances_batched(
-        instances=[101],
-        num_envs=1,
-        load_fn=load_fn,
-        step_fn=lambda active_env_indices: pytest.fail("simulation should not step"),
-        record_fn=lambda **record: record,
-    )
-
-    assert results[101]["step"] == 0
-    assert results[101]["connection_failure"] == "reconnect limit reached"
+    with pytest.raises(PolicyConnectionError, match="reconnect limit reached"):
+        evaluate_instances_batched(
+            instances=[101],
+            num_envs=1,
+            load_fn=load_fn,
+            step_fn=lambda active_env_indices: pytest.fail("simulation should not step"),
+            record_fn=lambda **record: record,
+        )
 
 
 def test_group_deadline_starts_after_load_and_preserves_completed_rollouts(monkeypatch):
@@ -235,7 +233,7 @@ def test_multiport_policy_queries_concurrently_and_preserves_environment_order(m
     policy.set_time_budget(100)
     try:
         policy.reset()
-        result = policy.forward({"value": th.tensor([[11.0], [22.0]])}, [0, 1])
+        result = policy.forward([{"value": th.tensor([11.0])}, {"value": th.tensor([22.0])}], [0, 1])
         assert result.failures == {}
         assert th.equal(result.actions, th.tensor([[8001.0], [8002.0]]))
         assert th.equal(received[8001], th.tensor([[11.0]]))
@@ -272,10 +270,10 @@ def test_multiport_policy_tracks_failures_and_simulation_share_separately(monkey
     policy.set_time_budget(10)
     try:
         policy.reset()
-        result = policy.forward({"value": th.tensor([[11.0], [22.0]])}, [0, 1])
+        result = policy.forward([{"value": th.tensor([11.0])}, {"value": th.tensor([22.0])}], [0, 1])
         assert isinstance(result.failures[1], PolicyConnectionError)
         assert th.equal(result.actions, th.tensor([[1.0], [0.0]]))
-        policy.forward({"value": th.tensor([[11.0], [22.0]])}, [0])
+        policy.forward([{"value": th.tensor([11.0])}, {"value": th.tensor([22.0])}], [0])
         assert calls.count(8002) == 1
 
         policy.elapsed[0] = 9.0
@@ -315,9 +313,11 @@ def test_batched_evaluator_steps_healthy_port_after_other_port_fails(monkeypatch
     evaluator.num_envs = 2
     evaluator.policy = policy
     evaluator.instance_eval_states = [
-        SimpleNamespace(env_accessor=SimpleNamespace(robot=SimpleNamespace(action_dim=1))) for _ in range(2)
+        SimpleNamespace(
+            env_accessor=SimpleNamespace(robot=SimpleNamespace(action_dim=1)), obs={"value": th.tensor([1.0])}
+        )
+        for _ in range(2)
     ]
-    evaluator._batch_obs = lambda: {"value": th.tensor([[1.0], [2.0]])}
     steps = []
 
     def apply_actions(actions, active_env_indices):
@@ -365,7 +365,7 @@ def test_multiport_rollout_budget_adds_own_query_and_shared_simulator_time(monke
     policy.set_time_budget(1.0)
     try:
         policy.reset()
-        result = policy.forward({"value": th.tensor([[1.0]])}, [0])
+        result = policy.forward([{"value": th.tensor([1.0])}], [0])
         assert result.failures == {}
         assert policy.elapsed[0] == pytest.approx(0.6)
         failures = policy.charge_simulation(0.5, [0])
