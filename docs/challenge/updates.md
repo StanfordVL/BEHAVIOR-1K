@@ -12,17 +12,19 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 1. **Submission deadline:** October 16, 2026, at **11:59 PM Anywhere on Earth (AoE)**. We will use each team's **latest valid submission** received before the deadline, so please ensure it contains your complete final solution and results.
 
-2. **Average evaluation speed:** Each rollout must average at least **1 FPS**, measured from one action query to the next, including inference, communication, and simulator stepping. We enforce this through an episode timeout of `max_steps × 1 second`, excluding scene startup. Individual steps may take longer than one second. This corresponds to approximately **10.85 hours** of episode timeout for the longest task.
+2. **Evaluation time budget:** Each task has a total time limit of `max_steps × 1 second`, roughly corresponding to **1 FPS** per step. When we evaluate `N` rollouts of the same task together on one GPU, the group has a wall-clock budget of `N × max_steps` seconds, excluding scene startup. For the longest task, this gives one rollout approximately **10.85 hours**, or a group of 10 approximately **108.6 hours**.
 
-3. **Per-step timeout:** Each action-query round trip must complete within **600 seconds** and within the remaining episode time.
+3. **Per-step timeout:** Each action-query round trip must complete within **600 seconds** and within the remaining group time budget.
 
-4. **Reconnections:** If the policy-server connection is lost, we will attempt to reconnect up to **three times** before stopping the rollout and counting it as a failure. Reconnection time counts toward the episode timeout.
+4. **Reconnections:** If a policy-server connection is lost, we will attempt to reconnect up to **three times** before stopping the affected rollout and counting it as a failure. Reconnection time counts toward the group time budget.
 
 5. **IP-based submissions:** You are welcome to DM the organizers to schedule a connection and inference-speed test before your final submission.
 
 6. **Leaderboard and final rankings:** To discourage leaderboard farming, we will hide leaderboard scores during the final week of submissions and restore their visibility after the deadline. For policies evaluated on hidden test instances, **hidden-test scores will replace public-instance scores** for final ranking.
 
 7. **No cherry-picking results:** Evaluating the same task instances repeatedly and assembling a submission from the best result of each rollout is **not allowed**. Submit results from a single evaluation run of your final policy, with one rollout per submitted task instance.
+
+We're excited to see what everyone builds this year!
 
 ---
 
