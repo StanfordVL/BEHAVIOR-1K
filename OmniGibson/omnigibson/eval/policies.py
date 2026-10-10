@@ -144,6 +144,8 @@ class MultiWebsocketPolicy:
     def set_time_budget(self, seconds: Optional[float]) -> None:
         self.time_budget = seconds
         self.elapsed = [0.0] * len(self.clients)
+        for client in self.clients:
+            client.set_deadline(None)
 
     def _run_client(self, env_idx: int, method, *args):
         start = time.monotonic()
@@ -172,7 +174,7 @@ class MultiWebsocketPolicy:
             except Exception as e:
                 self.failures[futures[future]] = e
 
-    def forward(self, obs: dict, active_env_indices: list[int]) -> PolicyBatchResult:
+    def forward(self, obs: list[dict], active_env_indices: list[int]) -> PolicyBatchResult:
         assert self.action_dim is not None
         actions = th.zeros((len(self.clients), self.action_dim), dtype=th.float32)
         failures = {env_idx: self.failures[env_idx] for env_idx in active_env_indices if env_idx in self.failures}
@@ -181,7 +183,7 @@ class MultiWebsocketPolicy:
                 self._run_client,
                 env_idx,
                 self.clients[env_idx].act,
-                {key: value[env_idx : env_idx + 1] for key, value in obs.items()},
+                {key: value.unsqueeze(0) for key, value in obs[env_idx].items()},
             ): env_idx
             for env_idx in active_env_indices
             if env_idx not in failures
@@ -210,6 +212,6 @@ class MultiWebsocketPolicy:
         return failures
 
     def close(self) -> None:
-        self.executor.shutdown(wait=True)
         for client in self.clients:
             client.close()
+        self.executor.shutdown(wait=True, cancel_futures=True)

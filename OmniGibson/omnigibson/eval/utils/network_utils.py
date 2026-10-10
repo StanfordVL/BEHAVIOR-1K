@@ -9,6 +9,7 @@ import logging
 import msgpack
 import numpy as np
 import requests
+import threading
 import time
 import torch as th
 import traceback
@@ -80,12 +81,14 @@ class WebsocketClientPolicy:
         self._chunk_requests_supported = self._action_chunk_size > 1
         self._reconnect_attempts = 0
         self._deadline = None
+        self._closed = threading.Event()
 
     def set_deadline(self, deadline: Optional[float]) -> None:
         self._deadline = deadline
 
-    @staticmethod
-    def _remaining(deadline: Optional[float], cap: Optional[float] = None) -> Optional[float]:
+    def _remaining(self, deadline: Optional[float], cap: Optional[float] = None) -> Optional[float]:
+        if self._closed.is_set():
+            raise PolicyConnectionError("Policy client closed")
         remaining = None if deadline is None else deadline - time.monotonic()
         if remaining is not None and remaining <= 0:
             raise PolicyTimeoutError("Policy evaluation time budget expired")
@@ -199,8 +202,8 @@ class WebsocketClientPolicy:
             try:
                 self._ws.send(data)
                 response = self._ws.recv(timeout=self._remaining(query_deadline))
-            except TimeoutError as e:
-                self.close()
+            except (TimeoutError, PolicyTimeoutError) as e:
+                self._close_socket()
                 raise PolicyTimeoutError("Action query exceeded its time limit") from e
             except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
                 self._reconnect(e, deadline=query_deadline)
@@ -254,10 +257,14 @@ class WebsocketClientPolicy:
             except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
                 self._reconnect(e, deadline=self._deadline)
 
-    def close(self) -> None:
+    def _close_socket(self) -> None:
         if self._ws is not None:
             self._ws.close()
             self._ws = None
+
+    def close(self) -> None:
+        self._closed.set()
+        self._close_socket()
 
 
 class WebsocketPolicyServer:
