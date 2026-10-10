@@ -14,8 +14,10 @@ from omnigibson.utils.object_state_utils import get_reachability_sampling_contex
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
+    PhysicsMaterial,
     absolute_prim_path_to_scene_relative,
     ensure_usd_api,
+    get_prim_at_path,
     scene_relative_prim_path_to_absolute,
     setup_collision_apis,
 )
@@ -456,7 +458,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
-        if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
+        if not get_prim_at_path(prim_path):
             with og.sim.editing_usd():
                 lazy.omni.kit.commands.execute(
                     "CopyPrim",
@@ -1198,7 +1200,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             og.sim.stage.DefinePrim(f"{self.prim_path}/particles", "Scope")
 
             # Physics material to apply to the particles
-            self.particle_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(
+            self.particle_physics_material = PhysicsMaterial(
                 prim_path=f"{self.prim_path}/material",
                 name=f"{self.name}_physics_material",
                 static_friction=m.MACRO_PHYSICAL_STATIC_FRICTION,
@@ -1213,15 +1215,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
-        if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
+        if not get_prim_at_path(prim_path):
             with og.sim.editing_usd():
-                lazy.omni.kit.commands.execute(
-                    "CopyPrim",
-                    path_from=self.particle_object.prim_path,
-                    path_to=prim_path,
-                )
+                og.sim.render_backend.copy_prim(self.particle_object.prim_path, prim_path)
             # Apply RigidBodyAPI to it so it is subject to physics
-            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+            prim = get_prim_at_path(prim_path)
             ensure_usd_api(prim, lazy.pxr.UsdPhysics.RigidBodyAPI)
             mass_api = ensure_usd_api(prim, lazy.pxr.UsdPhysics.MassAPI)
             with og.sim.editing_usd():
@@ -1263,11 +1261,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         This is called through og.sim.update_handles when the physx object count etc. changes.
         """
-        if not og.sim.is_playing() or og.sim.physics_sim_view is None:
+        if not og.sim.is_playing() or og.sim.physics_backend.physics_sim_view is None:
             self.particles_view = None
             return
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
+            self.particles_view = og.sim.physics_backend.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"
             )
 

@@ -1,7 +1,6 @@
 import torch as th
 import warp as wp
 
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
@@ -11,7 +10,7 @@ from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsolut
 from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import RigidBodyViewAPI
+from omnigibson.utils.usd_utils import RigidBodyViewAPI, create_tensor_from_list
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -370,7 +369,6 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
                         if flat is not None:
                             link_flat_idx[s_idx, hss_obj_idx] = int(flat)
 
-        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
         cls._temperatures = create_tensor_from_list(temperatures, "float32", device="cuda")
         cls._heating_rates = create_tensor_from_list(heating_rates, "float32", device="cuda")
         cls._distance_thresholds = create_tensor_from_list(distance_thresholds, "float32", device="cuda")
@@ -416,7 +414,6 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             self_open_idx[obj_idx] = open_map.get(rel_path, -1)
             self_onfire_idx[obj_idx] = onfire_map.get(rel_path, -1)
 
-        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
         cls._self_toggle_idx = create_tensor_from_list(self_toggle_idx, "int32", device="cuda")
         cls._self_open_idx = create_tensor_from_list(self_open_idx, "int32", device="cuda")
         cls._self_onfire_idx = create_tensor_from_list(self_onfire_idx, "int32", device="cuda")

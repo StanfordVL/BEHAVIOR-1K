@@ -7,7 +7,12 @@ from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.physx_utils import bind_material
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, get_sdf_value_type_name
+from omnigibson.utils.usd_utils import (
+    absolute_prim_path_to_scene_relative,
+    get_sdf_value_type_name,
+    is_prim_path_valid,
+    get_prim_at_path,
+)
 
 
 log = create_module_logger(module_name=__name__)
@@ -57,9 +62,9 @@ class MaterialPrim(BasePrim):
 
         # Otherwise, create a new one and return it
         material_class = cls
-        if lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
+        if is_prim_path_valid(prim_path):
             # If the prim already exists, infer its type.
-            material_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+            material_prim = get_prim_at_path(prim_path)
             shader_prim = lazy.omni.usd.get_shader_from_material(material_prim)
             assert shader_prim is not None, (
                 f"Material prim at {prim_path} exists, but does not have a shader associated with it! "
@@ -197,7 +202,7 @@ class MaterialPrim(BasePrim):
         og.sim.update_handles()
 
         # Return generated material
-        return lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path)
+        return get_prim_at_path(self.prim_path)
 
     @classmethod
     def clear(cls):

@@ -2,7 +2,6 @@ import torch as th
 import warp as wp
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -18,6 +17,8 @@ from omnigibson.utils.usd_utils import (
     RigidContactAPI,
     absolute_prim_path_to_scene_relative,
     create_primitive_mesh,
+    create_tensor_from_list,
+    get_prim_at_path,
     rigid_inverse_mat44,
 )
 
@@ -249,9 +250,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 obj_idx = cls.OBJ_IDXS[relative_prim_path]
                 for scene_idx in range(min(prev_time_cpu.shape[0], S)):
                     new_time_cpu[scene_idx, obj_idx] = prev_time_cpu[scene_idx, obj_idx_old]
-        cls._robots_can_toggle_time = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            new_time_cpu, "float32", device="cuda"
-        )
+        cls._robots_can_toggle_time = create_tensor_from_list(new_time_cpu, "float32", device="cuda")
 
         marker_finger_pairs = cls._init_finger(S, O)
         cls._init_marker(S, O, marker_finger_pairs)
@@ -280,15 +279,11 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 )
         # int32 so the kernel can index with wp.int32.
         if requires_closed_obj_idxes_in_open_values:
-            cls._requires_closed_obj_idxes_in_open_values = (
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                    requires_closed_obj_idxes_in_open_values, "int32", device="cuda"
-                )
+            cls._requires_closed_obj_idxes_in_open_values = create_tensor_from_list(
+                requires_closed_obj_idxes_in_open_values, "int32", device="cuda"
             )
-            cls._requires_closed_obj_idxes_in_this_values = (
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                    requires_closed_obj_idxes_in_this_values, "int32", device="cuda"
-                )
+            cls._requires_closed_obj_idxes_in_this_values = create_tensor_from_list(
+                requires_closed_obj_idxes_in_this_values, "int32", device="cuda"
             )
         else:
             cls._requires_closed_obj_idxes_in_open_values = None
@@ -391,14 +386,8 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
             finger_query_mask_data = row_mask.unsqueeze(0).to(th.uint8)  # (1, R_s) CPU uint8 tensor
             with_mask_data = th.stack(toggleable_obj_with_mask_rows).to(th.uint8)  # (O, C_s) CPU uint8 tensor
 
-            cls._finger_query_mask.append(
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                    finger_query_mask_data, "uint8", device="cuda"
-                )
-            )
-            cls._toggable_objs_with_mask.append(
-                lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(with_mask_data, "uint8", device="cuda")
-            )
+            cls._finger_query_mask.append(create_tensor_from_list(finger_query_mask_data, "uint8", device="cuda"))
+            cls._toggable_objs_with_mask.append(create_tensor_from_list(with_mask_data, "uint8", device="cuda"))
             cls._mask_can_toggle_per_scene.append(cls._mask_can_toggle[scene_idx])
 
         return marker_finger_pairs
@@ -449,19 +438,16 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
                 link_pos, link_ori = link.get_position_orientation()
                 marker_parent_link_idx_cpu[marker_idx_flat] = RigidBodyViewAPI.get_flat_idx(link.prim_path)
                 marker_local_offset_cpu[marker_idx_flat] = T.quat2mat(link_ori).T @ (marker_pos - link_pos)
-                marker_radii_cpu[marker_idx_flat] = th.min(state.marker.extent * state.marker.scale).item()
+                # extent is always CPU (raw local mesh geometry); scale now tracks og.sim.device -- match
+                # extent's device here since this is a purely local-frame geometric computation feeding a
+                # CPU tensor slot anyway.
+                marker_radii_cpu[marker_idx_flat] = th.min(state.marker.extent * state.marker.scale.cpu()).item()
 
         # Scalar-typed → create_tensor_from_list; vec3 has no helper, so use wp.array directly
         # — it reinterprets the CPU torch (N, 3) float32 buffer as (N,) vec3.
-        cls._marker_to_obj_idx_flat = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            marker_to_obj_idx_flat_cpu, "int32", device="cuda"
-        )
-        cls._marker_parent_link_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            marker_parent_link_idx_cpu, "int32", device="cuda"
-        )
-        cls._marker_radii = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            marker_radii_cpu, "float32", device="cuda"
-        )
+        cls._marker_to_obj_idx_flat = create_tensor_from_list(marker_to_obj_idx_flat_cpu, "int32", device="cuda")
+        cls._marker_parent_link_idx = create_tensor_from_list(marker_parent_link_idx_cpu, "int32", device="cuda")
+        cls._marker_radii = create_tensor_from_list(marker_radii_cpu, "float32", device="cuda")
         cls._marker_local_offset = wp.array(marker_local_offset_cpu, dtype=wp.vec3, device="cuda")
 
         # Wrap (marker, finger) pair list as wp.array of vec2i (each row a 2-element int32 vec).
@@ -721,13 +707,13 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
 
         # See if the mesh exists at the latest dataset's target location
         mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
-        pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
+        pre_existing_mesh = get_prim_at_path(mesh_prim_path)
 
         # If not, see if it exists in the legacy format's location
         # TODO: Remove this after new dataset release
         if not pre_existing_mesh:
             mesh_prim_path = f"{self.link.prim_path}/mesh_0"
-            pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
+            pre_existing_mesh = get_prim_at_path(mesh_prim_path)
 
         # Create a primitive mesh if neither option exists
         if not pre_existing_mesh:
@@ -739,7 +725,7 @@ class ToggledOn(TensorizedAbsoluteState, BooleanStateMixin, LinkBasedStateMixin)
         else:
             # Infer radius from mesh if not specified as an input
             with og.sim.editing_usd():
-                lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
+                og.sim.render_backend.recompute_extents(pre_existing_mesh)
             self.scale = vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim

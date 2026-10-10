@@ -287,7 +287,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         for p in stage.Traverse():
             p.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
-            p.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
+            og.sim.physics_backend.strip_articulation_schemas(p)
 
         n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
 
@@ -356,9 +356,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         if articulation_root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(articulation_root_prim)
-            lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(articulation_root_prim)
-            articulation_root_prim.GetAttribute("physxArticulation:enabledSelfCollisions").Set(
-                bool(self._load_config.get("self_collisions", False))
+            og.sim.physics_backend.apply_articulation_schemas(
+                articulation_root_prim, self_collisions=bool(self._load_config.get("self_collisions", False))
             )
 
         # Export to a temp file
