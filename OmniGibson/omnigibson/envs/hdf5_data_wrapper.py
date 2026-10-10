@@ -444,6 +444,10 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         Args:
             viewport_camera_path (str): Prim path to the camera to use for the viewer for data collection
         """
+        # Everything below tunes Kit's own renderer (Replicator render products, carb settings, the
+        # viewer camera) -- nothing applies to any other render backend.
+        if gm.RENDER_BACKEND != "kit":
+            return
 
         # Disable all render products to save on speed
         # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6

@@ -113,12 +113,16 @@ class EntityPrim(XFormPrim):
                 if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                     assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
                     old_link_prim = prim
-                    for child in prim.GetChildren():
-                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(
+                    # The visual (non-collision) mesh is a descendant of the link, not necessarily a
+                    # direct child -- current dataset assets nest it under an intermediate "visuals"
+                    # Xform (the same convention used for rigid objects' visual/collision meshes), so
+                    # search recursively rather than assuming a fixed depth.
+                    for descendant in lazy.pxr.Usd.PrimRange(prim):
+                        if descendant.GetPrimTypeInfo().GetTypeName() == "Mesh" and not descendant.HasAPI(
                             lazy.pxr.UsdPhysics.CollisionAPI
                         ):
                             assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
-                            cloth_mesh_prim = child
+                            cloth_mesh_prim = descendant
 
             # Move mesh prim one level up via copy, then delete the original link
             # NOTE: We copy because we cannot directly move the prim because it is ancestral
@@ -167,17 +171,19 @@ class EntityPrim(XFormPrim):
 
         assert th.all(self.original_scale == 1.0), "scale should be [1, 1, 1] at the EntityPrim (object) level"
 
-        # Cache material information
+        # Cache material information. Materials are a rendering-only concern, not loaded at all for a
+        # render backend that doesn't author them (see XFormPrim._post_load()).
         materials = set()
         material_paths = set()
-        for link in self._links.values():
-            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
-            for xform in xforms:
-                if xform.has_material():
-                    mat_path = xform.material.prim_path
-                    if mat_path not in material_paths:
-                        materials.add(xform.material)
-                        material_paths.add(mat_path)
+        if og.sim.render_backend.supports_materials:
+            for link in self._links.values():
+                xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
+                for xform in xforms:
+                    if xform.has_material():
+                        mat_path = xform.material.prim_path
+                        if mat_path not in material_paths:
+                            materials.add(xform.material)
+                            material_paths.add(mat_path)
 
         self._materials = materials
 
@@ -887,7 +893,7 @@ class EntityPrim(XFormPrim):
         Returns:
             th.Tensor: (n_dof,) boolean tensor. True for rotational DOFs, False for translational.
         """
-        return th.as_tensor(self._articulation_view.get_dof_is_rotational())
+        return th.as_tensor(self._articulation_view.get_dof_is_rotational(), device=og.sim.device)
 
     def get_joint_velocities(self, normalized=False):
         """

@@ -374,7 +374,6 @@ class KitRenderBackend(RenderBackend):
     ``PhysXBackend`` does on the physics side.
     """
 
-    runs_inside_kit = True
     supports_camera_capture = True
     supports_viewport = True
     supports_materials = True
@@ -444,41 +443,42 @@ class KitRenderBackend(RenderBackend):
         return lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
 
     def create_primitive_mesh(self, primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
-        MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
-            "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
-            "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
-            "Plane": lazy.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
-            "Cylinder": lazy.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
-            "Torus": lazy.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
-            "Cone": lazy.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
-            "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
-        }
+        with self.sim.editing_usd(stage=stage):
+            MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
+                "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
+                "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
+                "Plane": lazy.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
+                "Cylinder": lazy.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
+                "Torus": lazy.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
+                "Cone": lazy.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
+                "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
+            }
 
-        evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
-        u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
-        v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
-        hs_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
-        stage = self.sim.stage if stage is None else stage
+            evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
+            u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
+            v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
+            hs_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
+            lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
+            lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
+            stage = self.sim.stage if stage is None else stage
 
-        # Default half_scale (i.e. half-extent, half_height, radius) is 1.
-        # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
-        #  (currently it only accepts integer-number and floors 0.5 into 0).
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
-        kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
-        if u_patches is not None and v_patches is not None:
-            kwargs["u_patches"] = u_patches
-            kwargs["v_patches"] = v_patches
+            # Default half_scale (i.e. half-extent, half_height, radius) is 1.
+            # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
+            #  (currently it only accepts integer-number and floors 0.5 into 0).
+            lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
+            kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
+            if u_patches is not None and v_patches is not None:
+                kwargs["u_patches"] = u_patches
+                kwargs["v_patches"] = v_patches
 
-        # Import now to avoid too-eager load of Omni classes due to inheritance
-        from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
+            # Import now to avoid too-eager load of Omni classes due to inheritance
+            from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
 
-        CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
+            CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
 
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
+            lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
+            lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
+            lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
     def compute_world_aabb(self, prim_path):
         return lazy.omni.usd.get_context().compute_path_world_bounding_box(prim_path)

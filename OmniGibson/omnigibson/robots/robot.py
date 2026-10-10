@@ -53,10 +53,8 @@ from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
     RigidContactAPI,
-    create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
-    delete_or_deactivate_prim,
     get_prim_at_path,
 )
 
@@ -85,6 +83,42 @@ m.MAX_LINEAR_VELOCITY = 1.5
 m.MAX_ANGULAR_VELOCITY = th.pi
 m.MAX_EFFORT = 1000.0
 m.BASE_JOINT_CONTROLLER_POSITION_KP = 100.0
+
+# On the Newton backend, an articulated trunk carries the whole upper body's weight, so the generic
+# controllers.controller_base.DEFAULT_NEWTON_KP/KD (tuned for lightly-loaded joints) isn't stiff/damped
+# enough to hold a deployed pose without diverging -- matches feat/newton's own per-group tuning for
+# the same class of gravity-loaded joint.
+m.NEWTON_TRUNK_POSITION_KP = 20000.0
+m.NEWTON_TRUNK_POSITION_KD = 2000.0
+
+# Small finger links need much lower gains than arms: the generic Newton 3000/300 servo
+# overwhelms contacts with lightweight objects. Keep explicit user gains authoritative.
+m.NEWTON_GRIPPER_POSITION_KP = 30.0
+m.NEWTON_GRIPPER_POSITION_KD = 3.0
+
+# Passive damping/stiffness for a holonomic base's unactuated z/rx/ry virtual joints under Newton --
+# see _newton_passive_base_dofs() for why these need it at all. Damping alone was measured to only
+# halve the tip-over (peak pitch 109deg -> 61deg, still climbing) because a damper supplies no
+# restoring torque against a standing gravity moment, so the roll/pitch axes also get a spring holding
+# them level -- a real 3-wheeled base cannot pitch without lifting a wheel, so "held level" is the
+# more faithful model of flat-floor driving than "free to topple". Heave (z) stays damping-only: a
+# spring there would fight the base's need to rest on whatever the floor height actually is.
+m.NEWTON_PASSIVE_BASE_DOF_KD = 500.0
+# Measured on r1pro in Rs_int (trunk deployed, base commanded to hold still, 600 steps): peak pitch
+# was 109deg with neither term, 61deg with damping alone, 5.4deg at kp=5e3, and 0.84deg at 2e4 (heave
+# also settles to +-2cm from +-30cm). NOTE the spring's target is whatever joint_q the base was built
+# at (level), so it actively returns the base to level -- fine for BEHAVIOR's flat floors, but it
+# would also resist a genuinely tilted resting pose (e.g. a ramp) if one ever shows up.
+m.NEWTON_PASSIVE_BASE_TILT_KP = 20000.0
+
+# NOTE: deliberately NO base-specific velocity-kd override here. feat/newton drives its holonomic
+# base with a small velocity_kd (60-80), but it can only afford that because it ALSO lowers the
+# chassis/caster friction (its _apply_chassis_caster_friction() + _elevate_mjc_geom_priority()); this
+# branch has no equivalent, so the base servo has to overcome full mu=0.9 friction under ~900N of
+# robot weight. Measured on r1pro (91kg) in Rs_int: kd=60 produces ~30N and the base cannot move at
+# all (net -0.016m against a commanded 0.5m/s), while the generic DEFAULT_NEWTON_KP-sourced fallback
+# tracks the command correctly. Don't "tune this down to match feat/newton" without porting the
+# friction treatment first.
 
 
 AG_MODES = {
@@ -308,6 +342,10 @@ class Robot(USDObject, GymObservable):
         # Store control-related inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
+        # Must land on og.sim.device explicitly -- a caller-supplied tensor (e.g. a static,
+        # CPU-authored config value like JoyLo's ROBOT_CONFIGS) is not guaranteed to already be on the
+        # right device, and this value gets combined with device-tracking robot state elsewhere (e.g.
+        # joint_lower_limits/joint_upper_limits, both explicitly og.sim.device-resident).
         if reset_joint_pos is None:
             self._reset_joint_pos = None
         elif isinstance(reset_joint_pos, th.Tensor):
@@ -634,10 +672,30 @@ class Robot(USDObject, GymObservable):
         """
         # Update the control modes of each joint based on the outputted control from the controllers
         unused_dofs = {i for i in range(self.n_dof)}
-        for group_key, _ in self._controllers.values():
+        for name, (group_key, _) in self._controllers.items():
             isaac_kp = ControllerView.get_isaac_kp(group_key)
             isaac_kd = ControllerView.get_isaac_kd(group_key)
             control_type = ControllerView.get_control_type(group_key)
+            # See the comment above NEWTON_TRUNK_POSITION_KP/KD: the generic Newton default gain
+            # isn't enough for a gravity-loaded trunk holding a deployed pose. Only refine gains that
+            # came from that backend-wide default -- an explicitly configured isaac_kp/isaac_kd is the
+            # caller's own tuning and must not be silently discarded.
+            if (
+                name == "trunk"
+                and gm.PHYSICS_BACKEND == "newton"
+                and control_type == ControlType.POSITION
+                and ControllerView.isaac_gains_are_default(group_key)
+            ):
+                isaac_kp = th.full_like(isaac_kp, m.NEWTON_TRUNK_POSITION_KP)
+                isaac_kd = th.full_like(isaac_kd, m.NEWTON_TRUNK_POSITION_KD)
+            if (
+                name.startswith("gripper_")
+                and gm.PHYSICS_BACKEND == "newton"
+                and control_type == ControlType.POSITION
+                and ControllerView.isaac_gains_are_default(group_key)
+            ):
+                isaac_kp = th.full_like(isaac_kp, m.NEWTON_GRIPPER_POSITION_KP)
+                isaac_kd = th.full_like(isaac_kd, m.NEWTON_GRIPPER_POSITION_KD)
             for i, dof in enumerate(ControllerView.get_dof_idx(group_key).tolist()):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof in unused_dofs
@@ -652,6 +710,7 @@ class Robot(USDObject, GymObservable):
         # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
         # motion wrt a specific axis), so explicitly set kp / kd to 0 to avoid silent bugs when
         # joint positions / velocities are set
+        passive_base_dofs = self._newton_passive_base_dofs()
         for unused_dof in unused_dofs:
             unused_joint = self._joints[self.dof_names_ordered[unused_dof]]
             assert not unused_joint.driven, (
@@ -663,6 +722,39 @@ class Robot(USDObject, GymObservable):
                 kp=None,
                 kd=None,
             )
+            # See _newton_passive_base_dofs() for why. Applied AFTER set_control_type(), which zeroes
+            # both gains. Heave gets damping only (a spring there would fight the base's need to rest
+            # at the actual floor height); roll/pitch additionally get a leveling spring, whose target
+            # is the initial joint_q that _rebuild_impl seeds into model.joint_target_q -- i.e. level.
+            if unused_dof in passive_base_dofs:
+                unused_joint.damping = m.NEWTON_PASSIVE_BASE_DOF_KD
+                if m.NEWTON_PASSIVE_BASE_TILT_KP and unused_dof in self._newton_base_tilt_dofs():
+                    unused_joint.stiffness = m.NEWTON_PASSIVE_BASE_TILT_KP
+
+    def _newton_passive_base_dofs(self):
+        """The holonomic-base DOF indices that should get a passive velocity damper under Newton.
+
+        A holonomic base only drives x/y/rz; its z/rx/ry virtual joints are left unactuated on purpose
+        (kp=kd=0 above) so the base can conform to the floor. But that leaves the robot's heave, roll
+        and pitch resisted by *nothing* except floor contact -- and under Newton that isn't enough: with
+        the trunk deployed (CoM forward and high) r1pro develops a sustained pitch rock that can grow
+        until it tips over, even while the base is commanded to hold still. PhysX doesn't exhibit this
+        with the same free-DOF structure, so this is a Newton-side fidelity gap rather than an
+        OmniGibson modeling error -- hence backend-gated rather than applied unconditionally.
+
+        Derived from base_idx minus base_control_idx (rather than matching joint names here) so it
+        follows whatever the robot definition actually declares as its driven base joints.
+        """
+        if gm.PHYSICS_BACKEND != "newton" or not self.is_holonomic_base:
+            return set()
+        return {int(i) for i in self.base_idx.tolist()} - {int(i) for i in self.base_control_idx.tolist()}
+
+    def _newton_base_tilt_dofs(self):
+        """Of _newton_passive_base_dofs(), just the roll/pitch ones -- the axes that get a leveling
+        spring, as opposed to heave, which only ever gets damping. base_idx's own ordering is
+        [x, y, z, rx, ry, rz] (see that property), so rx/ry are its entries 3 and 4."""
+        base_idx = self.base_idx.tolist()
+        return {int(base_idx[3]), int(base_idx[4])} & self._newton_passive_base_dofs()
 
     def _generate_controller_config(self, custom_config=None):
         """
@@ -1269,7 +1361,7 @@ class Robot(USDObject, GymObservable):
             # OG-specified convention
             try:
                 self._infer_finger_properties()
-            except AssertionError as e:
+            except (AssertionError, RuntimeError) as e:
                 log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
 
         if self.is_holonomic_base:
@@ -1312,7 +1404,8 @@ class Robot(USDObject, GymObservable):
         Only manipulation robots own a view — any other robot simply clears its state.
         """
         # Non-manipulation robots don't need contact positions from fingers; just clear and exit.
-        if not self.is_manipulation:
+        # Same if this backend has no engine-level contact reporting at all (see supports_contact_reporting).
+        if not self.is_manipulation or not og.sim.physics_backend.supports_contact_reporting:
             self._rigid_contact_view = None
             self._rigid_contact_view_row_path_to_idx = {}
             self._rigid_contact_view_col_path_to_idx = {}
@@ -2070,8 +2163,7 @@ class Robot(USDObject, GymObservable):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        delete_or_deactivate_prim(self._ag_obj_constraints[arm].GetPath().pathString)
-        og.sim.update_handles()
+        og.sim.physics_backend.remove_attachment_constraint(self._ag_obj_constraints[arm])
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = None
         self._ag_release_counter[arm] = 0
@@ -3616,13 +3708,11 @@ class Robot(USDObject, GymObservable):
         """
         # Create the joint
         joint_prim_path = f"{self.eef_links[arm].prim_path}/ag_constraint"
-        joint_prim = create_joint(
+        joint_prim = og.sim.physics_backend.create_attachment_constraint(
             prim_path=joint_prim_path,
             joint_type=constraint_params["joint_type"],
             body0=self.eef_links[arm].prim_path,
             body1=constraint_params["target_obj"].links[constraint_params["target_link_name"]].prim_path,
-            enabled=True,
-            exclude_from_articulation=True,
             joint_frame_in_parent_frame_pos=constraint_params["parent_frame_pos"],
             joint_frame_in_parent_frame_quat=constraint_params["parent_frame_orn"],
             joint_frame_in_child_frame_pos=constraint_params["child_frame_pos"],
@@ -3657,7 +3747,24 @@ class Robot(USDObject, GymObservable):
         ret = []
         for element in li:
             ret.append(self._convert_to_math_pi(element))
-        return th.tensor(ret)
+        return th.tensor(ret, device=og.sim.device)
+
+    def _convert_mobile_manipulation_joint_pos_to_tensor(self, li):
+        # Values in tucked/untucked_default_joint_pos are authored positionally against a fixed joint
+        # order, but different physics backends can enumerate sibling joints (joints sharing a parent
+        # link, e.g. Fetch's head_tilt_joint / shoulder_pan_joint) in different orders. When the
+        # definition pins down that order via mobile_manipulation.joint_names, reorder by name into the
+        # live backend's own joint order (self.joints, already backend-ordered by this point) instead of
+        # applying positionally -- otherwise a value silently lands on the wrong joint.
+        tensor_val = self._convert_yaml_list_to_tensor(li)
+        canonical_names = self._definition.mobile_manipulation.joint_names
+        if canonical_names is None or len(canonical_names) != len(li):
+            return tensor_val
+        name_to_value = dict(zip(canonical_names, tensor_val))
+        live_names = list(self.joints.keys())
+        if set(live_names) != set(canonical_names):
+            return tensor_val
+        return th.stack([name_to_value[name] for name in live_names])
 
     def _get_teleop_rotation_offset(self, prop):
         dic = dict()
@@ -4006,12 +4113,16 @@ class Robot(USDObject, GymObservable):
     @property
     def tucked_default_joint_pos(self):
         assert self.is_mobile_manipulation
-        return self._convert_yaml_list_to_tensor(self._definition.mobile_manipulation.tucked_default_joint_pos)
+        return self._convert_mobile_manipulation_joint_pos_to_tensor(
+            self._definition.mobile_manipulation.tucked_default_joint_pos
+        )
 
     @property
     def untucked_default_joint_pos(self):
         assert self.is_mobile_manipulation
-        return self._convert_yaml_list_to_tensor(self._definition.mobile_manipulation.untucked_default_joint_pos)
+        return self._convert_mobile_manipulation_joint_pos_to_tensor(
+            self._definition.mobile_manipulation.untucked_default_joint_pos
+        )
 
     def tuck(self):
         """

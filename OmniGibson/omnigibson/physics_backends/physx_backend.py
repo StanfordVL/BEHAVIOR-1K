@@ -75,6 +75,12 @@ def _get_physx_articulation_view_cls():
 
 
 class PhysXBackend(PhysicsBackend):
+    supports_particles = True
+    supports_cloth = True
+    supports_lidar = True
+    supports_contact_reporting = True
+    supports_scene_queries = True
+
     def __init__(self, sim=None):
         super().__init__(sim)
         self._sim_context = None
@@ -461,7 +467,7 @@ class PhysXBackend(PhysicsBackend):
     # ---- Cloth particle state I/O ----
     # points/velocities are raw USD attrs on the cloth mesh prim -- PhysX's own particle-cloth solver
     # keeps them in sync with its internal simulation state each step via Fabric/USD live-sync (Kit-only
-    # behavior; a backend without an equivalent has to instead read/
+    # behavior; there is no equivalent standalone, which is why the Newton backend must instead read/
     # write its own solver state directly). points are authored in the mesh's LOCAL frame; velocities
     # are already world-frame (PhysX's own convention). This class exposes only the WORLD-frame contract
     # documented in PhysicsBackend, so local<->world conversion happens here, not in ClothPrim.
@@ -525,6 +531,54 @@ class PhysXBackend(PhysicsBackend):
             for key, value in values.items():
                 if value is not None:
                     prim.GetAttribute(self._CLOTH_STIFFNESS_ATTRS[key]).Set(value)
+
+    # ---- Fluid/granular particle-system state I/O ----
+    # Unlike cloth (relocated inline logic behind the abstraction), PhysX's particle-system generation
+    # continues to go through MicroPhysicalParticleSystem/PhysxParticleInstancer directly (existing,
+    # working code, untouched by this session's work) -- that machinery (multiple prototypes, scales,
+    # semantic labels for rendering) is considerably more involved than what these methods need to
+    # support for Newton's minimal-viable particle representation, and refactoring it without being
+    # able to verify PhysX behavior in this environment isn't worth the regression risk. These methods
+    # exist to satisfy the abstract interface but are not currently reachable from PhysX's own particle
+    # code path.
+
+    def create_particle_system(self, system_name):
+        raise NotImplementedError(
+            "PhysX particle-system creation goes through MicroPhysicalParticleSystem/"
+            "PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def generate_particles(self, system_name, positions, velocities=None):
+        raise NotImplementedError(
+            "PhysX particle generation goes through MicroPhysicalParticleSystem.generate_particles() "
+            "directly, not this abstraction."
+        )
+
+    def remove_particles(self, system_name, idxs):
+        raise NotImplementedError(
+            "PhysX particle removal goes through MicroPhysicalParticleSystem.remove_particles() "
+            "directly, not this abstraction."
+        )
+
+    def get_particle_positions(self, system_name):
+        raise NotImplementedError(
+            "PhysX particle positions are read via PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def set_particle_positions(self, system_name, positions, idxs=None):
+        raise NotImplementedError(
+            "PhysX particle positions are set via PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def get_particle_velocities(self, system_name):
+        raise NotImplementedError(
+            "PhysX particle velocities are read via PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def set_particle_velocities(self, system_name, velocities, idxs=None):
+        raise NotImplementedError(
+            "PhysX particle velocities are set via PhysxParticleInstancer directly, not this abstraction."
+        )
 
     # ---- Joint-break events ----
 

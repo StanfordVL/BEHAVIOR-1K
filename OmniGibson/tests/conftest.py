@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import torch as th
 
@@ -9,6 +11,19 @@ from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMe
 
 from utils import MULTI_ENV_ROBOTS
 
+# Allow selecting a non-default physics backend for a test run without changing the hardcoded
+# default in macros.py (which would affect every caller, not just test runs). Must be set before
+# the first og.Environment() triggers Simulator._launch_app(), which reads gm.PHYSICS_BACKEND once.
+if os.environ.get("OMNIGIBSON_PHYSICS_BACKEND"):
+    gm.PHYSICS_BACKEND = os.environ["OMNIGIBSON_PHYSICS_BACKEND"]
+if os.environ.get("OMNIGIBSON_RENDER_BACKEND"):
+    gm.RENDER_BACKEND = os.environ["OMNIGIBSON_RENDER_BACKEND"]
+
+# Some backend combinations (e.g. Newton on CPU with certain warp versions) hit unrelated,
+# pre-existing bugs unless run on CUDA -- allow forcing the env device the same way, for the same
+# reason as the two backend overrides above.
+_DEVICE_OVERRIDE = os.environ.get("OMNIGIBSON_DEVICE")
+
 
 @pytest.fixture
 def stopped_env():
@@ -17,7 +32,10 @@ def stopped_env():
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_TRANSITION_RULES = True
 
-    env = og.Environment(configs={"scene": {"type": "Scene"}})
+    configs = {"scene": {"type": "Scene"}}
+    if _DEVICE_OVERRIDE:
+        configs["env"] = {"device": _DEVICE_OVERRIDE}
+    env = og.Environment(configs=configs)
     og.sim.stop()
     yield env
 
