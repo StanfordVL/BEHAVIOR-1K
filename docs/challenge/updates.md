@@ -4,15 +4,37 @@ On this page, we provide updates regarding the **2026 BEHAVIOR Challenge**, incl
 
 ---
 
+### 10/09/2026 {#10092026}
+
+**Final Submission Reminder & Evaluation Rules**
+
+**Challenge rule clarifications:**
+
+1. **Submission deadline:** October 16, 2026, at **11:59 PM Anywhere on Earth (AoE)**. We will use each team's **latest valid submission** received before the deadline, so please ensure it contains your complete final solution and results.
+
+2. **Average evaluation speed:** Each rollout must average at least **1 FPS**, measured from one action query to the next, including inference, communication, and simulator stepping. We enforce this through an episode timeout of `max_steps × 1 second`, excluding scene startup. Individual steps may take longer than one second. This corresponds to approximately **10.85 hours** of episode timeout for the longest task.
+
+3. **Per-step timeout:** Each action-query round trip must complete within **600 seconds** and within the remaining episode time.
+
+4. **Reconnections:** If the policy-server connection is lost, we will attempt to reconnect up to **three times** before stopping the rollout and counting it as a failure. Reconnection time counts toward the episode timeout.
+
+5. **IP-based submissions:** You are welcome to DM the organizers to schedule a connection and inference-speed test before your final submission.
+
+6. **Leaderboard and final rankings:** To discourage leaderboard farming, we will hide leaderboard scores during the final week of submissions and restore their visibility after the deadline. For policies evaluated on hidden test instances, **hidden-test scores will replace public-instance scores** for final ranking.
+
+7. **No cherry-picking results:** Evaluating the same task instances repeatedly and assembling a submission from the best result of each rollout is **not allowed**. Submit results from a single evaluation run of your final policy, with one rollout per submitted task instance.
+
+---
+
 ### 10/07/2026 {#10072026}
 
 **Challenge rule clarifications:**
 
-1. If your submission uses a custom robot, please update to `v3.9.3.post2`. Otherwise, no update is required; you can continue using the previously specified release.
+1. If your submission uses a custom robot, please update to `v3.9.3-post2`. Otherwise, no update is required; you can continue using the previously specified release.
 
 **Bug fixes:**
 
-1. Released `v3.9.3.post2` with a single bug fix for custom robot evaluation.
+1. Released `v3.9.3-post2` with a single bug fix for custom robot evaluation.
 
 **New features:**
 
