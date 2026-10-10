@@ -818,6 +818,11 @@ class BatchedEvaluator:
                 logger.warning(
                     "Policy evaluation failed at step %s for instance %s: %s", step, instance, failure_message
                 )
+            if isinstance(self.policy, MultiWebsocketPolicy):
+                # Wall-clock seconds charged to this rollout, distinct from simulated time.
+                evaluation_time = self.policy.elapsed[env_idx]
+                result.setdefault("time", {})["evaluation_time"] = evaluation_time
+                result["time"]["evaluation_fps"] = step / evaluation_time if evaluation_time > 0 else None
             if metrics_dir is not None:
                 with open(os.path.join(metrics_dir, f"{task_name}_{instance}_{rollout_id}.json"), "w") as f:
                     json.dump(result, f, indent=2, default=float)
