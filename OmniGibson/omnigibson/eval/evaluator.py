@@ -812,7 +812,12 @@ class BatchedEvaluator:
                     {"simulator_steps": step, "simulator_time": step * og.sim.get_rendering_dt()},
                 )
                 result["time"]["normalized_time"] = 1 / EVAL_TIMEOUT_MULTIPLIER
-                logger.warning("Policy evaluation failed at step %s for instance %s: %s", step, instance, failure)
+                failure_message = next(
+                    value for value in (connection_failure, timeout_failure, policy_failure) if value is not None
+                )
+                logger.warning(
+                    "Policy evaluation failed at step %s for instance %s: %s", step, instance, failure_message
+                )
             if metrics_dir is not None:
                 with open(os.path.join(metrics_dir, f"{task_name}_{instance}_{rollout_id}.json"), "w") as f:
                     json.dump(result, f, indent=2, default=float)
