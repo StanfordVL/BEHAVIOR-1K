@@ -1,13 +1,25 @@
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+
 import torch as th
-from omnigibson.eval.utils.network_utils import WebsocketClientPolicy
+from omnigibson.eval.utils.network_utils import PolicyTimeoutError, WebsocketClientPolicy
 from typing import Optional
 
 
 __all__ = [
     "LocalPolicy",
+    "MultiWebsocketPolicy",
+    "PolicyBatchResult",
     "WebsocketPolicy",
 ]
+
+
+@dataclass
+class PolicyBatchResult:
+    actions: th.Tensor
+    failures: dict[int, Exception]
 
 
 class LocalPolicy:
@@ -46,6 +58,9 @@ class LocalPolicy:
         if self.policy is not None:
             self.policy.reset()
 
+    def set_deadline(self, deadline: Optional[float]) -> None:
+        pass
+
 
 class WebsocketPolicy:
     """
@@ -69,6 +84,7 @@ class WebsocketPolicy:
         self.policy = None
         self._allow_reconnect = allow_reconnect
         self._action_chunk_size = action_chunk_size
+        self._deadline = None
         if host is not None or port is not None:
             self.policy = WebsocketClientPolicy(
                 host=host,
@@ -84,6 +100,12 @@ class WebsocketPolicy:
             allow_reconnect=self._allow_reconnect,
             action_chunk_size=self._action_chunk_size,
         )
+        self.policy.set_deadline(self._deadline)
+
+    def set_deadline(self, deadline: Optional[float]) -> None:
+        self._deadline = deadline
+        if self.policy is not None:
+            self.policy.set_deadline(deadline)
 
     def forward(self, obs: dict, *args, **kwargs) -> th.Tensor:
         if "need_new_action" in obs and not obs["need_new_action"] and self.last_action is not None:
@@ -95,3 +117,102 @@ class WebsocketPolicy:
         if self.policy is not None:
             self.policy.reset()
         self.last_action = None
+
+
+class MultiWebsocketPolicy:
+    """Query one policy server per logical environment while OmniGibson steps them together."""
+
+    def __init__(self, endpoints: list[dict], allow_reconnect: bool = True, action_chunk_size: int = 0) -> None:
+        self.clients = [
+            WebsocketClientPolicy(
+                host=endpoint["host"],
+                port=endpoint["port"],
+                allow_reconnect=allow_reconnect,
+                action_chunk_size=action_chunk_size,
+            )
+            for endpoint in endpoints
+        ]
+        self.executor = ThreadPoolExecutor(max_workers=len(self.clients))
+        self.action_dim = None
+        self.failures = {}
+        self.time_budget = None
+        self.elapsed = [0.0] * len(self.clients)
+
+    def set_action_dim(self, action_dim: int) -> None:
+        self.action_dim = action_dim
+
+    def set_time_budget(self, seconds: Optional[float]) -> None:
+        self.time_budget = seconds
+        self.elapsed = [0.0] * len(self.clients)
+        for client in self.clients:
+            client.set_deadline(None)
+
+    def _run_client(self, env_idx: int, method, *args):
+        start = time.monotonic()
+        if self.time_budget is not None:
+            remaining = self.time_budget - self.elapsed[env_idx]
+            if remaining <= 0:
+                raise PolicyTimeoutError("Rollout time budget expired")
+            self.clients[env_idx].set_deadline(start + remaining)
+        try:
+            result = method(*args)
+        finally:
+            self.elapsed[env_idx] += time.monotonic() - start
+        if self.time_budget is not None and self.elapsed[env_idx] >= self.time_budget:
+            raise PolicyTimeoutError("Rollout time budget expired")
+        return result
+
+    def reset(self) -> None:
+        self.failures = {}
+        futures = {
+            self.executor.submit(self._run_client, env_idx, client.reset): env_idx
+            for env_idx, client in enumerate(self.clients)
+        }
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                self.failures[futures[future]] = e
+
+    def forward(self, obs: list[dict], active_env_indices: list[int]) -> PolicyBatchResult:
+        assert self.action_dim is not None
+        actions = th.zeros((len(self.clients), self.action_dim), dtype=th.float32)
+        failures = {env_idx: self.failures[env_idx] for env_idx in active_env_indices if env_idx in self.failures}
+        futures = {
+            self.executor.submit(
+                self._run_client,
+                env_idx,
+                self.clients[env_idx].act,
+                {key: value.unsqueeze(0) for key, value in obs[env_idx].items()},
+            ): env_idx
+            for env_idx in active_env_indices
+            if env_idx not in failures
+        }
+        for future in as_completed(futures):
+            env_idx = futures[future]
+            try:
+                action = future.result()
+                if action.ndim == 2 and action.shape[0] == 1:
+                    action = action[0]
+                if action.shape != (self.action_dim,):
+                    raise ValueError(f"Policy {env_idx} returned action shape {tuple(action.shape)}")
+                actions[env_idx] = action
+            except Exception as e:
+                self.failures[env_idx] = failures[env_idx] = e
+        return PolicyBatchResult(actions=actions, failures=failures)
+
+    def charge_simulation(self, seconds: float, active_env_indices: list[int]) -> dict[int, Exception]:
+        # Finished environments remain in the shared simulation, so the divisor stays fixed.
+        share = seconds / len(self.clients)
+        failures = {}
+        for env_idx in active_env_indices:
+            self.elapsed[env_idx] += share
+            if self.time_budget is not None and self.elapsed[env_idx] >= self.time_budget:
+                error = PolicyTimeoutError("Rollout time budget expired")
+                self.failures[env_idx] = failures[env_idx] = error
+        return failures
+
+    def close(self) -> None:
+        for client in self.clients:
+            client.close()
+        self.executor.shutdown(wait=True, cancel_futures=True)

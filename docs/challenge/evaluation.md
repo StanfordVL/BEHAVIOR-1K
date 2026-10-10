@@ -49,6 +49,8 @@ python -m omnigibson.eval.eval \
 
 The evaluator connects to the policy server at `--host` and `--port`; the policy server is responsible for receiving observations and returning robot actions. The websocket interface is implemented by the evaluation utilities adapted from [openpi](https://github.com/Physical-Intelligence/openpi), and baseline servers such as OpenPI or GR00T can expose compatible endpoints.
 
+For vectorized evaluation with one policy server per rollout, pass `--policy-endpoints` with one `HOST:PORT` for each `--instance-indices` value, in the same order. The evaluator queries these ports concurrently and advances the shared simulator after the active ports respond.
+
 Key arguments:
 
 <table class="challenge-data-table">
@@ -60,6 +62,10 @@ Key arguments:
     <tr>
       <td><code>--host</code> and <code>--port</code></td>
       <td>Address of the websocket policy server. The default port is <code>8000</code>. The evaluator waits for the server health check at <code>/healthz</code>, then opens the websocket connection.</td>
+    </tr>
+    <tr>
+      <td><code>--policy-endpoints</code></td>
+      <td>One <code>HOST:PORT</code> per environment, in <code>--instance-indices</code> order. Uses a separate websocket connection for each rollout and overrides <code>--host</code> and <code>--port</code>.</td>
     </tr>
     <tr>
       <td><code>--instance-indices</code></td>
@@ -101,6 +107,8 @@ Key arguments:
 </table>
 
 The evaluator sends flattened observations to the policy server. The server should return a msgpack-encoded response containing an `action` array with the robot action for the current step. The helper server implementation is `WebsocketPolicyServer` in `OmniGibson/omnigibson/eval/utils/network_utils.py`, and the evaluator-side client is `omnigibson.eval.policies.WebsocketPolicy`.
+
+In multi-port evaluation, each rollout has an accounted time budget of max_steps seconds after scene startup. The evaluator charges each active rollout for its own policy query time, including reconnections, plus the shared simulator step time divided by the total number of environments in the batch. This divisor stays fixed because finished or failed environments remain in the shared simulation; their timers stop accumulating charges. The evaluator waits for all active policy queries before stepping the simulator, but waiting for another port's response is not charged to a rollout's policy time. Each action query must complete within 600 seconds and the remaining time for that rollout. If the websocket connection drops, the evaluator attempts to reconnect up to three times and resends the current observation without advancing the simulation step. A failed or over-budget rollout receives zero score; other active rollouts continue.
 
 ### Optional action-chunk replay protocol
 
