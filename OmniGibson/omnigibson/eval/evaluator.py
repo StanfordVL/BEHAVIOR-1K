@@ -7,7 +7,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from signal import SIGINT, signal
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 import torch as th
@@ -34,6 +34,7 @@ from omnigibson.eval.utils.light_utils import LightToggleSynchronizer, set_light
 from omnigibson.eval.utils.network_utils import PolicyConnectionError, PolicyTimeoutError
 from omnigibson.eval.utils.obs_utils import create_video_writer, write_video
 from omnigibson.eval.utils.score_utils import load_human_stats
+from omnigibson.eval.policies import MultiWebsocketPolicy
 from omnigibson.macros import gm
 from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
@@ -89,11 +90,20 @@ def resolve_instance_ids(task_name: str, instance_indices: list[int], mode: str 
     return [int(test_instances[i]) for i in instance_indices]
 
 
+@dataclass
+class BatchStepResult:
+    terminated: Sequence[bool]
+    truncated: Sequence[bool]
+    failures: dict[int, Exception]
+    advanced: bool
+    failures_after_step: set[int] = field(default_factory=set)
+
+
 def evaluate_instances_batched(
     instances: Sequence,
     num_envs: int,
     load_fn: Callable[[Dict[int, object]], None],
-    step_fn: Callable[[List[int]], "tuple[Sequence[bool], Sequence[bool]]"],
+    step_fn: Callable[[List[int]], tuple],
     record_fn: Callable[..., object],
     max_steps: Optional[int] = None,
     time_limit_seconds: Optional[float] = None,
@@ -186,17 +196,13 @@ def evaluate_instances_batched(
             return group_timeout_results()
         active_env_indices = sorted(env_idx for env_idx, is_active in active.items() if is_active)
         try:
-            terminated, truncated = step_fn(active_env_indices)
+            step_result = step_fn(active_env_indices)
         except PolicyTimeoutError as e:
             if group_timed_out():
                 return group_timeout_results()
-            for env_idx, (finished_step, term, trunc) in completed.items():
+            for env_idx, record in completed.items():
                 results[env_idx_to_instance[env_idx]] = record_fn(
-                    env_idx=env_idx,
-                    instance=env_idx_to_instance[env_idx],
-                    step=finished_step,
-                    terminated=term,
-                    truncated=trunc,
+                    env_idx=env_idx, instance=env_idx_to_instance[env_idx], **record
                 )
             for env_idx in active_env_indices:
                 results[env_idx_to_instance[env_idx]] = record_fn(
@@ -211,13 +217,9 @@ def evaluate_instances_batched(
         except PolicyConnectionError as e:
             if group_timed_out():
                 return group_timeout_results()
-            for env_idx, (finished_step, term, trunc) in completed.items():
+            for env_idx, record in completed.items():
                 results[env_idx_to_instance[env_idx]] = record_fn(
-                    env_idx=env_idx,
-                    instance=env_idx_to_instance[env_idx],
-                    step=finished_step,
-                    terminated=term,
-                    truncated=trunc,
+                    env_idx=env_idx, instance=env_idx_to_instance[env_idx], **record
                 )
             for env_idx in active_env_indices:
                 results[env_idx_to_instance[env_idx]] = record_fn(
@@ -229,25 +231,47 @@ def evaluate_instances_batched(
                     connection_failure=str(e),
                 )
             break
-        step += 1
+        if not isinstance(step_result, BatchStepResult):
+            terminated, truncated = step_result
+            failures, advanced, failures_after_step = {}, True, set()
+        else:
+            terminated, truncated = step_result.terminated, step_result.truncated
+            failures, advanced = step_result.failures, step_result.advanced
+            failures_after_step = step_result.failures_after_step
+        previous_step = step
+        if advanced:
+            step += 1
         if group_timed_out():
             return group_timeout_results()
 
         hit_cap = max_steps is not None and step >= max_steps
         for env_idx in active_env_indices:
+            if env_idx in failures:
+                error = failures[env_idx]
+                failure_key = (
+                    "timeout_failure"
+                    if isinstance(error, PolicyTimeoutError)
+                    else "connection_failure"
+                    if isinstance(error, PolicyConnectionError)
+                    else "policy_failure"
+                )
+                completed[env_idx] = {
+                    "step": step if env_idx in failures_after_step else previous_step,
+                    "terminated": False,
+                    "truncated": True,
+                    failure_key: str(error),
+                }
+                active[env_idx] = False
+                continue
             term = bool(terminated[env_idx])
             trunc = bool(truncated[env_idx]) or hit_cap
             if term or trunc:
-                completed[env_idx] = (step, term, trunc)
+                completed[env_idx] = {"step": step, "terminated": term, "truncated": trunc}
                 active[env_idx] = False
 
-    for env_idx, (finished_step, term, trunc) in completed.items():
+    for env_idx, record in completed.items():
         results[env_idx_to_instance[env_idx]] = record_fn(
-            env_idx=env_idx,
-            instance=env_idx_to_instance[env_idx],
-            step=finished_step,
-            terminated=term,
-            truncated=trunc,
+            env_idx=env_idx, instance=env_idx_to_instance[env_idx], **record
         )
     return results
 
@@ -473,14 +497,13 @@ class BatchedEvaluator:
                     robot.sensors[head_sensor_name].horizontal_aperture = EVAL_HEAD_HORIZONTAL_APERTURE
 
     def load_policy(self) -> Any:
-        # A single policy serves all logical environments in one batched call. It accepts observations
-        # with a leading num_envs dimension and keeps per-environment state positionally aligned.
+        # The policy either handles the observation batch directly or fans it out to one server per environment.
         policy = instantiate(self.cfg.model)
         if hasattr(policy, "set_action_dim"):
             policy.set_action_dim(self.instance_eval_states[0].env_accessor.robot.action_dim)
         logger.info("")
         logger.info("=" * 50)
-        logger.info(f"Loaded {self.num_envs} policy instance(s) (batched): {self.cfg.policy_name}")
+        logger.info(f"Loaded policy for {self.num_envs} environment(s): {self.cfg.policy_name}")
         logger.info("=" * 50)
         logger.info("")
         return policy
@@ -534,21 +557,35 @@ class BatchedEvaluator:
             for key in keys
         }
 
-    def _step_fn(self, active_env_indices: List[int]) -> Tuple[th.Tensor, th.Tensor]:
+    def _step_fn(self, active_env_indices: List[int]):
         """
-        ``step_fn`` consumed by :func:`evaluate_instances_batched`: query the policy once with all
-        logical environments batched together, then step. Finished environments get a zero action but are
-        still advanced by the shared simulator.
+        Query active policies, then step the shared simulator once. Finished or failed environments
+        get zero actions and are not scored further.
         """
         action_dim = self.instance_eval_states[0].env_accessor.robot.action_dim
-        batched_action = self.policy.forward(obs=self._batch_obs())  # (num_envs, action_dim)
+        if isinstance(self.policy, MultiWebsocketPolicy):
+            policy_result = self.policy.forward(obs=self._batch_obs(), active_env_indices=active_env_indices)
+            batched_action, failures = policy_result.actions, policy_result.failures
+        else:
+            batched_action = self.policy.forward(obs=self._batch_obs())
+            failures = {}
         if batched_action.ndim == 1:
             batched_action = batched_action.unsqueeze(0)
         actions = th.zeros((self.num_envs, action_dim), dtype=th.float32)
-        for env_idx in active_env_indices:
+        healthy_indices = [env_idx for env_idx in active_env_indices if env_idx not in failures]
+        for env_idx in healthy_indices:
             actions[env_idx] = batched_action[env_idx].to(actions.dtype)
-        terminated, truncated, _ = self._apply_actions(actions, active_env_indices)
-        return terminated, truncated
+        if healthy_indices:
+            sim_start = time.monotonic()
+            terminated, truncated, _ = self._apply_actions(actions, healthy_indices)
+            failures_after_step = set()
+            if isinstance(self.policy, MultiWebsocketPolicy):
+                sim_failures = self.policy.charge_simulation(time.monotonic() - sim_start, healthy_indices)
+                failures.update(sim_failures)
+                failures_after_step = set(sim_failures)
+            return BatchStepResult(terminated, truncated, failures, True, failures_after_step)
+        empty = th.zeros(self.num_envs, dtype=th.bool)
+        return BatchStepResult(empty, empty, failures, False)
 
     def _set_video_writer(self, instance_eval_state: InstanceEvaluationState, video_writer) -> None:
         existing = instance_eval_state.video_writer
@@ -773,21 +810,35 @@ class BatchedEvaluator:
 
         def start_fn(deadline):
             # Scene loading is outside the budget; policy reset and any reconnect are inside it.
-            self.policy.set_deadline(deadline)
+            if isinstance(self.policy, MultiWebsocketPolicy):
+                self.policy.set_time_budget(self.max_steps)
+            else:
+                self.policy.set_deadline(deadline)
             self.policy.reset()
 
         def step_fn(active_env_indices):
-            terminated, truncated = self._step_fn(active_env_indices)
+            step_result = self._step_fn(active_env_indices)
             if write_video:
                 for env_idx in active_env_indices:
+                    if env_idx in step_result.failures or not step_result.advanced:
+                        continue
                     self._write_video(self.instance_eval_states[env_idx])
-            return terminated, truncated
+            return step_result
 
-        def record_fn(env_idx, instance, step, terminated, truncated, connection_failure=None, timeout_failure=None):
+        def record_fn(
+            env_idx,
+            instance,
+            step,
+            terminated,
+            truncated,
+            connection_failure=None,
+            timeout_failure=None,
+            policy_failure=None,
+        ):
             instance_eval_state = self.instance_eval_states[env_idx]
             instance_eval_state.active = False
             self.n_trials += 1
-            failure = connection_failure or timeout_failure
+            failure = connection_failure or timeout_failure or policy_failure
             success = False if failure else instance_eval_state.env_accessor.success
             if success:
                 self.n_success_trials += 1
@@ -801,6 +852,8 @@ class BatchedEvaluator:
                     result["failure_reason"] = "policy_connection_lost"
                 elif timeout_failure == "group_time_budget_exceeded":
                     result["failure_reason"] = "group_time_budget_exceeded"
+                elif policy_failure:
+                    result["failure_reason"] = "policy_error"
                 else:
                     result["failure_reason"] = "policy_query_timeout"
                 result["q_score"] = {"final": 0.0}
@@ -829,7 +882,7 @@ class BatchedEvaluator:
             load_fn=load_fn,
             step_fn=step_fn,
             record_fn=record_fn,
-            time_limit_seconds=self.num_envs * self.max_steps,
+            time_limit_seconds=None if isinstance(self.policy, MultiWebsocketPolicy) else self.max_steps,
             start_fn=start_fn,
         )
 
@@ -850,6 +903,8 @@ class BatchedEvaluator:
             traceback.print_exception(exc_type, exc_value, exc_tb)
         for instance_eval_state in self.instance_eval_states:
             self._set_video_writer(instance_eval_state, None)
+        if hasattr(self.policy, "close"):
+            self.policy.close()
         self.env.close()
         og.shutdown()
 
