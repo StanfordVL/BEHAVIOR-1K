@@ -255,6 +255,11 @@ class WebsocketClientPolicy:
             except (OSError, EOFError, websockets.exceptions.ConnectionClosed) as e:
                 self._reconnect(e, deadline=self._deadline)
 
+    def close(self) -> None:
+        if self._ws is not None:
+            self._ws.close()
+            self._ws = None
+
 
 class WebsocketPolicyServer:
     """Serves a policy using the websocket protocol. See websocket_client_policy.py for a client implementation.

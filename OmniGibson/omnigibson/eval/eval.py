@@ -20,6 +20,7 @@ import argparse
 import logging
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from omegaconf import OmegaConf
 
@@ -33,11 +34,33 @@ logger = create_module_logger(module_name=__name__)
 logger.setLevel(logging.INFO)
 
 
+def parse_policy_endpoints(values: list[str], num_envs: int) -> list[dict]:
+    if len(values) != num_envs:
+        raise ValueError("--policy-endpoints must have one HOST:PORT per environment")
+    endpoints = []
+    for value in values:
+        try:
+            parsed = urlsplit(f"//{value}")
+            host, port = parsed.hostname, parsed.port
+        except ValueError as e:
+            raise ValueError(f"Invalid policy endpoint: {value}. Expected HOST:PORT.") from e
+        if host is None or port is None or parsed.path:
+            raise ValueError(f"Invalid policy endpoint: {value}. Expected HOST:PORT.")
+        endpoints.append({"host": host, "port": port})
+    return endpoints
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task-name", required=True, help="BEHAVIOR task name, e.g. turning_on_radio.")
     parser.add_argument("--host", default="127.0.0.1", help="Policy websocket server host.")
     parser.add_argument("--port", type=int, default=8000, help="Policy websocket server port.")
+    parser.add_argument(
+        "--policy-endpoints",
+        nargs="+",
+        metavar="HOST:PORT",
+        help="One policy server per environment, in --instance-indices order. Overrides --host and --port.",
+    )
     parser.add_argument(
         "--robot-config",
         type=str,
@@ -142,13 +165,22 @@ def main() -> None:
         logger.info(f"Loaded robot config from {robot_config_path}")
 
     if args.policy == "websocket":
-        model_cfg = {
-            "_target_": "omnigibson.eval.policies.WebsocketPolicy",
-            "host": args.host,
-            "port": args.port,
-            "allow_reconnect": True,
-            "action_chunk_size": args.replay_action_chunk_size,
-        }
+        if args.policy_endpoints is not None:
+            endpoints = parse_policy_endpoints(args.policy_endpoints, args.num_envs)
+            model_cfg = {
+                "_target_": "omnigibson.eval.policies.MultiWebsocketPolicy",
+                "endpoints": endpoints,
+                "allow_reconnect": True,
+                "action_chunk_size": args.replay_action_chunk_size,
+            }
+        else:
+            model_cfg = {
+                "_target_": "omnigibson.eval.policies.WebsocketPolicy",
+                "host": args.host,
+                "port": args.port,
+                "allow_reconnect": True,
+                "action_chunk_size": args.replay_action_chunk_size,
+            }
     else:
         model_cfg = {"_target_": "omnigibson.eval.policies.LocalPolicy", "action_dim": None}
 

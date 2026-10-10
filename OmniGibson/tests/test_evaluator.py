@@ -1,4 +1,5 @@
 import json
+import threading
 from types import SimpleNamespace
 
 import numpy as np
@@ -6,11 +7,14 @@ import pytest
 import torch as th
 
 from omnigibson.eval.evaluator import (
+    BatchStepResult,
     BatchedEvaluator,
     InstanceEnvAccessor,
     InstanceEvaluationState,
     evaluate_instances_batched,
 )
+from omnigibson.eval.eval import parse_policy_endpoints
+from omnigibson.eval.policies import MultiWebsocketPolicy
 from omnigibson.eval.utils.network_utils import PolicyConnectionError, PolicyTimeoutError, WebsocketClientPolicy, packb
 from omnigibson.metrics import TaskMetric
 
@@ -146,6 +150,235 @@ def test_action_query_timeout_only_fails_active_rollouts(monkeypatch):
 
     assert results[101]["terminated"] is True
     assert results[202]["timeout_failure"] == "Action query exceeded 600 seconds"
+
+
+def test_one_port_failure_does_not_stop_other_environments():
+    calls = []
+
+    def step_fn(active_env_indices):
+        calls.append(active_env_indices)
+        if len(calls) == 1:
+            return BatchStepResult(
+                terminated=[False, False],
+                truncated=[False, False],
+                failures={1: PolicyConnectionError("port 2 disconnected")},
+                advanced=True,
+            )
+        return BatchStepResult(
+            terminated=[True, False],
+            truncated=[False, False],
+            failures={},
+            advanced=True,
+        )
+
+    results = evaluate_instances_batched(
+        instances=[101, 202],
+        num_envs=2,
+        load_fn=lambda instances: None,
+        step_fn=step_fn,
+        record_fn=lambda **record: record,
+    )
+
+    assert calls == [[0, 1], [0]]
+    assert results[101]["terminated"] is True
+    assert results[101]["step"] == 2
+    assert results[202]["connection_failure"] == "port 2 disconnected"
+    assert results[202]["step"] == 0
+
+
+def test_all_ports_can_fail_without_advancing_simulation():
+    results = evaluate_instances_batched(
+        instances=[101, 202],
+        num_envs=2,
+        load_fn=lambda instances: None,
+        step_fn=lambda active: BatchStepResult(
+            terminated=[False, False],
+            truncated=[False, False],
+            failures={0: PolicyTimeoutError("slow"), 1: PolicyConnectionError("lost")},
+            advanced=False,
+        ),
+        record_fn=lambda **record: record,
+    )
+    assert results[101]["step"] == results[202]["step"] == 0
+    assert results[101]["timeout_failure"] == "slow"
+    assert results[202]["connection_failure"] == "lost"
+
+
+def test_multiport_policy_queries_concurrently_and_preserves_environment_order(monkeypatch):
+    barrier = threading.Barrier(2, timeout=2)
+    received = {}
+
+    class FakeClient:
+        def __init__(self, host, port, **kwargs):
+            self.port = port
+
+        def set_deadline(self, deadline):
+            pass
+
+        def reset(self):
+            pass
+
+        def act(self, obs):
+            received[self.port] = obs["value"].clone()
+            barrier.wait()
+            return th.tensor([[float(self.port)]])
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("omnigibson.eval.policies.WebsocketClientPolicy", FakeClient)
+    policy = MultiWebsocketPolicy([{"host": "127.0.0.1", "port": 8001}, {"host": "127.0.0.1", "port": 8002}])
+    policy.set_action_dim(1)
+    policy.set_time_budget(100)
+    try:
+        policy.reset()
+        result = policy.forward({"value": th.tensor([[11.0], [22.0]])}, [0, 1])
+        assert result.failures == {}
+        assert th.equal(result.actions, th.tensor([[8001.0], [8002.0]]))
+        assert th.equal(received[8001], th.tensor([[11.0]]))
+        assert th.equal(received[8002], th.tensor([[22.0]]))
+    finally:
+        policy.close()
+
+
+def test_multiport_policy_tracks_failures_and_simulation_share_separately(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, host, port, **kwargs):
+            self.port = port
+
+        def set_deadline(self, deadline):
+            pass
+
+        def reset(self):
+            pass
+
+        def act(self, obs):
+            calls.append(self.port)
+            if self.port == 8002:
+                raise PolicyConnectionError("lost")
+            return th.tensor([[1.0]])
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("omnigibson.eval.policies.WebsocketClientPolicy", FakeClient)
+    policy = MultiWebsocketPolicy([{"host": "127.0.0.1", "port": 8001}, {"host": "127.0.0.1", "port": 8002}])
+    policy.set_action_dim(1)
+    policy.set_time_budget(10)
+    try:
+        policy.reset()
+        result = policy.forward({"value": th.tensor([[11.0], [22.0]])}, [0, 1])
+        assert isinstance(result.failures[1], PolicyConnectionError)
+        assert th.equal(result.actions, th.tensor([[1.0], [0.0]]))
+        policy.forward({"value": th.tensor([[11.0], [22.0]])}, [0])
+        assert calls.count(8002) == 1
+
+        policy.elapsed[0] = 9.8
+        sim_failures = policy.charge_simulation(0.6, [0])  # Two environments share the cost.
+        assert isinstance(sim_failures[0], PolicyTimeoutError)
+        assert policy.elapsed[0] == pytest.approx(10.1)
+    finally:
+        policy.close()
+
+
+def test_batched_evaluator_steps_healthy_port_after_other_port_fails(monkeypatch):
+    class FakeClient:
+        def __init__(self, host, port, **kwargs):
+            self.port = port
+
+        def set_deadline(self, deadline):
+            pass
+
+        def reset(self):
+            pass
+
+        def act(self, obs):
+            if self.port == 8002:
+                raise PolicyConnectionError("lost")
+            return th.tensor([[2.0]])
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("omnigibson.eval.policies.WebsocketClientPolicy", FakeClient)
+    policy = MultiWebsocketPolicy([{"host": "localhost", "port": 8001}, {"host": "localhost", "port": 8002}])
+    policy.set_action_dim(1)
+    policy.set_time_budget(10)
+    evaluator = BatchedEvaluator.__new__(BatchedEvaluator)
+    evaluator.num_envs = 2
+    evaluator.policy = policy
+    evaluator.instance_eval_states = [
+        SimpleNamespace(env_accessor=SimpleNamespace(robot=SimpleNamespace(action_dim=1))) for _ in range(2)
+    ]
+    evaluator._batch_obs = lambda: {"value": th.tensor([[1.0], [2.0]])}
+    steps = []
+
+    def apply_actions(actions, active_env_indices):
+        steps.append((actions.clone(), active_env_indices))
+        return th.tensor([False, False]), th.tensor([False, False]), None
+
+    evaluator._apply_actions = apply_actions
+    try:
+        policy.reset()
+        result = evaluator._step_fn([0, 1])
+        assert result.advanced
+        assert isinstance(result.failures[1], PolicyConnectionError)
+        assert len(steps) == 1
+        assert th.equal(steps[0][0], th.tensor([[2.0], [0.0]]))
+        assert steps[0][1] == [0]
+    finally:
+        policy.close()
+
+
+def test_multiport_rollout_budget_adds_own_query_and_shared_simulator_time(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("omnigibson.eval.policies.time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+    class FakeClient:
+        def __init__(self, host, port, **kwargs):
+            self.deadline = None
+
+        def set_deadline(self, deadline):
+            self.deadline = deadline
+
+        def reset(self):
+            pass
+
+        def act(self, obs):
+            assert self.deadline == pytest.approx(1.0)
+            clock[0] += 0.6
+            return th.tensor([[1.0]])
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("omnigibson.eval.policies.WebsocketClientPolicy", FakeClient)
+    policy = MultiWebsocketPolicy([{"host": "localhost", "port": 8001}])
+    policy.set_action_dim(1)
+    policy.set_time_budget(1.0)
+    try:
+        policy.reset()
+        result = policy.forward({"value": th.tensor([[1.0]])}, [0])
+        assert result.failures == {}
+        assert policy.elapsed[0] == pytest.approx(0.6)
+        failures = policy.charge_simulation(0.5, [0])
+        assert isinstance(failures[0], PolicyTimeoutError)
+        assert policy.elapsed[0] == pytest.approx(1.1)
+    finally:
+        policy.close()
+
+
+def test_parse_policy_endpoints_requires_one_port_per_environment():
+    assert parse_policy_endpoints(["server-a:8001", "server-b:8002"], 2) == [
+        {"host": "server-a", "port": 8001},
+        {"host": "server-b", "port": 8002},
+    ]
+    with pytest.raises(ValueError, match="one HOST:PORT"):
+        parse_policy_endpoints(["server-a:8001"], 2)
+    with pytest.raises(ValueError, match="Invalid policy endpoint"):
+        parse_policy_endpoints(["server-a:nope"], 1)
 
 
 def test_websocket_policy_reconnects_with_the_same_observation(monkeypatch):
