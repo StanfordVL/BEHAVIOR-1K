@@ -141,7 +141,7 @@ class MultiWebsocketPolicy:
     def set_action_dim(self, action_dim: int) -> None:
         self.action_dim = action_dim
 
-    def set_time_budget(self, seconds: float) -> None:
+    def set_time_budget(self, seconds: Optional[float]) -> None:
         self.time_budget = seconds
         self.elapsed = [0.0] * len(self.clients)
 

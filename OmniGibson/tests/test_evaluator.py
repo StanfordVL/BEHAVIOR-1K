@@ -98,7 +98,7 @@ def test_evaluate_instances_batched_records_connection_failure_during_load():
     assert results[101]["connection_failure"] == "reconnect limit reached"
 
 
-def test_group_deadline_starts_after_load_and_fails_completed_rollouts(monkeypatch):
+def test_group_deadline_starts_after_load_and_preserves_completed_rollouts(monkeypatch):
     clock = [100.0]
     monkeypatch.setattr("omnigibson.eval.evaluator.time.monotonic", lambda: clock[0])
     observed_deadlines = []
@@ -124,8 +124,11 @@ def test_group_deadline_starts_after_load_and_fails_completed_rollouts(monkeypat
     )
 
     assert observed_deadlines == [1104]
-    assert all(result["timeout_failure"] == "group_time_budget_exceeded" for result in results.values())
-    assert all(result["terminated"] is False for result in results.values())
+    assert results[101]["terminated"] is True
+    assert results[101]["truncated"] is False
+    assert "timeout_failure" not in results[101]
+    assert results[202]["timeout_failure"] == "group_time_budget_exceeded"
+    assert results[202]["terminated"] is False
 
 
 def test_action_query_timeout_only_fails_active_rollouts(monkeypatch):
@@ -444,7 +447,7 @@ def test_websocket_policy_fails_rollout_when_server_stays_unavailable(monkeypatc
     with pytest.raises(PolicyConnectionError, match="after 3 reconnect attempts"):
         policy.reset()
 
-    assert attempts == [1, 1, 1, 1]
+    assert attempts == [None, 1, 1, 1]
 
 
 def test_websocket_policy_reconnect_budget_spans_steps(monkeypatch):
@@ -480,6 +483,8 @@ def test_websocket_query_uses_shorter_group_deadline_and_does_not_reconnect_on_t
     monkeypatch.setattr("omnigibson.eval.utils.network_utils.time.monotonic", lambda: clock[0])
 
     class SlowSocket:
+        closed = False
+
         def send(self, data):
             pass
 
@@ -488,12 +493,18 @@ def test_websocket_query_uses_shorter_group_deadline_and_does_not_reconnect_on_t
             clock[0] += timeout
             raise TimeoutError("no response")
 
+        def close(self):
+            self.closed = True
+
     policy = WebsocketClientPolicy(allow_reconnect=True)
-    policy._ws = SlowSocket()
+    socket = SlowSocket()
+    policy._ws = socket
     policy.set_deadline(15.0)
     with pytest.raises(PolicyTimeoutError, match="Action query exceeded"):
         policy.act({"observation": th.tensor([1.0])})
     assert policy._reconnect_attempts == 0
+    assert socket.closed
+    assert policy._ws is None
 
 
 def test_websocket_query_has_600_second_cap(monkeypatch):
