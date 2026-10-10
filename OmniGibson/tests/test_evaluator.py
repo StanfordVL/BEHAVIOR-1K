@@ -11,7 +11,7 @@ from omnigibson.eval.evaluator import (
     InstanceEvaluationState,
     evaluate_instances_batched,
 )
-from omnigibson.eval.utils.network_utils import PolicyConnectionError, WebsocketClientPolicy, packb
+from omnigibson.eval.utils.network_utils import PolicyConnectionError, PolicyTimeoutError, WebsocketClientPolicy, packb
 from omnigibson.metrics import TaskMetric
 
 
@@ -94,8 +94,61 @@ def test_evaluate_instances_batched_records_connection_failure_during_load():
     assert results[101]["connection_failure"] == "reconnect limit reached"
 
 
-@pytest.mark.parametrize("disconnect", [ConnectionResetError("lost connection"), TimeoutError("response timed out")])
-def test_websocket_policy_reconnects_with_the_same_observation(monkeypatch, disconnect):
+def test_group_deadline_starts_after_load_and_fails_completed_rollouts(monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr("omnigibson.eval.evaluator.time.monotonic", lambda: clock[0])
+    observed_deadlines = []
+
+    def load_fn(instances):
+        clock[0] += 1000  # Scene startup is excluded.
+
+    def step_fn(active_env_indices):
+        clock[0] += 1
+        if clock[0] == 1101:
+            return [True, False], [False, False]
+        clock[0] += 3
+        return [False, False], [False, False]
+
+    results = evaluate_instances_batched(
+        instances=[101, 202],
+        num_envs=2,
+        load_fn=load_fn,
+        step_fn=step_fn,
+        record_fn=lambda **record: record,
+        time_limit_seconds=4,
+        start_fn=lambda deadline: observed_deadlines.append(deadline),
+    )
+
+    assert observed_deadlines == [1104]
+    assert all(result["timeout_failure"] == "group_time_budget_exceeded" for result in results.values())
+    assert all(result["terminated"] is False for result in results.values())
+
+
+def test_action_query_timeout_only_fails_active_rollouts(monkeypatch):
+    monkeypatch.setattr("omnigibson.eval.evaluator.time.monotonic", lambda: 0.0)
+    calls = 0
+
+    def step_fn(active_env_indices):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return [True, False], [False, False]
+        raise PolicyTimeoutError("Action query exceeded 600 seconds")
+
+    results = evaluate_instances_batched(
+        instances=[101, 202],
+        num_envs=2,
+        load_fn=lambda instances: None,
+        step_fn=step_fn,
+        record_fn=lambda **record: record,
+        time_limit_seconds=1000,
+    )
+
+    assert results[101]["terminated"] is True
+    assert results[202]["timeout_failure"] == "Action query exceeded 600 seconds"
+
+
+def test_websocket_policy_reconnects_with_the_same_observation(monkeypatch):
     class FakeSocket:
         def __init__(self, response):
             self.response = response
@@ -109,11 +162,11 @@ def test_websocket_policy_reconnects_with_the_same_observation(monkeypatch, disc
                 raise self.response
             return self.response
 
-    first_socket = FakeSocket(disconnect)
+    first_socket = FakeSocket(ConnectionResetError("lost connection"))
     second_socket = FakeSocket(packb({"action": np.array([0.5], dtype=np.float32)}))
     policy = WebsocketClientPolicy(allow_reconnect=True)
     policy._ws = first_socket
-    monkeypatch.setattr(policy, "_wait_for_server", lambda max_attempts=None: (second_socket, {}))
+    monkeypatch.setattr(policy, "_wait_for_server", lambda max_attempts=None, deadline=None: (second_socket, {}))
 
     action = policy.act({"observation": th.tensor([1.0])})
 
@@ -131,7 +184,7 @@ def test_websocket_policy_fails_after_three_reconnects(monkeypatch):
     policy._ws = BrokenSocket()
     reconnects = []
 
-    def reconnect(max_attempts=None):
+    def reconnect(max_attempts=None, deadline=None):
         reconnects.append(max_attempts)
         return BrokenSocket(), {}
 
@@ -146,7 +199,7 @@ def test_websocket_policy_fails_rollout_when_server_stays_unavailable(monkeypatc
     policy = WebsocketClientPolicy(allow_reconnect=True)
     attempts = []
 
-    def unavailable(max_attempts=None):
+    def unavailable(max_attempts=None, deadline=None):
         attempts.append(max_attempts)
         raise PolicyConnectionError("server unavailable")
 
@@ -174,7 +227,9 @@ def test_websocket_policy_reconnect_budget_spans_steps(monkeypatch):
 
     policy = WebsocketClientPolicy(allow_reconnect=True)
     policy._ws = ActionThenDisconnectSocket()
-    monkeypatch.setattr(policy, "_wait_for_server", lambda max_attempts=None: (ActionThenDisconnectSocket(), {}))
+    monkeypatch.setattr(
+        policy, "_wait_for_server", lambda max_attempts=None, deadline=None: (ActionThenDisconnectSocket(), {})
+    )
 
     for _ in range(4):
         assert th.equal(policy.act({"observation": th.tensor([1.0])}), th.tensor([0.5]))
@@ -185,16 +240,85 @@ def test_websocket_policy_reconnect_budget_spans_steps(monkeypatch):
     assert policy._reconnect_attempts == 1
 
 
+def test_websocket_query_uses_shorter_group_deadline_and_does_not_reconnect_on_timeout(monkeypatch):
+    clock = [10.0]
+    monkeypatch.setattr("omnigibson.eval.utils.network_utils.time.monotonic", lambda: clock[0])
+
+    class SlowSocket:
+        def send(self, data):
+            pass
+
+        def recv(self, timeout=None):
+            assert timeout == pytest.approx(5.0)
+            clock[0] += timeout
+            raise TimeoutError("no response")
+
+    policy = WebsocketClientPolicy(allow_reconnect=True)
+    policy._ws = SlowSocket()
+    policy.set_deadline(15.0)
+    with pytest.raises(PolicyTimeoutError, match="Action query exceeded"):
+        policy.act({"observation": th.tensor([1.0])})
+    assert policy._reconnect_attempts == 0
+
+
+def test_websocket_query_has_600_second_cap(monkeypatch):
+    monkeypatch.setattr("omnigibson.eval.utils.network_utils.time.monotonic", lambda: 10.0)
+
+    class Socket:
+        def send(self, data):
+            pass
+
+        def recv(self, timeout=None):
+            assert timeout == pytest.approx(600.0)
+            return packb({"action": np.array([0.5], dtype=np.float32)})
+
+    policy = WebsocketClientPolicy(allow_reconnect=True)
+    policy._ws = Socket()
+    policy.set_deadline(1000.0)
+    assert th.equal(policy.act({"observation": th.tensor([1.0])}), th.tensor([0.5]))
+
+
+def test_reconnection_uses_the_same_action_query_deadline(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("omnigibson.eval.utils.network_utils.time.monotonic", lambda: clock[0])
+
+    class DroppedSocket:
+        def send(self, data):
+            raise ConnectionResetError("lost connection")
+
+    class ReconnectedSocket:
+        def send(self, data):
+            pass
+
+        def recv(self, timeout=None):
+            assert timeout == pytest.approx(100.0)
+            return packb({"action": np.array([0.5], dtype=np.float32)})
+
+    policy = WebsocketClientPolicy(allow_reconnect=True)
+    policy._ws = DroppedSocket()
+
+    def reconnect(max_attempts=None, deadline=None):
+        assert deadline == pytest.approx(600.0)
+        clock[0] += 500.0
+        return ReconnectedSocket(), {}
+
+    monkeypatch.setattr(policy, "_wait_for_server", reconnect)
+    assert th.equal(policy.act({"observation": th.tensor([1.0])}), th.tensor([0.5]))
+    assert policy._reconnect_attempts == 1
+
+
 def test_batched_evaluator_writes_failed_result_after_connection_loss(tmp_path, monkeypatch):
     evaluator = BatchedEvaluator.__new__(BatchedEvaluator)
     evaluator.cfg = SimpleNamespace(task=SimpleNamespace(name="turning_on_radio"))
     evaluator.num_envs = 1
+    evaluator.max_steps = 10
     evaluator.n_trials = 0
     evaluator.n_success_trials = 0
     evaluator.instance_eval_states = [
         SimpleNamespace(active=True, env_accessor=SimpleNamespace(success=True), metrics=[], video_writer=None)
     ]
     evaluator.load_batch = lambda *args, **kwargs: None
+    evaluator.policy = SimpleNamespace(set_deadline=lambda deadline: None, reset=lambda: None)
 
     def step_fn(active_env_indices):
         raise PolicyConnectionError("reconnect limit reached")
