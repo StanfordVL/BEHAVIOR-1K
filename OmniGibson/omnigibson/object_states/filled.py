@@ -15,9 +15,9 @@ m.N_MAX_MICRO_PARTICLE_SAMPLES = 100000
 class Filled(RelativeObjectState, BooleanStateMixin):
     def _get_value(self, system):
         # Sanity check to make sure system is valid
-        assert self.obj.scene.is_physical_particle_system(
-            system_name=system.name
-        ), "Can only get Filled state with a valid PhysicalParticleSystem!"
+        assert self.obj.scene.is_physical_particle_system(system_name=system.name), (
+            "Can only get Filled state with a valid PhysicalParticleSystem!"
+        )
 
         # Check what volume is filled
         if system.n_particles > 0:
@@ -37,9 +37,9 @@ class Filled(RelativeObjectState, BooleanStateMixin):
 
     def _set_value(self, system, new_value):
         # Sanity check to make sure system is valid
-        assert self.obj.scene.is_physical_particle_system(
-            system_name=system.name
-        ), "Can only set Filled state with a valid PhysicalParticleSystem!"
+        assert self.obj.scene.is_physical_particle_system(system_name=system.name), (
+            "Can only set Filled state with a valid PhysicalParticleSystem!"
+        )
 
         # First, check our current state
         current_state = self.get_value(system)

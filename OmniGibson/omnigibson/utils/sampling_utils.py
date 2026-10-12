@@ -821,9 +821,9 @@ def sample_cuboid_on_object(
         cuboid_bottom_padding if cuboid_bottom_padding is not None else m.DEFAULT_CUBOID_BOTTOM_PADDING
     )
 
-    assert (
-        start_points.shape == end_points.shape
-    ), "the start and end points of raycasting are expected to have the same shape."
+    assert start_points.shape == end_points.shape, (
+        "the start and end points of raycasting are expected to have the same shape."
+    )
     num_samples = start_points.shape[0]
 
     if th.any(cuboid_dimensions > 50.0):
@@ -857,9 +857,9 @@ def sample_cuboid_on_object(
 
             if not zero_cuboid_dimension:
                 # Make sure we have valid (nonzero) x and y values
-                assert (
-                    this_cuboid_dimensions[:-1] > 0
-                ).all(), f"Cuboid x and y dimensions must not be zero if z dimension is nonzero! Got: {this_cuboid_dimensions}"
+                assert (this_cuboid_dimensions[:-1] > 0).all(), (
+                    f"Cuboid x and y dimensions must not be zero if z dimension is nonzero! Got: {this_cuboid_dimensions}"
+                )
                 # Obtain the parallel rays using the direction sampling method.
                 sources, destinations, grid = get_parallel_rays(
                     start_pos,

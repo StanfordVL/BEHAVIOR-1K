@@ -125,9 +125,9 @@ class SceneGraphBuilder(object):
         assert self._G is None, "Cannot start graph builder multiple times."
 
         if self._robot_names is None:
-            assert (
-                len(scene.robots) == 1
-            ), "Cannot build scene graph without specifying robot name if there are multiple robots."
+            assert len(scene.robots) == 1, (
+                "Cannot build scene graph without specifying robot name if there are multiple robots."
+            )
             self._robots = [scene.robots[0]]
         else:
             self._robots = [scene.object_registry("name", name) for name in self._robot_names]

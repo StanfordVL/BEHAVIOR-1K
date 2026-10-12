@@ -64,9 +64,9 @@ class Covered(RelativeObjectState, BooleanStateMixin):
                     value = system.num_group_particles(group=self._visual_particle_group) >= m.VISUAL_PARTICLE_THRESHOLD
             elif self.obj.scene.is_physical_particle_system(system_name=system.name):
                 # Make sure we're not cloth -- not supported yet
-                assert (
-                    self.obj.prim_type != PrimType.CLOTH
-                ), "Cloth objects currently cannot be Covered by physical particles!"
+                assert self.obj.prim_type != PrimType.CLOTH, (
+                    "Cloth objects currently cannot be Covered by physical particles!"
+                )
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
                 # touching the object and are visible (the non-visible ones are considered already "removed")
                 n_near_particles = len(self.obj.states[ContactParticles].get_value(system))
@@ -105,9 +105,9 @@ class Covered(RelativeObjectState, BooleanStateMixin):
 
         elif self.obj.scene.is_physical_particle_system(system_name=system.name):
             # Make sure we're not cloth -- not supported yet
-            assert (
-                self.obj.prim_type != PrimType.CLOTH
-            ), "Cloth objects currently cannot be Covered by physical particles!"
+            assert self.obj.prim_type != PrimType.CLOTH, (
+                "Cloth objects currently cannot be Covered by physical particles!"
+            )
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
                 if new_value:

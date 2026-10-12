@@ -118,9 +118,9 @@ class Registry:
             obj (any): Instance to add to this registry
         """
         # Make sure that obj is of the correct class type
-        assert any(
-            [isinstance(obj, class_type) or issubclass(obj, class_type) for class_type in self.class_types]
-        ), f"Added object must be either an instance or subclass of one of the following classes: {self.class_types}!"
+        assert any([isinstance(obj, class_type) or issubclass(obj, class_type) for class_type in self.class_types]), (
+            f"Added object must be either an instance or subclass of one of the following classes: {self.class_types}!"
+        )
         self._add(obj=obj, keys=self.all_keys)
 
     def _add(self, obj, keys=None):
@@ -387,9 +387,9 @@ class SerializableRegistry(Registry, Serializable):
     def add(self, obj):
         # In addition to any other class types, we make sure that the object is a serializable instance / class
         validate_class = issubclass if isclass(obj) else isinstance
-        assert any(
-            [validate_class(obj, class_type) for class_type in (Serializable, SerializableNonInstance)]
-        ), "Added object must be either an instance or subclass of Serializable or SerializableNonInstance!"
+        assert any([validate_class(obj, class_type) for class_type in (Serializable, SerializableNonInstance)]), (
+            "Added object must be either an instance or subclass of Serializable or SerializableNonInstance!"
+        )
         # Run super like normal
         super().add(obj=obj)
 
@@ -482,9 +482,9 @@ class SerializableRegistry(Registry, Serializable):
         for _ in range(n_objects):
             # Infer obj based on UUID
             obj = self(self.hash_key, int(state[idx]))
-            assert (
-                obj is not None
-            ), f"Could not find object while deserializing with hash_key {self.hash_key}: {int(state[idx])}"
+            assert obj is not None, (
+                f"Could not find object while deserializing with hash_key {self.hash_key}: {int(state[idx])}"
+            )
             idx += 1
             log.debug(f"obj: {obj.name}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states
