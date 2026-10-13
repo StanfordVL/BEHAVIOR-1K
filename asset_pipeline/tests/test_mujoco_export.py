@@ -124,9 +124,13 @@ class TestParts:
         assert part == "kitchen_0-living_room_0"
         assert mujoco_scene_utils.part_rooms(part) == ["kitchen_0", "living_room_0"]
 
-    def test_non_shell_without_rooms_fails(self):
-        with pytest.raises(ValueError):
-            mujoco_scene_utils.part_for_object("table", [])
+    def test_non_shell_without_rooms_goes_to_no_room(self):
+        assert mujoco_scene_utils.part_for_object("floors", []) == "no_room"
+        assert mujoco_scene_utils.part_rooms("no_room") == []
+        assert mujoco_scene_utils.parts_for_rooms(["shell", "no_room", "kitchen_0"], ["kitchen_0"]) == [
+            "shell",
+            "kitchen_0",
+        ]
 
     def test_parts_for_rooms(self):
         parts = ["shell", "kitchen_0", "living_room_0", "kitchen_0-living_room_0", "bedroom_0"]

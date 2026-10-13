@@ -122,6 +122,8 @@ Each scene is split into **parts**, following OmniGibson's loading rule
 - One part per distinct room set of the other objects. Most parts are a single
   room, such as `kitchen_0`, but objects that span rooms get their own part,
   such as `kitchen_0-living_room_0`. Each part holds its rooms' cameras.
+- `no_room`: the other objects without rooms. OmniGibson only loads these when
+  it loads every room, so only full scenes attach this part.
 
 A part is a scene MJCF of its own, at `scenes/{scene}/mjcf/parts/{part}/model.xml`:
 
@@ -172,6 +174,61 @@ the scene's `_best` URDF otherwise. Cameras come from the URDF.
 
 To load a scene restricted to some rooms, attach `shell` plus every part whose
 `rooms` intersect them.
+
+## Task scenes
+
+`export_tasks_mujoco.py` exports each activity of the 2026 challenge task
+instances, which have a template, 300 train instances and 20 public test
+instances. It writes these files next to the scene's parts:
+
+- `{scene}_task_{activity}_partial.xml`: the rooms the official evaluator
+  loads. These are the `inroom` room types of the BDDL's base scope, plus one
+  level of `ROOM_DEPENDENCIES`, plus `TASK_SPECIFIC_EXTRA_ROOMS`. The scene
+  attaches `shell` and every part whose rooms intersect them.
+- `{scene}_task_{activity}_full.xml`: every part.
+- `{scene}_task_{activity}.json`: the sidecar.
+
+Each task scene contains, in this order:
+
+1. its parts, attached with an empty prefix;
+2. the objects that the template adds to the settled scene, as `N_root`;
+3. the robot frames `robot_template`, `robot_train_0007`, `robot_test_0301`, …
+   These are yaw-only, worldbody `<frame>`s placed after every body.
+4. keyframes named `template`, `train_0007`, `test_0301`, … Each holds the
+   scene's full `qpos`.
+
+`qpos0` is the settled scene, with task objects at their template poses. The
+XML holds no task semantics.
+
+To start an instance in plain MuJoCo:
+
+```python
+model = mujoco.MjModel.from_xml_path("house_double_floor_lower_task_turning_on_radio_partial.xml")
+data = mujoco.MjData(model)
+mujoco.mj_resetDataKeyframe(model, data, model.key("test_0301").id)
+# Attach or place the robot at the frame robot_test_0301 (in an MjSpec, before compiling).
+```
+
+The sidecar (`format: b1k_mujoco_task/1`) holds:
+
+| Key | Content |
+| --- | --- |
+| `activity`, `activity_definition`, `task_index`, `scene` | |
+| `instruction`, `human_length_steps`, `eval_timeout_seconds` | from the challenge's `tasks.jsonl` and `metadata/task.jsonl`; the timeout is 1.5 × length / 30 Hz |
+| `modes` | `{partial, full}`: `xml`, `rooms`, `parts`, `added_objects`, `nq` and `qpos_layout` (`[joint, type, qposadr, size]`) |
+| `default_mode` | `"partial"` |
+| `rooms` | the evaluator's room `types` and their `instances` in the scene |
+| `bddl` | `problem_sha256`, `wildcards` (room instances, scene layout and the expanded instances' objects, as OmniGibson's BehaviorTask compiles them), and the compiled `init` and `goal` |
+| `scope` | scope instance → `{kind: object, object, synset}`, `{kind: agent}`, `{kind: system, system}` or `{kind: future}` |
+| `objects` | for scope and task-added objects: category, model, scale, fixedness, rooms, part, archive, `prefix`, `root`, `freejoint` and `joints` |
+| `initial_nonkin`, `nonkin_varies` | the template's non-kinematic states of scope objects, and which states some instance changes |
+| `instances` | per instance: `id`, `split`, `keyframe`, `robot_frame`, `source` (the instance file), `robot_pose` (key, position, orientation, tilt), `nonkin` (differences only), `systems` (raw particle data) and `issues` |
+| `issues`, `warnings` | for example, that systems aren't simulated, or that the joint order of a model was assumed |
+
+**Instance joint values.** Instances store `joint_pos` in OmniGibson's joint
+order. `metadata/mujoco_joint_order.json`, written by `dump_joint_order_og.py`,
+gives that order. Without it, the URDF's order is assumed, and the sidecar
+says so. Joints that `mujoco_joint_fixes.json` made fixed are skipped.
 
 ## Validation
 

@@ -29,6 +29,10 @@ from b1k_pipeline import mujoco_common
 # doors, plus the global cameras.
 SHELL_PART = "shell"
 
+# Part of the non-shell objects that have no rooms. OmniGibson doesn't load them
+# when it loads only some rooms, so only full scenes attach this part.
+NO_ROOM_PART = "no_room"
+
 # Separator between room names in a multi-room part's name. Part names end up in
 # asset ids, which allow [a-z0-9_.-].
 ROOM_SEPARATOR = "-"
@@ -91,19 +95,20 @@ def part_for_object(category, rooms):
     Shell categories always load and go into the shell part. Anything else
     loads when any of its rooms does, so it goes into the part of its exact room
     set; a task scene with a subset of rooms attaches every part whose room set
-    intersects it.
+    intersects it. Anything else without rooms only loads with every room, and
+    goes into the `no_room` part.
     """
     if category in mujoco_common.SHELL_CATEGORIES:
         return SHELL_PART
     rooms = sorted(set(rooms or []))
     if not rooms:
-        raise ValueError(f"Non-shell {category} object has no rooms")
+        return NO_ROOM_PART
     return ROOM_SEPARATOR.join(rooms)
 
 
 def part_rooms(part):
-    """Rooms of a part (none for the shell)."""
-    return [] if part == SHELL_PART else part.split(ROOM_SEPARATOR)
+    """Rooms of a part (none for the shell and the no-room part)."""
+    return [] if part in (SHELL_PART, NO_ROOM_PART) else part.split(ROOM_SEPARATOR)
 
 
 def parts_for_rooms(parts, rooms):

@@ -36,6 +36,7 @@ from xml.dom import minidom
 
 import numpy as np
 import tqdm
+import yaml
 from scipy.spatial.transform import Rotation as R
 
 import b1k_pipeline.utils
@@ -420,6 +421,7 @@ class ActivityExporter:
 
         fixed_cache = {}
         joint_order_assumed = set()
+        fixed_with_values = set()
 
         def joint_values(name, record, state, qpos_index, qpos):
             """Write an object's joint positions from an OmniGibson state."""
@@ -438,7 +440,7 @@ class ActivityExporter:
             for jn, v in zip(og_names, values):
                 if jn in fixed_cache[key]:
                     if abs(v) > 1e-3:
-                        issues.append(f"{name}: joint {jn} is fixed but has value {v:.4f}")
+                        fixed_with_values.add(f"{name}:{jn}")
                     continue
                 full = mujoco_common.attach_prefix(name) + jn
                 if full not in qpos_index:
@@ -459,7 +461,15 @@ class ActivityExporter:
         test_template = json.loads(instances_zf.read(test_template_member)) if test_template_member in names else None
 
         robot_frames = []
-        tkey, tpose = robot_pose(template["metadata"]["task"]["robot_poses"], self.args.robot_pose_key)
+        template_poses = template["metadata"]["task"].get("robot_poses")
+        if template_poses:
+            tkey, tpose = robot_pose(template_poses, self.args.robot_pose_key)
+        else:
+            # Fall back to the challenge's start pose (metadata/available_tasks.yaml).
+            start = self.args.available_tasks[activity][0]
+            tkey = "available_tasks"
+            tpose = {"position": start["robot_start_position"], "orientation": start["robot_start_orientation"]}
+            warnings.append("the template has no robot poses; its frame uses available_tasks.yaml's start pose")
         robot_frames.append(("template", "robot_template", tkey, tpose))
         instance_states = []
         for split, inst_id, member in instance_files:
@@ -629,6 +639,11 @@ class ActivityExporter:
             )
         if has_systems:
             issues.append("systems (particles) are passed through raw; they aren't simulated")
+        if fixed_with_values:
+            issues.append(
+                "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: "
+                + ", ".join(sorted(fixed_with_values))
+            )
         if joint_order_assumed:
             issues.append(
                 "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): "
@@ -755,6 +770,7 @@ def main():
                 args.instructions[entry["task_name"]] = entry
     args.human_lengths = {}
     with zipfile.ZipFile(args.instances_zip) as zf:
+        args.available_tasks = yaml.safe_load(zf.read("metadata/available_tasks.yaml"))
         for line in zf.read("metadata/task.jsonl").decode().splitlines():
             if line.strip():
                 entry = json.loads(line)
