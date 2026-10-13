@@ -121,32 +121,32 @@ prompt_for_terms() {
     echo ""
     echo "=== TERMS OF SERVICE AND LICENSING AGREEMENTS ==="
     echo ""
-    
+
     # Check what terms need to be accepted
     NEEDS_CONDA_TOS=false
     NEEDS_NVIDIA_EULA=false
     NEEDS_DATASET_TOS=false
-    
+
     if [ "$NEW_ENV" = true ] && [ "$ACCEPT_CONDA_TOS" = false ]; then
         NEEDS_CONDA_TOS=true
     fi
-    
+
     if [ "$OMNIGIBSON" = true ] && [ "$ACCEPT_NVIDIA_EULA" = false ]; then
         NEEDS_NVIDIA_EULA=true
     fi
-    
+
     if [ "$DATASET" = true ] && [ "$ACCEPT_DATASET_TOS" = false ]; then
         NEEDS_DATASET_TOS=true
     fi
-    
+
     # If nothing needs acceptance, return early
     if [ "$NEEDS_CONDA_TOS" = false ] && [ "$NEEDS_NVIDIA_EULA" = false ] && [ "$NEEDS_DATASET_TOS" = false ]; then
         return 0
     fi
-    
+
     echo "This installation requires acceptance of the following terms:"
     echo ""
-    
+
     if [ "$NEEDS_CONDA_TOS" = true ]; then
         cat << EOF
 1. CONDA TERMS OF SERVICE
@@ -156,7 +156,7 @@ prompt_for_terms() {
 
 EOF
     fi
-    
+
     if [ "$NEEDS_NVIDIA_EULA" = true ]; then
         cat << EOF
 2. NVIDIA ISAAC SIM EULA
@@ -166,40 +166,40 @@ EOF
 
 EOF
     fi
-    
+
     if [ "$NEEDS_DATASET_TOS" = true ]; then
         cat << EOF
 3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
     Last revision: December 8, 2022
     This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/BEHAVIOR-1K.
-    The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. 
-    It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
+    The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution.
+    It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use.
     Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):
         1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.
         2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.
         3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.
         4. You may only use the Data within OmniGibson.
         5. You may not redistribute the key or any other Data or elements in whole or part.
-        6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+        6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
             IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.
 
 EOF
     fi
-    
+
     echo "Do you accept ALL of the above terms? (y/N)"
     read -r response
-    
+
     if [[ ! "$response" =~ ^[Yy]$ ]]; then
         echo "Terms not accepted. Installation cancelled."
         echo "You can bypass these prompts by using --accept-conda-tos, --accept-nvidia-eula, and --accept-dataset-tos flags."
         exit 1
     fi
-    
+
     # Set acceptance flags
     [ "$NEEDS_CONDA_TOS" = true ] && ACCEPT_CONDA_TOS=true
     [ "$NEEDS_NVIDIA_EULA" = true ] && ACCEPT_NVIDIA_EULA=true
     [ "$NEEDS_DATASET_TOS" = true ] && ACCEPT_DATASET_TOS=true
-    
+
     echo ""
     echo "✓ All terms accepted. Proceeding with installation..."
     echo ""
@@ -229,13 +229,13 @@ fi
 if [ "$NEW_ENV" = true ]; then
     echo "Creating conda environment '$NEW_ENV_NAME'..."
     command -v conda >/dev/null || { echo "ERROR: Conda not found"; exit 1; }
-    
+
     # Set auto-accept environment variable if user agreed to TOS
     if [ "$ACCEPT_CONDA_TOS" = true ]; then
         export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
         echo "✓ Conda TOS auto-acceptance enabled"
     fi
-    
+
     source "$(conda info --base)/etc/profile.d/conda.sh"
 
     # Check if environment already exists and exit with instructions
@@ -247,11 +247,11 @@ if [ "$NEW_ENV" = true ]; then
         echo ""
         exit 1
     fi
-    
-    # Create environment with Python 3.11 and packaging tools used by this script
-    conda create -n "$NEW_ENV_NAME" python=3.11 pip "setuptools>=71,<81" wheel -c conda-forge -y
+
+    # Create environment with Python 3.12 and packaging tools used by this script
+    conda create -n "$NEW_ENV_NAME" python=3.12 pip "setuptools>=71,<81" wheel -c conda-forge -y
     conda activate "$NEW_ENV_NAME"
-    
+
     [[ "$CONDA_DEFAULT_ENV" != "$NEW_ENV_NAME" ]] && { echo "ERROR: Failed to activate environment '$NEW_ENV_NAME'"; exit 1; }
 
 fi
@@ -281,11 +281,11 @@ fi
 if [ "$OMNIGIBSON" = true ]; then
     echo "Installing OmniGibson..."
     [ ! -d "OmniGibson" ] && { echo "ERROR: OmniGibson directory not found"; exit 1; }
-    
+
     # Check Python version
     PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    [ "$PYTHON_VERSION" != "3.11" ] && { echo "ERROR: Python 3.11 required, found $PYTHON_VERSION"; exit 1; }
-    
+    [ "$PYTHON_VERSION" != "3.12" ] && { echo "ERROR: Python 3.12 required, found $PYTHON_VERSION"; exit 1; }
+
     # Check for conflicting environment variables
     if [[ -n "$EXP_PATH" || -n "$CARB_APP_PATH" || -n "$ISAAC_PATH" ]]; then
         echo "ERROR: Found existing Isaac Sim environment variables."
@@ -314,12 +314,16 @@ if [ "$OMNIGIBSON" = true ]; then
     # Install pre-commit for dev setup
     if [ "$DEV" = true ]; then
         echo "Setting up pre-commit..."
-        conda install -c conda-forge pre-commit -y
+        # Installed via pip, not conda: conda's own dependency resolver doesn't know about the
+        # packages pip just installed above (e.g. typing_extensions), so `conda install` here can
+        # silently downgrade/replace one of them with a version other already-installed pip packages
+        # don't expect (seen breaking typeguard's `from typing_extensions import NoExtraItems`).
+        python -m pip install pre-commit
         cd "$WORKDIR/OmniGibson"
         pre-commit install || true  # Ignore errors here in case the directory is not a git repo
         cd "$WORKDIR"
     fi
-    
+
     # Isaac Sim installation via pip
     if [ "$ACCEPT_NVIDIA_EULA" = true ]; then
         export OMNI_KIT_ACCEPT_EULA=YES
@@ -327,7 +331,7 @@ if [ "$OMNIGIBSON" = true ]; then
         echo "ERROR: NVIDIA EULA not accepted. Cannot install Isaac Sim."
         exit 1
     fi
-    
+
     # Check if already installed
     if python -c "import isaacsim" 2>/dev/null; then
         echo "Isaac Sim already installed, skipping..."
@@ -336,7 +340,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
         # For aarch, do alternative install via direct one-liner
         if [ "$ARCH" = "aarch64" ]; then
-            python -m pip install isaacsim[all,extscache]==5.1.0 --extra-index-url https://pypi.nvidia.com
+            python -m pip install isaacsim[all,extscache]==6.0.1.0 --extra-index-url https://pypi.nvidia.com
         else
             # Helper functions
             check_glibc_old() {
@@ -346,32 +350,32 @@ if [ "$OMNIGIBSON" = true ]; then
             install_isaac_packages() {
                 local temp_dir=$(mktemp -d)
                 local packages=(
-                    "omniverse_kit-107.3.1.206797"
-                    "isaacsim_kernel-5.1.0.0"
-                    "isaacsim_app-5.1.0.0"
-                    "isaacsim_core-5.1.0.0"
-                    "isaacsim_gui-5.1.0.0"
-                    "isaacsim_utils-5.1.0.0"
-                    "isaacsim_storage-5.1.0.0"
-                    "isaacsim_asset-5.1.0.0"
-                    "isaacsim_sensor-5.1.0.0"
-                    "isaacsim_robot_motion-5.1.0.0"
-                    "isaacsim_robot-5.1.0.0"
-                    "isaacsim_benchmark-5.1.0.0"
-                    "isaacsim_code_editor-5.1.0.0"
-                    "isaacsim_ros1-5.1.0.0"
-                    "isaacsim_cortex-5.1.0.0"
-                    "isaacsim_example-5.1.0.0"
-                    "isaacsim_replicator-5.1.0.0"
-                    "isaacsim_rl-5.1.0.0"
-                    "isaacsim_robot_setup-5.1.0.0"
-                    "isaacsim_ros2-5.1.0.0"
-                    "isaacsim_template-5.1.0.0"
-                    "isaacsim_test-5.1.0.0"
-                    "isaacsim-5.1.0.0"
-                    "isaacsim_extscache_physics-5.1.0.0"
-                    "isaacsim_extscache_kit-5.1.0.0"
-                    "isaacsim_extscache_kit_sdk-5.1.0.0"
+                    "omniverse_kit-110.1.1.305458"
+                    "isaacsim_kernel-6.0.1.0"
+                    "isaacsim_app-6.0.1.0"
+                    "isaacsim_core-6.0.1.0"
+                    "isaacsim_gui-6.0.1.0"
+                    "isaacsim_utils-6.0.1.0"
+                    "isaacsim_storage-6.0.1.0"
+                    "isaacsim_asset-6.0.1.0"
+                    "isaacsim_sensor-6.0.1.0"
+                    "isaacsim_robot_motion-6.0.1.0"
+                    "isaacsim_robot-6.0.1.0"
+                    "isaacsim_benchmark-6.0.1.0"
+                    "isaacsim_code_editor-6.0.1.0"
+                    "isaacsim_ros1-6.0.1.0"
+                    "isaacsim_cortex-6.0.1.0"
+                    "isaacsim_example-6.0.1.0"
+                    "isaacsim_replicator-6.0.1.0"
+                    "isaacsim_rl-6.0.1.0"
+                    "isaacsim_robot_setup-6.0.1.0"
+                    "isaacsim_ros2-6.0.1.0"
+                    "isaacsim_template-6.0.1.0"
+                    "isaacsim_test-6.0.1.0"
+                    "isaacsim-6.0.1.0"
+                    "isaacsim_extscache_physics-6.0.1.0"
+                    "isaacsim_extscache_kit-6.0.1.0"
+                    "isaacsim_extscache_kit_sdk-6.0.1.0"
                 )
 
                 # --fail keeps an HTTP error page from being saved under a .whl name;
@@ -381,24 +385,17 @@ if [ "$OMNIGIBSON" = true ]; then
                 local wheel_files=()
                 for pkg in "${packages[@]}"; do
                     local pkg_name=${pkg%-*}
-                    local filename="${pkg}-cp311-none-manylinux_2_35_${ARCH}.whl"
+                    local filename="${pkg}-cp312-none-manylinux_2_35_${ARCH}.whl"
                     local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
                     local filepath="$temp_dir/$filename"
                     local attempt
 
                     echo "Downloading $pkg..."
-                    for attempt in 1 2 3 4 5; do
-                        if curl "${curl_opts[@]}" "$url" -o "$filepath"; then
-                            break
-                        fi
-                        if [ "$attempt" -eq 5 ]; then
-                            echo "ERROR: Failed to download $pkg"
-                            rm -rf "$temp_dir"
-                            return 1
-                        fi
-                        echo "Retrying $pkg ($attempt/5)..."
-                        sleep 5
-                    done
+                    if ! curl -sL --fail --retry 5 --retry-all-errors --retry-connrefused "$url" -o "$filepath"; then
+                        echo "ERROR: Failed to download $pkg"
+                        rm -rf "$temp_dir"
+                        return 1
+                    fi
 
                     # Rename for older GLIBC
                     if check_glibc_old; then
@@ -423,7 +420,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
             install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
         fi
-        
+
         # Extract ISAAC_PATH from isaacsim module
         ISAAC_PATH=$(python -c "import isaacsim, os; print(os.environ.get('ISAAC_PATH', ''))" 2>/dev/null)
 
@@ -435,16 +432,21 @@ if [ "$OMNIGIBSON" = true ]; then
 
         # Fix packaging conflict - remove conflicting version
         # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0
-        if [ -d "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging" ]; then
-            echo "Fixing packaging conflict..."
-            rm -rf "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
-        fi
+        for pip_archive_packaging in "$CONDA_PREFIX"/lib/python3.*/site-packages/isaacsim/extscache/omni.services.pip_archive-*/pip_prebundle/packaging; do
+            if [ -d "$pip_archive_packaging" ]; then
+                echo "Fixing packaging conflict..."
+                rm -rf "$pip_archive_packaging"
+            fi
+        done
     fi
-    
+
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     python -m pip install --force-reinstall cffi==1.17.1
-    # Force reinstall websockets >= 15.0.1 because it's been overwritten by Isaac Sim with an older version
-    python -m pip install --force-reinstall "websockets>=15.0.1"
+
+    # isaacsim-kernel 6.0.1 pins coverage==7.4.4, llvmlite==0.46 and websockets==12.0,
+    # which break numba (needs newer coverage/llvmlite) and omnigibson.eval
+    # (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
+    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48" "websockets>=15.0.1"
 
     echo "OmniGibson installation completed successfully!"
 fi
@@ -460,7 +462,11 @@ fi
 if [ "$EVAL" = true ]; then
     # get torch version via pip and install corresponding torch-cluster
     TORCH_VERSION=$(python -m pip show torch | grep Version | cut -d " " -f 2)
-    python -m pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
+    # torch-cluster's prebuilt wheel index (data.pyg.org) lags behind the newest torch releases, so
+    # a matching wheel may not exist yet for TORCH_VERSION. This is optional: omnigibson.eval already
+    # falls back to `fps = None` when torch_cluster isn't importable, so don't hard-fail setup here.
+    python -m pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html || \
+        echo "WARNING: No torch-cluster wheel found for torch ${TORCH_VERSION}; skipping (optional, eval fps support will be unavailable)."
 fi
 
 # Install asset pipeline
@@ -486,9 +492,9 @@ if [ "$DATASET" = true ]; then
     else
         DATASET_ACCEPT_FLAG="False"
     fi
-    
+
     export OMNI_KIT_ACCEPT_EULA=YES
-    
+
     echo "Downloading OmniGibson robot assets..."
     python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()" || {
         echo "ERROR: OmniGibson robot assets installation failed"
