@@ -16,7 +16,7 @@ This needs a MuJoCo with anisotropic frame scaling.
 | --- | --- | --- |
 | Objects | `export_objects_mujoco.py` | `objects_mujoco.zip` |
 | Base scenes | `export_scenes_mujoco.py` | `scenes_mujoco.zip` |
-| Joint order (OmniGibson) | `dump_joint_order_og.py` | `metadata/mujoco_joint_order.json` |
+| Joint order (OmniGibson) | `dump_joint_order_og.py` (or `dump_joint_order_physx.py`) | `metadata/mujoco_joint_order.json` |
 | Validation | `validate_mujoco_export.py` | report |
 
 ## Naming
@@ -229,6 +229,12 @@ The sidecar (`format: b1k_mujoco_task/1`) holds:
 order. `metadata/mujoco_joint_order.json`, written by `dump_joint_order_og.py`,
 gives that order. Without it, the URDF's order is assumed, and the sidecar
 says so. Joints that `mujoco_joint_fixes.json` made fixed are skipped.
+
+Where Isaac Sim's renderer can't start (Isaac Sim 5.1 crashes in
+`librtx.scenedb` on R590+ drivers), `dump_joint_order_physx.py` writes the same
+file from PhysX alone: it reads the joint order from `omni.physics.tensors`, as
+OmniGibson does, in a Kit app without rendering. For the 39 models that the
+2026 instances articulate, the order matches the URDF's.
 
 ## Validation
 

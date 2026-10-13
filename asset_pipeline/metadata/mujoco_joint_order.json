@@ -1,0 +1,204 @@
+{
+ "format": "b1k_joint_order/1",
+ "models": {
+  "bottom_cabinet/bamfsz": [
+   "j_link_1",
+   "j_link_2",
+   "j_link_3",
+   "j_link_4"
+  ],
+  "bottom_cabinet/dajebq": [
+   "j_link_0",
+   "j_link_1",
+   "j_link_2",
+   "j_link_3"
+  ],
+  "bottom_cabinet/fancyy": [
+   "j_door1",
+   "j_door2",
+   "j_door3"
+  ],
+  "bottom_cabinet/immwzb": [
+   "j_link_0",
+   "j_link_2"
+  ],
+  "bottom_cabinet/jhymlr": [
+   "j_link_0",
+   "j_link_1",
+   "j_link_2",
+   "j_link_3",
+   "j_link_4",
+   "j_link_5"
+  ],
+  "bottom_cabinet/nddvba": [
+   "j_link_1",
+   "j_link_2",
+   "j_link_3",
+   "j_link_4"
+  ],
+  "bottom_cabinet/qacthv": [
+   "j_link_0",
+   "j_link_1",
+   "j_link_2"
+  ],
+  "bottom_cabinet/rhdbzv": [
+   "j_left_drawer",
+   "j_right_drawer"
+  ],
+  "bottom_cabinet/rvunhj": [
+   "j_link_0",
+   "j_link_1",
+   "j_link_2",
+   "j_link_3"
+  ],
+  "bottom_cabinet/slgzfc": [
+   "j_link_1",
+   "j_link_2",
+   "j_link_3",
+   "j_link_4"
+  ],
+  "bottom_cabinet/xqmipa": [
+   "j_bottom_left_drawer",
+   "j_bottom_right_drawer",
+   "j_left_left_leaf",
+   "j_left_right_leaf",
+   "j_middle_left_drawer",
+   "j_middle_right_drawer",
+   "j_right_left_leaf",
+   "j_right_right_leaf",
+   "j_top_left_drawer",
+   "j_top_right_drawer"
+  ],
+  "bottom_cabinet_no_top/gjeoer": [
+   "j_doorleft1",
+   "j_doorleft2",
+   "j_doorright1",
+   "j_doorright2"
+  ],
+  "bottom_cabinet_no_top/gjrero": [
+   "j_link_0",
+   "j_link_1"
+  ],
+  "bottom_cabinet_no_top/ncgmqr": [
+   "j_drawer0",
+   "j_drawer1",
+   "j_drawer2"
+  ],
+  "bottom_cabinet_no_top/rkgjer": [
+   "j_doorleft1",
+   "j_doorleft2",
+   "j_doorright1",
+   "j_doorright2"
+  ],
+  "deep_fryer/fooamf": [
+   "j_basket1",
+   "j_basket2"
+  ],
+  "desk/aduafr": [
+   "j_drawer1",
+   "j_drawer2",
+   "j_drawer3"
+  ],
+  "desk/xhjsub": [
+   "j_drawer1",
+   "j_drawer2",
+   "j_drawer3"
+  ],
+  "dishwasher/ynrhuk": [
+   "j_link_0",
+   "j_link_1",
+   "j_link_2"
+  ],
+  "door/adejun": [
+   "j_left_leaf",
+   "j_right_leaf"
+  ],
+  "door/cvvumy": [
+   "j_left_leaf",
+   "j_right_leaf"
+  ],
+  "door/iuuykr": [
+   "j_left_leaf",
+   "j_right_leaf"
+  ],
+  "door/ktydvs": [
+   "j_link_2",
+   "j_link_1"
+  ],
+  "door/lvgliq": [
+   "j_link_2",
+   "j_link_1"
+  ],
+  "fridge/petcxr": [
+   "j_left_door",
+   "j_right_door"
+  ],
+  "fridge/xyejdx": [
+   "j_link_0",
+   "j_link_1"
+  ],
+  "garage_door/prdjyt": [
+   "j_left_door",
+   "j_right_door"
+  ],
+  "metal_bottom_cabinet/bbjuqu": [
+   "j_leftdoor",
+   "j_rightdoor"
+  ],
+  "openable_window/ithrgo": [
+   "j_link_0",
+   "j_link_1"
+  ],
+  "openable_window/ulnafj": [
+   "j_link_0",
+   "j_link_1"
+  ],
+  "oven/amblrk": [
+   "j_door_leaf1",
+   "j_door_leaf2"
+  ],
+  "oven/ffitak": [
+   "j_door",
+   "j_rack1",
+   "j_rack2"
+  ],
+  "oven/wuinhm": [
+   "j_link_0",
+   "j_link_1",
+   "j_link_2",
+   "j_link_3",
+   "j_link_4"
+  ],
+  "recreational_vehicle/doiucd": [
+   "j_door0",
+   "j_door1",
+   "j_door2",
+   "j_door3",
+   "j_door4",
+   "j_door5"
+  ],
+  "stove/ykretu": [
+   "j_door_leaf1",
+   "j_door_leaf2"
+  ],
+  "toilet/aapttl": [
+   "j_link_0",
+   "j_link_1",
+   "j_link_2",
+   "j_link_3"
+  ],
+  "toilet/vtqdev": [
+   "j_link_0",
+   "j_link_1"
+  ],
+  "top_cabinet/lkxmne": [
+   "j_leftdoor",
+   "j_rightdoor"
+  ],
+  "top_cabinet/tynnnw": [
+   "j_leftdoor",
+   "j_rightdoor"
+  ]
+ },
+ "problems": {}
+}
