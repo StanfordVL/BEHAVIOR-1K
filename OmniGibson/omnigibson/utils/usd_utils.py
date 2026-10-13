@@ -428,8 +428,7 @@ def create_joint(
         # Get the prim pointed to at this path
         joint_prim = current_stage.GetPrimAtPath(prim_path)
 
-    # Apply joint API interface
-    ensure_usd_api(joint_prim, lazy.pxr.PhysxSchema.PhysxJointAPI)
+    og.sim.physics_backend.apply_joint_schemas(joint_prim)
 
     # We need to step rendering once to auto-fill the local pose before overwriting it.
     # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
@@ -1287,7 +1286,7 @@ class RigidContactAPIImpl:
                 if len(scene_dynamic_body_filters) == 0:
                     continue
 
-                self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
+                self._CONTACT_VIEW[scene_idx] = og.sim.physics_backend.physics_sim_view.create_rigid_contact_view(
                     pattern=f"/World/scene_{scene_idx}/*/*",
                     filter_patterns=scene_body_filters,
                     max_contact_data_count=self.get_max_contact_data_count(len(scene_body_filters)),
@@ -1323,7 +1322,7 @@ class RigidContactAPIImpl:
 
                 # Create the rigid body view, and create some indexing tensors that allow for fast lookups
                 # between the contact matrix rows and the rigid body view indices.
-                self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_body_view(
+                self._RIGID_BODY_VIEW[scene_idx] = og.sim.physics_backend.physics_sim_view.create_rigid_body_view(
                     pattern=f"/World/scene_{scene_idx}/*/*"
                 )
                 path_to_view_idx = {path: i for i, path in enumerate(list(self._RIGID_BODY_VIEW[scene_idx].prim_paths))}
@@ -2061,12 +2060,14 @@ def setup_collision_apis(prim):
         prim: The USD prim to set up collision APIs on.
 
     Returns:
-        tuple: (collision_api, physx_collision_api, mesh_collision_api) where mesh_collision_api
-            may be None for non-mesh prims.
+        tuple: (collision_api, engine_collision_api, mesh_collision_api) where engine_collision_api
+            is None for a backend with no collider API of its own, and mesh_collision_api may be
+            None for non-mesh prims.
     """
     # Create / get CollisionAPI reference
     collision_api = ensure_usd_api(prim, lazy.pxr.UsdPhysics.CollisionAPI)
-    physx_collision_api = ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxCollisionAPI)
+    og.sim.physics_backend.apply_collision_schemas(prim)
+    engine_collision_api = og.sim.physics_backend.get_collision_api(prim)
     mesh_collision_api = (
         ensure_usd_api(prim, lazy.pxr.UsdPhysics.MeshCollisionAPI)
         if prim.GetPrimTypeInfo().GetTypeName() == "Mesh"
@@ -2082,7 +2083,7 @@ def setup_collision_apis(prim):
         # Set collision enabled based on global setting
         collision_api.GetCollisionEnabledAttr().Set(not gm.VISUAL_ONLY)
 
-    return collision_api, physx_collision_api, mesh_collision_api
+    return collision_api, engine_collision_api, mesh_collision_api
 
 
 def apply_collision_approximation(prim, mesh_collision_api, approximation_type):
@@ -2111,27 +2112,10 @@ def apply_collision_approximation(prim, mesh_collision_api, approximation_type):
         name="collision approximation type",
     )
 
-    # Make sure to add the appropriate API if we're setting certain values
-    if approximation_type == "convexHull":
-        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI)
-    elif approximation_type == "convexDecomposition":
-        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI)
-    elif approximation_type == "meshSimplification":
-        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI)
-    elif approximation_type == "sdf":
-        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI)
-    elif approximation_type == "none":
-        ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI)
+    # Kept outside the editing_usd() block below because it opens its own, and nesting is forbidden
+    og.sim.physics_backend.configure_collision_approximation(prim, approximation_type)
 
     with og.sim.editing_usd():
-        if approximation_type == "convexHull":
-            pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(prim)
-            # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
-            # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
-            if pch_api.GetHullVertexLimitAttr().Get() is None:
-                pch_api.CreateHullVertexLimitAttr()
-            pch_api.GetHullVertexLimitAttr().Set(60)
-
         mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
@@ -2145,18 +2129,15 @@ def get_world_pose(prim_path):
             - torch.Tensor: (x,y,z) position in the world frame
             - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
     """
-    matrix = _get_world_pose_with_scale_from_fabric_hierarchy(prim_path)
+    matrix = _get_world_transform_with_scale(prim_path)
     quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
     position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
     orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
     return position, orientation
 
 
-def _get_world_pose_with_scale_from_fabric_hierarchy(prim_path):
-    # Check that no reads from Fabric are happening during a physics step.
-    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
-
-    return og.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
+def _get_world_transform_with_scale(prim_path):
+    return og.sim.physics_backend.get_world_transform_with_scale(prim_path)
 
 
 def get_world_pose_with_scale(prim_path):
@@ -2165,7 +2146,7 @@ def get_world_pose_with_scale(prim_path):
     e.g. when converting points in the prim frame to the world frame.
     """
 
-    return th.tensor(_get_world_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
+    return th.tensor(_get_world_transform_with_scale(prim_path), dtype=th.float32, device=og.sim.device).T
 
 
 def get_local_pose(prim_path):
@@ -2180,17 +2161,16 @@ def get_local_pose(prim_path):
             - torch.Tensor: (x,y,z) position in the parent frame
             - torch.Tensor: (x,y,z,w) quaternion orientation in the parent frame
     """
-    matrix = _get_local_pose_with_scale_from_fabric_hierarchy(prim_path)
+    matrix = _get_local_transform_with_scale(prim_path)
     quaternion = matrix.RemoveScaleShear().ExtractRotationQuat()
+    # See get_world_pose()'s equivalent comment -- must match og.sim.device explicitly, not default CPU.
     position = th.tensor(matrix.ExtractTranslation(), dtype=th.float32)
     orientation = th.tensor([*quaternion.GetImaginary(), quaternion.GetReal()], dtype=th.float32)
     return position, orientation
 
 
-def _get_local_pose_with_scale_from_fabric_hierarchy(prim_path):
-    assert not og.sim.currently_stepping, "Do not read poses from Fabric during a physics step, this is quite slow!"
-
-    return og.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
+def _get_local_transform_with_scale(prim_path):
+    return og.sim.physics_backend.get_local_transform_with_scale(prim_path)
 
 
 def get_local_pose_with_scale(prim_path):
@@ -2199,7 +2179,7 @@ def get_local_pose_with_scale(prim_path):
     for converting points between the prim frame and the parent frame.
     """
 
-    return th.tensor(_get_local_pose_with_scale_from_fabric_hierarchy(prim_path), dtype=th.float32).T
+    return th.tensor(_get_local_transform_with_scale(prim_path), dtype=th.float32, device=og.sim.device).T
 
 
 class BatchControlViewAPIImpl:
@@ -2277,54 +2257,27 @@ class BatchControlViewAPIImpl:
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
 
-    def _set_dof_position_targets(self, data, indices, cast=True):
-        # No casting results in better efficiency
-        if cast:
-            data = self._view._frontend.as_contiguous_float32(data)
-            indices = self._view._frontend.as_contiguous_uint32(indices)
-        data_desc = self._view._frontend.get_tensor_desc(data)
-        indices_desc = self._view._frontend.get_tensor_desc(indices)
-
-        if not self._view._backend.set_dof_position_targets(data_desc, indices_desc):
-            raise Exception("Failed to set DOF positions in backend")
-
-    def _set_dof_velocity_targets(self, data, indices, cast=True):
-        # No casting results in better efficiency
-        if cast:
-            data = self._view._frontend.as_contiguous_float32(data)
-            indices = self._view._frontend.as_contiguous_uint32(indices)
-        data_desc = self._view._frontend.get_tensor_desc(data)
-        indices_desc = self._view._frontend.get_tensor_desc(indices)
-
-        if not self._view._backend.set_dof_velocity_targets(data_desc, indices_desc):
-            raise Exception("Failed to set DOF velocities in backend")
-
-    def _set_dof_actuation_forces(self, data, indices, cast=True):
-        # No casting results in better efficiency
-        if cast:
-            data = self._view._frontend.as_contiguous_float32(data)
-            indices = self._view._frontend.as_contiguous_uint32(indices)
-        data_desc = self._view._frontend.get_tensor_desc(data)
-        indices_desc = self._view._frontend.get_tensor_desc(indices)
-
-        if not self._view._backend.set_dof_actuation_forces(data_desc, indices_desc):
-            raise Exception("Failed to set DOF actuation forces in backend")
-
     def flush_control(self):
         if "dof_position_targets" in self._write_idx_cache:
             pos_indices = cb.int_array(sorted(self._write_idx_cache["dof_position_targets"]))
             pos_targets = self._read_cache["dof_position_targets"]
-            self._set_dof_position_targets(cb.to_torch(pos_targets), cb.to_torch(pos_indices), cast=False)
+            og.sim.physics_backend.set_dof_position_targets(
+                self._view, cb.to_torch(pos_targets), cb.to_torch(pos_indices)
+            )
 
         if "dof_velocity_targets" in self._write_idx_cache:
             vel_indices = cb.int_array(sorted(self._write_idx_cache["dof_velocity_targets"]))
             vel_targets = self._read_cache["dof_velocity_targets"]
-            self._set_dof_velocity_targets(cb.to_torch(vel_targets), cb.to_torch(vel_indices), cast=False)
+            og.sim.physics_backend.set_dof_velocity_targets(
+                self._view, cb.to_torch(vel_targets), cb.to_torch(vel_indices)
+            )
 
         if "dof_actuation_forces" in self._write_idx_cache:
             eff_indices = cb.int_array(sorted(self._write_idx_cache["dof_actuation_forces"]))
             eff_targets = self._read_cache["dof_actuation_forces"]
-            self._set_dof_actuation_forces(cb.to_torch(eff_targets), cb.to_torch(eff_indices), cast=False)
+            og.sim.physics_backend.set_dof_actuation_forces(
+                self._view, cb.to_torch(eff_targets), cb.to_torch(eff_indices)
+            )
 
     def initialize_view(self):
         # First, get all of the controllable objects in the scene (avoiding circular import)
@@ -2347,7 +2300,7 @@ class BatchControlViewAPIImpl:
         # Create the actual articulation view. Note that even though we search for base_link here,
         # the returned things will not necessarily be the base_link prim paths, but the appropriate
         # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
-        self._view = og.sim.physics_sim_view.create_articulation_view(self._pattern)
+        self._view = og.sim.physics_backend.physics_sim_view.create_articulation_view(self._pattern)
         view_prim_paths = self._view.prim_paths
         assert (
             set(view_prim_paths) == expected_prim_paths
@@ -3472,8 +3425,7 @@ def add_asset_to_stage(asset_path, prim_path):
         ), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
 
         # Add reference to stage and grab prim
-        lazy.isaacsim.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
-        prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+        prim = og.sim.render_backend.add_reference_to_stage(asset_path, prim_path)
 
         # Make sure prim was loaded correctly
         assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
@@ -3481,12 +3433,63 @@ def add_asset_to_stage(asset_path, prim_path):
         return prim
 
 
+def is_prim_path_valid(prim_path):
+    """
+    Pure-pxr replacement for ``isaacsim.core.utils.prims.is_prim_path_valid``: semantically
+    identical to the Isaac Core convenience function for a plain USD stage, but with no dependency
+    on a live Kit application.
+    """
+    prim = og.sim.stage.GetPrimAtPath(prim_path)
+    return bool(prim) and prim.IsValid()
+
+
+def get_prim_at_path(prim_path):
+    """Pure-pxr replacement for ``isaacsim.core.utils.prims.get_prim_at_path`` (see above)."""
+    return og.sim.stage.GetPrimAtPath(prim_path)
+
+
+def get_prim_property(prim_path, property_name):
+    """Pure-pxr replacement for ``isaacsim.core.utils.prims.get_prim_property`` (see above)."""
+    attr = og.sim.stage.GetPrimAtPath(prim_path).GetAttribute(property_name)
+    return attr.Get() if attr.IsValid() else None
+
+
+def set_prim_property(prim_path, property_name, value):
+    """Pure-pxr replacement for ``isaacsim.core.utils.prims.set_prim_property`` (see above)."""
+    prim = og.sim.stage.GetPrimAtPath(prim_path)
+    attr = prim.GetAttribute(property_name)
+    if not attr.IsValid():
+        attr = prim.CreateAttribute(property_name, get_sdf_value_type_name(value))
+    attr.Set(value)
+
+
+# String dtype -> wp dtype, matching isaacsim.core.utils.warp.tensor.get_type()'s own mapping exactly
+# (including bool -> uint8, not wp.bool -- Warp has historically used uint8 as its packed bool storage).
+_WARP_DTYPE_FROM_STRING = {
+    "float32": wp.float32,
+    "bool": wp.uint8,
+    "int32": wp.int32,
+    "int64": wp.int64,
+    "long": wp.int64,
+    "uint8": wp.uint8,
+}
+
+
+def create_tensor_from_list(data, dtype, device=None):
+    """Pure-warp replacement for ``isaacsim.core.utils.warp.tensor.create_tensor_from_list`` -- that
+    function is itself just ``wp.array(data, device=device, dtype=get_type(dtype))`` under the hood
+    (confirmed from its own source), with no real Isaac dependency."""
+    return wp.array(data, device=device, dtype=_WARP_DTYPE_FROM_STRING[dtype])
+
+
 def get_world_prim():
     """
     Returns:
         Usd.Prim: Active world prim in the current stage
     """
-    return lazy.isaacsim.core.utils.prims.get_prim_at_path("/World")
+    # get_prim_at_path() is a pure-pxr equivalent of the Isaac Core convenience function (see its
+    # own docstring), so this needs no per-backend dispatch.
+    return get_prim_at_path("/World")
 
 
 def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
@@ -3576,11 +3579,15 @@ def delete_or_deactivate_prim(prim_path):
     # TODO: Replace the weird delete-or-deactivate mechanism here with a concrete deletion
     # using the Sdf layer deletion API.
     with og.sim.editing_usd():
-        if not lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
+        if not is_prim_path_valid(prim_path):
             return False
-        if lazy.isaacsim.core.utils.prims.is_prim_no_delete(prim_path):
+        prim = get_prim_at_path(prim_path)
+        # is_prim_no_delete/get_prim_type_name are trivial pure-USD wrappers -- use pxr directly
+        # instead of the Isaac Core convenience versions, same as is_prim_path_valid/get_prim_at_path
+        # above, regardless of backend.
+        if bool(prim.GetMetadata("no_delete")):
             return False
-        if lazy.isaacsim.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+        if prim.GetTypeName() == "PhysicsScene":
             return False
         if prim_path == "/World":
             return False
@@ -3590,9 +3597,22 @@ def delete_or_deactivate_prim(prim_path):
         if prim_path.startswith("/Render"):
             return False
 
+        # "Ancestral" means THIS prim's own definition was introduced via a reference arc (e.g. a link
+        # inside a dataset object's referenced USD), as opposed to a prim authored directly on the
+        # live stage -- matches Isaac's own is_prim_ancestral() semantics exactly (its docstring:
+        # is_prim_ancestral("/World/panda") is False -- the reference arc is authored ON that prim,
+        # not one of its ancestors -- while is_prim_ancestral("/World/panda/panda_link0") is True).
+        # Checking THIS prim's own strongest PrimStack layer against the stage's root/session layers
+        # (rather than walking ancestors looking for *any* reference, which is true for -- and would
+        # misclassify -- every runtime-created child of any referenced object, e.g. AttachedTo's own
+        # attachment joints, which live under a dataset object's referenced link but are themselves
+        # freshly Define()'d on the live stage) correctly distinguishes "lives inside referenced
+        # content" from "authored directly on the live stage, regardless of parentage".
+        ancestral = og.sim.render_backend.is_prim_ancestral(prim)
+
         # If the prim is not ancestral, we can delete it.
-        if not lazy.isaacsim.core.utils.prims.is_prim_ancestral(prim_path):
-            lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=True).do()
+        if not ancestral:
+            og.sim.render_backend.delete_prim(prim_path, destructive=True)
 
         # Otherwise, we can only deactivate it, which essentially serves the same purpose.
         # All objects that are originally in the scene are ancestral because we add the pre-build scene to the stage.
@@ -3600,12 +3620,55 @@ def delete_or_deactivate_prim(prim_path):
             # Clear all default attributes before deactivating the prim to ensure clean reactivation.
             # Note: Prim deactivation preserves attribute values, so we must explicitly clear defaults
             # to prevent stale custom values from persisting when the prim is reactivated later.
-            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             for attr in prim.GetAttributes():
                 assert attr.ClearDefault()
-            lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
+            og.sim.render_backend.delete_prim(prim_path, destructive=False)
 
     return True
+
+
+class PhysicsMaterial:
+    """
+    Pure-pxr equivalent of ``isaacsim.core.api.materials.PhysicsMaterial``. Used unconditionally
+    (regardless of backend) -- reading that class's own source shows it's already built entirely on
+    plain ``UsdShade``/``UsdPhysics`` pxr calls (``carb``/``omni.kit.app`` are only used for trivial
+    stage access and logging), so there's no real Kit dependency to gate here, unlike most other
+    ``lazy.isaacsim``/``lazy.omni`` call sites in this codebase. Exposes the same ``.material``/
+    ``.prim``/``.prim_path``/``.name`` surface real callers need (e.g. ``GeomPrim.
+    apply_physics_material()``'s ``physics_material.material``). Does not wrap USD edits in
+    ``og.sim.editing_usd()`` itself -- same convention as ``copy_mesh_prim_to_path()`` -- callers must.
+
+    Args:
+        prim_path (str): path to define (or reuse, if a valid prim already exists there) the physics
+            material prim at.
+        name (str): name for this material.
+        static_friction (float or None): if specified, static friction coefficient to set.
+        dynamic_friction (float or None): if specified, dynamic friction coefficient to set.
+        restitution (float or None): if specified, restitution coefficient to set.
+    """
+
+    def __init__(
+        self, prim_path, name="physics_material", static_friction=None, dynamic_friction=None, restitution=None
+    ):
+        self.prim_path = prim_path
+        self.name = name
+        stage = og.sim.stage
+        prim = stage.GetPrimAtPath(prim_path)
+        self.material = (
+            lazy.pxr.UsdShade.Material(prim) if prim.IsValid() else lazy.pxr.UsdShade.Material.Define(stage, prim_path)
+        )
+        self.prim = stage.GetPrimAtPath(prim_path)
+        material_api = (
+            lazy.pxr.UsdPhysics.MaterialAPI(self.prim)
+            if self.prim.HasAPI(lazy.pxr.UsdPhysics.MaterialAPI)
+            else lazy.pxr.UsdPhysics.MaterialAPI.Apply(self.prim)
+        )
+        if static_friction is not None:
+            material_api.CreateStaticFrictionAttr().Set(static_friction)
+        if dynamic_friction is not None:
+            material_api.CreateDynamicFrictionAttr().Set(dynamic_friction)
+        if restitution is not None:
+            material_api.CreateRestitutionAttr().Set(restitution)
 
 
 def activate_prim_and_children(prim_path):
@@ -3617,7 +3680,7 @@ def activate_prim_and_children(prim_path):
     """
 
     def _activate(path):
-        current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(path)
+        current_prim = get_prim_at_path(path)
         current_prim.SetActive(True)
         for child in current_prim.GetAllChildren():
             _activate(child.GetPath().pathString)

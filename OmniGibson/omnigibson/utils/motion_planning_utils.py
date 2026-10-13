@@ -509,9 +509,9 @@ def detect_robot_collision(context, verbose=False):
             mesh_path = mesh.GetPrimPath().pathString
             mesh_id = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(mesh_path)
             if mesh.GetTypeName() == "Mesh":
-                og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
+                og.sim.physics_backend.overlap_mesh(*mesh_id, reportFn=overlap_callback)
             else:
-                og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
+                og.sim.physics_backend.overlap_shape(*mesh_id, reportFn=overlap_callback)
 
     return valid_hit
 

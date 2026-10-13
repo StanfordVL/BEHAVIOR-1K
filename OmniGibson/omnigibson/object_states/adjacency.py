@@ -3,13 +3,12 @@ import math
 import torch as th
 import warp as wp
 
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.tensorized_relative_state import TensorizedRelativeState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import RigidBodyViewAPI, rigid_inverse_mat44
+from omnigibson.utils.usd_utils import RigidBodyViewAPI, create_tensor_from_list, rigid_inverse_mat44
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -199,12 +198,8 @@ class Adjacency(TensorizedRelativeState):
         super().global_initialize()
         # Build the constant axis tables (directions + per-axis max distance).
         directions_cpu, max_distances_cpu = _build_adjacency_axis_tables()
-        cls._directions = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            directions_cpu, "float32", device="cuda"
-        )
-        cls._max_distances = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-            max_distances_cpu, "float32", device="cuda"
-        )
+        cls._directions = create_tensor_from_list(directions_cpu, "float32", device="cuda")
+        cls._max_distances = create_tensor_from_list(max_distances_cpu, "float32", device="cuda")
 
     @classmethod
     def initialize_view(cls):
@@ -218,9 +213,7 @@ class Adjacency(TensorizedRelativeState):
             aabb_obj_idxs_cpu = th.full((N,), -1, dtype=th.int32)
             for rel_path, adj_idx in cls.OBJ_IDXS.items():
                 aabb_obj_idxs_cpu[adj_idx] = AABB.OBJ_IDXS.get(rel_path, -1)
-            cls._aabb_obj_idxs = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                aabb_obj_idxs_cpu, "int32", device="cuda"
-            )
+            cls._aabb_obj_idxs = create_tensor_from_list(aabb_obj_idxs_cpu, "int32", device="cuda")
         else:
             cls._aabb_obj_idxs = None
 
@@ -241,12 +234,8 @@ class Adjacency(TensorizedRelativeState):
                             continue
                         link_to_obj_cpu[flat_idx] = adj_idx
                         link_to_scene_cpu[flat_idx] = s_idx
-            cls._link_to_obj_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                link_to_obj_cpu, "int32", device="cuda"
-            )
-            cls._link_to_scene_idx = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list(
-                link_to_scene_cpu, "int32", device="cuda"
-            )
+            cls._link_to_obj_idx = create_tensor_from_list(link_to_obj_cpu, "int32", device="cuda")
+            cls._link_to_scene_idx = create_tensor_from_list(link_to_scene_cpu, "int32", device="cuda")
         else:
             cls._link_to_obj_idx = None
             cls._link_to_scene_idx = None

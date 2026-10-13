@@ -179,6 +179,14 @@ gm.NO_OMNI_LOGS = os.getenv("OMNIGIBSON_NO_OMNI_LOGS", "False").lower() in ("tru
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
 gm.SHOW_DISCLAIMERS = False
 
+# Which physics backend to use. Must be a key in omnigibson.physics_backends.PHYSICS_BACKENDS
+gm.PHYSICS_BACKEND = "physx"
+
+# Which render backend to use. Must be a key in omnigibson.render_backends.RENDER_BACKENDS. An
+# independent axis from PHYSICS_BACKEND: which engine simulates and what turns that into pixels are
+# separate choices, even though Kit is currently the only implementation of either.
+gm.RENDER_BACKEND = "kit"
+
 # Whether to use omni's GPU dynamics
 # This is necessary for certain features; e.g. particles (fluids / cloth)
 gm.USE_GPU_DYNAMICS = False
