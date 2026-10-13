@@ -57,6 +57,7 @@ from omnigibson.utils.usd_utils import (
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
     delete_or_deactivate_prim,
+    get_prim_at_path,
 )
 
 # Create module logger
@@ -310,9 +311,9 @@ class Robot(USDObject, GymObservable):
         if reset_joint_pos is None:
             self._reset_joint_pos = None
         elif isinstance(reset_joint_pos, th.Tensor):
-            self._reset_joint_pos = reset_joint_pos
+            self._reset_joint_pos = reset_joint_pos.to(og.sim.device)
         else:
-            self._reset_joint_pos = th.tensor(reset_joint_pos, dtype=th.float)
+            self._reset_joint_pos = th.tensor(reset_joint_pos, dtype=th.float, device=og.sim.device)
 
         # Make sure action type is valid, and also save
         assert_valid_key(key=action_type, valid_keys={"discrete", "continuous"}, name="action type")
@@ -438,7 +439,7 @@ class Robot(USDObject, GymObservable):
                 return None
             result = []
             for link_name, position in point_list:
-                result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
+                result.append(GraspingPoint(link_name=link_name, position=th.tensor(position, device=og.sim.device)))
             return result
 
         if points is None:
@@ -514,9 +515,7 @@ class Robot(USDObject, GymObservable):
         self._load_sensors()
 
         if self.is_holonomic_base:
-            self._world_base_fixed_joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
-                f"{self.prim_path}/rootJoint"
-            )
+            self._world_base_fixed_joint_prim = get_prim_at_path(f"{self.prim_path}/rootJoint")
             position, orientation = self.get_position_orientation()
             # Set the world-to-base fixed joint to be at the robot's current pose
             with og.sim.editing_usd():
@@ -779,7 +778,7 @@ class Robot(USDObject, GymObservable):
 
         # If we're using discrete action space, we grab the specific action and use that to convert to control
         if self._action_type == "discrete":
-            action = th.tensor(self.discrete_action_list[action], dtype=th.float32)
+            action = th.tensor(self.discrete_action_list[action], dtype=th.float32, device=og.sim.device)
 
         # Sanity check that action is 1D array
         assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
@@ -848,6 +847,15 @@ class Robot(USDObject, GymObservable):
             if control is None:
                 applying_grasp = False
             else:
+                # gm.USE_NUMPY_CONTROLLER_BACKEND (set by e.g. JoyLo's teleop config) makes
+                # ControllerView.get_control() always return a plain numpy array, regardless of what
+                # device physics runs on (see backend_utils.py's _ComputeNumpyBackend.from_torch,
+                # which unconditionally does `.cpu().numpy()`). Comparing that directly against a
+                # joint_lower_limits/joint_upper_limits tensor living on a non-CPU og.sim.device
+                # (e.g. Newton on CUDA) crashes with a device-mismatch error -- torch auto-converts
+                # the numpy array to a CPU tensor for the comparison, which then can't mix with a CUDA
+                # tensor. A no-op when control is already a th.Tensor on the right device.
+                control = th.as_tensor(control, device=self.joint_upper_limits.device)
                 if self._grasping_direction == "lower":
                     applying_grasp = (
                         th.any(control < self.joint_upper_limits[controlled_joints])
@@ -925,9 +933,10 @@ class Robot(USDObject, GymObservable):
             position = current_position if position is None else position
             orientation = current_orientation if orientation is None else orientation
 
-            # Convert to th.Tensor if necessary
-            position = th.as_tensor(position, dtype=th.float32)
-            orientation = th.as_tensor(orientation, dtype=th.float32)
+            # Convert to th.Tensor if necessary. Must land on og.sim.device explicitly -- see
+            # XFormPrim.set_position_orientation()'s equivalent comment for why.
+            position = th.as_tensor(position, dtype=th.float32, device=og.sim.device)
+            orientation = th.as_tensor(orientation, dtype=th.float32, device=og.sim.device)
 
             # Convert to from scene-relative to world if necessary
             if frame == "scene":
@@ -1071,7 +1080,7 @@ class Robot(USDObject, GymObservable):
 
                         # Need to find distance between robot and contact point in robot link's local frame and
                         # ag link and contact point in ag link's local frame
-                        joint_frame_orn = th.tensor([0, 0, 0, 1.0])
+                        joint_frame_orn = th.tensor([0, 0, 0, 1.0], device=og.sim.device)
                         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
                         parent_frame_pos, parent_frame_orn = T.relative_pose_transform(
                             contact_pos_world, joint_frame_orn, eef_link_pos, eef_link_orn
@@ -1160,7 +1169,8 @@ class Robot(USDObject, GymObservable):
                             *arm_params["child_frame_pos"].tolist(),
                             *arm_params["child_frame_orn"].tolist(),
                             float(arm_params["joint_type"] == "SphericalJoint"),
-                        ]
+                        ],
+                        device=state_flat.device,
                     )
                 )
             if ag_parts:
@@ -1582,7 +1592,7 @@ class Robot(USDObject, GymObservable):
                 # Add eef and grasping info (relative to articulation root / robot base frame)
                 eef_pos, eef_quat = self.get_relative_eef_pose(arm=arm)
                 dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = eef_pos, eef_quat
-                dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)])
+                dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)], device=og.sim.device)
                 dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
                 dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
         if self.is_articulated_trunk:
@@ -1608,8 +1618,8 @@ class Robot(USDObject, GymObservable):
             ang_vel = (r_vel - l_vel) / self.wheel_axle_length
 
             # Add info
-            dic["dd_base_lin_vel"] = th.tensor([lin_vel])
-            dic["dd_base_ang_vel"] = th.tensor([ang_vel])
+            dic["dd_base_lin_vel"] = th.tensor([lin_vel], device=og.sim.device)
+            dic["dd_base_ang_vel"] = th.tensor([ang_vel], device=og.sim.device)
         if self.is_active_camera:
             joint_positions = dic["joint_qpos"]
             joint_velocities = dic["joint_qvel"]
@@ -1814,7 +1824,10 @@ class Robot(USDObject, GymObservable):
                         finger_parent_pts is not None
                     ), f"Expected finger parent points to be defined for parent link {finger_parent_link.name}, but got None!"
                     # Convert from world frame -> eef frame
-                    finger_parent_pts = th.concatenate([finger_parent_pts, th.ones(len(finger_parent_pts), 1)], dim=-1)
+                    finger_parent_pts = th.concatenate(
+                        [finger_parent_pts, th.ones(len(finger_parent_pts), 1, device=finger_parent_pts.device)],
+                        dim=-1,
+                    )
                     finger_parent_pts = (finger_parent_pts @ eef_to_world_tf.T)[:, :3]
                     finger_parent_max_z = finger_parent_pts[:, 2].max().item()
                 else:
@@ -1828,7 +1841,7 @@ class Robot(USDObject, GymObservable):
                     finger_pts is not None
                 ), f"Expected finger points to be defined for link {finger_link.name}, but got None!"
                 # Convert from world frame -> eef frame
-                finger_pts = th.concatenate([finger_pts, th.ones(len(finger_pts), 1)], dim=-1)
+                finger_pts = th.concatenate([finger_pts, th.ones(len(finger_pts), 1, device=finger_pts.device)], dim=-1)
                 finger_pts = (finger_pts @ eef_to_world_tf.T)[:, :3]
                 finger_pts_in_eef_frame.append(finger_pts)
 
@@ -1908,7 +1921,8 @@ class Robot(USDObject, GymObservable):
                             z_offset,
                             1,
                         ],
-                    ]
+                    ],
+                    device=world_to_eef_tf.device,
                 )
                 # Convert the grasping points from the EEF frame -> finger frame
                 finger_to_world_tf = T.pose_inv(T.pose2mat(finger_link.get_position_orientation()))
@@ -2092,19 +2106,21 @@ class Robot(USDObject, GymObservable):
             th.tensor: array of action data filled with update value
         """
         if self.is_two_wheel:
-            action = th.zeros(self.action_dim)
+            action = th.zeros(self.action_dim, device=og.sim.device)
             assert ControllerView.is_controller_type(
                 self._controllers["base"][0], DifferentialDriveController
             ), "Only DifferentialDriveController is supported!"
-            action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
+            action[self.base_action_idx] = (
+                th.tensor([teleop_action.base[0], teleop_action.base[2]], device=og.sim.device).float() * 0.3
+            )
             return action
 
         if self.is_holonomic_base:
-            action = th.zeros(self.action_dim)
+            action = th.zeros(self.action_dim, device=og.sim.device)
             hands = ["left", "right"] if self.n_arms == 2 else ["right"]
             for i, hand in enumerate(hands):
                 arm_name = self.arm_names[i]
-                arm_action = th.tensor(teleop_action[hand]).float()
+                arm_action = th.tensor(teleop_action[hand], device=og.sim.device).float()
                 # arm action
                 assert ControllerView.is_controller_type(
                     self._controllers[f"arm_{arm_name}"][0], InverseKinematicsController
@@ -2118,15 +2134,15 @@ class Robot(USDObject, GymObservable):
                     self._controllers[f"gripper_{arm_name}"][0], MultiFingerGripperController
                 ), f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
                 action[self.gripper_action_idx[arm_name]] = arm_action[6]
-            action[self.base_action_idx] = th.tensor(teleop_action.base).float()
+            action[self.base_action_idx] = th.tensor(teleop_action.base, device=og.sim.device).float()
             return action
 
         if self.is_manipulation:
-            action = th.zeros(self.action_dim)
+            action = th.zeros(self.action_dim, device=og.sim.device)
             hands = ["left", "right"] if self.n_arms == 2 else ["right"]
             for i, hand in enumerate(hands):
                 arm_name = self.arm_names[i]
-                arm_action = th.tensor(teleop_action[hand]).float()
+                arm_action = th.tensor(teleop_action[hand], device=og.sim.device).float()
                 # arm action
                 assert ControllerView.is_controller_type(
                     self._controllers[f"arm_{arm_name}"][0], InverseKinematicsController
@@ -2401,7 +2417,7 @@ class Robot(USDObject, GymObservable):
         idx = 0
         for controller in self.controller_order:
             cmd_dim = ControllerView.get_command_dim(self._controllers[controller][0])
-            dic[controller] = th.arange(idx, idx + cmd_dim)
+            dic[controller] = th.arange(idx, idx + cmd_dim, device=og.sim.device)
             idx += cmd_dim
 
         return dic
@@ -2679,7 +2695,7 @@ class Robot(USDObject, GymObservable):
             )
             arm_group_key = self._controllers[f"arm_{arm_name}"][0]
             arm_action_idx[arm_name] = th.arange(
-                action_start_idx, action_start_idx + ControllerView.get_command_dim(arm_group_key)
+                action_start_idx, action_start_idx + ControllerView.get_command_dim(arm_group_key), device=og.sim.device
             )
         return arm_action_idx
 
@@ -2695,7 +2711,9 @@ class Robot(USDObject, GymObservable):
             )
             gripper_group_key = self._controllers[f"gripper_{arm_name}"][0]
             gripper_action_idx[arm_name] = th.arange(
-                action_start_idx, action_start_idx + ControllerView.get_command_dim(gripper_group_key)
+                action_start_idx,
+                action_start_idx + ControllerView.get_command_dim(gripper_group_key),
+                device=og.sim.device,
             )
         return gripper_action_idx
 
@@ -2813,7 +2831,9 @@ class Robot(USDObject, GymObservable):
         """
         assert self.is_manipulation
         idxs = {
-            arm: th.tensor([list(self.joints.keys()).index(name) for name in self.arm_joint_names[arm]])
+            arm: th.tensor(
+                [list(self.joints.keys()).index(name) for name in self.arm_joint_names[arm]], device=og.sim.device
+            )
             for arm in self.arm_names
         }
         if self._definition.manipulation and self._definition.manipulation.add_combined_arm_control_idx:
@@ -2829,7 +2849,9 @@ class Robot(USDObject, GymObservable):
         """
         assert self.is_manipulation
         return {
-            arm: th.tensor([list(self.joints.keys()).index(name) for name in self.finger_joint_names[arm]])
+            arm: th.tensor(
+                [list(self.joints.keys()).index(name) for name in self.finger_joint_names[arm]], device=og.sim.device
+            )
             for arm in self.arm_names
         }
 
@@ -3009,7 +3031,7 @@ class Robot(USDObject, GymObservable):
         if self._definition.manipulation and self._definition.manipulation.arm_workspace_range:
             workspace_range = self._definition.manipulation.arm_workspace_range
         for k, v in workspace_range.items():
-            dic[k] = th.deg2rad(th.tensor(v, dtype=th.float32))
+            dic[k] = th.deg2rad(th.tensor(v, dtype=th.float32, device=og.sim.device))
         return dic
 
     def get_eef_pose(self, arm="default"):
@@ -3233,9 +3255,9 @@ class Robot(USDObject, GymObservable):
         # by the number of end points and repeat the individual elements of the end points by the number of start points
         n_start_points = len(self.assisted_grasp_start_points[arm])
         n_end_points = len(self.assisted_grasp_end_points[arm])
-        start_and_end_points = th.zeros(n_start_points + n_end_points, 3)
-        link_positions = th.zeros(n_start_points + n_end_points, 3)
-        link_quats = th.zeros(n_start_points + n_end_points, 4)
+        start_and_end_points = th.zeros(n_start_points + n_end_points, 3, device=og.sim.device)
+        link_positions = th.zeros(n_start_points + n_end_points, 3, device=og.sim.device)
+        link_quats = th.zeros(n_start_points + n_end_points, 4, device=og.sim.device)
         idx = 0
         for grasp_start_point in self.assisted_grasp_start_points[arm]:
             # Get world coordinates of link base frame
@@ -3373,8 +3395,8 @@ class Robot(USDObject, GymObservable):
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
-                    th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                    th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                    th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], device=og.sim.device),
+                    th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], device=og.sim.device),
                 ),
                 "mode": "pose_delta_ori",
                 "smoothing_filter_size": 2,
@@ -3399,8 +3421,8 @@ class Robot(USDObject, GymObservable):
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
-                    th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                    th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                    th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], device=og.sim.device),
+                    th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], device=og.sim.device),
                 ),
                 "mode": "pose_delta_ori",
                 "workspace_pose_limiter": None,
@@ -3489,7 +3511,7 @@ class Robot(USDObject, GymObservable):
                 "motor_type": "velocity",
                 "control_limits": self.control_limits,
                 "dof_idx": self.gripper_control_idx[arm],
-                "default_goal": th.zeros(len(self.gripper_control_idx[arm])),
+                "default_goal": th.zeros(len(self.gripper_control_idx[arm]), device=og.sim.device),
                 "use_impedances": False,
             }
         return dic
@@ -3546,7 +3568,7 @@ class Robot(USDObject, GymObservable):
         # Note that we can't use scaled transforms here because those are only available through Fabric getters
         # which cannot be refreshed during a physics step. We instead use the unscaled position and orientation
         # and divide by the scale of the robot and target object to get the local frame position and orientation.
-        joint_frame_orn = th.tensor([0, 0, 0, 1.0])
+        joint_frame_orn = th.tensor([0, 0, 0, 1.0], device=og.sim.device)
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         parent_frame_pos, parent_frame_orn = T.relative_pose_transform(
             contact_pos_world, joint_frame_orn, eef_link_pos, eef_link_orn
@@ -3669,7 +3691,7 @@ class Robot(USDObject, GymObservable):
         # Check manipulation definition
         if self._definition.manipulation and self._definition.manipulation.teleop_rotation_offset:
             return self._get_teleop_rotation_offset(self._definition.manipulation.teleop_rotation_offset)
-        return {arm: th.tensor([0, 0, 0, 1]) for arm in self.arm_names}
+        return {arm: th.tensor([0, 0, 0, 1], device=og.sim.device) for arm in self.arm_names}
 
     @property
     def _default_base_joint_controller_config(self):
@@ -3702,7 +3724,7 @@ class Robot(USDObject, GymObservable):
             "motor_type": "velocity",
             "control_limits": self.control_limits,
             "dof_idx": self.base_control_idx,
-            "default_goal": th.zeros(len(self.base_control_idx)),
+            "default_goal": th.zeros(len(self.base_control_idx), device=og.sim.device),
             "use_impedances": False,
         }
 
@@ -3714,7 +3736,7 @@ class Robot(USDObject, GymObservable):
             delta (float):float], (x,y,z) cartesian delta base position
         """
         assert self.is_locomotion
-        new_pos = th.tensor(delta) + self.get_position_orientation()[0]
+        new_pos = th.tensor(delta, device=og.sim.device) + self.get_position_orientation()[0]
         self.set_position_orientation(position=new_pos)
 
     def move_forward(self, delta=0.05):
@@ -3725,7 +3747,7 @@ class Robot(USDObject, GymObservable):
             delta (float): delta base position forward
         """
         assert self.is_locomotion
-        self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([delta, 0, 0])))
+        self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([delta, 0, 0], device=og.sim.device)))
 
     def move_backward(self, delta=0.05):
         """
@@ -3735,7 +3757,9 @@ class Robot(USDObject, GymObservable):
             delta (float): delta base position backward
         """
         assert self.is_locomotion
-        self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([-delta, 0, 0])))
+        self.move_by(
+            T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([-delta, 0, 0], device=og.sim.device))
+        )
 
     def move_left(self, delta=0.05):
         """
@@ -3745,7 +3769,9 @@ class Robot(USDObject, GymObservable):
             delta (float): delta base position left
         """
         assert self.is_locomotion
-        self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([0, -delta, 0])))
+        self.move_by(
+            T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([0, -delta, 0], device=og.sim.device))
+        )
 
     def move_right(self, delta=0.05):
         """
@@ -3755,7 +3781,7 @@ class Robot(USDObject, GymObservable):
             delta (float): delta base position right
         """
         assert self.is_locomotion
-        self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([0, delta, 0])))
+        self.move_by(T.quat2mat(self.get_position_orientation()[1]).dot(th.tensor([0, delta, 0], device=og.sim.device)))
 
     def turn_left(self, delta=0.03):
         """
@@ -3809,7 +3835,9 @@ class Robot(USDObject, GymObservable):
             ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0]) for i in range(c_order_idx)
         )
         base_group_key = self._controllers["base"][0]
-        return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(base_group_key))
+        return th.arange(
+            action_start_idx, action_start_idx + ControllerView.get_command_dim(base_group_key), device=og.sim.device
+        )
 
     @property
     def base_joint_names(self):
@@ -3830,7 +3858,7 @@ class Robot(USDObject, GymObservable):
             n-array: Indices in low-level control vector corresponding to base joints.
         """
         assert self.is_locomotion
-        return th.tensor([list(self.joints.keys()).index(name) for name in self.base_joint_names])
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.base_joint_names], device=og.sim.device)
 
     @property
     def _default_holonomic_base_joint_controller_config(self):
@@ -3858,7 +3886,8 @@ class Robot(USDObject, GymObservable):
         assert self.is_holonomic_base
         joints = list(self.joints.keys())
         return th.tensor(
-            [joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "z", "rx", "ry", "rz"]]
+            [joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "z", "rx", "ry", "rz"]],
+            device=og.sim.device,
         )
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
@@ -3962,11 +3991,11 @@ class Robot(USDObject, GymObservable):
                 # For translation, we need to convert the command to the robot local frame
                 body_pos = base_joint_pos[:3]
                 body_quat = T.mat2quat(T.euler_intrinsic2mat(base_joint_pos[3:6]))
-                canonical_pos = th.tensor([command[0], command[1], body_pos[2]], dtype=th.float32)
+                canonical_pos = th.tensor([command[0], command[1], body_pos[2]], dtype=th.float32, device=og.sim.device)
                 local_pos = T.relative_pose_transform(
-                    canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), body_pos, body_quat
+                    canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0], device=og.sim.device), body_pos, body_quat
                 )[0]
-                command = th.tensor([local_pos[0], local_pos[1], delta_q])
+                command = th.tensor([local_pos[0], local_pos[1], delta_q], device=og.sim.device)
             action.append(ControllerView.reverse_preprocess_command(group_key, command))
         action = th.cat(action, dim=0)
         assert (
@@ -4030,7 +4059,9 @@ class Robot(USDObject, GymObservable):
             n-array: Indices in low-level control vector corresponding to trunk joints.
         """
         assert self.is_articulated_trunk
-        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
+        return th.tensor(
+            [list(self.joints.keys()).index(name) for name in self.trunk_joint_names], device=og.sim.device
+        )
 
     @property
     def trunk_action_idx(self):
@@ -4040,7 +4071,11 @@ class Robot(USDObject, GymObservable):
             ControllerView.get_command_dim(self._controllers[self.controller_order[i]][0]) for i in range(c_order_idx)
         )
         trunk_group_key = self._controllers["trunk"][0]
-        return th.arange(action_start_idx, action_start_idx + ControllerView.get_command_dim(trunk_group_key))
+        return th.arange(
+            action_start_idx,
+            action_start_idx + ControllerView.get_command_dim(trunk_group_key),
+            device=og.sim.device,
+        )
 
     @property
     def _default_trunk_ik_controller_config(self):
@@ -4056,8 +4091,8 @@ class Robot(USDObject, GymObservable):
             "control_limits": self.control_limits,
             "dof_idx": self.trunk_control_idx,
             "command_output_limits": (
-                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], device=og.sim.device),
+                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], device=og.sim.device),
             ),
             "mode": "pose_delta_ori",
             "smoothing_filter_size": 2,
@@ -4078,8 +4113,8 @@ class Robot(USDObject, GymObservable):
             "control_limits": self.control_limits,
             "dof_idx": self.trunk_control_idx,
             "command_output_limits": (
-                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], device=og.sim.device),
+                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], device=og.sim.device),
             ),
             "mode": "pose_delta_ori",
             "workspace_pose_limiter": None,
@@ -4257,7 +4292,9 @@ class Robot(USDObject, GymObservable):
             n-array: Indices in low-level control vector corresponding to camera joints.
         """
         assert self.is_active_camera
-        return th.tensor([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
+        return th.tensor(
+            [list(self.joints.keys()).index(name) for name in self.camera_joint_names], device=og.sim.device
+        )
 
     @property
     def disabled_collision_link_names(self):

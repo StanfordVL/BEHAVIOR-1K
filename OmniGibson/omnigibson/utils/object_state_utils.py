@@ -287,7 +287,7 @@ def sample_kinematics(
         else:
             aabb_lower, aabb_upper = objA.aabb
             parallel_bbox_center = (aabb_lower + aabb_upper) / 2.0
-            parallel_bbox_orn = th.tensor([0.0, 0.0, 0.0, 1.0])
+            parallel_bbox_orn = th.tensor([0.0, 0.0, 0.0, 1.0], device=parallel_bbox_center.device)
             parallel_bbox_extents = aabb_upper - aabb_lower
 
         sampling_results = sample_cuboid_for_predicate(predicate, objB, parallel_bbox_extents)

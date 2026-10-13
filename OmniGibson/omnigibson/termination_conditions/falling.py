@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
@@ -30,7 +31,7 @@ class Falling(FailureCondition):
         super().__init__()
 
     def _step(self, task, env, action):
-        results = th.zeros(env.num_envs, dtype=th.bool)
+        results = th.zeros(env.num_envs, dtype=th.bool, device=og.sim.device)
         for env_idx in range(env.num_envs):
             robot = env.scenes[env_idx].robots[self._robot_idn]
             pos, quat = robot.get_position_orientation()
@@ -41,7 +42,7 @@ class Falling(FailureCondition):
 
             # Terminate if the robot has toppled over
             if not fell and self._topple:
-                robot_up = T.quat_apply(quat, th.tensor([0, 0, 1], dtype=th.float32))
+                robot_up = T.quat_apply(quat, th.tensor([0, 0, 1], dtype=th.float32, device=quat.device))
                 fell = robot_up[2] < self._tilt_tolerance
 
             results[env_idx] = fell

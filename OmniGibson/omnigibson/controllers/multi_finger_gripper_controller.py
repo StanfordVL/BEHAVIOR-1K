@@ -412,9 +412,9 @@ class MultiFingerGripperController(GripperController):
         # Run super first
         state_flat = super().serialize(state=state, controller_idx=controller_idx)
         filter_flat = (
-            self._vel_filter.serialize(state["vel_filter"], controller_idx)
+            self._vel_filter.serialize(state["vel_filter"], controller_idx).to(state_flat.device)
             if self._vel_filter is not None and state.get("vel_filter") is not None
-            else th.tensor([])
+            else th.tensor([], device=state_flat.device)
         )
         return th.cat([state_flat, filter_flat])
 
